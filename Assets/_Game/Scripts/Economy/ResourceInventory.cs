@@ -25,6 +25,7 @@ namespace WasteCity.Economy
             if (values[id] < before && values[id] < 0) DebtIncreased?.Invoke(Math.Min(amount, -values[id]));
             return true;
         }
+        public bool CanSpend(string id, int amount) => amount >= 0 && Get(id) - amount >= -debtLimit;
         public void Set(string id, int amount) => values[id] = Math.Max(0, Math.Min(capacityPerResource, amount));
         public void AddCapacity(int amount)
         {

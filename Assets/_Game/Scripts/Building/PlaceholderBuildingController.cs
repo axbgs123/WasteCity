@@ -82,6 +82,18 @@ namespace WasteCity.Building
         public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
         public BuildingRuntime FindAtGrid(int x, int y) { foreach(var pair in placements)if(pair.Value.X==x&&pair.Value.Y==y)return pair.Key;return null; }
         public bool TryGetGrid(BuildingRuntime runtime, out int x, out int y) { if(runtime!=null&&placements.TryGetValue(runtime,out var placed)){x=placed.X;y=placed.Y;return true;}x=y=-1;return false; }
+        public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
+        public SpatialTemplateEntry[] CaptureTemplate(int originX, int originY) => placements.Where(pair => pair.Value.X >= originX && pair.Value.Y >= originY && pair.Value.X + pair.Value.Definition.Width <= originX + 3 && pair.Value.Y + pair.Value.Definition.Height <= originY + 3).Select(pair => new SpatialTemplateEntry { definitionId = pair.Value.Definition.Id.Value, dx = pair.Value.X - originX, dy = pair.Value.Y - originY }).ToArray();
+        public bool TryStampTemplate(IReadOnlyList<SpatialTemplateEntry> entries, int originX, int originY)
+        {
+            if (city.Deployment.Mode != CityMode.Fortress || entries == null || entries.Count == 0) return false; var pending=new List<(BuildingDefinition definition,int x,int y)>();var costs=new Dictionary<string,int>();
+            foreach(var entry in entries){var definition=BuildingCatalog.All.FirstOrDefault(value=>value.Id.Value==entry.definitionId);int x=originX+entry.dx,y=originY+entry.dy;if(definition==null||!grid.CanPlace(definition,x,y)||!TemplateResourceCondition(definition,x,y))return false;pending.Add((definition,x,y));costs[definition.CostId]=costs.TryGetValue(definition.CostId,out int cost)?cost+definition.Cost:definition.Cost;}
+            for(int i=0;i<pending.Count;i++)for(int j=i+1;j<pending.Count;j++)if(Overlaps(pending[i],pending[j]))return false;
+            foreach(var cost in costs)if(!economy.Inventory.CanSpend(cost.Key,cost.Value))return false;foreach(var cost in costs)economy.Inventory.TrySpend(cost.Key,cost.Value);
+            foreach(var value in pending)if(grid.TryRestore(value.definition,value.x,value.y,out var placed))CreateRuntime(placed);return true;
+        }
+        private bool TemplateResourceCondition(BuildingDefinition definition,int x,int y){if(!definition.RequiresResourceNode)return true;Vector2 point=new Vector2(city.transform.position.x-8f+x+definition.Width*.5f,city.transform.position.y-6f+y+definition.Height*.5f);int mapX=Mathf.FloorToInt(point.x+world.Model.Width*.5f),mapY=Mathf.FloorToInt(point.y+world.Model.Height*.5f);return mapX>=0&&mapY>=0&&mapX<world.Model.Width&&mapY<world.Model.Height&&world.Model.Get(mapX,mapY).HasResource;}
+        private static bool Overlaps((BuildingDefinition definition,int x,int y) a,(BuildingDefinition definition,int x,int y) b)=>a.x<b.x+b.definition.Width&&a.x+a.definition.Width>b.x&&a.y<b.y+b.definition.Height&&a.y+a.definition.Height>b.y;
         public void RestoreSnapshots(BuildingSnapshot[] snapshots)
         {
             foreach (var runtime in placements.Keys.ToArray()) { runtime.PrepareForRestore(); Destroy(runtime.gameObject); }

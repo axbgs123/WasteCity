@@ -74,5 +74,12 @@ namespace WasteCity.Building
             for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++) cells[x + dx, y + dy] = placed;
             Count++; return true;
         }
+        public bool CanPlace(BuildingDefinition definition, int x, int y)
+        {
+            if (definition == null) return false;
+            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++)
+            { int px=x+dx,py=y+dy;if(px<0||py<0||px>=cells.GetLength(0)||py>=cells.GetLength(1)||cells[px,py]!=null)return false; }
+            return true;
+        }
     }
 }
