@@ -15,5 +15,6 @@ namespace WasteCity.Population
         }
         public void AddPeople(int amount) => Current = Math.Max(0, Current + amount);
         public void AddCapacity(int amount) => Capacity = Math.Max(0, Capacity + amount);
+        public void Restore(int current, int capacity) { Current = Math.Max(0, current); Capacity = Math.Max(0, capacity); }
     }
 }

@@ -10,5 +10,6 @@ namespace WasteCity.Population
         private void Awake() => Model = new PopulationModel();
         public void AddPeople(int amount) => Model.AddPeople(amount);
         public void AddCapacity(int amount) => Model.AddCapacity(amount);
+        public void Restore(int current, int capacity) => Model.Restore(current, capacity);
     }
 }
