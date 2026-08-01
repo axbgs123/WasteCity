@@ -25,6 +25,7 @@ namespace WasteCity.Building
         public int PlacedCount => grid.Count;
         public event Action<BuildingDefinition> BuildingPlaced;
         public event Action<BuildingDefinition> BuildingRemoved;
+        public string LastAction { get; private set; }
         private void Update()
         {
             if (Keyboard.current != null)
@@ -40,6 +41,7 @@ namespace WasteCity.Building
                 if (Keyboard.current.digit8Key.wasPressedThisFrame) selected = 7;
             }
             if (active && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) PlaceAtMouse();
+            if (Mouse.current != null && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) TryRepairAtMouse();
             if (city.Deployment.Mode != CityMode.Fortress) active = false;
         }
         private void PlaceAtMouse()
@@ -52,7 +54,7 @@ namespace WasteCity.Building
             if (!grid.TryPlace(BuildingCatalog.All[selected], gridX, gridY, economy.Inventory, resource, out var placed)) return;
             CreateRuntime(placed);
         }
-        private BuildingRuntime CreateRuntime(PlacedBuilding placed, int health = -1, float remaining = -1f)
+        private BuildingRuntime CreateRuntime(PlacedBuilding placed, int health = -1, float remaining = -1f, float repairRemaining = 0f)
         {
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), Vector2.one * 0.5f, 1f);
             var item = new GameObject($"Placeholder_{placed.Definition.Name}"); item.transform.SetParent(transform);
@@ -62,7 +64,7 @@ namespace WasteCity.Building
             item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population);
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;
-            if (health >= 0) runtime.RestoreState(health, remaining);
+            if (health >= 0) runtime.RestoreState(health, remaining, repairRemaining);
             return runtime;
         }
         private static Color ColorFor(string id) => id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
@@ -72,7 +74,7 @@ namespace WasteCity.Building
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); }
-        public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, constructionRemaining = pair.Key.Construction.Remaining }).ToArray();
+        public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
         public void RestoreSnapshots(BuildingSnapshot[] snapshots)
         {
             foreach (var runtime in placements.Keys.ToArray()) { runtime.PrepareForRestore(); Destroy(runtime.gameObject); }
@@ -81,14 +83,22 @@ namespace WasteCity.Building
             foreach (var snapshot in snapshots)
             {
                 var definition = BuildingCatalog.All.FirstOrDefault(value => value.Id.Value == snapshot.definitionId);
-                if (definition != null && grid.TryRestore(definition, snapshot.x, snapshot.y, out var placed)) CreateRuntime(placed, snapshot.health, snapshot.constructionRemaining);
+                if (definition != null && grid.TryRestore(definition, snapshot.x, snapshot.y, out var placed)) CreateRuntime(placed, snapshot.health, snapshot.constructionRemaining, snapshot.repairRemaining);
             }
+        }
+        private void TryRepairAtMouse()
+        {
+            Vector2 point = Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue()); BuildingRuntime nearest = null; float best = 2.25f;
+            foreach (var runtime in placements.Keys) { float sqr = ((Vector2)runtime.transform.position - point).sqrMagnitude; if (sqr < best) { best = sqr; nearest = runtime; } }
+            if (nearest == null) { LastAction = "维修：请将鼠标指向受损建筑"; return; }
+            LastAction = nearest.TryStartRepair() ? $"维修开始：{nearest.Definition.Name} · 生物质 -1" : "维修无法开始：建筑未受损、施工中、已在维修或生物质不足";
         }
         private void OnGUI()
         {
             if (active) GUI.Box(new Rect(18, Screen.height - 72f, 780f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name} · 左键放置");
+            if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
         }
     }
     [Serializable]
-    public sealed class BuildingSnapshot { public string definitionId; public int x, y, health; public float constructionRemaining; }
+    public sealed class BuildingSnapshot { public string definitionId; public int x, y, health; public float constructionRemaining, repairRemaining; }
 }

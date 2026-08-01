@@ -18,6 +18,7 @@ namespace WasteCity.Building
         private SpriteRenderer visual;
         private bool suppressRemoval;
         public ConstructionProgress Construction { get; private set; }
+        public RepairProcess Repair { get; private set; }
         public event Action<BuildingRuntime> Completed;
         public event Action<BuildingRuntime> Removed;
         public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null)
@@ -30,12 +31,17 @@ namespace WasteCity.Building
         }
         private void Update()
         {
-            if (Construction == null || Construction.IsComplete) return;
-            if (!Construction.Tick(Time.deltaTime, productivity?.ConstructionMultiplier ?? 1f)) return;
-            FinishConstruction();
+            float multiplier = productivity?.ConstructionMultiplier ?? 1f;
+            if (Construction != null && !Construction.IsComplete) { if (Construction.Tick(Time.deltaTime, multiplier)) FinishConstruction(); return; }
+            if (Repair != null && !Repair.IsComplete && Repair.Tick(Time.deltaTime, multiplier)) { Health.Value.Heal(Repair.HealAmount); Repair = null; }
         }
         private void FinishConstruction() { if (effectApplied) return; ApplyEffect(1); effectApplied = true; if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this); }
-        public void RestoreState(int health, float remaining) { Health.Value.Restore(health); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); }
+        public bool TryStartRepair()
+        {
+            if (!Construction.IsComplete || Repair != null || Health.Value.Current >= Health.Value.Maximum || economy == null || !economy.Inventory.TrySpend(ResourceIds.Biomass, 1)) return false;
+            Repair = new RepairProcess(); return true;
+        }
+        public void RestoreState(int health, float remaining, float repairRemaining = 0f) { Health.Value.Restore(health); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); if (repairRemaining > 0f) { Repair = new RepairProcess(); Repair.Restore(repairRemaining); } }
         public void PrepareForRestore() { if (effectApplied) { ApplyEffect(-1); effectApplied = false; } Removed?.Invoke(this); suppressRemoval = true; }
         private void OnDestroy() { if (effectApplied) ApplyEffect(-1); if (!suppressRemoval) Removed?.Invoke(this); }
         private void ApplyEffect(int direction)

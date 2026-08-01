@@ -16,5 +16,6 @@ namespace WasteCity.Combat
             if (amount <= 0) return 0; Current -= amount; Damaged?.Invoke(amount); if (IsDead) Died?.Invoke(); return amount;
         }
         public void Restore(int current) => Current = Math.Max(1, Math.Min(Maximum, current));
+        public int Heal(int amount) { if (amount <= 0 || IsDead) return 0; int accepted = Math.Min(amount, Maximum - Current); Current += accepted; return accepted; }
     }
 }
