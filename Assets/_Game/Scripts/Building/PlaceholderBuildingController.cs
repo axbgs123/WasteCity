@@ -8,6 +8,7 @@ using WasteCity.Combat;
 using WasteCity.Population;
 using System.Collections.Generic;
 using System.Linq;
+using WasteCity.Legacy;
 
 namespace WasteCity.Building
 {
@@ -22,7 +23,9 @@ namespace WasteCity.Building
         private int selected;
         private static Sprite square;
         private readonly Dictionary<BuildingRuntime, PlacedBuilding> placements = new Dictionary<BuildingRuntime, PlacedBuilding>();
+        [SerializeField] private LocalHasteController localTime;
         public int PlacedCount => grid.Count;
+        public bool HasLocalTimeSource => localTime != null;
         public event Action<BuildingDefinition> BuildingPlaced;
         public event Action<BuildingDefinition> BuildingRemoved;
         public string LastAction { get; private set; }
@@ -61,7 +64,7 @@ namespace WasteCity.Building
             item.transform.position = new Vector3(city.transform.position.x - 8f + placed.X + placed.Definition.Width * 0.5f, city.transform.position.y - 6f + placed.Y + placed.Definition.Height * 0.5f, -1f);
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = ColorFor(placed.Definition.Id.Value);
-            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population);
+            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime);
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;
             if (health >= 0) runtime.RestoreState(health, remaining, repairRemaining);
@@ -70,11 +73,15 @@ namespace WasteCity.Building
         private static Color ColorFor(string id) => id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
         private void OnCompleted(BuildingRuntime runtime)
         {
-            if (runtime.Definition.Id.Value == "core.building.machine-gun-turret") runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy);
+            if (runtime.Definition.Id.Value == "core.building.machine-gun-turret") runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); }
         public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
+        public void SetLocalTimeSource(LocalHasteController value) { localTime = value; foreach (var runtime in placements.Keys) runtime.SetLocalTimeSource(value); }
+        public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
+        public BuildingRuntime FindAtGrid(int x, int y) { foreach(var pair in placements)if(pair.Value.X==x&&pair.Value.Y==y)return pair.Key;return null; }
+        public bool TryGetGrid(BuildingRuntime runtime, out int x, out int y) { if(runtime!=null&&placements.TryGetValue(runtime,out var placed)){x=placed.X;y=placed.Y;return true;}x=y=-1;return false; }
         public void RestoreSnapshots(BuildingSnapshot[] snapshots)
         {
             foreach (var runtime in placements.Keys.ToArray()) { runtime.PrepareForRestore(); Destroy(runtime.gameObject); }
