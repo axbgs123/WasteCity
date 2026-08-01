@@ -32,6 +32,11 @@ namespace WasteCity.Editor
             var systems = new GameObject("FormalGameBootstrap");
             var bootstrap = systems.AddComponent<FormalGameBootstrap>();
             var data = new SerializedObject(bootstrap); data.FindProperty("worldView").objectReferenceValue = worldView; data.ApplyModifiedPropertiesWithoutUndo();
+            var exploration = systems.AddComponent<WorldExplorationController>();
+            var explorationData = new SerializedObject(exploration);
+            explorationData.FindProperty("world").objectReferenceValue = worldView;
+            explorationData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
+            explorationData.ApplyModifiedPropertiesWithoutUndo();
             new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
