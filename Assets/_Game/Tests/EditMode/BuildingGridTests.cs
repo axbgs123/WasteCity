@@ -23,5 +23,13 @@ namespace WasteCity.Tests
             Assert.That(grid.TryPlace(BuildingCatalog.All[0], 0, 0, inventory, false, out _), Is.False);
             Assert.That(grid.TryPlace(BuildingCatalog.All[0], 0, 0, inventory, true, out _), Is.True);
         }
+        [Test]
+        public void RemovingDestroyedBuildingReleasesItsCells()
+        {
+            var inventory = new ResourceInventory(100); inventory.Add(ResourceIds.Alloy, 40); var grid = new BuildingGrid(8, 8);
+            Assert.That(grid.TryPlace(BuildingCatalog.All[1], 1, 1, inventory, false, out var placed), Is.True);
+            Assert.That(grid.Remove(placed), Is.True); Assert.That(grid.Count, Is.Zero);
+            Assert.That(grid.TryPlace(BuildingCatalog.All[1], 1, 1, inventory, false, out _), Is.True);
+        }
     }
 }

@@ -1,10 +1,12 @@
 using UnityEngine;
+using WasteCity.Building;
 
 namespace WasteCity.Population
 {
-    public sealed class FormalPopulationController : MonoBehaviour
+    public sealed class FormalPopulationController : MonoBehaviour, IProductivitySource
     {
         public PopulationModel Model { get; private set; }
+        public float ConstructionMultiplier => Model == null ? 1f : Model.ProductivityMultiplier;
         private void Awake() => Model = new PopulationModel();
         public void AddPeople(int amount) => Model.AddPeople(amount);
         public void AddCapacity(int amount) => Model.AddCapacity(amount);

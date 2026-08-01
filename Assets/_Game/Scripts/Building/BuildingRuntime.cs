@@ -2,6 +2,7 @@ using UnityEngine;
 using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Population;
+using System;
 
 namespace WasteCity.Building
 {
@@ -13,15 +14,26 @@ namespace WasteCity.Building
         private FormalEconomyController economy;
         private FormalPopulationController population;
         private bool effectApplied;
-        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null)
+        private IProductivitySource productivity;
+        private SpriteRenderer visual;
+        public ConstructionProgress Construction { get; private set; }
+        public event Action<BuildingRuntime> Completed;
+        public event Action<BuildingRuntime> Removed;
+        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null)
         {
-            Definition = definition; this.economy = economy; this.population = population; Health = GetComponent<HealthComponent>();
-            int hp = definition.Id.Value == "core.building.wall" ? 500 : definition.Id.Value == "core.building.machine-gun-turret" ? 250 : 300;
-            Health.Configure(hp, definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
+            Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
+            Health.Configure(definition.MaximumHealth, definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
             Health.Value.Died += () => Destroy(gameObject);
-            ApplyEffect(1); effectApplied = true;
+            Construction = new ConstructionProgress(definition.BuildSeconds);
+            if (visual != null) visual.color = Color.Lerp(visual.color, Color.gray, .65f);
         }
-        private void OnDestroy() { if (effectApplied) ApplyEffect(-1); }
+        private void Update()
+        {
+            if (Construction == null || Construction.IsComplete) return;
+            if (!Construction.Tick(Time.deltaTime, productivity?.ConstructionMultiplier ?? 1f)) return;
+            ApplyEffect(1); effectApplied = true; if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this);
+        }
+        private void OnDestroy() { if (effectApplied) ApplyEffect(-1); Removed?.Invoke(this); }
         private void ApplyEffect(int direction)
         {
             if (Definition.Id.Value == "core.building.housing") population?.AddCapacity(50 * direction);
@@ -37,7 +49,7 @@ namespace WasteCity.Building
         private void Update()
         {
             if (economy == null) return; HealthComponent nearest = null; float best = 100f;
-            foreach (var enemy in Object.FindObjectsOfType<PlaceholderEnemy>())
+            foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
             if (nearest != null) weapon.Tick(Time.deltaTime, economy.Inventory, nearest.Value, nearest.Armor);
         }

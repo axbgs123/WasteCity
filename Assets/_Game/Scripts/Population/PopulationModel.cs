@@ -8,7 +8,7 @@ namespace WasteCity.Population
         public int Capacity { get; private set; }
         public int EffectiveWorkers => Math.Min(Current, Capacity);
         public int Waiting => Math.Max(0, Current - Capacity);
-        public float ProductivityMultiplier => .5f + EffectiveWorkers * .005f;
+        public float ProductivityMultiplier => Math.Min(2.5f, .5f + EffectiveWorkers * .005f);
         public PopulationModel(int current = 100, int capacity = 150)
         {
             Current = Math.Max(0, current); Capacity = Math.Max(0, capacity);
