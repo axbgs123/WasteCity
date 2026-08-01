@@ -78,6 +78,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("cityHealth").objectReferenceValue = cityHealth;
             combatData.FindProperty("city").objectReferenceValue = city.transform;
             combatData.FindProperty("progression").objectReferenceValue = progression;
+            combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
             var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.ApplyModifiedPropertiesWithoutUndo();

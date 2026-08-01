@@ -4,6 +4,7 @@ using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.World;
 using System;
+using WasteCity.Combat;
 
 namespace WasteCity.Building
 {
@@ -47,6 +48,8 @@ namespace WasteCity.Building
             item.transform.position = new Vector3(city.transform.position.x - 8f + placed.X + placed.Definition.Width * 0.5f, city.transform.position.y - 6f + placed.Y + placed.Definition.Height * 0.5f, -1f);
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = selected == 0 ? Color.yellow : selected == 1 ? Color.cyan : selected == 2 ? Color.gray : selected == 3 ? Color.magenta : selected == 4 ? new Color(.8f,.3f,.1f) : selected == 5 ? Color.blue : Color.white;
+            item.AddComponent<HealthComponent>(); item.AddComponent<BuildingRuntime>().Configure(placed.Definition);
+            if (placed.Definition.Id.Value == "core.building.machine-gun-turret") item.AddComponent<PlaceholderTurret>().Configure(economy);
             BuildingPlaced?.Invoke(placed.Definition);
         }
         private void OnGUI()

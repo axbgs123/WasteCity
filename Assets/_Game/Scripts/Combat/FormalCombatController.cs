@@ -1,5 +1,6 @@
 using UnityEngine;
 using WasteCity.Progression;
+using WasteCity.Economy;
 
 namespace WasteCity.Combat
 {
@@ -8,6 +9,7 @@ namespace WasteCity.Combat
         [SerializeField] private HealthComponent cityHealth;
         [SerializeField] private Transform city;
         [SerializeField] private FormalProgressionController progression;
+        [SerializeField] private FormalEconomyController economy;
         private float defenseRemainder;
         public int SpawnedEnemies { get; private set; }
         private static Sprite square;
@@ -30,7 +32,7 @@ namespace WasteCity.Combat
             float angle=(slot*47f+threshold)*Mathf.Deg2Rad; var item=new GameObject(heavy?"PlaceholderHeavyEnemy":"PlaceholderEnemy");
             item.transform.position=(Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f; item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
-            var health=item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy);SpawnedEnemies++;
+            item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy,economy.Inventory);SpawnedEnemies++;
         }
     }
 }
