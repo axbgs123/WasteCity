@@ -9,6 +9,7 @@ using WasteCity.World;
 using WasteCity.Economy;
 using WasteCity.Legacy;
 using WasteCity.Building;
+using WasteCity.Research;
 
 namespace WasteCity.Editor
 {
@@ -46,6 +47,8 @@ namespace WasteCity.Editor
             economyData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
             economyData.FindProperty("world").objectReferenceValue = worldView;
             economyData.ApplyModifiedPropertiesWithoutUndo();
+            var research = systems.AddComponent<ResearchController>();
+            var researchData = new SerializedObject(research); researchData.FindProperty("economy").objectReferenceValue = economy; researchData.ApplyModifiedPropertiesWithoutUndo();
             var buildingRoot = new GameObject("PlaceholderBuildings");
             var buildingController = buildingRoot.AddComponent<PlaceholderBuildingController>();
             var buildingData = new SerializedObject(buildingController);
