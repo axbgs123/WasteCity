@@ -39,6 +39,8 @@ namespace WasteCity.World
             for (int x = 0; x < width; x++) for (int y = 0; y < height; y++)
                 tileRenderers[x, y].color = Model.IsRevealed(x, y) ? TerrainColor(Model.Get(x, y).Terrain) : new Color(0.025f, 0.03f, 0.035f);
         }
+        public void Restore(int[] amounts, bool[] visibility) { if(Model!=null&&Model.Restore(amounts,visibility))RefreshVisibility(); }
+        public void RefreshVisibility(){if(Model==null||tileRenderers==null)return;for(int x=0;x<width;x++)for(int y=0;y<height;y++)tileRenderers[x,y].color=Model.IsRevealed(x,y)?TerrainColor(Model.Get(x,y).Terrain):new Color(0.025f,0.03f,0.035f);}
 
         private static Color TerrainColor(TerrainKind terrain)
         {

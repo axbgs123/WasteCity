@@ -59,6 +59,13 @@ namespace WasteCity.World
             cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested);
             return harvested;
         }
+        public int[] CaptureResourceAmounts() { var result=new int[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=cells[x,y].ResourceAmount;return result; }
+        public bool[] CaptureRevealed() { var result=new bool[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=revealed[x,y];return result; }
+        public bool Restore(int[] amounts, bool[] visibility)
+        {
+            if(amounts==null||visibility==null||amounts.Length!=Width*Height||visibility.Length!=Width*Height)return false;
+            for(int y=0;y<Height;y++)for(int x=0;x<Width;x++){int index=y*Width+x;var cell=cells[x,y];cells[x,y]=new WorldCell(cell.Terrain,cell.ResourceId,Math.Max(0,amounts[index]));revealed[x,y]=visibility[index];}return true;
+        }
 
         private static string RollResource(int roll, TerrainKind terrain)
         {
