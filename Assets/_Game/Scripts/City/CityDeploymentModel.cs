@@ -10,6 +10,7 @@ namespace WasteCity.City
         private readonly float packDuration;
         private float remaining;
         public CityMode Mode { get; private set; } = CityMode.Mobile;
+        public float Remaining => remaining;
         public float Progress => Mode == CityMode.Deploying ? 1f - remaining / deployDuration : Mode == CityMode.Packing ? 1f - remaining / packDuration : 1f;
         public event Action<CityMode> Changed;
 
@@ -27,5 +28,6 @@ namespace WasteCity.City
             remaining -= Math.Max(0f, delta); if (remaining > 0f) return;
             Mode = Mode == CityMode.Deploying ? CityMode.Fortress : CityMode.Mobile; Changed?.Invoke(Mode);
         }
+        public void Restore(CityMode mode,float remainingSeconds){Mode=Enum.IsDefined(typeof(CityMode),mode)?mode:CityMode.Mobile;remaining=(Mode==CityMode.Deploying||Mode==CityMode.Packing)?Math.Max(.001f,remainingSeconds):0f;Changed?.Invoke(Mode);}
     }
 }

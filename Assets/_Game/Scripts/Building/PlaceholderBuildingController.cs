@@ -72,7 +72,7 @@ namespace WasteCity.Building
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = ColorFor(placed.Definition.Id.Value);
             VisualSlot.Attach(item, placed.Definition.Id.Value, renderer, renderer.color);
-            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime);
+            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime, city);
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;
             if (health >= 0) runtime.RestoreState(health, remaining, repairRemaining);

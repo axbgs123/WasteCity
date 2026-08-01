@@ -3,6 +3,7 @@ using WasteCity.Progression;
 using WasteCity.Economy;
 using System;
 using WasteCity.Presentation;
+using WasteCity.City;
 
 namespace WasteCity.Combat
 {
@@ -12,6 +13,7 @@ namespace WasteCity.Combat
         [SerializeField] private Transform city;
         [SerializeField] private FormalProgressionController progression;
         [SerializeField] private FormalEconomyController economy;
+        [SerializeField] private PlaceholderMobileCity cityState;
         private float defenseRemainder;
         public int SpawnedEnemies { get; private set; }
         public event Action<bool> EnemyDefeated;
@@ -21,7 +23,7 @@ namespace WasteCity.Combat
         {
             PlaceholderEnemy nearest = null; float best = 25f;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>()) { float sqr = ((Vector2)(enemy.transform.position - city.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = enemy; } }
-            if (nearest == null) return; defenseRemainder += 8f * Time.deltaTime; int damage = Mathf.FloorToInt(defenseRemainder);
+            if (nearest == null) return; defenseRemainder += 8f * CityOperationalRules.DefenseMultiplier(cityState.Deployment.Mode) * Time.deltaTime; int damage = Mathf.FloorToInt(defenseRemainder);
             if (damage > 0) { var health = nearest.GetComponent<HealthComponent>(); health.Value.Apply(damage, DamageType.Physical, health.Armor); defenseRemainder -= damage; }
         }
         private void OnThreshold(int threshold)

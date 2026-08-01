@@ -11,6 +11,7 @@ namespace WasteCity.City
         private Vector2 input;
         private CityDeploymentModel deployment;
         public CityDeploymentModel Deployment => deployment;
+        public bool LongWorkAllowed => deployment != null && CityOperationalRules.LongWorkAllowed(deployment.Mode);
         private void Awake() { body = GetComponent<Rigidbody2D>(); deployment = new CityDeploymentModel(3f, 5f); }
         private void Update()
         {
@@ -22,5 +23,6 @@ namespace WasteCity.City
                 (Keyboard.current.wKey.isPressed ? 1 : 0) - (Keyboard.current.sKey.isPressed ? 1 : 0)).normalized;
         }
         private void FixedUpdate() => body.MovePosition(body.position + input * moveSpeed * Time.fixedDeltaTime);
+        public void RestoreDeployment(CityMode mode,float remaining)=>deployment.Restore(mode,remaining);
     }
 }

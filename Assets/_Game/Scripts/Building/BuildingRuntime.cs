@@ -3,6 +3,7 @@ using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Population;
 using System;
+using WasteCity.City;
 
 namespace WasteCity.Building
 {
@@ -19,14 +20,15 @@ namespace WasteCity.Building
         private SpriteRenderer visual;
         private bool suppressRemoval;
         private ILocalTimeScaleSource localTime;
+        private PlaceholderMobileCity city;
         public ConstructionProgress Construction { get; private set; }
         public RepairProcess Repair { get; private set; }
         public bool HasLogistics { get; private set; } = true;
         public event Action<BuildingRuntime> Completed;
         public event Action<BuildingRuntime> Removed;
-        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null, ILocalTimeScaleSource localTime = null)
+        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null, ILocalTimeScaleSource localTime = null, PlaceholderMobileCity city = null)
         {
-            Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; this.localTime = localTime; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
+            Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; this.localTime = localTime; this.city=city; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
             Health.Configure(definition.MaximumHealth, definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
             Health.Value.Died += () => Destroy(gameObject);
             Construction = new ConstructionProgress(definition.BuildSeconds);
@@ -34,6 +36,7 @@ namespace WasteCity.Building
         }
         private void Update()
         {
+            if(city!=null&&!city.LongWorkAllowed)return;
             float multiplier = (productivity?.ConstructionMultiplier ?? 1f) * (localTime?.MultiplierFor(this) ?? 1f);
             if (Construction != null && !Construction.IsComplete) { if (Construction.Tick(Time.deltaTime, multiplier)) FinishConstruction(); return; }
             if (Repair != null && !Repair.IsComplete && Repair.Tick(Time.deltaTime, multiplier)) { Health.Value.Heal(Repair.HealAmount); Repair = null; }

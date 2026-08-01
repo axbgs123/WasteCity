@@ -78,10 +78,11 @@ namespace WasteCity.Editor
             buildingData.FindProperty("population").objectReferenceValue = population;
             buildingData.FindProperty("research").objectReferenceValue = research;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
-            researchData.FindProperty("buildings").objectReferenceValue = buildingController; researchData.ApplyModifiedPropertiesWithoutUndo(); saveData.FindProperty("research").objectReferenceValue = research; saveData.ApplyModifiedPropertiesWithoutUndo();
+            researchData.FindProperty("buildings").objectReferenceValue = buildingController; researchData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>(); researchData.ApplyModifiedPropertiesWithoutUndo(); saveData.FindProperty("research").objectReferenceValue = research; saveData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("buildings").objectReferenceValue = buildingController; saveData.ApplyModifiedPropertiesWithoutUndo();
             var production = systems.AddComponent<TechnologyProductionController>();
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
+            productionData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();productionData.ApplyModifiedPropertiesWithoutUndo();
             var progression = systems.AddComponent<FormalProgressionController>();
             var progressionData = new SerializedObject(progression);
             progressionData.FindProperty("research").objectReferenceValue = research;
@@ -95,6 +96,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("city").objectReferenceValue = city.transform;
             combatData.FindProperty("progression").objectReferenceValue = progression;
             combatData.FindProperty("economy").objectReferenceValue = economy;
+            combatData.FindProperty("cityState").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();
             combatData.ApplyModifiedPropertiesWithoutUndo();
             var rescueSites = systems.AddComponent<RescueSiteController>(); var rescueData = new SerializedObject(rescueSites); rescueData.FindProperty("world").objectReferenceValue = worldView; rescueData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); rescueData.FindProperty("economy").objectReferenceValue = economy; rescueData.FindProperty("population").objectReferenceValue = population; rescueData.FindProperty("progression").objectReferenceValue = progression; rescueData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("rescueSites").objectReferenceValue = rescueSites; saveData.ApplyModifiedPropertiesWithoutUndo();
