@@ -27,6 +27,9 @@ namespace WasteCity.Building
                 if (Keyboard.current.digit2Key.wasPressedThisFrame) selected = 1;
                 if (Keyboard.current.digit3Key.wasPressedThisFrame) selected = 2;
                 if (Keyboard.current.digit4Key.wasPressedThisFrame) selected = 3;
+                if (Keyboard.current.digit5Key.wasPressedThisFrame) selected = 4;
+                if (Keyboard.current.digit6Key.wasPressedThisFrame) selected = 5;
+                if (Keyboard.current.digit7Key.wasPressedThisFrame) selected = 6;
             }
             if (active && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) PlaceAtMouse();
             if (city.Deployment.Mode != CityMode.Fortress) active = false;
@@ -43,12 +46,12 @@ namespace WasteCity.Building
             var item = new GameObject($"Placeholder_{placed.Definition.Name}"); item.transform.SetParent(transform);
             item.transform.position = new Vector3(city.transform.position.x - 8f + placed.X + placed.Definition.Width * 0.5f, city.transform.position.y - 6f + placed.Y + placed.Definition.Height * 0.5f, -1f);
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
-            var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = selected == 0 ? Color.yellow : selected == 1 ? Color.cyan : selected == 2 ? Color.gray : Color.magenta;
+            var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = selected == 0 ? Color.yellow : selected == 1 ? Color.cyan : selected == 2 ? Color.gray : selected == 3 ? Color.magenta : selected == 4 ? new Color(.8f,.3f,.1f) : selected == 5 ? Color.blue : Color.white;
             BuildingPlaced?.Invoke(placed.Definition);
         }
         private void OnGUI()
         {
-            if (active) GUI.Box(new Rect(18, Screen.height - 72f, 520f, 52f), $"建造占位模式：1采矿站 2仓库 3城墙 4研究站 · 当前 {BuildingCatalog.All[selected].Name} · 左键放置");
+            if (active) GUI.Box(new Rect(18, Screen.height - 72f, 700f, 52f), $"建造：1采矿 2仓库 3墙 4研究 5冶炼 6装配 7机枪塔 · 当前 {BuildingCatalog.All[selected].Name} · 左键放置");
         }
     }
 }

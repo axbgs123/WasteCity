@@ -7,6 +7,8 @@ namespace WasteCity.Economy
         public const string Stone = "core.resource.stone";
         public const string Biomass = "core.resource.biomass";
         public const string Water = "core.resource.water";
+        public const string Alloy = "technology.resource.alloy";
+        public const string Ammunition = "technology.resource.ammunition";
         public static readonly string[] All = { Iron, EnergyCrystal, Stone, Biomass, Water };
     }
 }

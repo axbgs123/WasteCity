@@ -66,6 +66,8 @@ namespace WasteCity.Editor
             buildingData.FindProperty("economy").objectReferenceValue = economy;
             buildingData.FindProperty("world").objectReferenceValue = worldView;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
+            var production = systems.AddComponent<TechnologyProductionController>();
+            var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
             var progression = systems.AddComponent<FormalProgressionController>();
             var progressionData = new SerializedObject(progression);
             progressionData.FindProperty("research").objectReferenceValue = research;
