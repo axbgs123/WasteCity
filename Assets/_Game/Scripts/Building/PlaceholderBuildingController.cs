@@ -19,7 +19,9 @@ namespace WasteCity.Building
         [SerializeField] private FormalEconomyController economy;
         [SerializeField] private PlaceholderWorldView world;
         [SerializeField] private FormalPopulationController population;
-        private BuildingGrid grid = new BuildingGrid(16, 12);
+        private const int GridWidth=32,GridHeight=24;
+        private BuildingGrid grid = new BuildingGrid(GridWidth, GridHeight);
+        private readonly LogisticsNetworkModel logistics = new LogisticsNetworkModel();
         private bool active;
         private int selected;
         private static Sprite square;
@@ -27,6 +29,7 @@ namespace WasteCity.Building
         [SerializeField] private LocalHasteController localTime;
         public int PlacedCount => grid.Count;
         public bool HasLocalTimeSource => localTime != null;
+        public int DisconnectedCount => placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&!runtime.HasLogistics);
         public event Action<BuildingDefinition> BuildingPlaced;
         public event Action<BuildingDefinition> BuildingRemoved;
         public string LastAction { get; private set; }
@@ -70,15 +73,17 @@ namespace WasteCity.Building
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;
             if (health >= 0) runtime.RestoreState(health, remaining, repairRemaining);
+            RefreshLogistics();
             return runtime;
         }
         private static Color ColorFor(string id) => id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
         private void OnCompleted(BuildingRuntime runtime)
         {
+            RefreshLogistics();
             if (runtime.Definition.Id.Value == "core.building.machine-gun-turret") runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
-        private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); }
+        private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
         public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
         public void SetLocalTimeSource(LocalHasteController value) { localTime = value; foreach (var runtime in placements.Keys) runtime.SetLocalTimeSource(value); }
         public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
@@ -99,7 +104,7 @@ namespace WasteCity.Building
         public void RestoreSnapshots(BuildingSnapshot[] snapshots)
         {
             foreach (var runtime in placements.Keys.ToArray()) { runtime.PrepareForRestore(); Destroy(runtime.gameObject); }
-            placements.Clear(); grid = new BuildingGrid(16, 12);
+            placements.Clear(); grid = new BuildingGrid(GridWidth, GridHeight);
             if (snapshots == null) return;
             foreach (var snapshot in snapshots)
             {
@@ -114,10 +119,16 @@ namespace WasteCity.Building
             if (nearest == null) { LastAction = "维修：请将鼠标指向受损建筑"; return; }
             LastAction = nearest.TryStartRepair() ? $"维修开始：{nearest.Definition.Name} · 生物质 -1" : "维修无法开始：建筑未受损、施工中、已在维修或生物质不足";
         }
+        private void RefreshLogistics()
+        {
+            var points=placements.Where(pair=>pair.Key.Construction!=null&&pair.Key.Construction.IsComplete).Select(pair=>new LogisticsPoint(pair.Key.GetInstanceID().ToString(),pair.Value.X+pair.Value.Definition.Width/2,pair.Value.Y+pair.Value.Definition.Height/2)).ToArray();logistics.Rebuild(points);
+            foreach(var pair in placements)pair.Key.SetLogistics(pair.Key.Construction!=null&&pair.Key.Construction.IsComplete&&logistics.IsConnected(pair.Key.GetInstanceID().ToString()));
+        }
         private void OnGUI()
         {
             if (active) GUI.Box(new Rect(18, Screen.height - 72f, 780f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name} · 左键放置");
             if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
+            if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }
     }
     [Serializable]
