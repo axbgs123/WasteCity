@@ -1,0 +1,5 @@
+{
+  "name": "WasteCity.PlayModeTests",
+  "references": ["WasteCity.Game"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

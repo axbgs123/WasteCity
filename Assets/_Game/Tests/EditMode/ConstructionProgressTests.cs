@@ -14,5 +14,7 @@ namespace WasteCity.Tests
         { var people = new PopulationModel(1000, 1000); Assert.That(people.ProductivityMultiplier, Is.EqualTo(2.5f)); }
         [Test] public void BuildingCatalogCarriesFormalBuildTimeAndHealth()
         { Assert.That(BuildingCatalog.All[1].BuildSeconds, Is.EqualTo(5f)); Assert.That(BuildingCatalog.All[1].MaximumHealth, Is.EqualTo(250)); Assert.That(BuildingCatalog.All[7].BuildSeconds, Is.EqualTo(10f)); }
+        [Test] public void RemainingConstructionTimeCanBeRestored()
+        { var job = new ConstructionProgress(10f); job.Restore(2.5f); Assert.That(job.Remaining, Is.EqualTo(2.5f)); Assert.That(job.Normalized, Is.EqualTo(.75f)); }
     }
 }

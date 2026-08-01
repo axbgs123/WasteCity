@@ -65,6 +65,7 @@ namespace WasteCity.Editor
             saveData.FindProperty("cityHealth").objectReferenceValue = cityHealth;
             saveData.ApplyModifiedPropertiesWithoutUndo();
             var buildingRoot = new GameObject("PlaceholderBuildings");
+            buildingRoot.transform.SetParent(city.transform, true);
             var buildingController = buildingRoot.AddComponent<PlaceholderBuildingController>();
             var buildingData = new SerializedObject(buildingController);
             buildingData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
@@ -72,6 +73,7 @@ namespace WasteCity.Editor
             buildingData.FindProperty("world").objectReferenceValue = worldView;
             buildingData.FindProperty("population").objectReferenceValue = population;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
+            saveData.FindProperty("buildings").objectReferenceValue = buildingController; saveData.ApplyModifiedPropertiesWithoutUndo();
             var production = systems.AddComponent<TechnologyProductionController>();
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
             var progression = systems.AddComponent<FormalProgressionController>();

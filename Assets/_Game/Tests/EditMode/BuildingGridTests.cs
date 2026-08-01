@@ -31,5 +31,13 @@ namespace WasteCity.Tests
             Assert.That(grid.Remove(placed), Is.True); Assert.That(grid.Count, Is.Zero);
             Assert.That(grid.TryPlace(BuildingCatalog.All[1], 1, 1, inventory, false, out _), Is.True);
         }
+        [Test]
+        public void RestorePlacesBuildingWithoutSpendingResources()
+        {
+            var inventory = new ResourceInventory(100); var grid = new BuildingGrid(8, 8);
+            Assert.That(grid.TryRestore(BuildingCatalog.All[1], 2, 2, out var restored), Is.True);
+            Assert.That(restored.Definition.Id.Value, Is.EqualTo("core.building.housing")); Assert.That(inventory.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(grid.TryRestore(BuildingCatalog.All[1], 2, 2, out _), Is.False);
+        }
     }
 }

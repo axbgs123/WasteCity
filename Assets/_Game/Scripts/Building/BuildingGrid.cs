@@ -65,5 +65,14 @@ namespace WasteCity.Building
                 if (ReferenceEquals(cells[x, y], placed)) { cells[x, y] = null; found = true; }
             if (found) Count--; return found;
         }
+        public bool TryRestore(BuildingDefinition definition, int x, int y, out PlacedBuilding placed)
+        {
+            placed = null; if (definition == null) return false;
+            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++)
+            { int px = x + dx, py = y + dy; if (px < 0 || py < 0 || px >= cells.GetLength(0) || py >= cells.GetLength(1) || cells[px, py] != null) return false; }
+            placed = new PlacedBuilding(definition, x, y);
+            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++) cells[x + dx, y + dy] = placed;
+            Count++; return true;
+        }
     }
 }

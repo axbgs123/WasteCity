@@ -16,6 +16,7 @@ namespace WasteCity.Building
         private bool effectApplied;
         private IProductivitySource productivity;
         private SpriteRenderer visual;
+        private bool suppressRemoval;
         public ConstructionProgress Construction { get; private set; }
         public event Action<BuildingRuntime> Completed;
         public event Action<BuildingRuntime> Removed;
@@ -31,9 +32,12 @@ namespace WasteCity.Building
         {
             if (Construction == null || Construction.IsComplete) return;
             if (!Construction.Tick(Time.deltaTime, productivity?.ConstructionMultiplier ?? 1f)) return;
-            ApplyEffect(1); effectApplied = true; if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this);
+            FinishConstruction();
         }
-        private void OnDestroy() { if (effectApplied) ApplyEffect(-1); Removed?.Invoke(this); }
+        private void FinishConstruction() { if (effectApplied) return; ApplyEffect(1); effectApplied = true; if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this); }
+        public void RestoreState(int health, float remaining) { Health.Value.Restore(health); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); }
+        public void PrepareForRestore() { if (effectApplied) { ApplyEffect(-1); effectApplied = false; } Removed?.Invoke(this); suppressRemoval = true; }
+        private void OnDestroy() { if (effectApplied) ApplyEffect(-1); if (!suppressRemoval) Removed?.Invoke(this); }
         private void ApplyEffect(int direction)
         {
             if (Definition.Id.Value == "core.building.housing") population?.AddCapacity(50 * direction);

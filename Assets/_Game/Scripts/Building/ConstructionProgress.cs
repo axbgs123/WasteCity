@@ -16,5 +16,6 @@ namespace WasteCity.Building
             Remaining = Math.Max(0f, Remaining - delta * Math.Max(0f, productivity));
             return IsComplete;
         }
+        public void Restore(float remaining) => Remaining = Math.Max(0f, Math.Min(BaseDuration, remaining));
     }
 }
