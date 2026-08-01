@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.World;
+using System;
 
 namespace WasteCity.Building
 {
@@ -16,6 +17,7 @@ namespace WasteCity.Building
         private int selected;
         private static Sprite square;
         public int PlacedCount => grid.Count;
+        public event Action<BuildingDefinition> BuildingPlaced;
         private void Update()
         {
             if (Keyboard.current != null)
@@ -42,6 +44,7 @@ namespace WasteCity.Building
             item.transform.position = new Vector3(city.transform.position.x - 8f + placed.X + placed.Definition.Width * 0.5f, city.transform.position.y - 6f + placed.Y + placed.Definition.Height * 0.5f, -1f);
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = selected == 0 ? Color.yellow : selected == 1 ? Color.cyan : selected == 2 ? Color.gray : Color.magenta;
+            BuildingPlaced?.Invoke(placed.Definition);
         }
         private void OnGUI()
         {

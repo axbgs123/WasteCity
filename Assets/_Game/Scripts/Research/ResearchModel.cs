@@ -33,6 +33,7 @@ namespace WasteCity.Research
         public ResearchDefinition Active { get; private set; }
         public float Remaining { get; private set; }
         public int CompletedCount => completed.Count;
+        public event Action<ResearchDefinition> Completed;
         public bool Start(ResearchDefinition definition, ResourceInventory inventory)
         {
             if (Active != null || definition == null || completed.Contains(definition.Id) || !inventory.TrySpend(definition.CostId, definition.Cost)) return false;
@@ -41,7 +42,7 @@ namespace WasteCity.Research
         public bool Tick(float delta)
         {
             if (Active == null) return false; Remaining -= Math.Max(0f, delta); if (Remaining > 0.0001f) return false;
-            completed.Add(Active.Id); Active = null; Remaining = 0f; return true;
+            ResearchDefinition finished = Active; completed.Add(finished.Id); Active = null; Remaining = 0f; Completed?.Invoke(finished); return true;
         }
         public bool IsCompleted(StableId id) => completed.Contains(id);
     }

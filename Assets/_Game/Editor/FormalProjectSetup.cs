@@ -11,6 +11,7 @@ using WasteCity.Legacy;
 using WasteCity.Building;
 using WasteCity.Research;
 using WasteCity.Persistence;
+using WasteCity.Progression;
 
 namespace WasteCity.Editor
 {
@@ -63,6 +64,11 @@ namespace WasteCity.Editor
             buildingData.FindProperty("economy").objectReferenceValue = economy;
             buildingData.FindProperty("world").objectReferenceValue = worldView;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
+            var progression = systems.AddComponent<FormalProgressionController>();
+            var progressionData = new SerializedObject(progression);
+            progressionData.FindProperty("research").objectReferenceValue = research;
+            progressionData.FindProperty("buildings").objectReferenceValue = buildingController;
+            progressionData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
             var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
