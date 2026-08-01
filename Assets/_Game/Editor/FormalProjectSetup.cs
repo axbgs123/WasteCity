@@ -6,6 +6,7 @@ using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.UI;
 using WasteCity.World;
+using WasteCity.Economy;
 
 namespace WasteCity.Editor
 {
@@ -37,7 +38,13 @@ namespace WasteCity.Editor
             explorationData.FindProperty("world").objectReferenceValue = worldView;
             explorationData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
             explorationData.ApplyModifiedPropertiesWithoutUndo();
-            new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
+            var economy = systems.AddComponent<FormalEconomyController>();
+            var economyData = new SerializedObject(economy);
+            economyData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
+            economyData.FindProperty("world").objectReferenceValue = worldView;
+            economyData.ApplyModifiedPropertiesWithoutUndo();
+            var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
+            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
             PlayerSettings.productName = "Waste City"; PlayerSettings.companyName = "废土游戏";

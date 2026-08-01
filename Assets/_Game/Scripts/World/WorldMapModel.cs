@@ -50,6 +50,16 @@ namespace WasteCity.World
             return changed;
         }
 
+        public int Harvest(int x, int y, int requested, out string resourceId)
+        {
+            resourceId = null;
+            if (x < 0 || y < 0 || x >= Width || y >= Height || requested <= 0) return 0;
+            WorldCell cell = cells[x, y]; if (!cell.HasResource || cell.ResourceAmount <= 0) return 0;
+            int harvested = Math.Min(requested, cell.ResourceAmount); resourceId = cell.ResourceId;
+            cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested);
+            return harvested;
+        }
+
         private static string RollResource(int roll, TerrainKind terrain)
         {
             if (roll >= 18) return null;
