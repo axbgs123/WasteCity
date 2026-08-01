@@ -40,6 +40,7 @@ namespace WasteCity.Editor
 
             var systems = new GameObject("FormalGameBootstrap");
             var gameSpeed = systems.AddComponent<GameSpeedController>();
+            var clock = systems.AddComponent<FormalGameClockController>();
             var legacy = systems.AddComponent<LegacySelectionController>();
             var bootstrap = systems.AddComponent<FormalGameBootstrap>();
             var data = new SerializedObject(bootstrap); data.FindProperty("worldView").objectReferenceValue = worldView; data.ApplyModifiedPropertiesWithoutUndo();
@@ -95,11 +96,13 @@ namespace WasteCity.Editor
             var legacyEffects = systems.AddComponent<LegacyEffectsController>();
             var legacyEffectsData = new SerializedObject(legacyEffects); legacyEffectsData.FindProperty("selection").objectReferenceValue = legacy; legacyEffectsData.FindProperty("economy").objectReferenceValue = economy; legacyEffectsData.FindProperty("progression").objectReferenceValue = progression; legacyEffectsData.FindProperty("combat").objectReferenceValue = combat; legacyEffectsData.ApplyModifiedPropertiesWithoutUndo();
             productionData.FindProperty("legacyEffects").objectReferenceValue = legacyEffects; productionData.ApplyModifiedPropertiesWithoutUndo();
+            var foresight = systems.AddComponent<ForesightFlashController>(); var foresightData = new SerializedObject(foresight); foresightData.FindProperty("legacy").objectReferenceValue = legacy; foresightData.FindProperty("clock").objectReferenceValue = clock; foresightData.ApplyModifiedPropertiesWithoutUndo();
+            saveData.FindProperty("clock").objectReferenceValue = clock; saveData.FindProperty("foresight").objectReferenceValue = foresight; saveData.ApplyModifiedPropertiesWithoutUndo();
             var rewind = systems.AddComponent<RewindAnchorController>(); var rewindData = new SerializedObject(rewind); rewindData.FindProperty("legacy").objectReferenceValue = legacy; rewindData.FindProperty("saves").objectReferenceValue = saves; rewindData.FindProperty("progression").objectReferenceValue = progression; rewindData.ApplyModifiedPropertiesWithoutUndo();
             var guide = systems.AddComponent<OnboardingGuideController>();
             var guideData = new SerializedObject(guide); guideData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); guideData.FindProperty("economy").objectReferenceValue = economy; guideData.FindProperty("buildings").objectReferenceValue = buildingController; guideData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
-            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.FindProperty("guide").objectReferenceValue = guide; hudData.FindProperty("gameSpeed").objectReferenceValue = gameSpeed; hudData.ApplyModifiedPropertiesWithoutUndo();
+            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.FindProperty("guide").objectReferenceValue = guide; hudData.FindProperty("gameSpeed").objectReferenceValue = gameSpeed; hudData.FindProperty("clock").objectReferenceValue = clock; hudData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
             PlayerSettings.productName = "Waste City"; PlayerSettings.companyName = "废土游戏";
