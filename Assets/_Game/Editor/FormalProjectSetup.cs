@@ -7,6 +7,7 @@ using WasteCity.Core;
 using WasteCity.UI;
 using WasteCity.World;
 using WasteCity.Economy;
+using WasteCity.Legacy;
 
 namespace WasteCity.Editor
 {
@@ -31,6 +32,7 @@ namespace WasteCity.Editor
             city.AddComponent<BoxCollider2D>(); city.AddComponent<PlaceholderMobileCity>();
 
             var systems = new GameObject("FormalGameBootstrap");
+            systems.AddComponent<LegacySelectionController>();
             var bootstrap = systems.AddComponent<FormalGameBootstrap>();
             var data = new SerializedObject(bootstrap); data.FindProperty("worldView").objectReferenceValue = worldView; data.ApplyModifiedPropertiesWithoutUndo();
             var exploration = systems.AddComponent<WorldExplorationController>();
