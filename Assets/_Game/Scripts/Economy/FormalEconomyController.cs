@@ -12,7 +12,11 @@ namespace WasteCity.Economy
         public ResourceInventory Inventory { get; private set; }
         public string LastHarvestedId { get; private set; }
         public int LastHarvestedAmount { get; private set; }
-        private void Awake() => Inventory = new ResourceInventory(150);
+        private void Awake()
+        {
+            Inventory = new ResourceInventory(150);
+            Inventory.Add(ResourceIds.Iron, 30); Inventory.Add(ResourceIds.Stone, 30); Inventory.Add(ResourceIds.Water, 20);
+        }
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) HarvestCurrentCell();
