@@ -6,6 +6,7 @@ using UnityEngine.TestTools;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Persistence;
+using WasteCity.Presentation;
 
 namespace WasteCity.Tests.PlayMode
 {
@@ -19,6 +20,7 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(city, Is.Not.Null); Assert.That(buildings, Is.Not.Null); Assert.That(Object.FindObjectOfType<FormalSaveController>(), Is.Not.Null);
             Assert.That(buildings.transform.parent, Is.EqualTo(city.transform)); Assert.That(Camera.main, Is.Not.Null);
             Assert.That(buildings.HasLocalTimeSource, Is.True);
+            Assert.That(city.GetComponent<VisualSlot>()?.StableId, Is.EqualTo("core.city.mobile")); Assert.That(Object.FindObjectOfType<VisualLibraryProvider>()?.Library, Is.Not.Null);
         }
     }
 }

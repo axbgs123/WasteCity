@@ -2,6 +2,7 @@ using UnityEngine;
 using WasteCity.Progression;
 using WasteCity.Economy;
 using System;
+using WasteCity.Presentation;
 
 namespace WasteCity.Combat
 {
@@ -34,6 +35,7 @@ namespace WasteCity.Combat
             float angle=(slot*47f+threshold)*Mathf.Deg2Rad; var item=new GameObject(heavy?"PlaceholderHeavyEnemy":"PlaceholderEnemy");
             item.transform.position=(Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f; item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
+            VisualSlot.Attach(item,heavy?"core.enemy.heavy-placeholder":"core.enemy.light-placeholder",renderer,renderer.color);
             item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy,economy.Inventory, value => EnemyDefeated?.Invoke(value));SpawnedEnemies++;
         }
     }

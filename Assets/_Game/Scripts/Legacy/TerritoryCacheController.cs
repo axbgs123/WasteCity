@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.World;
+using WasteCity.Presentation;
 
 namespace WasteCity.Legacy
 {
@@ -21,7 +22,7 @@ namespace WasteCity.Legacy
         private void Start()=>TryInitialize();
         private void TryInitialize(){if(Network!=null||world.Model==null)return;Network=new TerritoryResourceNetwork(economy.Inventory);FindSite();CreateMarker();}
         private void FindSite(){for(int y=0;y<world.Model.Height;y++)for(int x=0;x<world.Model.Width;x++)if(world.Model.Get(x,y).HasResource&&Vector2.Distance(WorldPosition(x,y),city.transform.position)>7f){X=x;Y=y;return;}}
-        private void CreateMarker(){var item=new GameObject("TerritoryCachePlaceholder");item.transform.SetParent(transform);item.transform.position=WorldPosition(X,Y);item.transform.localScale=Vector3.one*.8f;var sprite=Sprite.Create(Texture2D.whiteTexture,new Rect(0,0,1,1),Vector2.one*.5f,1f);marker=item.AddComponent<SpriteRenderer>();marker.sprite=sprite;marker.color=Color.yellow;marker.sortingOrder=5;}
+        private void CreateMarker(){var item=new GameObject("TerritoryCachePlaceholder");item.transform.SetParent(transform);item.transform.position=WorldPosition(X,Y);item.transform.localScale=Vector3.one*.8f;var sprite=Sprite.Create(Texture2D.whiteTexture,new Rect(0,0,1,1),Vector2.one*.5f,1f);marker=item.AddComponent<SpriteRenderer>();marker.sprite=sprite;marker.color=Color.yellow;marker.sortingOrder=5;VisualSlot.Attach(item,"core.world.territory-cache",marker,marker.color);}
         private void Update()
         {
             if(Network==null){TryInitialize();return;}marker.enabled=world.Model.IsRevealed(X,Y);bool near=Vector2.Distance(city.transform.position,WorldPosition(X,Y))<=1.5f;

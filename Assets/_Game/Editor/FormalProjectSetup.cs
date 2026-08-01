@@ -14,6 +14,7 @@ using WasteCity.Persistence;
 using WasteCity.Progression;
 using WasteCity.Combat;
 using WasteCity.Population;
+using WasteCity.Presentation;
 
 namespace WasteCity.Editor
 {
@@ -34,11 +35,13 @@ namespace WasteCity.Editor
             var renderer = city.AddComponent<SpriteRenderer>();
             renderer.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd"); renderer.color = new Color(0.9f, 0.48f, 0.1f); renderer.sortingOrder = 10;
             city.transform.localScale = new Vector3(3f, 2f, 1f);
+            VisualSlot.Attach(city,"core.city.mobile",renderer,renderer.color);
             var body = city.AddComponent<Rigidbody2D>(); body.gravityScale = 0f; body.freezeRotation = true; body.interpolation = RigidbodyInterpolation2D.Interpolate;
             city.AddComponent<BoxCollider2D>(); city.AddComponent<PlaceholderMobileCity>();
             var cityHealth = city.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
 
             var systems = new GameObject("FormalGameBootstrap");
+            var visualProvider = systems.AddComponent<VisualLibraryProvider>(); var visualLibrary = LoadOrCreateVisualLibrary(); var visualProviderData = new SerializedObject(visualProvider); visualProviderData.FindProperty("library").objectReferenceValue = visualLibrary; visualProviderData.ApplyModifiedPropertiesWithoutUndo();
             var gameSpeed = systems.AddComponent<GameSpeedController>();
             var clock = systems.AddComponent<FormalGameClockController>();
             var legacy = systems.AddComponent<LegacySelectionController>();
@@ -118,6 +121,10 @@ namespace WasteCity.Editor
             if (AssetDatabase.IsValidFolder(path)) return;
             string parent = Path.GetDirectoryName(path).Replace('\\', '/'); EnsureFolder(parent);
             AssetDatabase.CreateFolder(parent, Path.GetFileName(path));
+        }
+        private static VisualLibrary LoadOrCreateVisualLibrary()
+        {
+            EnsureFolder("Assets/_Game/ArtIntegration"); const string path="Assets/_Game/ArtIntegration/VisualLibrary.asset"; var library=AssetDatabase.LoadAssetAtPath<VisualLibrary>(path); if(library!=null)return library; library=ScriptableObject.CreateInstance<VisualLibrary>();AssetDatabase.CreateAsset(library,path);return library;
         }
     }
 }

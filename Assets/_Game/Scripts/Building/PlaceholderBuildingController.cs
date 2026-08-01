@@ -9,6 +9,7 @@ using WasteCity.Population;
 using System.Collections.Generic;
 using System.Linq;
 using WasteCity.Legacy;
+using WasteCity.Presentation;
 
 namespace WasteCity.Building
 {
@@ -64,6 +65,7 @@ namespace WasteCity.Building
             item.transform.position = new Vector3(city.transform.position.x - 8f + placed.X + placed.Definition.Width * 0.5f, city.transform.position.y - 6f + placed.Y + placed.Definition.Height * 0.5f, -1f);
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = ColorFor(placed.Definition.Id.Value);
+            VisualSlot.Attach(item, placed.Definition.Id.Value, renderer, renderer.color);
             item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime);
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;

@@ -4,6 +4,7 @@ using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.Population;
 using WasteCity.Progression;
+using WasteCity.Presentation;
 
 namespace WasteCity.World
 {
@@ -24,7 +25,7 @@ namespace WasteCity.World
             if (Model != null || world.Model == null) return;
             Model = new RescueSiteModel(world.Model.Width, world.Model.Height, new WorldSeed(8128)); markers = new SpriteRenderer[Model.Sites.Count];
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), Vector2.one * .5f, 1f);
-            for (int i = 0; i < markers.Length; i++) { var site = Model.Sites[i]; var item = new GameObject($"RescueRuinPlaceholder_{i}"); item.transform.SetParent(transform); item.transform.position = WorldPosition(site); item.transform.localScale = Vector3.one * .65f; var r = item.AddComponent<SpriteRenderer>(); r.sprite = square; r.color = Color.white; r.sortingOrder = 4; markers[i] = r; }
+            for (int i = 0; i < markers.Length; i++) { var site = Model.Sites[i]; var item = new GameObject($"RescueRuinPlaceholder_{i}"); item.transform.SetParent(transform); item.transform.position = WorldPosition(site); item.transform.localScale = Vector3.one * .65f; var r = item.AddComponent<SpriteRenderer>(); r.sprite = square; r.color = Color.white; r.sortingOrder = 4; VisualSlot.Attach(item,"core.world.rescue-ruin",r,r.color); markers[i] = r; }
         }
         private void Update()
         {
