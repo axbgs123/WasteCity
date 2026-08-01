@@ -46,5 +46,12 @@ namespace WasteCity.Legacy
             if (Selected != null || index < 0 || index >= Choices.Count) return false;
             Selected = Choices[index]; return true;
         }
+        public bool Restore(string stableId)
+        {
+            if (Selected != null) return false;
+            foreach (var definition in LegacyPathCatalog.Approved)
+                if (definition.Id.Value == stableId) { Selected = definition; return true; }
+            return false;
+        }
     }
 }

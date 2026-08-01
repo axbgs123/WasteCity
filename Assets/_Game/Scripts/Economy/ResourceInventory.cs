@@ -20,5 +20,6 @@ namespace WasteCity.Economy
             if (amount < 0 || Get(id) < amount) return false;
             values[id] = Get(id) - amount; return true;
         }
+        public void Set(string id, int amount) => values[id] = Math.Max(0, Math.Min(capacityPerResource, amount));
     }
 }

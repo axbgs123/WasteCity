@@ -10,6 +10,7 @@ using WasteCity.Economy;
 using WasteCity.Legacy;
 using WasteCity.Building;
 using WasteCity.Research;
+using WasteCity.Persistence;
 
 namespace WasteCity.Editor
 {
@@ -34,7 +35,7 @@ namespace WasteCity.Editor
             city.AddComponent<BoxCollider2D>(); city.AddComponent<PlaceholderMobileCity>();
 
             var systems = new GameObject("FormalGameBootstrap");
-            systems.AddComponent<LegacySelectionController>();
+            var legacy = systems.AddComponent<LegacySelectionController>();
             var bootstrap = systems.AddComponent<FormalGameBootstrap>();
             var data = new SerializedObject(bootstrap); data.FindProperty("worldView").objectReferenceValue = worldView; data.ApplyModifiedPropertiesWithoutUndo();
             var exploration = systems.AddComponent<WorldExplorationController>();
@@ -49,6 +50,12 @@ namespace WasteCity.Editor
             economyData.ApplyModifiedPropertiesWithoutUndo();
             var research = systems.AddComponent<ResearchController>();
             var researchData = new SerializedObject(research); researchData.FindProperty("economy").objectReferenceValue = economy; researchData.ApplyModifiedPropertiesWithoutUndo();
+            var saves = systems.AddComponent<FormalSaveController>();
+            var saveData = new SerializedObject(saves);
+            saveData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
+            saveData.FindProperty("economy").objectReferenceValue = economy;
+            saveData.FindProperty("legacy").objectReferenceValue = legacy;
+            saveData.ApplyModifiedPropertiesWithoutUndo();
             var buildingRoot = new GameObject("PlaceholderBuildings");
             var buildingController = buildingRoot.AddComponent<PlaceholderBuildingController>();
             var buildingData = new SerializedObject(buildingController);
