@@ -13,7 +13,7 @@ namespace WasteCity.World
     public sealed class RescueSiteModel
     {
         public IReadOnlyList<RescueSite> Sites { get; }
-        public RescueSiteModel(int width, int height, WorldSeed seed, int count = 3)
+        public RescueSiteModel(int width, int height, WorldSeed seed, int count = 5)
         {
             var sites = new List<RescueSite>(); var occupied = new HashSet<int>();
             for (int i = 0; sites.Count < Math.Max(1, count) && i < 1000; i++)

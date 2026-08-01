@@ -21,5 +21,7 @@ namespace WasteCity.Tests
             var model = new ResearchModel(); Assert.That(model.Start(ResearchCatalog.Starting[0], inventory), Is.True);
             Assert.That(model.Start(ResearchCatalog.Starting[3], inventory), Is.False);
         }
+        [Test] public void ResearchProgressCanBeRestored()
+        {var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Iron,10);var model=new ResearchModel();model.Start(ResearchCatalog.Starting[0],inventory);model.Tick(5);var restored=new ResearchModel();restored.Restore(model.CaptureCompleted(),model.Active.Id.Value,model.Remaining);Assert.That(restored.Active.Id.Value,Is.EqualTo("core.research.automated-machinery"));Assert.That(restored.Remaining,Is.EqualTo(15));}
     }
 }

@@ -16,8 +16,11 @@ namespace WasteCity.Building
         public bool RequiresResourceNode { get; }
         public float BuildSeconds { get; }
         public int MaximumHealth { get; }
-        public BuildingDefinition(string id, string name, int width, int height, string costId, int cost, bool requiresNode = false, float buildSeconds = 5f, int maximumHealth = 300)
-        { Id = new StableId(id); Name = name; Width = Math.Max(1, width); Height = Math.Max(1, height); CostId = costId; Cost = Math.Max(0, cost); RequiresResourceNode = requiresNode; BuildSeconds = Math.Max(.1f, buildSeconds); MaximumHealth = Math.Max(1, maximumHealth); }
+        public int MinimumPopulation { get; }
+        public string RequiredResearchId { get; }
+        public string RequiredBuildingId { get; }
+        public BuildingDefinition(string id, string name, int width, int height, string costId, int cost, bool requiresNode = false, float buildSeconds = 5f, int maximumHealth = 300, int minimumPopulation = 0, string requiredResearchId = null, string requiredBuildingId = null)
+        { Id = new StableId(id); Name = name; Width = Math.Max(1, width); Height = Math.Max(1, height); CostId = costId; Cost = Math.Max(0, cost); RequiresResourceNode = requiresNode; BuildSeconds = Math.Max(.1f, buildSeconds); MaximumHealth = Math.Max(1, maximumHealth); MinimumPopulation=Math.Max(0,minimumPopulation);RequiredResearchId=requiredResearchId;RequiredBuildingId=requiredBuildingId; }
     }
 
     public static class BuildingCatalog
@@ -28,10 +31,10 @@ namespace WasteCity.Building
             new BuildingDefinition("core.building.housing", "住房", 2, 2, ResourceIds.Alloy, 8, false, 5f, 250),
             new BuildingDefinition("core.building.warehouse", "仓库", 2, 2, ResourceIds.Alloy, 8, false, 6f, 300),
             new BuildingDefinition("core.building.wall", "城墙", 1, 1, ResourceIds.Stone, 2, false, 2f, 300),
-            new BuildingDefinition("core.building.research-station", "研究站", 2, 2, ResourceIds.Iron, 6, false, 10f, 260),
-            new BuildingDefinition("core.building.smelter", "冶炼厂", 2, 2, ResourceIds.Stone, 6, false, 8f, 280),
-            new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260),
-            new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250)
+            new BuildingDefinition("core.building.research-station", "研究站", 2, 2, ResourceIds.Iron, 6, false, 10f, 260, 200),
+            new BuildingDefinition("core.building.smelter", "冶炼厂", 2, 2, ResourceIds.Stone, 6, false, 8f, 280, 0, "core.research.automated-machinery"),
+            new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, null, "core.building.smelter"),
+            new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, null, "core.building.assembler")
         };
     }
 

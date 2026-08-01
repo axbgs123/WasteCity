@@ -76,7 +76,9 @@ namespace WasteCity.Editor
             buildingData.FindProperty("economy").objectReferenceValue = economy;
             buildingData.FindProperty("world").objectReferenceValue = worldView;
             buildingData.FindProperty("population").objectReferenceValue = population;
+            buildingData.FindProperty("research").objectReferenceValue = research;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
+            researchData.FindProperty("buildings").objectReferenceValue = buildingController; researchData.ApplyModifiedPropertiesWithoutUndo(); saveData.FindProperty("research").objectReferenceValue = research; saveData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("buildings").objectReferenceValue = buildingController; saveData.ApplyModifiedPropertiesWithoutUndo();
             var production = systems.AddComponent<TechnologyProductionController>();
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();

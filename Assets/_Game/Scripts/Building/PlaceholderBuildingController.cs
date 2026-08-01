@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using WasteCity.Legacy;
 using WasteCity.Presentation;
+using WasteCity.Research;
 
 namespace WasteCity.Building
 {
@@ -19,6 +20,7 @@ namespace WasteCity.Building
         [SerializeField] private FormalEconomyController economy;
         [SerializeField] private PlaceholderWorldView world;
         [SerializeField] private FormalPopulationController population;
+        [SerializeField] private ResearchController research;
         private const int GridWidth=32,GridHeight=24;
         private BuildingGrid grid = new BuildingGrid(GridWidth, GridHeight);
         private readonly LogisticsNetworkModel logistics = new LogisticsNetworkModel();
@@ -53,6 +55,7 @@ namespace WasteCity.Building
         }
         private void PlaceAtMouse()
         {
+            if(!CanBuild(BuildingCatalog.All[selected],out _))return;
             Vector2 worldPosition = Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
             int gridX = Mathf.FloorToInt(worldPosition.x - city.transform.position.x + 8f);
             int gridY = Mathf.FloorToInt(worldPosition.y - city.transform.position.y + 6f);
@@ -89,6 +92,8 @@ namespace WasteCity.Building
         public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
         public BuildingRuntime FindAtGrid(int x, int y) { foreach(var pair in placements)if(pair.Value.X==x&&pair.Value.Y==y)return pair.Key;return null; }
         public bool TryGetGrid(BuildingRuntime runtime, out int x, out int y) { if(runtime!=null&&placements.TryGetValue(runtime,out var placed)){x=placed.X;y=placed.Y;return true;}x=y=-1;return false; }
+        public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.Definition.Id.Value==id);
+        public bool CanBuild(BuildingDefinition definition,out string reason)=>BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new WasteCity.Content.StableId(id)),CompletedCount,out reason);
         public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
         public SpatialTemplateEntry[] CaptureTemplate(int originX, int originY) => placements.Where(pair => pair.Value.X >= originX && pair.Value.Y >= originY && pair.Value.X + pair.Value.Definition.Width <= originX + 3 && pair.Value.Y + pair.Value.Definition.Height <= originY + 3).Select(pair => new SpatialTemplateEntry { definitionId = pair.Value.Definition.Id.Value, dx = pair.Value.X - originX, dy = pair.Value.Y - originY }).ToArray();
         public bool TryStampTemplate(IReadOnlyList<SpatialTemplateEntry> entries, int originX, int originY)
@@ -126,7 +131,7 @@ namespace WasteCity.Building
         }
         private void OnGUI()
         {
-            if (active) GUI.Box(new Rect(18, Screen.height - 72f, 780f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name} · 左键放置");
+            if (active){CanBuild(BuildingCatalog.All[selected],out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 850f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置");}
             if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
             if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }

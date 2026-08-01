@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using WasteCity.Content;
 using WasteCity.Economy;
+using System.Linq;
 
 namespace WasteCity.Research
 {
@@ -45,5 +46,11 @@ namespace WasteCity.Research
             ResearchDefinition finished = Active; completed.Add(finished.Id); Active = null; Remaining = 0f; Completed?.Invoke(finished); return true;
         }
         public bool IsCompleted(StableId id) => completed.Contains(id);
+        public string[] CaptureCompleted()=>completed.Select(id=>id.Value).ToArray();
+        public void Restore(string[] completedIds,string activeId,float remaining)
+        {
+            completed.Clear();if(completedIds!=null)foreach(string id in completedIds)foreach(var definition in ResearchCatalog.Starting)if(definition.Id.Value==id)completed.Add(definition.Id);
+            Active=ResearchCatalog.Starting.FirstOrDefault(value=>value.Id.Value==activeId);Remaining=Active==null?0f:Math.Max(0.001f,Math.Min(Active.Duration,remaining));
+        }
     }
 }
