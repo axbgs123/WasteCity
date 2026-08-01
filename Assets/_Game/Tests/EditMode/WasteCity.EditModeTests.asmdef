@@ -1,0 +1,6 @@
+{
+  "name": "WasteCity.EditModeTests",
+  "references": ["WasteCity.Game"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "includePlatforms": ["Editor"]
+}

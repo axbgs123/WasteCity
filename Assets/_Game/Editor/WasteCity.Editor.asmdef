@@ -1,0 +1,5 @@
+{
+  "name": "WasteCity.Editor",
+  "references": ["WasteCity.Game", "Unity.RenderPipelines.Universal.Runtime"],
+  "includePlatforms": ["Editor"]
+}

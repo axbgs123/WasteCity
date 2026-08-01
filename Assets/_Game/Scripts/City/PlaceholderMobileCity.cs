@@ -1,0 +1,21 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+namespace WasteCity.City
+{
+    [RequireComponent(typeof(Rigidbody2D))]
+    public sealed class PlaceholderMobileCity : MonoBehaviour
+    {
+        [SerializeField] private float moveSpeed = 4f;
+        private Rigidbody2D body;
+        private Vector2 input;
+        private void Awake() => body = GetComponent<Rigidbody2D>();
+        private void Update()
+        {
+            if (Keyboard.current == null) { input = Vector2.zero; return; }
+            input = new Vector2((Keyboard.current.dKey.isPressed ? 1 : 0) - (Keyboard.current.aKey.isPressed ? 1 : 0),
+                (Keyboard.current.wKey.isPressed ? 1 : 0) - (Keyboard.current.sKey.isPressed ? 1 : 0)).normalized;
+        }
+        private void FixedUpdate() => body.MovePosition(body.position + input * moveSpeed * Time.fixedDeltaTime);
+    }
+}
