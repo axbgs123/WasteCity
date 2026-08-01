@@ -39,6 +39,7 @@ namespace WasteCity.Editor
             var cityHealth = city.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
 
             var systems = new GameObject("FormalGameBootstrap");
+            var gameSpeed = systems.AddComponent<GameSpeedController>();
             var legacy = systems.AddComponent<LegacySelectionController>();
             var bootstrap = systems.AddComponent<FormalGameBootstrap>();
             var data = new SerializedObject(bootstrap); data.FindProperty("worldView").objectReferenceValue = worldView; data.ApplyModifiedPropertiesWithoutUndo();
@@ -83,8 +84,10 @@ namespace WasteCity.Editor
             combatData.FindProperty("progression").objectReferenceValue = progression;
             combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.ApplyModifiedPropertiesWithoutUndo();
+            var guide = systems.AddComponent<OnboardingGuideController>();
+            var guideData = new SerializedObject(guide); guideData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); guideData.FindProperty("economy").objectReferenceValue = economy; guideData.FindProperty("buildings").objectReferenceValue = buildingController; guideData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
-            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.ApplyModifiedPropertiesWithoutUndo();
+            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.FindProperty("guide").objectReferenceValue = guide; hudData.FindProperty("gameSpeed").objectReferenceValue = gameSpeed; hudData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
             PlayerSettings.productName = "Waste City"; PlayerSettings.companyName = "废土游戏";
