@@ -9,10 +9,10 @@ namespace WasteCity.Tests
         [Test]
         public void PlacementConsumesCostAndBlocksOverlap()
         {
-            var inventory = new ResourceInventory(100); inventory.Add(ResourceIds.Stone, 20);
-            var grid = new BuildingGrid(8, 8); var warehouse = BuildingCatalog.All[1];
+            var inventory = new ResourceInventory(100); inventory.Add(ResourceIds.Alloy, 20);
+            var grid = new BuildingGrid(8, 8); var warehouse = BuildingCatalog.All[2];
             Assert.That(grid.TryPlace(warehouse, 1, 1, inventory, false, out _), Is.True);
-            Assert.That(inventory.Get(ResourceIds.Stone), Is.EqualTo(12));
+            Assert.That(inventory.Get(ResourceIds.Alloy), Is.EqualTo(12));
             Assert.That(grid.TryPlace(warehouse, 2, 2, inventory, false, out _), Is.False);
         }
         [Test]

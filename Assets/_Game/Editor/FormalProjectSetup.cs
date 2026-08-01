@@ -13,6 +13,7 @@ using WasteCity.Research;
 using WasteCity.Persistence;
 using WasteCity.Progression;
 using WasteCity.Combat;
+using WasteCity.Population;
 
 namespace WasteCity.Editor
 {
@@ -47,6 +48,7 @@ namespace WasteCity.Editor
             explorationData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
             explorationData.ApplyModifiedPropertiesWithoutUndo();
             var economy = systems.AddComponent<FormalEconomyController>();
+            var population = systems.AddComponent<FormalPopulationController>();
             var economyData = new SerializedObject(economy);
             economyData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
             economyData.FindProperty("world").objectReferenceValue = worldView;
@@ -65,6 +67,7 @@ namespace WasteCity.Editor
             buildingData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>();
             buildingData.FindProperty("economy").objectReferenceValue = economy;
             buildingData.FindProperty("world").objectReferenceValue = worldView;
+            buildingData.FindProperty("population").objectReferenceValue = population;
             buildingData.ApplyModifiedPropertiesWithoutUndo();
             var production = systems.AddComponent<TechnologyProductionController>();
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
@@ -81,7 +84,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();
-            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.ApplyModifiedPropertiesWithoutUndo();
+            var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
             PlayerSettings.productName = "Waste City"; PlayerSettings.companyName = "废土游戏";

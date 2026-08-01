@@ -1,6 +1,7 @@
 using UnityEngine;
 using WasteCity.Combat;
 using WasteCity.Economy;
+using WasteCity.Population;
 
 namespace WasteCity.Building
 {
@@ -9,12 +10,22 @@ namespace WasteCity.Building
     {
         public BuildingDefinition Definition { get; private set; }
         public HealthComponent Health { get; private set; }
-        public void Configure(BuildingDefinition definition)
+        private FormalEconomyController economy;
+        private FormalPopulationController population;
+        private bool effectApplied;
+        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null)
         {
-            Definition = definition; Health = GetComponent<HealthComponent>();
+            Definition = definition; this.economy = economy; this.population = population; Health = GetComponent<HealthComponent>();
             int hp = definition.Id.Value == "core.building.wall" ? 500 : definition.Id.Value == "core.building.machine-gun-turret" ? 250 : 300;
             Health.Configure(hp, definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
             Health.Value.Died += () => Destroy(gameObject);
+            ApplyEffect(1); effectApplied = true;
+        }
+        private void OnDestroy() { if (effectApplied) ApplyEffect(-1); }
+        private void ApplyEffect(int direction)
+        {
+            if (Definition.Id.Value == "core.building.housing") population?.AddCapacity(50 * direction);
+            if (Definition.Id.Value == "core.building.warehouse") economy?.Inventory.AddCapacity(150 * direction);
         }
     }
 

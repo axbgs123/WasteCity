@@ -6,7 +6,8 @@ namespace WasteCity.Economy
     public sealed class ResourceInventory
     {
         private readonly Dictionary<string, int> values = new Dictionary<string, int>();
-        private readonly int capacityPerResource;
+        private int capacityPerResource;
+        public int CapacityPerResource => capacityPerResource;
         public ResourceInventory(int capacityPerResource) => this.capacityPerResource = Math.Max(0, capacityPerResource);
         public int Get(string id) => values.TryGetValue(id, out int value) ? value : 0;
         public int Add(string id, int amount)
@@ -21,5 +22,11 @@ namespace WasteCity.Economy
             values[id] = Get(id) - amount; return true;
         }
         public void Set(string id, int amount) => values[id] = Math.Max(0, Math.Min(capacityPerResource, amount));
+        public void AddCapacity(int amount)
+        {
+            capacityPerResource = Math.Max(0, capacityPerResource + amount);
+            if (amount >= 0) return;
+            foreach (string id in new List<string>(values.Keys)) values[id] = Math.Min(values[id], capacityPerResource);
+        }
     }
 }
