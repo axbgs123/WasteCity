@@ -76,6 +76,7 @@ namespace WasteCity.Editor
             var progressionData = new SerializedObject(progression);
             progressionData.FindProperty("research").objectReferenceValue = research;
             progressionData.FindProperty("buildings").objectReferenceValue = buildingController;
+            progressionData.FindProperty("legacy").objectReferenceValue = legacy;
             progressionData.ApplyModifiedPropertiesWithoutUndo();
             var combat = systems.AddComponent<FormalCombatController>();
             var combatData = new SerializedObject(combat);
@@ -84,6 +85,9 @@ namespace WasteCity.Editor
             combatData.FindProperty("progression").objectReferenceValue = progression;
             combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.ApplyModifiedPropertiesWithoutUndo();
+            var legacyEffects = systems.AddComponent<LegacyEffectsController>();
+            var legacyEffectsData = new SerializedObject(legacyEffects); legacyEffectsData.FindProperty("selection").objectReferenceValue = legacy; legacyEffectsData.FindProperty("economy").objectReferenceValue = economy; legacyEffectsData.FindProperty("progression").objectReferenceValue = progression; legacyEffectsData.FindProperty("combat").objectReferenceValue = combat; legacyEffectsData.ApplyModifiedPropertiesWithoutUndo();
+            productionData.FindProperty("legacyEffects").objectReferenceValue = legacyEffects; productionData.ApplyModifiedPropertiesWithoutUndo();
             var guide = systems.AddComponent<OnboardingGuideController>();
             var guideData = new SerializedObject(guide); guideData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); guideData.FindProperty("economy").objectReferenceValue = economy; guideData.FindProperty("buildings").objectReferenceValue = buildingController; guideData.ApplyModifiedPropertiesWithoutUndo();
             var hud = new GameObject("PlaceholderHUD").AddComponent<FormalPlaceholderHud>();

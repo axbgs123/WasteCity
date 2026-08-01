@@ -1,6 +1,7 @@
 using UnityEngine;
 using WasteCity.Progression;
 using WasteCity.Economy;
+using System;
 
 namespace WasteCity.Combat
 {
@@ -12,12 +13,13 @@ namespace WasteCity.Combat
         [SerializeField] private FormalEconomyController economy;
         private float defenseRemainder;
         public int SpawnedEnemies { get; private set; }
+        public event Action<bool> EnemyDefeated;
         private static Sprite square;
         private void Start() => progression.Observation.ThresholdReached += OnThreshold;
         private void Update()
         {
             PlaceholderEnemy nearest = null; float best = 25f;
-            foreach (var enemy in Object.FindObjectsOfType<PlaceholderEnemy>()) { float sqr = ((Vector2)(enemy.transform.position - city.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = enemy; } }
+            foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>()) { float sqr = ((Vector2)(enemy.transform.position - city.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = enemy; } }
             if (nearest == null) return; defenseRemainder += 8f * Time.deltaTime; int damage = Mathf.FloorToInt(defenseRemainder);
             if (damage > 0) { var health = nearest.GetComponent<HealthComponent>(); health.Value.Apply(damage, DamageType.Physical, health.Armor); defenseRemainder -= damage; }
         }
@@ -32,7 +34,7 @@ namespace WasteCity.Combat
             float angle=(slot*47f+threshold)*Mathf.Deg2Rad; var item=new GameObject(heavy?"PlaceholderHeavyEnemy":"PlaceholderEnemy");
             item.transform.position=(Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f; item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
-            item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy,economy.Inventory);SpawnedEnemies++;
+            item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy,economy.Inventory, value => EnemyDefeated?.Invoke(value));SpawnedEnemies++;
         }
     }
 }

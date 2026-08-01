@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using WasteCity.Building;
 using WasteCity.Research;
+using WasteCity.Legacy;
+using System.Linq;
 
 namespace WasteCity.Progression
 {
@@ -9,6 +11,7 @@ namespace WasteCity.Progression
     {
         [SerializeField] private ResearchController research;
         [SerializeField] private PlaceholderBuildingController buildings;
+        [SerializeField] private LegacySelectionController legacy;
         public ObservationModel Observation { get; } = new ObservationModel();
         public EraTrackModel EraTracks { get; } = new EraTrackModel();
         public CivilizationModel Civilization { get; } = new CivilizationModel();
@@ -29,7 +32,9 @@ namespace WasteCity.Progression
         }
         private void OnGUI()
         {
-            GUI.Box(new Rect(Screen.width - 350f, 100f, 330f, 125f), $"文明等级 {Civilization.Level}\n异常观测值 {Observation.Value:0}/100\n时代轨道：机械 {EraTracks.Get(DevelopmentRoute.Technology)} · 修仙 {EraTracks.Get(DevelopmentRoute.Cultivation)}\n血肉 {EraTracks.Get(DevelopmentRoute.BiologicalAscension)} · 灵能 {EraTracks.Get(DevelopmentRoute.Psionics)}\nU 尝试主动升阶");
+            bool transparent = legacy?.Model?.Selected?.Id.Value == LegacyEffectModel.CausalTransparency;
+            string reasons = transparent ? $"\n原因：{string.Join(" / ", Observation.RecentReasons.ToArray())}\n阈值预警：30 / 60 / 90" : "";
+            GUI.Box(new Rect(Screen.width - 350f, 100f, 330f, transparent ? 175f : 125f), $"文明等级 {Civilization.Level}\n异常观测值 {Observation.Value:0}/100\n时代轨道：机械 {EraTracks.Get(DevelopmentRoute.Technology)} · 修仙 {EraTracks.Get(DevelopmentRoute.Cultivation)}\n血肉 {EraTracks.Get(DevelopmentRoute.BiologicalAscension)} · 灵能 {EraTracks.Get(DevelopmentRoute.Psionics)}\nU 尝试主动升阶{reasons}");
         }
     }
 }

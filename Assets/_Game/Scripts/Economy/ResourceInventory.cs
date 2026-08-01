@@ -7,6 +7,8 @@ namespace WasteCity.Economy
     {
         private readonly Dictionary<string, int> values = new Dictionary<string, int>();
         private int capacityPerResource;
+        private int debtLimit;
+        public event Action<int> DebtIncreased;
         public int CapacityPerResource => capacityPerResource;
         public ResourceInventory(int capacityPerResource) => this.capacityPerResource = Math.Max(0, capacityPerResource);
         public int Get(string id) => values.TryGetValue(id, out int value) ? value : 0;
@@ -18,8 +20,10 @@ namespace WasteCity.Economy
         }
         public bool TrySpend(string id, int amount)
         {
-            if (amount < 0 || Get(id) < amount) return false;
-            values[id] = Get(id) - amount; return true;
+            if (amount < 0 || Get(id) - amount < -debtLimit) return false;
+            int before = Get(id); values[id] = before - amount;
+            if (values[id] < before && values[id] < 0) DebtIncreased?.Invoke(Math.Min(amount, -values[id]));
+            return true;
         }
         public void Set(string id, int amount) => values[id] = Math.Max(0, Math.Min(capacityPerResource, amount));
         public void AddCapacity(int amount)
@@ -28,5 +32,6 @@ namespace WasteCity.Economy
             if (amount >= 0) return;
             foreach (string id in new List<string>(values.Keys)) values[id] = Math.Min(values[id], capacityPerResource);
         }
+        public void SetDebtLimit(int amount) => debtLimit = Math.Max(0, amount);
     }
 }
