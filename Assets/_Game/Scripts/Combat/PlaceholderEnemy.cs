@@ -2,6 +2,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.Economy;
 using System;
+using WasteCity.Research;
 
 namespace WasteCity.Combat
 {
@@ -15,17 +16,18 @@ namespace WasteCity.Combat
         private ResourceInventory lootInventory;
         private EnemyDefinition definition;
         private EnemyQualityProfile quality;
+        private ResearchController research;
         public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
         public EnemyDefinition Definition => definition;
         public EnemyQuality Quality => quality.Quality;
         public float MoveSpeedMultiplier { get; set; }=1f;
-        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary)
+        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null)
         {
-            definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
+            definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; research=researchController; health = GetComponent<HealthComponent>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
             cityHealth = targetHealth; city = target; health.Value.Died += OnDied;
         }
-        private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,Mathf.RoundToInt(definition.BiomassDrop*quality.LootMultiplier));defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
+        private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
         private void Update()
         {
             if (city == null || cityHealth.Value.IsDead) return;

@@ -107,6 +107,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.FindProperty("cityState").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();
             combatData.FindProperty("buildings").objectReferenceValue=buildingController;
+            combatData.FindProperty("research").objectReferenceValue=research;
             combatData.ApplyModifiedPropertiesWithoutUndo();
             progressionData.FindProperty("combat").objectReferenceValue=combat;progressionData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("combat").objectReferenceValue=combat;saveData.ApplyModifiedPropertiesWithoutUndo();

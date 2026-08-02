@@ -16,6 +16,10 @@ namespace WasteCity.Research
         public ResearchModel Model { get; private set; } = new ResearchModel();
         public float TurretRangeMultiplier=>Model.IsCompleted(new Content.StableId("core.research.ballistics"))?1.2f:1f;
         public float TurretDamageMultiplier=>Model.IsCompleted(new Content.StableId("core.research.ballistics"))?1.15f:1f;
+        public bool HasMetabolicAcceleration => Model.IsCompleted(new Content.StableId("core.research.metabolic-acceleration"));
+        public bool HasCarapaceGrowth => Model.IsCompleted(new Content.StableId("core.research.carapace-growth"));
+        public bool HasTissueRegeneration => Model.IsCompleted(new Content.StableId("core.research.tissue-regeneration"));
+        public bool HasPrecognitiveSense => Model.IsCompleted(new Content.StableId("core.research.precognitive-sense"));
         private bool visible;
         private int selectedIndex;
         private void Update()

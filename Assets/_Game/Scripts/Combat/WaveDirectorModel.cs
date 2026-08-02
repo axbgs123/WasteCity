@@ -53,6 +53,9 @@ namespace WasteCity.Combat
         public int SpawnedCount => nextSpawn;
         public int DefeatedCount => defeated;
         public int PendingWaveCount => pending.Count;
+        public float WarningMultiplier { get; private set; } = 1f;
+
+        public void SetWarningMultiplier(float multiplier) => WarningMultiplier = Math.Max(1f, multiplier);
 
         public bool Schedule(int trigger)
         {
@@ -96,7 +99,7 @@ namespace WasteCity.Combat
 
         private void BeginNext()
         {
-            if(pending.Count==0)return;Current=pending.Dequeue();sequence=Interleave(Current.Entries);nextSpawn=defeated=0;spawnClock=0;WarningRemaining=Current.WarningSeconds;Phase=WarningRemaining>0?WavePhase.Warning:WavePhase.Spawning;
+            if(pending.Count==0)return;Current=pending.Dequeue();sequence=Interleave(Current.Entries);nextSpawn=defeated=0;spawnClock=0;WarningRemaining=Current.WarningSeconds*WarningMultiplier;Phase=WarningRemaining>0?WavePhase.Warning:WavePhase.Spawning;
         }
 
         private static List<EnemyArchetype> Interleave(IReadOnlyList<WaveEntry> entries)
