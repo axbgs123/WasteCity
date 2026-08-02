@@ -10,7 +10,7 @@ namespace WasteCity.Building
     }
     public sealed class LogisticsNetworkModel
     {
-        private readonly int range;
+        private int range;
         private readonly int coreX,coreY;
         private readonly HashSet<string> connected=new HashSet<string>();
         public LogisticsNetworkModel(int coreX=8,int coreY=6,int range=8){this.coreX=coreX;this.coreY=coreY;this.range=Math.Max(1,range);}
@@ -21,6 +21,7 @@ namespace WasteCity.Building
             while(frontier.Count>0){var source=points[frontier.Dequeue()];for(int i=0;i<points.Count;i++)if(!connected.Contains(points[i].Key)&&InRange(source.X,source.Y,points[i].X,points[i].Y)){connected.Add(points[i].Key);frontier.Enqueue(i);}}
         }
         public bool IsConnected(string key)=>!string.IsNullOrEmpty(key)&&connected.Contains(key);
+        public bool SetRange(int value){int next=Math.Max(1,value);if(next==range)return false;range=next;return true;}
         private bool InRange(int ax,int ay,int bx,int by)=>Math.Max(Math.Abs(ax-bx),Math.Abs(ay-by))<=range;
     }
 }

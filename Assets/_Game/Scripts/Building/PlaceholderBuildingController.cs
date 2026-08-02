@@ -41,6 +41,7 @@ namespace WasteCity.Building
         public string LastAction { get; private set; }
         private void Update()
         {
+            if(research!=null&&logistics.SetRange(RouteTechnologyEffects.LogisticsRange(research.HasFormationReinforcement,research.HasOrbitalSupply)))RefreshLogistics();
             if (Keyboard.current != null)
             {
                 if (Keyboard.current.bKey.wasPressedThisFrame) active = city.Deployment.Mode == CityMode.Fortress && !active;

@@ -20,6 +20,11 @@ namespace WasteCity.Research
         public bool HasCarapaceGrowth => Model.IsCompleted(new Content.StableId("core.research.carapace-growth"));
         public bool HasTissueRegeneration => Model.IsCompleted(new Content.StableId("core.research.tissue-regeneration"));
         public bool HasPrecognitiveSense => Model.IsCompleted(new Content.StableId("core.research.precognitive-sense"));
+        public bool HasAlloyArmor => Model.IsCompleted(new Content.StableId("core.research.alloy-armor"));
+        public bool HasTalismanBasics => Model.IsCompleted(new Content.StableId("core.research.talisman-basics"));
+        public bool HasSwordRiding => Model.IsCompleted(new Content.StableId("core.research.sword-riding"));
+        public bool HasFormationReinforcement => Model.IsCompleted(new Content.StableId("core.research.formation-reinforcement"));
+        public bool HasOrbitalSupply => Model.IsCompleted(new Content.StableId("core.research.orbital-supply"));
         private bool visible;
         private int selectedIndex;
         private void Update()

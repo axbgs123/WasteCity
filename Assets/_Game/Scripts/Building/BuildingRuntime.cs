@@ -33,13 +33,15 @@ namespace WasteCity.Building
         public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null, ILocalTimeScaleSource localTime = null, PlaceholderMobileCity city = null, ResearchController research = null)
         {
             Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; this.localTime = localTime; this.city=city; this.research=research; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
-            Health.Configure(definition.MaximumHealth, definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
+            Health.Configure(RouteTechnologyEffects.BuildingMaximumHealth(definition.MaximumHealth,research!=null&&research.HasAlloyArmor), definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
             Health.Value.Died += () => Destroy(gameObject);
             Construction = new ConstructionProgress(definition.BuildSeconds);
             if (visual != null) visual.color = Color.Lerp(visual.color, Color.gray, .65f);
+            SyncResearchEffects();
         }
         private void Update()
         {
+            SyncResearchEffects();
             if(Construction != null && Construction.IsComplete && research != null)regeneration.Tick(Time.deltaTime,Definition.Id.Value=="core.building.wall",research.HasTissueRegeneration,research.HasCarapaceGrowth,Health.Value,economy?.Inventory);
             if(city!=null&&!city.LongWorkAllowed)return;
             float multiplier = (productivity?.ConstructionMultiplier ?? 1f) * (localTime?.MultiplierFor(this) ?? 1f);
@@ -63,6 +65,13 @@ namespace WasteCity.Building
             if (Definition.Id.Value == "core.building.housing") population?.AddCapacity(50 * direction);
             if (Definition.Id.Value == "core.building.warehouse") economy?.Inventory.AddCapacity(150 * direction);
         }
+        private void SyncResearchEffects()
+        {
+            if(research==null||Health?.Value==null||Definition==null)return;
+            int maximum=RouteTechnologyEffects.BuildingMaximumHealth(Definition.MaximumHealth,research.HasAlloyArmor);
+            if(Health.Value.Maximum!=maximum)Health.Value.SetMaximum(maximum,true);
+            Health.Value.SetPhysicalDamagePercent(RouteTechnologyEffects.PhysicalDamagePercent(Definition.Id.Value,research.HasTalismanBasics));
+        }
     }
 
     public sealed class PlaceholderTurret : MonoBehaviour
@@ -74,7 +83,7 @@ namespace WasteCity.Building
         public void SetFireRateSource(ITurretFireRateSource value)=>fireRate=value;
         private void Update()
         {
-            if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f);float best = range*range;
+            if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f)*RouteTechnologyEffects.TowerRangeMultiplier(runtime.Definition.Id.Value,research!=null&&research.HasSwordRiding);float best = range*range;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
             if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor,physical?(research?.TurretDamageMultiplier??1f):1f);

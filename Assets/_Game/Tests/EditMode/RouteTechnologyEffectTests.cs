@@ -61,5 +61,44 @@ namespace WasteCity.Tests
             Assert.That(new BuildingRegenerationModel().Tick(10f, false, false, true, health, inventory), Is.Zero);
             Assert.That(inventory.Get(ResourceIds.Biomass), Is.EqualTo(1));
         }
+
+        [Test]
+        public void AlloyArmorAddsThirtyPercentBuildingDurability()
+        {
+            Assert.That(RouteTechnologyEffects.BuildingMaximumHealth(300, false), Is.EqualTo(300));
+            Assert.That(RouteTechnologyEffects.BuildingMaximumHealth(300, true), Is.EqualTo(390));
+        }
+
+        [Test]
+        public void TalismanBasicsReducesWallPhysicalDamageByTwentyPercent()
+        {
+            Assert.That(RouteTechnologyEffects.PhysicalDamagePercent("core.building.wall", true), Is.EqualTo(80));
+            Assert.That(RouteTechnologyEffects.PhysicalDamagePercent("core.building.housing", true), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void SwordRidingOnlyExtendsSwordArrayRange()
+        {
+            Assert.That(RouteTechnologyEffects.TowerRangeMultiplier("cultivation.building.sword-array-tower", true), Is.EqualTo(1.3f));
+            Assert.That(RouteTechnologyEffects.TowerRangeMultiplier("core.building.machine-gun-turret", true), Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void FormationAndOrbitalResearchExpandLogisticsRange()
+        {
+            Assert.That(RouteTechnologyEffects.LogisticsRange(false, false), Is.EqualTo(8));
+            Assert.That(RouteTechnologyEffects.LogisticsRange(true, false), Is.EqualTo(12));
+            Assert.That(RouteTechnologyEffects.LogisticsRange(false, true), Is.EqualTo(24));
+        }
+
+        [Test]
+        public void IncreasingMaximumHealthPreservesExistingDamage()
+        {
+            var health = new HealthModel(100);
+            health.Restore(75);
+            health.SetMaximum(130, true);
+            Assert.That(health.Maximum, Is.EqualTo(130));
+            Assert.That(health.Current, Is.EqualTo(105));
+        }
     }
 }
