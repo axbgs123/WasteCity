@@ -14,16 +14,18 @@ namespace WasteCity.Combat
         private float attackRemainder;
         private ResourceInventory lootInventory;
         private EnemyDefinition definition;
+        private EnemyQualityProfile quality;
         public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
         public EnemyDefinition Definition => definition;
+        public EnemyQuality Quality => quality.Quality;
         public float MoveSpeedMultiplier { get; set; }=1f;
-        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null)
+        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary)
         {
-            definition = enemyDefinition ?? EnemyCatalog.Gnawer; WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(definition.MaximumHealth, definition.Armor);
+            definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
             cityHealth = targetHealth; city = target; health.Value.Died += OnDied;
         }
-        private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,definition.BiomassDrop);defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
+        private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,Mathf.RoundToInt(definition.BiomassDrop*quality.LootMultiplier));defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
         private void Update()
         {
             if (city == null || cityHealth.Value.IsDead) return;
@@ -35,7 +37,7 @@ namespace WasteCity.Combat
             }
             if(best==float.MaxValue)best=Vector2.Distance(transform.position,city.position);
             if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * MoveSpeedMultiplier * Time.deltaTime);
-            else { attackRemainder += definition.DamagePerSecond * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (damage > 0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
+            else { attackRemainder += definition.DamagePerSecond * quality.DamageMultiplier * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (damage > 0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
         }
         private bool CanTarget(BuildingRuntime building)
         {

@@ -35,7 +35,8 @@ namespace WasteCity.Combat
         public static readonly WaveDefinition Directed=new WaveDefinition(30,60,60,new WaveEntry(EnemyArchetype.Gnawer,18),new WaveEntry(EnemyArchetype.CrystalBeast,4));
         public static readonly WaveDefinition HighRisk=new WaveDefinition(60,75,75,new WaveEntry(EnemyArchetype.Gnawer,24),new WaveEntry(EnemyArchetype.CrystalBeast,6),new WaveEntry(EnemyArchetype.Howler,4),new WaveEntry(EnemyArchetype.Burrower,1));
         public static readonly WaveDefinition Boss=new WaveDefinition(90,90,5,new WaveEntry(EnemyArchetype.CrystalBroodmother,1));
-        public static readonly WaveDefinition[] All={Tutorial,Directed,HighRisk,Boss};
+        public static readonly WaveDefinition PostAdvance=new WaveDefinition(120,45,90,new WaveEntry(EnemyArchetype.Gnawer,18),new WaveEntry(EnemyArchetype.CrystalBeast,7),new WaveEntry(EnemyArchetype.Howler,5),new WaveEntry(EnemyArchetype.Burrower,2));
+        public static readonly WaveDefinition[] All={Tutorial,Directed,HighRisk,Boss,PostAdvance};
         public static WaveDefinition ForTrigger(int trigger)=>All.FirstOrDefault(value=>value.Trigger==trigger);
     }
 
