@@ -18,10 +18,11 @@ namespace WasteCity.Tests
         [Test]
         public void MiningStationRequiresResourceCoverage()
         {
-            var inventory = new ResourceInventory(100); inventory.Add(ResourceIds.Iron, 20);
+            var inventory = new ResourceInventory(100); inventory.Add(ResourceIds.Alloy, 20);
             var grid = new BuildingGrid(8, 8);
             Assert.That(grid.TryPlace(BuildingCatalog.All[0], 0, 0, inventory, false, out _), Is.False);
             Assert.That(grid.TryPlace(BuildingCatalog.All[0], 0, 0, inventory, true, out _), Is.True);
+            Assert.That(inventory.Get(ResourceIds.Alloy), Is.EqualTo(16));
         }
         [Test]
         public void RemovingDestroyedBuildingReleasesItsCells()

@@ -27,7 +27,7 @@ namespace WasteCity.Building
     {
         public static readonly BuildingDefinition[] All =
         {
-            new BuildingDefinition("core.building.mining-station", "采矿站", 2, 2, ResourceIds.Iron, 4, true, 5f, 220),
+            new BuildingDefinition("core.building.mining-station", "采矿站", 2, 2, ResourceIds.Alloy, 4, true, 5f, 220),
             new BuildingDefinition("core.building.housing", "住房", 2, 2, ResourceIds.Alloy, 8, false, 5f, 250),
             new BuildingDefinition("core.building.warehouse", "仓库", 2, 2, ResourceIds.Alloy, 8, false, 6f, 300),
             new BuildingDefinition("core.building.wall", "城墙", 1, 1, ResourceIds.Stone, 2, false, 2f, 300),

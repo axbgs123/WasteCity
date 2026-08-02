@@ -82,7 +82,7 @@ namespace WasteCity.Editor
             saveData.FindProperty("buildings").objectReferenceValue = buildingController; saveData.ApplyModifiedPropertiesWithoutUndo();
             var production = systems.AddComponent<TechnologyProductionController>();
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
-            productionData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();productionData.ApplyModifiedPropertiesWithoutUndo();
+            productionData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();productionData.FindProperty("world").objectReferenceValue=worldView;productionData.ApplyModifiedPropertiesWithoutUndo();
             var progression = systems.AddComponent<FormalProgressionController>();
             var progressionData = new SerializedObject(progression);
             progressionData.FindProperty("research").objectReferenceValue = research;

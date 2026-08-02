@@ -1,10 +1,16 @@
 using NUnit.Framework;
 using WasteCity.Economy;
+using WasteCity.World;
 namespace WasteCity.Tests
 {
  public sealed class ProductionTests
  {
   [Test] public void SmeltingConsumesIronAndCreatesAlloy(){var i=new ResourceInventory(100);i.Add(ResourceIds.Iron,4);var p=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.Alloy,1,6));Assert.That(p.Tick(6,i,1),Is.EqualTo(1));Assert.That(i.Get(ResourceIds.Iron),Is.EqualTo(2));Assert.That(i.Get(ResourceIds.Alloy),Is.EqualTo(1));}
   [Test] public void NoBuildingMeansNoProduction(){var i=new ResourceInventory(100);i.Add(ResourceIds.Iron,10);var p=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.Alloy,1,6));Assert.That(p.Tick(60,i,0),Is.Zero);}
+  [Test] public void ExtractionProducesOneUnitEveryThreeSeconds(){var map=CreateMapWithNode(out int x,out int y);var cell=map.Get(x,y);var inventory=new ResourceInventory(100);var process=new ResourceExtractionProcess();Assert.That(process.Tick(2.9f,map,x,y,inventory),Is.Zero);Assert.That(process.Tick(.1f,map,x,y,inventory),Is.EqualTo(1));Assert.That(inventory.Get(cell.ResourceId),Is.EqualTo(1));Assert.That(map.Get(x,y).ResourceAmount,Is.EqualTo(cell.ResourceAmount-1));}
+  [Test] public void DepletedNodeStopsExtraction(){var map=CreateMapWithNode(out int x,out int y);int amount=map.Get(x,y).ResourceAmount;map.Harvest(x,y,amount,out _);var process=new ResourceExtractionProcess();Assert.That(process.Tick(30,map,x,y,new ResourceInventory(100)),Is.Zero);Assert.That(process.Status,Is.EqualTo(ExtractionStatus.Depleted));}
+  [Test] public void FullInventoryDoesNotConsumeResourceNode(){var map=CreateMapWithNode(out int x,out int y);var cell=map.Get(x,y);var inventory=new ResourceInventory(1);inventory.Add(cell.ResourceId,1);var process=new ResourceExtractionProcess();Assert.That(process.Tick(30,map,x,y,inventory),Is.Zero);Assert.That(process.Status,Is.EqualTo(ExtractionStatus.OutputFull));Assert.That(map.Get(x,y).ResourceAmount,Is.EqualTo(cell.ResourceAmount));}
+  [Test] public void ProductionReportsMissingInputAndFullOutput(){var missingInventory=new ResourceInventory(10);var missing=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.Alloy,1,6));missing.Tick(6,missingInventory,1);Assert.That(missing.Status,Is.EqualTo(ProductionStatus.MissingInput));var fullInventory=new ResourceInventory(2);fullInventory.Add(ResourceIds.Iron,2);fullInventory.Add(ResourceIds.Alloy,2);var full=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.Alloy,1,6));full.Tick(6,fullInventory,1);Assert.That(full.Status,Is.EqualTo(ProductionStatus.OutputFull));Assert.That(fullInventory.Get(ResourceIds.Iron),Is.EqualTo(2));}
+  private static WorldMapModel CreateMapWithNode(out int nodeX,out int nodeY){var map=new WorldMapModel(12,12,new WorldSeed(8128));for(int x=0;x<map.Width;x++)for(int y=0;y<map.Height;y++)if(map.Get(x,y).HasResource){nodeX=x;nodeY=y;return map;}throw new AssertionException("Seed must provide a resource node");}
  }
 }

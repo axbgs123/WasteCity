@@ -15,7 +15,8 @@ namespace WasteCity.Economy
         private void Awake()
         {
             Inventory = new ResourceInventory(150);
-            Inventory.Add(ResourceIds.Iron, 30); Inventory.Add(ResourceIds.Stone, 30); Inventory.Add(ResourceIds.Water, 20);
+            Inventory.Add(ResourceIds.Iron, 20); Inventory.Add(ResourceIds.Alloy, 20);
+            Inventory.Add(ResourceIds.Ammunition, 30); Inventory.Add(ResourceIds.Biomass, 10);
         }
         private void Update()
         {

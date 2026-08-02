@@ -60,7 +60,7 @@ namespace WasteCity.Building
             int gridX = Mathf.FloorToInt(worldPosition.x - city.transform.position.x + 8f);
             int gridY = Mathf.FloorToInt(worldPosition.y - city.transform.position.y + 6f);
             int mapX = Mathf.FloorToInt(worldPosition.x + world.Model.Width * 0.5f); int mapY = Mathf.FloorToInt(worldPosition.y + world.Model.Height * 0.5f);
-            bool resource = mapX >= 0 && mapY >= 0 && mapX < world.Model.Width && mapY < world.Model.Height && world.Model.Get(mapX, mapY).HasResource;
+            bool resource = CoversRequiredResource(BuildingCatalog.All[selected], mapX, mapY);
             if (!grid.TryPlace(BuildingCatalog.All[selected], gridX, gridY, economy.Inventory, resource, out var placed)) return;
             CreateRuntime(placed);
         }
@@ -92,6 +92,13 @@ namespace WasteCity.Building
         public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
         public BuildingRuntime FindAtGrid(int x, int y) { foreach(var pair in placements)if(pair.Value.X==x&&pair.Value.Y==y)return pair.Key;return null; }
         public bool TryGetGrid(BuildingRuntime runtime, out int x, out int y) { if(runtime!=null&&placements.TryGetValue(runtime,out var placed)){x=placed.X;y=placed.Y;return true;}x=y=-1;return false; }
+        public bool TryGetWorldCell(BuildingRuntime runtime, out int x, out int y)
+        {
+            x = y = -1; if (runtime == null || world.Model == null || !placements.ContainsKey(runtime)) return false;
+            x = Mathf.FloorToInt(runtime.transform.position.x + world.Model.Width * .5f);
+            y = Mathf.FloorToInt(runtime.transform.position.y + world.Model.Height * .5f);
+            return x >= 0 && y >= 0 && x < world.Model.Width && y < world.Model.Height;
+        }
         public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.Definition.Id.Value==id);
         public bool CanBuild(BuildingDefinition definition,out string reason)=>BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new WasteCity.Content.StableId(id)),CompletedCount,out reason);
         public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
@@ -104,7 +111,14 @@ namespace WasteCity.Building
             foreach(var cost in costs)if(!economy.Inventory.CanSpend(cost.Key,cost.Value))return false;foreach(var cost in costs)economy.Inventory.TrySpend(cost.Key,cost.Value);
             foreach(var value in pending)if(grid.TryRestore(value.definition,value.x,value.y,out var placed))CreateRuntime(placed);return true;
         }
-        private bool TemplateResourceCondition(BuildingDefinition definition,int x,int y){if(!definition.RequiresResourceNode)return true;Vector2 point=new Vector2(city.transform.position.x-8f+x+definition.Width*.5f,city.transform.position.y-6f+y+definition.Height*.5f);int mapX=Mathf.FloorToInt(point.x+world.Model.Width*.5f),mapY=Mathf.FloorToInt(point.y+world.Model.Height*.5f);return mapX>=0&&mapY>=0&&mapX<world.Model.Width&&mapY<world.Model.Height&&world.Model.Get(mapX,mapY).HasResource;}
+        private bool TemplateResourceCondition(BuildingDefinition definition,int x,int y){if(!definition.RequiresResourceNode)return true;Vector2 point=new Vector2(city.transform.position.x-8f+x+definition.Width*.5f,city.transform.position.y-6f+y+definition.Height*.5f);int mapX=Mathf.FloorToInt(point.x+world.Model.Width*.5f),mapY=Mathf.FloorToInt(point.y+world.Model.Height*.5f);return CoversRequiredResource(definition,mapX,mapY);}
+        private bool CoversRequiredResource(BuildingDefinition definition,int mapX,int mapY)
+        {
+            if(!definition.RequiresResourceNode)return true;
+            if(mapX<0||mapY<0||mapX>=world.Model.Width||mapY>=world.Model.Height)return false;
+            WorldCell cell=world.Model.Get(mapX,mapY);
+            return definition.Id.Value=="core.building.mining-station"?cell.ResourceId==ResourceIds.Iron:cell.HasResource;
+        }
         private static bool Overlaps((BuildingDefinition definition,int x,int y) a,(BuildingDefinition definition,int x,int y) b)=>a.x<b.x+b.definition.Width&&a.x+a.definition.Width>b.x&&a.y<b.y+b.definition.Height&&a.y+a.definition.Height>b.y;
         public void RestoreSnapshots(BuildingSnapshot[] snapshots)
         {
