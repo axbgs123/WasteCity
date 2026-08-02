@@ -14,11 +14,12 @@ namespace WasteCity.Combat
         private float attackRemainder;
         private ResourceInventory lootInventory;
         private EnemyDefinition definition;
+        public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
         public EnemyDefinition Definition => definition;
-        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, Action<bool> onDefeated = null)
+        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null)
         {
-            definition = enemyDefinition ?? EnemyCatalog.Gnawer; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(definition.MaximumHealth, definition.Armor);
+            definition = enemyDefinition ?? EnemyCatalog.Gnawer; WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(definition.MaximumHealth, definition.Armor);
             cityHealth = targetHealth; city = target; health.Value.Died += OnDied;
         }
         private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,definition.BiomassDrop);defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}

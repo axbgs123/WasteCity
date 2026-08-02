@@ -17,7 +17,7 @@ namespace WasteCity.Progression
             reasons.Enqueue(reason); while (reasons.Count > 3) reasons.Dequeue();
             foreach (int threshold in new[] { 30, 60, 90 }) if (Value >= threshold && reached.Add(threshold)) ThresholdReached?.Invoke(threshold);
         }
-        public void Restore(float value) { Value = Math.Max(0f, Math.Min(100f, value)); }
+        public void Restore(float value) { Value = Math.Max(0f, Math.Min(100f, value)); reached.Clear();foreach(int threshold in new[]{30,60,90})if(Value>=threshold)reached.Add(threshold); }
     }
 
     public sealed class EraTrackModel

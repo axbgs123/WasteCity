@@ -4,6 +4,12 @@ using System.Linq;
 
 namespace WasteCity.Combat
 {
+    [Serializable] public sealed class WaveDirectorSnapshot
+    {
+        public int currentTrigger=-1,phase,nextSpawn,defeated;
+        public float warningRemaining,spawnClock;
+        public int[] pendingTriggers,scheduledTriggers;
+    }
     public enum WavePhase { Idle, Warning, Spawning, Active }
 
     public readonly struct WaveEntry
@@ -72,6 +78,19 @@ namespace WasteCity.Combat
             if(Current==null||Current.Trigger!=trigger)return false;defeated++;
             if(Phase!=WavePhase.Active||defeated<Math.Max(1,(int)Math.Ceiling(Current.TotalCount*.9f)))return false;
             Current=null;Phase=WavePhase.Idle;BeginNext();return true;
+        }
+
+        public WaveDirectorSnapshot Capture()=>new WaveDirectorSnapshot{currentTrigger=Current?.Trigger??-1,phase=(int)Phase,nextSpawn=nextSpawn,defeated=defeated,warningRemaining=WarningRemaining,spawnClock=spawnClock,pendingTriggers=pending.Select(value=>value.Trigger).ToArray(),scheduledTriggers=scheduled.ToArray()};
+        public void Restore(WaveDirectorSnapshot snapshot)
+        {
+            pending.Clear();scheduled.Clear();Current=null;sequence.Clear();nextSpawn=defeated=0;spawnClock=WarningRemaining=0;Phase=WavePhase.Idle;
+            if(snapshot==null)return;
+            if(snapshot.scheduledTriggers!=null)foreach(int trigger in snapshot.scheduledTriggers)if(WaveCatalog.ForTrigger(trigger)!=null)scheduled.Add(trigger);
+            if(snapshot.pendingTriggers!=null)foreach(int trigger in snapshot.pendingTriggers){var definition=WaveCatalog.ForTrigger(trigger);if(definition!=null)pending.Enqueue(definition);}
+            Current=WaveCatalog.ForTrigger(snapshot.currentTrigger);
+            if(Current==null){BeginNext();return;}
+            scheduled.Add(Current.Trigger);sequence=Interleave(Current.Entries);nextSpawn=Math.Max(0,Math.Min(sequence.Count,snapshot.nextSpawn));defeated=Math.Max(0,Math.Min(Current.TotalCount,snapshot.defeated));
+            spawnClock=Math.Max(0,snapshot.spawnClock);WarningRemaining=Math.Max(0,snapshot.warningRemaining);Phase=Enum.IsDefined(typeof(WavePhase),snapshot.phase)?(WavePhase)snapshot.phase:WavePhase.Warning;
         }
 
         private void BeginNext()
