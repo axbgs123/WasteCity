@@ -17,6 +17,7 @@ namespace WasteCity.Economy
         public const string BiologicalWeapon = "biological.resource.weapon";
         public const string ResonanceMetal = "psionics.resource.resonance-metal";
         public const string PsionicAmplifier = "psionics.resource.amplifier";
-        public static readonly string[] All = { Iron, EnergyCrystal, Stone, Biomass, Water, Alloy, Ammunition, SpiritIron, FlyingSword, BoneSteel, BiomassConcentrate, BiologicalWeapon, ResonanceMetal, PsionicAmplifier };
+        public const string Elixir = "cultivation.resource.elixir";
+        public static readonly string[] All = { Iron, EnergyCrystal, Stone, Biomass, Water, Alloy, Ammunition, SpiritIron, FlyingSword, BoneSteel, BiomassConcentrate, BiologicalWeapon, ResonanceMetal, PsionicAmplifier, Elixir };
     }
 }

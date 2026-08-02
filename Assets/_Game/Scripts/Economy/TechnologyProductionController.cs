@@ -28,11 +28,12 @@ namespace WasteCity.Economy
         private readonly ProductionProcess resonance=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.ResonanceMetal,1,8f));
         private readonly ProductionProcess psionicWorkshop=new ProductionProcess(new ProductionRecipe(ResourceIds.ResonanceMetal,2,ResourceIds.PsionicAmplifier,2,8f));
         private readonly PassiveProductionProcess spiritGathering=new PassiveProductionProcess(ResourceIds.EnergyCrystal,1,6f);
+        private readonly DualInputProductionProcess alchemy=new DualInputProductionProcess(new DualInputProductionRecipe(ResourceIds.Biomass,1,ResourceIds.EnergyCrystal,1,ResourceIds.Elixir,1,10f));
         private readonly Dictionary<BuildingRuntime,ResourceExtractionProcess> mines=new Dictionary<BuildingRuntime,ResourceExtractionProcess>();
         public int ActiveMines { get; private set; }
         public int DepletedMines { get; private set; }
         public int FullMines { get; private set; }
-        public bool HasRunningProduction=>ActiveMines>0||new[]{smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate,resonance,psionicWorkshop}.Any(value=>value.Status==ProductionStatus.Running)||breeding.Status==ProductionStatus.Running||spiritGathering.Status==ProductionStatus.Running;
+        public bool HasRunningProduction=>ActiveMines>0||new[]{smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate,resonance,psionicWorkshop}.Any(value=>value.Status==ProductionStatus.Running)||breeding.Status==ProductionStatus.Running||alchemy.Status==ProductionStatus.Running||spiritGathering.Status==ProductionStatus.Running;
         public event Action<int> ProductionCompleted;
 
         private void Update()
@@ -55,7 +56,7 @@ namespace WasteCity.Economy
             }
             foreach(var stale in mines.Keys.Where(value=>value==null||!activeMining.Contains(value)).ToArray())mines.Remove(stale);
             int smelters=0,assemblers=0;
-            int spiritFires=0,artifactWorkshops=0,spiritGatheringArrays=0,colonyPools=0,breedingChambers=0,resonanceFurnaces=0,psionicWorkshops=0;
+            int spiritFires=0,artifactWorkshops=0,spiritGatheringArrays=0,alchemyChambers=0,colonyPools=0,breedingChambers=0,resonanceFurnaces=0,psionicWorkshops=0;
             foreach(var runtime in runtimes)
             {
                 int units=Mathf.RoundToInt(localHaste?.MultiplierFor(runtime)??1f);
@@ -64,6 +65,7 @@ namespace WasteCity.Economy
                 if(runtime.Definition.Id.Value=="cultivation.building.spirit-fire-furnace")spiritFires+=units;
                 if(runtime.Definition.Id.Value=="cultivation.building.artifact-workshop")artifactWorkshops+=units;
                 if(runtime.Definition.Id.Value=="cultivation.building.spirit-gathering-array")spiritGatheringArrays+=units;
+                if(runtime.Definition.Id.Value=="cultivation.building.alchemy-chamber")alchemyChambers+=units;
                 if(runtime.Definition.Id.Value=="biological.building.colony-pool")colonyPools+=units;
                 if(runtime.Definition.Id.Value=="biological.building.breeding-chamber")breedingChambers+=units;
                 if(runtime.Definition.Id.Value=="psionics.building.resonance-furnace")resonanceFurnaces+=units;
@@ -75,6 +77,7 @@ namespace WasteCity.Economy
             completedCycles+=spiritFire.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(spiritFires)??spiritFires);
             completedCycles+=artifactWorkshop.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(artifactWorkshops)??artifactWorkshops);
             completedCycles+=spiritGathering.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(spiritGatheringArrays)??spiritGatheringArrays,buildings.Research!=null&&buildings.Research.HasFormationReinforcement?1.5f:1f);
+            completedCycles+=alchemy.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(alchemyChambers)??alchemyChambers);
             int colonyUnits=legacyEffects?.Model?.ProductionUnits(colonyPools)??colonyPools;completedCycles+=boneSteel.Tick(industryDelta,economy.Inventory,colonyUnits);completedCycles+=concentrate.Tick(industryDelta,economy.Inventory,colonyUnits);
             completedCycles+=breeding.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(breedingChambers)??breedingChambers);
             completedCycles+=resonance.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(resonanceFurnaces)??resonanceFurnaces);
@@ -87,8 +90,8 @@ namespace WasteCity.Economy
             GUI.Box(new Rect(Screen.width-470f,18f,450f,125f),$"多路线生产监控\n采矿：运行 {ActiveMines} / 枯竭 {DepletedMines} / 满仓 {FullMines}\n科技 冶炼 {StatusText(smelter.Status)} · 装配 {StatusText(assembler.Status)}\n修仙 灵火 {StatusText(spiritFire.Status)} · 炼器 {StatusText(artifactWorkshop.Status)}\n血肉 菌落 {StatusText(boneSteel.Status)}/{StatusText(concentrate.Status)} · 培育 {StatusText(breeding.Status)}\n灵能 共振 {StatusText(resonance.Status)} · 工坊 {StatusText(psionicWorkshop.Status)}");
         }
 
-        public float[] CaptureProgress()=>new[]{smelter.Progress,assembler.Progress,spiritFire.Progress,artifactWorkshop.Progress,boneSteel.Progress,concentrate.Progress,breeding.Progress,resonance.Progress,psionicWorkshop.Progress,spiritGathering.Progress};
-        public void RestoreProgress(float[] values){if(values==null)return;ProductionProcess[] singles={smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate};for(int i=0;i<singles.Length&&i<values.Length;i++)singles[i].Restore(values[i]);if(values.Length>6)breeding.Restore(values[6]);if(values.Length>7)resonance.Restore(values[7]);if(values.Length>8)psionicWorkshop.Restore(values[8]);if(values.Length>9)spiritGathering.Restore(values[9]);}
+        public float[] CaptureProgress()=>new[]{smelter.Progress,assembler.Progress,spiritFire.Progress,artifactWorkshop.Progress,boneSteel.Progress,concentrate.Progress,breeding.Progress,resonance.Progress,psionicWorkshop.Progress,spiritGathering.Progress,alchemy.Progress};
+        public void RestoreProgress(float[] values){if(values==null)return;ProductionProcess[] singles={smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate};for(int i=0;i<singles.Length&&i<values.Length;i++)singles[i].Restore(values[i]);if(values.Length>6)breeding.Restore(values[6]);if(values.Length>7)resonance.Restore(values[7]);if(values.Length>8)psionicWorkshop.Restore(values[8]);if(values.Length>9)spiritGathering.Restore(values[9]);if(values.Length>10)alchemy.Restore(values[10]);}
 
         private static string StatusText(ProductionStatus status)=>status==ProductionStatus.Running?"运行":status==ProductionStatus.MissingInput?"缺少输入":status==ProductionStatus.OutputFull?"输出已满":"无联网建筑";
     }

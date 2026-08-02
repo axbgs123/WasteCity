@@ -90,6 +90,7 @@ namespace WasteCity.Editor
             var productionData = new SerializedObject(production); productionData.FindProperty("economy").objectReferenceValue=economy; productionData.FindProperty("buildings").objectReferenceValue=buildingController; productionData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("production").objectReferenceValue=production;saveData.ApplyModifiedPropertiesWithoutUndo();
             productionData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();productionData.FindProperty("world").objectReferenceValue=worldView;productionData.ApplyModifiedPropertiesWithoutUndo();
+            var elixir=systems.AddComponent<ElixirController>();var elixirData=new SerializedObject(elixir);elixirData.FindProperty("economy").objectReferenceValue=economy;elixirData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();elixirData.FindProperty("cityHealth").objectReferenceValue=cityHealth;elixirData.ApplyModifiedPropertiesWithoutUndo();
             var progression = systems.AddComponent<FormalProgressionController>();
             var progressionData = new SerializedObject(progression);
             progressionData.FindProperty("research").objectReferenceValue = research;
