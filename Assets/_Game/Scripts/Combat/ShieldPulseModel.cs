@@ -15,4 +15,13 @@ namespace WasteCity.Combat
             return true;
         }
     }
+
+    public sealed class AutomatedRepairModel
+    {
+        private readonly ShieldPulseModel pulse;
+        private readonly int healAmount;
+        public AutomatedRepairModel(float intervalSeconds,int amount){pulse=new ShieldPulseModel(intervalSeconds);healAmount=Math.Max(1,amount);}
+        public bool Tick(float deltaTime)=>pulse.Tick(deltaTime);
+        public int Repair(HealthModel health)=>health?.Heal(healAmount)??0;
+    }
 }

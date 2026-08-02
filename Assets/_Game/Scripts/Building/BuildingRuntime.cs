@@ -102,4 +102,17 @@ namespace WasteCity.Building
                 if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)building.Health.Value.GrantShield(25,100);
         }
     }
+
+    public sealed class PlaceholderAutomatedRepairBay : MonoBehaviour
+    {
+        private readonly AutomatedRepairModel repair = new AutomatedRepairModel(6f,20);
+        private BuildingRuntime runtime;
+        public void Configure(BuildingRuntime building)=>runtime=building;
+        private void Update()
+        {
+            if(runtime==null||!runtime.HasLogistics||!repair.Tick(Time.deltaTime))return;
+            foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
+                if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)repair.Repair(building.Health.Value);
+        }
+    }
 }

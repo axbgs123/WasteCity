@@ -94,6 +94,7 @@ namespace WasteCity.Building
             RefreshLogistics();
             if (DefenseTowerCatalog.For(runtime.Definition.Id.Value)!=null) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader,research);
             if(runtime.Definition.Id.Value==BuildingCatalog.ShieldGenerator.Id.Value)runtime.gameObject.AddComponent<PlaceholderShieldGenerator>().Configure(runtime);
+            if(runtime.Definition.Id.Value==BuildingCatalog.AutomatedRepairBay.Id.Value)runtime.gameObject.AddComponent<PlaceholderAutomatedRepairBay>().Configure(runtime);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
