@@ -25,5 +25,7 @@ namespace WasteCity.World
         }
         public bool[] Capture() { var result = new bool[Sites.Count]; for (int i = 0; i < result.Length; i++) result[i] = Sites[i].Completed; return result; }
         public void Restore(bool[] values) { if (values == null) return; for (int i = 0; i < Sites.Count && i < values.Length; i++) Sites[i].Restore(values[i]); }
+        public int FindFirstIncomplete(Func<RescueSite,bool> predicate){for(int i=0;i<Sites.Count;i++)if(!Sites[i].Completed&&(predicate==null||predicate(Sites[i])))return i;return -1;}
     }
+    public static class RescueRules{public static int BiomassCost(bool immediate,bool remoteCommunication)=>immediate?5:remoteCommunication?0:2;}
 }

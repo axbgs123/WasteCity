@@ -27,6 +27,7 @@ namespace WasteCity.Research
         public bool HasOrbitalSupply => Model.IsCompleted(new Content.StableId("core.research.orbital-supply"));
         public bool HasMindControl => Model.IsCompleted(new Content.StableId("core.research.mind-control"));
         public bool HasGeneSplicing => Model.IsCompleted(new Content.StableId("core.research.gene-splicing"));
+        public bool HasConsciousnessNetwork => Model.IsCompleted(new Content.StableId("core.research.consciousness-network"));
         private bool visible;
         private int selectedIndex;
         private void Update()
