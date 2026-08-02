@@ -41,6 +41,12 @@ namespace WasteCity.Progression
             if (Level >= 10 || completedResearch < Level || buildings < Level) return false;
             Level++; return true;
         }
+        public bool TryAdvanceFormal(bool requirementsMet){if(!requirementsMet||Level!=1)return false;Level=2;return true;}
         public void Restore(int level) => Level = Math.Max(1, Math.Min(10, level));
+    }
+
+    public static class CivilizationAdvanceRequirements
+    {
+        public static bool Meets(bool legacyAnalysis,int turretCount,bool bossDefeated,bool productionRunning)=>legacyAnalysis&&turretCount>=2&&bossDefeated&&productionRunning;
     }
 }

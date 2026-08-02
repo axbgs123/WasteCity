@@ -89,6 +89,7 @@ namespace WasteCity.Editor
             progressionData.FindProperty("research").objectReferenceValue = research;
             progressionData.FindProperty("buildings").objectReferenceValue = buildingController;
             progressionData.FindProperty("legacy").objectReferenceValue = legacy;
+            progressionData.FindProperty("production").objectReferenceValue = production;
             progressionData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("progression").objectReferenceValue = progression; saveData.ApplyModifiedPropertiesWithoutUndo();
             var combat = systems.AddComponent<FormalCombatController>();
@@ -100,6 +101,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("cityState").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();
             combatData.FindProperty("buildings").objectReferenceValue=buildingController;
             combatData.ApplyModifiedPropertiesWithoutUndo();
+            progressionData.FindProperty("combat").objectReferenceValue=combat;progressionData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("combat").objectReferenceValue=combat;saveData.ApplyModifiedPropertiesWithoutUndo();
             var guidance=systems.AddComponent<FormalGuidanceController>();var guidanceData=new SerializedObject(guidance);guidanceData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();guidanceData.FindProperty("buildings").objectReferenceValue=buildingController;guidanceData.FindProperty("combat").objectReferenceValue=combat;guidanceData.ApplyModifiedPropertiesWithoutUndo();saveData.FindProperty("guidance").objectReferenceValue=guidance;saveData.ApplyModifiedPropertiesWithoutUndo();
             var session=systems.AddComponent<FormalSessionController>();var sessionData=new SerializedObject(session);sessionData.FindProperty("cityHealth").objectReferenceValue=cityHealth;sessionData.FindProperty("saves").objectReferenceValue=saves;sessionData.FindProperty("guidance").objectReferenceValue=guidance;sessionData.ApplyModifiedPropertiesWithoutUndo();

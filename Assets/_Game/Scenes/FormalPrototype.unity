@@ -122,7 +122,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &605676774
+--- !u!1 &498059334
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -130,471 +130,13 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 605676776}
-  - component: {fileID: 605676775}
-  m_Layer: 0
-  m_Name: PlaceholderHUD
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &605676775
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 605676774}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d49d6d6f178414d4eafc9ed9eb15b869, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
-  cityHealth: {fileID: 996539047}
-  population: {fileID: 714970113}
-  guide: {fileID: 714970109}
-  gameSpeed: {fileID: 714970108}
-  clock: {fileID: 714970107}
---- !u!4 &605676776
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 605676774}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &714970106
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 714970130}
-  - component: {fileID: 714970129}
-  - component: {fileID: 714970108}
-  - component: {fileID: 714970107}
-  - component: {fileID: 714970111}
-  - component: {fileID: 714970128}
-  - component: {fileID: 714970127}
-  - component: {fileID: 714970114}
-  - component: {fileID: 714970113}
-  - component: {fileID: 714970112}
-  - component: {fileID: 714970126}
-  - component: {fileID: 714970125}
-  - component: {fileID: 714970124}
-  - component: {fileID: 714970123}
-  - component: {fileID: 714970122}
-  - component: {fileID: 714970121}
-  - component: {fileID: 714970120}
-  - component: {fileID: 714970119}
-  - component: {fileID: 714970118}
-  - component: {fileID: 714970110}
-  - component: {fileID: 714970117}
-  - component: {fileID: 714970116}
-  - component: {fileID: 714970115}
-  - component: {fileID: 714970109}
-  m_Layer: 0
-  m_Name: FormalGameBootstrap
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &714970107
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7290c8a4e1662ae48880fc94e8b34805, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  secondsPerDay: 600
---- !u!114 &714970108
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2de95344ec891c4da0aef1cf528e1f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &714970109
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d8d9394331795f4489df5f863541ec39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
-  buildings: {fileID: 1442519525}
---- !u!114 &714970110
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 33831c5205ec3b34abe08fdb29e8070b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  legacy: {fileID: 714970111}
-  clock: {fileID: 714970107}
-  buildings: {fileID: 1442519525}
---- !u!114 &714970111
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 29ab65d0a60edb14097f0a36408a7a14, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  worldSeed: 8128
---- !u!114 &714970112
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 68d337d93228f0f40af209ad967dc257, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  economy: {fileID: 714970114}
-  buildings: {fileID: 1442519525}
-  city: {fileID: 996539048}
---- !u!114 &714970113
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 376832a9698ed884c862d85cf8254d95, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &714970114
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 49aedf081d42aa246b51f3001cbdb1b4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  world: {fileID: 1353713660}
---- !u!114 &714970115
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d700faee940554d4c9d24d128c8ebe77, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  legacy: {fileID: 714970111}
-  saves: {fileID: 714970126}
-  progression: {fileID: 714970124}
---- !u!114 &714970116
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2bcf6c825d820d245b6ae26e58ef2103, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  legacy: {fileID: 714970111}
-  world: {fileID: 1353713660}
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
---- !u!114 &714970117
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 0aab08de48497694abebf2a684cc44cd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  legacy: {fileID: 714970111}
-  buildings: {fileID: 1442519525}
---- !u!114 &714970118
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53e5a0b91db0cbd4f8ec3a45484a10c0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  legacy: {fileID: 714970111}
-  clock: {fileID: 714970107}
---- !u!114 &714970119
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9e0693bdc00f0842a2a42990a617eb8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  selection: {fileID: 714970111}
-  economy: {fileID: 714970114}
-  progression: {fileID: 714970124}
-  combat: {fileID: 714970123}
---- !u!114 &714970120
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1a14bbad460cf9e429f05802469af07e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  world: {fileID: 1353713660}
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
-  population: {fileID: 714970113}
-  progression: {fileID: 714970124}
---- !u!114 &714970121
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b08b92418e6e5c54ba294d35a955b17d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cityHealth: {fileID: 996539047}
-  saves: {fileID: 714970126}
-  guidance: {fileID: 714970122}
---- !u!114 &714970122
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 10142575a1d98714293066d3ccc95919, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  buildings: {fileID: 1442519525}
-  combat: {fileID: 714970123}
---- !u!114 &714970123
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e8bd3a68558d6094aa0d2db864d8c1b9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  cityHealth: {fileID: 996539047}
-  city: {fileID: 996539046}
-  progression: {fileID: 714970124}
-  economy: {fileID: 714970114}
-  cityState: {fileID: 996539048}
-  buildings: {fileID: 1442519525}
---- !u!114 &714970124
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b247ba618713fb84aac4f3dc4c0a3372, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  research: {fileID: 714970112}
-  buildings: {fileID: 1442519525}
-  legacy: {fileID: 714970111}
---- !u!114 &714970125
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4b0aa15ced19bbb4986a7a59c632faf4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  economy: {fileID: 714970114}
-  buildings: {fileID: 1442519525}
-  legacyEffects: {fileID: 714970119}
-  localHaste: {fileID: 714970110}
-  city: {fileID: 996539048}
-  world: {fileID: 1353713660}
---- !u!114 &714970126
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c985c526af6d99a46b5dfd31b0a4f689, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
-  legacy: {fileID: 714970111}
-  population: {fileID: 714970113}
-  progression: {fileID: 714970124}
-  cityHealth: {fileID: 996539047}
-  buildings: {fileID: 1442519525}
-  rescueSites: {fileID: 714970120}
-  clock: {fileID: 714970107}
-  foresight: {fileID: 714970118}
-  localHaste: {fileID: 714970110}
-  spatialTemplate: {fileID: 714970117}
-  worldView: {fileID: 1353713660}
-  territory: {fileID: 714970116}
-  research: {fileID: 714970112}
-  combat: {fileID: 714970123}
-  guidance: {fileID: 714970122}
---- !u!114 &714970127
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 575ebe844676689408c0592f0cc15c67, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  world: {fileID: 1353713660}
-  city: {fileID: 996539048}
-  revealRadius: 5
---- !u!114 &714970128
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2701031cf5e861d4bab234cb3050aa52, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  worldSeed: 8128
-  worldView: {fileID: 1353713660}
---- !u!114 &714970129
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e6d3fcc4b2fc88545ba69a701a17bf21, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  library: {fileID: 11400000, guid: 8167caf2b54d5ba4c902c98291e86086, type: 2}
---- !u!4 &714970130
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 714970106}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &996539045
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 996539046}
-  - component: {fileID: 996539052}
-  - component: {fileID: 996539051}
-  - component: {fileID: 996539050}
-  - component: {fileID: 996539049}
-  - component: {fileID: 996539048}
-  - component: {fileID: 996539047}
+  - component: {fileID: 498059335}
+  - component: {fileID: 498059341}
+  - component: {fileID: 498059340}
+  - component: {fileID: 498059339}
+  - component: {fileID: 498059338}
+  - component: {fileID: 498059337}
+  - component: {fileID: 498059336}
   m_Layer: 0
   m_Name: PlaceholderMobileCity
   m_TagString: Untagged
@@ -602,29 +144,29 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &996539046
+--- !u!4 &498059335
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -8, y: -5, z: -1}
   m_LocalScale: {x: 3, y: 2, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1442519526}
+  - {fileID: 598070082}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &996539047
+--- !u!114 &498059336
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 426d7e331a9379740938915fe50aba1f, type: 3}
@@ -632,26 +174,26 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maximum: 2000
   armor: 1
---- !u!114 &996539048
+--- !u!114 &498059337
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f64f60be06c07cc46accf66926f1540b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 4
---- !u!61 &996539049
+--- !u!61 &498059338
 BoxCollider2D:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_Enabled: 1
   m_Density: 1
   m_Material: {fileID: 0}
@@ -690,14 +232,14 @@ BoxCollider2D:
   serializedVersion: 2
   m_Size: {x: 0.16, y: 0.16}
   m_EdgeRadius: 0
---- !u!50 &996539050
+--- !u!50 &498059339
 Rigidbody2D:
   serializedVersion: 4
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_BodyType: 0
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
@@ -717,28 +259,28 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 4
---- !u!114 &996539051
+--- !u!114 &498059340
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 810d03bf1ee770e41aa0301d289c4dcd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   stableId: core.city.mobile
-  placeholderRenderer: {fileID: 996539052}
+  placeholderRenderer: {fileID: 498059341}
   fallbackColor: {r: 0.9, g: 0.48, b: 0.1, a: 1}
---- !u!212 &996539052
+--- !u!212 &498059341
 SpriteRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 996539045}
+  m_GameObject: {fileID: 498059334}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 0
@@ -784,7 +326,7 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
---- !u!1 &1353713659
+--- !u!1 &598070080
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -792,36 +334,91 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1353713661}
-  - component: {fileID: 1353713660}
+  - component: {fileID: 598070082}
+  - component: {fileID: 598070081}
   m_Layer: 0
-  m_Name: PlaceholderWorld
+  m_Name: PlaceholderBuildings
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1353713660
+--- !u!114 &598070081
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1353713659}
+  m_GameObject: {fileID: 598070080}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a9f31596519dc124ca89eacb13ec26b1, type: 3}
+  m_Script: {fileID: 11500000, guid: 28e1bc8f7e7363d4ca91f70a00cae919, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 32
-  height: 24
---- !u!4 &1353713661
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+  world: {fileID: 1839203936}
+  population: {fileID: 927194195}
+  research: {fileID: 927194194}
+  localTime: {fileID: 927194192}
+--- !u!4 &598070082
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1353713659}
+  m_GameObject: {fileID: 598070080}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 2.6666667, y: 2.5, z: 1}
+  m_LocalScale: {x: 0.33333334, y: 0.5, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 498059335}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &711676558
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 711676560}
+  - component: {fileID: 711676559}
+  m_Layer: 0
+  m_Name: PlaceholderHUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &711676559
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 711676558}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d49d6d6f178414d4eafc9ed9eb15b869, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+  cityHealth: {fileID: 498059336}
+  population: {fileID: 927194195}
+  guide: {fileID: 927194191}
+  gameSpeed: {fileID: 927194190}
+  clock: {fileID: 927194189}
+--- !u!4 &711676560
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 711676558}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -830,7 +427,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1442519524
+--- !u!1 &927194188
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -838,49 +435,408 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1442519526}
-  - component: {fileID: 1442519525}
+  - component: {fileID: 927194212}
+  - component: {fileID: 927194211}
+  - component: {fileID: 927194190}
+  - component: {fileID: 927194189}
+  - component: {fileID: 927194193}
+  - component: {fileID: 927194210}
+  - component: {fileID: 927194209}
+  - component: {fileID: 927194196}
+  - component: {fileID: 927194195}
+  - component: {fileID: 927194194}
+  - component: {fileID: 927194208}
+  - component: {fileID: 927194207}
+  - component: {fileID: 927194206}
+  - component: {fileID: 927194205}
+  - component: {fileID: 927194204}
+  - component: {fileID: 927194203}
+  - component: {fileID: 927194202}
+  - component: {fileID: 927194201}
+  - component: {fileID: 927194200}
+  - component: {fileID: 927194192}
+  - component: {fileID: 927194199}
+  - component: {fileID: 927194198}
+  - component: {fileID: 927194197}
+  - component: {fileID: 927194191}
   m_Layer: 0
-  m_Name: PlaceholderBuildings
+  m_Name: FormalGameBootstrap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1442519525
+--- !u!114 &927194189
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1442519524}
+  m_GameObject: {fileID: 927194188}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 28e1bc8f7e7363d4ca91f70a00cae919, type: 3}
+  m_Script: {fileID: 11500000, guid: 7290c8a4e1662ae48880fc94e8b34805, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  city: {fileID: 996539048}
-  economy: {fileID: 714970114}
-  world: {fileID: 1353713660}
-  population: {fileID: 714970113}
-  research: {fileID: 714970112}
-  localTime: {fileID: 714970110}
---- !u!4 &1442519526
+  secondsPerDay: 600
+--- !u!114 &927194190
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2de95344ec891c4da0aef1cf528e1f8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &927194191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8d9394331795f4489df5f863541ec39, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+  buildings: {fileID: 598070081}
+--- !u!114 &927194192
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 33831c5205ec3b34abe08fdb29e8070b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legacy: {fileID: 927194193}
+  clock: {fileID: 927194189}
+  buildings: {fileID: 598070081}
+--- !u!114 &927194193
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29ab65d0a60edb14097f0a36408a7a14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  worldSeed: 8128
+--- !u!114 &927194194
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68d337d93228f0f40af209ad967dc257, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  economy: {fileID: 927194196}
+  buildings: {fileID: 598070081}
+  city: {fileID: 498059337}
+--- !u!114 &927194195
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 376832a9698ed884c862d85cf8254d95, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &927194196
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 49aedf081d42aa246b51f3001cbdb1b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  city: {fileID: 498059337}
+  world: {fileID: 1839203936}
+--- !u!114 &927194197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d700faee940554d4c9d24d128c8ebe77, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legacy: {fileID: 927194193}
+  saves: {fileID: 927194208}
+  progression: {fileID: 927194206}
+--- !u!114 &927194198
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2bcf6c825d820d245b6ae26e58ef2103, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legacy: {fileID: 927194193}
+  world: {fileID: 1839203936}
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+--- !u!114 &927194199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0aab08de48497694abebf2a684cc44cd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legacy: {fileID: 927194193}
+  buildings: {fileID: 598070081}
+--- !u!114 &927194200
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53e5a0b91db0cbd4f8ec3a45484a10c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  legacy: {fileID: 927194193}
+  clock: {fileID: 927194189}
+--- !u!114 &927194201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a9e0693bdc00f0842a2a42990a617eb8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  selection: {fileID: 927194193}
+  economy: {fileID: 927194196}
+  progression: {fileID: 927194206}
+  combat: {fileID: 927194205}
+--- !u!114 &927194202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a14bbad460cf9e429f05802469af07e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  world: {fileID: 1839203936}
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+  population: {fileID: 927194195}
+  progression: {fileID: 927194206}
+--- !u!114 &927194203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b08b92418e6e5c54ba294d35a955b17d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cityHealth: {fileID: 498059336}
+  saves: {fileID: 927194208}
+  guidance: {fileID: 927194204}
+--- !u!114 &927194204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10142575a1d98714293066d3ccc95919, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  city: {fileID: 498059337}
+  buildings: {fileID: 598070081}
+  combat: {fileID: 927194205}
+--- !u!114 &927194205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8bd3a68558d6094aa0d2db864d8c1b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cityHealth: {fileID: 498059336}
+  city: {fileID: 498059335}
+  progression: {fileID: 927194206}
+  economy: {fileID: 927194196}
+  cityState: {fileID: 498059337}
+  buildings: {fileID: 598070081}
+--- !u!114 &927194206
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b247ba618713fb84aac4f3dc4c0a3372, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  research: {fileID: 927194194}
+  buildings: {fileID: 598070081}
+  legacy: {fileID: 927194193}
+  combat: {fileID: 927194205}
+  production: {fileID: 927194207}
+--- !u!114 &927194207
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b0aa15ced19bbb4986a7a59c632faf4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  economy: {fileID: 927194196}
+  buildings: {fileID: 598070081}
+  legacyEffects: {fileID: 927194201}
+  localHaste: {fileID: 927194192}
+  city: {fileID: 498059337}
+  world: {fileID: 1839203936}
+--- !u!114 &927194208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c985c526af6d99a46b5dfd31b0a4f689, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  city: {fileID: 498059337}
+  economy: {fileID: 927194196}
+  legacy: {fileID: 927194193}
+  population: {fileID: 927194195}
+  progression: {fileID: 927194206}
+  cityHealth: {fileID: 498059336}
+  buildings: {fileID: 598070081}
+  rescueSites: {fileID: 927194202}
+  clock: {fileID: 927194189}
+  foresight: {fileID: 927194200}
+  localHaste: {fileID: 927194192}
+  spatialTemplate: {fileID: 927194199}
+  worldView: {fileID: 1839203936}
+  territory: {fileID: 927194198}
+  research: {fileID: 927194194}
+  combat: {fileID: 927194205}
+  guidance: {fileID: 927194204}
+--- !u!114 &927194209
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 575ebe844676689408c0592f0cc15c67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  world: {fileID: 1839203936}
+  city: {fileID: 498059337}
+  revealRadius: 5
+--- !u!114 &927194210
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2701031cf5e861d4bab234cb3050aa52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  worldSeed: 8128
+  worldView: {fileID: 1839203936}
+--- !u!114 &927194211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 927194188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e6d3fcc4b2fc88545ba69a701a17bf21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  library: {fileID: 11400000, guid: 8167caf2b54d5ba4c902c98291e86086, type: 2}
+--- !u!4 &927194212
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1442519524}
+  m_GameObject: {fileID: 927194188}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 2.6666667, y: 2.5, z: 1}
-  m_LocalScale: {x: 0.33333334, y: 0.5, z: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 996539046}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1560870960
+--- !u!1 &1611851640
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -888,8 +844,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1560870962}
-  - component: {fileID: 1560870961}
+  - component: {fileID: 1611851642}
+  - component: {fileID: 1611851641}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -897,13 +853,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!20 &1560870961
+--- !u!20 &1611851641
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1560870960}
+  m_GameObject: {fileID: 1611851640}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
@@ -948,16 +904,62 @@ Camera:
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
   m_StereoSeparation: 0.022
---- !u!4 &1560870962
+--- !u!4 &1611851642
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1560870960}
+  m_GameObject: {fileID: 1611851640}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -10}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1839203935
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1839203937}
+  - component: {fileID: 1839203936}
+  m_Layer: 0
+  m_Name: PlaceholderWorld
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1839203936
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1839203935}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a9f31596519dc124ca89eacb13ec26b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  width: 32
+  height: 24
+--- !u!4 &1839203937
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1839203935}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -967,8 +969,8 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1560870962}
-  - {fileID: 1353713661}
-  - {fileID: 996539046}
-  - {fileID: 714970130}
-  - {fileID: 605676776}
+  - {fileID: 1611851642}
+  - {fileID: 1839203937}
+  - {fileID: 498059335}
+  - {fileID: 927194212}
+  - {fileID: 711676560}

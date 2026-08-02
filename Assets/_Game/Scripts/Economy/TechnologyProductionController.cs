@@ -21,6 +21,7 @@ namespace WasteCity.Economy
         public int ActiveMines { get; private set; }
         public int DepletedMines { get; private set; }
         public int FullMines { get; private set; }
+        public bool HasRunningProduction=>ActiveMines>0||smelter.Status==ProductionStatus.Running||assembler.Status==ProductionStatus.Running;
 
         private void Update()
         {
