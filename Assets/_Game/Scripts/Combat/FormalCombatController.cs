@@ -23,6 +23,8 @@ namespace WasteCity.Combat
         private readonly List<EnemyArchetype> spawnBuffer=new List<EnemyArchetype>();
         public int SpawnedEnemies { get; private set; }
         public event Action<bool> EnemyDefeated;
+        public event Action<EnemyArchetype> EnemyArchetypeDefeated;
+        public event Action<int> WaveCompleted;
         private static Sprite square;
         private void Start(){progression.Observation.ThresholdReached+=OnThreshold;buildings.BuildingPlaced+=OnBuildingPlaced;}
         private void Update()
@@ -46,7 +48,7 @@ namespace WasteCity.Combat
             item.transform.position=restoredPosition??((Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f); item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
             VisualSlot.Attach(item,definition.Id.Value,renderer,renderer.color);
-            item.AddComponent<HealthComponent>();var enemy=item.AddComponent<PlaceholderEnemy>();enemy.Configure(cityHealth,city,definition,economy.Inventory,threshold,value => {waves.RegisterDefeat(threshold);EnemyDefeated?.Invoke(value);});if(restoredHealth>=0)enemy.GetComponent<HealthComponent>().Value.Restore(restoredHealth,restoredShield);if(archetype==EnemyArchetype.CrystalBroodmother)item.AddComponent<PlaceholderBossEncounter>().Configure(cityHealth,city,(type,position)=>Spawn(type,-1,SpawnedEnemies,position),restoredBoss);SpawnedEnemies++;return enemy;
+            item.AddComponent<HealthComponent>();var enemy=item.AddComponent<PlaceholderEnemy>();enemy.Configure(cityHealth,city,definition,economy.Inventory,threshold,value => {if(waves.RegisterDefeat(threshold))WaveCompleted?.Invoke(threshold);EnemyDefeated?.Invoke(value);EnemyArchetypeDefeated?.Invoke(archetype);});if(restoredHealth>=0)enemy.GetComponent<HealthComponent>().Value.Restore(restoredHealth,restoredShield);if(archetype==EnemyArchetype.CrystalBroodmother)item.AddComponent<PlaceholderBossEncounter>().Configure(cityHealth,city,(type,position)=>Spawn(type,-1,SpawnedEnemies,position),restoredBoss);SpawnedEnemies++;return enemy;
         }
         private static EnemyDefinition DefinitionFor(EnemyArchetype archetype)=>archetype==EnemyArchetype.CrystalBeast?EnemyCatalog.CrystalBeast:archetype==EnemyArchetype.Howler?EnemyCatalog.Howler:archetype==EnemyArchetype.Burrower?EnemyCatalog.Burrower:archetype==EnemyArchetype.CrystalBroodmother?EnemyCatalog.CrystalBroodmother:EnemyCatalog.Gnawer;
         public WaveDirectorSnapshot CaptureWave()=>waves.Capture();

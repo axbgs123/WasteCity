@@ -15,6 +15,7 @@ using WasteCity.Progression;
 using WasteCity.Combat;
 using WasteCity.Population;
 using WasteCity.Presentation;
+using WasteCity.Narrative;
 
 namespace WasteCity.Editor
 {
@@ -100,6 +101,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("buildings").objectReferenceValue=buildingController;
             combatData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("combat").objectReferenceValue=combat;saveData.ApplyModifiedPropertiesWithoutUndo();
+            var guidance=systems.AddComponent<FormalGuidanceController>();var guidanceData=new SerializedObject(guidance);guidanceData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();guidanceData.FindProperty("buildings").objectReferenceValue=buildingController;guidanceData.FindProperty("combat").objectReferenceValue=combat;guidanceData.ApplyModifiedPropertiesWithoutUndo();saveData.FindProperty("guidance").objectReferenceValue=guidance;saveData.ApplyModifiedPropertiesWithoutUndo();
             var rescueSites = systems.AddComponent<RescueSiteController>(); var rescueData = new SerializedObject(rescueSites); rescueData.FindProperty("world").objectReferenceValue = worldView; rescueData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); rescueData.FindProperty("economy").objectReferenceValue = economy; rescueData.FindProperty("population").objectReferenceValue = population; rescueData.FindProperty("progression").objectReferenceValue = progression; rescueData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("rescueSites").objectReferenceValue = rescueSites; saveData.ApplyModifiedPropertiesWithoutUndo();
             var legacyEffects = systems.AddComponent<LegacyEffectsController>();
