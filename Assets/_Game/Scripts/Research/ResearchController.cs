@@ -25,6 +25,7 @@ namespace WasteCity.Research
         public bool HasSwordRiding => Model.IsCompleted(new Content.StableId("core.research.sword-riding"));
         public bool HasFormationReinforcement => Model.IsCompleted(new Content.StableId("core.research.formation-reinforcement"));
         public bool HasOrbitalSupply => Model.IsCompleted(new Content.StableId("core.research.orbital-supply"));
+        public bool HasMindControl => Model.IsCompleted(new Content.StableId("core.research.mind-control"));
         private bool visible;
         private int selectedIndex;
         private void Update()

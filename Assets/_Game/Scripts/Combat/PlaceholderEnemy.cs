@@ -3,6 +3,7 @@ using WasteCity.Building;
 using WasteCity.Economy;
 using System;
 using WasteCity.Research;
+using WasteCity.Presentation;
 
 namespace WasteCity.Combat
 {
@@ -17,21 +18,39 @@ namespace WasteCity.Combat
         private EnemyDefinition definition;
         private EnemyQualityProfile quality;
         private ResearchController research;
+        private SpriteRenderer visual;
+        private bool defeatReported;
         public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
+        private Action converted;
         public EnemyDefinition Definition => definition;
         public EnemyQuality Quality => quality.Quality;
+        public bool IsControlled { get; private set; }
         public float MoveSpeedMultiplier { get; set; }=1f;
-        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null)
+        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null, Action onConverted = null)
         {
-            definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; research=researchController; health = GetComponent<HealthComponent>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
+            definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; converted=onConverted; lootInventory = inventory; research=researchController; health = GetComponent<HealthComponent>(); visual=GetComponent<SpriteRenderer>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
             cityHealth = targetHealth; city = target; health.Value.Died += OnDied;
         }
-        private void OnDied(){lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
+        private void OnDied(){if(!IsControlled)lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));if(!defeatReported)defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
+        public bool TryConvert(bool reportDefeat=true)
+        {
+            if(IsControlled||!MindControlModel.ShouldConvert(research!=null&&research.HasMindControl,Quality,definition.IsHeavy,0))return false;
+            IsControlled=true;MoveSpeedMultiplier=1.15f;
+            if(!defeatReported){defeatReported=true;if(reportDefeat)converted?.Invoke();}
+            if(visual!=null){Color color=new Color(.2f,1f,.75f);VisualSlot.Attach(gameObject,$"{definition.Id.Value}.controlled",visual,color);}
+            return true;
+        }
         private void Update()
         {
             if (city == null || cityHealth.Value.IsDead) return;
+            if(IsControlled){UpdateControlled();return;}
             HealthComponent targetHealth = cityHealth; Transform targetTransform = city; float best = definition.TargetPriority==EnemyTargetPriority.Nearest?Vector2.Distance(transform.position, city.position):float.MaxValue;
+            foreach(var ally in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
+            {
+                if(!ally.IsControlled||ally==this)continue;float distance=Vector2.Distance(transform.position,ally.transform.position);
+                if(distance<best){best=distance;targetHealth=ally.health;targetTransform=ally.transform;}
+            }
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
             {
                 if(!CanTarget(building))continue;float distance=Vector2.Distance(transform.position,building.transform.position);
@@ -40,6 +59,14 @@ namespace WasteCity.Combat
             if(best==float.MaxValue)best=Vector2.Distance(transform.position,city.position);
             if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * MoveSpeedMultiplier * Time.deltaTime);
             else { attackRemainder += definition.DamagePerSecond * quality.DamageMultiplier * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (damage > 0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
+        }
+        private void UpdateControlled()
+        {
+            PlaceholderEnemy target=null;float best=float.MaxValue;
+            foreach(var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>()){if(enemy==this||enemy.IsControlled)continue;float distance=Vector2.Distance(transform.position,enemy.transform.position);if(distance<best){best=distance;target=enemy;}}
+            if(target==null){if(Vector2.Distance(transform.position,city.position)>4f)transform.position=Vector2.MoveTowards(transform.position,city.position,definition.MoveSpeed*MoveSpeedMultiplier*Time.deltaTime);return;}
+            if(best>definition.AttackRange)transform.position=Vector2.MoveTowards(transform.position,target.transform.position,definition.MoveSpeed*MoveSpeedMultiplier*Time.deltaTime);
+            else{attackRemainder+=definition.DamagePerSecond*.75f*Time.deltaTime;int damage=Mathf.FloorToInt(attackRemainder);if(damage>0){target.health.Value.Apply(damage,DamageType.Psionic,target.health.Armor);attackRemainder-=damage;}}
         }
         private bool CanTarget(BuildingRuntime building)
         {

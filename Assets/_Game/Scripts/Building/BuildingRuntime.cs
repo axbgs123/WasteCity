@@ -78,15 +78,19 @@ namespace WasteCity.Building
     {
         private FormalEconomyController economy;
         private TurretWeaponModel weapon;
-        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;private ResearchController research;private DefenseTowerDefinition profile;
+        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;private ResearchController research;private DefenseTowerDefinition profile;private float mindControlClock;
         public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null,ResearchController researchController=null) { economy = value; runtime = building; localTime = time;fireRate=rate;research=researchController;profile=DefenseTowerCatalog.For(building?.Definition?.Id.Value)??DefenseTowerCatalog.For("core.building.machine-gun-turret");weapon=new TurretWeaponModel(profile.DamagePerSecond,profile.SecondsPerConsumable,profile.DamageType,profile.ConsumableId); }
         public void SetFireRateSource(ITurretFireRateSource value)=>fireRate=value;
         private void Update()
         {
-            if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f)*RouteTechnologyEffects.TowerRangeMultiplier(runtime.Definition.Id.Value,research!=null&&research.HasSwordRiding);float best = range*range;
+            if (economy == null || runtime == null || !runtime.HasLogistics) return; PlaceholderEnemy nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f)*RouteTechnologyEffects.TowerRangeMultiplier(runtime.Definition.Id.Value,research!=null&&research.HasSwordRiding);float best = range*range;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
-            { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
-            if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor,physical?(research?.TurretDamageMultiplier??1f):1f);
+            { var health = enemy.GetComponent<HealthComponent>(); if (enemy.IsControlled||health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = enemy; } }
+            if (nearest != null)
+            {
+                float delta=Time.deltaTime*(localTime?.MultiplierFor(runtime)??1f)*(fireRate?.FireRateMultiplier??1f);var targetHealth=nearest.GetComponent<HealthComponent>();int dealt=weapon.Tick(delta,economy.Inventory,targetHealth.Value,targetHealth.Armor,physical?(research?.TurretDamageMultiplier??1f):1f);
+                if(dealt>0&&profile.DamageType==DamageType.Psionic&&research!=null&&research.HasMindControl){mindControlClock+=Time.deltaTime;if(mindControlClock>=1f){mindControlClock%=1f;if(MindControlModel.ShouldConvert(true,nearest.Quality,nearest.Definition.IsHeavy,UnityEngine.Random.Range(0,100)))nearest.TryConvert();}}
+            }
         }
     }
 
