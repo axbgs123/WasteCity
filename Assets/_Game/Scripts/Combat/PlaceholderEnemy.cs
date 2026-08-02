@@ -51,6 +51,11 @@ namespace WasteCity.Combat
                 if(!ally.IsControlled||ally==this)continue;float distance=Vector2.Distance(transform.position,ally.transform.position);
                 if(distance<best){best=distance;targetHealth=ally.health;targetTransform=ally.transform;}
             }
+            foreach(var puppet in UnityEngine.Object.FindObjectsOfType<PlaceholderPuppet>())
+            {
+                float distance=Vector2.Distance(transform.position,puppet.transform.position);
+                if(distance<best){best=distance;targetHealth=puppet.Health;targetTransform=puppet.transform;}
+            }
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
             {
                 if(!CanTarget(building))continue;float distance=Vector2.Distance(transform.position,building.transform.position);

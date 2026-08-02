@@ -20,8 +20,8 @@ namespace WasteCity.Legacy
         private void Update()
         {
             if (!Active || Keyboard.current == null) return;
-            if (Keyboard.current.f6Key.wasPressedThisFrame) anchor = saves.Capture();
-            if (Keyboard.current.f10Key.wasPressedThisFrame && anchor != null) { float attention = RewindAnchorRules.AttentionAfterLoad(progression.Observation.Value); saves.Apply(anchor, true); progression.Observation.Restore(attention); }
+            if (Keyboard.current.f6Key.wasPressedThisFrame) anchor = saves.CaptureComplete();
+            if (Keyboard.current.f10Key.wasPressedThisFrame && anchor != null) { float attention = RewindAnchorRules.AttentionAfterLoad(progression.Observation.Value); saves.ApplyComplete(anchor, true); progression.Observation.Restore(attention); }
         }
         private void OnGUI() { if (Active) GUI.Box(new Rect(Screen.width - 390f, 400f, 370f, 48f), HasAnchor ? "回溯锚点：F6 覆盖锚点 · F10 回溯（观测值 +3）" : "回溯锚点：按 F6 创建本局唯一锚点"); }
     }
