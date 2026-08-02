@@ -5,6 +5,7 @@ using WasteCity.Economy;
 using WasteCity.Population;
 using WasteCity.Progression;
 using WasteCity.Presentation;
+using System;
 
 namespace WasteCity.World
 {
@@ -17,6 +18,7 @@ namespace WasteCity.World
         [SerializeField] private FormalProgressionController progression;
         public RescueSiteModel Model { get; private set; }
         public string LastResult { get; private set; }
+        public event Action<int,bool> Rescued;
         private SpriteRenderer[] markers;
         private static Sprite square;
         private void Start() => TryInitialize();
@@ -31,16 +33,17 @@ namespace WasteCity.World
         {
             if (Model == null) { TryInitialize(); return; } int nearby = -1;
             for (int i = 0; i < Model.Sites.Count; i++) { var site = Model.Sites[i]; markers[i].enabled = world.Model.IsRevealed(site.X, site.Y) && !site.Completed; if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) nearby = i; }
-            if (nearby >= 0 && city.Deployment.Mode == CityMode.Fortress && Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame) TryRescue(nearby);
+            if (nearby >= 0 && city.Deployment.Mode == CityMode.Fortress && Keyboard.current != null)
+            {if(Keyboard.current.eKey.wasPressedThisFrame)TryRescue(nearby,true);else if(Keyboard.current.gKey.wasPressedThisFrame)TryRescue(nearby,false);}
         }
-        public bool TryRescue(int index)
+        public bool TryRescue(int index,bool immediate=true)
         {
-            if (index < 0 || index >= Model.Sites.Count || Model.Sites[index].Completed || !economy.Inventory.TrySpend(ResourceIds.Biomass, 5)) return false;
-            Model.Sites[index].Complete(); population.AddPeople(20); progression.Observation.Add("救援废墟幸存者", 2f); LastResult = "救援成功：人口 +20 · 生物质 -5 · 异常观测值 +2"; return true;
+            int cost=immediate?5:2;if (index < 0 || index >= Model.Sites.Count || Model.Sites[index].Completed || !economy.Inventory.TrySpend(ResourceIds.Biomass, cost)) return false;
+            Model.Sites[index].Complete(); population.AddPeople(20); progression.Observation.Add("救援废墟幸存者", 2f); LastResult = $"{(immediate?"立即":"延迟")}救援成功：人口 +20 · 生物质 -{cost} · 异常观测值 +2";Rescued?.Invoke(index,immediate);return true;
         }
         public bool[] Capture() => Model?.Capture();
         public void Restore(bool[] values) => Model?.Restore(values);
         private Vector3 WorldPosition(RescueSite site) => new Vector3(site.X - world.Model.Width * .5f, site.Y - world.Model.Height * .5f, -1f);
-        private void OnGUI() { if (Model == null) return; foreach (var site in Model.Sites) if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) GUI.Box(new Rect(18, Screen.height - 132f, 500f, 48f), "救援遗迹：堡垒状态按 F，消耗 5 生物质救出 20 人"); if (!string.IsNullOrEmpty(LastResult)) GUI.Box(new Rect(18, 245f, 500f, 45f), LastResult); }
+        private void OnGUI() { if (Model == null) return; foreach (var site in Model.Sites) if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) GUI.Box(new Rect(18, Screen.height - 132f, 620f, 48f), "救援遗迹：[E] 立即救援（生物质5，健康） / [G] 延迟救援（生物质2，受伤）"); if (!string.IsNullOrEmpty(LastResult)) GUI.Box(new Rect(18, 245f, 500f, 45f), LastResult); }
     }
 }

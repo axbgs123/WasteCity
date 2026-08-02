@@ -5,6 +5,7 @@ using WasteCity.City;
 using WasteCity.World;
 using System.Collections.Generic;
 using System.Linq;
+using WasteCity.Leader;
 
 namespace WasteCity.Economy
 {
@@ -15,6 +16,7 @@ namespace WasteCity.Economy
         [SerializeField] LocalHasteController localHaste;
         [SerializeField] PlaceholderMobileCity city;
         [SerializeField] PlaceholderWorldView world;
+        [SerializeField] FormalLeaderController leader;
         private readonly ProductionProcess smelter=new ProductionProcess(new ProductionRecipe(ResourceIds.Iron,2,ResourceIds.Alloy,1,6f));
         private readonly ProductionProcess assembler=new ProductionProcess(new ProductionRecipe(ResourceIds.Alloy,2,ResourceIds.Ammunition,2,6f));
         private readonly Dictionary<BuildingRuntime,ResourceExtractionProcess> mines=new Dictionary<BuildingRuntime,ResourceExtractionProcess>();
@@ -51,7 +53,7 @@ namespace WasteCity.Economy
             }
             float industryDelta=Time.deltaTime*cityMultiplier;
             smelter.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(smelters)??smelters);
-            assembler.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(assemblers)??assemblers);
+            assembler.Tick(industryDelta*(leader?.AssemblerEfficiency??1f),economy.Inventory,legacyEffects?.Model?.ProductionUnits(assemblers)??assemblers);
         }
 
         private void OnGUI()

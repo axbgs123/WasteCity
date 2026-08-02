@@ -8,6 +8,7 @@ using WasteCity.City;
 namespace WasteCity.Building
 {
     public interface ILocalTimeScaleSource { float MultiplierFor(BuildingRuntime runtime); }
+    public interface ITurretFireRateSource { float FireRateMultiplier { get; } }
     [RequireComponent(typeof(HealthComponent))]
     public sealed class BuildingRuntime : MonoBehaviour
     {
@@ -63,14 +64,15 @@ namespace WasteCity.Building
     {
         private FormalEconomyController economy;
         private readonly TurretWeaponModel weapon = new TurretWeaponModel(20f, 3f);
-        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;
-        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null) { economy = value; runtime = building; localTime = time; }
+        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;
+        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null) { economy = value; runtime = building; localTime = time;fireRate=rate; }
+        public void SetFireRateSource(ITurretFireRateSource value)=>fireRate=value;
         private void Update()
         {
             if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; float best = 100f;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
-            if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f), economy.Inventory, nearest.Value, nearest.Armor);
+            if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor);
         }
     }
 }

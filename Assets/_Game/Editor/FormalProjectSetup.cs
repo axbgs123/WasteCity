@@ -16,6 +16,7 @@ using WasteCity.Combat;
 using WasteCity.Population;
 using WasteCity.Presentation;
 using WasteCity.Narrative;
+using WasteCity.Leader;
 
 namespace WasteCity.Editor
 {
@@ -43,6 +44,7 @@ namespace WasteCity.Editor
             var body = city.AddComponent<Rigidbody2D>(); body.gravityScale = 0f; body.freezeRotation = true; body.interpolation = RigidbodyInterpolation2D.Interpolate;
             city.AddComponent<BoxCollider2D>(); city.AddComponent<PlaceholderMobileCity>();
             var cityHealth = city.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var leaderVisual=new GameObject("PlaceholderLeader_CenJin");var leaderRenderer=leaderVisual.AddComponent<SpriteRenderer>();leaderRenderer.sprite=AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");leaderRenderer.color=new Color(.2f,.85f,.95f);leaderRenderer.sortingOrder=12;leaderVisual.transform.localScale=Vector3.one*.65f;VisualSlot.Attach(leaderVisual,"core.character.cen-jin",leaderRenderer,leaderRenderer.color);leaderVisual.SetActive(false);
 
             var systems = new GameObject("FormalGameBootstrap");
             var visualProvider = systems.AddComponent<VisualLibraryProvider>(); var visualLibrary = LoadOrCreateVisualLibrary(); var visualProviderData = new SerializedObject(visualProvider); visualProviderData.FindProperty("library").objectReferenceValue = visualLibrary; visualProviderData.ApplyModifiedPropertiesWithoutUndo();
@@ -111,6 +113,7 @@ namespace WasteCity.Editor
             var session=systems.AddComponent<FormalSessionController>();var sessionData=new SerializedObject(session);sessionData.FindProperty("cityHealth").objectReferenceValue=cityHealth;sessionData.FindProperty("saves").objectReferenceValue=saves;sessionData.FindProperty("guidance").objectReferenceValue=guidance;sessionData.FindProperty("advancement").objectReferenceValue=advancement;sessionData.ApplyModifiedPropertiesWithoutUndo();
             var rescueSites = systems.AddComponent<RescueSiteController>(); var rescueData = new SerializedObject(rescueSites); rescueData.FindProperty("world").objectReferenceValue = worldView; rescueData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); rescueData.FindProperty("economy").objectReferenceValue = economy; rescueData.FindProperty("population").objectReferenceValue = population; rescueData.FindProperty("progression").objectReferenceValue = progression; rescueData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("rescueSites").objectReferenceValue = rescueSites; saveData.ApplyModifiedPropertiesWithoutUndo();
+            var leader=systems.AddComponent<FormalLeaderController>();var leaderData=new SerializedObject(leader);leaderData.FindProperty("rescueSites").objectReferenceValue=rescueSites;leaderData.FindProperty("city").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();leaderData.FindProperty("visual").objectReferenceValue=leaderVisual.transform;leaderData.ApplyModifiedPropertiesWithoutUndo();buildingController.SetTurretFireRateSource(leader);productionData.FindProperty("leader").objectReferenceValue=leader;productionData.ApplyModifiedPropertiesWithoutUndo();saveData.FindProperty("leader").objectReferenceValue=leader;saveData.ApplyModifiedPropertiesWithoutUndo();
             var legacyEffects = systems.AddComponent<LegacyEffectsController>();
             var legacyEffectsData = new SerializedObject(legacyEffects); legacyEffectsData.FindProperty("selection").objectReferenceValue = legacy; legacyEffectsData.FindProperty("economy").objectReferenceValue = economy; legacyEffectsData.FindProperty("progression").objectReferenceValue = progression; legacyEffectsData.FindProperty("combat").objectReferenceValue = combat; legacyEffectsData.ApplyModifiedPropertiesWithoutUndo();
             productionData.FindProperty("legacyEffects").objectReferenceValue = legacyEffects; productionData.ApplyModifiedPropertiesWithoutUndo();
