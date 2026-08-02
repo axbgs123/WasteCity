@@ -17,6 +17,7 @@ namespace WasteCity.Combat
         public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
         public EnemyDefinition Definition => definition;
+        public float MoveSpeedMultiplier { get; set; }=1f;
         public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null)
         {
             definition = enemyDefinition ?? EnemyCatalog.Gnawer; WaveTrigger=waveTrigger; defeated = onDefeated; lootInventory = inventory; health = GetComponent<HealthComponent>(); health.Configure(definition.MaximumHealth, definition.Armor);
@@ -33,7 +34,7 @@ namespace WasteCity.Combat
                 if(distance<best){best=distance;targetHealth=building.Health;targetTransform=building.transform;}
             }
             if(best==float.MaxValue)best=Vector2.Distance(transform.position,city.position);
-            if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * Time.deltaTime);
+            if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * MoveSpeedMultiplier * Time.deltaTime);
             else { attackRemainder += definition.DamagePerSecond * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (damage > 0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
         }
         private bool CanTarget(BuildingRuntime building)

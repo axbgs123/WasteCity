@@ -9,7 +9,7 @@ using System.Collections.Generic;
 
 namespace WasteCity.Combat
 {
-    [Serializable] public sealed class EnemySnapshot { public int archetype,waveTrigger,health;public float x,y; }
+    [Serializable] public sealed class EnemySnapshot { public int archetype,waveTrigger,health,shield;public float x,y;public BossEncounterSnapshot boss; }
     public sealed class FormalCombatController : MonoBehaviour
     {
         [SerializeField] private HealthComponent cityHealth;
@@ -38,7 +38,7 @@ namespace WasteCity.Combat
             waves.Schedule(threshold);
         }
         private void OnBuildingPlaced(BuildingDefinition definition){if(definition.Id.Value=="core.building.machine-gun-turret")waves.Schedule(0);}
-        private PlaceholderEnemy Spawn(EnemyArchetype archetype,int threshold,int slot,Vector2? restoredPosition=null,int restoredHealth=-1)
+        private PlaceholderEnemy Spawn(EnemyArchetype archetype,int threshold,int slot,Vector2? restoredPosition=null,int restoredHealth=-1,int restoredShield=0,BossEncounterSnapshot restoredBoss=null)
         {
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture,new Rect(0,0,1,1),Vector2.one*.5f,1f);
             EnemyDefinition definition=DefinitionFor(archetype);bool heavy=definition.IsHeavy;
@@ -46,15 +46,15 @@ namespace WasteCity.Combat
             item.transform.position=restoredPosition??((Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f); item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
             VisualSlot.Attach(item,definition.Id.Value,renderer,renderer.color);
-            item.AddComponent<HealthComponent>();var enemy=item.AddComponent<PlaceholderEnemy>();enemy.Configure(cityHealth,city,definition,economy.Inventory,threshold,value => {waves.RegisterDefeat(threshold);EnemyDefeated?.Invoke(value);});if(restoredHealth>=0)enemy.GetComponent<HealthComponent>().Value.Restore(restoredHealth);SpawnedEnemies++;return enemy;
+            item.AddComponent<HealthComponent>();var enemy=item.AddComponent<PlaceholderEnemy>();enemy.Configure(cityHealth,city,definition,economy.Inventory,threshold,value => {waves.RegisterDefeat(threshold);EnemyDefeated?.Invoke(value);});if(restoredHealth>=0)enemy.GetComponent<HealthComponent>().Value.Restore(restoredHealth,restoredShield);if(archetype==EnemyArchetype.CrystalBroodmother)item.AddComponent<PlaceholderBossEncounter>().Configure(cityHealth,city,(type,position)=>Spawn(type,-1,SpawnedEnemies,position),restoredBoss);SpawnedEnemies++;return enemy;
         }
         private static EnemyDefinition DefinitionFor(EnemyArchetype archetype)=>archetype==EnemyArchetype.CrystalBeast?EnemyCatalog.CrystalBeast:archetype==EnemyArchetype.Howler?EnemyCatalog.Howler:archetype==EnemyArchetype.Burrower?EnemyCatalog.Burrower:archetype==EnemyArchetype.CrystalBroodmother?EnemyCatalog.CrystalBroodmother:EnemyCatalog.Gnawer;
         public WaveDirectorSnapshot CaptureWave()=>waves.Capture();
-        public EnemySnapshot[] CaptureEnemies(){var values=UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>();var result=new EnemySnapshot[values.Length];for(int i=0;i<values.Length;i++){var enemy=values[i];result[i]=new EnemySnapshot{archetype=(int)enemy.Definition.Archetype,waveTrigger=enemy.WaveTrigger,health=enemy.GetComponent<HealthComponent>().Value.Current,x=enemy.transform.position.x,y=enemy.transform.position.y};}return result;}
+        public EnemySnapshot[] CaptureEnemies(){var values=UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>();var result=new EnemySnapshot[values.Length];for(int i=0;i<values.Length;i++){var enemy=values[i];var health=enemy.GetComponent<HealthComponent>().Value;result[i]=new EnemySnapshot{archetype=(int)enemy.Definition.Archetype,waveTrigger=enemy.WaveTrigger,health=health.Current,shield=health.Shield,x=enemy.transform.position.x,y=enemy.transform.position.y,boss=enemy.GetComponent<PlaceholderBossEncounter>()?.Capture()};}return result;}
         public void Restore(WaveDirectorSnapshot wave,EnemySnapshot[] enemies)
         {
             waves.Restore(wave);foreach(var existing in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())Destroy(existing.gameObject);if(enemies==null)return;
-            for(int i=0;i<enemies.Length;i++){var value=enemies[i];EnemyArchetype archetype=Enum.IsDefined(typeof(EnemyArchetype),value.archetype)?(EnemyArchetype)value.archetype:EnemyArchetype.Gnawer;Spawn(archetype,value.waveTrigger,SpawnedEnemies,new Vector2(value.x,value.y),value.health);}
+            for(int i=0;i<enemies.Length;i++){var value=enemies[i];EnemyArchetype archetype=Enum.IsDefined(typeof(EnemyArchetype),value.archetype)?(EnemyArchetype)value.archetype:EnemyArchetype.Gnawer;Spawn(archetype,value.waveTrigger,SpawnedEnemies,new Vector2(value.x,value.y),value.health,value.shield,value.boss);}
         }
         private void OnGUI(){if(waves.Current==null)return;string phase=waves.Phase==WavePhase.Warning?$"预警 {waves.WarningRemaining:0}s":waves.Phase==WavePhase.Spawning?"敌群正在分批抵达":"清剿中";GUI.Box(new Rect(Screen.width*.5f-190f,18f,380f,58f),$"压力波次 {waves.Current.Trigger} · {phase}\n已出现 {waves.SpawnedCount}/{waves.Current.TotalCount} · 已消灭 {waves.DefeatedCount}");}
     }
