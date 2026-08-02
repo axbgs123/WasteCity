@@ -12,6 +12,6 @@ namespace WasteCity.Building
     public static class BuildingUpgradeCatalog
     {
         private static readonly BuildingUpgradeDefinition HeavyTurret=new BuildingUpgradeDefinition(BuildingCatalog.MachineGunTurret,BuildingCatalog.HeavyMachineGunTurret,Economy.ResourceIds.Alloy,20,2);
-        public static BuildingUpgradeDefinition For(BuildingDefinition source,int civilizationLevel)=>source==HeavyTurret.Source&&civilizationLevel>=HeavyTurret.RequiredCivilizationLevel?HeavyTurret:null;
+        public static BuildingUpgradeDefinition For(BuildingDefinition source,int civilizationLevel,bool alloyArmorCompleted=false)=>source==HeavyTurret.Source&&civilizationLevel>=HeavyTurret.RequiredCivilizationLevel&&alloyArmorCompleted?HeavyTurret:null;
     }
 }

@@ -31,8 +31,8 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition Wall=new BuildingDefinition("core.building.wall", "城墙", 1, 1, ResourceIds.Stone, 2, false, 2f, 300);
         public static readonly BuildingDefinition ResearchStation=new BuildingDefinition("core.building.research-station", "研究站", 2, 2, ResourceIds.Iron, 6, false, 10f, 260, 200);
         public static readonly BuildingDefinition Smelter=new BuildingDefinition("core.building.smelter", "冶炼厂", 2, 2, ResourceIds.Stone, 6, false, 8f, 280, 0, "core.research.automated-machinery");
-        public static readonly BuildingDefinition Assembler=new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, null, "core.building.smelter");
-        public static readonly BuildingDefinition MachineGunTurret=new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, null, "core.building.assembler");
+        public static readonly BuildingDefinition Assembler=new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, "core.research.precision-assembly", "core.building.smelter");
+        public static readonly BuildingDefinition MachineGunTurret=new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, "core.research.automated-defense", "core.building.assembler");
         public static readonly BuildingDefinition HeavyMachineGunTurret=new BuildingDefinition("core.building.heavy-machine-gun-turret", "重型机枪塔", 1, 1, ResourceIds.Alloy, 20, false, 12f, 420);
         public static readonly BuildingDefinition[] All =
         {

@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using WasteCity.Economy;
 using WasteCity.Research;
+using System.Linq;
 
 namespace WasteCity.Tests
 {
@@ -24,5 +25,8 @@ namespace WasteCity.Tests
         [Test] public void ResearchProgressCanBeRestored()
         {var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Iron,10);var model=new ResearchModel();model.Start(ResearchCatalog.Starting[0],inventory);model.Tick(5);var restored=new ResearchModel();restored.Restore(model.CaptureCompleted(),model.Active.Id.Value,model.Remaining);Assert.That(restored.Active.Id.Value,Is.EqualTo("core.research.automated-machinery"));Assert.That(restored.Remaining,Is.EqualTo(15));}
         [Test] public void LegacyAnalysisRequiresAutomatedMachinery(){var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Alloy,60);inventory.Add(ResourceIds.Iron,10);var model=new ResearchModel();Assert.That(model.Start(ResearchCatalog.Starting[4],inventory),Is.False);Assert.That(model.Start(ResearchCatalog.Starting[0],inventory),Is.True);model.Tick(20);Assert.That(model.Start(ResearchCatalog.Starting[4],inventory),Is.True);}
+        [Test] public void FormalCatalogContainsFortyTwoTreeNodesPlusLegacyAnalysis(){Assert.That(ResearchCatalog.All.Length,Is.EqualTo(43));Assert.That(ResearchCatalog.All.Select(value=>value.Id.Value).Distinct().Count(),Is.EqualTo(43));}
+        [Test] public void BridgeResearchRequiresBothRoutes(){var bridge=ResearchCatalog.Find("core.research.bridge.psionic-mech");var inventory=new ResourceInventory(200);inventory.Add(ResourceIds.Alloy,100);var model=new ResearchModel();model.Restore(new[]{"core.research.precision-assembly"},null,0);Assert.That(model.Start(bridge,inventory),Is.False);model.Restore(new[]{"core.research.precision-assembly","core.research.psionic-workshop"},null,0);Assert.That(model.Start(bridge,inventory),Is.True);}
+        [Test] public void ExtendedResearchNodesRoundTrip(){var model=new ResearchModel();model.Restore(new[]{"core.research.alloy-armor","core.research.collective-consciousness"},"core.research.bridge.bio-hangar",17);Assert.That(model.IsCompleted(ResearchCatalog.Find("core.research.alloy-armor").Id),Is.True);Assert.That(model.Active.Id.Value,Is.EqualTo("core.research.bridge.bio-hangar"));Assert.That(model.Remaining,Is.EqualTo(17));}
     }
 }

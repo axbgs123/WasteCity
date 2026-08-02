@@ -88,7 +88,7 @@ namespace WasteCity.Building
         private void OnCompleted(BuildingRuntime runtime)
         {
             RefreshLogistics();
-            if (runtime.Definition.Id.Value.EndsWith("machine-gun-turret")) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader);
+            if (runtime.Definition.Id.Value.EndsWith("machine-gun-turret")) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader,research);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
@@ -146,7 +146,7 @@ namespace WasteCity.Building
         }
         private void TryUpgradeAtMouse()
         {
-            if(Mouse.current==null||city.Deployment.Mode!=CityMode.Fortress)return;Vector2 point=Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());BuildingRuntime runtime=FindNearest(point,1.5f);if(runtime==null||!runtime.Construction.IsComplete){LastAction="升级：请指向已完成建筑";return;}var recipe=BuildingUpgradeCatalog.For(runtime.Definition,progression.Civilization.Level);if(recipe==null){LastAction="升级锁定：需要二级文明或该建筑没有后续型号";return;}if(!placements.TryGetValue(runtime,out var placed)||!grid.TryUpgrade(placed,recipe.Target,economy.Inventory,recipe.CostId,recipe.Cost,out var upgraded)){LastAction=$"升级失败：需要 {recipe.Cost} 合金";return;}runtime.PrepareForUpgrade();placements.Remove(runtime);Destroy(runtime.gameObject);CreateRuntime(upgraded);LastAction=$"升级施工：{recipe.Target.Name} · {recipe.CostId} -{recipe.Cost}";
+            if(Mouse.current==null||city.Deployment.Mode!=CityMode.Fortress)return;Vector2 point=Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());BuildingRuntime runtime=FindNearest(point,1.5f);if(runtime==null||!runtime.Construction.IsComplete){LastAction="升级：请指向已完成建筑";return;}bool alloyArmor=research.Model.IsCompleted(new WasteCity.Content.StableId("core.research.alloy-armor"));var recipe=BuildingUpgradeCatalog.For(runtime.Definition,progression.Civilization.Level,alloyArmor);if(recipe==null){LastAction="升级锁定：需要二级文明与合金装甲科技，或该建筑没有后续型号";return;}if(!placements.TryGetValue(runtime,out var placed)||!grid.TryUpgrade(placed,recipe.Target,economy.Inventory,recipe.CostId,recipe.Cost,out var upgraded)){LastAction=$"升级失败：需要 {recipe.Cost} 合金";return;}runtime.PrepareForUpgrade();placements.Remove(runtime);Destroy(runtime.gameObject);CreateRuntime(upgraded);LastAction=$"升级施工：{recipe.Target.Name} · {recipe.CostId} -{recipe.Cost}";
         }
         private void RefreshLogistics()
         {
