@@ -20,5 +20,12 @@ namespace WasteCity.Tests
             var model = new LegacySelectionModel(new WorldSeed(1));
             Assert.That(model.Select(1), Is.True); Assert.That(model.Select(2), Is.False);
         }
+        [Test]
+        public void SelectedLegacyCanUpgradeAndRestoreItsLevel()
+        {
+            var model = new LegacySelectionModel(new WorldSeed(1)); model.Select(0);
+            Assert.That(model.Upgrade(), Is.True); Assert.That(model.Level, Is.EqualTo(2));
+            var restored = new LegacySelectionModel(new WorldSeed(1)); Assert.That(restored.Restore(model.Selected.Id.Value, 2), Is.True); Assert.That(restored.Level, Is.EqualTo(2));
+        }
     }
 }

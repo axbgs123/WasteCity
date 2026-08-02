@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 using WasteCity.Combat;
 using WasteCity.Narrative;
 using WasteCity.Persistence;
+using WasteCity.Progression;
 
 namespace WasteCity.Core
 {
@@ -12,12 +13,13 @@ namespace WasteCity.Core
         [SerializeField] private HealthComponent cityHealth;
         [SerializeField] private FormalSaveController saves;
         [SerializeField] private FormalGuidanceController guidance;
+        [SerializeField] private FormalAdvancementController advancement;
         public GameSessionStateModel Model { get; }=new GameSessionStateModel();
         public GuidanceStage LastCheckpointStage { get; private set; }
         private void Start(){Time.timeScale=1;cityHealth.Value.Died+=OnDefeated;guidance.Model.Changed+=OnGuidanceChanged;}
         private void Update()
         {
-            if(Keyboard.current==null)return;
+            if(Keyboard.current==null||advancement.IsPresenting)return;
             if(Keyboard.current.pKey.wasPressedThisFrame&&Model.TogglePause())Time.timeScale=Model.State==GameSessionState.Paused?0:1;
             if(Model.State==GameSessionState.Defeated&&Keyboard.current.rKey.wasPressedThisFrame)Retry();
         }

@@ -34,6 +34,7 @@ namespace WasteCity.Legacy
     {
         public IReadOnlyList<LegacyPathDefinition> Choices { get; }
         public LegacyPathDefinition Selected { get; private set; }
+        public int Level { get; private set; } = 1;
         public LegacySelectionModel(WorldSeed seed)
         {
             var pool = new List<LegacyPathDefinition>(LegacyPathCatalog.Approved);
@@ -46,11 +47,15 @@ namespace WasteCity.Legacy
             if (Selected != null || index < 0 || index >= Choices.Count) return false;
             Selected = Choices[index]; return true;
         }
-        public bool Restore(string stableId)
+        public bool Upgrade()
         {
-            if (Selected != null) return false;
+            if (Selected == null || Level >= 10) return false;
+            Level++; return true;
+        }
+        public bool Restore(string stableId, int level = 1)
+        {
             foreach (var definition in LegacyPathCatalog.Approved)
-                if (definition.Id.Value == stableId) { Selected = definition; return true; }
+                if (definition.Id.Value == stableId) { Selected = definition; Level = Math.Max(1, Math.Min(10, level)); return true; }
             return false;
         }
     }

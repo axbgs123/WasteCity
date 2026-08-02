@@ -2,6 +2,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Combat;
+using WasteCity.Progression;
 
 namespace WasteCity.Narrative
 {
@@ -10,12 +11,13 @@ namespace WasteCity.Narrative
         [SerializeField] private PlaceholderMobileCity city;
         [SerializeField] private PlaceholderBuildingController buildings;
         [SerializeField] private FormalCombatController combat;
+        [SerializeField] private FormalProgressionController progression;
         private Vector2 startPosition;
         public GuidanceFlowModel Model { get; }=new GuidanceFlowModel();
         public string CurrentObjective=>Model.Objective;
         private void Start()
         {
-            startPosition=city.transform.position;city.Deployment.Changed+=OnCityModeChanged;buildings.BuildingPlaced+=OnBuildingPlaced;combat.WaveCompleted+=Model.SignalWaveCompleted;combat.EnemyArchetypeDefeated+=OnEnemyDefeated;
+            startPosition=city.transform.position;city.Deployment.Changed+=OnCityModeChanged;buildings.BuildingPlaced+=OnBuildingPlaced;combat.WaveCompleted+=Model.SignalWaveCompleted;combat.EnemyArchetypeDefeated+=OnEnemyDefeated;progression.Advanced+=Model.SignalAdvanced;
         }
         private void Update(){if(Model.Stage==GuidanceStage.Awakening&&Vector2.Distance(startPosition,city.transform.position)>=3)Model.SignalMoved();}
         private void OnCityModeChanged(CityMode mode){if(mode==CityMode.Fortress)Model.SignalFortress();}

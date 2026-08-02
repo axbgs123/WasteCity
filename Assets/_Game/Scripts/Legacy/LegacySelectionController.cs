@@ -20,7 +20,7 @@ namespace WasteCity.Legacy
         {
             if (Model.Selected != null)
             {
-                GUI.Box(new Rect(Screen.width - 330f, 18f, 312f, 70f), $"命轨 Lv.1：{Model.Selected.DisplayName}\n{Model.Selected.RuleSummary}"); return;
+                GUI.Box(new Rect(Screen.width - 330f, 18f, 312f, 70f), $"命轨 Lv.{Model.Level}：{Model.Selected.DisplayName}\n{Model.Selected.RuleSummary}"); return;
             }
             GUI.Box(new Rect(Screen.width * 0.18f, Screen.height * 0.22f, Screen.width * 0.64f, 245f), "遗产响应 · 命轨三选一\n\n" +
                 $"[1] {Model.Choices[0].DisplayName} — {Model.Choices[0].RuleSummary}\n\n" +

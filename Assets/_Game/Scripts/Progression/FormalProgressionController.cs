@@ -7,6 +7,7 @@ using System.Linq;
 using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Content;
+using System;
 
 namespace WasteCity.Progression
 {
@@ -21,6 +22,7 @@ namespace WasteCity.Progression
         public EraTrackModel EraTracks { get; } = new EraTrackModel();
         public CivilizationModel Civilization { get; } = new CivilizationModel();
         public bool BossDefeated { get; private set; }
+        public event Action Advanced;
         public bool CanAdvance=>CivilizationAdvanceRequirements.Meets(research.Model.IsCompleted(new StableId("core.research.legacy-analysis")),buildings.CompletedCount("core.building.machine-gun-turret"),BossDefeated,production.HasRunningProduction);
         private void Start()
         {
@@ -31,7 +33,12 @@ namespace WasteCity.Progression
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.uKey.wasPressedThisFrame)
-                if (Civilization.TryAdvanceFormal(CanAdvance)) Observation.Add("文明升阶", 15f);
+                if (Civilization.TryAdvanceFormal(CanAdvance))
+                {
+                    Observation.Add("文明升阶", 25f);
+                    legacy.Model.Upgrade();
+                    Advanced?.Invoke();
+                }
         }
         private void OnEnemyDefeated(EnemyArchetype archetype){if(archetype==EnemyArchetype.CrystalBroodmother)BossDefeated=true;}
         public void RestoreBossDefeated(bool value)=>BossDefeated=value;
