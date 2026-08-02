@@ -43,11 +43,14 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition ResonanceFurnace=new BuildingDefinition("psionics.building.resonance-furnace","共振炉",2,2,ResourceIds.Stone,8,false,8f,260,0,"core.research.mind-resonance");
         public static readonly BuildingDefinition PsionicWorkshop=new BuildingDefinition("psionics.building.workshop","灵能工坊",2,2,ResourceIds.ResonanceMetal,6,false,10f,240,0,"core.research.psionic-workshop","psionics.building.resonance-furnace");
         public static readonly BuildingDefinition MindSpire=new BuildingDefinition("psionics.building.mind-spire","心灵尖塔",1,1,ResourceIds.ResonanceMetal,10,false,12f,220,0,"core.research.mind-spire","psionics.building.workshop");
+        public static readonly BuildingDefinition LaserTower=new BuildingDefinition("core.building.laser-tower","激光塔",1,1,ResourceIds.Alloy,18,false,12f,280,0,"core.research.energy-weapons","core.building.assembler");
+        public static readonly BuildingDefinition AcidTower=new BuildingDefinition("biological.building.acid-tower","酸液塔",1,1,ResourceIds.BiomassConcentrate,16,false,12f,320,0,"core.research.acid-spit","biological.building.breeding-chamber");
+        public static readonly BuildingDefinition ShieldGenerator=new BuildingDefinition("psionics.building.shield-generator","护盾发生器",2,2,ResourceIds.PsionicAmplifier,12,false,14f,300,0,"core.research.mind-shield","psionics.building.workshop");
         public static readonly BuildingDefinition[] All =
         {
-            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator
         };
-        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire};
+        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator};
     }
 
     public sealed class PlacedBuilding

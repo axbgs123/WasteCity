@@ -54,7 +54,7 @@ namespace WasteCity.Building
             if (!Construction.IsComplete || !HasLogistics || Repair != null || Health.Value.Current >= Health.Value.Maximum || economy == null || !economy.Inventory.TrySpend(ResourceIds.Biomass, 1)) return false;
             Repair = new RepairProcess(); return true;
         }
-        public void RestoreState(int health, float remaining, float repairRemaining = 0f) { Health.Value.Restore(health); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); if (repairRemaining > 0f) { Repair = new RepairProcess(); Repair.Restore(repairRemaining); } }
+        public void RestoreState(int health, float remaining, float repairRemaining = 0f, int shield = 0) { Health.Value.Restore(health,shield); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); if (repairRemaining > 0f) { Repair = new RepairProcess(); Repair.Restore(repairRemaining); } }
         public void PrepareForRestore() { if (effectApplied) { ApplyEffect(-1); effectApplied = false; } Removed?.Invoke(this); suppressRemoval = true; }
         public void PrepareForUpgrade(){if(effectApplied){ApplyEffect(-1);effectApplied=false;}suppressRemoval=true;}
         public void SetLocalTimeSource(ILocalTimeScaleSource value) => localTime = value;
@@ -87,6 +87,19 @@ namespace WasteCity.Building
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
             if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor,physical?(research?.TurretDamageMultiplier??1f):1f);
+        }
+    }
+
+    public sealed class PlaceholderShieldGenerator : MonoBehaviour
+    {
+        private readonly ShieldPulseModel pulse = new ShieldPulseModel(8f);
+        private BuildingRuntime runtime;
+        public void Configure(BuildingRuntime building) => runtime = building;
+        private void Update()
+        {
+            if(runtime==null||!runtime.HasLogistics||!pulse.Tick(Time.deltaTime))return;
+            foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
+                if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)building.Health.Value.GrantShield(25,100);
         }
     }
 }
