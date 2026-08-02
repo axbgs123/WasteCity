@@ -34,4 +34,15 @@ namespace WasteCity.Leader
         public void Tick(float delta){if(Recruited)Overload.Tick(delta);}
         public void Restore(bool recruited,bool injured,float cooldown,float boost,float lockout){Recruited=recruited;Injured=injured;Overload.Restore(cooldown,boost,lockout);}
     }
+
+    public sealed class GeneSpliceAuraModel
+    {
+        private readonly float healingPerSecond;
+        private float remainder;
+        public GeneSpliceAuraModel(float rate)=>healingPerSecond=Math.Max(0f,rate);
+        public int Tick(float delta,bool active)
+        {
+            if(!active){remainder=0f;return 0;}remainder+=Math.Max(0f,delta)*healingPerSecond;int amount=(int)remainder;remainder-=amount;return amount;
+        }
+    }
 }

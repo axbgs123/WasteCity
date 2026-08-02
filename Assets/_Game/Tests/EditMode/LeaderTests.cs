@@ -9,5 +9,7 @@ namespace WasteCity.Tests
         [Test] public void DelayedRescueProvidesReducedOverload(){var m=new LeaderModel();m.Recruit(false);m.Overload.TryActivate();Assert.That(m.Injured,Is.True);Assert.That(m.Overload.FireRateMultiplier,Is.EqualTo(1.35f));}
         [Test] public void OverloadBoostThenLocksTurretsBeforeCooldown(){var m=new LeaderModel();m.Recruit(true);m.Overload.TryActivate();m.Tick(5f);Assert.That(m.Overload.FireRateMultiplier,Is.Zero);m.Tick(3f);Assert.That(m.Overload.FireRateMultiplier,Is.EqualTo(1f));Assert.That(m.Overload.TryActivate(),Is.False);m.Tick(22f);Assert.That(m.Overload.TryActivate(),Is.True);}
         [Test] public void LeaderStateCanBeRestored(){var m=new LeaderModel();m.Restore(true,true,12f,0f,0f);Assert.That(m.Recruited,Is.True);Assert.That(m.Injured,Is.True);Assert.That(m.Overload.CooldownRemaining,Is.EqualTo(12f));}
+        [Test] public void GeneSpliceAuraHealsFiveHealthPerSecondWhileActive(){var aura=new GeneSpliceAuraModel(5f);Assert.That(aura.Tick(.19f,true),Is.Zero);Assert.That(aura.Tick(.01f,true),Is.EqualTo(1));Assert.That(aura.Tick(1f,true),Is.EqualTo(5));}
+        [Test] public void GeneSpliceAuraDoesNotBankProgressWhileInactive(){var aura=new GeneSpliceAuraModel(5f);Assert.That(aura.Tick(10f,false),Is.Zero);Assert.That(aura.Tick(.1f,true),Is.Zero);}
     }
 }
