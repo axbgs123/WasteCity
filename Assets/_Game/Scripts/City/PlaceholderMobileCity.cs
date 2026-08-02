@@ -17,7 +17,7 @@ namespace WasteCity.City
         {
             deployment.Tick(Time.deltaTime);
             if (Keyboard.current == null) { input = Vector2.zero; return; }
-            if (Keyboard.current.xKey.wasPressedThisFrame) deployment.Toggle();
+            if (Keyboard.current.fKey.wasPressedThisFrame) deployment.Toggle();
             if (deployment.Mode != CityMode.Mobile) { input = Vector2.zero; return; }
             input = new Vector2((Keyboard.current.dKey.isPressed ? 1 : 0) - (Keyboard.current.aKey.isPressed ? 1 : 0),
                 (Keyboard.current.wKey.isPressed ? 1 : 0) - (Keyboard.current.sKey.isPressed ? 1 : 0)).normalized;

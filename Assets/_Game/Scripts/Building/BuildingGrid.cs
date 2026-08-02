@@ -34,14 +34,20 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition Assembler=new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, "core.research.precision-assembly", "core.building.smelter");
         public static readonly BuildingDefinition MachineGunTurret=new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, "core.research.automated-defense", "core.building.assembler");
         public static readonly BuildingDefinition HeavyMachineGunTurret=new BuildingDefinition("core.building.heavy-machine-gun-turret", "重型机枪塔", 1, 1, ResourceIds.Alloy, 20, false, 12f, 420);
-        public static readonly BuildingDefinition SwordArrayTower=new BuildingDefinition("cultivation.building.sword-array-tower","剑阵台",1,1,ResourceIds.EnergyCrystal,15,false,10f,240,0,"core.research.sword-array");
-        public static readonly BuildingDefinition SporeTower=new BuildingDefinition("biological.building.spore-tower","孢子塔",1,1,ResourceIds.Biomass,15,false,10f,280,0,"core.research.spore-dispersal");
-        public static readonly BuildingDefinition MindSpire=new BuildingDefinition("psionics.building.mind-spire","心灵尖塔",1,1,ResourceIds.EnergyCrystal,20,false,12f,220,0,"core.research.mind-spire");
+        public static readonly BuildingDefinition SpiritFireFurnace=new BuildingDefinition("cultivation.building.spirit-fire-furnace","灵火炉",2,2,ResourceIds.Stone,8,false,8f,280,0,"core.research.spirit-sensing");
+        public static readonly BuildingDefinition ArtifactWorkshop=new BuildingDefinition("cultivation.building.artifact-workshop","炼器坊",2,2,ResourceIds.SpiritIron,6,false,10f,260,0,"core.research.artifact-crafting","cultivation.building.spirit-fire-furnace");
+        public static readonly BuildingDefinition SwordArrayTower=new BuildingDefinition("cultivation.building.sword-array-tower","剑阵台",1,1,ResourceIds.SpiritIron,10,false,10f,240,0,"core.research.sword-array","cultivation.building.artifact-workshop");
+        public static readonly BuildingDefinition ColonyPool=new BuildingDefinition("biological.building.colony-pool","菌落池",2,2,ResourceIds.Biomass,10,false,8f,320,0,"core.research.adaptive-tissue");
+        public static readonly BuildingDefinition BreedingChamber=new BuildingDefinition("biological.building.breeding-chamber","培育室",2,2,ResourceIds.BoneSteel,6,false,10f,300,0,"core.research.bio-cultivation","biological.building.colony-pool");
+        public static readonly BuildingDefinition SporeTower=new BuildingDefinition("biological.building.spore-tower","孢子塔",1,1,ResourceIds.BiomassConcentrate,10,false,10f,280,0,"core.research.spore-dispersal","biological.building.breeding-chamber");
+        public static readonly BuildingDefinition ResonanceFurnace=new BuildingDefinition("psionics.building.resonance-furnace","共振炉",2,2,ResourceIds.Stone,8,false,8f,260,0,"core.research.mind-resonance");
+        public static readonly BuildingDefinition PsionicWorkshop=new BuildingDefinition("psionics.building.workshop","灵能工坊",2,2,ResourceIds.ResonanceMetal,6,false,10f,240,0,"core.research.psionic-workshop","psionics.building.resonance-furnace");
+        public static readonly BuildingDefinition MindSpire=new BuildingDefinition("psionics.building.mind-spire","心灵尖塔",1,1,ResourceIds.ResonanceMetal,10,false,12f,220,0,"core.research.mind-spire","psionics.building.workshop");
         public static readonly BuildingDefinition[] All =
         {
-            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SwordArrayTower,SporeTower,MindSpire
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire
         };
-        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SwordArrayTower,SporeTower,MindSpire};
+        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire};
     }
 
     public sealed class PlacedBuilding

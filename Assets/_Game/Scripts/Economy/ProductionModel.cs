@@ -31,4 +31,21 @@ namespace WasteCity.Economy
         }
         public void Restore(float savedProgress)=>progress=Math.Max(0f,Math.Min(recipe.Duration,savedProgress));
     }
+
+    public sealed class DualInputProductionRecipe
+    {
+        public string FirstInputId{get;}public int FirstInputAmount{get;}public string SecondInputId{get;}public int SecondInputAmount{get;}public string OutputId{get;}public int OutputAmount{get;}public float Duration{get;}
+        public DualInputProductionRecipe(string first,int firstAmount,string second,int secondAmount,string output,int outputAmount,float duration){FirstInputId=first;FirstInputAmount=Math.Max(0,firstAmount);SecondInputId=second;SecondInputAmount=Math.Max(0,secondAmount);OutputId=output;OutputAmount=Math.Max(1,outputAmount);Duration=Math.Max(.1f,duration);}
+    }
+    public sealed class DualInputProductionProcess
+    {
+        private readonly DualInputProductionRecipe recipe;private float progress;public float Progress=>progress;public ProductionStatus Status{get;private set;}=ProductionStatus.NoBuildings;
+        public DualInputProductionProcess(DualInputProductionRecipe value)=>recipe=value;
+        public int Tick(float delta,ResourceInventory inventory,int buildingCount)
+        {
+            if(buildingCount<=0){Status=ProductionStatus.NoBuildings;return 0;}progress+=Math.Max(0,delta)*buildingCount;Status=ProductionStatus.Running;int cycles=0;
+            while(progress>=recipe.Duration){if(inventory.Get(recipe.FirstInputId)<recipe.FirstInputAmount||inventory.Get(recipe.SecondInputId)<recipe.SecondInputAmount){Status=ProductionStatus.MissingInput;break;}if(inventory.Get(recipe.OutputId)+recipe.OutputAmount>inventory.CapacityPerResource){Status=ProductionStatus.OutputFull;break;}if(!inventory.TrySpend(recipe.FirstInputId,recipe.FirstInputAmount)||!inventory.TrySpend(recipe.SecondInputId,recipe.SecondInputAmount))break;inventory.Add(recipe.OutputId,recipe.OutputAmount);progress-=recipe.Duration;cycles++;}return cycles;
+        }
+        public void Restore(float savedProgress)=>progress=Math.Max(0f,Math.Min(recipe.Duration,savedProgress));
+    }
 }

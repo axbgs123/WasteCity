@@ -86,7 +86,7 @@ namespace WasteCity.Building
             RefreshLogistics();
             return runtime;
         }
-        private static Color ColorFor(string id) => id.Contains("sword-array")?new Color(.3f,.85f,1f):id.Contains("spore-tower")?new Color(.35f,.9f,.25f):id.Contains("mind-spire")?new Color(.75f,.25f,1f):id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
+        private static Color ColorFor(string id) => id.StartsWith("cultivation.")?new Color(.3f,.85f,1f):id.StartsWith("biological.")?new Color(.35f,.9f,.25f):id.StartsWith("psionics.")?new Color(.75f,.25f,1f):id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
         private void OnCompleted(BuildingRuntime runtime)
         {
             RefreshLogistics();
