@@ -97,6 +97,7 @@ namespace WasteCity.Editor
             combatData.FindProperty("progression").objectReferenceValue = progression;
             combatData.FindProperty("economy").objectReferenceValue = economy;
             combatData.FindProperty("cityState").objectReferenceValue=city.GetComponent<PlaceholderMobileCity>();
+            combatData.FindProperty("buildings").objectReferenceValue=buildingController;
             combatData.ApplyModifiedPropertiesWithoutUndo();
             var rescueSites = systems.AddComponent<RescueSiteController>(); var rescueData = new SerializedObject(rescueSites); rescueData.FindProperty("world").objectReferenceValue = worldView; rescueData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); rescueData.FindProperty("economy").objectReferenceValue = economy; rescueData.FindProperty("population").objectReferenceValue = population; rescueData.FindProperty("progression").objectReferenceValue = progression; rescueData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("rescueSites").objectReferenceValue = rescueSites; saveData.ApplyModifiedPropertiesWithoutUndo();
