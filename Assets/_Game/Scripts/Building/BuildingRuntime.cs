@@ -66,15 +66,15 @@ namespace WasteCity.Building
     {
         private FormalEconomyController economy;
         private TurretWeaponModel weapon;
-        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;private ResearchController research;
-        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null,ResearchController researchController=null) { economy = value; runtime = building; localTime = time;fireRate=rate;research=researchController;weapon=new TurretWeaponModel(building!=null&&building.Definition.Id.Value=="core.building.heavy-machine-gun-turret"?60f:20f,3f); }
+        private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;private ResearchController research;private DefenseTowerDefinition profile;
+        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null,ResearchController researchController=null) { economy = value; runtime = building; localTime = time;fireRate=rate;research=researchController;profile=DefenseTowerCatalog.For(building?.Definition?.Id.Value)??DefenseTowerCatalog.For("core.building.machine-gun-turret");weapon=new TurretWeaponModel(profile.DamagePerSecond,profile.SecondsPerConsumable,profile.DamageType,profile.ConsumableId); }
         public void SetFireRateSource(ITurretFireRateSource value)=>fireRate=value;
         private void Update()
         {
-            if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; float range=10f*(research?.TurretRangeMultiplier??1f);float best = range*range;
+            if (economy == null || runtime == null || !runtime.HasLogistics) return; HealthComponent nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f);float best = range*range;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = health; } }
-            if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor,research?.TurretDamageMultiplier??1f);
+            if (nearest != null) weapon.Tick(Time.deltaTime * (localTime?.MultiplierFor(runtime) ?? 1f)*(fireRate?.FireRateMultiplier??1f), economy.Inventory, nearest.Value, nearest.Armor,physical?(research?.TurretDamageMultiplier??1f):1f);
         }
     }
 }

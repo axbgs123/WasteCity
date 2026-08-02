@@ -34,10 +34,14 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition Assembler=new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, "core.research.precision-assembly", "core.building.smelter");
         public static readonly BuildingDefinition MachineGunTurret=new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, "core.research.automated-defense", "core.building.assembler");
         public static readonly BuildingDefinition HeavyMachineGunTurret=new BuildingDefinition("core.building.heavy-machine-gun-turret", "重型机枪塔", 1, 1, ResourceIds.Alloy, 20, false, 12f, 420);
+        public static readonly BuildingDefinition SwordArrayTower=new BuildingDefinition("cultivation.building.sword-array-tower","剑阵台",1,1,ResourceIds.EnergyCrystal,15,false,10f,240,0,"core.research.sword-array");
+        public static readonly BuildingDefinition SporeTower=new BuildingDefinition("biological.building.spore-tower","孢子塔",1,1,ResourceIds.Biomass,15,false,10f,280,0,"core.research.spore-dispersal");
+        public static readonly BuildingDefinition MindSpire=new BuildingDefinition("psionics.building.mind-spire","心灵尖塔",1,1,ResourceIds.EnergyCrystal,20,false,12f,220,0,"core.research.mind-spire");
         public static readonly BuildingDefinition[] All =
         {
-            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SwordArrayTower,SporeTower,MindSpire
         };
+        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SwordArrayTower,SporeTower,MindSpire};
     }
 
     public sealed class PlacedBuilding

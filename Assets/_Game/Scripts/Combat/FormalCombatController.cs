@@ -39,7 +39,7 @@ namespace WasteCity.Combat
         {
             waves.Schedule(threshold);
         }
-        private void OnBuildingPlaced(BuildingDefinition definition){if(definition.Id.Value=="core.building.machine-gun-turret")waves.Schedule(0);}
+        private void OnBuildingPlaced(BuildingDefinition definition){if(DefenseTowerCatalog.For(definition.Id.Value)!=null)waves.Schedule(0);}
         private void OnCivilizationAdvanced()=>waves.Schedule(120);
         private PlaceholderEnemy Spawn(EnemyArchetype archetype,int threshold,int slot,Vector2? restoredPosition=null,int restoredHealth=-1,int restoredShield=0,BossEncounterSnapshot restoredBoss=null,int restoredQuality=-1)
         {

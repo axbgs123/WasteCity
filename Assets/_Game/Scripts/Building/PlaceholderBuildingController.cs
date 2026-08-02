@@ -52,6 +52,8 @@ namespace WasteCity.Building
                 if (Keyboard.current.digit6Key.wasPressedThisFrame) selected = 5;
                 if (Keyboard.current.digit7Key.wasPressedThisFrame) selected = 6;
                 if (Keyboard.current.digit8Key.wasPressedThisFrame) selected = 7;
+                if(active&&Keyboard.current.leftArrowKey.wasPressedThisFrame)selected=(selected-1+BuildingCatalog.BuildMenu.Length)%BuildingCatalog.BuildMenu.Length;
+                if(active&&Keyboard.current.rightArrowKey.wasPressedThisFrame)selected=(selected+1)%BuildingCatalog.BuildMenu.Length;
                 if (Keyboard.current.tKey.wasPressedThisFrame) TryUpgradeAtMouse();
             }
             if (active && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) PlaceAtMouse();
@@ -60,13 +62,13 @@ namespace WasteCity.Building
         }
         private void PlaceAtMouse()
         {
-            if(!CanBuild(BuildingCatalog.All[selected],out _))return;
+            if(!CanBuild(BuildingCatalog.BuildMenu[selected],out _))return;
             Vector2 worldPosition = Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
             int gridX = Mathf.FloorToInt(worldPosition.x - city.transform.position.x + 8f);
             int gridY = Mathf.FloorToInt(worldPosition.y - city.transform.position.y + 6f);
             int mapX = Mathf.FloorToInt(worldPosition.x + world.Model.Width * 0.5f); int mapY = Mathf.FloorToInt(worldPosition.y + world.Model.Height * 0.5f);
-            bool resource = CoversRequiredResource(BuildingCatalog.All[selected], mapX, mapY);
-            if (!grid.TryPlace(BuildingCatalog.All[selected], gridX, gridY, economy.Inventory, resource, out var placed)) return;
+            bool resource = CoversRequiredResource(BuildingCatalog.BuildMenu[selected], mapX, mapY);
+            if (!grid.TryPlace(BuildingCatalog.BuildMenu[selected], gridX, gridY, economy.Inventory, resource, out var placed)) return;
             CreateRuntime(placed);
         }
         private BuildingRuntime CreateRuntime(PlacedBuilding placed, int health = -1, float remaining = -1f, float repairRemaining = 0f)
@@ -84,11 +86,11 @@ namespace WasteCity.Building
             RefreshLogistics();
             return runtime;
         }
-        private static Color ColorFor(string id) => id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
+        private static Color ColorFor(string id) => id.Contains("sword-array")?new Color(.3f,.85f,1f):id.Contains("spore-tower")?new Color(.35f,.9f,.25f):id.Contains("mind-spire")?new Color(.75f,.25f,1f):id.Contains("mining") ? Color.yellow : id.Contains("housing") ? Color.green : id.Contains("warehouse") ? Color.cyan : id.Contains("wall") ? Color.gray : id.Contains("research") ? Color.magenta : id.Contains("smelter") ? new Color(.8f,.3f,.1f) : id.Contains("assembler") ? Color.blue : Color.white;
         private void OnCompleted(BuildingRuntime runtime)
         {
             RefreshLogistics();
-            if (runtime.Definition.Id.Value.EndsWith("machine-gun-turret")) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader,research);
+            if (DefenseTowerCatalog.For(runtime.Definition.Id.Value)!=null) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader,research);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
@@ -155,7 +157,7 @@ namespace WasteCity.Building
         }
         private void OnGUI()
         {
-            if (active){CanBuild(BuildingCatalog.All[selected],out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 850f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [T] 指向建筑升级");}
+            if (active){var definition=BuildingCatalog.BuildMenu[selected];CanBuild(definition,out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 930f, 52f), $"建造：数字1-8基础建筑 · ←/→ 全建筑 · 当前 {selected+1}/{BuildingCatalog.BuildMenu.Length} {definition.Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [T] 升级");}
             if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
             if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }
