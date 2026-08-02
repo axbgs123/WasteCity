@@ -12,6 +12,7 @@ using WasteCity.Legacy;
 using WasteCity.Presentation;
 using WasteCity.Research;
 using WasteCity.Leader;
+using WasteCity.Progression;
 
 namespace WasteCity.Building
 {
@@ -31,6 +32,7 @@ namespace WasteCity.Building
         private readonly Dictionary<BuildingRuntime, PlacedBuilding> placements = new Dictionary<BuildingRuntime, PlacedBuilding>();
         [SerializeField] private LocalHasteController localTime;
         [SerializeField] private FormalLeaderController leader;
+        [SerializeField] private FormalProgressionController progression;
         public int PlacedCount => grid.Count;
         public bool HasLocalTimeSource => localTime != null;
         public int DisconnectedCount => placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&!runtime.HasLogistics);
@@ -50,6 +52,7 @@ namespace WasteCity.Building
                 if (Keyboard.current.digit6Key.wasPressedThisFrame) selected = 5;
                 if (Keyboard.current.digit7Key.wasPressedThisFrame) selected = 6;
                 if (Keyboard.current.digit8Key.wasPressedThisFrame) selected = 7;
+                if (Keyboard.current.tKey.wasPressedThisFrame) TryUpgradeAtMouse();
             }
             if (active && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) PlaceAtMouse();
             if (Mouse.current != null && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) TryRepairAtMouse();
@@ -85,7 +88,7 @@ namespace WasteCity.Building
         private void OnCompleted(BuildingRuntime runtime)
         {
             RefreshLogistics();
-            if (runtime.Definition.Id.Value == "core.building.machine-gun-turret") runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader);
+            if (runtime.Definition.Id.Value.EndsWith("machine-gun-turret")) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader);
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
@@ -102,7 +105,7 @@ namespace WasteCity.Building
             y = Mathf.FloorToInt(runtime.transform.position.y + world.Model.Height * .5f);
             return x >= 0 && y >= 0 && x < world.Model.Width && y < world.Model.Height;
         }
-        public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.Definition.Id.Value==id);
+        public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&(runtime.Definition.Id.Value==id||(id=="core.building.machine-gun-turret"&&runtime.Definition.Id.Value=="core.building.heavy-machine-gun-turret")));
         public bool CanBuild(BuildingDefinition definition,out string reason)=>BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new WasteCity.Content.StableId(id)),CompletedCount,out reason);
         public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
         public SpatialTemplateEntry[] CaptureTemplate(int originX, int originY) => placements.Where(pair => pair.Value.X >= originX && pair.Value.Y >= originY && pair.Value.X + pair.Value.Definition.Width <= originX + 3 && pair.Value.Y + pair.Value.Definition.Height <= originY + 3).Select(pair => new SpatialTemplateEntry { definitionId = pair.Value.Definition.Id.Value, dx = pair.Value.X - originX, dy = pair.Value.Y - originY }).ToArray();
@@ -141,6 +144,10 @@ namespace WasteCity.Building
             if (nearest == null) { LastAction = "维修：请将鼠标指向受损建筑"; return; }
             LastAction = nearest.TryStartRepair() ? $"维修开始：{nearest.Definition.Name} · 生物质 -1" : "维修无法开始：建筑未受损、施工中、已在维修或生物质不足";
         }
+        private void TryUpgradeAtMouse()
+        {
+            if(Mouse.current==null||city.Deployment.Mode!=CityMode.Fortress)return;Vector2 point=Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());BuildingRuntime runtime=FindNearest(point,1.5f);if(runtime==null||!runtime.Construction.IsComplete){LastAction="升级：请指向已完成建筑";return;}var recipe=BuildingUpgradeCatalog.For(runtime.Definition,progression.Civilization.Level);if(recipe==null){LastAction="升级锁定：需要二级文明或该建筑没有后续型号";return;}if(!placements.TryGetValue(runtime,out var placed)||!grid.TryUpgrade(placed,recipe.Target,economy.Inventory,recipe.CostId,recipe.Cost,out var upgraded)){LastAction=$"升级失败：需要 {recipe.Cost} 合金";return;}runtime.PrepareForUpgrade();placements.Remove(runtime);Destroy(runtime.gameObject);CreateRuntime(upgraded);LastAction=$"升级施工：{recipe.Target.Name} · {recipe.CostId} -{recipe.Cost}";
+        }
         private void RefreshLogistics()
         {
             var points=placements.Where(pair=>pair.Key.Construction!=null&&pair.Key.Construction.IsComplete).Select(pair=>new LogisticsPoint(pair.Key.GetInstanceID().ToString(),pair.Value.X+pair.Value.Definition.Width/2,pair.Value.Y+pair.Value.Definition.Height/2)).ToArray();logistics.Rebuild(points);
@@ -148,7 +155,7 @@ namespace WasteCity.Building
         }
         private void OnGUI()
         {
-            if (active){CanBuild(BuildingCatalog.All[selected],out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 850f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置");}
+            if (active){CanBuild(BuildingCatalog.All[selected],out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 850f, 52f), $"建造：1采矿 2住房 3仓库 4墙 5研究 6冶炼 7装配 8机枪塔 · 当前 {BuildingCatalog.All[selected].Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [T] 指向建筑升级");}
             if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
             if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }

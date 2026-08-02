@@ -25,16 +25,18 @@ namespace WasteCity.Building
 
     public static class BuildingCatalog
     {
+        public static readonly BuildingDefinition MiningStation=new BuildingDefinition("core.building.mining-station", "采矿站", 2, 2, ResourceIds.Alloy, 4, true, 5f, 220);
+        public static readonly BuildingDefinition Housing=new BuildingDefinition("core.building.housing", "住房", 2, 2, ResourceIds.Alloy, 8, false, 5f, 250);
+        public static readonly BuildingDefinition Warehouse=new BuildingDefinition("core.building.warehouse", "仓库", 2, 2, ResourceIds.Alloy, 8, false, 6f, 300);
+        public static readonly BuildingDefinition Wall=new BuildingDefinition("core.building.wall", "城墙", 1, 1, ResourceIds.Stone, 2, false, 2f, 300);
+        public static readonly BuildingDefinition ResearchStation=new BuildingDefinition("core.building.research-station", "研究站", 2, 2, ResourceIds.Iron, 6, false, 10f, 260, 200);
+        public static readonly BuildingDefinition Smelter=new BuildingDefinition("core.building.smelter", "冶炼厂", 2, 2, ResourceIds.Stone, 6, false, 8f, 280, 0, "core.research.automated-machinery");
+        public static readonly BuildingDefinition Assembler=new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, null, "core.building.smelter");
+        public static readonly BuildingDefinition MachineGunTurret=new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, null, "core.building.assembler");
+        public static readonly BuildingDefinition HeavyMachineGunTurret=new BuildingDefinition("core.building.heavy-machine-gun-turret", "重型机枪塔", 1, 1, ResourceIds.Alloy, 20, false, 12f, 420);
         public static readonly BuildingDefinition[] All =
         {
-            new BuildingDefinition("core.building.mining-station", "采矿站", 2, 2, ResourceIds.Alloy, 4, true, 5f, 220),
-            new BuildingDefinition("core.building.housing", "住房", 2, 2, ResourceIds.Alloy, 8, false, 5f, 250),
-            new BuildingDefinition("core.building.warehouse", "仓库", 2, 2, ResourceIds.Alloy, 8, false, 6f, 300),
-            new BuildingDefinition("core.building.wall", "城墙", 1, 1, ResourceIds.Stone, 2, false, 2f, 300),
-            new BuildingDefinition("core.building.research-station", "研究站", 2, 2, ResourceIds.Iron, 6, false, 10f, 260, 200),
-            new BuildingDefinition("core.building.smelter", "冶炼厂", 2, 2, ResourceIds.Stone, 6, false, 8f, 280, 0, "core.research.automated-machinery"),
-            new BuildingDefinition("core.building.assembler", "装配厂", 2, 2, ResourceIds.Alloy, 8, false, 8f, 260, 0, null, "core.building.smelter"),
-            new BuildingDefinition("core.building.machine-gun-turret", "机枪塔", 1, 1, ResourceIds.Alloy, 10, false, 10f, 250, 0, null, "core.building.assembler")
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret
         };
     }
 
@@ -76,6 +78,11 @@ namespace WasteCity.Building
             placed = new PlacedBuilding(definition, x, y);
             for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++) cells[x + dx, y + dy] = placed;
             Count++; return true;
+        }
+        public bool TryUpgrade(PlacedBuilding placed,BuildingDefinition target,ResourceInventory inventory,string costId,int cost,out PlacedBuilding upgraded)
+        {
+            upgraded=null;if(placed==null||target==null||inventory==null||placed.Definition.Width!=target.Width||placed.Definition.Height!=target.Height||!inventory.TrySpend(costId,cost))return false;
+            upgraded=new PlacedBuilding(target,placed.X,placed.Y);for(int x=0;x<cells.GetLength(0);x++)for(int y=0;y<cells.GetLength(1);y++)if(ReferenceEquals(cells[x,y],placed))cells[x,y]=upgraded;return true;
         }
         public bool CanPlace(BuildingDefinition definition, int x, int y)
         {

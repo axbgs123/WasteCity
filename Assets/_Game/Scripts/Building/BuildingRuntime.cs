@@ -50,6 +50,7 @@ namespace WasteCity.Building
         }
         public void RestoreState(int health, float remaining, float repairRemaining = 0f) { Health.Value.Restore(health); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); if (repairRemaining > 0f) { Repair = new RepairProcess(); Repair.Restore(repairRemaining); } }
         public void PrepareForRestore() { if (effectApplied) { ApplyEffect(-1); effectApplied = false; } Removed?.Invoke(this); suppressRemoval = true; }
+        public void PrepareForUpgrade(){if(effectApplied){ApplyEffect(-1);effectApplied=false;}suppressRemoval=true;}
         public void SetLocalTimeSource(ILocalTimeScaleSource value) => localTime = value;
         public void SetLogistics(bool connected){if(HasLogistics==connected)return;HasLogistics=connected;if(!Construction.IsComplete)return;if(connected&&!effectApplied){ApplyEffect(1);effectApplied=true;}else if(!connected&&effectApplied){ApplyEffect(-1);effectApplied=false;}}
         private void OnDestroy() { if (effectApplied) ApplyEffect(-1); if (!suppressRemoval) Removed?.Invoke(this); }
@@ -63,9 +64,9 @@ namespace WasteCity.Building
     public sealed class PlaceholderTurret : MonoBehaviour
     {
         private FormalEconomyController economy;
-        private readonly TurretWeaponModel weapon = new TurretWeaponModel(20f, 3f);
+        private TurretWeaponModel weapon;
         private BuildingRuntime runtime; private ILocalTimeScaleSource localTime;private ITurretFireRateSource fireRate;
-        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null) { economy = value; runtime = building; localTime = time;fireRate=rate; }
+        public void Configure(FormalEconomyController value, BuildingRuntime building = null, ILocalTimeScaleSource time = null,ITurretFireRateSource rate = null) { economy = value; runtime = building; localTime = time;fireRate=rate;weapon=new TurretWeaponModel(building!=null&&building.Definition.Id.Value=="core.building.heavy-machine-gun-turret"?60f:20f,3f); }
         public void SetFireRateSource(ITurretFireRateSource value)=>fireRate=value;
         private void Update()
         {

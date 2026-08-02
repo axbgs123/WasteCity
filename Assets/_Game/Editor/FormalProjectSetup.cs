@@ -96,6 +96,7 @@ namespace WasteCity.Editor
             progressionData.FindProperty("legacy").objectReferenceValue = legacy;
             progressionData.FindProperty("production").objectReferenceValue = production;
             progressionData.ApplyModifiedPropertiesWithoutUndo();
+            buildingData.FindProperty("progression").objectReferenceValue=progression;buildingData.ApplyModifiedPropertiesWithoutUndo();
             saveData.FindProperty("progression").objectReferenceValue = progression; saveData.ApplyModifiedPropertiesWithoutUndo();
             var combat = systems.AddComponent<FormalCombatController>();
             var combatData = new SerializedObject(combat);
