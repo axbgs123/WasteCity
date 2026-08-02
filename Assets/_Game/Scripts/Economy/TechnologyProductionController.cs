@@ -6,6 +6,7 @@ using WasteCity.World;
 using System.Collections.Generic;
 using System.Linq;
 using WasteCity.Leader;
+using System;
 
 namespace WasteCity.Economy
 {
@@ -24,21 +25,22 @@ namespace WasteCity.Economy
         public int DepletedMines { get; private set; }
         public int FullMines { get; private set; }
         public bool HasRunningProduction=>ActiveMines>0||smelter.Status==ProductionStatus.Running||assembler.Status==ProductionStatus.Running;
+        public event Action<int> ProductionCompleted;
 
         private void Update()
         {
-            var runtimes=Object.FindObjectsOfType<BuildingRuntime>().Where(value=>value.Construction.IsComplete&&value.HasLogistics).ToArray();
+            var runtimes=UnityEngine.Object.FindObjectsOfType<BuildingRuntime>().Where(value=>value.Construction.IsComplete&&value.HasLogistics).ToArray();
             var activeMining=runtimes.Where(value=>value.Definition.Id.Value=="core.building.mining-station").ToArray();
             int productionUnits=legacyEffects?.Model?.ProductionUnits(activeMining.Length)??activeMining.Length;
             int bonusUnits=Mathf.Max(0,productionUnits-activeMining.Length);ActiveMines=DepletedMines=FullMines=0;
             float cityMultiplier=CityOperationalRules.ProductionMultiplier(city.Deployment.Mode);
-            for(int index=0;index<activeMining.Length;index++)
+            int completedCycles=0;for(int index=0;index<activeMining.Length;index++)
             {
                 BuildingRuntime runtime=activeMining[index];
                 if(!mines.TryGetValue(runtime,out var process)){process=new ResourceExtractionProcess(3f);mines.Add(runtime,process);}
                 buildings.TryGetWorldCell(runtime,out int x,out int y);
                 float delta=Time.deltaTime*cityMultiplier*(localHaste?.MultiplierFor(runtime)??1f);
-                process.Tick(delta,world.Model,x,y,economy.Inventory,1+(index==0?bonusUnits:0));
+                completedCycles+=process.Tick(delta,world.Model,x,y,economy.Inventory,1+(index==0?bonusUnits:0));
                 if(process.Status==ExtractionStatus.Running)ActiveMines++;
                 else if(process.Status==ExtractionStatus.Depleted)DepletedMines++;
                 else if(process.Status==ExtractionStatus.OutputFull)FullMines++;
@@ -52,8 +54,9 @@ namespace WasteCity.Economy
                 if(runtime.Definition.Id.Value=="core.building.assembler")assemblers+=units;
             }
             float industryDelta=Time.deltaTime*cityMultiplier;
-            smelter.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(smelters)??smelters);
-            assembler.Tick(industryDelta*(leader?.AssemblerEfficiency??1f),economy.Inventory,legacyEffects?.Model?.ProductionUnits(assemblers)??assemblers);
+            completedCycles+=smelter.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(smelters)??smelters);
+            completedCycles+=assembler.Tick(industryDelta*(leader?.AssemblerEfficiency??1f),economy.Inventory,legacyEffects?.Model?.ProductionUnits(assemblers)??assemblers);
+            if(completedCycles>0)ProductionCompleted?.Invoke(completedCycles);
         }
 
         private void OnGUI()

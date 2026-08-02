@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using WasteCity.Persistence;
+using WasteCity.Core;
 
 namespace WasteCity.Progression
 {
@@ -9,6 +10,7 @@ namespace WasteCity.Progression
         [SerializeField] private FormalProgressionController progression;
         [SerializeField] private FormalSaveController saves;
         [SerializeField] private GameObject scanVisual;
+        [SerializeField] private FormalSessionStatisticsController statistics;
         public AdvancementSequenceModel Model { get; } = new AdvancementSequenceModel();
         public bool IsPresenting => Model.IsPresenting;
 
@@ -58,8 +60,13 @@ namespace WasteCity.Progression
                     ? "异常变量确认。\n遗产响应程度：超出历史样本。"
                     : Model.Stage == AdvancementSequenceStage.Warning
                         ? "未知信息覆盖了扫描结果：\n\n“它们已经看见你了。下一次，不会只派这些东西。”"
-                        : "阶段结算\n\n文明等级提升至 2\n命轨提升至 Lv.2\n异常观测值 +25\n晶壳母体已击败\n\n按 C 继续游玩当前地图";
+                        : ResultsText();
             GUI.Box(rect, message);
+        }
+        private string ResultsText()
+        {
+            var stats=statistics.Model;int minutes=Mathf.FloorToInt(stats.ElapsedSeconds/60f),seconds=Mathf.FloorToInt(stats.ElapsedSeconds)%60;float efficiency=stats.ElapsedSeconds>0?stats.ProductionCycles/(stats.ElapsedSeconds/60f):0f;string rescue=stats.Rescues==0?"未完成":$"{stats.Rescues} 次（延迟 {stats.DelayedRescues}）";string strategy=stats.RetreatedDuringBoss?"撤离重组防线":"坚守原阵地";
+            return $"阶段结算\n\n完成时间 {minutes:00}:{seconds:00}｜击杀 {stats.Kills}｜最高关注度 {stats.HighestObservation:0}\n生产效率 {efficiency:0.0} 周期/分钟｜建筑损失 {stats.BuildingLosses}\n救援 {rescue}｜Boss 策略：{strategy}\n文明等级 2｜命轨 Lv.2｜晶壳母体已击败\n\n按 C 继续游玩当前地图";
         }
     }
 }
