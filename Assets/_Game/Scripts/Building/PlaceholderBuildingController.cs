@@ -36,6 +36,7 @@ namespace WasteCity.Building
         public int PlacedCount => grid.Count;
         public bool HasLocalTimeSource => localTime != null;
         public int DisconnectedCount => placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&!runtime.HasLogistics);
+        public ResearchController Research => research;
         public event Action<BuildingDefinition> BuildingPlaced;
         public event Action<BuildingDefinition> BuildingRemoved;
         public string LastAction { get; private set; }

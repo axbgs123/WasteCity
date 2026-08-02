@@ -48,4 +48,17 @@ namespace WasteCity.Economy
         }
         public void Restore(float savedProgress)=>progress=Math.Max(0f,Math.Min(recipe.Duration,savedProgress));
     }
+
+    public sealed class PassiveProductionProcess
+    {
+        private readonly string outputId;private readonly int outputAmount;private readonly float duration;private float progress;
+        public float Progress=>progress;public ProductionStatus Status{get;private set;}=ProductionStatus.NoBuildings;
+        public PassiveProductionProcess(string output,int amount,float seconds){outputId=output;outputAmount=Math.Max(1,amount);duration=Math.Max(.1f,seconds);}
+        public int Tick(float delta,ResourceInventory inventory,int buildingCount,float speedMultiplier=1f)
+        {
+            if(buildingCount<=0){Status=ProductionStatus.NoBuildings;return 0;}progress+=Math.Max(0,delta)*buildingCount*Math.Max(0,speedMultiplier);Status=ProductionStatus.Running;int cycles=0;
+            while(progress>=duration){if(inventory.Get(outputId)+outputAmount>inventory.CapacityPerResource){Status=ProductionStatus.OutputFull;break;}inventory.Add(outputId,outputAmount);progress-=duration;cycles++;}return cycles;
+        }
+        public void Restore(float savedProgress)=>progress=Math.Max(0f,Math.Min(duration,savedProgress));
+    }
 }
