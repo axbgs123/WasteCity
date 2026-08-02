@@ -34,11 +34,12 @@ namespace WasteCity.Combat
         private void Spawn(int slot, int threshold, bool heavy)
         {
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture,new Rect(0,0,1,1),Vector2.one*.5f,1f);
-            float angle=(slot*47f+threshold)*Mathf.Deg2Rad; var item=new GameObject(heavy?"PlaceholderHeavyEnemy":"PlaceholderEnemy");
+            EnemyDefinition definition=heavy?EnemyCatalog.CrystalBeast:EnemyCatalog.Gnawer;
+            float angle=(slot*47f+threshold)*Mathf.Deg2Rad; var item=new GameObject($"Placeholder_{definition.Name}");
             item.transform.position=(Vector2)city.position+new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*10f; item.transform.localScale=Vector3.one*(heavy?1.4f:.8f);
             var renderer=item.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=heavy?Color.magenta:Color.red;renderer.sortingOrder=9;
-            VisualSlot.Attach(item,heavy?"core.enemy.heavy-placeholder":"core.enemy.light-placeholder",renderer,renderer.color);
-            item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,heavy,economy.Inventory, value => EnemyDefeated?.Invoke(value));SpawnedEnemies++;
+            VisualSlot.Attach(item,definition.Id.Value,renderer,renderer.color);
+            item.AddComponent<HealthComponent>();item.AddComponent<PlaceholderEnemy>().Configure(cityHealth,city,definition,economy.Inventory, value => EnemyDefeated?.Invoke(value));SpawnedEnemies++;
         }
     }
 }
