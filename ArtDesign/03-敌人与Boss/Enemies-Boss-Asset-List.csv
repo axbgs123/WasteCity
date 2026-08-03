@@ -1,0 +1,8 @@
+﻿"id","category","asset_name_zh","deliverable","priority","status","notes"
+"art.enemy.family","enemy","三种普通敌人阵列","PNG设计板","S","pending","比例与轮廓统一"
+"art.enemy.devourer","enemy","啃噬者","PNG概念图","S","pending","低伏群体杂兵"
+"art.enemy.crystal_shell","enemy","晶壳兽","PNG概念图","S","pending","前重型结晶甲壳"
+"art.enemy.screamer","enemy","啸叫者","PNG概念图","S","pending","高瘦远程轮廓"
+"art.enemy.burrower","enemy","结晶掘地者","PNG概念图","A","pending","精英几何异常"
+"art.enemy.boss","enemy","晶壳母体三阶段","PNG设计板","S","pending","同一主体连续阶段"
+"art.enemy.damage","enemy","敌人受击死亡反馈","PNG特效板","S","pending","中等暴力尺度"

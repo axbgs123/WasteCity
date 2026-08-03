@@ -1,0 +1,7 @@
+﻿"id","category","asset_name_zh","deliverable","priority","status","notes"
+"art.vfx.attention","vfx","关注度四阶段","PNG特效板","S","pending","同场景对比"
+"art.vfx.fates","vfx","三条命轨效果","PNG特效板","A","pending","规则改写语言"
+"art.vfx.boss_warning","vfx","Boss预警","PNG特效板","S","pending","形状颜色动画三重提示"
+"art.vfx.combat","vfx","炮塔碾压与命中反馈","PNG特效板","S","pending","暖黄物理反馈"
+"art.vfx.production","vfx","生产与堵塞反馈","PNG特效板","A","pending","采矿冶炼装配维修"
+"art.vfx.ascension","vfx","升阶结尾关键帧","PNG关键帧板","A","pending","希望转未知威胁"

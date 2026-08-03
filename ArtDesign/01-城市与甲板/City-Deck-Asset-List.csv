@@ -1,0 +1,6 @@
+﻿"id","category","asset_name_zh","deliverable","priority","status","notes"
+"art.city.mobile","city","移动城市收起状态","PNG概念图","S","pending","展示可定制基础甲板"
+"art.city.deployed","city","移动城市展开状态","PNG概念图","S","pending","保持同一城市结构"
+"art.city.deck","city","空甲板与弱化网格","PNG设计板","S","pending","普通与建造状态对比"
+"art.city.exploded","city","城市结构拆分","PNG设计板","S","pending","供后续建模与分层"
+"art.city.states","city","城市受损与异常状态","PNG设计板","A","pending","正常受损异常对比"

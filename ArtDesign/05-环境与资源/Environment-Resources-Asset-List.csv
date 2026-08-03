@@ -1,0 +1,7 @@
+﻿"id","category","asset_name_zh","deliverable","priority","status","notes"
+"art.environment.plains","environment","锈蚀平原","PNG环境图","S","pending","主要探索区"
+"art.environment.mines","environment","安全矿区与结晶裂谷","PNG对比图","S","pending","收益风险对比"
+"art.environment.rescue","environment","岑烬求救区","PNG环境图","A","pending","暖黄求救灯"
+"art.environment.boss","environment","Boss区域","PNG环境图","S","pending","中央保持清晰"
+"art.environment.props","environment","装饰与探索点资产板","PNG设计板","A","pending","模块化环境物"
+"art.resource.family","resource","四种资源视觉板","PNG设计板","S","pending","世界物体与图标"
