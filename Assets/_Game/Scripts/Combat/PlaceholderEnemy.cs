@@ -56,6 +56,11 @@ namespace WasteCity.Combat
                 float distance=Vector2.Distance(transform.position,puppet.transform.position);
                 if(distance<best){best=distance;targetHealth=puppet.Health;targetTransform=puppet.transform;}
             }
+            foreach(var behemoth in UnityEngine.Object.FindObjectsOfType<PlaceholderBehemoth>())
+            {
+                float distance=Vector2.Distance(transform.position,behemoth.transform.position);
+                if(distance<best){best=distance;targetHealth=behemoth.Health;targetTransform=behemoth.transform;}
+            }
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
             {
                 if(!CanTarget(building))continue;float distance=Vector2.Distance(transform.position,building.transform.position);
@@ -63,7 +68,7 @@ namespace WasteCity.Combat
             }
             if(best==float.MaxValue)best=Vector2.Distance(transform.position,city.position);
             if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * MoveSpeedMultiplier * Time.deltaTime);
-            else { attackRemainder += definition.DamagePerSecond * quality.DamageMultiplier * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (damage > 0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
+            else { attackRemainder += definition.DamagePerSecond * quality.DamageMultiplier * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (DamageMatrix.Apply(damage,DamageType.Physical,targetHealth.Armor)>0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
         }
         private void UpdateControlled()
         {

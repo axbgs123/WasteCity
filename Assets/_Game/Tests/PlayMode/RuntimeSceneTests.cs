@@ -40,5 +40,20 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(puppet.Health.Value.Current, Is.LessThan(before));
             Object.Destroy(enemyObject); Object.Destroy(puppetObject); Object.Destroy(cityObject); yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator HostileEnemyRetaliatesAgainstNearbyBehemoth()
+        {
+            var cityObject = new GameObject("TestBehemothCityTarget"); cityObject.transform.position = Vector3.right * 50f;
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var enemyObject = new GameObject("TestBehemothHostile"); enemyObject.AddComponent<HealthComponent>();
+            var enemy = enemyObject.AddComponent<PlaceholderEnemy>(); enemy.Configure(cityHealth, cityObject.transform, EnemyCatalog.Gnawer, new ResourceInventory(100));
+            var behemothObject = new GameObject("TestBehemoth"); behemothObject.transform.position = Vector3.right * .5f; behemothObject.AddComponent<HealthComponent>();
+            var behemoth = behemothObject.AddComponent<PlaceholderBehemoth>(); behemoth.Configure(cityObject.transform, null);
+            int before = behemoth.Health.Value.Current;
+            yield return new WaitForSeconds(.5f);
+            Assert.That(behemoth.Health.Value.Current, Is.LessThan(before));
+            Object.Destroy(enemyObject); Object.Destroy(behemothObject); Object.Destroy(cityObject); yield return null;
+        }
     }
 }

@@ -50,11 +50,12 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition AutomatedRepairBay=new BuildingDefinition("core.building.automated-repair-bay","自动维修机甲站",2,2,ResourceIds.Alloy,16,false,12f,300,0,"core.research.unmanned-systems","core.building.assembler");
         public static readonly BuildingDefinition AlchemyChamber=new BuildingDefinition("cultivation.building.alchemy-chamber","炼丹房",2,2,ResourceIds.SpiritIron,14,false,12f,280,0,"core.research.alchemy","cultivation.building.artifact-workshop");
         public static readonly BuildingDefinition PuppetWorkshop=new BuildingDefinition("cultivation.building.puppet-workshop","傀儡工坊",2,2,ResourceIds.Alloy,18,false,12f,300,0,"core.research.puppetry","cultivation.building.artifact-workshop");
+        public static readonly BuildingDefinition BehemothPen=new BuildingDefinition("biological.building.behemoth-pen","巨兽栏",3,2,ResourceIds.BoneSteel,16,false,16f,420,0,"core.research.behemoth-breeding","biological.building.breeding-chamber");
         public static readonly BuildingDefinition[] All =
         {
-            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop,BehemothPen
         };
-        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop};
+        public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop,BehemothPen};
     }
 
     public sealed class PlacedBuilding

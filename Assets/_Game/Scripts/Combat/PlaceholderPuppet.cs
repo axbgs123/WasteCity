@@ -1,4 +1,5 @@
 using UnityEngine;
+using WasteCity.Research;
 
 namespace WasteCity.Combat
 {
@@ -10,13 +11,16 @@ namespace WasteCity.Combat
         private const float AttackRange = 1.5f;
         private const float DamagePerSecond = 18f;
         private Transform city;
+        private ResearchController research;
+        private readonly BuildingRegenerationModel regeneration = new BuildingRegenerationModel();
         private HealthComponent health;
         private float attackRemainder;
         public HealthComponent Health => health;
 
-        public void Configure(Transform cityTransform, int restoredHealth = -1)
+        public void Configure(Transform cityTransform, int restoredHealth = -1, ResearchController researchController = null)
         {
             city = cityTransform;
+            research = researchController;
             health = GetComponent<HealthComponent>();
             health.Configure(MaximumHealth, ArmorType.Light);
             if (restoredHealth >= 0) health.Value.Restore(restoredHealth);
@@ -25,6 +29,7 @@ namespace WasteCity.Combat
 
         private void Update()
         {
+            if (research != null) regeneration.Tick(Time.deltaTime, false, research.HasTissueRegeneration, false, health.Value, null);
             PlaceholderEnemy target = null;
             float best = float.MaxValue;
             foreach (var enemy in Object.FindObjectsOfType<PlaceholderEnemy>())
