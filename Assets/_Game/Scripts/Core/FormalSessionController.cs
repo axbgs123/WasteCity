@@ -14,16 +14,17 @@ namespace WasteCity.Core
         [SerializeField] private FormalSaveController saves;
         [SerializeField] private FormalGuidanceController guidance;
         [SerializeField] private FormalAdvancementController advancement;
+        private GameSpeedController gameSpeed;
         public GameSessionStateModel Model { get; }=new GameSessionStateModel();
         public GuidanceStage LastCheckpointStage { get; private set; }
-        private void Start(){Time.timeScale=1;cityHealth.Value.Died+=OnDefeated;guidance.Model.Changed+=OnGuidanceChanged;}
+        private void Start(){gameSpeed=FindObjectOfType<GameSpeedController>();cityHealth.Value.Died+=OnDefeated;guidance.Model.Changed+=OnGuidanceChanged;}
         private void Update()
         {
             if(Keyboard.current==null||advancement.IsPresenting)return;
-            if(Keyboard.current.pKey.wasPressedThisFrame&&Model.TogglePause())Time.timeScale=Model.State==GameSessionState.Paused?0:1;
+            if(Keyboard.current.pKey.wasPressedThisFrame&&Model.TogglePause())gameSpeed?.SetPaused(GamePauseReason.Session,Model.State==GameSessionState.Paused);
             if(Model.State==GameSessionState.Defeated&&Keyboard.current.rKey.wasPressedThisFrame)Retry();
         }
-        private void OnDefeated(){if(Model.Defeat())Time.timeScale=0;}
+        private void OnDefeated(){if(Model.Defeat())gameSpeed?.SetPaused(GamePauseReason.Defeat,true);}
         private void OnGuidanceChanged(GuidanceStage stage)
         {
             if(stage!=GuidanceStage.FirstFortress&&stage!=GuidanceStage.ProductionChain&&stage!=GuidanceStage.PressureTest&&stage!=GuidanceStage.Broodmother)return;
@@ -31,7 +32,8 @@ namespace WasteCity.Core
         }
         public void Retry()
         {
-            Time.timeScale=1;if(!saves.Load())SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);Model.ResumeAfterRetry();
+            gameSpeed?.SetPaused(GamePauseReason.Defeat,false);gameSpeed?.SetPaused(GamePauseReason.Session,false);
+            if(!saves.Load())SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);Model.ResumeAfterRetry();
         }
         private void OnGUI()
         {

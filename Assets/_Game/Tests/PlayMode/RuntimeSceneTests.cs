@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -9,11 +10,34 @@ using WasteCity.Persistence;
 using WasteCity.Presentation;
 using WasteCity.Combat;
 using WasteCity.Economy;
+using WasteCity.Population;
 
 namespace WasteCity.Tests.PlayMode
 {
     public sealed class RuntimeSceneTests
     {
+        [UnityTearDown]
+        public IEnumerator RestoreTimeScale()
+        {
+            var gameSpeed = Object.FindObjectOfType<WasteCity.Core.GameSpeedController>();
+            gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Title, false);
+            gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Session, false);
+            gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Defeat, false);
+            gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Advancement, false);
+            Time.timeScale = 1f;
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TitleMenuKeepsWorldPausedAcrossFrames()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+
+            Assert.That(Time.timeScale, Is.Zero);
+        }
+
         [UnityTest]
         public IEnumerator FormalSceneStartsWithPersistentRuntimeAndAttachedBuildingRoot()
         {
@@ -24,6 +48,70 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(buildings.transform.parent, Is.EqualTo(city.transform)); Assert.That(Camera.main, Is.Not.Null);
             Assert.That(buildings.HasLocalTimeSource, Is.True);
             Assert.That(city.GetComponent<VisualSlot>()?.StableId, Is.EqualTo("core.city.mobile")); Assert.That(Object.FindObjectOfType<VisualLibraryProvider>()?.Library, Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator SaveRestoreAppliesBuildingCapacityBeforeStoredValues()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var economy = Object.FindObjectOfType<FormalEconomyController>();
+            var population = Object.FindObjectOfType<FormalPopulationController>();
+            var data = saves.CaptureComplete();
+            data.iron = 250;
+            data.population = 100;
+            data.populationCapacity = 200;
+            data.buildings = new[]
+            {
+                new BuildingSnapshot { definitionId = BuildingCatalog.Housing.Id.Value, x = 0, y = 0, health = 250, constructionRemaining = 0f },
+                new BuildingSnapshot { definitionId = BuildingCatalog.Warehouse.Id.Value, x = 3, y = 0, health = 300, constructionRemaining = 0f }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+
+            Assert.That(population.Model.Capacity, Is.EqualTo(200));
+            Assert.That(economy.Inventory.CapacityPerResource, Is.EqualTo(300));
+            Assert.That(economy.Inventory.Get(ResourceIds.Iron), Is.EqualTo(250));
+        }
+
+        [UnityTest]
+        public IEnumerator ResourceMarkersStayHiddenUntilTheirTileIsRevealed()
+        {
+            var worldObject = new GameObject("FogVisibilityWorld");
+            var world = worldObject.AddComponent<WasteCity.World.PlaceholderWorldView>();
+            world.Generate(new WasteCity.World.WorldSeed(8128));
+            var marker = worldObject.GetComponentsInChildren<SpriteRenderer>()
+                .First(value => value.gameObject.name == "ResourcePlaceholder");
+
+            world.RefreshVisibility();
+
+            Assert.That(marker.enabled, Is.False);
+            world.RevealAroundWorld(marker.transform.parent.position, 0);
+            Assert.That(marker.enabled, Is.True);
+            Object.Destroy(worldObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ResourceMarkerHidesAfterNodeIsDepleted()
+        {
+            var worldObject = new GameObject("DepletedResourceWorld");
+            var world = worldObject.AddComponent<WasteCity.World.PlaceholderWorldView>();
+            world.Generate(new WasteCity.World.WorldSeed(8128));
+            var marker = worldObject.GetComponentsInChildren<SpriteRenderer>()
+                .First(value => value.gameObject.name == "ResourcePlaceholder");
+            var tilePosition = marker.transform.parent.localPosition;
+            int x = Mathf.FloorToInt(tilePosition.x + world.Model.Width * .5f);
+            int y = Mathf.FloorToInt(tilePosition.y + world.Model.Height * .5f);
+            world.RevealAroundWorld(marker.transform.parent.position, 0);
+
+            world.Model.Harvest(x, y, int.MaxValue, out _);
+            world.RefreshVisibility();
+
+            Assert.That(marker.enabled, Is.False);
+            Object.Destroy(worldObject);
+            yield return null;
         }
 
         [UnityTest]

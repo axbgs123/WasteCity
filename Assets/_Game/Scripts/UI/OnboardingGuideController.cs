@@ -12,7 +12,7 @@ namespace WasteCity.UI
         [SerializeField] private PlaceholderBuildingController buildings;
         private Vector2 start;
         public int Stage { get; private set; }
-        public string CurrentInstruction => Stage == 0 ? "引导 1/4：使用 WASD 驾驶移动城市" : Stage == 1 ? "引导 2/4：按 X 展开城市为堡垒" : Stage == 2 ? "引导 3/4：停在资源点，按 E 采集" : Stage == 3 ? "引导 4/4：按 B 打开建造，数字选建筑，左键放置" : "基础引导完成：探索、生产并防御你的城市";
+        public string CurrentInstruction => Stage == 0 ? "引导 1/4：使用 WASD 驾驶移动城市" : Stage == 1 ? "引导 2/4：按 F 展开城市为堡垒" : Stage == 2 ? "引导 3/4：停在资源点，按 E 采集" : Stage == 3 ? "引导 4/4：按 B 打开建造，数字选建筑，左键放置" : "基础引导完成：探索、生产并防御你的城市";
         private void Start() => start = city == null ? Vector2.zero : (Vector2)city.transform.position;
         private void Update()
         {

@@ -1,12 +1,21 @@
 using System;
+using System.Collections.Generic;
 
 namespace WasteCity.Core
 {
+    public enum GamePauseReason { User, Title, Session, Defeat, Advancement }
+
     public sealed class GameSpeedModel
     {
-        public float Speed { get; private set; } = 1f;
-        private float speedBeforePause = 1f;
-        public void Set(float speed) { Speed = Math.Max(0f, Math.Min(2f, speed)); if (Speed > 0f) speedBeforePause = Speed; }
-        public void TogglePause() => Speed = Speed > 0f ? 0f : speedBeforePause;
+        private readonly HashSet<GamePauseReason> pauseReasons = new HashSet<GamePauseReason>();
+        private float requestedSpeed = 1f;
+        public float Speed => pauseReasons.Count == 0 ? requestedSpeed : 0f;
+        public void Set(float speed) => requestedSpeed = Math.Max(0f, Math.Min(2f, speed));
+        public void TogglePause() => SetPaused(GamePauseReason.User, !pauseReasons.Contains(GamePauseReason.User));
+        public void SetPaused(GamePauseReason reason, bool paused)
+        {
+            if (paused) pauseReasons.Add(reason);
+            else pauseReasons.Remove(reason);
+        }
     }
 }

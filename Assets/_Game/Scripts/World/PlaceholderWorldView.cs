@@ -10,6 +10,7 @@ namespace WasteCity.World
         public int GeneratedTileCount { get; private set; }
         public WorldMapModel Model { get; private set; }
         private SpriteRenderer[,] tileRenderers;
+        private SpriteRenderer[,] resourceRenderers;
         private static Sprite square;
 
         public void Generate(WorldSeed seed)
@@ -18,6 +19,7 @@ namespace WasteCity.World
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), Vector2.one * 0.5f, 1f);
             Model = new WorldMapModel(width, height, seed);
             tileRenderers = new SpriteRenderer[width, height];
+            resourceRenderers = new SpriteRenderer[width, height];
             for (int x = 0; x < width; x++) for (int y = 0; y < height; y++)
             {
                 var tile = new GameObject($"Tile_{x}_{y}"); tile.transform.SetParent(transform);
@@ -26,9 +28,10 @@ namespace WasteCity.World
                 renderer.color = TerrainColor(Model.Get(x, y).Terrain);
                 renderer.sortingOrder = 0; tile.transform.localScale = Vector3.one * 0.96f;
                 tileRenderers[x, y] = renderer;
-                if (Model.Get(x, y).HasResource) CreateResourceMarker(tile.transform, Model.Get(x, y).ResourceId);
+                if (Model.Get(x, y).HasResource) resourceRenderers[x,y]=CreateResourceMarker(tile.transform, Model.Get(x, y).ResourceId);
                 GeneratedTileCount++;
             }
+            RefreshVisibility();
         }
 
         public void RevealAroundWorld(Vector2 world, int radius)
@@ -36,11 +39,19 @@ namespace WasteCity.World
             if (Model == null) return;
             int centerX = Mathf.FloorToInt(world.x + width * 0.5f); int centerY = Mathf.FloorToInt(world.y + height * 0.5f);
             Model.Reveal(centerX, centerY, radius);
-            for (int x = 0; x < width; x++) for (int y = 0; y < height; y++)
-                tileRenderers[x, y].color = Model.IsRevealed(x, y) ? TerrainColor(Model.Get(x, y).Terrain) : new Color(0.025f, 0.03f, 0.035f);
+            RefreshVisibility();
         }
         public void Restore(int[] amounts, bool[] visibility) { if(Model!=null&&Model.Restore(amounts,visibility))RefreshVisibility(); }
-        public void RefreshVisibility(){if(Model==null||tileRenderers==null)return;for(int x=0;x<width;x++)for(int y=0;y<height;y++)tileRenderers[x,y].color=Model.IsRevealed(x,y)?TerrainColor(Model.Get(x,y).Terrain):new Color(0.025f,0.03f,0.035f);}
+        public void RefreshVisibility()
+        {
+            if(Model==null||tileRenderers==null)return;
+            for(int x=0;x<width;x++)for(int y=0;y<height;y++)
+            {
+                bool revealed=Model.IsRevealed(x,y);
+                tileRenderers[x,y].color=revealed?TerrainColor(Model.Get(x,y).Terrain):new Color(0.025f,0.03f,0.035f);
+                if(resourceRenderers?[x,y]!=null)resourceRenderers[x,y].enabled=revealed&&Model.Get(x,y).ResourceAmount>0;
+            }
+        }
 
         private static Color TerrainColor(TerrainKind terrain)
         {
@@ -50,11 +61,12 @@ namespace WasteCity.World
             return new Color(0.2f, 0.22f, 0.18f);
         }
 
-        private static void CreateResourceMarker(Transform parent, string id)
+        private static SpriteRenderer CreateResourceMarker(Transform parent, string id)
         {
             var marker = new GameObject("ResourcePlaceholder"); marker.transform.SetParent(parent); marker.transform.localPosition = new Vector3(0f, 0f, -0.1f); marker.transform.localScale = Vector3.one * 0.35f;
             var renderer = marker.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 2;
             renderer.color = id == ResourceIds.EnergyCrystal ? Color.cyan : id == ResourceIds.Water ? Color.blue : id == ResourceIds.Biomass ? Color.green : id == ResourceIds.Stone ? Color.gray : new Color(0.75f, 0.45f, 0.2f);
+            return renderer;
         }
     }
 }

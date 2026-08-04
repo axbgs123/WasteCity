@@ -41,7 +41,58 @@ namespace WasteCity.Persistence
         public FormalSaveData CaptureComplete(){var data=Capture();data.puppetProgress=friendlyUnits.Fabrication.Progress;data.puppets=friendlyUnits.Capture();data.behemothProgress=friendlyUnits.Breeding.Progress;data.behemoths=friendlyUnits.CaptureBehemoths();return data;}
         public bool Load(){var d=Read(SavePath)??Read(SavePath+".bak");return d!=null&&ApplyComplete(d,false);}
         public bool ApplyComplete(FormalSaveData data,bool preserveObservation){bool applied=Apply(data,preserveObservation);if(applied&&data.schema>=22)friendlyUnits.Restore(data.puppetProgress,data.puppets);if(applied&&data.schema>=23)friendlyUnits.RestoreBehemoths(data.behemothProgress,data.behemoths);return applied;}
-        public bool Apply(FormalSaveData d,bool preserveObservation){if(d==null)return false;city.transform.position=new Vector3(d.cityX,d.cityY,city.transform.position.z);if(d.schema>=11)city.RestoreDeployment((CityMode)d.cityMode,d.deploymentRemaining);if(!string.IsNullOrEmpty(d.legacyPathId))legacy.Model.Restore(d.legacyPathId,d.schema>=16?d.legacyLevel:1);var i=economy.Inventory;if(d.legacyPathId==LegacyEffectModel.VoidDebt)i.SetDebtLimit(1000000);i.Restore(ResourceIds.Iron,d.iron);i.Restore(ResourceIds.EnergyCrystal,d.energyCrystal);i.Restore(ResourceIds.Stone,d.stone);i.Restore(ResourceIds.Biomass,d.biomass);i.Restore(ResourceIds.Water,d.water);i.Restore(ResourceIds.Alloy,d.alloy);i.Restore(ResourceIds.Ammunition,d.ammunition);if(d.schema>=20){i.Restore(ResourceIds.SpiritIron,d.spiritIron);i.Restore(ResourceIds.FlyingSword,d.flyingSword);i.Restore(ResourceIds.BoneSteel,d.boneSteel);i.Restore(ResourceIds.BiomassConcentrate,d.biomassConcentrate);i.Restore(ResourceIds.BiologicalWeapon,d.biologicalWeapon);i.Restore(ResourceIds.ResonanceMetal,d.resonanceMetal);i.Restore(ResourceIds.PsionicAmplifier,d.psionicAmplifier);production.RestoreProgress(d.productionProgress);}if(d.schema>=21)i.Restore(ResourceIds.Elixir,d.elixir);if(d.schema>=2){population.Restore(d.population,d.populationCapacity);if(!preserveObservation)progression.Observation.Restore(d.observation);progression.Civilization.Restore(d.civilizationLevel);cityHealth.Value.Restore(d.cityHealth);}if(d.schema>=10)research.Model.Restore(d.completedResearchIds,d.activeResearchId,d.researchRemaining);if(d.schema>=3)buildings.RestoreSnapshots(d.buildings);if(d.schema>=4)rescueSites.Restore(d.rescuedSites);if(d.schema>=6){clock.Model.Restore(d.day,d.secondsIntoDay);foresight.Restore(d.foresightFlashedDay);}if(d.schema>=7)localHaste.Restore(d.hastePoolDay,d.hasteRemaining,d.hasteActive,d.hasteTargetX,d.hasteTargetY);if(d.schema>=8)spatialTemplate.Model.Restore(d.spatialTemplate);if(d.schema>=9){worldView.Restore(d.worldResourceAmounts,d.worldRevealed);territory.Restore(d.territoryActivated,d.territoryProgress,d.territoryLocalResources);}if(d.schema>=12)combat.Restore(d.wave,d.enemies);if(d.schema>=15)progression.RestoreBossDefeated(d.bossDefeated);if(d.schema>=14){int stage=d.guidanceStage;if(d.schema<16&&stage==(int)GuidanceStage.Complete&&d.civilizationLevel<2)stage=(int)GuidanceStage.Advancement;guidance.Restore(stage);}if(d.schema>=16)advancement.Restore(d.advancementStage,d.advancementRemaining);if(d.schema>=18)leader.Restore(d.leaderRecruited,d.leaderInjured,d.leaderCooldown,d.leaderBoost,d.leaderLockout);else if(d.rescuedSites!=null&&System.Array.Exists(d.rescuedSites,value=>value))leader.Restore(true,false,0,0,0);if(d.schema>=19)statistics.Restore(d.statsElapsed,d.statsKills,d.statsHighestObservation,d.statsProductionCycles,d.statsBuildingLosses,d.statsRescues,d.statsDelayedRescues,d.statsRetreated);return true;}
+        public bool Apply(FormalSaveData d,bool preserveObservation)
+        {
+            if(d==null)return false;
+            city.transform.position=new Vector3(d.cityX,d.cityY,city.transform.position.z);
+            if(d.schema>=11)city.RestoreDeployment((CityMode)d.cityMode,d.deploymentRemaining);
+            if(!string.IsNullOrEmpty(d.legacyPathId))legacy.Model.Restore(d.legacyPathId,d.schema>=16?d.legacyLevel:1);
+
+            var i=economy.Inventory;
+            if(d.legacyPathId==LegacyEffectModel.VoidDebt)i.SetDebtLimit(1000000);
+            if(d.schema>=10)research.Model.Restore(d.completedResearchIds,d.activeResearchId,d.researchRemaining);
+            if(d.schema>=3)buildings.RestoreSnapshots(d.buildings);
+
+            i.Restore(ResourceIds.Iron,d.iron);
+            i.Restore(ResourceIds.EnergyCrystal,d.energyCrystal);
+            i.Restore(ResourceIds.Stone,d.stone);
+            i.Restore(ResourceIds.Biomass,d.biomass);
+            i.Restore(ResourceIds.Water,d.water);
+            i.Restore(ResourceIds.Alloy,d.alloy);
+            i.Restore(ResourceIds.Ammunition,d.ammunition);
+            if(d.schema>=20)
+            {
+                i.Restore(ResourceIds.SpiritIron,d.spiritIron);
+                i.Restore(ResourceIds.FlyingSword,d.flyingSword);
+                i.Restore(ResourceIds.BoneSteel,d.boneSteel);
+                i.Restore(ResourceIds.BiomassConcentrate,d.biomassConcentrate);
+                i.Restore(ResourceIds.BiologicalWeapon,d.biologicalWeapon);
+                i.Restore(ResourceIds.ResonanceMetal,d.resonanceMetal);
+                i.Restore(ResourceIds.PsionicAmplifier,d.psionicAmplifier);
+                production.RestoreProgress(d.productionProgress);
+            }
+            if(d.schema>=21)i.Restore(ResourceIds.Elixir,d.elixir);
+            if(d.schema>=2)
+            {
+                population.Restore(d.population,d.populationCapacity);
+                if(!preserveObservation)progression.Observation.Restore(d.observation);
+                progression.Civilization.Restore(d.civilizationLevel);
+                cityHealth.Value.Restore(d.cityHealth);
+            }
+            if(d.schema>=4)rescueSites.Restore(d.rescuedSites);
+            if(d.schema>=6){clock.Model.Restore(d.day,d.secondsIntoDay);foresight.Restore(d.foresightFlashedDay);}
+            if(d.schema>=7)localHaste.Restore(d.hastePoolDay,d.hasteRemaining,d.hasteActive,d.hasteTargetX,d.hasteTargetY);
+            if(d.schema>=8)spatialTemplate.Model.Restore(d.spatialTemplate);
+            if(d.schema>=9){worldView.Restore(d.worldResourceAmounts,d.worldRevealed);territory.Restore(d.territoryActivated,d.territoryProgress,d.territoryLocalResources);}
+            if(d.schema>=12)combat.Restore(d.wave,d.enemies);
+            if(d.schema>=15)progression.RestoreBossDefeated(d.bossDefeated);
+            if(d.schema>=14){int stage=d.guidanceStage;if(d.schema<16&&stage==(int)GuidanceStage.Complete&&d.civilizationLevel<2)stage=(int)GuidanceStage.Advancement;guidance.Restore(stage);}
+            if(d.schema>=16)advancement.Restore(d.advancementStage,d.advancementRemaining);
+            if(d.schema>=18)leader.Restore(d.leaderRecruited,d.leaderInjured,d.leaderCooldown,d.leaderBoost,d.leaderLockout);
+            else if(d.rescuedSites!=null&&System.Array.Exists(d.rescuedSites,value=>value))leader.Restore(true,false,0,0,0);
+            if(d.schema>=19)statistics.Restore(d.statsElapsed,d.statsKills,d.statsHighestObservation,d.statsProductionCycles,d.statsBuildingLosses,d.statsRescues,d.statsDelayedRescues,d.statsRetreated);
+            return true;
+        }
         static FormalSaveData Read(string path)=>File.Exists(path)?FormalSaveCodec.Decode(File.ReadAllText(path)):null;
     }
 }

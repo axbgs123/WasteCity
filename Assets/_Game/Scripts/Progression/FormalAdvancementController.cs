@@ -11,14 +11,17 @@ namespace WasteCity.Progression
         [SerializeField] private FormalSaveController saves;
         [SerializeField] private GameObject scanVisual;
         [SerializeField] private FormalSessionStatisticsController statistics;
+        private GameSpeedController gameSpeed;
         public AdvancementSequenceModel Model { get; } = new AdvancementSequenceModel();
         public bool IsPresenting => Model.IsPresenting;
 
         private void Start()
         {
+            gameSpeed=FindObjectOfType<GameSpeedController>();
             progression.Advanced += Begin;
             Model.Changed += OnStageChanged;
             OnStageChanged(Model.Stage);
+            gameSpeed?.SetPaused(GamePauseReason.Advancement,Model.IsPresenting);
         }
 
         private void Update()
@@ -29,14 +32,14 @@ namespace WasteCity.Progression
             if (previous != AdvancementSequenceStage.Results && Model.Stage == AdvancementSequenceStage.Results) saves.Save();
             if (Model.Stage == AdvancementSequenceStage.Results && Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame)
             {
-                Model.Continue(); Time.timeScale = 1f; saves.Save();
+                Model.Continue(); gameSpeed?.SetPaused(GamePauseReason.Advancement,false); saves.Save();
             }
         }
 
         private void Begin()
         {
             if (!Model.Start()) return;
-            Time.timeScale = 0f; saves.Save();
+            gameSpeed?.SetPaused(GamePauseReason.Advancement,true); saves.Save();
         }
 
         private void OnStageChanged(AdvancementSequenceStage stage)
@@ -47,7 +50,7 @@ namespace WasteCity.Progression
         public void Restore(int stage, float remaining)
         {
             Model.Restore(stage, remaining);
-            Time.timeScale = Model.IsPresenting ? 0f : 1f;
+            gameSpeed?.SetPaused(GamePauseReason.Advancement,Model.IsPresenting);
         }
 
         private void OnGUI()

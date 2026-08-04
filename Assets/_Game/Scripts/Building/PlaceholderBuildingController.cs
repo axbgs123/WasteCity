@@ -56,7 +56,7 @@ namespace WasteCity.Building
                 if (Keyboard.current.digit8Key.wasPressedThisFrame) selected = 7;
                 if(active&&Keyboard.current.leftArrowKey.wasPressedThisFrame)selected=(selected-1+BuildingCatalog.BuildMenu.Length)%BuildingCatalog.BuildMenu.Length;
                 if(active&&Keyboard.current.rightArrowKey.wasPressedThisFrame)selected=(selected+1)%BuildingCatalog.BuildMenu.Length;
-                if (Keyboard.current.tKey.wasPressedThisFrame) TryUpgradeAtMouse();
+                if (Keyboard.current.vKey.wasPressedThisFrame) TryUpgradeAtMouse();
             }
             if (active && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) PlaceAtMouse();
             if (Mouse.current != null && Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame) TryRepairAtMouse();
@@ -161,7 +161,7 @@ namespace WasteCity.Building
         }
         private void OnGUI()
         {
-            if (active){var definition=BuildingCatalog.BuildMenu[selected];CanBuild(definition,out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 930f, 52f), $"建造：数字1-8基础建筑 · ←/→ 全建筑 · 当前 {selected+1}/{BuildingCatalog.BuildMenu.Length} {definition.Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [T] 升级");}
+            if (active){var definition=BuildingCatalog.BuildMenu[selected];CanBuild(definition,out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 930f, 52f), $"建造：数字1-8基础建筑 · ←/→ 全建筑 · 当前 {selected+1}/{BuildingCatalog.BuildMenu.Length} {definition.Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [V] 升级");}
             if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
             if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }
