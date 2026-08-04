@@ -632,6 +632,39 @@ namespace WasteCity.Tests.PlayMode
             Object.Destroy(worldObject); Object.Destroy(city); Object.Destroy(researchObject); yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator TechnologyRoute_FormalSceneWiresControllersAndRestoresSchemaTwentySix()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var technology = Object.FindObjectOfType<FormalTechnologyRouteController>();
+            var drones = Object.FindObjectOfType<FormalDroneController>();
+            var data = saves.CaptureComplete();
+            data.schema = 26;
+            data.completedResearchIds = new[] { "core.research.energy-weapons" };
+            data.technologyOverloadCooldown = 18f;
+            data.technologyOverloadBoost = 2f;
+            data.technologyOverloadLockout = 0f;
+
+            Assert.That(technology, Is.Not.Null);
+            Assert.That(drones, Is.Not.Null);
+            Assert.That(drones.HasRequiredReferences, Is.True);
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            Assert.That(technology.Model.CooldownRemaining, Is.EqualTo(18f));
+            Assert.That(technology.Model.BoostRemaining, Is.EqualTo(2f));
+
+            data.schema = 25;
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            Assert.That(technology.Model.Phase, Is.EqualTo(TechnologyOverloadPhase.Ready));
+
+            data.schema = 26;
+            data.completedResearchIds = new string[0];
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            Assert.That(technology.Model.Phase, Is.EqualTo(TechnologyOverloadPhase.Ready));
+        }
+
         private static GameObject CreateInfectionTurret(
             string name,
             Vector2 position,
