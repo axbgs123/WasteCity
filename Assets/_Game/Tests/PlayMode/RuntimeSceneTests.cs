@@ -33,7 +33,8 @@ namespace WasteCity.Tests.PlayMode
                     || item.name.StartsWith("AcidTower")
                     || item.name.StartsWith("PhysicalTower")
                     || item.name.StartsWith("Technology")
-                    || item.name.StartsWith("Unmanned"))
+                    || item.name.StartsWith("Unmanned")
+                    || item.name.StartsWith("SwordIntent"))
                     Object.Destroy(item);
             yield return null;
         }
@@ -663,6 +664,82 @@ namespace WasteCity.Tests.PlayMode
             data.completedResearchIds = new string[0];
             Assert.That(saves.ApplyComplete(data, false), Is.True);
             Assert.That(technology.Model.Phase, Is.EqualTo(TechnologyOverloadPhase.Ready));
+        }
+
+        [UnityTest]
+        public IEnumerator SwordIntent_FlyingSwordTowersStackButPhysicalTowerDoesNot()
+        {
+            var economyObject = new GameObject("SwordIntentEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.FlyingSword, 4);
+            economy.Inventory.Add(ResourceIds.Ammunition, 2);
+            var cityObject = new GameObject("SwordIntentCity"); cityObject.transform.position = new Vector2(100f, 100f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var baseTarget = CreateInfectionEnemy("SwordIntentBaseTarget", Vector2.right, cityHealth, cityObject.transform, 500);
+            var upgradeTarget = CreateInfectionEnemy("SwordIntentUpgradeTarget", new Vector2(31f, 0f), cityHealth, cityObject.transform, 500);
+            var physicalTarget = CreateInfectionEnemy("SwordIntentPhysicalTarget", new Vector2(61f, 0f), cityHealth, cityObject.transform, 500);
+            GameObject baseTower = CreateInfectionTurret("SwordIntentBaseTower", Vector2.zero, BuildingCatalog.SwordArrayTower, economy);
+            GameObject upgradeTower = CreateInfectionTurret("SwordIntentUpgradeTower", new Vector2(30f, 0f), BuildingCatalog.SwordRidingPlatform, economy);
+            GameObject physicalTower = CreateInfectionTurret("SwordIntentPhysicalTower", new Vector2(60f, 0f), BuildingCatalog.MachineGunTurret, economy);
+
+            yield return new WaitForSeconds(.2f);
+
+            Assert.That(baseTarget.SwordIntent.Stacks, Is.EqualTo(1));
+            Assert.That(upgradeTarget.SwordIntent.Stacks, Is.EqualTo(1));
+            Assert.That(physicalTarget.SwordIntent.Stacks, Is.Zero);
+            Assert.That(baseTarget.SwordIntent.Marker.GetComponent<VisualSlot>().StableId, Is.EqualTo("cultivation.status.sword-intent"));
+            Object.Destroy(baseTarget.gameObject); Object.Destroy(upgradeTarget.gameObject); Object.Destroy(physicalTarget.gameObject);
+            Object.Destroy(baseTower); Object.Destroy(upgradeTower); Object.Destroy(physicalTower);
+            Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SwordIntent_ContinuousTowerAddsAtMostOneLayerPerSecond()
+        {
+            var economyObject = new GameObject("SwordIntentCadenceEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.FlyingSword, 2);
+            var cityObject = new GameObject("SwordIntentCadenceCity"); cityObject.transform.position = new Vector2(100f, 100f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var target = CreateInfectionEnemy("SwordIntentCadenceTarget", Vector2.right, cityHealth, cityObject.transform, 1000);
+            GameObject tower = CreateInfectionTurret("SwordIntentCadenceTower", Vector2.zero, BuildingCatalog.SwordArrayTower, economy);
+
+            yield return new WaitForSeconds(.2f);
+            Assert.That(target.SwordIntent.Stacks, Is.EqualTo(1));
+            yield return new WaitForSeconds(.5f);
+            Assert.That(target.SwordIntent.Stacks, Is.EqualTo(1));
+            yield return new WaitForSeconds(.6f);
+            Assert.That(target.SwordIntent.Stacks, Is.EqualTo(2));
+            Object.Destroy(target.gameObject); Object.Destroy(tower); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SwordIntent_ExecutionBypassesShieldAndMindControlClearsStatus()
+        {
+            var cityObject = new GameObject("SwordIntentExecutionCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var executionTarget = CreateInfectionEnemy("SwordIntentExecutionTarget", Vector2.zero, cityHealth, cityObject.transform, 100);
+            executionTarget.Health.Value.GrantShield(200);
+            executionTarget.RestoreSwordIntent(19);
+
+            executionTarget.ApplySwordIntent();
+
+            Assert.That(executionTarget.Health.Value.IsDead, Is.True);
+            Assert.That(executionTarget.Health.Value.Shield, Is.EqualTo(200));
+            Assert.That(executionTarget.SwordIntent.Stacks, Is.Zero);
+
+            var researchObject = new GameObject("SwordIntentControlResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.mind-control" }, null, 0f);
+            research.enabled = false;
+            var controlled = CreateInfectionEnemy("SwordIntentControlledTarget", Vector2.right, cityHealth, cityObject.transform, 60, research);
+            controlled.RestoreSwordIntent(7);
+            GameObject marker = controlled.SwordIntent.Marker;
+            Assert.That(controlled.TryConvert(), Is.True);
+            Assert.That(controlled.SwordIntent.Stacks, Is.Zero);
+            Assert.That(marker.activeSelf, Is.False);
+            Object.Destroy(controlled.gameObject); Object.Destroy(executionTarget.gameObject);
+            Object.Destroy(researchObject); Object.Destroy(cityObject); yield return null;
         }
 
         private static GameObject CreateInfectionTurret(
