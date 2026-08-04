@@ -245,5 +245,119 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(commands.TotalLosses, Is.EqualTo(1));
             Object.Destroy(behemothObject); Object.Destroy(controlledObject); Object.Destroy(cityObject); Object.Destroy(researchObject); yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_StatusTicksAndUsesReplaceableMarker()
+        {
+            var cityObject = new GameObject("InfectionTickCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var enemy = CreateInfectionEnemy("InfectionTickEnemy", Vector2.zero, cityHealth, cityObject.transform, 250);
+
+            enemy.ApplyInfection(1);
+
+            Assert.That(enemy.Infection.Stacks, Is.EqualTo(1));
+            Assert.That(enemy.Infection.Marker, Is.Not.Null);
+            Assert.That(enemy.Infection.Marker.activeSelf, Is.True);
+            Assert.That(enemy.Infection.Marker.GetComponent<VisualSlot>().StableId, Is.EqualTo("biological.status.infection"));
+            yield return new WaitForSeconds(1.05f);
+            Assert.That(enemy.Health.Value.Current, Is.EqualTo(245));
+            Object.Destroy(enemy.gameObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_BurstSpreadsOnlyToLivingHostilesInsideRadius()
+        {
+            var cityObject = new GameObject("InfectionSpreadCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var researchObject = new GameObject("InfectionSpreadResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.mind-control" }, null, 0f);
+            research.enabled = false;
+            var source = CreateInfectionEnemy("InfectionSource", Vector2.zero, cityHealth, cityObject.transform);
+            var inside = CreateInfectionEnemy("InfectionInside", Vector2.right * 3f, cityHealth, cityObject.transform);
+            var outside = CreateInfectionEnemy("InfectionOutside", Vector2.right * 3.01f, cityHealth, cityObject.transform);
+            var dead = CreateInfectionEnemy("InfectionDead", Vector2.up, cityHealth, cityObject.transform);
+            var controlled = CreateInfectionEnemy("InfectionControlled", Vector2.down, cityHealth, cityObject.transform, 60, research);
+            dead.Health.Value.Apply(1000, DamageType.Energy, dead.Health.Armor);
+            Assert.That(controlled.TryConvert(), Is.True);
+            source.ApplyInfection(9);
+
+            source.ApplyInfection(1);
+
+            Assert.That(source.Infection.Stacks, Is.Zero);
+            Assert.That(inside.Infection.Stacks, Is.EqualTo(5));
+            Assert.That(outside.Infection.Stacks, Is.Zero);
+            Assert.That(dead.Infection.Stacks, Is.Zero);
+            Assert.That(controlled.Infection.Stacks, Is.Zero);
+            Object.Destroy(source.gameObject); Object.Destroy(inside.gameObject); Object.Destroy(outside.gameObject);
+            Object.Destroy(dead.gameObject); Object.Destroy(controlled.gameObject); Object.Destroy(cityObject); Object.Destroy(researchObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_MindControlClearsStatusAndMarker()
+        {
+            var cityObject = new GameObject("InfectionControlCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var researchObject = new GameObject("InfectionControlResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.mind-control" }, null, 0f);
+            research.enabled = false;
+            var enemy = CreateInfectionEnemy("InfectionControlEnemy", Vector2.zero, cityHealth, cityObject.transform, 60, research);
+            enemy.ApplyInfection(4);
+            GameObject marker = enemy.Infection.Marker;
+
+            Assert.That(enemy.TryConvert(), Is.True);
+
+            Assert.That(enemy.Infection.Stacks, Is.Zero);
+            Assert.That(marker.activeSelf, Is.False);
+            Object.Destroy(enemy.gameObject); Object.Destroy(cityObject); Object.Destroy(researchObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_PropagationChainTerminatesWithOneBurstPerTarget()
+        {
+            var cityObject = new GameObject("InfectionChainCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var first = CreateInfectionEnemy("InfectionChainFirst", Vector2.zero, cityHealth, cityObject.transform);
+            var second = CreateInfectionEnemy("InfectionChainSecond", Vector2.right, cityHealth, cityObject.transform);
+            var third = CreateInfectionEnemy("InfectionChainThird", Vector2.right * 2f, cityHealth, cityObject.transform);
+            first.ApplyInfection(9);
+            second.ApplyInfection(5);
+            third.ApplyInfection(5);
+
+            first.ApplyInfection(1);
+
+            Assert.That(first.Infection.Stacks, Is.EqualTo(9));
+            Assert.That(second.Infection.Stacks, Is.EqualTo(5));
+            Assert.That(third.Infection.Stacks, Is.EqualTo(5));
+            Object.Destroy(first.gameObject); Object.Destroy(second.gameObject); Object.Destroy(third.gameObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        private static PlaceholderEnemy CreateInfectionEnemy(
+            string name,
+            Vector2 position,
+            HealthComponent cityHealth,
+            Transform city,
+            int maximumHealth = 60,
+            ResearchController research = null)
+        {
+            var definition = new EnemyDefinition(
+                $"test.enemy.{name.ToLowerInvariant()}",
+                name,
+                EnemyArchetype.Gnawer,
+                maximumHealth,
+                .1f,
+                0f,
+                .5f,
+                ArmorType.Light,
+                0,
+                EnemyTargetPriority.Nearest);
+            var item = new GameObject(name);
+            item.transform.position = position;
+            item.AddComponent<HealthComponent>();
+            var enemy = item.AddComponent<PlaceholderEnemy>();
+            enemy.Configure(cityHealth, city, definition, new ResourceInventory(100), 0, null, EnemyQuality.Ordinary, research);
+            return enemy;
+        }
     }
 }
