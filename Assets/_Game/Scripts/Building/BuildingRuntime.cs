@@ -97,6 +97,7 @@ namespace WasteCity.Building
                 float delta=Time.deltaTime*(localTime?.MultiplierFor(runtime)??1f)*(combatModifier?.FireRateMultiplier??1f);var targetHealth=nearest.GetComponent<HealthComponent>();float researchDamage=physical?(research?.TurretDamageMultiplier??1f):1f;float routeDamage=combatModifier?.DamageMultiplier(profile.DamageType)??1f;int dealt=weapon.Tick(delta,economy.Inventory,targetHealth.Value,targetHealth.Armor,researchDamage*routeDamage);
                 if(infectionEmitter.Tick(0f,dealt>0&&profile.DamageType==DamageType.Biological))nearest.ApplyInfection(1);
                 if(swordIntentEmitter.Tick(0f,dealt>0&&profile.ConsumableId==ResourceIds.FlyingSword))nearest.ApplySwordIntent();
+                if(dealt>0&&profile.DamageType==DamageType.Psionic)nearest.ApplyPsionicResonance(dealt);
                 if(dealt>0&&profile.DamageType==DamageType.Psionic&&research!=null&&research.HasMindControl){mindControlClock+=Time.deltaTime;if(mindControlClock>=1f){mindControlClock%=1f;if(MindControlModel.ShouldConvert(true,nearest.Quality,nearest.Definition.IsHeavy,UnityEngine.Random.Range(0,100)))nearest.TryConvert();}}
             }
         }

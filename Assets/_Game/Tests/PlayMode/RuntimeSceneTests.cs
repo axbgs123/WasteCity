@@ -35,7 +35,8 @@ namespace WasteCity.Tests.PlayMode
                     || item.name.StartsWith("Technology")
                     || item.name.StartsWith("Unmanned")
                     || item.name.StartsWith("SwordIntent")
-                    || item.name.StartsWith("PuppetMaintenance"))
+                    || item.name.StartsWith("PuppetMaintenance")
+                    || item.name.StartsWith("Psionic"))
                     Object.Destroy(item);
             yield return null;
         }
@@ -577,6 +578,145 @@ namespace WasteCity.Tests.PlayMode
             FriendlyUnitSnapshot captured = saves.CaptureComplete().puppets.Single();
             Assert.That(captured.maintenanceActive, Is.False);
             Assert.That(captured.maintenanceElapsed, Is.EqualTo(60f));
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicResonance_MindSpireMarksButPhysicalTowerDoesNot()
+        {
+            var economyObject = new GameObject("PsionicTowerEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.PsionicAmplifier, 2);
+            economy.Inventory.Add(ResourceIds.Ammunition, 2);
+            var cityObject = new GameObject("PsionicTowerCity");
+            cityObject.transform.position = new Vector2(100f, 100f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>();
+            cityHealth.Configure(2000, ArmorType.Heavy);
+            var psionicTarget = CreateInfectionEnemy(
+                "PsionicTowerTarget",
+                Vector2.right,
+                cityHealth,
+                cityObject.transform,
+                500);
+            var physicalTarget = CreateInfectionEnemy(
+                "PsionicPhysicalTarget",
+                new Vector2(31f, 0f),
+                cityHealth,
+                cityObject.transform,
+                500);
+            GameObject mindSpire = CreateInfectionTurret(
+                "PsionicMindSpire",
+                Vector2.zero,
+                BuildingCatalog.MindSpire,
+                economy);
+            GameObject physicalTower = CreateInfectionTurret(
+                "PsionicPhysicalTower",
+                new Vector2(30f, 0f),
+                BuildingCatalog.MachineGunTurret,
+                economy);
+
+            yield return new WaitForSeconds(.2f);
+
+            Assert.That(psionicTarget.PsionicResonance.Active, Is.True);
+            Assert.That(
+                psionicTarget.PsionicResonance.Marker.GetComponent<VisualSlot>().StableId,
+                Is.EqualTo("psionics.status.resonance"));
+            Assert.That(physicalTarget.PsionicResonance.Active, Is.False);
+            Object.Destroy(psionicTarget.gameObject);
+            Object.Destroy(physicalTarget.gameObject);
+            Object.Destroy(mindSpire);
+            Object.Destroy(physicalTower);
+            Object.Destroy(cityObject);
+            Object.Destroy(economyObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicResonance_SynchronizesThirtyPercentWithoutRecursion()
+        {
+            var cityObject = new GameObject("PsionicSyncCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>();
+            cityHealth.Configure(2000, ArmorType.Heavy);
+            var primary = CreateInfectionEnemy(
+                "PsionicSyncPrimary",
+                Vector2.zero,
+                cityHealth,
+                cityObject.transform,
+                100);
+            var linked = CreateInfectionEnemy(
+                "PsionicSyncLinked",
+                Vector2.right,
+                cityHealth,
+                cityObject.transform,
+                100);
+            primary.RestorePsionicResonance(5f);
+            linked.RestorePsionicResonance(5f);
+
+            int primaryDealt = primary.Health.Value.Apply(10, DamageType.Psionic, primary.Health.Armor);
+            primary.ApplyPsionicResonance(primaryDealt);
+
+            Assert.That(primary.Health.Value.Current, Is.EqualTo(90));
+            Assert.That(linked.Health.Value.Current, Is.EqualTo(97));
+            Object.Destroy(primary.gameObject);
+            Object.Destroy(linked.gameObject);
+            Object.Destroy(cityObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicResonance_MindControlClearsStatusAndMarker()
+        {
+            var cityObject = new GameObject("PsionicControlCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>();
+            cityHealth.Configure(2000, ArmorType.Heavy);
+            var researchObject = new GameObject("PsionicControlResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.mind-control" }, null, 0f);
+            research.enabled = false;
+            var enemy = CreateInfectionEnemy(
+                "PsionicControlTarget",
+                Vector2.zero,
+                cityHealth,
+                cityObject.transform,
+                60,
+                research);
+            enemy.RestorePsionicResonance(5f);
+            GameObject marker = enemy.PsionicResonance.Marker;
+
+            Assert.That(enemy.TryConvert(), Is.True);
+
+            Assert.That(enemy.PsionicResonance.Active, Is.False);
+            Assert.That(marker.activeSelf, Is.False);
+            Object.Destroy(enemy.gameObject);
+            Object.Destroy(researchObject);
+            Object.Destroy(cityObject);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicResonance_EleventhTargetIsNotMarked()
+        {
+            var cityObject = new GameObject("PsionicCapCity");
+            var cityHealth = cityObject.AddComponent<HealthComponent>();
+            cityHealth.Configure(2000, ArmorType.Heavy);
+            for (int index = 0; index < 11; index++)
+            {
+                var enemy = CreateInfectionEnemy(
+                    $"PsionicCapTarget{index}",
+                    new Vector2(index, 0f),
+                    cityHealth,
+                    cityObject.transform,
+                    100);
+                enemy.ApplyPsionicResonance(1);
+            }
+
+            Assert.That(
+                Object.FindObjectsOfType<PlaceholderEnemy>()
+                    .Count(value => value.PsionicResonance.Active),
+                Is.EqualTo(10));
+            foreach (var enemy in Object.FindObjectsOfType<PlaceholderEnemy>())
+                Object.Destroy(enemy.gameObject);
+            Object.Destroy(cityObject);
+            yield return null;
         }
 
         [UnityTest]

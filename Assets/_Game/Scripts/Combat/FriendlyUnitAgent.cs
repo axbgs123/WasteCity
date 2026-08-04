@@ -112,6 +112,8 @@ namespace WasteCity.Combat
             int dealt = target.Health.Value.Apply(damage, damageType, target.Health.Armor);
             if (infectionEmitter.Tick(0f, dealt > 0 && damageType == DamageType.Biological))
                 target.ApplyInfection(1);
+            if (dealt > 0 && damageType == DamageType.Psionic)
+                target.ApplyPsionicResonance(dealt);
             attackRemainder -= damage;
         }
 

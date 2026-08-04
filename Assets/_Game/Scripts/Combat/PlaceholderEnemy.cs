@@ -26,18 +26,21 @@ namespace WasteCity.Combat
         private FriendlyUnitCommandModel friendlyCommands;
         private EnemyInfectionStatus infection;
         private EnemySwordIntentStatus swordIntent;
+        private EnemyPsionicResonanceStatus psionicResonance;
         public EnemyDefinition Definition => definition;
         public EnemyQuality Quality => quality.Quality;
         public bool IsControlled { get; private set; }
         public HealthComponent Health => health;
         public EnemyInfectionStatus Infection => infection;
         public EnemySwordIntentStatus SwordIntent => swordIntent;
+        public EnemyPsionicResonanceStatus PsionicResonance => psionicResonance;
         public float MoveSpeedMultiplier { get; set; }=1f;
         public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null, Action onConverted = null, FriendlyUnitCommandModel commandModel = null)
         {
             definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; converted=onConverted; lootInventory = inventory; research=researchController; health = GetComponent<HealthComponent>(); visual=GetComponent<SpriteRenderer>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
             infection=GetComponent<EnemyInfectionStatus>()??gameObject.AddComponent<EnemyInfectionStatus>();infection.Configure(this,health);
             swordIntent=GetComponent<EnemySwordIntentStatus>()??gameObject.AddComponent<EnemySwordIntentStatus>();swordIntent.Configure(this,health);
+            psionicResonance=GetComponent<EnemyPsionicResonanceStatus>()??gameObject.AddComponent<EnemyPsionicResonanceStatus>();psionicResonance.Configure(this,health);
             cityHealth = targetHealth; city = target; friendlyCommands=commandModel; health.Value.Died += OnDied;
         }
         public void ApplyInfection(int stacks)=>infection?.Apply(stacks);
@@ -46,12 +49,16 @@ namespace WasteCity.Combat
         public void ApplySwordIntent()=>swordIntent?.Apply();
         public void RestoreSwordIntent(int stacks)=>swordIntent?.Restore(stacks);
         public void ClearSwordIntent()=>swordIntent?.Clear();
-        private void OnDied(){ClearSwordIntent();if(!IsControlled)lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));if(!defeatReported)defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
+        public void ApplyPsionicResonance(int primaryAppliedDamage)=>psionicResonance?.ReceivePrimaryHit(primaryAppliedDamage);
+        public void RestorePsionicResonance(float remaining)=>psionicResonance?.Restore(remaining);
+        public void ClearPsionicResonance()=>psionicResonance?.Clear();
+        private void OnDied(){ClearSwordIntent();ClearPsionicResonance();if(!IsControlled)lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));if(!defeatReported)defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
         public bool TryConvert(bool reportDefeat=true)
         {
             if(IsControlled||!MindControlModel.ShouldConvert(research!=null&&research.HasMindControl,Quality,definition.IsHeavy,0))return false;
             ClearInfection();
             ClearSwordIntent();
+            ClearPsionicResonance();
             IsControlled=true;MoveSpeedMultiplier=1.15f;
             if(!defeatReported){defeatReported=true;if(reportDefeat)converted?.Invoke();}
             if(visual!=null){Color color=new Color(.2f,1f,.75f);VisualSlot.Attach(gameObject,$"{definition.Id.Value}.controlled",visual,color);}
