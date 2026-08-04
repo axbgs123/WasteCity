@@ -193,13 +193,13 @@ git diff --cached --name-only
 git commit -m "docs: add user feedback control"
 ```
 
-- [ ] **Step 4: Push without force**
+- [x] **Step 4: Push without force**
 
 ```bash
 git push
 ```
 
-- [ ] **Step 5: Verify remote parity**
+- [x] **Step 5: Verify remote parity**
 
 ```bash
 local_head=$(git rev-parse HEAD)
