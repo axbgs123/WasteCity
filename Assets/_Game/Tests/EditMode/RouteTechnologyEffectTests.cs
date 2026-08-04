@@ -80,6 +80,7 @@ namespace WasteCity.Tests
         public void SwordRidingOnlyExtendsSwordArrayRange()
         {
             Assert.That(RouteTechnologyEffects.TowerRangeMultiplier("cultivation.building.sword-array-tower", true), Is.EqualTo(1.3f));
+            Assert.That(RouteTechnologyEffects.TowerRangeMultiplier("cultivation.building.sword-riding-platform", true), Is.EqualTo(1.3f));
             Assert.That(RouteTechnologyEffects.TowerRangeMultiplier("core.building.machine-gun-turret", true), Is.EqualTo(1f));
         }
 

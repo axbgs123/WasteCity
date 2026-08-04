@@ -19,6 +19,7 @@ namespace WasteCity.Combat
             new DefenseTowerDefinition("core.building.machine-gun-turret",DamageType.Physical,20,10,ResourceIds.Ammunition,3),
             new DefenseTowerDefinition("core.building.heavy-machine-gun-turret",DamageType.Physical,60,11,ResourceIds.Ammunition,3),
             new DefenseTowerDefinition("cultivation.building.sword-array-tower",DamageType.TrueEssence,28,12,ResourceIds.FlyingSword,5),
+            new DefenseTowerDefinition("cultivation.building.sword-riding-platform",DamageType.TrueEssence,28,12,ResourceIds.FlyingSword,5),
             new DefenseTowerDefinition("biological.building.spore-tower",DamageType.Biological,18,9,ResourceIds.BiologicalWeapon,5),
             new DefenseTowerDefinition("psionics.building.mind-spire",DamageType.Psionic,30,11,ResourceIds.PsionicAmplifier,4),
             new DefenseTowerDefinition("core.building.laser-tower",DamageType.Energy,48,12,ResourceIds.EnergyCrystal,4),

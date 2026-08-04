@@ -37,6 +37,7 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition SpiritFireFurnace=new BuildingDefinition("cultivation.building.spirit-fire-furnace","灵火炉",2,2,ResourceIds.Stone,8,false,8f,280,0,"core.research.spirit-sensing");
         public static readonly BuildingDefinition ArtifactWorkshop=new BuildingDefinition("cultivation.building.artifact-workshop","炼器坊",2,2,ResourceIds.SpiritIron,6,false,10f,260,0,"core.research.artifact-crafting","cultivation.building.spirit-fire-furnace");
         public static readonly BuildingDefinition SwordArrayTower=new BuildingDefinition("cultivation.building.sword-array-tower","剑阵台",1,1,ResourceIds.SpiritIron,10,false,10f,240,0,"core.research.sword-array","cultivation.building.artifact-workshop");
+        public static readonly BuildingDefinition SwordRidingPlatform=new BuildingDefinition("cultivation.building.sword-riding-platform","御剑台",1,1,ResourceIds.SpiritIron,20,false,12f,300);
         public static readonly BuildingDefinition ColonyPool=new BuildingDefinition("biological.building.colony-pool","菌落池",2,2,ResourceIds.Biomass,10,false,8f,320,0,"core.research.adaptive-tissue");
         public static readonly BuildingDefinition BreedingChamber=new BuildingDefinition("biological.building.breeding-chamber","培育室",2,2,ResourceIds.BoneSteel,6,false,10f,300,0,"core.research.bio-cultivation","biological.building.colony-pool");
         public static readonly BuildingDefinition SporeTower=new BuildingDefinition("biological.building.spore-tower","孢子塔",1,1,ResourceIds.BiomassConcentrate,10,false,10f,280,0,"core.research.spore-dispersal","biological.building.breeding-chamber");
@@ -53,7 +54,7 @@ namespace WasteCity.Building
         public static readonly BuildingDefinition BehemothPen=new BuildingDefinition("biological.building.behemoth-pen","巨兽栏",3,2,ResourceIds.BoneSteel,16,false,16f,420,0,"core.research.behemoth-breeding","biological.building.breeding-chamber");
         public static readonly BuildingDefinition[] All =
         {
-            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop,BehemothPen
+            MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,HeavyMachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,SwordRidingPlatform,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop,BehemothPen
         };
         public static readonly BuildingDefinition[] BuildMenu={MiningStation,Housing,Warehouse,Wall,ResearchStation,Smelter,Assembler,MachineGunTurret,SpiritFireFurnace,ArtifactWorkshop,SwordArrayTower,ColonyPool,BreedingChamber,SporeTower,ResonanceFurnace,PsionicWorkshop,MindSpire,LaserTower,AcidTower,ShieldGenerator,SpiritGatheringArray,AutomatedRepairBay,AlchemyChamber,PuppetWorkshop,BehemothPen};
     }

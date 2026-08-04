@@ -16,7 +16,7 @@ namespace WasteCity.Research
         public static float WarningMultiplier(bool precognitiveSense) => precognitiveSense ? 1.5f : 1f;
         public static int BuildingMaximumHealth(int baseHealth, bool alloyArmor) => Mathf.RoundToInt(Math.Max(1, baseHealth) * (alloyArmor ? 1.3f : 1f));
         public static int PhysicalDamagePercent(string buildingId, bool talismanBasics) => talismanBasics && buildingId == "core.building.wall" ? 80 : -1;
-        public static float TowerRangeMultiplier(string buildingId, bool swordRiding) => swordRiding && buildingId == "cultivation.building.sword-array-tower" ? 1.3f : 1f;
+        public static float TowerRangeMultiplier(string buildingId, bool swordRiding) => swordRiding && (buildingId == "cultivation.building.sword-array-tower" || buildingId == "cultivation.building.sword-riding-platform") ? 1.3f : 1f;
         public static int LogisticsRange(bool formationReinforcement, bool orbitalSupply) => orbitalSupply ? 24 : formationReinforcement ? 12 : 8;
     }
 
