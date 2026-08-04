@@ -36,14 +36,15 @@ git status
 5. 启动 `Builds/Windows/WasteCity.exe` 做独立运行冒烟；
 6. 开发前执行 `git status`，不要覆盖未提交改动。
 
-当前已验证基线：
+当前自动化与构建基线（`d5baf17`）：
 
-- EditMode：`191/191`；
-- PlayMode：`3/3`；
+- EditMode：`206/206`；
+- PlayMode：`11/11`；
 - Unity 无界面编译：0 错误；
 - Windows 构建：成功；
-- Direct3D 11 独立运行 12 秒：0 异常、0 错误；
-- 存档 schema：`23`。
+- 存档 schema：`24`；
+- 统一友军集结点、随城回归、死亡统计和组织再生已经实现；
+- 当前基线的 Direct3D 11 独立运行冒烟待真实 Windows 10/11 电脑补验。上一正式基线曾完成 12 秒冒烟；当前基线补验前不作为候选发布版。
 
 ## 仓库目录
 
