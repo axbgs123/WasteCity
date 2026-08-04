@@ -7,6 +7,13 @@ using System.Linq;
 namespace WasteCity.Research
 {
     public enum DevelopmentRoute { Technology, Cultivation, BiologicalAscension, Psionics }
+    public static class CollectiveConsciousnessRules
+    {
+        public const float SharedProgressRatio = .2f;
+        public static float InheritedProgressRatio(bool unlocked) =>
+            unlocked ? SharedProgressRatio : 0f;
+    }
+
     public sealed class ResearchDefinition
     {
         public StableId Id { get; }
@@ -86,10 +93,11 @@ namespace WasteCity.Research
         public float Remaining { get; private set; }
         public int CompletedCount => completed.Count;
         public event Action<ResearchDefinition> Completed;
-        public bool Start(ResearchDefinition definition, ResourceInventory inventory)
+        public bool Start(ResearchDefinition definition, ResourceInventory inventory, float inheritedProgressRatio = 0f)
         {
             if (Active != null || definition == null || completed.Contains(definition.Id) || definition.RequiredResearchIds.Any(required=>!completed.Any(id=>id.Value==required)) || !inventory.TrySpend(definition.CostId, definition.Cost)) return false;
-            Active = definition; Remaining = definition.Duration; return true;
+            float ratio=Math.Max(0f,Math.Min(1f,inheritedProgressRatio));
+            Active = definition; Remaining = Math.Max(.001f,definition.Duration*(1f-ratio)); return true;
         }
         public bool Tick(float delta)
         {
