@@ -12,6 +12,7 @@ using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Population;
 using WasteCity.Research;
+using WasteCity.World;
 
 namespace WasteCity.Tests.PlayMode
 {
@@ -31,7 +32,8 @@ namespace WasteCity.Tests.PlayMode
                     || item.name.StartsWith("SporeTower")
                     || item.name.StartsWith("AcidTower")
                     || item.name.StartsWith("PhysicalTower")
-                    || item.name.StartsWith("Technology"))
+                    || item.name.StartsWith("Technology")
+                    || item.name.StartsWith("Unmanned"))
                     Object.Destroy(item);
             yield return null;
         }
@@ -570,6 +572,66 @@ namespace WasteCity.Tests.PlayMode
             Object.Destroy(researchObject); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator UnmannedSystems_RequiresResearchCompletionAndLogistics()
+        {
+            var researchObject = new GameObject("UnmannedResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.enabled = false;
+            var city = new GameObject("UnmannedCity");
+            var worldObject = new GameObject("UnmannedWorld");
+            var world = worldObject.AddComponent<PlaceholderWorldView>();
+            world.Generate(new WorldSeed(19));
+            BuildingRuntime bay = CreateCompletedRepairBay("UnmannedBay", Vector2.zero);
+            var controllerObject = new GameObject("UnmannedController");
+            var controller = controllerObject.AddComponent<FormalDroneController>();
+            controller.Configure(research, city.transform, world, null);
+
+            controller.RefreshDeployment();
+            Assert.That(controller.ActiveDroneCount, Is.Zero);
+            research.Model.Restore(new[] { "core.research.unmanned-systems" }, null, 0f);
+            controller.RefreshDeployment();
+            Assert.That(controller.ActiveDroneCount, Is.EqualTo(1));
+            Assert.That(controller.DroneAt(0).GetComponent<VisualSlot>().StableId, Is.EqualTo("technology.unit.scout-drone"));
+            Assert.That(bay.transform.GetComponentsInChildren<VisualSlot>().Any(value => value.StableId == "technology.unit.repair-mech"), Is.True);
+            bay.SetLogistics(false);
+            controller.RefreshDeployment();
+            Assert.That(controller.ActiveDroneCount, Is.Zero);
+            Object.Destroy(controllerObject); Object.Destroy(bay.gameObject); Object.Destroy(worldObject);
+            Object.Destroy(city); Object.Destroy(researchObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UnmannedSystems_UsesSeparatedPatrolPositionsAndRevealsFog()
+        {
+            var researchObject = new GameObject("UnmannedPatrolResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.unmanned-systems" }, null, 0f);
+            research.enabled = false;
+            var city = new GameObject("UnmannedPatrolCity");
+            var worldObject = new GameObject("UnmannedPatrolWorld");
+            var world = worldObject.AddComponent<PlaceholderWorldView>();
+            world.Generate(new WorldSeed(23));
+            BuildingRuntime firstBay = CreateCompletedRepairBay("UnmannedPatrolBayA", Vector2.zero);
+            BuildingRuntime secondBay = CreateCompletedRepairBay("UnmannedPatrolBayB", Vector2.right * 3f);
+            var controllerObject = new GameObject("UnmannedPatrolController");
+            var controller = controllerObject.AddComponent<FormalDroneController>();
+            controller.Configure(research, city.transform, world, null);
+            controller.RefreshDeployment();
+
+            yield return null;
+
+            Assert.That(controller.ActiveDroneCount, Is.EqualTo(2));
+            Assert.That(controller.DroneAt(0).transform.position, Is.Not.EqualTo(controller.DroneAt(1).transform.position));
+            yield return new WaitForSeconds(1.05f);
+            Vector2 dronePosition = controller.DroneAt(0).transform.position;
+            int mapX = Mathf.FloorToInt(dronePosition.x + world.Model.Width * .5f);
+            int mapY = Mathf.FloorToInt(dronePosition.y + world.Model.Height * .5f);
+            Assert.That(world.Model.IsRevealed(mapX, mapY), Is.True);
+            Object.Destroy(controllerObject); Object.Destroy(firstBay.gameObject); Object.Destroy(secondBay.gameObject);
+            Object.Destroy(worldObject); Object.Destroy(city); Object.Destroy(researchObject); yield return null;
+        }
+
         private static GameObject CreateInfectionTurret(
             string name,
             Vector2 position,
@@ -613,6 +675,18 @@ namespace WasteCity.Tests.PlayMode
             var enemy = item.AddComponent<PlaceholderEnemy>();
             enemy.Configure(cityHealth, city, definition, new ResourceInventory(100), 0, null, EnemyQuality.Ordinary, research);
             return enemy;
+        }
+
+        private static BuildingRuntime CreateCompletedRepairBay(string name, Vector2 position)
+        {
+            var item = new GameObject(name);
+            item.transform.position = position;
+            item.AddComponent<HealthComponent>();
+            var runtime = item.AddComponent<BuildingRuntime>();
+            runtime.Configure(BuildingCatalog.AutomatedRepairBay);
+            runtime.RestoreState(runtime.Health.Value.Maximum, 0f);
+            item.AddComponent<PlaceholderAutomatedRepairBay>().Configure(runtime);
+            return runtime;
         }
     }
 }

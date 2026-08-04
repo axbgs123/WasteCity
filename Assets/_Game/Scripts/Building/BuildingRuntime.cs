@@ -117,12 +117,23 @@ namespace WasteCity.Building
     {
         private readonly AutomatedRepairModel repair = new AutomatedRepairModel(6f,20);
         private BuildingRuntime runtime;
-        public void Configure(BuildingRuntime building)=>runtime=building;
+        private static Sprite square;
+        private GameObject repairMarker;
+        private float repairVisualAngle;
+        public void Configure(BuildingRuntime building){runtime=building;EnsureRepairMarker();}
         private void Update()
         {
+            repairVisualAngle+=Time.deltaTime*90f;if(repairMarker!=null)repairMarker.transform.localPosition=new Vector3(Mathf.Cos(repairVisualAngle*Mathf.Deg2Rad)*.8f,Mathf.Sin(repairVisualAngle*Mathf.Deg2Rad)*.8f,-.15f);
             if(runtime==null||!runtime.HasLogistics||!repair.Tick(Time.deltaTime))return;
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
                 if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)repair.Repair(building.Health.Value);
+        }
+        private void EnsureRepairMarker()
+        {
+            if(repairMarker!=null)return;if(square==null)square=Sprite.Create(Texture2D.whiteTexture,new Rect(0,0,1,1),Vector2.one*.5f,1f);
+            repairMarker=new GameObject("TechnologyRepairMech");repairMarker.transform.SetParent(transform,false);repairMarker.transform.localScale=new Vector3(.38f,.38f,1f);
+            var renderer=repairMarker.AddComponent<SpriteRenderer>();renderer.sprite=square;renderer.color=new Color(.25f,1f,.65f);renderer.sortingOrder=11;
+            WasteCity.Presentation.VisualSlot.Attach(repairMarker,"technology.unit.repair-mech",renderer,renderer.color);
         }
     }
 }
