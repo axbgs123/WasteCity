@@ -29,6 +29,17 @@
 
 ## 2. 文件优先级
 
+### 开发前必读：用户反馈与变更控制
+
+`06-User-Feedback-and-Change-Control-ZH.md`
+
+- 所有人类开发者和 AI 开发代理每次开始任务前都必须阅读；
+- 记录测试 Bug、用户新构思、原文档变更请求及是否已经实现；
+- 新记录默认是 `待确认 + 未实现`，未批准内容不得扩大开发范围；
+- 已批准的文档变更必须同步修改正式文档并建立双向引用；
+- 标记为 `已验证` 前必须填写实现提交和验证证据；
+- 每次新增记录或状态变化后单独提交并推送 GitHub。
+
 ### 当前正式版持续开发路线图
 
 `05-Formal-Development-Roadmap-ZH.md`
@@ -54,6 +65,7 @@
 | `02-Demo实施计划-v1.0.md` | `02-Demo-Implementation-Plan-ZH.md` |
 | `03-原开发进度记录.md` | `03-Legacy-Progress-Notes-ZH.md` |
 | `05-正式版后续制作计划.md` | `05-Formal-Development-Roadmap-ZH.md` |
+| `06-用户反馈与变更控制.md` | `06-User-Feedback-and-Change-Control-ZH.md` |
 
 ### 第一优先级：主设计文档
 

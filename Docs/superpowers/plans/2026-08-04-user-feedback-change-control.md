@@ -29,11 +29,11 @@
 - Consumes: `Docs/superpowers/specs/2026-08-04-user-feedback-change-control-design.md`
 - Produces: 所有后续开发者必须读取的统一记录入口与三类记录模板
 
-- [ ] **Step 1: Create the document header and authority rules**
+- [x] **Step 1: Create the document header and authority rules**
 
 写入项目名、最后更新时间、文档用途、先登记后生效规则，以及“登记不等于批准、批准不等于实现、实现不等于验证”声明。
 
-- [ ] **Step 2: Add exact status definitions**
+- [x] **Step 2: Add exact status definitions**
 
 审批状态写为：
 
@@ -49,7 +49,7 @@
 
 明确新记录默认 `待确认 + 未实现`，只有 `已批准` 才能进入正式文档修改或开发。
 
-- [ ] **Step 3: Add the active-record summary**
+- [x] **Step 3: Add the active-record summary**
 
 使用以下固定列：
 
@@ -60,7 +60,7 @@
 
 初始状态写明“当前没有待处理记录”，不得创建虚构 Bug 或需求。
 
-- [ ] **Step 4: Add detailed templates**
+- [x] **Step 4: Add detailed templates**
 
 分别提供 `BUG-0001`、`IDEA-0001`、`DOC-0001` 模板。每个模板包含：
 
@@ -82,11 +82,11 @@
 决策原因或备注
 ```
 
-- [ ] **Step 5: Add update and GitHub rules**
+- [x] **Step 5: Add update and GitHub rules**
 
 明确编号不可复用、状态转换、原文档双向引用、独立提交、非强制推送、GitHub 不可用时先本地提交，以及禁止提交本机缓存和绝对路径。
 
-- [ ] **Step 6: Run document checks**
+- [x] **Step 6: Run document checks**
 
 ```bash
 rg -n "待确认|已批准|已实现待验证|已验证|BUG-0001|IDEA-0001|DOC-0001" Docs/06-User-Feedback-and-Change-Control-ZH.md
@@ -106,7 +106,7 @@ git diff --check -- Docs/06-User-Feedback-and-Change-Control-ZH.md
 - Consumes: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Produces: 仓库级强制阅读规则及两个人类可见文档入口
 
-- [ ] **Step 1: Create root AGENTS.md**
+- [x] **Step 1: Create root AGENTS.md**
 
 要求所有人类开发者和 AI 代理在分析、设计、计划、编码、测试或修改文档前：
 
@@ -117,7 +117,7 @@ git diff --check -- Docs/06-User-Feedback-and-Change-Control-ZH.md
 5. 完成后回写实现状态、提交哈希和验证证据；
 6. 用户提出反馈时先更新补充文档并推送 GitHub。
 
-- [ ] **Step 2: Update README document priority**
+- [x] **Step 2: Update README document priority**
 
 在“文档优先级”前加入开发启动入口：
 
@@ -128,7 +128,7 @@ git diff --check -- Docs/06-User-Feedback-and-Change-Control-ZH.md
 
 同时将补充文档列入仓库目录说明。
 
-- [ ] **Step 3: Update the handoff index**
+- [x] **Step 3: Update the handoff index**
 
 在 `Docs/00-README-ZH.md` 的文件优先级顶部加入补充文档，并说明：
 
@@ -137,7 +137,7 @@ git diff --check -- Docs/06-User-Feedback-and-Change-Control-ZH.md
 - 实现状态必须有提交和验证证据；
 - 未批准记录不得扩大开发范围。
 
-- [ ] **Step 4: Verify all entry points**
+- [x] **Step 4: Verify all entry points**
 
 ```bash
 rg -n "06-User-Feedback-and-Change-Control-ZH.md" AGENTS.md README.md Docs/00-README-ZH.md
@@ -160,11 +160,11 @@ git diff --check -- AGENTS.md README.md Docs/00-README-ZH.md
 - Consumes: Task 1-2 的完整文档变更
 - Produces: GitHub 上可追溯、可供所有开发者读取的正式流程
 
-- [ ] **Step 1: Mark completed plan steps**
+- [x] **Step 1: Mark completed plan steps**
 
 只将已经实际执行并验证的步骤从 `[ ]` 更新为 `[x]`。
 
-- [ ] **Step 2: Check repository scope**
+- [x] **Step 2: Check repository scope**
 
 ```bash
 git status --short
@@ -184,7 +184,7 @@ Docs/superpowers/plans/2026-08-04-user-feedback-change-control.md
 
 本机离线包和 `ProjectSettings/PackageManagerSettings.asset` 不得暂存。
 
-- [ ] **Step 3: Commit the implementation**
+- [x] **Step 3: Commit the implementation**
 
 ```bash
 git add AGENTS.md README.md Docs/00-README-ZH.md Docs/06-User-Feedback-and-Change-Control-ZH.md Docs/superpowers/plans/2026-08-04-user-feedback-change-control.md

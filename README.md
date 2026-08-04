@@ -57,11 +57,14 @@ git status
 - `Packages/`：Unity 包清单和锁文件；
 - `ProjectSettings/`：Unity 工程设置与精确编辑器版本；
 - `Docs/`：主 GDD、历史计划、当前进度与正式版后续路线图；
+- `Docs/06-User-Feedback-and-Change-Control-ZH.md`：用户 Bug、新构思、文档变更及实现状态的开发前必读入口；
 - `ArtDesign/`：美术 Bible、风格规范、提示词、资产清单和基线参考图；
 - `.gitattributes`：Unity YAML 合并和 Git LFS 规则；
 - `.gitignore`：Unity 本地生成目录排除规则。
 
 ## 文档优先级
+
+开发前必须先阅读 `Docs/06-User-Feedback-and-Change-Control-ZH.md`。它记录用户最新反馈和已批准变更；登记不等于批准，批准不等于实现，实现不等于验证。
 
 1. `Docs/05-Formal-Development-Roadmap-ZH.md`：当前正式版实现顺序与质量门；
 2. `Docs/01-Game-Design-Document-ZH.md`：主 GDD 和正式版目标；
