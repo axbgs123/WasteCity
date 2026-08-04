@@ -33,7 +33,7 @@
 - Changes: `BuildingCatalog.SpiritGatheringArray.MinimumPopulation` to `1000`.
 - Produces: all four capstones in `BuildingCatalog.All` and `BuildMenu`.
 
-- [ ] **Step 1: Write failing catalog tests**
+- [x] **Step 1: Write failing catalog tests**
 
 Add tests with literal expected IDs proving:
 
@@ -48,19 +48,19 @@ Assert.That(BuildingCatalog.ConsciousnessNetwork.Id.Value,
 
 Assert the four capstones are unique, `2×2`, population `1000`, present once in `All`, and present once in `BuildMenu`. Assert the exact research IDs from the design.
 
-- [ ] **Step 2: Write failing unlock tests**
+- [x] **Step 2: Write failing unlock tests**
 
 For each capstone, assert `BuildingUnlockModel.IsUnlocked` rejects population `999`, rejects missing research at population `1000`, and accepts population `1000` with its exact research.
 
 Update the existing spirit-gathering test from population `200` to the `999/1000` boundary.
 
-- [ ] **Step 3: Run focused EditMode tests to verify RED**
+- [x] **Step 3: Run focused EditMode tests to verify RED**
 
 Run `RouteCapstoneBuildingTests` and `BuildingUnlockTests`.
 
 Expected: three definitions are missing and the existing array has no population threshold.
 
-- [ ] **Step 4: Implement catalog definitions**
+- [x] **Step 4: Implement catalog definitions**
 
 Add exact definitions:
 
@@ -83,11 +83,11 @@ ConsciousnessNetwork = new BuildingDefinition(
 
 Set `SpiritGatheringArray` minimum population to `1000`. Add the three definitions once to both catalog arrays.
 
-- [ ] **Step 5: Run focused tests to verify GREEN**
+- [x] **Step 5: Run focused tests to verify GREEN**
 
 Expected: all capstone catalog and unlock tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Assets/_Game/Scripts/Building/BuildingGrid.cs Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs Assets/_Game/Tests/EditMode/RouteCapstoneBuildingTests.cs Assets/_Game/Tests/EditMode/RouteCapstoneBuildingTests.cs.meta
@@ -108,7 +108,7 @@ git commit -m "feat: add route capstone building catalog"
 - Changes: `TechnologyProductionController.CaptureProgress()` length from `11` to `14`.
 - Keeps: existing indices `0..10`; appends power plant at `11`, metabolic furnace at `12`, consciousness network at `13`.
 
-- [ ] **Step 1: Write failing recipe tests**
+- [x] **Step 1: Write failing recipe tests**
 
 Exercise real process behavior:
 
@@ -122,11 +122,11 @@ Assert.That(inventory.Get(ResourceIds.EnergyCrystal), Is.EqualTo(1));
 
 For the metabolic furnace, stock `2` biomass, tick `8` seconds, and assert biomass becomes `0` and energy crystal becomes `1`. For consciousness network, tick `10` seconds and assert one psionic amplifier. Assert zero building count produces nothing.
 
-- [ ] **Step 2: Run recipe tests to verify RED**
+- [x] **Step 2: Run recipe tests to verify RED**
 
 Expected: the capstone production catalog is missing.
 
-- [ ] **Step 3: Implement recipe factories**
+- [x] **Step 3: Implement recipe factories**
 
 Return fresh stateful processes:
 
@@ -142,21 +142,21 @@ public static PassiveProductionProcess CreateConsciousnessNetwork() =>
     new PassiveProductionProcess(ResourceIds.PsionicAmplifier, 1, 10f);
 ```
 
-- [ ] **Step 4: Run recipe tests to verify GREEN**
+- [x] **Step 4: Run recipe tests to verify GREEN**
 
 Expected: all capstone production tests pass.
 
-- [ ] **Step 5: Connect the production controller**
+- [x] **Step 5: Connect the production controller**
 
 Instantiate the three processes through the factories. Count completed, logistics-online buildings by exact catalog IDs. Tick them with city, haste, and legacy production multipliers following existing processes.
 
 Include all three in `HasRunningProduction` and the GUI monitor. Append their progress to `CaptureProgress`; restore only when the array contains the corresponding index.
 
-- [ ] **Step 6: Run all EditMode tests**
+- [x] **Step 6: Run all EditMode tests**
 
 Expected: all EditMode tests pass without changing existing production progress indices.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs.meta Assets/_Game/Scripts/Economy/TechnologyProductionController.cs Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs.meta
@@ -178,7 +178,7 @@ git commit -m "feat: add route capstone production"
 - Produces: `PlaceholderBuildingController.OperationalCount(string id)`.
 - Changes: remote `[J]` rescue requires both completed research and one operational consciousness network.
 
-- [ ] **Step 1: Write failing pure-rule tests**
+- [x] **Step 1: Write failing pure-rule tests**
 
 Assert all truth-table branches:
 
@@ -189,21 +189,21 @@ Assert.That(ConsciousnessNetworkRules.RemoteLinkAvailable(true, 0), Is.False);
 Assert.That(ConsciousnessNetworkRules.RemoteLinkAvailable(true, -1), Is.False);
 ```
 
-- [ ] **Step 2: Run focused tests to verify RED**
+- [x] **Step 2: Run focused tests to verify RED**
 
 Expected: the rules type is missing.
 
-- [ ] **Step 3: Implement rule and operational count**
+- [x] **Step 3: Implement rule and operational count**
 
 `OperationalCount` counts only runtimes whose construction is complete, `HasLogistics` is true, and definition ID matches.
 
 In `RescueSiteController`, cache or lazily find `PlaceholderBuildingController`, then replace both keyboard and GUI research-only checks with one `RemoteLinkAvailable` property derived from research plus operational count.
 
-- [ ] **Step 4: Run focused and existing rescue tests**
+- [x] **Step 4: Run focused and existing rescue tests**
 
 Expected: all consciousness and rescue rules pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Assets/_Game/Scripts/World/ConsciousnessNetworkRules.cs Assets/_Game/Scripts/World/ConsciousnessNetworkRules.cs.meta Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs Assets/_Game/Scripts/World/RescueSiteController.cs Assets/_Game/Tests/EditMode/ConsciousnessNetworkTests.cs Assets/_Game/Tests/EditMode/ConsciousnessNetworkTests.cs.meta
@@ -220,7 +220,7 @@ git commit -m "feat: gate remote rescue through consciousness network"
 - Consumes: catalog, production, and remote-link APIs from Tasks 1-3.
 - Proves: all four terminal buildings restore into the formal scene, retain stable visual IDs, produce resources, and round-trip progress.
 
-- [ ] **Step 1: Write failing formal scene test**
+- [x] **Step 1: Write failing formal scene test**
 
 Load `FormalPrototype`, apply a schema 28 save with population/capacity `1000`, fortress city mode, the four research IDs, and four completed building snapshots at non-overlapping connected coordinates.
 
@@ -234,23 +234,23 @@ Clear title pause, use an accelerated time scale, and advance at least `10` scal
 - `CaptureProgress()` length is `14`;
 - `CaptureComplete().buildings` contains all four IDs.
 
-- [ ] **Step 2: Write progress compatibility test**
+- [x] **Step 2: Write progress compatibility test**
 
 On the formal production controller, call `RestoreProgress` with a literal `11`-value array and assert `CaptureProgress()` preserves indices `0..10` while indices `11..13` are zero.
 
-- [ ] **Step 3: Run the runtime fixture to verify RED**
+- [x] **Step 3: Run the runtime fixture to verify RED**
 
 Expected: production is not wired and progress length remains `11`.
 
-- [ ] **Step 4: Fix only integration gaps revealed by the tests**
+- [x] **Step 4: Fix only integration gaps revealed by the tests**
 
 Do not add new systems. Ensure formal building restoration creates runtime placeholders through the existing catalog and construction completion callback.
 
-- [ ] **Step 5: Run formal save and runtime tests to verify GREEN**
+- [x] **Step 5: Run formal save and runtime tests to verify GREEN**
 
 Expected: all tests pass and schema remains `28`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Assets/_Game/Tests/PlayMode/RuntimeSceneTests.cs Assets/_Game/Tests/EditMode/FormalSaveTests.cs
@@ -268,34 +268,34 @@ git commit -m "test: verify route capstone integration"
 - Consumes: exact test totals, compile/build result, and capstone feature commit.
 - Produces: the final requested local baseline and pushed GitHub branch.
 
-- [ ] **Step 1: Run static checks**
+- [x] **Step 1: Run static checks**
 
 Run `git diff --check`, inspect all current changes, and confirm package files contain no local absolute path.
 
-- [ ] **Step 2: Run all EditMode and PlayMode tests**
+- [x] **Step 2: Run all EditMode and PlayMode tests**
 
 Use Unity batch mode without `-quit`; require zero failed, skipped, or inconclusive tests.
 
-- [ ] **Step 3: Run headless compile and Windows build**
+- [x] **Step 3: Run headless compile and Windows build**
 
 Require zero C# errors and a successful `WasteCity.Editor.FormalBuildTools.BuildWindows` exit.
 
-- [ ] **Step 4: Restore portable package configuration**
+- [x] **Step 4: Restore portable package configuration**
 
 Set Input System manifest version to `1.7.0`, lock source to `registry`, and URL to `https://packages.unity.com`.
 
-- [ ] **Step 5: Update baseline documents**
+- [x] **Step 5: Update baseline documents**
 
 Record the capstone milestone as implemented, exact test counts, schema `28`, compile/build result, proxy-resource limitation, and still-pending real Windows smoke.
 
-- [ ] **Step 6: Commit documentation**
+- [x] **Step 6: Commit documentation**
 
 ```bash
 git add README.md Docs/00-README-ZH.md Docs/05-Formal-Development-Roadmap-ZH.md
 git commit -m "docs: record route capstone baseline"
 ```
 
-- [ ] **Step 7: Verify final tree**
+- [x] **Step 7: Verify final tree**
 
 Re-run the complete tests on the exact committed tree, inspect recent commits, and require a clean worktree.
 
