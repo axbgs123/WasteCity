@@ -12,12 +12,10 @@ namespace WasteCity.Combat
         private const float DamagePerSecond = 18f;
         private Transform city;
         private ResearchController research;
-        private readonly BuildingRegenerationModel regeneration = new BuildingRegenerationModel();
         private HealthComponent health;
-        private float attackRemainder;
         public HealthComponent Health => health;
 
-        public void Configure(Transform cityTransform, int restoredHealth = -1, ResearchController researchController = null)
+        public void Configure(Transform cityTransform, int restoredHealth = -1, ResearchController researchController = null, FriendlyUnitCommandModel commandModel = null)
         {
             city = cityTransform;
             research = researchController;
@@ -25,37 +23,8 @@ namespace WasteCity.Combat
             health.Configure(MaximumHealth, ArmorType.Light);
             if (restoredHealth >= 0) health.Value.Restore(restoredHealth);
             health.Value.Died += () => Destroy(gameObject);
-        }
-
-        private void Update()
-        {
-            if (research != null) regeneration.Tick(Time.deltaTime, false, research.HasTissueRegeneration, false, health.Value, null);
-            PlaceholderEnemy target = null;
-            float best = float.MaxValue;
-            foreach (var enemy in Object.FindObjectsOfType<PlaceholderEnemy>())
-            {
-                if (enemy.IsControlled) continue;
-                float distance = Vector2.Distance(transform.position, enemy.transform.position);
-                if (distance < best) { best = distance; target = enemy; }
-            }
-            if (target == null)
-            {
-                if (city != null && Vector2.Distance(transform.position, city.position) > 4f)
-                    transform.position = Vector2.MoveTowards(transform.position, city.position, MoveSpeed * Time.deltaTime);
-                return;
-            }
-            if (best > AttackRange) transform.position = Vector2.MoveTowards(transform.position, target.transform.position, MoveSpeed * Time.deltaTime);
-            else
-            {
-                attackRemainder += DamagePerSecond * Time.deltaTime;
-                int damage = Mathf.FloorToInt(attackRemainder);
-                if (damage > 0)
-                {
-                    var targetHealth = target.GetComponent<HealthComponent>();
-                    targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor);
-                    attackRemainder -= damage;
-                }
-            }
+            var agent = GetComponent<FriendlyUnitAgent>() ?? gameObject.AddComponent<FriendlyUnitAgent>();
+            agent.Configure(health, city, commandModel, FriendlyUnitKind.Puppet, research, MoveSpeed, AttackRange, DamagePerSecond, DamageType.Physical, 1.25f);
         }
     }
 }

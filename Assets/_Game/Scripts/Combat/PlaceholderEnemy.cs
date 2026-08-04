@@ -23,14 +23,16 @@ namespace WasteCity.Combat
         public int WaveTrigger { get; private set; }
         private Action<bool> defeated;
         private Action converted;
+        private FriendlyUnitCommandModel friendlyCommands;
         public EnemyDefinition Definition => definition;
         public EnemyQuality Quality => quality.Quality;
         public bool IsControlled { get; private set; }
+        public HealthComponent Health => health;
         public float MoveSpeedMultiplier { get; set; }=1f;
-        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null, Action onConverted = null)
+        public void Configure(HealthComponent targetHealth, Transform target, EnemyDefinition enemyDefinition, ResourceInventory inventory, int waveTrigger = 0, Action<bool> onDefeated = null, EnemyQuality enemyQuality = EnemyQuality.Ordinary, ResearchController researchController = null, Action onConverted = null, FriendlyUnitCommandModel commandModel = null)
         {
             definition = enemyDefinition ?? EnemyCatalog.Gnawer; quality=EnemyQualityCatalog.For(enemyQuality);WaveTrigger=waveTrigger; defeated = onDefeated; converted=onConverted; lootInventory = inventory; research=researchController; health = GetComponent<HealthComponent>(); visual=GetComponent<SpriteRenderer>(); health.Configure(Mathf.RoundToInt(definition.MaximumHealth*quality.HealthMultiplier), definition.Armor);
-            cityHealth = targetHealth; city = target; health.Value.Died += OnDied;
+            cityHealth = targetHealth; city = target; friendlyCommands=commandModel; health.Value.Died += OnDied;
         }
         private void OnDied(){if(!IsControlled)lootInventory?.Add(ResourceIds.Biomass,RouteTechnologyEffects.BiomassDrop(definition.BiomassDrop,quality.LootMultiplier,research!=null&&research.HasMetabolicAcceleration));if(!defeatReported)defeated?.Invoke(definition.IsHeavy);Destroy(gameObject);}
         public bool TryConvert(bool reportDefeat=true)
@@ -39,27 +41,20 @@ namespace WasteCity.Combat
             IsControlled=true;MoveSpeedMultiplier=1.15f;
             if(!defeatReported){defeatReported=true;if(reportDefeat)converted?.Invoke();}
             if(visual!=null){Color color=new Color(.2f,1f,.75f);VisualSlot.Attach(gameObject,$"{definition.Id.Value}.controlled",visual,color);}
+            FriendlyUnitCommandModel commands=friendlyCommands??UnityEngine.Object.FindObjectOfType<FormalFriendlyUnitController>()?.Commands??new FriendlyUnitCommandModel();
+            var agent=GetComponent<FriendlyUnitAgent>()??gameObject.AddComponent<FriendlyUnitAgent>();
+            agent.Configure(health,city,commands,FriendlyUnitKind.Controlled,research,definition.MoveSpeed*MoveSpeedMultiplier,definition.AttackRange,definition.DamagePerSecond*.75f,DamageType.Psionic,1.25f);
             return true;
         }
         private void Update()
         {
             if (city == null || cityHealth.Value.IsDead) return;
-            if(IsControlled){UpdateControlled();return;}
+            if(IsControlled)return;
             HealthComponent targetHealth = cityHealth; Transform targetTransform = city; float best = definition.TargetPriority==EnemyTargetPriority.Nearest?Vector2.Distance(transform.position, city.position):float.MaxValue;
-            foreach(var ally in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
+            foreach(var ally in UnityEngine.Object.FindObjectsOfType<FriendlyUnitAgent>())
             {
-                if(!ally.IsControlled||ally==this)continue;float distance=Vector2.Distance(transform.position,ally.transform.position);
-                if(distance<best){best=distance;targetHealth=ally.health;targetTransform=ally.transform;}
-            }
-            foreach(var puppet in UnityEngine.Object.FindObjectsOfType<PlaceholderPuppet>())
-            {
-                float distance=Vector2.Distance(transform.position,puppet.transform.position);
-                if(distance<best){best=distance;targetHealth=puppet.Health;targetTransform=puppet.transform;}
-            }
-            foreach(var behemoth in UnityEngine.Object.FindObjectsOfType<PlaceholderBehemoth>())
-            {
-                float distance=Vector2.Distance(transform.position,behemoth.transform.position);
-                if(distance<best){best=distance;targetHealth=behemoth.Health;targetTransform=behemoth.transform;}
+                float distance=Vector2.Distance(transform.position,ally.transform.position);
+                if(distance<best){best=distance;targetHealth=ally.Health;targetTransform=ally.transform;}
             }
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
             {
@@ -69,14 +64,6 @@ namespace WasteCity.Combat
             if(best==float.MaxValue)best=Vector2.Distance(transform.position,city.position);
             if (best > definition.AttackRange) transform.position = Vector2.MoveTowards(transform.position, targetTransform.position, definition.MoveSpeed * MoveSpeedMultiplier * Time.deltaTime);
             else { attackRemainder += definition.DamagePerSecond * quality.DamageMultiplier * Time.deltaTime; int damage = Mathf.FloorToInt(attackRemainder); if (DamageMatrix.Apply(damage,DamageType.Physical,targetHealth.Armor)>0) { targetHealth.Value.Apply(damage, DamageType.Physical, targetHealth.Armor); attackRemainder -= damage; } }
-        }
-        private void UpdateControlled()
-        {
-            PlaceholderEnemy target=null;float best=float.MaxValue;
-            foreach(var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>()){if(enemy==this||enemy.IsControlled)continue;float distance=Vector2.Distance(transform.position,enemy.transform.position);if(distance<best){best=distance;target=enemy;}}
-            if(target==null){if(Vector2.Distance(transform.position,city.position)>4f)transform.position=Vector2.MoveTowards(transform.position,city.position,definition.MoveSpeed*MoveSpeedMultiplier*Time.deltaTime);return;}
-            if(best>definition.AttackRange)transform.position=Vector2.MoveTowards(transform.position,target.transform.position,definition.MoveSpeed*MoveSpeedMultiplier*Time.deltaTime);
-            else{attackRemainder+=definition.DamagePerSecond*.75f*Time.deltaTime;int damage=Mathf.FloorToInt(attackRemainder);if(damage>0){target.health.Value.Apply(damage,DamageType.Psionic,target.health.Armor);attackRemainder-=damage;}}
         }
         private bool CanTarget(BuildingRuntime building)
         {

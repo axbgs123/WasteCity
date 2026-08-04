@@ -38,9 +38,33 @@ namespace WasteCity.Persistence
         void Update(){if(Keyboard.current==null)return;if(Keyboard.current.f5Key.wasPressedThisFrame)Save();if(Keyboard.current.f9Key.wasPressedThisFrame)Load();}
         public void Save(){Directory.CreateDirectory(Application.persistentDataPath);if(File.Exists(SavePath))File.Copy(SavePath,SavePath+".bak",true);File.WriteAllText(SavePath,FormalSaveCodec.Encode(CaptureComplete()));}
         public FormalSaveData Capture(){var i=economy.Inventory;var stats=statistics.Model;int hx=-1,hy=-1;buildings.TryGetGrid(localHaste.Target,out hx,out hy);return new FormalSaveData{worldSeed=8128,cityX=city.transform.position.x,cityY=city.transform.position.y,iron=i.Get(ResourceIds.Iron),energyCrystal=i.Get(ResourceIds.EnergyCrystal),stone=i.Get(ResourceIds.Stone),biomass=i.Get(ResourceIds.Biomass),water=i.Get(ResourceIds.Water),alloy=i.Get(ResourceIds.Alloy),ammunition=i.Get(ResourceIds.Ammunition),spiritIron=i.Get(ResourceIds.SpiritIron),flyingSword=i.Get(ResourceIds.FlyingSword),boneSteel=i.Get(ResourceIds.BoneSteel),biomassConcentrate=i.Get(ResourceIds.BiomassConcentrate),biologicalWeapon=i.Get(ResourceIds.BiologicalWeapon),resonanceMetal=i.Get(ResourceIds.ResonanceMetal),psionicAmplifier=i.Get(ResourceIds.PsionicAmplifier),elixir=i.Get(ResourceIds.Elixir),population=population.Model.Current,populationCapacity=population.Model.Capacity,observation=progression.Observation.Value,civilizationLevel=progression.Civilization.Level,cityHealth=cityHealth.Value.Current,legacyPathId=legacy.Model.Selected?.Id.Value,legacyLevel=legacy.Model.Level,buildings=buildings.CaptureSnapshots(),rescuedSites=rescueSites.Capture(),day=clock.Model.Day,secondsIntoDay=clock.Model.SecondsIntoDay,foresightFlashedDay=foresight.Model?.LastFlashedDay??0,hastePoolDay=localHaste.Model.PoolDay,hasteRemaining=localHaste.Model.Remaining,hasteActive=localHaste.Model.Active,hasteTargetX=hx,hasteTargetY=hy,spatialTemplate=spatialTemplate.Model.Capture(),worldResourceAmounts=worldView.Model.CaptureResourceAmounts(),worldRevealed=worldView.Model.CaptureRevealed(),territoryActivated=territory.Activated,territoryProgress=territory.Extraction.Progress,territoryLocalResources=territory.CaptureLocal(),completedResearchIds=research.Model.CaptureCompleted(),activeResearchId=research.Model.Active?.Id.Value,researchRemaining=research.Model.Remaining,productionProgress=production.CaptureProgress(),cityMode=(int)city.Deployment.Mode,deploymentRemaining=city.Deployment.Remaining,wave=combat.CaptureWave(),enemies=combat.CaptureEnemies(),guidanceStage=(int)guidance.Model.Stage,bossDefeated=progression.BossDefeated,advancementStage=(int)advancement.Model.Stage,advancementRemaining=advancement.Model.Remaining,leaderRecruited=leader.Model.Recruited,leaderInjured=leader.Model.Injured,leaderCooldown=leader.Model.Overload.CooldownRemaining,leaderBoost=leader.Model.Overload.BoostRemaining,leaderLockout=leader.Model.Overload.LockoutRemaining,statsElapsed=stats.ElapsedSeconds,statsKills=stats.Kills,statsHighestObservation=stats.HighestObservation,statsProductionCycles=stats.ProductionCycles,statsBuildingLosses=stats.BuildingLosses,statsRescues=stats.Rescues,statsDelayedRescues=stats.DelayedRescues,statsRetreated=stats.RetreatedDuringBoss};}
-        public FormalSaveData CaptureComplete(){var data=Capture();data.puppetProgress=friendlyUnits.Fabrication.Progress;data.puppets=friendlyUnits.Capture();data.behemothProgress=friendlyUnits.Breeding.Progress;data.behemoths=friendlyUnits.CaptureBehemoths();return data;}
+        public FormalSaveData CaptureComplete()
+        {
+            var data=Capture();
+            data.puppetProgress=friendlyUnits.Fabrication.Progress;
+            data.puppets=friendlyUnits.Capture();
+            data.behemothProgress=friendlyUnits.Breeding.Progress;
+            data.behemoths=friendlyUnits.CaptureBehemoths();
+            FriendlyRallyPoint rally=friendlyUnits.Commands.ResolveRally(city.transform.position.x,city.transform.position.y);
+            data.rallyFixed=friendlyUnits.Commands.HasFixedRally;
+            data.rallyX=rally.X;
+            data.rallyY=rally.Y;
+            data.puppetLosses=friendlyUnits.Commands.PuppetLosses;
+            data.behemothLosses=friendlyUnits.Commands.BehemothLosses;
+            data.controlledLosses=friendlyUnits.Commands.ControlledLosses;
+            return data;
+        }
         public bool Load(){var d=Read(SavePath)??Read(SavePath+".bak");return d!=null&&ApplyComplete(d,false);}
-        public bool ApplyComplete(FormalSaveData data,bool preserveObservation){bool applied=Apply(data,preserveObservation);if(applied&&data.schema>=22)friendlyUnits.Restore(data.puppetProgress,data.puppets);if(applied&&data.schema>=23)friendlyUnits.RestoreBehemoths(data.behemothProgress,data.behemoths);return applied;}
+        public bool ApplyComplete(FormalSaveData data,bool preserveObservation)
+        {
+            if(data==null)return false;
+            if(data.schema>=24)friendlyUnits.RestoreCommandState(data.rallyFixed,data.rallyX,data.rallyY,data.puppetLosses,data.behemothLosses,data.controlledLosses);
+            else friendlyUnits.RestoreCommandState(false,0f,0f,0,0,0);
+            bool applied=Apply(data,preserveObservation);
+            if(applied&&data.schema>=22)friendlyUnits.Restore(data.puppetProgress,data.puppets);
+            if(applied&&data.schema>=23)friendlyUnits.RestoreBehemoths(data.behemothProgress,data.behemoths);
+            return applied;
+        }
         public bool Apply(FormalSaveData d,bool preserveObservation)
         {
             if(d==null)return false;
