@@ -114,7 +114,7 @@ namespace WasteCity.Combat
             VisualSlot.Attach(item, "cultivation.unit.puppet", renderer, renderer.color);
             item.AddComponent<HealthComponent>();
             var puppet = item.AddComponent<PlaceholderPuppet>();
-            puppet.Configure(city.transform, restoredHealth, research, Commands);
+            puppet.Configure(city.transform, restoredHealth, research, Commands, economy?.Inventory);
             return puppet;
         }
 

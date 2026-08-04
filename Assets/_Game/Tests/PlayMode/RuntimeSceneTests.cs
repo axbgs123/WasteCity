@@ -34,7 +34,8 @@ namespace WasteCity.Tests.PlayMode
                     || item.name.StartsWith("PhysicalTower")
                     || item.name.StartsWith("Technology")
                     || item.name.StartsWith("Unmanned")
-                    || item.name.StartsWith("SwordIntent"))
+                    || item.name.StartsWith("SwordIntent")
+                    || item.name.StartsWith("PuppetMaintenance"))
                     Object.Destroy(item);
             yield return null;
         }
@@ -740,6 +741,34 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(marker.activeSelf, Is.False);
             Object.Destroy(controlled.gameObject); Object.Destroy(executionTarget.gameObject);
             Object.Destroy(researchObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PuppetMaintenance_DormancyStopsAgentAndReplenishmentRestores()
+        {
+            var inventory = new ResourceInventory(10);
+            var city = new GameObject("PuppetMaintenanceCity");
+            var item = new GameObject("PuppetMaintenanceUnit");
+            var renderer = item.AddComponent<SpriteRenderer>();
+            item.AddComponent<HealthComponent>();
+            var puppet = item.AddComponent<PlaceholderPuppet>();
+
+            puppet.Configure(city.transform, -1, null, null, inventory, 60f, false);
+            yield return null;
+
+            var agent = item.GetComponent<FriendlyUnitAgent>();
+            Assert.That(puppet.Maintenance.Active, Is.False);
+            Assert.That(agent.enabled, Is.False);
+            Assert.That(item.GetComponent<VisualSlot>().StableId, Is.EqualTo("cultivation.unit.puppet.dormant"));
+
+            inventory.Add(ResourceIds.EnergyCrystal, 1);
+            yield return null;
+
+            Assert.That(puppet.Maintenance.Active, Is.True);
+            Assert.That(agent.enabled, Is.True);
+            Assert.That(item.GetComponent<VisualSlot>().StableId, Is.EqualTo("cultivation.unit.puppet"));
+            Assert.That(inventory.Get(ResourceIds.EnergyCrystal), Is.Zero);
+            Object.Destroy(item); Object.Destroy(city); Object.Destroy(renderer); yield return null;
         }
 
         private static GameObject CreateInfectionTurret(
