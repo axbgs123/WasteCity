@@ -581,6 +581,94 @@ namespace WasteCity.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator PsionicState_SaveRestorePreservesHostileResonance()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 28;
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    x = 2f,
+                    y = -1f,
+                    psionicResonanceRemaining = 3.5f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(
+                value => !value.IsControlled);
+
+            Assert.That(restoredEnemy.PsionicResonance.Remaining, Is.EqualTo(3.5f));
+            EnemySnapshot captured = saves.CaptureComplete().enemies.Single(
+                value => !value.controlled);
+            Assert.That(captured.psionicResonanceRemaining, Is.EqualTo(3.5f));
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicState_VersionTwentySevenIgnoresResonance()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 27;
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    psionicResonanceRemaining = 3.5f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(
+                value => !value.IsControlled);
+
+            Assert.That(restoredEnemy.PsionicResonance.Active, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator PsionicState_ControlledSnapshotRestoresWithoutResonance()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 28;
+            data.completedResearchIds = new[] { "core.research.mind-control" };
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    controlled = true,
+                    psionicResonanceRemaining = 3.5f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(
+                value => value.IsControlled);
+
+            Assert.That(restoredEnemy.PsionicResonance.Active, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator PsionicResonance_MindSpireMarksButPhysicalTowerDoesNot()
         {
             var economyObject = new GameObject("PsionicTowerEconomy");
