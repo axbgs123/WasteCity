@@ -30,7 +30,8 @@ namespace WasteCity.Tests.PlayMode
                 if (item.name.StartsWith("Infection")
                     || item.name.StartsWith("SporeTower")
                     || item.name.StartsWith("AcidTower")
-                    || item.name.StartsWith("PhysicalTower"))
+                    || item.name.StartsWith("PhysicalTower")
+                    || item.name.StartsWith("Technology"))
                     Object.Destroy(item);
             yield return null;
         }
@@ -486,11 +487,96 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(restoredEnemy.Infection.Elapsed, Is.Zero);
         }
 
+        [UnityTest]
+        public IEnumerator TechnologyOverload_RequiresEnergyWeaponsAndUsesStableMarker()
+        {
+            var city = new GameObject("TechnologyOverloadCity");
+            var researchObject = new GameObject("TechnologyOverloadResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.enabled = false;
+            var controllerObject = new GameObject("TechnologyOverloadController");
+            var controller = controllerObject.AddComponent<FormalTechnologyRouteController>();
+            controller.Configure(research, null, city.transform);
+
+            Assert.That(controller.TryActivate(), Is.False);
+            research.Model.Restore(new[] { "core.research.energy-weapons" }, null, 0f);
+            Assert.That(controller.TryActivate(), Is.True);
+
+            Assert.That(controller.FireRateMultiplier, Is.EqualTo(2f));
+            Assert.That(controller.DamageMultiplier(DamageType.Energy), Is.EqualTo(1.3f));
+            Assert.That(controller.DamageMultiplier(DamageType.Physical), Is.EqualTo(1f));
+            Assert.That(controller.Marker, Is.Not.Null);
+            Assert.That(controller.Marker.activeSelf, Is.True);
+            Assert.That(controller.Marker.GetComponent<VisualSlot>().StableId, Is.EqualTo("technology.status.overload"));
+            Object.Destroy(controllerObject); Object.Destroy(researchObject); Object.Destroy(city); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TechnologyOverload_ComposesWithLeaderWithoutMultiplicationAndEitherLockoutStops()
+        {
+            var city = new GameObject("TechnologyCompositionCity");
+            var researchObject = new GameObject("TechnologyCompositionResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.energy-weapons" }, null, 0f);
+            research.enabled = false;
+            var leaderObject = new GameObject("TechnologyCompositionLeader");
+            var leader = leaderObject.AddComponent<WasteCity.Leader.FormalLeaderController>();
+            leader.enabled = false;
+            leader.Model.Recruit(true);
+            leader.Model.Overload.TryActivate();
+            var controllerObject = new GameObject("TechnologyCompositionController");
+            var controller = controllerObject.AddComponent<FormalTechnologyRouteController>();
+            controller.Configure(research, leader, city.transform);
+
+            controller.TryActivate();
+
+            Assert.That(controller.FireRateMultiplier, Is.EqualTo(2f));
+            controller.Model.Tick(5f);
+            Assert.That(controller.FireRateMultiplier, Is.Zero);
+            Object.Destroy(controllerObject); Object.Destroy(leaderObject); Object.Destroy(researchObject); Object.Destroy(city); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TechnologyOverload_EnergyTurretUsesAttackRateAndDamageBoost()
+        {
+            Vector2 origin = new Vector2(140f, 140f);
+            var economyObject = new GameObject("TechnologyTurretEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.EnergyCrystal, 10);
+            var cityObject = new GameObject("TechnologyTurretCity"); cityObject.transform.position = origin + new Vector2(50f, 50f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var boostedTarget = CreateInfectionEnemy("TechnologyBoostedTarget", origin + Vector2.right, cityHealth, cityObject.transform, 1000);
+            var baselineTarget = CreateInfectionEnemy("TechnologyBaselineTarget", origin + new Vector2(31f, 0f), cityHealth, cityObject.transform, 1000);
+            var researchObject = new GameObject("TechnologyTurretResearch");
+            var research = researchObject.AddComponent<ResearchController>();
+            research.Model.Restore(new[] { "core.research.energy-weapons" }, null, 0f);
+            research.enabled = false;
+            var controllerObject = new GameObject("TechnologyTurretController");
+            var controller = controllerObject.AddComponent<FormalTechnologyRouteController>();
+            controller.Configure(research, null, cityObject.transform);
+            controller.TryActivate();
+            GameObject boostedTower = CreateInfectionTurret("TechnologyBoostedTower", origin, BuildingCatalog.LaserTower, economy, controller, research);
+            GameObject baselineTower = CreateInfectionTurret("TechnologyBaselineTower", origin + new Vector2(30f, 0f), BuildingCatalog.LaserTower, economy);
+
+            yield return new WaitForSeconds(.5f);
+
+            int boostedDamage = 1000 - boostedTarget.Health.Value.Current;
+            int baselineDamage = 1000 - baselineTarget.Health.Value.Current;
+            Assert.That(baselineDamage, Is.GreaterThan(0));
+            Assert.That(boostedDamage, Is.GreaterThan(baselineDamage * 2.3f));
+            Assert.That(boostedDamage, Is.LessThan(baselineDamage * 2.9f));
+            Object.Destroy(boostedTarget.gameObject); Object.Destroy(baselineTarget.gameObject);
+            Object.Destroy(boostedTower); Object.Destroy(baselineTower); Object.Destroy(controllerObject);
+            Object.Destroy(researchObject); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
         private static GameObject CreateInfectionTurret(
             string name,
             Vector2 position,
             BuildingDefinition definition,
-            FormalEconomyController economy)
+            FormalEconomyController economy,
+            ITurretCombatModifierSource modifier = null,
+            ResearchController research = null)
         {
             var item = new GameObject(name);
             item.transform.position = position;
@@ -498,7 +584,7 @@ namespace WasteCity.Tests.PlayMode
             var runtime = item.AddComponent<BuildingRuntime>();
             runtime.Configure(definition, economy);
             var turret = item.AddComponent<PlaceholderTurret>();
-            turret.Configure(economy, runtime);
+            turret.Configure(economy, runtime, null, modifier, research);
             return item;
         }
 

@@ -28,6 +28,8 @@ namespace WasteCity.Research
         public bool HasMindControl => Model.IsCompleted(new Content.StableId("core.research.mind-control"));
         public bool HasGeneSplicing => Model.IsCompleted(new Content.StableId("core.research.gene-splicing"));
         public bool HasConsciousnessNetwork => Model.IsCompleted(new Content.StableId("core.research.consciousness-network"));
+        public bool HasEnergyWeapons => Model.IsCompleted(new Content.StableId("core.research.energy-weapons"));
+        public bool HasUnmannedSystems => Model.IsCompleted(new Content.StableId("core.research.unmanned-systems"));
         private bool visible;
         private int selectedIndex;
         private void Update()

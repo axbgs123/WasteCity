@@ -32,6 +32,7 @@ namespace WasteCity.Building
         private readonly Dictionary<BuildingRuntime, PlacedBuilding> placements = new Dictionary<BuildingRuntime, PlacedBuilding>();
         [SerializeField] private LocalHasteController localTime;
         [SerializeField] private FormalLeaderController leader;
+        [SerializeField] private FormalTechnologyRouteController technology;
         [SerializeField] private FormalProgressionController progression;
         public int PlacedCount => grid.Count;
         public bool HasLocalTimeSource => localTime != null;
@@ -92,7 +93,7 @@ namespace WasteCity.Building
         private void OnCompleted(BuildingRuntime runtime)
         {
             RefreshLogistics();
-            if (DefenseTowerCatalog.For(runtime.Definition.Id.Value)!=null) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,leader,research);
+            if (DefenseTowerCatalog.For(runtime.Definition.Id.Value)!=null) runtime.gameObject.AddComponent<PlaceholderTurret>().Configure(economy, runtime, localTime,TurretModifier,research);
             if(runtime.Definition.Id.Value==BuildingCatalog.ShieldGenerator.Id.Value)runtime.gameObject.AddComponent<PlaceholderShieldGenerator>().Configure(runtime);
             if(runtime.Definition.Id.Value==BuildingCatalog.AutomatedRepairBay.Id.Value)runtime.gameObject.AddComponent<PlaceholderAutomatedRepairBay>().Configure(runtime);
             BuildingPlaced?.Invoke(runtime.Definition);
@@ -100,7 +101,9 @@ namespace WasteCity.Building
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
         public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, shield = pair.Key.Health.Value.Shield, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
         public void SetLocalTimeSource(LocalHasteController value) { localTime = value; foreach (var runtime in placements.Keys) runtime.SetLocalTimeSource(value); }
-        public void SetTurretFireRateSource(FormalLeaderController value){leader=value;foreach(var turret in UnityEngine.Object.FindObjectsOfType<PlaceholderTurret>())turret.SetFireRateSource(value);}
+        private ITurretCombatModifierSource TurretModifier=>technology!=null?technology:leader;
+        public void SetTurretFireRateSource(FormalLeaderController value){leader=value;foreach(var turret in UnityEngine.Object.FindObjectsOfType<PlaceholderTurret>())turret.SetCombatModifierSource(TurretModifier);}
+        public void SetTurretCombatModifierSource(FormalTechnologyRouteController value){technology=value;foreach(var turret in UnityEngine.Object.FindObjectsOfType<PlaceholderTurret>())turret.SetCombatModifierSource(TurretModifier);}
         public BuildingRuntime FindNearest(Vector2 point, float radius) { BuildingRuntime nearest=null;float best=radius*radius;foreach(var runtime in placements.Keys){float sqr=((Vector2)runtime.transform.position-point).sqrMagnitude;if(sqr<=best){best=sqr;nearest=runtime;}}return nearest; }
         public BuildingRuntime FindAtGrid(int x, int y) { foreach(var pair in placements)if(pair.Value.X==x&&pair.Value.Y==y)return pair.Key;return null; }
         public bool TryGetGrid(BuildingRuntime runtime, out int x, out int y) { if(runtime!=null&&placements.TryGetValue(runtime,out var placed)){x=placed.X;y=placed.Y;return true;}x=y=-1;return false; }

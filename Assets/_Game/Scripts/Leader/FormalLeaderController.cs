@@ -8,7 +8,7 @@ using WasteCity.Presentation;
 
 namespace WasteCity.Leader
 {
-    public sealed class FormalLeaderController : MonoBehaviour, ITurretFireRateSource
+    public sealed class FormalLeaderController : MonoBehaviour, ITurretCombatModifierSource
     {
         [SerializeField] private RescueSiteController rescueSites;
         [SerializeField] private PlaceholderMobileCity city;
@@ -18,6 +18,7 @@ namespace WasteCity.Leader
         private readonly GeneSpliceAuraModel geneAura=new GeneSpliceAuraModel(5f);
         private bool geneVisualActive;
         public float FireRateMultiplier=>Model.Overload.FireRateMultiplier;
+        public float DamageMultiplier(WasteCity.Combat.DamageType damageType)=>1f;
         public float AssemblerEfficiency=>Model.AssemblerEfficiency;
         public bool GeneSpliceActive=>Model.Recruited&&research!=null&&research.HasGeneSplicing&&Model.Overload.Phase==OverloadPhase.Boosting;
         private void Start(){rescueSites.Rescued+=OnRescued;if(visual!=null)visual.gameObject.SetActive(Model.Recruited);}
