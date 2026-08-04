@@ -391,10 +391,11 @@ namespace WasteCity.Tests.PlayMode
         {
             var economyObject = new GameObject("InfectionEmptyEconomy");
             var economy = economyObject.AddComponent<FormalEconomyController>();
-            var cityObject = new GameObject("InfectionEmptyCity"); cityObject.transform.position = new Vector2(40f, 40f);
+            Vector2 isolatedOrigin = new Vector2(100f, 100f);
+            var cityObject = new GameObject("InfectionEmptyCity"); cityObject.transform.position = isolatedOrigin + new Vector2(40f, 40f);
             var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
-            var target = CreateInfectionEnemy("InfectionEmptyTarget", Vector2.right, cityHealth, cityObject.transform, 250);
-            GameObject tower = CreateInfectionTurret("InfectionEmptyTower", Vector2.zero, BuildingCatalog.SporeTower, economy);
+            var target = CreateInfectionEnemy("InfectionEmptyTarget", isolatedOrigin + Vector2.right, cityHealth, cityObject.transform, 250);
+            GameObject tower = CreateInfectionTurret("InfectionEmptyTower", isolatedOrigin, BuildingCatalog.SporeTower, economy);
 
             yield return new WaitForSeconds(.2f);
 
@@ -420,6 +421,69 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(target.Health.Value.Current, Is.LessThan(250));
             Assert.That(target.Infection.Stacks, Is.EqualTo(1));
             Object.Destroy(target.gameObject); Object.Destroy(behemothObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_SaveRestorePreservesHostileStatus()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 25;
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    x = 2f,
+                    y = -1f,
+                    infectionStacks = 7,
+                    infectionElapsed = .4f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(value => !value.IsControlled);
+
+            Assert.That(restoredEnemy.Infection.Stacks, Is.EqualTo(7));
+            Assert.That(restoredEnemy.Infection.Elapsed, Is.EqualTo(.4f).Within(.001f));
+            EnemySnapshot captured = saves.CaptureComplete().enemies.Single(value => !value.controlled);
+            Assert.That(captured.infectionStacks, Is.EqualTo(7));
+            Assert.That(captured.infectionElapsed, Is.EqualTo(.4f).Within(.001f));
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_ControlledSnapshotRestoresWithoutInfection()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 25;
+            data.completedResearchIds = new[] { "core.research.mind-control" };
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    controlled = true,
+                    infectionStacks = 7,
+                    infectionElapsed = .4f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(value => value.IsControlled);
+
+            Assert.That(restoredEnemy.Infection.Stacks, Is.Zero);
+            Assert.That(restoredEnemy.Infection.Elapsed, Is.Zero);
         }
 
         private static GameObject CreateInfectionTurret(

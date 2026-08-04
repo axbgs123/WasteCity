@@ -108,7 +108,7 @@ namespace WasteCity.Persistence
             if(d.schema>=7)localHaste.Restore(d.hastePoolDay,d.hasteRemaining,d.hasteActive,d.hasteTargetX,d.hasteTargetY);
             if(d.schema>=8)spatialTemplate.Model.Restore(d.spatialTemplate);
             if(d.schema>=9){worldView.Restore(d.worldResourceAmounts,d.worldRevealed);territory.Restore(d.territoryActivated,d.territoryProgress,d.territoryLocalResources);}
-            if(d.schema>=12)combat.Restore(d.wave,d.enemies);
+            if(d.schema>=12)combat.Restore(d.wave,d.enemies,d.schema);
             if(d.schema>=15)progression.RestoreBossDefeated(d.bossDefeated);
             if(d.schema>=14){int stage=d.guidanceStage;if(d.schema<16&&stage==(int)GuidanceStage.Complete&&d.civilizationLevel<2)stage=(int)GuidanceStage.Advancement;guidance.Restore(stage);}
             if(d.schema>=16)advancement.Restore(d.advancementStage,d.advancementRemaining);
