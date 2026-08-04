@@ -299,10 +299,10 @@ git commit -m "docs: record route capstone baseline"
 
 Re-run the complete tests on the exact committed tree, inspect recent commits, and require a clean worktree.
 
-- [ ] **Step 8: Push GitHub branch**
+- [x] **Step 8: Push GitHub branch**
 
 Resolve the configured `origin`, confirm it is the requested WasteCity repository, and push `codex/fix-foundation` without force. Do not merge to the default branch or create a public release.
 
-- [ ] **Step 9: Stop**
+- [x] **Step 9: Stop**
 
 Report the pushed branch and remaining real-Windows smoke limitation. Do not begin route descriptions or any later roadmap item.
