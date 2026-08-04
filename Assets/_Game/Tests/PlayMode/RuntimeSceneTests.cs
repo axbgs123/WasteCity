@@ -26,6 +26,12 @@ namespace WasteCity.Tests.PlayMode
             gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Defeat, false);
             gameSpeed?.SetPaused(WasteCity.Core.GamePauseReason.Advancement, false);
             Time.timeScale = 1f;
+            foreach (GameObject item in Object.FindObjectsOfType<GameObject>())
+                if (item.name.StartsWith("Infection")
+                    || item.name.StartsWith("SporeTower")
+                    || item.name.StartsWith("AcidTower")
+                    || item.name.StartsWith("PhysicalTower"))
+                    Object.Destroy(item);
             yield return null;
         }
 
@@ -331,6 +337,105 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(second.Infection.Stacks, Is.EqualTo(5));
             Assert.That(third.Infection.Stacks, Is.EqualTo(5));
             Object.Destroy(first.gameObject); Object.Destroy(second.gameObject); Object.Destroy(third.gameObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_SporeAndAcidTowersInfectButPhysicalTowerDoesNot()
+        {
+            var economyObject = new GameObject("InfectionTowerEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.BiologicalWeapon, 4);
+            var cityObject = new GameObject("InfectionTowerCity"); cityObject.transform.position = new Vector2(40f, 40f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var sporeTarget = CreateInfectionEnemy("SporeTowerTarget", new Vector2(1f, 0f), cityHealth, cityObject.transform, 250);
+            var acidTarget = CreateInfectionEnemy("AcidTowerTarget", new Vector2(21f, 0f), cityHealth, cityObject.transform, 250);
+            var physicalTarget = CreateInfectionEnemy("PhysicalTowerTarget", new Vector2(41f, 0f), cityHealth, cityObject.transform, 250);
+            GameObject sporeTower = CreateInfectionTurret("SporeTower", Vector2.zero, BuildingCatalog.SporeTower, economy);
+            GameObject acidTower = CreateInfectionTurret("AcidTower", new Vector2(20f, 0f), BuildingCatalog.AcidTower, economy);
+            GameObject physicalTower = CreateInfectionTurret("PhysicalTower", new Vector2(40f, 0f), BuildingCatalog.MachineGunTurret, economy);
+
+            yield return new WaitForSeconds(.2f);
+
+            Assert.That(sporeTarget.Health.Value.Current, Is.LessThan(250));
+            Assert.That(acidTarget.Health.Value.Current, Is.LessThan(250));
+            Assert.That(physicalTarget.Health.Value.Current, Is.LessThan(250));
+            Assert.That(sporeTarget.Infection.Stacks, Is.EqualTo(1));
+            Assert.That(acidTarget.Infection.Stacks, Is.EqualTo(1));
+            Assert.That(physicalTarget.Infection.Stacks, Is.Zero);
+            Object.Destroy(sporeTarget.gameObject); Object.Destroy(acidTarget.gameObject); Object.Destroy(physicalTarget.gameObject);
+            Object.Destroy(sporeTower); Object.Destroy(acidTower); Object.Destroy(physicalTower); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_ContinuousTowerDamageAddsAtMostOneLayerPerSecond()
+        {
+            var economyObject = new GameObject("InfectionCadenceEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            economy.Inventory.Add(ResourceIds.BiologicalWeapon, 2);
+            var cityObject = new GameObject("InfectionCadenceCity"); cityObject.transform.position = new Vector2(40f, 40f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var target = CreateInfectionEnemy("InfectionCadenceTarget", Vector2.right, cityHealth, cityObject.transform, 1000);
+            GameObject tower = CreateInfectionTurret("InfectionCadenceTower", Vector2.zero, BuildingCatalog.SporeTower, economy);
+
+            yield return new WaitForSeconds(.2f);
+            Assert.That(target.Infection.Stacks, Is.EqualTo(1));
+            yield return new WaitForSeconds(.5f);
+            Assert.That(target.Infection.Stacks, Is.EqualTo(1));
+            yield return new WaitForSeconds(.6f);
+            Assert.That(target.Infection.Stacks, Is.EqualTo(2));
+            Object.Destroy(target.gameObject); Object.Destroy(tower); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_NoBiologicalAmmunitionMeansNoDamageOrInfection()
+        {
+            var economyObject = new GameObject("InfectionEmptyEconomy");
+            var economy = economyObject.AddComponent<FormalEconomyController>();
+            var cityObject = new GameObject("InfectionEmptyCity"); cityObject.transform.position = new Vector2(40f, 40f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var target = CreateInfectionEnemy("InfectionEmptyTarget", Vector2.right, cityHealth, cityObject.transform, 250);
+            GameObject tower = CreateInfectionTurret("InfectionEmptyTower", Vector2.zero, BuildingCatalog.SporeTower, economy);
+
+            yield return new WaitForSeconds(.2f);
+
+            Assert.That(target.Health.Value.Current, Is.EqualTo(250));
+            Assert.That(target.Infection.Stacks, Is.Zero);
+            Object.Destroy(target.gameObject); Object.Destroy(tower); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator BiologicalInfection_BehemothDamageInfectsHostile()
+        {
+            var cityObject = new GameObject("InfectionBehemothCity"); cityObject.transform.position = new Vector2(40f, 40f);
+            var cityHealth = cityObject.AddComponent<HealthComponent>(); cityHealth.Configure(2000, ArmorType.Heavy);
+            var target = CreateInfectionEnemy("InfectionBehemothTarget", Vector2.right, cityHealth, cityObject.transform, 250);
+            var behemothObject = new GameObject("InfectionBehemoth");
+            behemothObject.AddComponent<HealthComponent>();
+            var behemoth = behemothObject.AddComponent<PlaceholderBehemoth>();
+            var commands = new FriendlyUnitCommandModel(); commands.SetRally(0f, 0f);
+            behemoth.Configure(cityObject.transform, null, -1, commands);
+
+            yield return new WaitForSeconds(.2f);
+
+            Assert.That(target.Health.Value.Current, Is.LessThan(250));
+            Assert.That(target.Infection.Stacks, Is.EqualTo(1));
+            Object.Destroy(target.gameObject); Object.Destroy(behemothObject); Object.Destroy(cityObject); yield return null;
+        }
+
+        private static GameObject CreateInfectionTurret(
+            string name,
+            Vector2 position,
+            BuildingDefinition definition,
+            FormalEconomyController economy)
+        {
+            var item = new GameObject(name);
+            item.transform.position = position;
+            item.AddComponent<HealthComponent>();
+            var runtime = item.AddComponent<BuildingRuntime>();
+            runtime.Configure(definition, economy);
+            var turret = item.AddComponent<PlaceholderTurret>();
+            turret.Configure(economy, runtime);
+            return item;
         }
 
         private static PlaceholderEnemy CreateInfectionEnemy(

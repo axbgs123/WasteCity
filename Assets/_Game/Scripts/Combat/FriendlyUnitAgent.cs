@@ -19,6 +19,7 @@ namespace WasteCity.Combat
         private float moveSpeed;
         private float damagePerSecond;
         private DamageType damageType;
+        private readonly InfectionEmitterModel infectionEmitter = new InfectionEmitterModel();
         private FriendlyTacticalProfile tacticalProfile;
         private PlaceholderEnemy currentTarget;
         private float attackRemainder;
@@ -54,6 +55,7 @@ namespace WasteCity.Combat
         private void Update()
         {
             if (health == null || health.Value.IsDead || city == null) return;
+            infectionEmitter.Tick(Time.deltaTime, false);
             if (research != null)
                 regeneration.Tick(Time.deltaTime, false, research.HasTissueRegeneration, false, health.Value, null);
 
@@ -107,7 +109,9 @@ namespace WasteCity.Combat
             attackRemainder += damagePerSecond * Time.deltaTime;
             int damage = Mathf.FloorToInt(attackRemainder);
             if (damage <= 0) return;
-            target.Health.Value.Apply(damage, damageType, target.Health.Armor);
+            int dealt = target.Health.Value.Apply(damage, damageType, target.Health.Armor);
+            if (infectionEmitter.Tick(0f, dealt > 0 && damageType == DamageType.Biological))
+                target.ApplyInfection(1);
             attackRemainder -= damage;
         }
 
