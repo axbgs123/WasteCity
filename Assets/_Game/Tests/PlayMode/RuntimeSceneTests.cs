@@ -808,6 +808,106 @@ namespace WasteCity.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator RouteCapstoneProduction_OldProgressDefaultsNewProcessesToZero()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var production = Object.FindObjectOfType<TechnologyProductionController>();
+            float[] oldProgress =
+            {
+                .1f, .2f, .3f, .4f, .5f, .6f, .7f, .8f, .9f, 1f, 1.1f
+            };
+
+            production.RestoreProgress(oldProgress);
+            float[] captured = production.CaptureProgress();
+
+            Assert.That(captured.Length, Is.EqualTo(14));
+            Assert.That(captured.Take(11), Is.EqualTo(oldProgress));
+            Assert.That(captured.Skip(11), Is.EqualTo(new[] { 0f, 0f, 0f }));
+        }
+
+        [UnityTest]
+        public IEnumerator RouteCapstoneBuildings_RestoreProduceAndUseStableVisualSlots()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var gameSpeed = Object.FindObjectOfType<WasteCity.Core.GameSpeedController>();
+            var economy = Object.FindObjectOfType<FormalEconomyController>();
+            var production = Object.FindObjectOfType<TechnologyProductionController>();
+            var data = saves.CaptureComplete();
+            data.schema = 28;
+            data.population = 1000;
+            data.populationCapacity = 1200;
+            data.energyCrystal = 0;
+            data.biomass = 10;
+            data.psionicAmplifier = 0;
+            data.cityMode = (int)CityMode.Fortress;
+            data.completedResearchIds = new[]
+            {
+                "core.research.thermal-engineering",
+                "core.research.spirit-gathering",
+                "core.research.metabolic-acceleration",
+                "core.research.consciousness-network"
+            };
+            data.productionProgress = new float[14];
+            data.buildings = new[]
+            {
+                new BuildingSnapshot
+                {
+                    definitionId = BuildingCatalog.PowerPlant.Id.Value,
+                    x = 0, y = 0, health = 320, constructionRemaining = 0f
+                },
+                new BuildingSnapshot
+                {
+                    definitionId = BuildingCatalog.SpiritGatheringArray.Id.Value,
+                    x = 3, y = 0, health = 260, constructionRemaining = 0f
+                },
+                new BuildingSnapshot
+                {
+                    definitionId = BuildingCatalog.MetabolicFurnace.Id.Value,
+                    x = 0, y = 3, health = 360, constructionRemaining = 0f
+                },
+                new BuildingSnapshot
+                {
+                    definitionId = BuildingCatalog.ConsciousnessNetwork.Id.Value,
+                    x = 3, y = 3, health = 300, constructionRemaining = 0f
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            gameSpeed.SetPaused(WasteCity.Core.GamePauseReason.Title, false);
+            Time.timeScale = 10f;
+            yield return new WaitForSeconds(10.1f);
+
+            string[] expectedIds =
+            {
+                BuildingCatalog.PowerPlant.Id.Value,
+                BuildingCatalog.SpiritGatheringArray.Id.Value,
+                BuildingCatalog.MetabolicFurnace.Id.Value,
+                BuildingCatalog.ConsciousnessNetwork.Id.Value
+            };
+            BuildingRuntime[] runtimes = Object.FindObjectsOfType<BuildingRuntime>();
+            foreach (string id in expectedIds)
+            {
+                BuildingRuntime runtime = runtimes.Single(value => value.Definition.Id.Value == id);
+                Assert.That(runtime.HasLogistics, Is.True);
+                Assert.That(runtime.GetComponent<VisualSlot>().StableId, Is.EqualTo(id));
+            }
+
+            Assert.That(economy.Inventory.Get(ResourceIds.EnergyCrystal), Is.GreaterThanOrEqualTo(3));
+            Assert.That(economy.Inventory.Get(ResourceIds.Biomass), Is.LessThanOrEqualTo(8));
+            Assert.That(economy.Inventory.Get(ResourceIds.PsionicAmplifier), Is.GreaterThanOrEqualTo(1));
+            Assert.That(production.CaptureProgress().Length, Is.EqualTo(14));
+            string[] capturedIds = saves.CaptureComplete().buildings
+                .Select(value => value.definitionId)
+                .ToArray();
+            foreach (string id in expectedIds) Assert.That(capturedIds, Does.Contain(id));
+        }
+
+        [UnityTest]
         public IEnumerator TechnologyOverload_RequiresEnergyWeaponsAndUsesStableMarker()
         {
             var city = new GameObject("TechnologyOverloadCity");

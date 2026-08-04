@@ -29,11 +29,14 @@ namespace WasteCity.Economy
         private readonly ProductionProcess psionicWorkshop=new ProductionProcess(new ProductionRecipe(ResourceIds.ResonanceMetal,2,ResourceIds.PsionicAmplifier,2,8f));
         private readonly PassiveProductionProcess spiritGathering=new PassiveProductionProcess(ResourceIds.EnergyCrystal,1,6f);
         private readonly DualInputProductionProcess alchemy=new DualInputProductionProcess(new DualInputProductionRecipe(ResourceIds.Biomass,1,ResourceIds.EnergyCrystal,1,ResourceIds.Elixir,1,10f));
+        private readonly PassiveProductionProcess powerPlant=RouteCapstoneProductionCatalog.CreatePowerPlant();
+        private readonly ProductionProcess metabolicFurnace=RouteCapstoneProductionCatalog.CreateMetabolicFurnace();
+        private readonly PassiveProductionProcess consciousnessNetwork=RouteCapstoneProductionCatalog.CreateConsciousnessNetwork();
         private readonly Dictionary<BuildingRuntime,ResourceExtractionProcess> mines=new Dictionary<BuildingRuntime,ResourceExtractionProcess>();
         public int ActiveMines { get; private set; }
         public int DepletedMines { get; private set; }
         public int FullMines { get; private set; }
-        public bool HasRunningProduction=>ActiveMines>0||new[]{smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate,resonance,psionicWorkshop}.Any(value=>value.Status==ProductionStatus.Running)||breeding.Status==ProductionStatus.Running||alchemy.Status==ProductionStatus.Running||spiritGathering.Status==ProductionStatus.Running;
+        public bool HasRunningProduction=>ActiveMines>0||new[]{smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate,resonance,psionicWorkshop,metabolicFurnace}.Any(value=>value.Status==ProductionStatus.Running)||breeding.Status==ProductionStatus.Running||alchemy.Status==ProductionStatus.Running||spiritGathering.Status==ProductionStatus.Running||powerPlant.Status==ProductionStatus.Running||consciousnessNetwork.Status==ProductionStatus.Running;
         public event Action<int> ProductionCompleted;
 
         private void Update()
@@ -56,7 +59,7 @@ namespace WasteCity.Economy
             }
             foreach(var stale in mines.Keys.Where(value=>value==null||!activeMining.Contains(value)).ToArray())mines.Remove(stale);
             int smelters=0,assemblers=0;
-            int spiritFires=0,artifactWorkshops=0,spiritGatheringArrays=0,alchemyChambers=0,colonyPools=0,breedingChambers=0,resonanceFurnaces=0,psionicWorkshops=0;
+            int spiritFires=0,artifactWorkshops=0,spiritGatheringArrays=0,alchemyChambers=0,colonyPools=0,breedingChambers=0,resonanceFurnaces=0,psionicWorkshops=0,powerPlants=0,metabolicFurnaces=0,consciousnessNetworks=0;
             foreach(var runtime in runtimes)
             {
                 int units=Mathf.RoundToInt(localHaste?.MultiplierFor(runtime)??1f);
@@ -70,6 +73,9 @@ namespace WasteCity.Economy
                 if(runtime.Definition.Id.Value=="biological.building.breeding-chamber")breedingChambers+=units;
                 if(runtime.Definition.Id.Value=="psionics.building.resonance-furnace")resonanceFurnaces+=units;
                 if(runtime.Definition.Id.Value=="psionics.building.workshop")psionicWorkshops+=units;
+                if(runtime.Definition.Id.Value==BuildingCatalog.PowerPlant.Id.Value)powerPlants+=units;
+                if(runtime.Definition.Id.Value==BuildingCatalog.MetabolicFurnace.Id.Value)metabolicFurnaces+=units;
+                if(runtime.Definition.Id.Value==BuildingCatalog.ConsciousnessNetwork.Id.Value)consciousnessNetworks+=units;
             }
             float industryDelta=Time.deltaTime*cityMultiplier;
             completedCycles+=smelter.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(smelters)??smelters);
@@ -82,16 +88,19 @@ namespace WasteCity.Economy
             completedCycles+=breeding.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(breedingChambers)??breedingChambers);
             completedCycles+=resonance.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(resonanceFurnaces)??resonanceFurnaces);
             completedCycles+=psionicWorkshop.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(psionicWorkshops)??psionicWorkshops);
+            completedCycles+=powerPlant.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(powerPlants)??powerPlants);
+            completedCycles+=metabolicFurnace.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(metabolicFurnaces)??metabolicFurnaces);
+            completedCycles+=consciousnessNetwork.Tick(industryDelta,economy.Inventory,legacyEffects?.Model?.ProductionUnits(consciousnessNetworks)??consciousnessNetworks);
             if(completedCycles>0)ProductionCompleted?.Invoke(completedCycles);
         }
 
         private void OnGUI()
         {
-            GUI.Box(new Rect(Screen.width-470f,18f,450f,125f),$"多路线生产监控\n采矿：运行 {ActiveMines} / 枯竭 {DepletedMines} / 满仓 {FullMines}\n科技 冶炼 {StatusText(smelter.Status)} · 装配 {StatusText(assembler.Status)}\n修仙 灵火 {StatusText(spiritFire.Status)} · 炼器 {StatusText(artifactWorkshop.Status)}\n血肉 菌落 {StatusText(boneSteel.Status)}/{StatusText(concentrate.Status)} · 培育 {StatusText(breeding.Status)}\n灵能 共振 {StatusText(resonance.Status)} · 工坊 {StatusText(psionicWorkshop.Status)}");
+            GUI.Box(new Rect(Screen.width-470f,18f,450f,145f),$"多路线生产监控\n采矿：运行 {ActiveMines} / 枯竭 {DepletedMines} / 满仓 {FullMines}\n科技 冶炼 {StatusText(smelter.Status)} · 装配 {StatusText(assembler.Status)} · 发电 {StatusText(powerPlant.Status)}\n修仙 灵火 {StatusText(spiritFire.Status)} · 炼器 {StatusText(artifactWorkshop.Status)} · 聚灵 {StatusText(spiritGathering.Status)}\n血肉 菌落 {StatusText(boneSteel.Status)}/{StatusText(concentrate.Status)} · 培育 {StatusText(breeding.Status)} · 代谢 {StatusText(metabolicFurnace.Status)}\n灵能 共振 {StatusText(resonance.Status)} · 工坊 {StatusText(psionicWorkshop.Status)} · 网络 {StatusText(consciousnessNetwork.Status)}");
         }
 
-        public float[] CaptureProgress()=>new[]{smelter.Progress,assembler.Progress,spiritFire.Progress,artifactWorkshop.Progress,boneSteel.Progress,concentrate.Progress,breeding.Progress,resonance.Progress,psionicWorkshop.Progress,spiritGathering.Progress,alchemy.Progress};
-        public void RestoreProgress(float[] values){if(values==null)return;ProductionProcess[] singles={smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate};for(int i=0;i<singles.Length&&i<values.Length;i++)singles[i].Restore(values[i]);if(values.Length>6)breeding.Restore(values[6]);if(values.Length>7)resonance.Restore(values[7]);if(values.Length>8)psionicWorkshop.Restore(values[8]);if(values.Length>9)spiritGathering.Restore(values[9]);if(values.Length>10)alchemy.Restore(values[10]);}
+        public float[] CaptureProgress()=>new[]{smelter.Progress,assembler.Progress,spiritFire.Progress,artifactWorkshop.Progress,boneSteel.Progress,concentrate.Progress,breeding.Progress,resonance.Progress,psionicWorkshop.Progress,spiritGathering.Progress,alchemy.Progress,powerPlant.Progress,metabolicFurnace.Progress,consciousnessNetwork.Progress};
+        public void RestoreProgress(float[] values){if(values==null)return;ProductionProcess[] singles={smelter,assembler,spiritFire,artifactWorkshop,boneSteel,concentrate};for(int i=0;i<singles.Length&&i<values.Length;i++)singles[i].Restore(values[i]);if(values.Length>6)breeding.Restore(values[6]);if(values.Length>7)resonance.Restore(values[7]);if(values.Length>8)psionicWorkshop.Restore(values[8]);if(values.Length>9)spiritGathering.Restore(values[9]);if(values.Length>10)alchemy.Restore(values[10]);if(values.Length>11)powerPlant.Restore(values[11]);if(values.Length>12)metabolicFurnace.Restore(values[12]);if(values.Length>13)consciousnessNetwork.Restore(values[13]);}
 
         private static string StatusText(ProductionStatus status)=>status==ProductionStatus.Running?"运行":status==ProductionStatus.MissingInput?"缺少输入":status==ProductionStatus.OutputFull?"输出已满":"无联网建筑";
     }
