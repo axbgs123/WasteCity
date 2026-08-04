@@ -7,6 +7,7 @@ using WasteCity.Progression;
 using WasteCity.Presentation;
 using System;
 using WasteCity.Research;
+using WasteCity.Building;
 
 namespace WasteCity.World
 {
@@ -18,9 +19,24 @@ namespace WasteCity.World
         [SerializeField] private FormalPopulationController population;
         [SerializeField] private FormalProgressionController progression;
         [SerializeField] private ResearchController research;
+        private PlaceholderBuildingController buildings;
         public RescueSiteModel Model { get; private set; }
         public string LastResult { get; private set; }
         public event Action<int,bool> Rescued;
+        public bool RemoteLinkAvailable
+        {
+            get
+            {
+                if (buildings == null)
+                    buildings = FindObjectOfType<PlaceholderBuildingController>();
+                return ConsciousnessNetworkRules.RemoteLinkAvailable(
+                    research != null && research.HasConsciousnessNetwork,
+                    buildings == null
+                        ? 0
+                        : buildings.OperationalCount(
+                            BuildingCatalog.ConsciousnessNetwork.Id.Value));
+            }
+        }
         private SpriteRenderer[] markers;
         private static Sprite square;
         private void Start() => TryInitialize();
@@ -37,7 +53,7 @@ namespace WasteCity.World
             for (int i = 0; i < Model.Sites.Count; i++) { var site = Model.Sites[i]; markers[i].enabled = world.Model.IsRevealed(site.X, site.Y) && !site.Completed; if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) nearby = i; }
             if (nearby >= 0 && city.Deployment.Mode == CityMode.Fortress && Keyboard.current != null)
             {if(Keyboard.current.nKey.wasPressedThisFrame)TryRescue(nearby,true);else if(Keyboard.current.mKey.wasPressedThisFrame)TryRescue(nearby,false);}
-            if(research!=null&&research.HasConsciousnessNetwork&&Keyboard.current!=null&&Keyboard.current.jKey.wasPressedThisFrame){int remote=Model.FindFirstIncomplete(site=>world.Model.IsRevealed(site.X,site.Y));if(remote>=0)TryRescue(remote,false,true);else LastResult="远程通讯：没有已发现的待救援信号";}
+            if(RemoteLinkAvailable&&Keyboard.current!=null&&Keyboard.current.jKey.wasPressedThisFrame){int remote=Model.FindFirstIncomplete(site=>world.Model.IsRevealed(site.X,site.Y));if(remote>=0)TryRescue(remote,false,true);else LastResult="远程通讯：没有已发现的待救援信号";}
         }
         public bool TryRescue(int index,bool immediate=true,bool remote=false)
         {
@@ -47,6 +63,6 @@ namespace WasteCity.World
         public bool[] Capture() => Model?.Capture();
         public void Restore(bool[] values) => Model?.Restore(values);
         private Vector3 WorldPosition(RescueSite site) => new Vector3(site.X - world.Model.Width * .5f, site.Y - world.Model.Height * .5f, -1f);
-        private void OnGUI() { if (Model == null) return; foreach (var site in Model.Sites) if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) GUI.Box(new Rect(18, Screen.height - 132f, 620f, 48f), "救援遗迹：[N] 立即救援（生物质5，健康） / [M] 延迟救援（生物质2，受伤）"); if(research!=null&&research.HasConsciousnessNetwork&&Model.FindFirstIncomplete(site=>world.Model.IsRevealed(site.X,site.Y))>=0)GUI.Box(new Rect(18,Screen.height-185f,620f,44f),"意识网络：[J] 免费远程处理已发现求救（按延迟救援结算）");if (!string.IsNullOrEmpty(LastResult)) GUI.Box(new Rect(18, 245f, 500f, 45f), LastResult); }
+        private void OnGUI() { if (Model == null) return; foreach (var site in Model.Sites) if (!site.Completed && Vector2.Distance(city.transform.position, WorldPosition(site)) <= 1.5f) GUI.Box(new Rect(18, Screen.height - 132f, 620f, 48f), "救援遗迹：[N] 立即救援（生物质5，健康） / [M] 延迟救援（生物质2，受伤）"); if(RemoteLinkAvailable&&Model.FindFirstIncomplete(site=>world.Model.IsRevealed(site.X,site.Y))>=0)GUI.Box(new Rect(18,Screen.height-185f,620f,44f),"意识网络：[J] 免费远程处理已发现求救（按延迟救援结算）");if (!string.IsNullOrEmpty(LastResult)) GUI.Box(new Rect(18, 245f, 500f, 45f), LastResult); }
     }
 }

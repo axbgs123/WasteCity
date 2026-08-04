@@ -901,6 +901,9 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(economy.Inventory.Get(ResourceIds.Biomass), Is.LessThanOrEqualTo(8));
             Assert.That(economy.Inventory.Get(ResourceIds.PsionicAmplifier), Is.GreaterThanOrEqualTo(1));
             Assert.That(production.CaptureProgress().Length, Is.EqualTo(14));
+            Assert.That(
+                Object.FindObjectOfType<RescueSiteController>().RemoteLinkAvailable,
+                Is.True);
             string[] capturedIds = saves.CaptureComplete().buildings
                 .Select(value => value.definitionId)
                 .ToArray();

@@ -115,6 +115,7 @@ namespace WasteCity.Building
             return x >= 0 && y >= 0 && x < world.Model.Width && y < world.Model.Height;
         }
         public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&(runtime.Definition.Id.Value==id||(id=="core.building.machine-gun-turret"&&runtime.Definition.Id.Value=="core.building.heavy-machine-gun-turret")));
+        public int OperationalCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.HasLogistics&&runtime.Definition.Id.Value==id);
         public bool CanBuild(BuildingDefinition definition,out string reason)=>BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new WasteCity.Content.StableId(id)),CompletedCount,out reason);
         public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
         public SpatialTemplateEntry[] CaptureTemplate(int originX, int originY) => placements.Where(pair => pair.Value.X >= originX && pair.Value.Y >= originY && pair.Value.X + pair.Value.Definition.Width <= originX + 3 && pair.Value.Y + pair.Value.Definition.Height <= originY + 3).Select(pair => new SpatialTemplateEntry { definitionId = pair.Value.Definition.Id.Value, dx = pair.Value.X - originX, dy = pair.Value.Y - originY }).ToArray();
