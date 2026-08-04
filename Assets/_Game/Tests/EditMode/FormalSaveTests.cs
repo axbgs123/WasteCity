@@ -12,7 +12,7 @@ namespace WasteCity.Tests
         [Test] public void EnemyQualityRoundTrips(){var data=new FormalSaveData{enemies=new[]{new WasteCity.Combat.EnemySnapshot{archetype=1,quality=(int)WasteCity.Combat.EnemyQuality.Epic,health=321}}};var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(data));Assert.That(restored.enemies[0].quality,Is.EqualTo((int)WasteCity.Combat.EnemyQuality.Epic));Assert.That(restored.enemies[0].health,Is.EqualTo(321));}
         [Test] public void ControlledEnemyStateRoundTrips(){var data=new FormalSaveData{enemies=new[]{new WasteCity.Combat.EnemySnapshot{archetype=0,quality=0,controlled=true,health=42}}};var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(data));Assert.That(restored.enemies[0].controlled,Is.True);Assert.That(restored.enemies[0].health,Is.EqualTo(42));}
         [Test] public void RouteResourcesAndProductionProgressRoundTrip(){var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(new FormalSaveData{spiritIron=7,flyingSword=3,boneSteel=9,biomassConcentrate=4,biologicalWeapon=2,resonanceMetal=8,psionicAmplifier=5,productionProgress=new[]{1f,2f,3f}}));Assert.That(restored.spiritIron,Is.EqualTo(7));Assert.That(restored.biologicalWeapon,Is.EqualTo(2));Assert.That(restored.psionicAmplifier,Is.EqualTo(5));Assert.That(restored.productionProgress,Is.EqualTo(new[]{1f,2f,3f}));}
-        [Test] public void ElixirRoundTripsInCurrentSchema(){var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(new FormalSaveData{elixir=4}));Assert.That(restored.schema,Is.EqualTo(26));Assert.That(restored.elixir,Is.EqualTo(4));}
+        [Test] public void ElixirRoundTripsInCurrentSchema(){var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(new FormalSaveData{elixir=4}));Assert.That(restored.schema,Is.EqualTo(27));Assert.That(restored.elixir,Is.EqualTo(4));}
         [Test] public void VersionTwentyTwoPuppetsRoundTrip(){var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(new FormalSaveData{schema=22,puppetProgress=7.5f,puppets=new[]{new FriendlyUnitSnapshot{x=2f,y=-3f,health=91}}}));Assert.That(restored.schema,Is.EqualTo(22));Assert.That(restored.puppetProgress,Is.EqualTo(7.5f));Assert.That(restored.puppets.Length,Is.EqualTo(1));Assert.That(restored.puppets[0].health,Is.EqualTo(91));}
         [Test] public void VersionTwentyThreeBehemothsRoundTrip(){var restored=FormalSaveCodec.Decode(FormalSaveCodec.Encode(new FormalSaveData{schema=23,behemothProgress=11f,behemoths=new[]{new FriendlyUnitSnapshot{x=-4f,y=6f,health=515}}}));Assert.That(restored.schema,Is.EqualTo(23));Assert.That(restored.behemothProgress,Is.EqualTo(11f));Assert.That(restored.behemoths[0].health,Is.EqualTo(515));}
         [Test] public void VersionTwentyFourRallyAndFriendlyLossesRoundTrip()
@@ -68,6 +68,7 @@ namespace WasteCity.Tests
         {
             var data = new FormalSaveData
             {
+                schema = 26,
                 technologyOverloadCooldown = 18f,
                 technologyOverloadBoost = 2f,
                 technologyOverloadLockout = .5f
@@ -79,6 +80,40 @@ namespace WasteCity.Tests
             Assert.That(restored.technologyOverloadCooldown, Is.EqualTo(18f));
             Assert.That(restored.technologyOverloadBoost, Is.EqualTo(2f));
             Assert.That(restored.technologyOverloadLockout, Is.EqualTo(.5f));
+        }
+        [Test] public void VersionTwentySevenCultivationCombatStateRoundTrips()
+        {
+            var data = new FormalSaveData
+            {
+                schema = 27,
+                enemies = new[] { new EnemySnapshot { swordIntentStacks = 11 } },
+                puppets = new[]
+                {
+                    new FriendlyUnitSnapshot
+                    {
+                        health = 120,
+                        maintenanceElapsed = 37.5f,
+                        maintenanceActive = false
+                    }
+                }
+            };
+
+            var restored = FormalSaveCodec.Decode(FormalSaveCodec.Encode(data));
+
+            Assert.That(restored.schema, Is.EqualTo(27));
+            Assert.That(restored.enemies[0].swordIntentStacks, Is.EqualTo(11));
+            Assert.That(restored.puppets[0].maintenanceElapsed, Is.EqualTo(37.5f));
+            Assert.That(restored.puppets[0].maintenanceActive, Is.False);
+        }
+        [Test] public void VersionTwentySixDefaultsCultivationCombatStateSafely()
+        {
+            var restored = FormalSaveCodec.Decode(
+                "{\"schema\":26,\"enemies\":[{\"health\":42}],\"puppets\":[{\"health\":100}]}");
+
+            Assert.That(restored, Is.Not.Null);
+            Assert.That(restored.enemies[0].swordIntentStacks, Is.Zero);
+            Assert.That(restored.puppets[0].maintenanceElapsed, Is.Zero);
+            Assert.That(restored.puppets[0].maintenanceActive, Is.False);
         }
         [Test] public void VersionTwentyFiveDefaultsTechnologyOverloadToReady()
         {

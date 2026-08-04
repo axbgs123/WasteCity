@@ -14,6 +14,8 @@ namespace WasteCity.Combat
     {
         public float x, y;
         public int health;
+        public float maintenanceElapsed;
+        public bool maintenanceActive;
     }
 
     public sealed class FormalFriendlyUnitController : MonoBehaviour
@@ -101,7 +103,7 @@ namespace WasteCity.Combat
             VisualSlot.Attach(rallyMarker, "core.command.rally-point", renderer, renderer.color);
         }
 
-        private PlaceholderPuppet SpawnPuppet(Vector2? restoredPosition = null, int restoredHealth = -1)
+        private PlaceholderPuppet SpawnPuppet(Vector2? restoredPosition = null, int restoredHealth = -1, float maintenanceElapsed = 0f, bool maintenanceActive = true)
         {
             if (square == null) square = Sprite.Create(Texture2D.whiteTexture, new Rect(0, 0, 1, 1), Vector2.one * .5f, 1f);
             float angle = spawnSequence++ * 137.5f * Mathf.Deg2Rad;
@@ -114,7 +116,7 @@ namespace WasteCity.Combat
             VisualSlot.Attach(item, "cultivation.unit.puppet", renderer, renderer.color);
             item.AddComponent<HealthComponent>();
             var puppet = item.AddComponent<PlaceholderPuppet>();
-            puppet.Configure(city.transform, restoredHealth, research, Commands, economy?.Inventory);
+            puppet.Configure(city.transform, restoredHealth, research, Commands, economy?.Inventory, maintenanceElapsed, maintenanceActive);
             return puppet;
         }
 
@@ -133,17 +135,17 @@ namespace WasteCity.Combat
         {
             var values = FindObjectsOfType<PlaceholderPuppet>();
             var result = new FriendlyUnitSnapshot[values.Length];
-            for (int i = 0; i < values.Length; i++) result[i] = new FriendlyUnitSnapshot { x = values[i].transform.position.x, y = values[i].transform.position.y, health = values[i].Health.Value.Current };
+            for (int i = 0; i < values.Length; i++) result[i] = new FriendlyUnitSnapshot { x = values[i].transform.position.x, y = values[i].transform.position.y, health = values[i].Health.Value.Current, maintenanceElapsed = values[i].Maintenance.Elapsed, maintenanceActive = values[i].Maintenance.Active };
             return result;
         }
 
-        public void Restore(float progress, FriendlyUnitSnapshot[] snapshots)
+        public void Restore(float progress, FriendlyUnitSnapshot[] snapshots, int schema)
         {
             fabrication.Restore(progress);
             foreach (var existing in FindObjectsOfType<PlaceholderPuppet>()) Destroy(existing.gameObject);
             spawnSequence = 0;
             if (snapshots == null) return;
-            foreach (var value in snapshots) SpawnPuppet(new Vector2(value.x, value.y), value.health);
+            foreach (var value in snapshots) SpawnPuppet(new Vector2(value.x, value.y), value.health, schema >= 27 ? value.maintenanceElapsed : 0f, schema < 27 || value.maintenanceActive);
         }
 
         public FriendlyUnitSnapshot[] CaptureBehemoths()

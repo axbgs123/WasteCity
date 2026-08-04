@@ -492,6 +492,94 @@ namespace WasteCity.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator CultivationState_SaveRestorePreservesHostileSwordIntent()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 27;
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    x = 2f,
+                    y = -1f,
+                    swordIntentStacks = 11
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(value => !value.IsControlled);
+
+            Assert.That(restoredEnemy.SwordIntent.Stacks, Is.EqualTo(11));
+            EnemySnapshot captured = saves.CaptureComplete().enemies.Single(value => !value.controlled);
+            Assert.That(captured.swordIntentStacks, Is.EqualTo(11));
+        }
+
+        [UnityTest]
+        public IEnumerator CultivationState_VersionTwentySixDoesNotRestoreSwordIntent()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 26;
+            data.enemies = new[]
+            {
+                new EnemySnapshot
+                {
+                    archetype = (int)EnemyArchetype.Gnawer,
+                    quality = (int)EnemyQuality.Ordinary,
+                    health = 60,
+                    swordIntentStacks = 11
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var restoredEnemy = Object.FindObjectsOfType<PlaceholderEnemy>().Single(value => !value.IsControlled);
+
+            Assert.That(restoredEnemy.SwordIntent.Stacks, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator CultivationState_SaveRestorePreservesDormantPuppetMaintenance()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var data = saves.CaptureComplete();
+            data.schema = 27;
+            data.energyCrystal = 0;
+            data.puppets = new[]
+            {
+                new FriendlyUnitSnapshot
+                {
+                    x = 3f,
+                    y = -2f,
+                    health = 120,
+                    maintenanceElapsed = 60f,
+                    maintenanceActive = false
+                }
+            };
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            var puppet = Object.FindObjectsOfType<PlaceholderPuppet>().Single();
+
+            Assert.That(puppet.Maintenance.Active, Is.False);
+            Assert.That(puppet.Maintenance.Elapsed, Is.EqualTo(60f));
+            FriendlyUnitSnapshot captured = saves.CaptureComplete().puppets.Single();
+            Assert.That(captured.maintenanceActive, Is.False);
+            Assert.That(captured.maintenanceElapsed, Is.EqualTo(60f));
+        }
+
+        [UnityTest]
         public IEnumerator TechnologyOverload_RequiresEnergyWeaponsAndUsesStableMarker()
         {
             var city = new GameObject("TechnologyOverloadCity");

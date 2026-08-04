@@ -62,7 +62,7 @@ namespace WasteCity.Persistence
             if(data.schema>=24)friendlyUnits.RestoreCommandState(data.rallyFixed,data.rallyX,data.rallyY,data.puppetLosses,data.behemothLosses,data.controlledLosses);
             else friendlyUnits.RestoreCommandState(false,0f,0f,0,0,0);
             bool applied=Apply(data,preserveObservation);
-            if(applied&&data.schema>=22)friendlyUnits.Restore(data.puppetProgress,data.puppets);
+            if(applied&&data.schema>=22)friendlyUnits.Restore(data.puppetProgress,data.puppets,data.schema);
             if(applied&&data.schema>=23)friendlyUnits.RestoreBehemoths(data.behemothProgress,data.behemoths);
             return applied;
         }
