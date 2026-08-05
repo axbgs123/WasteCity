@@ -297,6 +297,8 @@ namespace WasteCity.Tests
                 smelter.Progress.BaseDuration,
                 1d,
                 BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(new[] { work }, out _),
+                Is.True);
             Assert.That(session.TryLockEvacuationWork(new[] { work }, out _),
                 Is.True);
 

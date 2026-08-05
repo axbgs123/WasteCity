@@ -1075,13 +1075,16 @@ namespace WasteCity.Tests
                 Is.EqualTo(2));
             Assert.That(session.CompletedBuildingCount(BuildingCatalog.Housing.Id.Value),
                 Is.EqualTo(1));
+            BuildingEvacuationWork abandon = BuildingEvacuationRules.Create(
+                ruined.StableInstanceId,
+                ruined.Placement.Definition.Cost,
+                ruined.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(session.TryCaptureEvacuationWork(new[] { abandon }, out _),
+                Is.True);
             Assert.That(session.TryCommitEvacuation(
-                BuildingEvacuationRules.Create(
-                    ruined.StableInstanceId,
-                    ruined.Placement.Definition.Cost,
-                    ruined.Progress.BaseDuration,
-                    1d,
-                    BuildingEvacuationTreatment.Abandon),
+                abandon,
                 presentation,
                 out int refund,
                 out _), Is.True);
@@ -1092,6 +1095,8 @@ namespace WasteCity.Tests
                 ground.Progress.BaseDuration,
                 1d,
                 BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(new[] { full }, out _),
+                Is.True);
             Assert.That(session.TryLockEvacuationWork(new[] { full }, out _),
                 Is.True);
 

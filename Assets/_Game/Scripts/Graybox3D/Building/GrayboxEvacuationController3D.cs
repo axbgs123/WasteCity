@@ -137,9 +137,11 @@ namespace WasteCity.Graybox3D.Building
                         out BuildingEvacuationTreatment treatment) ||
                     treatment == BuildingEvacuationTreatment.Unassigned)
                     return false;
-                double remainingRatio = instance.Progress.BaseDuration <= 0f
+                double remainingRatio = instance.State ==
+                    GrayboxBuildingInstanceState.Completed
                     ? 1d
-                    : instance.Progress.Remaining / instance.Progress.BaseDuration;
+                    : instance.Progress.Remaining /
+                      instance.Progress.BaseDuration;
                 work.Add(BuildingEvacuationRules.Create(
                     instance.StableInstanceId,
                     instance.Placement.Definition.Cost,
@@ -149,14 +151,19 @@ namespace WasteCity.Graybox3D.Building
             }
             IReadOnlyList<BuildingEvacuationWork> sorted =
                 BuildingEvacuationRules.CreateStableFullDismantleQueue(work);
-            for (var index = 0; index < sorted.Count; index++)
+            if (!session.TryCaptureEvacuationWork(work, out _))
             {
-                fullQueue.Add(sorted[index]);
-                rollbackWork.Add(sorted[index]);
+                ClearWorkOnly();
+                return false;
             }
+            for (var index = 0; index < sorted.Count; index++)
+                fullQueue.Add(sorted[index]);
+            for (var index = 0; index < work.Count; index++)
+                rollbackWork.Add(work[index]);
             if (fullQueue.Count > 0 &&
                 !session.TryLockEvacuationWork(fullQueue, out _))
             {
+                session.RollbackEvacuationLocksAfterFailure(rollbackWork);
                 ClearWorkOnly();
                 return false;
             }
@@ -174,6 +181,7 @@ namespace WasteCity.Graybox3D.Building
                         FailProcessing();
                         return false;
                     }
+                    rollbackWork.Remove(item);
                 }
             }
             catch

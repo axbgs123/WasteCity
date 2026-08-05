@@ -121,9 +121,12 @@ namespace WasteCity.Tests
                 wall.Progress.BaseDuration,
                 1d,
                 BuildingEvacuationTreatment.FullDismantle);
+            string failure;
 
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out failure), Is.True, failure);
             Assert.That(session.TryLockEvacuationWork(
-                new[] { work }, out string failure), Is.True, failure);
+                new[] { work }, out failure), Is.True, failure);
             Assert.That(wall.IsEvacuationLocked, Is.True);
             Assert.That(session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
                 Is.Zero);
@@ -156,9 +159,12 @@ namespace WasteCity.Tests
                 wall.Progress.BaseDuration,
                 1d,
                 BuildingEvacuationTreatment.Abandon);
+            string failure;
 
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out failure), Is.True, failure);
             Assert.That(session.TryCommitEvacuation(
-                work, presentation, out int refund, out string failure),
+                work, presentation, out int refund, out failure),
                 Is.True, failure);
             Assert.That(refund, Is.Zero);
             Assert.That(wall.State, Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
@@ -166,6 +172,53 @@ namespace WasteCity.Tests
             Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.True);
             Assert.That(session.Inventory.Get(BuildingCatalog.Wall.CostId),
                 Is.EqualTo(stoneBefore));
+        }
+
+        [Test]
+        public void Session_QuickCommitRejectsFabricatedWorkAndConsumesOnlyCapturedSnapshot()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D wall = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                10,
+                10,
+                presentation);
+            BuildingEvacuationWork captured = BuildingEvacuationRules.Create(
+                wall.StableInstanceId,
+                wall.Placement.Definition.Cost,
+                wall.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+            BuildingEvacuationWork fabricated = BuildingEvacuationRules.Create(
+                wall.StableInstanceId,
+                wall.Placement.Definition.Cost + 100,
+                wall.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { fabricated }, out string rejectedCaptureFailure),
+                Is.False);
+            Assert.That(rejectedCaptureFailure, Is.Not.Empty);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { captured }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryCommitEvacuation(
+                fabricated, presentation, out int fabricatedRefund,
+                out string failure), Is.False);
+            Assert.That(fabricatedRefund, Is.Zero);
+            Assert.That(failure, Is.Not.Empty);
+            Assert.That(session.Instances.Contains(wall), Is.True);
+            Assert.That(session.TryCommitEvacuation(
+                captured, presentation, out int acceptedRefund,
+                out failure), Is.True, failure);
+            Assert.That(acceptedRefund, Is.EqualTo(captured.Refund));
+            Assert.That(session.TryCommitEvacuation(
+                captured, presentation, out _, out failure), Is.False);
+            Assert.That(failure, Is.Not.Empty);
         }
 
         [Test]
@@ -220,6 +273,10 @@ namespace WasteCity.Tests
                 BuildingEvacuationTreatment.FullDismantle), Is.True);
             Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
             Assert.That(ground.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Controller.Assign(
+                ground.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.False);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.False);
             Assert.That(fixture.Session.CompletedBuildingCount(
                 BuildingCatalog.Wall.Id.Value), Is.Zero);
 
@@ -232,6 +289,60 @@ namespace WasteCity.Tests
 
             Assert.That(fixture.Session.Instances.Contains(ground), Is.False);
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
+        [Test]
+        public void Session_FullLockValidationForLaterItemLeavesEarlierItemUnlocked()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D first = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, presentation);
+            BuildingEvacuationWork firstWork = BuildingEvacuationRules.Create(
+                first.StableInstanceId, first.Placement.Definition.Cost,
+                first.Progress.BaseDuration, 1d,
+                BuildingEvacuationTreatment.FullDismantle);
+            BuildingEvacuationWork invalidSecond = BuildingEvacuationRules.Create(
+                second.StableInstanceId, second.Placement.Definition.Cost,
+                second.Progress.BaseDuration, 1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { firstWork }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryLockEvacuationWork(
+                new[] { firstWork, invalidSecond }, out string failure),
+                Is.False);
+            Assert.That(failure, Is.Not.Empty);
+            Assert.That(first.IsEvacuationLocked, Is.False);
+            Assert.That(second.IsEvacuationLocked, Is.False);
+        }
+
+        [Test]
+        public void Controller_UnassignedBlocksConfirmationAndNoGroundDelegatesOnce()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.False);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+
+            EvacuationFixture emptyFixture = CreateFixture();
+            Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(emptyFixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.False);
         }
 
         private GrayboxBuildingSession3D CreateSession()

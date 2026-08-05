@@ -98,6 +98,8 @@ namespace WasteCity.Graybox3D.Building
         private List<GrayboxBuildingInstance3D> instances;
         private readonly Dictionary<string, BuildingEvacuationWork> evacuationLocks =
             new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
+        private readonly Dictionary<string, BuildingEvacuationWork> evacuationSnapshots =
+            new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
@@ -143,6 +145,7 @@ namespace WasteCity.Graybox3D.Building
             contactedRoutes.Clear();
             instances = new List<GrayboxBuildingInstance3D>();
             evacuationLocks.Clear();
+            evacuationSnapshots.Clear();
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
@@ -401,7 +404,11 @@ namespace WasteCity.Graybox3D.Building
                     !seen.Add(work.StableInstanceId) || instanceIndex < 0 ||
                     !IsEligibleGroundInstance(instances[instanceIndex]) ||
                     instances[instanceIndex].IsEvacuationLocked ||
-                    evacuationLocks.ContainsKey(work.StableInstanceId))
+                    evacuationLocks.ContainsKey(work.StableInstanceId) ||
+                    !evacuationSnapshots.TryGetValue(
+                        work.StableInstanceId,
+                        out BuildingEvacuationWork captured) ||
+                    !captured.Equals(work))
                 {
                     failureReason = "完整拆除项目无效";
                     return false;
@@ -439,6 +446,53 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryCaptureEvacuationWork(
+            IReadOnlyList<BuildingEvacuationWork> evacuationWork,
+            out string failureReason)
+        {
+            EnsureConfigured();
+            failureReason = string.Empty;
+            if (evacuationWork == null || evacuationWork.Count == 0)
+            {
+                failureReason = "撤离快照为空";
+                return false;
+            }
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < evacuationWork.Count; index++)
+            {
+                BuildingEvacuationWork work = evacuationWork[index];
+                int instanceIndex = FindInstanceIndex(work.StableInstanceId);
+                GrayboxBuildingInstance3D instance = instanceIndex < 0
+                    ? null
+                    : instances[instanceIndex];
+                BuildingEvacuationWork expected = instance == null
+                    ? default(BuildingEvacuationWork)
+                    : BuildingEvacuationRules.Create(
+                        instance.StableInstanceId,
+                        instance.Placement.Definition.Cost,
+                        instance.Progress.BaseDuration,
+                        EvacuationRemainingRatio(instance),
+                        work.Treatment);
+                if (work.Treatment == BuildingEvacuationTreatment.Unassigned ||
+                    !Enum.IsDefined(typeof(BuildingEvacuationTreatment),
+                        work.Treatment) ||
+                    !seen.Add(work.StableInstanceId) || instance == null ||
+                    !IsEligibleGroundInstance(instance) ||
+                    instance.IsEvacuationLocked ||
+                    evacuationSnapshots.ContainsKey(work.StableInstanceId) ||
+                    !expected.Equals(work))
+                {
+                    failureReason = "撤离快照无效";
+                    return false;
+                }
+            }
+            for (var index = 0; index < evacuationWork.Count; index++)
+                evacuationSnapshots.Add(
+                    evacuationWork[index].StableInstanceId,
+                    evacuationWork[index]);
+            return true;
+        }
+
         public void RollbackEvacuationLocksAfterFailure(
             IReadOnlyList<BuildingEvacuationWork> fullDismantleWork)
         {
@@ -447,14 +501,15 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < fullDismantleWork.Count; index++)
             {
                 BuildingEvacuationWork work = fullDismantleWork[index];
-                if (!evacuationLocks.TryGetValue(
+                if (!evacuationSnapshots.TryGetValue(
                         work.StableInstanceId,
                         out BuildingEvacuationWork captured) ||
                     !captured.Equals(work))
                     continue;
-                evacuationLocks.Remove(work.StableInstanceId);
+                evacuationSnapshots.Remove(work.StableInstanceId);
+                bool wasLocked = evacuationLocks.Remove(work.StableInstanceId);
                 int instanceIndex = FindInstanceIndex(work.StableInstanceId);
-                if (instanceIndex < 0) continue;
+                if (instanceIndex < 0 || !wasLocked) continue;
                 GrayboxBuildingInstance3D instance = instances[instanceIndex];
                 bool countedAfter = instance.State ==
                     GrayboxBuildingInstanceState.Completed &&
@@ -485,6 +540,16 @@ namespace WasteCity.Graybox3D.Building
             }
 
             GrayboxBuildingInstance3D instance = instances[instanceIndex];
+            if (!Enum.IsDefined(typeof(BuildingEvacuationTreatment),
+                    work.Treatment) ||
+                !evacuationSnapshots.TryGetValue(
+                    work.StableInstanceId,
+                    out BuildingEvacuationWork snapshot) ||
+                !snapshot.Equals(work))
+            {
+                failureReason = "撤离快照不匹配";
+                return false;
+            }
             if (work.Treatment == BuildingEvacuationTreatment.FullDismantle &&
                 (!evacuationLocks.TryGetValue(
                     work.StableInstanceId,
@@ -641,6 +706,7 @@ namespace WasteCity.Graybox3D.Building
                 throw;
             }
             if (wasCounted) AdvanceCatalogRevision();
+            evacuationSnapshots.Remove(instance.StableInstanceId);
             failureReason = string.Empty;
             return true;
         }
@@ -690,6 +756,7 @@ namespace WasteCity.Graybox3D.Building
                     work.Refund);
                 instances.RemoveAt(instanceIndex);
                 evacuationLocks.Remove(work.StableInstanceId);
+                evacuationSnapshots.Remove(work.StableInstanceId);
             }
             catch
             {
@@ -727,6 +794,15 @@ namespace WasteCity.Graybox3D.Building
                    instance.State == GrayboxBuildingInstanceState.Completed &&
                    instance.IsPlayerOwned &&
                    !instance.IsEvacuationLocked;
+        }
+
+        private static double EvacuationRemainingRatio(
+            GrayboxBuildingInstance3D instance)
+        {
+            return instance.State == GrayboxBuildingInstanceState.Completed
+                ? 1d
+                : instance.Progress.Remaining /
+                  instance.Progress.BaseDuration;
         }
 
         private BuildingPlacementRequest RefreshRequest(
