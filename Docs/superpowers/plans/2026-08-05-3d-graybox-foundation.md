@@ -643,8 +643,11 @@ git commit -m "feat: add combined graybox world visuals"
 - Create: `Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs.meta`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/WasteCity.EditModeTests.asmdef`
 
 - [ ] **Step 1：写两个属性独立恢复的失败测试**
+
+给 `WasteCity.EditModeTests.asmdef` 增加对 `Unity.RenderPipelines.Universal.Runtime` 的直接引用；asmdef 引用不传递，测试直接使用 `UniversalRenderPipelineAsset` 时不能只依赖 `WasteCity.Graybox3D` 的引用。
 
 每个测试 `SetUp` 记录原 Graphics/Quality 引用，`TearDown` 无条件恢复测试前引用并销毁临时 Asset。覆盖：
 
@@ -778,7 +781,8 @@ git add \
   Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs \
   Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs.meta \
   Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs \
-  Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs.meta
+  Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs.meta \
+  Assets/_Game/Tests/EditMode/WasteCity.EditModeTests.asmdef
 git diff --cached --name-only
 git commit -m "feat: add scene scoped urp ownership"
 ```
