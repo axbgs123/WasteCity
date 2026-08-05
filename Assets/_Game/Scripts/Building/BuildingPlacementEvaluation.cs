@@ -143,12 +143,14 @@ namespace WasteCity.Building
             var footprint = new List<BuildingCell>();
             var hasDefinition = request.Definition != null;
             var hasGrid = request.Grid != null;
+            var hasValidOrientation = Enum.IsDefined(typeof(BuildingOrientation), request.Orientation);
             var rotatedWidth = 0;
             var rotatedHeight = 0;
 
-            if (!hasDefinition || !hasGrid) failures.Add(BuildingPlacementFailure.MissingReference);
+            if (!hasDefinition || !hasGrid || !hasValidOrientation)
+                failures.Add(BuildingPlacementFailure.MissingReference);
 
-            if (hasDefinition)
+            if (hasDefinition && hasValidOrientation)
             {
                 rotatedWidth = BuildingOrientationRules.Width(request.Definition, request.Orientation);
                 rotatedHeight = BuildingOrientationRules.Height(request.Definition, request.Orientation);
@@ -159,18 +161,19 @@ namespace WasteCity.Building
 
             if (!request.ProjectionSucceeded) failures.Add(BuildingPlacementFailure.ProjectionFailed);
 
-            var footprintInBounds = hasDefinition && hasGrid &&
+            var footprintInBounds = hasDefinition && hasGrid && hasValidOrientation &&
                 (request.Site == BuildingSite.InnerCity
                     ? BuildingRangeRules.IsInnerFootprintInBounds(request.Definition, request.X, request.Y, request.Orientation)
                     : request.Grid.ContainsFootprint(request.Definition, request.X, request.Y, request.Orientation));
-            if (hasDefinition && hasGrid && !footprintInBounds) failures.Add(BuildingPlacementFailure.OutOfBounds);
+            if (hasDefinition && hasGrid && hasValidOrientation && !footprintInBounds)
+                failures.Add(BuildingPlacementFailure.OutOfBounds);
 
             var supportsSite = hasDefinition && BuildingMobilityRules.SupportsSite(request.Definition, request.Site);
             if (hasDefinition && !supportsSite) failures.Add(BuildingPlacementFailure.UnsupportedSite);
             if (supportsSite && !BuildingMobilityRules.CanConstruct(request.Definition, request.Site, request.CityMode))
                 failures.Add(BuildingPlacementFailure.InvalidCityMode);
 
-            if (hasDefinition && request.Site == BuildingSite.Ground && !IsGroundFootprintInRange(request, footprint))
+            if (hasDefinition && hasValidOrientation && request.Site == BuildingSite.Ground && !IsGroundFootprintInRange(request, footprint))
                 failures.Add(BuildingPlacementFailure.OutsideBuildRange);
             if (hasGrid && footprintInBounds && IsAnyFootprintCellOccupied(request.Grid, footprint))
                 failures.Add(BuildingPlacementFailure.Overlap);

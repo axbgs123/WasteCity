@@ -32,6 +32,20 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InvalidOrientationReportsMissingReferenceInsteadOfNorthPlacement()
+        {
+            var evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(orientation: (BuildingOrientation)99));
+
+            Assert.That(evaluation.IsValid, Is.False);
+            Assert.That(evaluation.PrimaryFailure, Is.EqualTo(BuildingPlacementFailure.MissingReference));
+            Assert.That(evaluation.Failures, Is.EqualTo(new[] { BuildingPlacementFailure.MissingReference }));
+            Assert.That(evaluation.RotatedWidth, Is.Zero);
+            Assert.That(evaluation.RotatedHeight, Is.Zero);
+            Assert.That(evaluation.Footprint, Is.Empty);
+        }
+
+        [Test]
         public void FailedProjectionReportsProjectionFailure()
         {
             AssertFailures(
@@ -215,6 +229,66 @@ namespace WasteCity.Tests
                     BuildingPlacementFailure.ContentUnavailable,
                     BuildingPlacementFailure.PopulationRequired,
                     BuildingPlacementFailure.PrerequisiteBuildingRequired,
+                    BuildingPlacementFailure.InsufficientMaterials
+                }));
+        }
+
+        [Test]
+        public void MissingReferencePrecedesProjectionAndEveryCompatibleLaterFailure()
+        {
+            var evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(
+                    useDefaultDefinition: false,
+                    projectionSucceeded: false,
+                    footprintTouchesCity: true,
+                    terrainPassable: false,
+                    obstacleFree: false,
+                    contentVisible: false,
+                    canAfford: false));
+
+            Assert.That(
+                evaluation.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.MissingReference,
+                    BuildingPlacementFailure.ProjectionFailed,
+                    BuildingPlacementFailure.CityOccupied,
+                    BuildingPlacementFailure.InvalidTerrain,
+                    BuildingPlacementFailure.Obstacle,
+                    BuildingPlacementFailure.ContentUnavailable,
+                    BuildingPlacementFailure.InsufficientMaterials
+                }));
+        }
+
+        [Test]
+        public void ProjectionOutOfBoundsAndUnsupportedSiteUseTheirApprovedOrder()
+        {
+            var groundOnly = new BuildingDefinition("test.building.boundary", "Boundary", 2, 2, ResourceIds.Alloy, 1);
+
+            var evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(
+                    definition: groundOnly,
+                    site: BuildingSite.InnerCity,
+                    x: 7,
+                    y: 5,
+                    projectionSucceeded: false,
+                    footprintTouchesCity: true,
+                    terrainPassable: false,
+                    obstacleFree: false,
+                    contentVisible: false,
+                    canAfford: false));
+
+            Assert.That(
+                evaluation.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.ProjectionFailed,
+                    BuildingPlacementFailure.OutOfBounds,
+                    BuildingPlacementFailure.UnsupportedSite,
+                    BuildingPlacementFailure.CityOccupied,
+                    BuildingPlacementFailure.InvalidTerrain,
+                    BuildingPlacementFailure.Obstacle,
+                    BuildingPlacementFailure.ContentUnavailable,
                     BuildingPlacementFailure.InsufficientMaterials
                 }));
         }
