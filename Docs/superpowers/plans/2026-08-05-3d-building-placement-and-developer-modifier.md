@@ -509,6 +509,7 @@ namespace WasteCity.Graybox3D.Building
         public ConstructionProgress Progress { get; }
         public GrayboxBuildingInstanceState State { get; }
         public bool IsPlayerOwned { get; }
+        public bool IsEvacuationLocked { get; }
     }
 
     public interface IGrayboxBuildingPresentation3D
@@ -532,6 +533,7 @@ namespace WasteCity.Graybox3D.Building
         public int GroundBuildRadius { get; }
         public float ConstructionMultiplier { get; }
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances { get; }
+        public int CompletedBuildingCount(string id);
 
         public void Configure(bool developmentFixtureEnabled);
         public void ConfigureDevelopmentFixture();
@@ -553,9 +555,13 @@ namespace WasteCity.Graybox3D.Building
         public bool HasPlayerOwnedGroundInstances { get; }
         public void CopyPlayerOwnedGroundInstances(
             List<GrayboxBuildingInstance3D> destination);
+        public bool TryLockEvacuationWork(
+            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork,
+            out string failureReason);
+        public void RollbackEvacuationLocksAfterFailure(
+            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork);
         public bool TryCommitEvacuation(
-            string stableInstanceId,
-            BuildingEvacuationTreatment treatment,
+            in BuildingEvacuationWork work,
             IGrayboxBuildingPresentation3D presentation,
             out int acceptedRefund,
             out string failureReason);
@@ -683,13 +689,17 @@ namespace WasteCity.Graybox3D.Building
 
 Evacuation session rules:
 
+- `CompletedBuildingCount(id)` returns zero for a null, empty or unknown stable definition ID. Otherwise it counts both Ground and InnerCity instances only when the definition ID matches, `IsPlayerOwned == true`, `State == Completed`, and `IsEvacuationLocked == false`. `UnderConstruction`, `AbandonedRuin`, every locked full-dismantle item, and an item currently being dismantled never satisfy a prerequisite.
 - `CopyPlayerOwnedGroundInstances` requires a non-null caller-owned list, clears it, then appends only player-owned Ground instances in ordinal stable-instance-ID order; it never exposes the mutable backing list.
 - `HasPlayerOwnedGroundInstances` performs the same ownership/site predicate without allocation.
-- `TryCommitEvacuation` rejects null/unknown IDs, InnerCity instances, non-owned instances, `Unassigned`, and a presentation mismatch with a non-empty failure reason and no mutation.
+- `TryLockEvacuationWork` accepts only non-null, non-empty, duplicate-free `FullDismantle` work for currently owned Ground instances. It first validates every item and calculates no new refund or duration, then copies the exact immutable structs into a private stable-ID lock table and marks all matching instances locked. A validation failure returns false with no locks; an exception rolls back every lock created by that call before rethrowing. Thus confirmation can never leave a partial lock set.
+- `RollbackEvacuationLocksAfterFailure` accepts only the controller's current suffix/list of still-locked exact work snapshots and exists solely for confirmation/commit failure cleanup before processing can continue. The controller removes a work item from that rollback buffer only after a successful commit. The method is not exposed through UI and does not create a player cancellation path after a manifest has been confirmed.
+- `TryCommitEvacuation(in work, ...)` rejects an empty/unknown ID, InnerCity or non-owned instance, `Unassigned`, and a presentation mismatch with a non-empty failure reason and no mutation. For `FullDismantle`, it additionally requires the instance to be locked and every field of `work` to equal the private snapshot captured by `TryLockEvacuationWork`; it consumes that snapshot on success and never calls `BuildingEvacuationRules.Create` again.
 - Abandon changes ownership/state to `AbandonedRuin`, preserves the original `PlacedBuilding` and occupied cells, gives zero refund, then updates the same presentation.
-- QuickDismantle and a FullDismantle whose timer has already completed calculate their ratio through `BuildingEvacuationRules.Create`, remove the exact grid placement, credit only the amount accepted by `ResourceInventory.Add`, remove the session instance, and remove its presentation.
-- A mutation/presentation exception rolls back ownership/state or list position, grid occupancy, and accepted refund before rethrowing. If presentation recreation during rollback fails, throw an `InvalidOperationException` containing both failures. A normal validation failure returns false and never partially mutates.
-- The evacuation controller may call `TryCommitEvacuation(FullDismantle, ...)` only after its stable queue timer reaches zero. Session methods do not own or advance the timer.
+- QuickDismantle commits its freshly created work immediately. A locked FullDismantle commits only after its stable queue timer reaches zero. Both use the work snapshot's refund and duration, remove the exact grid placement, credit only the amount accepted by `ResourceInventory.Add`, remove the session instance, and remove its presentation.
+- `TickConstruction` skips every `IsEvacuationLocked` instance before calling `ConstructionProgress.Tick`, including full-dismantle work waiting later in the queue. Pausing stops the evacuation timer; it cannot allow locked construction to progress or complete.
+- A mutation/presentation exception rolls back ownership/state or list position, grid occupancy, accepted refund, and the current lock snapshot before rethrowing. If presentation recreation during rollback fails, throw an `InvalidOperationException` containing both failures. The controller catches confirmation/commit failure, calls `RollbackEvacuationLocksAfterFailure` for every remaining queued work item, clears its queue, and returns to the open manifest without leaving a lock. A normal validation failure never partially mutates.
+- The evacuation controller may call `TryCommitEvacuation(in fullWork, ...)` only after that exact stable queue item's timer reaches zero. Session methods do not own or advance the timer.
 - The controller allocates its manifest/work buffers once during `Configure` and reuses them with `CopyPlayerOwnedGroundInstances`; normal `Tick` performs no LINQ, list creation or category-map construction.
 
 Ground evaluation details are fixed:
@@ -776,6 +786,8 @@ namespace WasteCity.Graybox3D.Building
 ```
 
 只有 `Fortress` 收起且存在玩家拥有的外城完成建筑或施工点时打开清单。遗弃立即变为无功能、非玩家所有但仍占格的遗迹；快速拆除立即移除；完整拆除按稳定实例 ID 排序逐个推进。所有玩家拥有的外城实例处理完成后，仅调用既有精确 API `city.TryToggleDeployment(out _)` 继续 Packing。内城实例不进入清单并随城市移动。
+
+`ConfirmManifest()` 先从当前实例状态为每个已分配条目创建一次不可变 `BuildingEvacuationWork`；其中所有 `FullDismantle` work 按稳定实例 ID 排序，并在任何遗弃/快速提交或计时开始前用一次 `TryLockEvacuationWork` 原子锁定。锁定中途失败时确认返回 false、清空临时 work 且零实例留锁。锁成功后 Abandon/Quick 仍在确认阶段立即提交，Full work 使用原快照逐项计时和提交；队列后项从确认成功起也已锁定。异常或提交失败会进入唯一的失败回滚路径，释放当前及所有尚未处理 work 的锁并回到清单，不增加“取消已确认撤离”操作。
 
 ### 2.6 UGUI, input and developer modifier
 
@@ -896,7 +908,7 @@ namespace WasteCity.Graybox3D.Building
 #endif
 ```
 
-`GrayboxDeveloperModifierBootstrap3D` 的类型、序列化字段和 `ResolveRuntimeAvailability` 在所有构建存在。Release 的 `Awake`、`TryTogglePanel` 不创建 UI、不读 F10、不创建命令服务，并返回不可用。条件编译类型绝不出现在场景序列化字段、Prefab 或 ScriptableObject 中。
+`GrayboxDeveloperModifierBootstrap3D` 的类型、序列化字段和 `ResolveRuntimeAvailability` 在所有构建存在。它在任何构建的 `Awake`、`Update` 或其他生命周期方法中都不读取 `Keyboard.current`/F10；它只提供 `TryTogglePanel` 和受条件编译保护的服务创建。Release 的 `Awake`、`TryTogglePanel` 不创建 UI、不创建命令服务，并返回不可用。唯一 F10 读取者是 `GrayboxBuildingInputRouter3D.ProcessCurrentInput`，且读取发生在 UGUI 键盘焦点与模态输入处理之后。条件编译类型绝不出现在场景序列化字段、Prefab 或 ScriptableObject 中。
 
 Menu and callback ownership:
 
@@ -926,13 +938,13 @@ Runtime serialization rules:
 | 旋转兼容旧 API | 1, 2, 5, 11 | 四方向 footprint；旧 API North；真实 R 输入 |
 | 外城 8/12/24 与内城 8×6 | 2, 5, 10, 11 | 边界/坐标单测；场景平台；真实鼠标自动选面 |
 | 有序合法性和节点高亮 | 2, 5, 11 | 每个失败原因独立；预览重评估；采矿节点 |
-| 正式有限资源、研究、前置、人口 | 3, 4, 8, 11 | fixture 精确值；同一模型命令；耗尽红预览 |
+| 正式有限资源、研究、前置、人口 | 3, 4, 7, 8, 11 | fixture 精确值；Completed-only 前置计数；同一模型命令；耗尽红预览 |
 | 原子扣款、占格、施工和连续放置 | 4, 5, 11 | 回滚故障注入；真实施工完成；连续选择保留 |
 | AwayFromZero 退款 | 4, 7 | 小于/等于/大于 0.5；每资源限幅 |
-| 遗弃/完整/快速与混合撤离 | 7, 9, 11 | 规则、稳定队列、单体/类别/全部真实流程 |
+| 遗弃/完整/快速与混合撤离 | 7, 9, 11 | 原子快照锁、施工跳过、稳定队列、单体/类别/全部真实流程 |
 | 全部处理后恢复 Packing | 7, 9, 11 | 只调用既有城市切换；真实控制目标回 City |
 | Catalog `returnState` | 3, 6, 9, 11 | 两种来源、选择/方向保留、多级 Esc |
-| UGUI 键盘焦点不穿透 | 6, 9, 11 | 真实 EventSystem；headless 虚拟全键集合 |
+| UGUI 键盘焦点不穿透 | 6, 9, 10, 11 | UI action 重载合同；F10 单一读取者；真实 EventSystem/headless 虚拟全键集合 |
 | 建造输入优先且不破坏移动/镜头 | 9, 11 | 右键不自动驾驶；WASD/middle/Home 合同 |
 | Release 惰性、Editor/Development 修改器 | 8, 10, 11, 12 | 条件编译、无条件序列化 bootstrap、三构建、无 Missing Script |
 | 增量 authoring 与既有身份保护 | 10 | 基础合同先验证；首次前后 GlobalObjectId/GUID；第二次内容 hash 幂等 |
@@ -976,6 +988,7 @@ Existing API audit against the approved parent source:
 | `ResearchModel` | `bool IsCompleted(StableId id)`; `string[] CaptureCompleted()`; `void Restore(string[] completedIds, string activeId, float remaining)` |
 | `ConstructionProgress` | `bool Tick(float delta, float productivity)`; `void Restore(float remaining)`; public `BaseDuration`, `Remaining`, `IsComplete`, `Normalized` getters |
 | `GrayboxVisualSlot` | `void Configure(string stableId, MeshRenderer renderer, Color fallbackColor)`; `void ApplyFallback(Material sharedMaterial)` |
+| `InputSystemUIInputModule` 1.7.0 | public `InputActionReference point`, `leftClick`, `move`, `submit`, `cancel` properties; public `void AssignDefaultActions()`; `OnEnable` assigns defaults when all actions are absent and enables the referenced actions |
 
 Any implementation discovery that contradicts this table is a stop gate requiring a plan correction before production edits.
 
@@ -1187,12 +1200,15 @@ git commit -m "feat: project graybox building catalog"
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs.meta`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs`
 
 - [ ] Write RED tests for the exact development fixture values, ground 32×24 and inner 8×6 grids, radius 8, no initial research/routes/prerequisites, and finite inventory.
 
 - [ ] Write RED transaction tests for: successful one-time spend; stable instance ID; one occupied footprint; presentation success; insufficient material leaves all state unchanged; grid failure leaves inventory unchanged; presentation false rolls back grid and full actual spend; presentation exception rolls back then rethrows; retry receives deterministic next stable ID without orphan.
 
 - [ ] Write RED construction tests for paused no progress, illegal mode no progress, legal inner Mobile progress, legal Fortress progress, multiplier 1/10/100, completion retains same stable ID and changes presentation state once.
+
+- [ ] Write RED session/catalog integration tests for prerequisite counts available before evacuation exists. Prove matching Completed Ground and InnerCity instances count, while UnderConstruction, a different definition, and null/empty/unknown IDs return zero and cannot make `GrayboxBuildingCatalogPresenter3D.Describe` unlock a dependent card. Task 7 extends the same tests with non-owned, ruin, and evacuation-lock cases.
 
 - [ ] Write RED refund tests for raw fractions below 0.5, exactly 0.5, and above 0.5; verify `MidpointRounding.AwayFromZero`, handling ratios 1.0/0.8/0.5/0, remaining ratio clamp, original cost clamp, accepted amount limited by `ResourceInventory.Add`, grid release and view removal.
 
@@ -1203,7 +1219,7 @@ git commit -m "feat: project graybox building catalog"
   -batchmode -nographics \
   -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
   -runTests -testPlatform EditMode \
-  -testFilter WasteCity.Tests.GrayboxBuildingSessionTests \
+  -testFilter "WasteCity.Tests.GrayboxBuildingSessionTests;WasteCity.Tests.GrayboxBuildingCatalogTests" \
   -testResults /tmp/wastecity-3d-building/task-04-red.xml \
   -logFile /tmp/wastecity-3d-building/task-04-red.log
 ```
@@ -1222,7 +1238,7 @@ int rounded = (int)Math.Round(
 return Math.Max(0, Math.Min(originalCost, rounded));
 ```
 
-- [ ] Implement the Task 4 session subset: `Configure`, `ConfigureDevelopmentFixture`, `TryBeginConstruction`, `TryCancelConstruction`, `TickConstruction`, route/research development methods, construction multiplier, and complete-all. Do not add `HasPlayerOwnedGroundInstances`, `CopyPlayerOwnedGroundInstances`, or `TryCommitEvacuation` until Task 7 creates the evacuation rule behavior and modifies the session. Use the `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` persists only the fixture switch, and `Awake` rebuilds the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, or unlock table.
+- [ ] Implement the Task 4 session subset: `Configure`, `ConfigureDevelopmentFixture`, `TryBeginConstruction`, `TryCancelConstruction`, `TickConstruction`, exact `CompletedBuildingCount` semantics, route/research development methods, construction multiplier, and complete-all. At this stage the lock flag is false for every instance; Task 7 adds its only mutation path. Do not add `HasPlayerOwnedGroundInstances`, `CopyPlayerOwnedGroundInstances`, `TryLockEvacuationWork`, `RollbackEvacuationLocksAfterFailure`, or `TryCommitEvacuation` until Task 7 creates the evacuation rule behavior and modifies the session. Use the `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` persists only the fixture switch, and `Awake` rebuilds the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, or unlock table.
 
 - [ ] Run focused GREEN; then run existing `ConstructionProgressTests`, `BuildingGridTests`, `BuildingUnlockTests`, and `ResearchTests`.
 
@@ -1244,6 +1260,7 @@ git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs.meta
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs.meta
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs
 git diff --cached --name-only
 git commit -m "feat: add atomic graybox construction session"
 ```
@@ -1417,12 +1434,14 @@ git commit -m "feat: add graybox building menu state"
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs`
 
 - [ ] Write RED pure-rule tests for completed and incomplete instances under Abandon, FullDismantle and QuickDismantle; assert 0/80/50 handling, 50% duration, remaining-ratio-first calculation, AwayFromZero rounding, clamping, and ordinal stable-ID queue order.
 
-- [ ] Write RED controller tests for: `CopyPlayerOwnedGroundInstances` filtering and stable ordering; `HasPlayerOwnedGroundInstances`; no ground ownership delegates exactly to `city.TryToggleDeployment(out _)`; Fortress with owned ground instances remains Fortress and opens manifest; inner instances never enter manifest; single/category/all assignments can mix; `AssignCategory` agrees with `GrayboxBuildingCatalogPresenter3D.CategoryOf`; unassigned blocks confirmation; abandonment creates a non-owned blocking ruin with zero refund; quick removes immediately; full processes sequentially and pauses at timeScale 0; `TryCommitEvacuation` validation failures leave all state unchanged; presentation exceptions fully roll back or raise the specified compound failure; all resolved invokes existing packing once; Packing later returns city control through existing coordinator behavior.
+- [ ] Write RED controller tests for: `CopyPlayerOwnedGroundInstances` filtering and stable ordering; `HasPlayerOwnedGroundInstances`; no ground ownership delegates exactly to `city.TryToggleDeployment(out _)`; Fortress with owned ground instances remains Fortress and opens manifest; inner instances never enter manifest; single/category/all assignments can mix; `AssignCategory` agrees with `GrayboxBuildingCatalogPresenter3D.CategoryOf`; unassigned blocks confirmation; abandonment creates a non-owned blocking ruin with zero refund; quick removes immediately; all Full work is snapshotted and atomically locked at confirmation; a failure while validating/locking item N leaves items 1..N-1 unlocked; full processes sequentially and pauses at timeScale 0; locked current and later queue items never advance construction; work refund/remaining ratio/duration stay equal to the confirmation snapshot even across elapsed frames; `TryCommitEvacuation(in work, ...)` rejects a mismatched snapshot without recomputing; successful commit consumes its lock; validation or presentation exceptions roll back all remaining queue locks and state or raise the specified compound failure; all resolved invokes existing packing once; Packing later returns city control through existing coordinator behavior. Assert no user action or menu callback cancels a successfully confirmed queue.
 
-- [ ] Include tests that an abandoned ruin still makes `BuildingGrid.IsOccupied` true and cannot produce/operate through the session state, while no new outpost, salvage or recovery semantics appear.
+- [ ] Extend `GrayboxBuildingSessionTests` and `GrayboxBuildingCatalogTests` to prove non-owned Completed, AbandonedRuin, evacuation-locked Completed, and the currently dismantling item never contribute to `CompletedBuildingCount` or unlock a dependent catalog card; both owned, unlocked Completed Ground and InnerCity instances do count. Include tests that an abandoned ruin still makes `BuildingGrid.IsOccupied` true and cannot produce/operate through the session state, while no new outpost, salvage or recovery semantics appear.
 
 - [ ] Run focused RED:
 
@@ -1431,14 +1450,16 @@ git commit -m "feat: add graybox building menu state"
   -batchmode -nographics \
   -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
   -runTests -testPlatform EditMode \
-  -testFilter WasteCity.Tests.GrayboxEvacuationTests \
+  -testFilter "WasteCity.Tests.GrayboxEvacuationTests;WasteCity.Tests.GrayboxBuildingSessionTests;WasteCity.Tests.GrayboxBuildingCatalogTests" \
   -testResults /tmp/wastecity-3d-building/task-07-red.xml \
   -logFile /tmp/wastecity-3d-building/task-07-red.log
 ```
 
-Expected RED: the Task 6 treatment enum exists, but `BuildingEvacuationWork`, rule methods, the three session evacuation APIs, and `GrayboxEvacuationController3D` behavior are missing.
+Expected RED: the Task 6 treatment enum exists, but `BuildingEvacuationWork`, rule methods, lock/snapshot/commit session APIs, lock-aware construction behavior, and `GrayboxEvacuationController3D` behavior are missing.
 
-- [ ] Implement pure rules using `ConstructionRefundRules`. Implement controller as a request interceptor around exact existing API `GrayboxMobileCityController3D.TryToggleDeployment(out string failureReason)` and the session's `CopyPlayerOwnedGroundInstances`, `HasPlayerOwnedGroundInstances`, and `TryCommitEvacuation` APIs. Category batches call only presenter `CategoryOf`; the controller must not copy category mappings or write `CityDeploymentModel.Mode`, Transform, grid private cells or inventory internals.
+- [ ] Implement pure rules using `ConstructionRefundRules`. At `ConfirmManifest`, create every immutable work snapshot once, sort Full work by ordinal stable ID, and call session `TryLockEvacuationWork` once before any timer or immediate commit. Session prevalidates the whole list, copies exact work values into its private lock table, marks instances, and makes `TickConstruction` skip all locks. Implement controller as a request interceptor around exact existing API `GrayboxMobileCityController3D.TryToggleDeployment(out string failureReason)` and the session's `CopyPlayerOwnedGroundInstances`, `HasPlayerOwnedGroundInstances`, `TryLockEvacuationWork`, `RollbackEvacuationLocksAfterFailure`, and `TryCommitEvacuation(in BuildingEvacuationWork, ...)` APIs. Category batches call only presenter `CategoryOf`; the controller must not copy category mappings or write `CityDeploymentModel.Mode`, Transform, grid private cells or inventory internals.
+
+- [ ] Keep Abandon and QuickDismantle immediate after a successful lock phase. FullDismantle advances only the controller's current queue timer, uses the captured `DismantleSeconds`, and commits the exact captured work. On any confirmation/commit failure or exception, use the single failure-only rollback API to release every remaining lock before returning to the open manifest; do not add an input, button, or public gameplay flow for cancelling a confirmed queue.
 
 - [ ] Implement menu manifest rows and single/category/all controls using stable instance IDs. The controller owns work state; UI is projection only.
 
@@ -1467,6 +1488,8 @@ git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs
 git add Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs.meta
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs
 git diff --cached --name-only
 git commit -m "feat: add graybox evacuation handling"
 ```
@@ -1485,7 +1508,7 @@ git commit -m "feat: add graybox evacuation handling"
 - Create: `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs.meta`
 
-- [ ] Write RED tests for `ResolveRuntimeAvailability(false,false) == false`, and true for Editor or Development. Reflect serialized fields and assert none reference a conditionally compiled type.
+- [ ] Write RED tests for `ResolveRuntimeAvailability(false,false) == false`, and true for Editor or Development. Reflect serialized fields and assert none reference a conditionally compiled type. Assert the bootstrap declares no `Update` input loop and source-audit its `Awake`/lifecycle code for zero `Keyboard.current`, `f10Key`, or Input System polling; `TryTogglePanel` is the only panel-toggle entry.
 
 - [ ] Under the Editor test compilation, write RED command tests for resource +100/+1000/clear/set with capacity rules; single research/route/all unlock without relocking; safe Mobile/Fortress set; completing Deploying/Packing; construction multiplier 1×/10×/100×; immediate completion finishing every existing site in the same frame through `CompleteAllConstructionForDevelopment`; immediate completion preserving the prior multiplier so the next site is not accelerated; exit/session recreation discarding all changes.
 
@@ -1505,7 +1528,7 @@ git commit -m "feat: add graybox evacuation handling"
 
 Expected RED: missing bootstrap/modifier and city development adapter only.
 
-- [ ] Implement the always-compiled bootstrap with only normal serializable Unity/component fields. Place command service construction, panel creation and F10-capable behavior inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD`; Release method bodies remain inert and deterministic.
+- [ ] Implement the always-compiled bootstrap with only normal serializable Unity/component fields. Place command service construction, panel creation, and `TryTogglePanel` behavior inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD`; Release method bodies remain inert and deterministic. Do not declare an `Update` input reader and do not read Keyboard/F10 in `Awake`, `Update`, or any bootstrap lifecycle callback: Task 9's building input router is the sole reader.
 
 - [ ] Add to `GrayboxMobileCityController3D`:
 
@@ -1519,9 +1542,14 @@ public bool CompleteDeploymentTransitionForDevelopment();
 - [ ] Run focused GREEN, then existing mobile city/deployment tests. Inspect the compiled-source boundary:
 
 ```bash
-rg -n "#if|#endif|SerializeField|GrayboxDeveloperModifier3D|F10|f10Key" \
+rg -n "#if|#endif|SerializeField|GrayboxDeveloperModifier3D|TryTogglePanel" \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs
+if rg -n "Keyboard\\.current|f10Key|void Update\\s*\\(" \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs; then
+  echo "bootstrap must not poll F10" >&2
+  exit 1
+fi
 git diff --check
 ```
 
@@ -1571,6 +1599,8 @@ middle drag and Home remain unsuppressed when pointer/focus permits
 UI pointer blocks world click and camera drag
 focused keyboard UGUI blocks W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter
 focus loss restores gameplay on the next frame
+F10 after focus/modal handling calls developer.TryTogglePanel exactly once
+bootstrap and router cannot both read F10
 outside build mode digits remain unconsumed for future skills
 ```
 
@@ -1594,8 +1624,9 @@ Expected RED: missing generic interceptor/suppression and building router behavi
 
 ```text
 focused editable/keyboard UGUI
-→ pointer-over-UGUI
 → open modal/evacuation confirmation
+→ one guarded F10 read and developer.TryTogglePanel
+→ pointer-over-UGUI for pointer channels
 → catalog/build selection actions
 → unconsumed base city/leader/camera actions
 ```
@@ -1604,6 +1635,8 @@ When paused, building construction and gameplay actions remain disabled; UGUI na
 
 Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.TrySelectCatalogItem`; the input router has no session/presenter field and cannot inspect visibility, lock reasons or the 28-item mapping.
 
+`ProcessCurrentInput` is the only method in the project that reads `Keyboard.current.f10Key.wasPressedThisFrame`. It performs that read only after returning for focused editable/keyboard UGUI and after an open modal has consumed its input. In Editor/Development it calls the serialized bootstrap's `TryTogglePanel` once; in Release the same call is harmless and returns false, while compile guards prevent creating developer UI/commands. A focused search field therefore blocks F10; after focus loss a fresh F10 edge toggles the panel exactly once.
+
 - [ ] Run focused GREEN. Add a 300-call warmed allocation assertion for `ProcessCurrentInput` with unchanged device state; record the byte difference and require zero.
 
 - [ ] Run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`, then:
@@ -1611,6 +1644,13 @@ Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.Try
 ```bash
 rg -n "TickMovement|TickDeployment|TickControl|TickCamera|ProcessFrame" \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs
+test "$(rg -l "f10Key" \
+  Assets/_Game/Scripts | wc -l | tr -d ' ')" = "1"
+if rg -n "Keyboard\\.current|f10Key|void Update\\s*\\(" \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs; then
+  echo "bootstrap must not poll F10" >&2
+  exit 1
+fi
 git diff --check
 ```
 
@@ -1680,7 +1720,7 @@ GrayboxPrototype3D/GrayboxUI/EventSystem
 GrayboxPrototype3D/GrayboxActors/MobileCity/InnerCityPlatform
 ```
 
-Assert one EventSystem/InputSystemUIInputModule, one enabled GraphicRaycaster, all serialized references, base `GrayboxInputRouter` interceptor reference, 8×6 platform dimensions, no conditional modifier type serialization, no Missing Script, no 28 precreated card/building objects, and unchanged camera/city/leader/world contracts. Add a behavior test that builds an unsaved in-memory scene missing one foundation object and invokes `ValidateFoundationContract` through reflection, expecting `InvalidOperationException`; the test must not delete or alter the real scene asset. Add a source assertion that the existing-scene path cannot enter `NewScene`.
+Assert one EventSystem/InputSystemUIInputModule, one enabled GraphicRaycaster, all serialized references, base `GrayboxInputRouter` interceptor reference, 8×6 platform dimensions, no conditional modifier type serialization, no Missing Script, no 28 precreated card/building objects, and unchanged camera/city/leader/world contracts. Use an EditMode `UnityTest` to save, close, and reopen the real scene, yield one Editor update for the public enable lifecycle, then inspect only the module's public `point`, `leftClick`, `move`, `submit`, and `cancel` properties: every reference and `.action` must be non-null and each action must have at least one binding. The assertion accepts either serialized references or public default assignment during lifecycle; it verifies only the usable post-reload contract. Add a behavior test that builds an unsaved in-memory scene missing one foundation object and invokes `ValidateFoundationContract` through reflection, expecting `InvalidOperationException`; the test must not delete or alter the real scene asset. Add a source assertion that the existing-scene path cannot enter `NewScene`.
 
 - [ ] Run focused RED. It must fail only because the existing scene lacks new components/references:
 
@@ -1712,7 +1752,7 @@ Scene asset present
 
 `TryOpenAndValidateFoundation` returns false only when the scene asset does not exist; an invalid existing scene throws. For an existing scene, neither it nor `EnsureBuildingContract` may call `EditorSceneManager.NewScene`, destroy/recreate the root, world, city, leader, camera, base systems, or replace existing components. The old `TryOpenCompleteScene == false → NewScene` branch must not be reused for a missing building contract.
 
-- [ ] `EnsureBuildingContract` must use the existing city object as the inner platform parent. The inner surface bottom/top alignment keeps gameplay grid local, and its Collider only serves projector selection. Reuse the single existing EventSystem when present; otherwise create one `EventSystem` plus `InputSystemUIInputModule`, call the verified Input System 1.7.0 public API `AssignDefaultActions()`, and do not create a project `.inputactions` asset. No scene object represents individual catalog entries or 768 world cells. Retain Build Settings order `GrayboxPrototype3D` index 0, `FormalPrototype` index 1.
+- [ ] `EnsureBuildingContract` must use the existing city object as the inner platform parent. The inner surface bottom/top alignment keeps gameplay grid local, and its Collider only serves projector selection. Reuse the single existing EventSystem when present; otherwise create one. Reuse or add exactly one `InputSystemUIInputModule`; if any public `point`, `leftClick`, `move`, `submit`, or `cancel` reference/action is absent during authoring, call the verified Input System 1.7.0 public API `AssignDefaultActions()` before saving. Do not create a project `.inputactions` asset or read/write private fields. Reopen the saved scene, allow the public enable lifecycle one Editor update, and run the five-reference/action/binding contract before accepting authoring; the final contract does not depend on whether a usable action came from serialization or public runtime default assignment. If public lifecycle/serialization does not retain or create usable actions, stop and report the public API result instead of reaching into private fields or inventing a package workaround. No scene object represents individual catalog entries or 768 world cells. Retain Build Settings order `GrayboxPrototype3D` index 0, `FormalPrototype` index 1.
 
 - [ ] After implementing but before the first `Configure`, close GUI Unity, confirm project lock removal, then capture the existing identity/GUID baseline:
 
@@ -1841,7 +1881,7 @@ QueueStateEvent
 
 Tests must not call `ProcessCurrentInput`, `ProcessFrame`, `ReadCurrentFrame`, `TickGameplay`, `TickMovement`, `TickDeployment`, `TickConstruction`, `GrayboxEvacuationController3D.Tick` or camera methods directly.
 
-- [ ] Add initial RED tests for scene reload, serialized session/inner platform/developer bootstrap, and the minimum flow B → choose a normal BuildMenu item → surface preview → left-click construction → real frames complete it → evacuation processing. The first RED must be a missing PlayMode behavior or scene connection, not an asmdef error.
+- [ ] Add initial RED tests for scene reload, serialized session/inner platform/developer bootstrap, and the minimum flow B → choose a normal BuildMenu item → surface preview → left-click construction → real frames complete it → evacuation processing. After scene load and at least one real frame, assert the public `InputSystemUIInputModule.point`, `leftClick`, `move`, `submit`, and `cancel` references/actions are non-null and each action is enabled; this is the runtime half of Task 10's serialized action contract. The first RED must be a missing PlayMode behavior or scene connection, not an asmdef error. If the public Input System lifecycle does not enable those actions, stop rather than using private-field access.
 
 - [ ] Add real-input tests covering:
 
@@ -1864,7 +1904,7 @@ all handled ground instances automatically continue Packing
 inner instances follow city and do not enter manifest
 ```
 
-- [ ] Add the focused UGUI keyboard test. Focus the real search InputField and virtually press/type `W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter`. Assert UI owns text/navigation/submit/cancel; city/leader positions, catalog origin, orientation, quickbar selection, deployment mode, camera mode/target and developer panel do not change. First Esc ends editing; only after a real next frame and second Esc may the catalog state machine act.
+- [ ] Add the focused UGUI keyboard test. Focus the real search InputField and virtually press/type `W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter`. Assert UI owns text/navigation/submit/cancel; city/leader positions, catalog origin, orientation, quickbar selection, deployment mode, camera mode/target and developer panel do not change. First Esc ends editing; only after a real next frame and second Esc may the catalog state machine act. Then clear keyboard focus, send one fresh F10 edge through the same real Update loop, and assert the developer panel changes state exactly once; source and behavior together prove the bootstrap did not also poll F10.
 
 - [ ] Add developer availability behavior in Editor: F10 opens a visibly marked development panel; resource/research/mode/construction buttons mutate the same session models. Do not claim this test proves Release behavior; Release is proved by compile/build contract in Task 12.
 
