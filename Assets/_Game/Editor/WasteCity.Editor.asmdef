@@ -1,5 +1,9 @@
 {
   "name": "WasteCity.Editor",
-  "references": ["WasteCity.Game", "Unity.RenderPipelines.Universal.Runtime"],
+  "references": [
+    "WasteCity.Game",
+    "WasteCity.Graybox3D",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
   "includePlatforms": ["Editor"]
 }
