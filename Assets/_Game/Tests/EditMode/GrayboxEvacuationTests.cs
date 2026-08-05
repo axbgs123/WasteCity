@@ -415,6 +415,30 @@ namespace WasteCity.Tests
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
         }
 
+        [Test]
+        public void Session_PresentationFailureRetainsMutationUntilFailureCleanup()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new FailingPresentation { ThrowRemove = true };
+            GrayboxBuildingInstance3D wall = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, presentation);
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                wall.StableInstanceId, wall.Placement.Definition.Cost,
+                wall.Progress.BaseDuration, 1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(new[] { work }, out _),
+                Is.True);
+
+            Assert.Throws<InvalidOperationException>(() => session.TryCommitEvacuation(
+                work, presentation, out _, out _));
+            Assert.That(session.Instances.Contains(wall), Is.True);
+            session.RollbackEvacuationLocksAfterFailure(new[] { work });
+            Assert.That(session.TryCommitEvacuation(
+                work, presentation, out _, out string failure), Is.False);
+            Assert.That(failure, Is.Not.Empty);
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var gameObject = new GameObject("graybox-evacuation-test");
@@ -491,6 +515,17 @@ namespace WasteCity.Tests
             public bool TryCreate(GrayboxBuildingInstance3D instance) => true;
             public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
             public void Remove(GrayboxBuildingInstance3D instance) { }
+        }
+
+        private sealed class FailingPresentation : IGrayboxBuildingPresentation3D
+        {
+            public bool ThrowRemove { get; set; }
+            public bool TryCreate(GrayboxBuildingInstance3D instance) => true;
+            public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
+                if (ThrowRemove) throw new InvalidOperationException("remove");
+            }
         }
 
         private readonly struct EvacuationFixture
