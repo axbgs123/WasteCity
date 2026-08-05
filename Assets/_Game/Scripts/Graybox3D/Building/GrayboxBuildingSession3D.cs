@@ -79,6 +79,7 @@ namespace WasteCity.Graybox3D.Building
         private List<GrayboxBuildingInstance3D> instances;
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
         private int nextStableInstanceOrdinal;
+        private uint catalogRevision;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -88,6 +89,7 @@ namespace WasteCity.Graybox3D.Building
         public int Population { get; private set; }
         public int GroundBuildRadius { get; private set; }
         public float ConstructionMultiplier { get; private set; }
+        public uint CatalogRevision => catalogRevision;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
 
@@ -122,6 +124,7 @@ namespace WasteCity.Graybox3D.Building
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
+            AdvanceCatalogRevision();
         }
 
         public bool TryBeginConstruction(
@@ -297,6 +300,7 @@ namespace WasteCity.Graybox3D.Building
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
+                if (completed) AdvanceCatalogRevision();
             }
         }
 
@@ -340,10 +344,10 @@ namespace WasteCity.Graybox3D.Building
             if (route == ContentRoute.Core ||
                 !Enum.IsDefined(typeof(ContentRoute), route))
                 return;
-            if (contacted)
-                contactedRoutes.Add(route);
-            else
-                contactedRoutes.Remove(route);
+            bool changed = contacted
+                ? contactedRoutes.Add(route)
+                : contactedRoutes.Remove(route);
+            if (changed) AdvanceCatalogRevision();
         }
 
         public void UnlockResearchForDevelopment(string researchId)
@@ -357,6 +361,7 @@ namespace WasteCity.Graybox3D.Building
             Array.Copy(completed, restored, completed.Length);
             restored[completed.Length] = definition.Id.Value;
             Research.Restore(restored, null, 0f);
+            AdvanceCatalogRevision();
         }
 
         public void UnlockRouteForDevelopment(ContentRoute route)
@@ -379,10 +384,9 @@ namespace WasteCity.Graybox3D.Building
             SetRouteContact(ContentRoute.Cultivation, true);
             SetRouteContact(ContentRoute.BiologicalAscension, true);
             SetRouteContact(ContentRoute.Psionics, true);
-            var completed = new string[ResearchCatalog.All.Length];
             for (var index = 0; index < ResearchCatalog.All.Length; index++)
-                completed[index] = ResearchCatalog.All[index].Id.Value;
-            Research.Restore(completed, null, 0f);
+                UnlockResearchForDevelopment(
+                    ResearchCatalog.All[index].Id.Value);
         }
 
         public void SetConstructionMultiplierForDevelopment(float value)
@@ -414,7 +418,13 @@ namespace WasteCity.Graybox3D.Building
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
+                AdvanceCatalogRevision();
             }
+        }
+
+        private void AdvanceCatalogRevision()
+        {
+            unchecked { catalogRevision++; }
         }
 
         private BuildingPlacementRequest RefreshRequest(

@@ -305,6 +305,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Placement_MiningAcceptsEnergyCrystalWithCoordinateNodeId()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[19, 15] = Cell(ResourceIds.EnergyCrystal);
+            WorldFixture fixture = CreateWorldFixture(cells, CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 18, 14);
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(fixture.Placement.CurrentEvaluation.IsValid, Is.True);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.CompatibleResourceNodeId,
+                Is.EqualTo("world.resource-node.19.15"));
+        }
+
+        [TestCase(ResourceIds.Stone)]
+        [TestCase(ResourceIds.Biomass)]
+        [TestCase(ResourceIds.Water)]
+        public void Placement_MiningRejectsIncompatibleResourceTypes(
+            string resourceId)
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[19, 15] = Cell(resourceId);
+            WorldFixture fixture = CreateWorldFixture(cells, CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 18, 14);
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(BuildingPlacementFailure.IncompatibleResourceNode));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.CompatibleResourceNodeId,
+                Is.Null);
+        }
+
+        [Test]
+        public void Placement_NonMiningIgnoresResourceCellsAndOmitsNodeId()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 15] = Cell(ResourceIds.Stone);
+            WorldFixture fixture = CreateWorldFixture(cells, CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PositionCameraAtCell(fixture, 20, 15);
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(fixture.Placement.CurrentEvaluation.IsValid, Is.True);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.CompatibleResourceNodeId,
+                Is.Null);
+        }
+
+        [Test]
         public void Placement_ResourceNodeIdentityUsesCoordinatesNotResourceType()
         {
             string first = GrayboxBuildingPlacementController3D

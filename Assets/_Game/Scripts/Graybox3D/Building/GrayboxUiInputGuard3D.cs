@@ -36,7 +36,19 @@ namespace WasteCity.Graybox3D.Building
             };
             raycastResults.Clear();
             eventSystem.RaycastAll(pointer, raycastResults);
-            bool hit = raycastResults.Count > 0;
+            bool hit = false;
+            for (var index = 0; index < raycastResults.Count; index++)
+            {
+                GraphicRaycaster raycaster =
+                    raycastResults[index].module as GraphicRaycaster;
+                if (raycaster == null || !raycaster.isActiveAndEnabled)
+                    continue;
+                Canvas canvas = raycaster.GetComponent<Canvas>();
+                if (canvas == null || !canvas.isActiveAndEnabled)
+                    continue;
+                hit = true;
+                break;
+            }
             raycastResults.Clear();
             if (hit) return true;
 

@@ -300,10 +300,14 @@ namespace WasteCity.Graybox3D.Building
         {
             return ReferenceEquals(definition, BuildingCatalog.MiningStation) &&
                 cell.HasResource &&
-                string.Equals(
-                    cell.ResourceId,
-                    ResourceIds.Iron,
-                    StringComparison.Ordinal);
+                (string.Equals(
+                     cell.ResourceId,
+                     ResourceIds.Iron,
+                     StringComparison.Ordinal) ||
+                 string.Equals(
+                     cell.ResourceId,
+                     ResourceIds.EnergyCrystal,
+                     StringComparison.Ordinal));
         }
 
         private void UpdateNodeHighlight(

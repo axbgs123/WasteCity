@@ -254,6 +254,55 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Menu_UpdateRefreshesCatalogOnlyAfterSessionRevisionChanges()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.RefreshCatalog();
+            Transform oldQuickbar = FindTransform(
+                fixture.Canvas.transform, "QuickbarSlot.0");
+            Assert.That(FindTransform(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.PowerPlant.Id.Value), Is.Null);
+
+            fixture.Session.SetRouteContact(ContentRoute.Technology, true);
+            InvokeLifecycle(fixture.Menu, "Update");
+            Transform card = FindTransform(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.PowerPlant.Id.Value);
+            Assert.That(card, Is.Not.Null);
+            Transform refreshedQuickbar = FindTransform(
+                fixture.Canvas.transform, "QuickbarSlot.0");
+            InvokeLifecycle(fixture.Menu, "Update");
+
+            Assert.That(FindTransform(
+                fixture.Canvas.transform, "QuickbarSlot.0"), Is.SameAs(refreshedQuickbar));
+            Assert.That(FindTransform(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.PowerPlant.Id.Value), Is.SameAs(card));
+            Assert.That(oldQuickbar, Is.Not.SameAs(refreshedQuickbar));
+        }
+
+        [Test]
+        public void Menu_DetailsAlwaysShowMinimumPopulationWhenSatisfiedOrLocked()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+            string satisfied = BuildDetails(presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.ResearchStation));
+
+            fixture.Session.SetRouteContact(ContentRoute.Technology, true);
+            string locked = BuildDetails(presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.PowerPlant));
+
+            Assert.That(satisfied, Does.Contain("最低人口：200"));
+            Assert.That(locked, Does.Contain("最低人口：1000"));
+            Assert.That(locked, Does.Contain("锁定原因 "));
+        }
+
+        [Test]
         public void UiGuard_RealSelectableFocusOwnsKeyboardUntilFollowingFrame()
         {
             UiFixture fixture = CreateMenuFixture();
@@ -308,6 +357,40 @@ namespace WasteCity.Tests
                     pointerPosition),
                 Is.True);
             Assert.That(guard.ConsumeFocusedEscape(fixture.EventSystem), Is.True);
+        }
+
+        [Test]
+        public void UiGuard_PhysicsRaycastResultDoesNotCapturePointerAsUi()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            Camera worldCamera = Create<Camera>("WorldPhysicsCamera");
+            worldCamera.pixelRect = new Rect(0f, 0f, 640f, 480f);
+            worldCamera.transform.position = new Vector3(0f, 0f, -10f);
+            PhysicsRaycaster physicsRaycaster =
+                worldCamera.gameObject.AddComponent<PhysicsRaycaster>();
+            RegisterHeadlessEditModeRaycaster(physicsRaycaster);
+            GameObject worldTarget = NewObject("WorldCollider");
+            worldTarget.AddComponent<BoxCollider>();
+            Physics.SyncTransforms();
+
+            var pointer = new PointerEventData(fixture.EventSystem)
+            {
+                position = ScreenCenter
+            };
+            var results = new List<RaycastResult>();
+            fixture.EventSystem.RaycastAll(pointer, results);
+            Assert.That(
+                results.Any(result => result.module == physicsRaycaster),
+                Is.True);
+            Assert.That(
+                results.Any(result => result.module is GraphicRaycaster),
+                Is.False);
+
+            Assert.That(
+                new GrayboxUiInputGuard3D().IsPointerOverUi(
+                    fixture.EventSystem,
+                    ScreenCenter),
+                Is.False);
         }
 
         [Test]
@@ -1302,8 +1385,18 @@ namespace WasteCity.Tests
                 .Invoke(behaviour, null);
         }
 
+        private static string BuildDetails(GrayboxBuildingCatalogItem3D item)
+        {
+            return (string)typeof(GrayboxBuildingMenuView3D).GetMethod(
+                "BuildDetails",
+                System.Reflection.BindingFlags.Static |
+                System.Reflection.BindingFlags.NonPublic).Invoke(
+                null,
+                new object[] { item });
+        }
+
         private static void RegisterHeadlessEditModeRaycaster(
-            GraphicRaycaster raycaster)
+            BaseRaycaster raycaster)
         {
             Type manager = typeof(BaseRaycaster).Assembly.GetType(
                 "UnityEngine.EventSystems.RaycasterManager");

@@ -98,6 +98,53 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CatalogRevision_AdvancesOnlyForCommittedCatalogProjectionChanges()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            uint revision = CatalogRevision(session);
+
+            session.ConfigureDevelopmentFixture();
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 1u)));
+            revision = CatalogRevision(session);
+            session.SetRouteContact(ContentRoute.Technology, true);
+            session.SetRouteContact(ContentRoute.Technology, true);
+            session.SetRouteContact(ContentRoute.Technology, false);
+            session.UnlockResearchForDevelopment("core.research.automated-machinery");
+            session.UnlockResearchForDevelopment("core.research.automated-machinery");
+            session.UnlockResearchForDevelopment("unknown.research");
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 3u)));
+
+            GrayboxBuildingInstance3D instance = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            revision = CatalogRevision(session);
+            session.TickConstruction(1f, CityMode.Fortress, false, presentation);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+            session.TickConstruction(1f, CityMode.Fortress, false, presentation);
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 1u)));
+            Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+        }
+
+        [Test]
+        public void CatalogRevision_DoesNotAdvanceWhenPresentationCompletionRollsBack()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation
+            {
+                UpdateException = new InvalidOperationException("update failed")
+            };
+            Begin(session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            uint revision = CatalogRevision(session);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                session.TickConstruction(2f, CityMode.Fortress, false, presentation));
+
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+        }
+
+        [Test]
         public void TryBeginConstruction_CommitsOneSpendOneFootprintAndStableInstance()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -882,6 +929,14 @@ namespace WasteCity.Tests
             session.Configure(true);
             session.ConfigureDevelopmentFixture();
             return session;
+        }
+
+        private static uint CatalogRevision(GrayboxBuildingSession3D session)
+        {
+            var property = typeof(GrayboxBuildingSession3D).GetProperty(
+                "CatalogRevision");
+            Assert.That(property, Is.Not.Null);
+            return (uint)property.GetValue(session);
         }
 
         private static GrayboxBuildingInstance3D Begin(

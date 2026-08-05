@@ -42,6 +42,8 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxBuildingInteractionState lastPlacementState;
         private BuildingPlacementFailure lastPlacementFailure;
         private bool lastPlacementValid;
+        private bool hasCatalogRevision;
+        private uint lastCatalogRevision;
 
         public bool CatalogVisible
         {
@@ -82,6 +84,10 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
+            if (IsConfigured &&
+                (!hasCatalogRevision ||
+                 session.CatalogRevision != lastCatalogRevision))
+                RefreshCatalog();
             SyncCatalogVisibility();
             RefreshPlacementStatus();
         }
@@ -214,6 +220,7 @@ namespace WasteCity.Graybox3D.Building
             this.eventSystem = eventSystem;
             this.session = session;
             this.interaction = interaction;
+            hasCatalogRevision = false;
             EnsureRuntimeServices();
             if (isActiveAndEnabled)
                 RebuildUi();
@@ -225,6 +232,8 @@ namespace WasteCity.Graybox3D.Building
             RefreshQuickbar();
             RebuildCatalogCards();
             SyncCatalogVisibility();
+            lastCatalogRevision = session.CatalogRevision;
+            hasCatalogRevision = true;
         }
 
         public void SetCategory(BuildingMenuCategory category)
@@ -767,22 +776,23 @@ namespace WasteCity.Graybox3D.Building
                              item.LockReasons.Count == 0
                 ? "无"
                 : string.Join("；", item.LockReasons.ToArray());
-            return string.Join(
-                "\n",
-                new[]
-                {
-                    definition.Name,
-                    "类别 " + CategoryLabel(item.Category),
-                    "路线 " + RouteLabel(item.Route),
-                    "占地 " + definition.Width + "×" + definition.Height,
-                    "位置 " + BuildingMobilityRules.PlacementName(
-                        definition.Placement),
-                    "施工 " + definition.BuildSeconds + " 秒",
-                    "完整成本 " + definition.Cost + " " + definition.CostId,
-                    "研究 " + (definition.RequiredResearchId ?? "无"),
-                    "前置 " + (definition.RequiredBuildingId ?? "无"),
-                    "锁定原因 " + reasons
-                });
+            var lines = new List<string>
+            {
+                definition.Name,
+                "类别 " + CategoryLabel(item.Category),
+                "路线 " + RouteLabel(item.Route),
+                "占地 " + definition.Width + "×" + definition.Height,
+                "位置 " + BuildingMobilityRules.PlacementName(
+                    definition.Placement),
+                "施工 " + definition.BuildSeconds + " 秒",
+                "完整成本 " + definition.Cost + " " + definition.CostId
+            };
+            if (definition.MinimumPopulation > 0)
+                lines.Add("最低人口：" + definition.MinimumPopulation);
+            lines.Add("研究 " + (definition.RequiredResearchId ?? "无"));
+            lines.Add("前置 " + (definition.RequiredBuildingId ?? "无"));
+            lines.Add("锁定原因 " + reasons);
+            return string.Join("\n", lines);
         }
 
         private void CreateEvacuationItem(
