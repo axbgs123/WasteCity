@@ -236,6 +236,7 @@ namespace WasteCity.Graybox3D
     public sealed class GrayboxGroundProjector : MonoBehaviour
     {
         public void Configure(Camera camera, PlanarCoordinateMapper3D coordinates);
+        public void Configure(Camera camera, GrayboxWorldView3D worldView);
         public bool TryProjectToPlane(Vector2 screenPosition, out Vector3 worldPoint);
         public bool TryProjectToCell(
             Vector2 screenPosition,
@@ -1382,6 +1383,8 @@ git commit -m "feat: add graybox input and camera adapters"
 **Files:**
 
 - Modify: `Assets/_Game/Editor/GrayboxSceneAuthoring.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs`
 - Modify: `Assets/_Game/Scenes/GrayboxPrototype3D.unity`
 - Modify: `ProjectSettings/EditorBuildSettings.asset`
 - Modify: `Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef`
@@ -1391,7 +1394,9 @@ git commit -m "feat: add graybox input and camera adapters"
 
 - [ ] **Step 1：先写正式场景失败测试**
 
-给 PlayMode asmdef 增加 `WasteCity.Graybox3D` 引用。PlayMode fixture 每次：
+给 PlayMode asmdef 增加直接引用 `WasteCity.Graybox3D`、
+`Unity.InputSystem` 和 `Unity.RenderPipelines.Universal.Runtime`；测试不得依赖
+程序集引用传递。PlayMode fixture 每次：
 
 ```csharp
 yield return SceneManager.LoadSceneAsync(
@@ -1414,6 +1419,10 @@ yield return null;
 10. `timeScale == 0` 时玩法停止、镜头仍可拖动和返回。
 11. 镜头操作前后城市 Autopilot、Mode、Remaining 不变。
 12. 卸载 3D 场景后 Graphics/Quality 两属性按各自所有权恢复。
+13. 真正重新加载场景后，ground projector 能通过序列化的 world view
+    完成屏幕点到地图格投影；不得依赖只存在于 authoring 进程内的 mapper。
+14. 真正重新加载场景后，领袖的开发夹具开关和 `Model.Recruited` 均为
+    true。
 
 EditMode 场景契约扩展断言：
 
@@ -1449,9 +1458,21 @@ mkdir -p "/tmp/wastecity-3d-graybox-foundation/task-08"
   -logFile "/tmp/wastecity-3d-graybox-foundation/task-08/red-play.log"
 ```
 
-预期 RED：现有初始 3D 场景尚未接入城市、领袖、输入和相机；不接受 2D 场景测试失败。
+预期 RED：现有初始 3D 场景尚未接入城市、领袖、输入、相机和可重载的
+projector/领袖夹具序列化引用；不接受程序集错误或 2D 场景测试失败。
 
 - [ ] **Step 3：扩展 authoring 并生成最终首阶段场景**
+
+先修复两个运行时序列化边界：
+
+- `GrayboxGroundProjector` 序列化 `GrayboxWorldView3D worldView` 引用，并保留
+  非序列化的注入 mapper。运行时坐标源严格使用
+  `injectedCoordinates ?? worldView?.Coordinates`。mapper overload 仅供纯测试
+  注入；新增的 world view overload 供 authoring 使用并持久化场景引用。
+- `GrayboxLeaderController3D` 使用
+  `[SerializeField] bool developmentFixtureRecruited` 持久化开发夹具开关；
+  `Awake` 应用夹具，`Configure` 设置开关后在 authoring 当次也应用。启用时
+  只调用既有 `Model.Restore(true, false, 0, 0, 0)`，不得读写正式存档。
 
 `GrayboxSceneAuthoring.Configure` 增加：
 
@@ -1459,7 +1480,8 @@ mkdir -p "/tmp/wastecity-3d-graybox-foundation/task-08"
 - `GrayboxActors/MobileCity`：Cube Mesh、共享材质、`GrayboxVisualSlot("core.city.mobile")`、kinematic Rigidbody、BoxCollider、城市控制器；底面 Y=0。
 - `GrayboxActors/Leader_CenJin`：Capsule Mesh、共享材质、`GrayboxVisualSlot("core.character.cen-jin")`、CapsuleCollider、领袖控制器，开发夹具开关为 true。
 - `GrayboxSystems`：bootstrap、input router、direct coordinator、ground projector。
-- 所有 `Configure` 引用完整序列化。
+- 所有 `Configure` 引用完整序列化；ground projector 必须调用 world view
+  overload，不得把 `worldView.Coordinates` 作为 authoring 时瞬态对象传入。
 - 场景中不增加 FormalSaveController、NavMeshSurface、Cinemachine、2D 物理或 SpriteRenderer。
 
 更新 `EditorBuildSettings.asset` 后场景顺序必须是：
@@ -1508,6 +1530,8 @@ cd "/Users/baiyan1/Documents/WasteCity-3d-graybox-foundation"
 git diff --check
 git add \
   Assets/_Game/Editor/GrayboxSceneAuthoring.cs \
+  Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs \
+  Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs \
   Assets/_Game/Scenes/GrayboxPrototype3D.unity \
   ProjectSettings/EditorBuildSettings.asset \
   Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef \
