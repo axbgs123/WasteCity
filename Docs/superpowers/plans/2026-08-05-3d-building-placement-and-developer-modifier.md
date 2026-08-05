@@ -532,6 +532,7 @@ namespace WasteCity.Graybox3D.Building
         public int Population { get; }
         public int GroundBuildRadius { get; }
         public float ConstructionMultiplier { get; }
+        public uint CatalogRevision { get; }
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances { get; }
         public int CompletedBuildingCount(string id);
 
@@ -683,6 +684,8 @@ namespace WasteCity.Graybox3D.Building
 
 `ConfigureDevelopmentFixture()` 固定创建容量 5000、人口 200，并设置 Iron 30、EnergyCrystal 10、Stone 30、Biomass 20、Water 20、Alloy 30，其余正式资源为 0；研究、路线接触、前置建筑均为 0。它不提供无限资源或默认全解锁。
 
+`CatalogRevision` is the frozen public `uint` catalog-projection revision. It advances with unchecked arithmetic and never resets during the lifetime of a session component. It increments exactly once after a fixture/model rebuild, an actual route-contact set change, each newly completed research ID, and each successfully committed building completion (both a normal `TickConstruction` completion and each individual successful `CompleteAllConstructionForDevelopment` completion). The completion increment occurs only after its presentation update has succeeded. No-op calls, partial construction progress, failed presentation updates that roll construction back, and any other rolled-back mutation do not advance it. `UnlockRouteForDevelopment` and `UnlockAllResearchForDevelopment` therefore use the same actual-change rules: each route/contact or research ID that was already present is a no-op, while each newly added research ID advances the revision once.
+
 原子放置顺序固定为：重新评估 → 正式库存 `TrySpend` → 对应 `BuildingGrid.TryRestore` 占格 → 创建稳定实例 → `presentation.TryCreate`。任何一步返回失败都按相反顺序释放占格并返还本次实际扣款；`TryCreate` 抛出异常时先回滚再重新抛出，不吞异常。只有全部成功才递增稳定实例序号并对外返回实例。
 
 施工实例 Collider 只作为 `TryPickInstance` 的选择代理。`RequestCancelSelected` 对零进度实例立即调用同一退款函数并返回 `Cancelled`；已有进度时进入 `CancelConfirmation` 并返回 `ConfirmationRequired`，只有 `ResolveCancelSelected(true)` 才执行退款和移除。
@@ -690,6 +693,7 @@ namespace WasteCity.Graybox3D.Building
 Evacuation session rules:
 
 - `CompletedBuildingCount(id)` returns zero for a null, empty or unknown stable definition ID. Otherwise it counts both Ground and InnerCity instances only when the definition ID matches, `IsPlayerOwned == true`, `State == Completed`, and `IsEvacuationLocked == false`. `UnderConstruction`, `AbandonedRuin`, every locked full-dismantle item, and an item currently being dismantled never satisfy a prerequisite.
+- Task 7 owns the future extension of this revision contract: every successfully committed owner, state, evacuation-lock, or evacuation-commit mutation that changes `CompletedBuildingCount` increments `CatalogRevision` once; validation failures, presentation failures, and rollbacks do not. Task 4 does not add those Task 7 mutation paths.
 - `CopyPlayerOwnedGroundInstances` requires a non-null caller-owned list, clears it, then appends only player-owned Ground instances in ordinal stable-instance-ID order; it never exposes the mutable backing list.
 - `HasPlayerOwnedGroundInstances` performs the same ownership/site predicate without allocation.
 - `TryLockEvacuationWork` accepts only non-null, non-empty, duplicate-free `FullDismantle` work for currently owned Ground instances. It first validates every item and calculates no new refund or duration, then copies the exact immutable structs into a private stable-ID lock table and marks all matching instances locked. A validation failure returns false with no locks; an exception rolls back every lock created by that call before rethrowing. Thus confirmation can never leave a partial lock set.
@@ -707,8 +711,8 @@ Ground evaluation details are fixed:
 - derive the city logical center with existing public Unity state `PlanarCoordinateMapper3D.TryWorldToCell(city.transform.position, out cityX, out cityY)`; the controller's Rigidbody is private and must not be accessed by reflection; conversion failure invalidates ground placement instead of clamping;
 - the city occupies the 3×3 cells whose offsets from that center are each `-1..1`;
 - `DeepWater` and `Cliff` fail terrain, while `Ruins` fails the independent obstacle reason;
-- a required resource node is compatible only when the footprint contains a `WorldCell.HasResource` node; `WorldCell.ResourceId` remains the resource type and is never treated as node identity;
-- `CreateResourceNodeVisualId(x,y)` returns the unique deterministic adapter ID `world.resource-node.<x>.<y>`; `BuildingPlacementRequest.CompatibleResourceNodeId`, `BuildingPlacementEvaluation.CompatibleResourceNodeId` and `building.node-highlight.<node-id>` use that coordinate ID without modifying `WorldMapModel`;
+- only `MiningStation` requires a resource node in this scope. It is compatible only when its footprint contains a `WorldCell.HasResource` node whose `ResourceId` is the resource type `ResourceIds.Iron` or `ResourceIds.EnergyCrystal`; `Stone`, `Biomass`, `Water`, and every other `HasResource` type are incompatible. `ResourceId` is used only for this type-compatibility check and is never node identity; a building that does not require a node neither depends on nor exposes a compatible node ID;
+- `CreateResourceNodeVisualId(x,y)` returns the unique deterministic adapter ID `world.resource-node.<x>.<y>`, the only stable resource-node identity in this adapter; `BuildingPlacementRequest.CompatibleResourceNodeId`, `BuildingPlacementEvaluation.CompatibleResourceNodeId` and `building.node-highlight.<node-id>` use that coordinate ID without modifying `WorldMapModel`;
 - stable session instance IDs use `building.instance.000001` ordinal formatting, are never persisted, and advance only after a complete atomic commit.
 
 ### 2.5 Refund and evacuation
@@ -880,6 +884,8 @@ namespace WasteCity.Graybox3D.Building
 }
 ```
 
+UI pointer classification is intentionally limited to UGUI graphics. `GrayboxUiInputGuard3D.IsPointerOverUi` calls `EventSystem.RaycastAll`, but counts a returned `RaycastResult` only when `result.module` is a `GraphicRaycaster` that is active and enabled and whose owning `Canvas` is active and enabled. Results from `PhysicsRaycaster`, `Physics2DRaycaster`, or any other world raycaster—including results against world Colliders—never establish UI capture. If no qualifying EventSystem result exists, retain the `GraphicRegistry` fallback over active, enabled `GraphicRaycaster`/Canvas pairs and raycastable active graphics; that fallback may establish UI capture but must not inspect physics results.
+
 `GrayboxDeveloperModifier3D.cs` 中仅在条件编译区域定义：
 
 ```csharp
@@ -913,6 +919,8 @@ namespace WasteCity.Graybox3D.Building
 Menu and callback ownership:
 
 - `GrayboxBuildingMenuView3D.Awake` creates exactly one non-serialized presenter and uses its serialized session for every selection check. `TrySelectQuickbarSlot` validates `0..9`, resolves `Quickbar[index]`, then requires `Describe(...).Visibility == Buildable`. `TrySelectCatalogItem` searches only the current `Query(session, category, route, searchText)` result and requires `Buildable`. Hidden, locked, filtered-out and unknown IDs return false; success calls `interaction.Select(definition)`. Input code calls these menu APIs and never reads the 28-item mapping.
+- The menu owns a cached last-seen `uint` revision. An explicit `RefreshCatalog()` rebuilds the quickbar/catalog projection and synchronizes that cache to `session.CatalogRevision` only after the refresh succeeds. In `Update`, it calls `RefreshCatalog()` only when the configured session revision differs from the cached revision, then performs the existing catalog visibility and placement-status synchronization. An unchanged revision must not rebuild cards, quickbar slots, or their GameObjects/Transforms.
+- Every Build Details projection shows `最低人口：<definition.MinimumPopulation>` whenever `MinimumPopulation > 0`, whether or not the current population already satisfies it. It also retains the applicable research and prerequisite-building requirements plus the primary/all current lock reasons; satisfying population does not hide its numeric requirement.
 - `CategoryOf`/`RouteOf` are the single stable mapping used by catalog queries, cards, quickbar checks and evacuation category batches. A definition outside `BuildingCatalog.BuildMenu` throws `ArgumentException`; the input, UI and evacuation controller contain no duplicate mapping tables.
 - UGUI button listeners only raise the listed menu events. `GrayboxConstructionController3D.Configure` subscribes to the two cancel events; `GrayboxEvacuationController3D.Configure` subscribes to the four evacuation events. Each controller unsubscribes in `OnDestroy`. The menu never calls session mutation or deployment APIs directly, eliminating controller/UI circular dependencies.
 - `Normal/Fast10/Fast100` set the persistent current-session multiplier to 1/10/100. The “立即完成” button calls `CompleteAllConstruction()` → `session.CompleteAllConstructionForDevelopment(presentation)` in the same frame and leaves the multiplier unchanged for later construction.
@@ -937,8 +945,9 @@ Runtime serialization rules:
 | 固定十槽快捷栏 | 3, 6, 9, 11 | 精确顺序、隐藏空槽、数字键优先级 |
 | 旋转兼容旧 API | 1, 2, 5, 11 | 四方向 footprint；旧 API North；真实 R 输入 |
 | 外城 8/12/24 与内城 8×6 | 2, 5, 10, 11 | 边界/坐标单测；场景平台；真实鼠标自动选面 |
-| 有序合法性和节点高亮 | 2, 5, 11 | 每个失败原因独立；预览重评估；采矿节点 |
+| 有序合法性和节点高亮 | 2, 5, 11 | 每个失败原因独立；预览重评估；采矿站仅 Iron/EnergyCrystal、坐标节点 ID |
 | 正式有限资源、研究、前置、人口 | 3, 4, 7, 8, 11 | fixture 精确值；Completed-only 前置计数；同一模型命令；耗尽红预览 |
+| CatalogRevision 驱动目录投影 | 4, 6 | 实际变化单调版本；研究/路线/前置完成自动刷新；未变化 UI 身份稳定 |
 | 原子扣款、占格、施工和连续放置 | 4, 5, 11 | 回滚故障注入；真实施工完成；连续选择保留 |
 | AwayFromZero 退款 | 4, 7 | 小于/等于/大于 0.5；每资源限幅 |
 | 遗弃/完整/快速与混合撤离 | 7, 9, 11 | 原子快照锁、施工跳过、稳定队列、单体/类别/全部真实流程 |
@@ -1204,11 +1213,13 @@ git commit -m "feat: project graybox building catalog"
 
 - [ ] Write RED tests for the exact development fixture values, ground 32×24 and inner 8×6 grids, radius 8, no initial research/routes/prerequisites, and finite inventory.
 
+- [ ] Write RED `CatalogRevision` tests for the frozen `public uint CatalogRevision { get; }` contract: a fixture/model rebuild advances it once with unchecked arithmetic; an actual route-contact addition/removal and each newly completed research ID advance it once; repeated/no-op route or research calls do not. Prove a normal `TickConstruction` completion advances once only after `presentation.UpdateInstance` succeeds, a presentation failure rollback leaves it unchanged, and `CompleteAllConstructionForDevelopment` advances once per successfully committed instance while already-completed items do not advance it.
+
 - [ ] Write RED transaction tests for: successful one-time spend; stable instance ID; one occupied footprint; presentation success; insufficient material leaves all state unchanged; grid failure leaves inventory unchanged; presentation false rolls back grid and full actual spend; presentation exception rolls back then rethrows; retry receives deterministic next stable ID without orphan.
 
 - [ ] Write RED construction tests for paused no progress, illegal mode no progress, legal inner Mobile progress, legal Fortress progress, multiplier 1/10/100, completion retains same stable ID and changes presentation state once.
 
-- [ ] Write RED session/catalog integration tests for prerequisite counts available before evacuation exists. Prove matching Completed Ground and InnerCity instances count, while UnderConstruction, a different definition, and null/empty/unknown IDs return zero and cannot make `GrayboxBuildingCatalogPresenter3D.Describe` unlock a dependent card. Task 7 extends the same tests with non-owned, ruin, and evacuation-lock cases.
+- [ ] Write RED session/catalog integration tests for prerequisite counts available before evacuation exists. Prove matching Completed Ground and InnerCity instances count, while UnderConstruction, a different definition, and null/empty/unknown IDs return zero and cannot make `GrayboxBuildingCatalogPresenter3D.Describe` unlock a dependent card. Prove the revision changes on the completed prerequisite's successful commit, so Task 6 can refresh the dependent card from the same session state. Task 7 extends the same tests with non-owned, ruin, and evacuation-lock cases.
 
 - [ ] Write RED refund tests for raw fractions below 0.5, exactly 0.5, and above 0.5; verify `MidpointRounding.AwayFromZero`, handling ratios 1.0/0.8/0.5/0, remaining ratio clamp, original cost clamp, accepted amount limited by `ResourceInventory.Add`, grid release and view removal.
 
@@ -1238,7 +1249,7 @@ int rounded = (int)Math.Round(
 return Math.Max(0, Math.Min(originalCost, rounded));
 ```
 
-- [ ] Implement the Task 4 session subset: `Configure`, `ConfigureDevelopmentFixture`, `TryBeginConstruction`, `TryCancelConstruction`, `TickConstruction`, exact `CompletedBuildingCount` semantics, route/research development methods, construction multiplier, and complete-all. At this stage the lock flag is false for every instance; Task 7 adds its only mutation path. Do not add `HasPlayerOwnedGroundInstances`, `CopyPlayerOwnedGroundInstances`, `TryLockEvacuationWork`, `RollbackEvacuationLocksAfterFailure`, or `TryCommitEvacuation` until Task 7 creates the evacuation rule behavior and modifies the session. Use the `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` persists only the fixture switch, and `Awake` rebuilds the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, or unlock table.
+- [ ] Implement the Task 4 session subset: `Configure`, `ConfigureDevelopmentFixture`, `TryBeginConstruction`, `TryCancelConstruction`, `TickConstruction`, exact `CompletedBuildingCount` semantics, route/research development methods, construction multiplier, complete-all, and the frozen `CatalogRevision` contract in §2.4. At this stage the lock flag is false for every instance; Task 7 adds its only mutation path. Do not add `HasPlayerOwnedGroundInstances`, `CopyPlayerOwnedGroundInstances`, `TryLockEvacuationWork`, `RollbackEvacuationLocksAfterFailure`, or `TryCommitEvacuation` until Task 7 creates the evacuation rule behavior and modifies the session. Use the `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` persists only the fixture switch, and `Awake` rebuilds the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, unlock table, or a second catalog invalidation mechanism.
 
 - [ ] Run focused GREEN; then run existing `ConstructionProgressTests`, `BuildingGridTests`, `BuildingUnlockTests`, and `ResearchTests`.
 
@@ -1284,7 +1295,7 @@ git commit -m "feat: add atomic graybox construction session"
 
 - [ ] In projector tests, create an isolated Physics scene or explicit Collider fixture and call `Physics.SyncTransforms()` before ray assertions. If Unity 2022.3 Collider.Raycast behavior differs from the approved contract, stop rather than replacing logical evaluation with Physics truth.
 
-- [ ] Write RED placement/view tests proving all footprint cells feed terrain, obstacle, city-body, compatible-node and grid checks; mining preview highlights only a compatible node; two cells holding the same `WorldCell.ResourceId` produce distinct `world.resource-node.<x>.<y>` IDs and distinct VisualSlots; `CompatibleResourceNodeId` never equals the resource type ID; green/red preview exposes the ordered reason; confirmation reevaluates instead of trusting the cached preview; selection remains active after success for continuous placement; material exhaustion leaves a red preview; Collider ray selection resolves only a stable instance ID.
+- [ ] Write RED placement/view tests proving all footprint cells feed terrain, obstacle, city-body, compatible-node and grid checks. For `MiningStation`, Iron and EnergyCrystal nodes must each pass with their own coordinate `world.resource-node.<x>.<y>` IDs; Stone, Biomass, Water, and other `HasResource` types must reject with `IncompatibleResourceNode` and no `CompatibleResourceNodeId` (explicitly assert the Stone null-ID case). A non-node-requiring definition remains node-independent and exposes no compatible node ID even when its footprint includes a resource cell. Two cells holding the same compatible `WorldCell.ResourceId` produce distinct coordinate IDs and distinct VisualSlots; `CompatibleResourceNodeId` never equals a resource type ID. Prove green/red preview exposes the ordered reason; confirmation reevaluates instead of trusting the cached preview; selection remains active after success for continuous placement; material exhaustion leaves a red preview; Collider ray selection resolves only a stable instance ID.
 
 - [ ] Write RED presentation tests for stable IDs:
 
@@ -1365,9 +1376,11 @@ git commit -m "feat: add graybox dual grid placement view"
 
 - [ ] Write RED state tests for every transition in specification §8.4, especially both Catalog origins, retained selection/orientation, new-card selection returning Previewing, first Esc consumed by focused InputField, next Esc closing to returnState, and a further Esc canceling preview.
 
-- [ ] Write RED menu tests for always-visible ten-slot quickbar, B catalog vertical layer, five categories, four route filters, visible-only search, cost text, hover detail fields, hidden empty shortcut slots, locked disabled cards with primary/all reasons, `TrySelectQuickbarSlot(0..9)` and `TrySelectCatalogItem(stableId)` rejecting hidden/locked items and selecting only buildable definitions through interaction, selecting a card auto-closing catalog, and world continuing while catalog is open.
+- [ ] Write RED menu tests for always-visible ten-slot quickbar, B catalog vertical layer, five categories, four route filters, visible-only search, cost text, hover detail fields, hidden empty shortcut slots, locked disabled cards with primary/all reasons, `TrySelectQuickbarSlot(0..9)` and `TrySelectCatalogItem(stableId)` rejecting hidden/locked items and selecting only buildable definitions through interaction, selecting a card auto-closing catalog, and world continuing while catalog is open. Build Details must show `最低人口：<N>` for every definition with `MinimumPopulation > 0` even when the fixture already meets it, while retaining research, prerequisite-building, and current lock-reason detail.
 
-- [ ] Write RED UGUI guard tests using a real `EventSystem`, `InputSystemUIInputModule`, `Canvas`, `GraphicRaycaster`, `InputField`, `Button`, and pointer event data. Assert editable/keyboard controls own focus, text input consumes W/A/S/D/B/R/digits, and pointer-over-UI reports true without relying on object names.
+- [ ] Add RED revision-driven menu tests. `RefreshCatalog()` must synchronize the cached session revision. Without an explicit refresh, one later `Update` after an actual route contact, research unlock, or successful prerequisite completion must rebuild the affected catalog/quickbar projection from the same session and expose the newly visible/unlocked card. Repeated `Update` calls with an unchanged revision must preserve the exact existing quickbar/card `GameObject` and `Transform` identities; they may still perform visibility and placement-status sync.
+
+- [ ] Write RED UGUI guard tests using a real `EventSystem`, `InputSystemUIInputModule`, `Canvas`, `GraphicRaycaster`, `InputField`, `Button`, and pointer event data. Assert editable/keyboard controls own focus, text input consumes W/A/S/D/B/R/digits, and pointer-over-UI reports true without relying on object names. Add a real active `PhysicsRaycaster`/world-Collider negative case proving an `EventSystem.RaycastAll` physics result alone does not capture UI, and a real active `GraphicRaycaster` positive case proving its result does; retain a separate `GraphicRegistry` fallback-positive case.
 
 - [ ] Add RED callback tests proving construction cancel/confirmation buttons and evacuation item/category/all/confirm buttons raise exactly the public events in §2.6, never mutate session/deployment directly, and do not retain duplicate listeners after a view/controller is destroyed and recreated.
 
@@ -1390,6 +1403,8 @@ Expected RED: missing `BuildingEvacuationTreatment`, `GrayboxBuildingMenuView3D`
 - [ ] Define `BuildingEvacuationTreatment` in `BuildingEvacuationRules.cs` so the UGUI event contract compiles; Task 7 will add work/rule behavior to the same file. Reuse the Task 3 scene-serialized interaction component unchanged. Implement UGUI view construction from stable procedural elements; do not add icons, TMP, prefabs, textures or packages. UI events call its public methods; the component has no Renderer/Physics/Input/Persistence responsibility and remains the state source of truth. Implement the construction controller now that its concrete view and menu event contracts both exist.
 
 - [ ] Implement focus precedence: when an editable/keyboard UGUI control is selected, UI consumes text/navigation/submit/cancel. `ConsumeFocusedEscape` uses EventSystem deselection/end-edit semantics, and gameplay is eligible only on the following frame.
+
+- [ ] Implement the §2.6 pointer filter exactly: inspect every `EventSystem.RaycastAll` result's `module`, accept only an active/enabled `GraphicRaycaster` with an active/enabled owning `Canvas`, and ignore Physics/Physics2D/world raycasters. Preserve the active `GraphicRegistry` fallback without introducing physics checks. Make `RefreshCatalog()` synchronize the menu's cached `CatalogRevision` after a successful rebuild; `Update` refreshes only when that revision changes before its existing visibility/status synchronization. Render the explicit minimum-population line independently of the current unlock result.
 
 - [ ] Run focused GREEN. Verify no hidden item text is present in active or inactive card GameObjects and no 28-card scene pool is serialized.
 
