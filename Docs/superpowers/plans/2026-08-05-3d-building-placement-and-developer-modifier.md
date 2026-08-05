@@ -914,7 +914,7 @@ namespace WasteCity.Graybox3D.Building
 #endif
 ```
 
-`GrayboxDeveloperModifierBootstrap3D` 的类型、序列化字段和 `ResolveRuntimeAvailability` 在所有构建存在。它在任何构建的 `Awake`、`Update` 或其他生命周期方法中都不读取 `Keyboard.current`/F10；它只提供 `TryTogglePanel` 和受条件编译保护的服务创建。Release 的 `Awake`、`TryTogglePanel` 不创建 UI、不创建命令服务，并返回不可用。唯一 F10 读取者是 `GrayboxBuildingInputRouter3D.ProcessCurrentInput`，且读取发生在 UGUI 键盘焦点与模态输入处理之后。条件编译类型绝不出现在场景序列化字段、Prefab 或 ScriptableObject 中。
+`GrayboxDeveloperModifierBootstrap3D` 的类型、序列化字段和 `ResolveRuntimeAvailability` 在所有构建存在。它在任何构建的 `Awake`、`Update` 或其他生命周期方法中都不读取 `Keyboard.current`/F10；它只提供 `TryTogglePanel` 和受条件编译保护的服务创建。Release 的 `Awake`、`TryTogglePanel` 不创建 UI、不创建命令服务，并返回不可用。在 `Assets/_Game/Scripts/Graybox3D` 的建造/开发修改器运行时链路中，唯一 F10 读取者是 `GrayboxBuildingInputRouter3D.ProcessCurrentInput`，且读取发生在 UGUI 键盘焦点与模态输入处理之后。冻结的 Legacy 2D 回溯锚点保留其独立 F10 入口，不计入该 3D 链路唯一性合同且不得在本任务修改。条件编译类型绝不出现在场景序列化字段、Prefab 或 ScriptableObject 中。
 
 Menu and callback ownership:
 
@@ -1650,7 +1650,7 @@ When paused, building construction and gameplay actions remain disabled; UGUI na
 
 Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.TrySelectCatalogItem`; the input router has no session/presenter field and cannot inspect visibility, lock reasons or the 28-item mapping.
 
-`ProcessCurrentInput` is the only method in the project that reads `Keyboard.current.f10Key.wasPressedThisFrame`. It performs that read only after returning for focused editable/keyboard UGUI and after an open modal has consumed its input. In Editor/Development it calls the serialized bootstrap's `TryTogglePanel` once; in Release the same call is harmless and returns false, while compile guards prevent creating developer UI/commands. A focused search field therefore blocks F10; after focus loss a fresh F10 edge toggles the panel exactly once.
+`ProcessCurrentInput` is the only method in the Graybox3D building/developer-modifier runtime scope that reads `Keyboard.current.f10Key.wasPressedThisFrame`. It performs that read only after returning for focused editable/keyboard UGUI and after an open modal has consumed its input. In Editor/Development it calls the serialized bootstrap's `TryTogglePanel` once; in Release the same call is harmless and returns false, while compile guards prevent creating developer UI/commands. A focused search field therefore blocks F10; after focus loss a fresh F10 edge toggles the panel exactly once. The frozen `Assets/_Game/Scripts/Legacy/RewindAnchorController.cs` F10 reader belongs to an isolated Legacy 2D entry, remains byte-for-byte unchanged from batch baseline `e5898fef63e33f59cd98a6fe9be753ca97414e12`, and is outside this scoped uniqueness check.
 
 - [ ] Run focused GREEN. Add a 300-call warmed allocation assertion for `ProcessCurrentInput` with unchanged device state; record the byte difference and require zero.
 
@@ -1660,16 +1660,20 @@ Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.Try
 rg -n "TickMovement|TickDeployment|TickControl|TickCamera|ProcessFrame" \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs
 test "$(rg -l "f10Key" \
-  Assets/_Game/Scripts | wc -l | tr -d ' ')" = "1"
+  Assets/_Game/Scripts/Graybox3D | wc -l | tr -d ' ')" = "1"
+test "$(rg -l "f10Key" Assets/_Game/Scripts/Graybox3D)" = \
+  "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs"
 if rg -n "Keyboard\\.current|f10Key|void Update\\s*\\(" \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs; then
   echo "bootstrap must not poll F10" >&2
   exit 1
 fi
+git diff --quiet e5898fef63e33f59cd98a6fe9be753ca97414e12 -- \
+  Assets/_Game/Scripts/Legacy/RewindAnchorController.cs
 git diff --check
 ```
 
-Expected: building router does not directly drive any gameplay tick.
+Expected: building router does not directly drive any gameplay tick; the scoped Graybox3D F10 scan returns exactly the building input router; the bootstrap does not poll input; and the frozen Legacy 2D F10 reader remains unchanged.
 
 - [ ] Stage exactly and commit:
 
