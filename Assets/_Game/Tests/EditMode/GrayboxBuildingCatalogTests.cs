@@ -289,22 +289,55 @@ namespace WasteCity.Tests
             Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
         }
 
-        [Test]
-        public void Interaction_ResolvesCancelConfirmationDeterministically()
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Interaction_CancelConstructionFromInactiveReturnsToInactive(bool confirmed)
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
-            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
+
             interaction.RequestCancelConstruction();
             Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CancelConfirmation));
 
-            interaction.ResolveCancelConfirmation(false);
-            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
-            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
-
-            interaction.RequestCancelConstruction();
-            interaction.ResolveCancelConfirmation(true);
+            interaction.ResolveCancelConfirmation(confirmed);
             Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
             Assert.That(interaction.Selected, Is.Null);
+            Assert.That(interaction.Orientation, Is.EqualTo(BuildingOrientation.North));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Interaction_CancelConstructionFromPreviewReturnsWithoutClearingContinuousPlacement(bool confirmed)
+        {
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
+            interaction.RotateClockwise();
+            interaction.RequestCancelConstruction();
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CancelConfirmation));
+
+            interaction.ResolveCancelConfirmation(confirmed);
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
+            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
+            Assert.That(interaction.Orientation, Is.EqualTo(BuildingOrientation.East));
+        }
+
+        [Test]
+        public void Interaction_CancelConstructionRejectsCatalogAndKeepsFirstCapturedReturnState()
+        {
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+            interaction.ToggleCatalog();
+            interaction.RequestCancelConstruction();
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+
+            interaction.CloseCatalog();
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
+            interaction.RotateClockwise();
+            interaction.RequestCancelConstruction();
+            interaction.RequestCancelConstruction();
+            interaction.ResolveCancelConfirmation(false);
+
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
+            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
+            Assert.That(interaction.Orientation, Is.EqualTo(BuildingOrientation.East));
         }
 
         [Test]

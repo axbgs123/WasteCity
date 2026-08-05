@@ -187,7 +187,9 @@ namespace WasteCity.Building
             if (request.FootprintTouchesCity) failures.Add(BuildingPlacementFailure.CityOccupied);
             if (!request.TerrainPassable) failures.Add(BuildingPlacementFailure.InvalidTerrain);
             if (!request.ObstacleFree) failures.Add(BuildingPlacementFailure.Obstacle);
-            if (hasDefinition && request.Definition.RequiresResourceNode && !request.CoversCompatibleResourceNode)
+            var hasCompatibleResourceNode = request.CoversCompatibleResourceNode &&
+                !string.IsNullOrEmpty(request.CompatibleResourceNodeId);
+            if (hasDefinition && request.Definition.RequiresResourceNode && !hasCompatibleResourceNode)
                 failures.Add(BuildingPlacementFailure.IncompatibleResourceNode);
             if (!request.ContentVisible || ContainsUnlockFailure(request.Unlock, BuildingUnlockFailure.Research))
                 failures.Add(BuildingPlacementFailure.ContentUnavailable);
@@ -197,7 +199,7 @@ namespace WasteCity.Building
                 failures.Add(BuildingPlacementFailure.PrerequisiteBuildingRequired);
             if (!request.CanAfford) failures.Add(BuildingPlacementFailure.InsufficientMaterials);
 
-            var nodeId = hasDefinition && request.Definition.RequiresResourceNode && request.CoversCompatibleResourceNode
+            var nodeId = hasDefinition && request.Definition.RequiresResourceNode && hasCompatibleResourceNode
                 ? request.CompatibleResourceNodeId
                 : null;
             return new BuildingPlacementEvaluation(

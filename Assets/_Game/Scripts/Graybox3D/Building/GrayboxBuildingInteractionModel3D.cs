@@ -82,7 +82,9 @@ namespace WasteCity.Graybox3D.Building
 
         public void RequestCancelConstruction()
         {
-            if (state != GrayboxBuildingInteractionState.Previewing) return;
+            if (state != GrayboxBuildingInteractionState.Inactive &&
+                state != GrayboxBuildingInteractionState.Previewing)
+                return;
             cancelReturnState = state;
             state = GrayboxBuildingInteractionState.CancelConfirmation;
         }
@@ -90,13 +92,6 @@ namespace WasteCity.Graybox3D.Building
         public void ResolveCancelConfirmation(bool confirmed)
         {
             if (state != GrayboxBuildingInteractionState.CancelConfirmation) return;
-            if (confirmed)
-            {
-                selectedBuildingId = null;
-                orientation = BuildingOrientation.North;
-                state = GrayboxBuildingInteractionState.Inactive;
-                return;
-            }
             state = cancelReturnState;
         }
 

@@ -152,6 +152,29 @@ namespace WasteCity.Tests
                 BuildingPlacementFailure.IncompatibleResourceNode);
         }
 
+        [TestCase(null)]
+        [TestCase("")]
+        public void MiningWithMissingStableNodeIdReportsNodeFailure(string compatibleResourceNodeId)
+        {
+            var mining = new BuildingDefinition(
+                "test.building.missing-node-id",
+                "Missing Node Id",
+                2,
+                2,
+                ResourceIds.Alloy,
+                1,
+                true);
+
+            BuildingPlacementEvaluation evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(
+                    definition: mining,
+                    coversCompatibleResourceNode: true,
+                    compatibleResourceNodeId: compatibleResourceNodeId));
+
+            AssertFailures(evaluation, BuildingPlacementFailure.IncompatibleResourceNode);
+            Assert.That(evaluation.CompatibleResourceNodeId, Is.Null);
+        }
+
         [Test]
         public void HiddenContentReportsContentUnavailable()
         {
