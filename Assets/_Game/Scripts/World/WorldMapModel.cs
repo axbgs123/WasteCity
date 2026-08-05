@@ -4,15 +4,17 @@ using WasteCity.Economy;
 namespace WasteCity.World
 {
     public enum TerrainKind { Wasteland, Rocky, Crystal, Wetland }
+    public enum WorldTraversalKind { Open, Ruins, DeepWater, Cliff }
 
     public readonly struct WorldCell
     {
         public TerrainKind Terrain { get; }
         public string ResourceId { get; }
         public int ResourceAmount { get; }
+        public WorldTraversalKind Traversal { get; }
         public bool HasResource => !string.IsNullOrEmpty(ResourceId);
-        public WorldCell(TerrainKind terrain, string resourceId, int amount)
-        { Terrain = terrain; ResourceId = resourceId; ResourceAmount = amount; }
+        public WorldCell(TerrainKind terrain, string resourceId, int amount, WorldTraversalKind traversal = WorldTraversalKind.Open)
+        { Terrain = terrain; ResourceId = resourceId; ResourceAmount = amount; Traversal = traversal; }
     }
 
     public sealed class WorldMapModel
@@ -32,9 +34,34 @@ namespace WasteCity.World
                 int terrainRoll = seed.Sample(x, y, 0) % 100;
                 TerrainKind terrain = terrainRoll < 15 ? TerrainKind.Crystal : terrainRoll < 35 ? TerrainKind.Rocky : terrainRoll < 45 ? TerrainKind.Wetland : TerrainKind.Wasteland;
                 string resource = RollResource(seed.Sample(x, y, 1) % 100, terrain);
+                WorldTraversalKind traversal = WorldTraversalKind.Open;
+                if (resource == null)
+                {
+                    int traversalRoll = seed.Sample(x, y, 3) % 100;
+                    traversal = traversalRoll < 4
+                        ? WorldTraversalKind.Cliff
+                        : traversalRoll < 8
+                            ? WorldTraversalKind.DeepWater
+                            : traversalRoll < 18
+                                ? WorldTraversalKind.Ruins
+                                : WorldTraversalKind.Open;
+                }
                 int amount = resource == null ? 0 : 80 + seed.Sample(x, y, 2) % 321;
-                cells[x, y] = new WorldCell(terrain, resource, amount);
+                cells[x, y] = new WorldCell(terrain, resource, amount, traversal);
                 if (resource != null) ResourceNodeCount++;
+            }
+        }
+
+        public WorldMapModel(WorldCell[,] source)
+        {
+            if (source == null || source.GetLength(0) < 1 || source.GetLength(1) < 1)
+                throw new ArgumentException("World cells are required.", nameof(source));
+            Width = source.GetLength(0); Height = source.GetLength(1);
+            cells = new WorldCell[Width, Height]; revealed = new bool[Width, Height];
+            for (int x = 0; x < Width; x++) for (int y = 0; y < Height; y++)
+            {
+                cells[x, y] = source[x, y];
+                if (cells[x, y].HasResource) ResourceNodeCount++;
             }
         }
 
@@ -56,7 +83,7 @@ namespace WasteCity.World
             if (x < 0 || y < 0 || x >= Width || y >= Height || requested <= 0) return 0;
             WorldCell cell = cells[x, y]; if (!cell.HasResource || cell.ResourceAmount <= 0) return 0;
             int harvested = Math.Min(requested, cell.ResourceAmount); resourceId = cell.ResourceId;
-            cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested);
+            cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested, cell.Traversal);
             return harvested;
         }
         public int[] CaptureResourceAmounts() { var result=new int[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=cells[x,y].ResourceAmount;return result; }
@@ -64,7 +91,7 @@ namespace WasteCity.World
         public bool Restore(int[] amounts, bool[] visibility)
         {
             if(amounts==null||visibility==null||amounts.Length!=Width*Height||visibility.Length!=Width*Height)return false;
-            for(int y=0;y<Height;y++)for(int x=0;x<Width;x++){int index=y*Width+x;var cell=cells[x,y];cells[x,y]=new WorldCell(cell.Terrain,cell.ResourceId,Math.Max(0,amounts[index]));revealed[x,y]=visibility[index];}return true;
+            for(int y=0;y<Height;y++)for(int x=0;x<Width;x++){int index=y*Width+x;var cell=cells[x,y];cells[x,y]=new WorldCell(cell.Terrain,cell.ResourceId,Math.Max(0,amounts[index]),cell.Traversal);revealed[x,y]=visibility[index];}return true;
         }
 
         private static string RollResource(int roll, TerrainKind terrain)
