@@ -4,6 +4,8 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
@@ -127,6 +129,48 @@ namespace WasteCity.Tests
                 "core.research.automated-machinery"), Is.True);
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
             Assert.That(fixture.Session.ConstructionMultiplier, Is.EqualTo(10f));
+        }
+
+        [Test]
+        public void Bootstrap_ProvidesIdempotentEventSystemAndRealUguiClickPath()
+        {
+            BootstrapFixture fixture = CreateBootstrapFixture();
+            Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
+
+            EventSystem[] eventSystems =
+                UnityEngine.Object.FindObjectsOfType<EventSystem>();
+            Assert.That(eventSystems, Has.Length.EqualTo(1));
+            EventSystem eventSystem = eventSystems[0];
+            Assert.That(eventSystem.gameObject.activeInHierarchy, Is.True);
+            Assert.That(eventSystem.GetComponent<InputSystemUIInputModule>(),
+                Is.Not.Null);
+            Assert.That(eventSystem.GetComponent<InputSystemUIInputModule>()
+                .isActiveAndEnabled, Is.True);
+            Assert.That(
+                eventSystem.GetComponents<InputSystemUIInputModule>().Length,
+                Is.EqualTo(1));
+
+            Button button = ButtonNamed(fixture.Panel, "Resource +100");
+            ExecuteEvents.Execute(
+                button.gameObject,
+                new PointerEventData(eventSystem)
+                {
+                    button = PointerEventData.InputButton.Left
+                },
+                ExecuteEvents.pointerClickHandler);
+            Assert.That(fixture.Session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(130));
+
+            fixture.Bootstrap.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.Presentation);
+            Assert.That(
+                UnityEngine.Object.FindObjectsOfType<EventSystem>().Length,
+                Is.EqualTo(1));
+            Assert.That(
+                eventSystem.GetComponents<InputSystemUIInputModule>().Length,
+                Is.EqualTo(1));
         }
 
         [Test]
@@ -319,6 +363,7 @@ namespace WasteCity.Tests
                 bootstrap,
                 fixture.Session,
                 fixture.City,
+                presentation,
                 bootstrap.transform.Find("Graybox Developer Modifier")
                     ?.gameObject);
         }
@@ -417,17 +462,20 @@ namespace WasteCity.Tests
                 GrayboxDeveloperModifierBootstrap3D bootstrap,
                 GrayboxBuildingSession3D session,
                 GrayboxMobileCityController3D city,
+                GrayboxBuildingWorldView3D presentation,
                 GameObject panel)
             {
                 Bootstrap = bootstrap;
                 Session = session;
                 City = city;
+                Presentation = presentation;
                 Panel = panel;
             }
 
             public GrayboxDeveloperModifierBootstrap3D Bootstrap { get; }
             public GrayboxBuildingSession3D Session { get; }
             public GrayboxMobileCityController3D City { get; }
+            public GrayboxBuildingWorldView3D Presentation { get; }
             public GameObject Panel { get; }
         }
 

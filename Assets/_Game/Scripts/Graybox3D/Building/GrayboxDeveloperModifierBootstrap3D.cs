@@ -3,6 +3,8 @@ using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 #endif
 
@@ -63,6 +65,7 @@ namespace WasteCity.Graybox3D.Building
             if (panelRoot != null || session == null || city == null ||
                 presentation == null)
                 return;
+            EnsureEventSystem();
             modifier = new GrayboxDeveloperModifier3D(
                 session,
                 city,
@@ -144,6 +147,33 @@ namespace WasteCity.Graybox3D.Building
             CreateButton(root, "Complete Construction", "立即完成施工", () =>
                 modifier.CompleteAllConstruction());
             panelRoot.SetActive(false);
+        }
+
+        private static EventSystem EnsureEventSystem()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                EventSystem[] existing =
+                    FindObjectsOfType<EventSystem>();
+                if (existing.Length > 0)
+                    eventSystem = existing[0];
+            }
+
+            if (eventSystem == null)
+            {
+                var root = new GameObject("Graybox Developer EventSystem");
+                eventSystem = root.AddComponent<EventSystem>();
+            }
+
+            BaseInputModule module = eventSystem.GetComponent<
+                BaseInputModule>();
+            if (module == null)
+                module = eventSystem.gameObject.AddComponent<
+                    InputSystemUIInputModule>();
+            if (!module.enabled)
+                module.enabled = true;
+            return eventSystem;
         }
 
         private static InputField CreateInput(
