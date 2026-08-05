@@ -275,6 +275,7 @@ namespace WasteCity.Graybox3D
             GrayboxCameraController3D cameraController);
         public GrayboxInputFrame ReadCurrentFrame();
         public void ProcessFrame(GrayboxInputFrame frame);
+        public void TickGameplay(float deltaTime);
     }
 
     public sealed class GrayboxCameraController3D : MonoBehaviour
@@ -1239,7 +1240,12 @@ git commit -m "feat: add graybox leader direct control"
 - 缺领袖引用回退城市；缺城市引用保持当前 rig 位置，不回原点。
 - CameraRig 只改 X/Z，保持 Y；相机局部位置、旋转、orthographicSize 不变。
 - `Time.timeScale = 0` 时中键和 Home 仍工作；城市/领袖玩法 tick 不由镜头调用。
-- `ProcessFrame` 和 `TickCamera` 在两次预热后连续 300 次不分配托管内存。
+- Fortress+已招募时，先由 `ProcessFrame` 路由 WASD，再调用
+  `TickGameplay(.1f)`，领袖移动且城市不动。
+- City 目标时 `TickGameplay` 使领袖停靠，但不推进城市；暂停时即使
+  领袖此前已有非零输入，也不移动或停靠。
+- `ProcessFrame`、`TickGameplay` 和 `TickCamera` 在两次预热后连续
+  300 次不分配托管内存。
 
 反向拖动断言使用真实平面投影：
 
@@ -1293,7 +1299,7 @@ public bool TryProjectToPlane(Vector2 screenPosition, out Vector3 worldPoint)
 }
 ```
 
-输入路由 `Update` 只负责构造 `GrayboxInputFrame`：
+输入路由 `Update` 先构造并处理 `GrayboxInputFrame`，再推进领袖：
 
 ```csharp
 Vector2 move = new Vector2(
@@ -1304,6 +1310,19 @@ Vector2 move = new Vector2(
 ```
 
 `ProcessFrame` 不使用 delta time。它先处理中键与 Home，使镜头在 `Time.timeScale == 0` 时仍可操作；只有 `Time.timeScale > 0` 时才处理 WASD、F 和右键，确保暂停不会改变玩法位置、路径或部署 Mode。F 调用城市 `TryToggleDeployment`；右键先投影再调用 `TrySetDestinationCell`；WASD 按协调器当前目标路由。
+
+`Update()` 的固定顺序为：
+
+```csharp
+ProcessFrame(ReadCurrentFrame());
+TickGameplay(Time.deltaTime);
+```
+
+`TickGameplay(float deltaTime)` 在 `Time.timeScale <= 0` 或领袖引用缺失
+时直接返回；否则刷新 `directControl`，以其当前目标（协调器缺失时为
+City）调用 `leader.TickControl(target, Mathf.Max(0f, deltaTime))`。
+该方法不得调用城市的 `TickMovement` 或 `TickDeployment`；城市继续由
+自身的 `Update`/`FixedUpdate` 驱动，镜头也不得调用任何玩法 tick。
 
 镜头内部持有既有 `CameraFollowModel`。`TickCamera` 先调用 `directControl.Refresh()`，再：
 
@@ -1317,7 +1336,10 @@ if (targetChanged || followModel.Mode == CameraFollowMode.Following)
 
 `BeginFreeDrag` 先记录第一次有效平面命中再 `BeginFreeDrag()`；`ContinueFreeDrag` 只在有前一命中时应用 `previous-current`；`EndFreeDrag` 调用空吸回语义的 `CameraFollowModel.EndFreeDrag()`；`ReturnToTarget` 调用模型后立即 `SnapRigToEffectiveTarget()`。这些方法不依赖 scaled/unscaled delta。
 
-分配测试使用 `GC.GetAllocatedBytesForCurrentThread()`，先调用两次预热，再在同线程调用 300 次只接受差值 `0`；测试输入、数组、delegate 和 comparer 在计量前创建，避免把测试夹具分配归因给适配器。
+分配测试使用 `GC.GetAllocatedBytesForCurrentThread()`，先调用两次预热，
+再在同线程连续调用 `ProcessFrame`、`TickGameplay` 和 `TickCamera`
+300 次，只接受差值 `0`；测试输入、数组、delegate 和 comparer 在计量前
+创建，避免把测试夹具分配归因给适配器。
 
 - [ ] **Step 4：运行 GREEN**
 
@@ -1331,7 +1353,9 @@ if (targetChanged || followModel.Mode == CameraFollowMode.Following)
   -logFile "/tmp/wastecity-3d-graybox-foundation/task-07/green.log"
 ```
 
-GREEN 必须包括暂停、反向拖动、释放保持、Home、目标变化和 300 次适配器调用零分配。
+GREEN 必须包括领袖运行时推进、City 目标停靠、暂停不推进、反向拖动、
+释放保持、Home、目标变化和包含 `TickGameplay` 的 300 次适配器调用
+零分配。
 
 - [ ] **Step 5：检查并提交**
 
