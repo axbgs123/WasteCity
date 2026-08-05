@@ -1593,6 +1593,7 @@ git commit -m "feat: add release safe graybox developer modifier"
 - Modify: `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs.meta`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`
 
@@ -1618,6 +1619,10 @@ F10 after focus/modal handling calls developer.TryTogglePanel exactly once
 bootstrap and router cannot both read F10
 outside build mode digits remain unconsumed for future skills
 ```
+
+- [ ] Write RED pointer-cache regressions using real UGUI and virtual mouse state. Hold middle mouse at one unchanged screen position, change UI visibility/layout from no hit to a GraphicRaycaster hit, and assert the next `ProcessCurrentInput` changes `CameraDrag` from false to true; close that UI without moving or releasing and assert the following call changes it back to false. Preserve the existing real-mouse regression proving a UI-suppressed middle release still reaches camera cleanup and cannot resume a stale drag.
+
+- [ ] Write RED dynamic-preview regressions with unchanged pointer position, selected definition and orientation. Mutate inventory/resources, city mode or logical position, and grid occupancy in separate cases, then assert the next Previewing frame calls `placement.UpdatePointer(pointerPosition)` and publishes the newly evaluated legality. These state inputs are deliberately not copied into the input router.
 
 - [ ] Run focused RED:
 
@@ -1652,7 +1657,11 @@ Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.Try
 
 `ProcessCurrentInput` is the only method in the Graybox3D building/developer-modifier runtime scope that reads `Keyboard.current.f10Key.wasPressedThisFrame`. It performs that read only after returning for focused editable/keyboard UGUI and after an open modal has consumed its input. In Editor/Development it calls the serialized bootstrap's `TryTogglePanel` once; in Release the same call is harmless and returns false, while compile guards prevent creating developer UI/commands. A focused search field therefore blocks F10; after focus loss a fresh F10 edge toggles the panel exactly once. The frozen `Assets/_Game/Scripts/Legacy/RewindAnchorController.cs` F10 reader belongs to an isolated Legacy 2D entry, remains byte-for-byte unchanged from batch baseline `e5898fef63e33f59cd98a6fe9be753ca97414e12`, and is outside this scoped uniqueness check.
 
-- [ ] Run focused GREEN. Add a 300-call warmed allocation assertion for `ProcessCurrentInput` with unchanged device state; record the byte difference and require zero.
+- [ ] Remove every cached UI-hit Boolean and its invalidation fields/helpers from `GrayboxBuildingInputRouter3D`. Whenever any pointer channel is active, call `menu.IsPointerOverUi(pointerPosition)` on that frame even when device, buttons and position are unchanged. `GrayboxUiInputGuard3D` must reuse one instance-level `PointerEventData` and its existing reusable `List<RaycastResult>`; when the supplied `EventSystem` instance changes, rebuild the `PointerEventData` safely. Before every `EventSystem.RaycastAll`, reset the reusable event data, assign the current position, clear the result list, and perform a real raycast. Never cache the hit Boolean, Canvas layout, Graphic or RaycastResult between calls.
+
+- [ ] Remove every placement/preview-result cache and its invalidation fields/helpers from `GrayboxBuildingInputRouter3D`. While the interaction is `Previewing` and the pointer is not owned by UGUI, call `placement.UpdatePointer(pointerPosition)` every frame so inventory, city mode/position, grid occupancy, obstacles and resource nodes remain authoritative through the placement controller.
+
+- [ ] Run focused GREEN. Add warmed 300-call allocation assertions for three exact states: idle input, unchanged middle-hold over a real UGUI GraphicRaycaster target, and stable Previewing. Record every byte difference and require `0 B`. The middle-hold loop must still execute a real `EventSystem.RaycastAll` through `GrayboxUiInputGuard3D` on every measured call; a shortcut that skips classification does not satisfy the gate.
 
 - [ ] Run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`, then:
 
@@ -1683,6 +1692,7 @@ git add Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs.meta
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs
 git diff --cached --name-only
