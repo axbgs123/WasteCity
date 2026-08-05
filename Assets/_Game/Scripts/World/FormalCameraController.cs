@@ -15,6 +15,8 @@ namespace WasteCity.World
         [SerializeField] private Transform leaderTarget;
 
         private readonly CameraFollowModel model = new CameraFollowModel();
+        private bool pointerDragActive;
+        private Vector2 lastPointerPosition;
 
         public CameraFollowMode Mode => model.Mode;
         public DirectControlTarget CurrentTarget => model.Target;
@@ -34,18 +36,11 @@ namespace WasteCity.World
         {
             Mouse mouse = Mouse.current;
             if (mouse != null)
-            {
-                if (mouse.middleButton.wasPressedThisFrame)
-                    BeginFreeDrag();
-
-                if (mouse.middleButton.isPressed)
-                    ApplyPointerDelta(
-                        mouse.delta.ReadValue(),
-                        Screen.height);
-
-                if (mouse.middleButton.wasReleasedThisFrame)
-                    EndFreeDrag();
-            }
+                ProcessPointerState(
+                    mouse.position.ReadValue(),
+                    mouse.middleButton.wasPressedThisFrame,
+                    mouse.middleButton.wasReleasedThisFrame,
+                    Screen.height);
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null &&
@@ -77,7 +72,32 @@ namespace WasteCity.World
 
         public void EndFreeDrag()
         {
+            pointerDragActive = false;
             model.EndFreeDrag();
+        }
+
+        public void ProcessPointerState(
+            Vector2 screenPosition,
+            bool pressedThisFrame,
+            bool releasedThisFrame,
+            float screenHeight)
+        {
+            if (pressedThisFrame)
+            {
+                BeginFreeDrag();
+                pointerDragActive = true;
+                lastPointerPosition = screenPosition;
+            }
+            else if (pointerDragActive)
+            {
+                ApplyPointerDelta(
+                    screenPosition - lastPointerPosition,
+                    screenHeight);
+                lastPointerPosition = screenPosition;
+            }
+
+            if (releasedThisFrame)
+                EndFreeDrag();
         }
 
         public void ApplyPointerDelta(
@@ -126,6 +146,7 @@ namespace WasteCity.World
         private bool IsLeaderTargetAvailable()
         {
             return leader != null &&
+                   leader.isActiveAndEnabled &&
                    leaderTarget != null &&
                    leaderTarget.gameObject.activeInHierarchy;
         }
