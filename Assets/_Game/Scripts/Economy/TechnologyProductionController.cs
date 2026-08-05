@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using WasteCity.Leader;
 using System;
+using WasteCity.Content;
 
 namespace WasteCity.Economy
 {
@@ -96,7 +97,7 @@ namespace WasteCity.Economy
 
         private void OnGUI()
         {
-            GUI.Box(new Rect(Screen.width-470f,18f,450f,145f),$"多路线生产监控\n采矿：运行 {ActiveMines} / 枯竭 {DepletedMines} / 满仓 {FullMines}\n科技 冶炼 {StatusText(smelter.Status)} · 装配 {StatusText(assembler.Status)} · 发电 {StatusText(powerPlant.Status)}\n修仙 灵火 {StatusText(spiritFire.Status)} · 炼器 {StatusText(artifactWorkshop.Status)} · 聚灵 {StatusText(spiritGathering.Status)}\n血肉 菌落 {StatusText(boneSteel.Status)}/{StatusText(concentrate.Status)} · 培育 {StatusText(breeding.Status)} · 代谢 {StatusText(metabolicFurnace.Status)}\n灵能 共振 {StatusText(resonance.Status)} · 工坊 {StatusText(psionicWorkshop.Status)} · 网络 {StatusText(consciousnessNetwork.Status)}");
+            GUI.Box(new Rect(Screen.width-520f,18f,500f,145f),$"多路线生产监控\n{BuildingCatalog.MiningStation.Name}：运行 {ActiveMines} / 枯竭 {DepletedMines} / 满仓 {FullMines}\n{RouteContentDisplayCatalog.RouteName(ContentRoute.Technology)} {BuildingCatalog.Smelter.Name} {StatusText(smelter.Status)} · {BuildingCatalog.Assembler.Name} {StatusText(assembler.Status)} · {BuildingCatalog.PowerPlant.Name} {StatusText(powerPlant.Status)}\n{RouteContentDisplayCatalog.RouteName(ContentRoute.Cultivation)} {BuildingCatalog.SpiritFireFurnace.Name} {StatusText(spiritFire.Status)} · {BuildingCatalog.ArtifactWorkshop.Name} {StatusText(artifactWorkshop.Status)} · {BuildingCatalog.SpiritGatheringArray.Name} {StatusText(spiritGathering.Status)}\n{RouteContentDisplayCatalog.RouteName(ContentRoute.BiologicalAscension)} {BuildingCatalog.ColonyPool.Name} {StatusText(boneSteel.Status)}/{StatusText(concentrate.Status)} · {BuildingCatalog.BreedingChamber.Name} {StatusText(breeding.Status)} · {BuildingCatalog.MetabolicFurnace.Name} {StatusText(metabolicFurnace.Status)}\n{RouteContentDisplayCatalog.RouteName(ContentRoute.Psionics)} {BuildingCatalog.ResonanceFurnace.Name} {StatusText(resonance.Status)} · {BuildingCatalog.PsionicWorkshop.Name} {StatusText(psionicWorkshop.Status)} · {BuildingCatalog.ConsciousnessNetwork.Name} {StatusText(consciousnessNetwork.Status)}");
         }
 
         public float[] CaptureProgress()=>new[]{smelter.Progress,assembler.Progress,spiritFire.Progress,artifactWorkshop.Progress,boneSteel.Progress,concentrate.Progress,breeding.Progress,resonance.Progress,psionicWorkshop.Progress,spiritGathering.Progress,alchemy.Progress,powerPlant.Progress,metabolicFurnace.Progress,consciousnessNetwork.Progress};

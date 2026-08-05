@@ -13,6 +13,7 @@ using WasteCity.Presentation;
 using WasteCity.Research;
 using WasteCity.Leader;
 using WasteCity.Progression;
+using WasteCity.Content;
 
 namespace WasteCity.Building
 {
@@ -116,7 +117,16 @@ namespace WasteCity.Building
         }
         public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&(runtime.Definition.Id.Value==id||(id=="core.building.machine-gun-turret"&&runtime.Definition.Id.Value=="core.building.heavy-machine-gun-turret")));
         public int OperationalCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.HasLogistics&&runtime.Definition.Id.Value==id);
-        public bool CanBuild(BuildingDefinition definition,out string reason)=>BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new WasteCity.Content.StableId(id)),CompletedCount,out reason);
+        public bool CanBuild(BuildingDefinition definition,out string reason)
+        {
+            bool unlocked=BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new StableId(id)),CompletedCount,out _);
+            reason=unlocked?null:RouteContentDisplayCatalog.FriendlyUnlockReason(
+                definition,
+                population.Model.Current,
+                id=>research.Model.IsCompleted(new StableId(id)),
+                placements.Keys.Where(runtime=>runtime.Construction.IsComplete).Select(runtime=>runtime.Definition.Id.Value));
+            return unlocked;
+        }
         public void WorldToGrid(Vector2 point, out int x, out int y) { x=Mathf.FloorToInt(point.x-city.transform.position.x+8f);y=Mathf.FloorToInt(point.y-city.transform.position.y+6f); }
         public SpatialTemplateEntry[] CaptureTemplate(int originX, int originY) => placements.Where(pair => pair.Value.X >= originX && pair.Value.Y >= originY && pair.Value.X + pair.Value.Definition.Width <= originX + 3 && pair.Value.Y + pair.Value.Definition.Height <= originY + 3).Select(pair => new SpatialTemplateEntry { definitionId = pair.Value.Definition.Id.Value, dx = pair.Value.X - originX, dy = pair.Value.Y - originY }).ToArray();
         public bool TryStampTemplate(IReadOnlyList<SpatialTemplateEntry> entries, int originX, int originY)
@@ -156,7 +166,7 @@ namespace WasteCity.Building
         }
         private void TryUpgradeAtMouse()
         {
-            if(Mouse.current==null||city.Deployment.Mode!=CityMode.Fortress)return;Vector2 point=Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());BuildingRuntime runtime=FindNearest(point,1.5f);if(runtime==null||!runtime.Construction.IsComplete){LastAction="升级：请指向已完成建筑";return;}bool alloyArmor=research.Model.IsCompleted(new WasteCity.Content.StableId("core.research.alloy-armor"));bool swordRiding=research.HasSwordRiding;var recipe=BuildingUpgradeCatalog.For(runtime.Definition,progression.Civilization.Level,alloyArmor,swordRiding);if(recipe==null){LastAction="升级锁定：需要对应 T3 研究与二级文明，或该建筑没有后续型号";return;}if(!placements.TryGetValue(runtime,out var placed)||!grid.TryUpgrade(placed,recipe.Target,economy.Inventory,recipe.CostId,recipe.Cost,out var upgraded)){LastAction=$"升级失败：需要 {recipe.Cost} {recipe.CostId}";return;}runtime.PrepareForUpgrade();placements.Remove(runtime);Destroy(runtime.gameObject);CreateRuntime(upgraded);LastAction=$"升级施工：{recipe.Target.Name} · {recipe.CostId} -{recipe.Cost}";
+            if(Mouse.current==null||city.Deployment.Mode!=CityMode.Fortress)return;Vector2 point=Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());BuildingRuntime runtime=FindNearest(point,1.5f);if(runtime==null||!runtime.Construction.IsComplete){LastAction="升级：请指向已完成建筑";return;}bool alloyArmor=research.Model.IsCompleted(new StableId("core.research.alloy-armor"));bool swordRiding=research.HasSwordRiding;var recipe=BuildingUpgradeCatalog.For(runtime.Definition,progression.Civilization.Level,alloyArmor,swordRiding);if(recipe==null){LastAction="升级锁定：需要对应 T3 研究与二级文明，或该建筑没有后续型号";return;}if(!placements.TryGetValue(runtime,out var placed)||!grid.TryUpgrade(placed,recipe.Target,economy.Inventory,recipe.CostId,recipe.Cost,out var upgraded)){LastAction=$"升级失败：需要 {recipe.Cost} {RouteContentDisplayCatalog.ResourceName(recipe.CostId)}";return;}runtime.PrepareForUpgrade();placements.Remove(runtime);Destroy(runtime.gameObject);CreateRuntime(upgraded);LastAction=$"升级施工：{recipe.Target.Name} · {RouteContentDisplayCatalog.ResourceName(recipe.CostId)} -{recipe.Cost}";
         }
         private void RefreshLogistics()
         {
@@ -165,9 +175,9 @@ namespace WasteCity.Building
         }
         private void OnGUI()
         {
-            if (active){var definition=BuildingCatalog.BuildMenu[selected];CanBuild(definition,out string lockReason);GUI.Box(new Rect(18, Screen.height - 72f, 930f, 52f), $"建造：数字1-8基础建筑 · ←/→ 全建筑 · 当前 {selected+1}/{BuildingCatalog.BuildMenu.Length} {definition.Name}{(lockReason==null?" · 已解锁":$" · 锁定：{lockReason}")} · 左键放置 · [V] 升级");}
-            if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 185f, 620f, 45f), LastAction);
-            if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-292f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
+            if (active){var definition=BuildingCatalog.BuildMenu[selected];CanBuild(definition,out string lockReason);string state=lockReason==null?"已解锁":$"锁定：{lockReason}";GUI.Box(new Rect(18, Screen.height - 170f, 930f, 150f), $"建造：数字1-8基础建筑 · ←/→ 全建筑 · 当前 {selected+1}/{BuildingCatalog.BuildMenu.Length} · {state} · 左键放置 · [V] 升级\n{RouteContentDisplayCatalog.BuildingSummary(definition)}");}
+            if (!string.IsNullOrEmpty(LastAction)) GUI.Box(new Rect(18, Screen.height - 225f, 620f, 45f), LastAction);
+            if(DisconnectedCount>0)GUI.Box(new Rect(18,Screen.height-277f,520f,42f),$"物流警告：{DisconnectedCount} 座建筑断网，效果和库存访问暂停");
         }
     }
     [Serializable]
