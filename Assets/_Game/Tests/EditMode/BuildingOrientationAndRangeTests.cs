@@ -101,5 +101,59 @@ namespace WasteCity.Tests
             var constructed = new PlacedBuilding(ThreeByTwo, 1, 2);
             Assert.That(constructed.Orientation, Is.EqualTo(BuildingOrientation.North));
         }
+
+        [Test]
+        public void GroundRangeIncludesEveryChebyshevBoundaryCellAtRadiusEight()
+        {
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(8), Is.True);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(10, -3, 18, 5, 8), Is.True);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(10, -3, 2, -11, 8), Is.True);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(10, -3, 19, 5, 8), Is.False);
+        }
+
+        [Test]
+        public void GroundRangeRejectsNineAndOtherUnsupportedRadiusValues()
+        {
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(9), Is.False);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(0, 0, 0, 0, 9), Is.False);
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(0), Is.False);
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(10), Is.False);
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(25), Is.False);
+        }
+
+        [TestCase(12)]
+        [TestCase(24)]
+        public void GroundRangeSupportsApprovedExtensionHooks(int radius)
+        {
+            Assert.That(BuildingRangeRules.IsSupportedGroundRadius(radius), Is.True);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(4, 7, 4 + radius, 7 - radius, radius), Is.True);
+            Assert.That(BuildingRangeRules.IsGroundCellInRange(4, 7, 5 + radius, 7, radius), Is.False);
+        }
+
+        [TestCase(BuildingOrientation.North, 3, 2)]
+        [TestCase(BuildingOrientation.East, 2, 3)]
+        [TestCase(BuildingOrientation.South, 3, 2)]
+        [TestCase(BuildingOrientation.West, 2, 3)]
+        public void InnerGridAcceptsEveryEdgeAndCornerForEachOrientation(
+            BuildingOrientation orientation,
+            int footprintWidth,
+            int footprintHeight)
+        {
+            var maximumX = 8 - footprintWidth;
+            var maximumY = 6 - footprintHeight;
+
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, 0, 0, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX, 0, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, 0, maximumY, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX, maximumY, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX / 2, 0, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX / 2, maximumY, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, 0, maximumY / 2, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX, maximumY / 2, orientation), Is.True);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, -1, 0, orientation), Is.False);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, maximumX + 1, 0, orientation), Is.False);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, 0, -1, orientation), Is.False);
+            Assert.That(BuildingRangeRules.IsInnerFootprintInBounds(ThreeByTwo, 0, maximumY + 1, orientation), Is.False);
+        }
     }
 }
