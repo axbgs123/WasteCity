@@ -73,7 +73,7 @@
 
 | Path | Change | Single responsibility |
 |---|---|---|
-| `Assets/_Game/Editor/WasteCity.Editor.asmdef` | Modify | 直接引用新建造程序集与 `Unity.ugui` |
+| `Assets/_Game/Editor/WasteCity.Editor.asmdef` | Modify | 直接引用新建造程序集、`Unity.ugui` 与 `Unity.InputSystem` |
 | `Assets/_Game/Editor/GrayboxSceneAuthoring.cs` | Modify | 幂等创建并接线建造系统、内城表面、Canvas/EventSystem、开发 bootstrap |
 | `Assets/_Game/Editor/FormalBuildTools.cs` | Modify | 新增独立 3D Development Windows 构建入口 |
 | `Assets/_Game/Editor/GrayboxPerformanceProbe.cs` | Modify | 五次 128 实例生成/清理测量并写 `/tmp` JSON |
@@ -112,7 +112,7 @@
 }
 ```
 
-`WasteCity.EditModeTests`、`WasteCity.PlayModeTests` 和 `WasteCity.Editor` 必须直接引用 `WasteCity.Graybox3D.Building`；凡源文件直接使用 `UnityEngine.UI` 或 `EventSystems` 的程序集必须直接引用 `Unity.ugui`，不得依赖传递引用。
+`WasteCity.EditModeTests`、`WasteCity.PlayModeTests` 和 `WasteCity.Editor` 必须直接引用 `WasteCity.Graybox3D.Building`；凡源文件直接使用 `UnityEngine.UI` 或 `EventSystems` 的程序集必须直接引用 `Unity.ugui`，不得依赖传递引用。`GrayboxSceneAuthoring` 直接使用 `InputSystemUIInputModule`，因此 `WasteCity.Editor.asmdef` 还必须直接引用 `Unity.InputSystem`，不能依赖 `WasteCity.Graybox3D.Building` 的传递引用。
 
 ---
 
@@ -249,6 +249,27 @@ namespace WasteCity.Building
         public bool ContentVisible { get; }
         public BuildingUnlockEvaluation Unlock { get; }
         public bool CanAfford { get; }
+
+        public BuildingPlacementRequest(
+            BuildingDefinition definition,
+            BuildingGrid grid,
+            BuildingSite site,
+            BuildingOrientation orientation,
+            int x,
+            int y,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityMode cityMode,
+            bool projectionSucceeded,
+            bool footprintTouchesCity,
+            bool terrainPassable,
+            bool obstacleFree,
+            bool coversCompatibleResourceNode,
+            string compatibleResourceNodeId,
+            bool contentVisible,
+            BuildingUnlockEvaluation unlock,
+            bool canAfford);
     }
 
     public readonly struct BuildingPlacementEvaluation
@@ -301,6 +322,14 @@ namespace WasteCity.Building
 
 旧 `BuildingGrid.TryPlace`、`TryRestore`、`CanPlace` 和 `PlacedBuilding` 构造函数继续存在，并委托 `BuildingOrientation.North`。旧 `BuildingUnlockModel.IsUnlocked` 继续返回 `Evaluate(...).PrimaryReason`。
 
+Value construction rules:
+
+- `BuildingCell(int x, int y)` assigns both coordinates without clamping.
+- `BuildingPlacementRequest(...)` assigns every argument in the listed order and performs no mutation. It deliberately accepts `null` `definition`/`grid`, invalid enum values and a `null` node ID so `BuildingPlacementRules.Evaluate` can return the approved failure instead of constructor exceptions.
+- `BuildingPlacementEvaluation` and `BuildingUnlockEvaluation` are created only by their public `Evaluate` entry points; later tasks do not call unlisted constructors.
+- `BuildingSurfaceHit(...)` is the public fixture/controller construction entry; `Invalid` returns `isValid=false`, zero coordinates/world point, Ground site and an empty label.
+- `GrayboxBuildingCatalogItem3D` is created only by `Describe`/`Query`; `BuildingEvacuationWork` is created only by `BuildingEvacuationRules.Create`; no later task invents constructors for them.
+
 ### 2.2 Generic input interception
 
 ```csharp
@@ -334,11 +363,11 @@ namespace WasteCity.Graybox3D
 ```csharp
 public void ConfigureInputInterceptor(MonoBehaviour value);
 public void ProcessFrame(
-    in GrayboxInputFrame frame,
-    in GrayboxInputSuppression suppression);
+    GrayboxInputFrame frame,
+    GrayboxInputSuppression suppression);
 ```
 
-既有 `ProcessFrame(in GrayboxInputFrame)` 委托默认空抑制。`Update()` 的顺序固定为：
+既有精确签名 `public void ProcessFrame(GrayboxInputFrame frame)` 保持按值参数且原调用者无需修改；它委托 `ProcessFrame(frame, default(GrayboxInputSuppression))`。不得将旧签名替换成 `in` 参数。`Update()` 的顺序固定为：
 
 ```text
 interceptor.ProcessCurrentInput()
@@ -392,6 +421,10 @@ namespace WasteCity.Graybox3D.Building
     {
         public const int BuildMenuCount = 28;
         public static IReadOnlyList<BuildingDefinition> Quickbar { get; }
+        public static BuildingMenuCategory CategoryOf(
+            BuildingDefinition definition);
+        public static ContentRoute RouteOf(
+            BuildingDefinition definition);
         public IReadOnlyList<GrayboxBuildingCatalogItem3D> Query(
             IGrayboxBuildingCatalogContext3D context,
             BuildingMenuCategory? category,
@@ -517,6 +550,15 @@ namespace WasteCity.Graybox3D.Building
             CityMode mode,
             bool paused,
             IGrayboxBuildingPresentation3D presentation);
+        public bool HasPlayerOwnedGroundInstances { get; }
+        public void CopyPlayerOwnedGroundInstances(
+            List<GrayboxBuildingInstance3D> destination);
+        public bool TryCommitEvacuation(
+            string stableInstanceId,
+            BuildingEvacuationTreatment treatment,
+            IGrayboxBuildingPresentation3D presentation,
+            out int acceptedRefund,
+            out string failureReason);
         public void SetRouteContact(ContentRoute route, bool contacted);
         public void UnlockResearchForDevelopment(string researchId);
         public void UnlockRouteForDevelopment(ContentRoute route);
@@ -534,6 +576,15 @@ namespace WasteCity.Graybox3D.Building
         public int Y { get; }
         public Vector3 WorldPoint { get; }
         public string SurfaceLabel { get; }
+
+        public static BuildingSurfaceHit Invalid { get; }
+        public BuildingSurfaceHit(
+            bool isValid,
+            BuildingSite site,
+            int x,
+            int y,
+            Vector3 worldPoint,
+            string surfaceLabel);
     }
 
     public sealed class GrayboxBuildingSurfaceProjector3D : MonoBehaviour
@@ -560,6 +611,9 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingSurfaceProjector3D projector,
             GrayboxBuildingWorldView3D presentation,
             GrayboxBuildingInteractionModel3D interaction);
+        public static string CreateResourceNodeVisualId(
+            int worldX,
+            int worldY);
         public void UpdatePointer(Vector2 screenPosition);
         public bool ConfirmCurrentPlacement(
             out GrayboxBuildingInstance3D instance);
@@ -573,7 +627,8 @@ namespace WasteCity.Graybox3D.Building
             GrayboxMobileCityController3D city,
             GrayboxBuildingWorldView3D presentation,
             GrayboxBuildingInteractionModel3D interaction,
-            Camera controlledCamera);
+            Camera controlledCamera,
+            GrayboxBuildingMenuView3D menu);
         public bool SelectAt(Vector2 screenPosition);
         public bool SelectInstance(string stableInstanceId);
         public ConstructionCancelResult RequestCancelSelected();
@@ -609,6 +664,7 @@ namespace WasteCity.Graybox3D.Building
             in BuildingPlacementEvaluation evaluation);
         public void HidePreview();
         public void ShowCompatibleResourceNode(
+            string stableNodeVisualId,
             int worldX,
             int worldY,
             bool visible);
@@ -625,12 +681,24 @@ namespace WasteCity.Graybox3D.Building
 
 施工实例 Collider 只作为 `TryPickInstance` 的选择代理。`RequestCancelSelected` 对零进度实例立即调用同一退款函数并返回 `Cancelled`；已有进度时进入 `CancelConfirmation` 并返回 `ConfirmationRequired`，只有 `ResolveCancelSelected(true)` 才执行退款和移除。
 
+Evacuation session rules:
+
+- `CopyPlayerOwnedGroundInstances` requires a non-null caller-owned list, clears it, then appends only player-owned Ground instances in ordinal stable-instance-ID order; it never exposes the mutable backing list.
+- `HasPlayerOwnedGroundInstances` performs the same ownership/site predicate without allocation.
+- `TryCommitEvacuation` rejects null/unknown IDs, InnerCity instances, non-owned instances, `Unassigned`, and a presentation mismatch with a non-empty failure reason and no mutation.
+- Abandon changes ownership/state to `AbandonedRuin`, preserves the original `PlacedBuilding` and occupied cells, gives zero refund, then updates the same presentation.
+- QuickDismantle and a FullDismantle whose timer has already completed calculate their ratio through `BuildingEvacuationRules.Create`, remove the exact grid placement, credit only the amount accepted by `ResourceInventory.Add`, remove the session instance, and remove its presentation.
+- A mutation/presentation exception rolls back ownership/state or list position, grid occupancy, and accepted refund before rethrowing. If presentation recreation during rollback fails, throw an `InvalidOperationException` containing both failures. A normal validation failure returns false and never partially mutates.
+- The evacuation controller may call `TryCommitEvacuation(FullDismantle, ...)` only after its stable queue timer reaches zero. Session methods do not own or advance the timer.
+- The controller allocates its manifest/work buffers once during `Configure` and reuses them with `CopyPlayerOwnedGroundInstances`; normal `Tick` performs no LINQ, list creation or category-map construction.
+
 Ground evaluation details are fixed:
 
-- derive the city logical center with `PlanarCoordinateMapper3D.TryWorldToCell(city Rigidbody.position)`; conversion failure invalidates ground placement instead of clamping;
+- derive the city logical center with existing public Unity state `PlanarCoordinateMapper3D.TryWorldToCell(city.transform.position, out cityX, out cityY)`; the controller's Rigidbody is private and must not be accessed by reflection; conversion failure invalidates ground placement instead of clamping;
 - the city occupies the 3×3 cells whose offsets from that center are each `-1..1`;
 - `DeepWater` and `Cliff` fail terrain, while `Ruins` fails the independent obstacle reason;
-- a required resource node is compatible only when the footprint contains a `WorldCell.HasResource` node; record that cell's stable resource ID for highlighting;
+- a required resource node is compatible only when the footprint contains a `WorldCell.HasResource` node; `WorldCell.ResourceId` remains the resource type and is never treated as node identity;
+- `CreateResourceNodeVisualId(x,y)` returns the unique deterministic adapter ID `world.resource-node.<x>.<y>`; `BuildingPlacementRequest.CompatibleResourceNodeId`, `BuildingPlacementEvaluation.CompatibleResourceNodeId` and `building.node-highlight.<node-id>` use that coordinate ID without modifying `WorldMapModel`;
 - stable session instance IDs use `building.instance.000001` ordinal formatting, are never persisted, and advance only after a complete atomic commit.
 
 ### 2.5 Refund and evacuation
@@ -707,7 +775,7 @@ namespace WasteCity.Graybox3D.Building
 }
 ```
 
-只有 `Fortress` 收起且存在玩家拥有的外城完成建筑或施工点时打开清单。遗弃立即变为无功能、非玩家所有但仍占格的遗迹；快速拆除立即移除；完整拆除按稳定实例 ID 排序逐个推进。所有玩家拥有的外城实例处理完成后，仅调用既有 `city.TryToggleDeployment()` 继续 Packing。内城实例不进入清单并随城市移动。
+只有 `Fortress` 收起且存在玩家拥有的外城完成建筑或施工点时打开清单。遗弃立即变为无功能、非玩家所有但仍占格的遗迹；快速拆除立即移除；完整拆除按稳定实例 ID 排序逐个推进。所有玩家拥有的外城实例处理完成后，仅调用既有精确 API `city.TryToggleDeployment(out _)` 继续 Packing。内城实例不进入清单并随城市移动。
 
 ### 2.6 UGUI, input and developer modifier
 
@@ -728,12 +796,31 @@ namespace WasteCity.Graybox3D.Building
         public bool CatalogVisible { get; }
         public bool EvacuationVisible { get; }
         public string SearchText { get; }
+        public event Action CancelSelectedConstructionRequested;
+        public event Action<bool>
+            CancelConstructionConfirmationResolved;
+        public event Action<
+            string,
+            BuildingEvacuationTreatment>
+            EvacuationItemTreatmentRequested;
+        public event Action<
+            BuildingMenuCategory,
+            BuildingEvacuationTreatment>
+            EvacuationCategoryTreatmentRequested;
+        public event Action<BuildingEvacuationTreatment>
+            EvacuationAllTreatmentRequested;
+        public event Action EvacuationConfirmationRequested;
         public void Configure(
             Canvas canvas,
             EventSystem eventSystem,
             GrayboxBuildingSession3D session,
             GrayboxBuildingInteractionModel3D interaction);
         public void RefreshCatalog();
+        public void SetCategory(BuildingMenuCategory category);
+        public void SetRouteFilter(ContentRoute? route);
+        public void SetSearchText(string value);
+        public bool TrySelectQuickbarSlot(int zeroBasedIndex);
+        public bool TrySelectCatalogItem(string stableBuildingId);
         public bool HasKeyboardFocus();
         public bool IsPointerOverUi(Vector2 screenPosition);
         public bool ConsumeFocusedEscape();
@@ -776,8 +863,7 @@ namespace WasteCity.Graybox3D.Building
     {
         Normal = 1,
         Fast10 = 10,
-        Fast100 = 100,
-        CompleteImmediately = 1000
+        Fast100 = 100
     }
 }
 ```
@@ -790,6 +876,10 @@ namespace WasteCity.Graybox3D.Building
 {
     public sealed class GrayboxDeveloperModifier3D
     {
+        public GrayboxDeveloperModifier3D(
+            GrayboxBuildingSession3D session,
+            GrayboxMobileCityController3D city,
+            GrayboxBuildingWorldView3D presentation);
         public bool AddResource(string resourceId, int amount);
         public bool SetResource(string resourceId, int amount);
         public bool ClearResource(string resourceId);
@@ -807,6 +897,14 @@ namespace WasteCity.Graybox3D.Building
 ```
 
 `GrayboxDeveloperModifierBootstrap3D` 的类型、序列化字段和 `ResolveRuntimeAvailability` 在所有构建存在。Release 的 `Awake`、`TryTogglePanel` 不创建 UI、不读 F10、不创建命令服务，并返回不可用。条件编译类型绝不出现在场景序列化字段、Prefab 或 ScriptableObject 中。
+
+Menu and callback ownership:
+
+- `GrayboxBuildingMenuView3D.Awake` creates exactly one non-serialized presenter and uses its serialized session for every selection check. `TrySelectQuickbarSlot` validates `0..9`, resolves `Quickbar[index]`, then requires `Describe(...).Visibility == Buildable`. `TrySelectCatalogItem` searches only the current `Query(session, category, route, searchText)` result and requires `Buildable`. Hidden, locked, filtered-out and unknown IDs return false; success calls `interaction.Select(definition)`. Input code calls these menu APIs and never reads the 28-item mapping.
+- `CategoryOf`/`RouteOf` are the single stable mapping used by catalog queries, cards, quickbar checks and evacuation category batches. A definition outside `BuildingCatalog.BuildMenu` throws `ArgumentException`; the input, UI and evacuation controller contain no duplicate mapping tables.
+- UGUI button listeners only raise the listed menu events. `GrayboxConstructionController3D.Configure` subscribes to the two cancel events; `GrayboxEvacuationController3D.Configure` subscribes to the four evacuation events. Each controller unsubscribes in `OnDestroy`. The menu never calls session mutation or deployment APIs directly, eliminating controller/UI circular dependencies.
+- `Normal/Fast10/Fast100` set the persistent current-session multiplier to 1/10/100. The “立即完成” button calls `CompleteAllConstruction()` → `session.CompleteAllConstructionForDevelopment(presentation)` in the same frame and leaves the multiplier unchanged for later construction.
+- `GrayboxDeveloperModifier3D(session, city, presentation)` throws `ArgumentNullException` for any missing dependency; the always-compiled bootstrap constructs it only inside the approved compile guard and never serializes it.
 
 Runtime serialization rules:
 
@@ -837,6 +935,7 @@ Runtime serialization rules:
 | UGUI 键盘焦点不穿透 | 6, 9, 11 | 真实 EventSystem；headless 虚拟全键集合 |
 | 建造输入优先且不破坏移动/镜头 | 9, 11 | 右键不自动驾驶；WASD/middle/Home 合同 |
 | Release 惰性、Editor/Development 修改器 | 8, 10, 11, 12 | 条件编译、无条件序列化 bootstrap、三构建、无 Missing Script |
+| 增量 authoring 与既有身份保护 | 10 | 基础合同先验证；首次前后 GlobalObjectId/GUID；第二次内容 hash 幂等 |
 | VisualSlot/共享材质/程序化占位 | 5, 10, 12 | 稳定 ID、MPB、Renderer 和 GameObject 预算 |
 | 性能与完整回归 | 9, 12 | 128 实例、300 tick 零分配、五次生成、GUI 300 帧、全量测试与三构建 |
 | schema/存档/2D/BUG 边界 | 10, 12, 13 | 冻结路径 diff、schema 搜索、BUG-0001 字节比较 |
@@ -846,9 +945,9 @@ Dependency review:
 
 - Task 1 creates the new assembly before any adapter type is referenced.
 - Task 3 creates the serialized interaction component before Tasks 4 and 5 compile controllers that consume it.
-- Task 4 exposes `IGrayboxBuildingPresentation3D` for atomic session tests; Task 5 creates the concrete view and the construction controller together.
+- Task 4 exposes `IGrayboxBuildingPresentation3D` for atomic session tests; Task 5 creates the concrete view; Task 6 creates the construction controller after both the view and menu callback contract exist.
 - Task 5 creates projector/view/placement before UI, evacuation, developer and input layers consume them.
-- Task 6 creates UGUI/view guards before Task 7 adds evacuation UI.
+- Task 6 creates the evacuation treatment enum with the UGUI event contract; Task 7 extends that rule file and adds evacuation behavior.
 - Task 8 creates the always-serializable developer bootstrap before Task 9 routes F10.
 - Task 9 creates the base generic interceptor before Task 10 serializes the building router into the scene.
 - Task 10 completes scene serialization before Task 11 loads the formal scene through PlayMode.
@@ -862,6 +961,23 @@ Signature review:
 - `WasteCity.Graybox3D` generic input contracts contain no building-adapter types.
 - Conditional `GrayboxDeveloperModifier3D` is referenced only inside the bootstrap's matching compile guards and never in serialized fields.
 - Old `BuildingGrid`, `BuildingUnlockModel` and base `GrayboxInputRouter` overloads remain callable.
+
+Existing API audit against the approved parent source:
+
+| Existing type | Exact reused signature |
+|---|---|
+| `GrayboxMobileCityController3D` | `bool TryToggleDeployment(out string failureReason)`; `bool TrySetDestinationCell(int cellX, int cellY, out string failureReason)`; `void TickDeployment(float deltaTime)` |
+| `GrayboxInputFrame` | `GrayboxInputFrame(Vector2 move, Vector2 pointerPosition, bool toggleDeploymentPressed, bool destinationPressed, bool middlePressed, bool middleHeld, bool middleReleased, bool homePressed)` |
+| `GrayboxInputRouter` | `GrayboxInputFrame ReadCurrentFrame()`; `void ProcessFrame(GrayboxInputFrame frame)`; `void TickGameplay(float deltaTime)` |
+| `CityDeploymentModel` | `bool Toggle()`; `void Tick(float delta)`; `void Restore(CityMode mode, float remainingSeconds)` |
+| `PlanarCoordinateMapper3D` | `bool TryCellToWorld(int cellX, int cellY, float visualY, out Vector3 world)`; `bool TryWorldToCell(Vector3 world, out int cellX, out int cellY)`; `Vector3 PlaneToWorld(Vector2 plane, float visualY)`; `Vector2 WorldToPlane(Vector3 world)` |
+| `GrayboxWorldView3D` | `void Generate(WorldMapModel model)`; `bool TryWorldToCell(Vector3 world, out int cellX, out int cellY)`; public `Model` and `Coordinates` getters |
+| `ResourceInventory` | `int Add(string id, int amount)`; `bool TrySpend(string id, int amount)`; `bool CanSpend(string id, int amount)`; `void Set(string id, int amount)` |
+| `ResearchModel` | `bool IsCompleted(StableId id)`; `string[] CaptureCompleted()`; `void Restore(string[] completedIds, string activeId, float remaining)` |
+| `ConstructionProgress` | `bool Tick(float delta, float productivity)`; `void Restore(float remaining)`; public `BaseDuration`, `Remaining`, `IsComplete`, `Normalized` getters |
+| `GrayboxVisualSlot` | `void Configure(string stableId, MeshRenderer renderer, Color fallbackColor)`; `void ApplyFallback(Material sharedMaterial)` |
+
+Any implementation discovery that contradicts this table is a stop gate requiring a plan correction before production edits.
 
 ---
 
@@ -1013,11 +1129,11 @@ git commit -m "feat: evaluate building placement rules"
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs.meta`
 
-- [ ] Encode in RED tests the approved stable-ID classification table from specification §7.2, including all five top-level categories and four route filters. Assert exactly 28 unique IDs, equality with `BuildingCatalog.BuildMenu`, and explicit exclusion of `HeavyMachineGunTurret` and `SwordRidingPlatform`.
+- [ ] Encode in RED tests the approved stable-ID classification table from specification §7.2, including all five top-level categories and four route filters. Assert exactly 28 unique IDs, equality with `BuildingCatalog.BuildMenu`, explicit exclusion of `HeavyMachineGunTurret` and `SwordRidingPlatform`, `CategoryOf`/`RouteOf` agreement with every query/card, and `ArgumentException` for definitions outside BuildMenu.
 
-- [ ] Add RED tests for the exact ten-slot quickbar order, visible-content-only case-insensitive search, hidden untouched routes not leaking names or lock reasons, contacted route items becoming visible, locked cards exposing primary plus all reasons, and buildable cards exposing no stale reason.
+- [ ] Add RED tests for the exact ten-slot quickbar order, visible-content-only case-insensitive search, hidden untouched routes not leaking names or lock reasons, contacted route items becoming visible, locked cards exposing primary plus all reasons, buildable cards exposing no stale reason, and no category table outside the presenter source.
 
-- [ ] Add RED interaction-model tests for Inactive initial state, catalog origin capture, Previewing selection/orientation retention, new-card replacement, and deterministic cancel-confirmation transitions. This creates the non-Unity state dependency before placement and construction controllers compile.
+- [ ] Add RED interaction-model tests for Inactive initial state, catalog origin capture, Previewing selection/orientation retention, new-card replacement, and deterministic cancel-confirmation transitions. This creates the scene-serializable state dependency, with no Renderer/Physics/Input/Persistence responsibility, before placement and construction controllers compile.
 
 - [ ] Run focused RED:
 
@@ -1031,7 +1147,7 @@ git commit -m "feat: evaluate building placement rules"
   -logFile /tmp/wastecity-3d-building/task-03-red.log
 ```
 
-Expected RED: only catalog presenter/types are missing.
+Expected RED: only `GrayboxBuildingCatalogPresenter3D` and `GrayboxBuildingInteractionModel3D` types/behavior are missing.
 
 - [ ] Implement a stable-ID dictionary with one entry per BuildMenu item. Query order must follow `BuildingCatalog.BuildMenu`, never display-name sorting. Use `RouteContentDisplayCatalog.BuildingRoute`, `BuildingUnlockModel.Evaluate`, and the injected context; do not duplicate building definitions or alter `BuildingCatalog`. Implement the interaction model as a serializable MonoBehaviour with no Renderer, Physics, input-device or persistence responsibility so Tasks 4–6 consume one scene-stable state truth.
 
@@ -1106,7 +1222,7 @@ int rounded = (int)Math.Round(
 return Math.Max(0, Math.Min(originalCost, rounded));
 ```
 
-- [ ] Implement the session contract and its `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` must persist only the fixture switch, and `Awake` must rebuild the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, or unlock table.
+- [ ] Implement the Task 4 session subset: `Configure`, `ConfigureDevelopmentFixture`, `TryBeginConstruction`, `TryCancelConstruction`, `TickConstruction`, route/research development methods, construction multiplier, and complete-all. Do not add `HasPlayerOwnedGroundInstances`, `CopyPlayerOwnedGroundInstances`, or `TryCommitEvacuation` until Task 7 creates the evacuation rule behavior and modifies the session. Use the `IGrayboxBuildingPresentation3D` transaction seam. `Configure(true)` persists only the fixture switch, and `Awake` rebuilds the finite models on every real scene load. Use `ResourceInventory`, `ResearchModel`, `BuildingGrid`, `ConstructionProgress`, and `BuildingMobilityRules.CanConstruct` directly. Do not add a parallel currency store, timer, occupancy array, or unlock table.
 
 - [ ] Run focused GREEN; then run existing `ConstructionProgressTests`, `BuildingGridTests`, `BuildingUnlockTests`, and `ResearchTests`.
 
@@ -1142,8 +1258,6 @@ git commit -m "feat: add atomic graybox construction session"
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs.meta`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs.meta`
-- Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
-- Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs.meta`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs.meta`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`
@@ -1153,7 +1267,7 @@ git commit -m "feat: add atomic graybox construction session"
 
 - [ ] In projector tests, create an isolated Physics scene or explicit Collider fixture and call `Physics.SyncTransforms()` before ray assertions. If Unity 2022.3 Collider.Raycast behavior differs from the approved contract, stop rather than replacing logical evaluation with Physics truth.
 
-- [ ] Write RED placement/construction tests proving all footprint cells feed terrain, obstacle, city-body, compatible-node and grid checks; mining preview highlights only a compatible node; green/red preview exposes the ordered reason; confirmation reevaluates instead of trusting the cached preview; selection remains active after success for continuous placement; material exhaustion leaves a red preview; Collider ray selection resolves only a stable instance ID; zero-progress Delete cancels immediately through the refund function; progressed construction requires confirmation; construction controller `Update` delegates progress while the input router remains uninvolved.
+- [ ] Write RED placement/view tests proving all footprint cells feed terrain, obstacle, city-body, compatible-node and grid checks; mining preview highlights only a compatible node; two cells holding the same `WorldCell.ResourceId` produce distinct `world.resource-node.<x>.<y>` IDs and distinct VisualSlots; `CompatibleResourceNodeId` never equals the resource type ID; green/red preview exposes the ordered reason; confirmation reevaluates instead of trusting the cached preview; selection remains active after success for continuous placement; material exhaustion leaves a red preview; Collider ray selection resolves only a stable instance ID.
 
 - [ ] Write RED presentation tests for stable IDs:
 
@@ -1182,7 +1296,7 @@ Assert one shared material, MaterialPropertyBlock color changes, at most one Ren
   -logFile /tmp/wastecity-3d-building/task-05-red.log
 ```
 
-Expected RED: missing projector/placement/construction-controller/view types only.
+Expected RED: missing projector/placement/view types only.
 
 - [ ] Implement inner projection using the serialized inner surface Collider solely to identify and locate the platform hit. Convert that point through `city.transform.InverseTransformPoint`; compute the 8×6 cell using the frozen anchor and cell size. Implement ground projection with the math plane and `GrayboxWorldView3D.Coordinates`; do not call `Physics.Raycast` for ground truth.
 
@@ -1207,8 +1321,6 @@ git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs.meta
-git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs
-git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs.meta
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs
@@ -1223,18 +1335,26 @@ git commit -m "feat: add graybox dual grid placement view"
 
 **Files:**
 
+- Create: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs`
+- Create: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs.meta`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs.meta`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs.meta`
+- Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
+- Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs.meta`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs.meta`
 
 - [ ] Write RED state tests for every transition in specification §8.4, especially both Catalog origins, retained selection/orientation, new-card selection returning Previewing, first Esc consumed by focused InputField, next Esc closing to returnState, and a further Esc canceling preview.
 
-- [ ] Write RED menu tests for always-visible ten-slot quickbar, B catalog vertical layer, five categories, four route filters, visible-only search, cost text, hover detail fields, hidden empty shortcut slots, locked disabled cards with primary/all reasons, selecting a card auto-closing catalog, and world continuing while catalog is open.
+- [ ] Write RED menu tests for always-visible ten-slot quickbar, B catalog vertical layer, five categories, four route filters, visible-only search, cost text, hover detail fields, hidden empty shortcut slots, locked disabled cards with primary/all reasons, `TrySelectQuickbarSlot(0..9)` and `TrySelectCatalogItem(stableId)` rejecting hidden/locked items and selecting only buildable definitions through interaction, selecting a card auto-closing catalog, and world continuing while catalog is open.
 
 - [ ] Write RED UGUI guard tests using a real `EventSystem`, `InputSystemUIInputModule`, `Canvas`, `GraphicRaycaster`, `InputField`, `Button`, and pointer event data. Assert editable/keyboard controls own focus, text input consumes W/A/S/D/B/R/digits, and pointer-over-UI reports true without relying on object names.
+
+- [ ] Add RED callback tests proving construction cancel/confirmation buttons and evacuation item/category/all/confirm buttons raise exactly the public events in §2.6, never mutate session/deployment directly, and do not retain duplicate listeners after a view/controller is destroyed and recreated.
+
+- [ ] Add RED construction-controller tests proving Collider selection resolves a stable instance ID; zero-progress Delete cancels immediately through the refund function; progressed construction requires confirmation; menu cancel events route to the same methods; `Update` delegates construction progress once per frame; `OnDestroy` removes menu listeners; input router remains uninvolved.
 
 - [ ] Run focused RED:
 
@@ -1248,9 +1368,9 @@ git commit -m "feat: add graybox dual grid placement view"
   -logFile /tmp/wastecity-3d-building/task-06-red.log
 ```
 
-Expected RED: missing interaction/menu/guard types only. A missing `Unity.ugui` or Input System UI reference is a stop gate.
+Expected RED: missing `BuildingEvacuationTreatment`, `GrayboxBuildingMenuView3D`, `GrayboxUiInputGuard3D`, and `GrayboxConstructionController3D` types/behavior only; the Task 3 interaction component must compile and retain its GREEN tests. A missing `Unity.ugui` or Input System UI reference is a stop gate.
 
-- [ ] Implement the state model without Unity dependencies. Implement UGUI view construction from stable procedural elements; do not add icons, TMP, prefabs, textures or packages. UI events call model methods; model state remains the source of truth.
+- [ ] Define `BuildingEvacuationTreatment` in `BuildingEvacuationRules.cs` so the UGUI event contract compiles; Task 7 will add work/rule behavior to the same file. Reuse the Task 3 scene-serialized interaction component unchanged. Implement UGUI view construction from stable procedural elements; do not add icons, TMP, prefabs, textures or packages. UI events call its public methods; the component has no Renderer/Physics/Input/Persistence responsibility and remains the state source of truth. Implement the construction controller now that its concrete view and menu event contracts both exist.
 
 - [ ] Implement focus precedence: when an editable/keyboard UGUI control is selected, UI consumes text/navigation/submit/cancel. `ConsumeFocusedEscape` uses EventSystem deselection/end-edit semantics, and gameplay is eligible only on the following frame.
 
@@ -1270,10 +1390,14 @@ Expected: no new package/asset loading and no menu pause behavior.
 - [ ] Stage exactly and commit:
 
 ```bash
+git add Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs
+git add Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs.meta
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs.meta
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs.meta
 git diff --cached --name-only
@@ -1286,8 +1410,7 @@ git commit -m "feat: add graybox building menu state"
 
 **Files:**
 
-- Create: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs`
-- Create: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs.meta`
+- Modify: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs.meta`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
@@ -1297,7 +1420,7 @@ git commit -m "feat: add graybox building menu state"
 
 - [ ] Write RED pure-rule tests for completed and incomplete instances under Abandon, FullDismantle and QuickDismantle; assert 0/80/50 handling, 50% duration, remaining-ratio-first calculation, AwayFromZero rounding, clamping, and ordinal stable-ID queue order.
 
-- [ ] Write RED controller tests for: no ground ownership delegates directly to existing city toggle; Fortress with owned ground instances remains Fortress and opens manifest; inner instances never enter manifest; single/category/all assignments can mix; unassigned blocks confirmation; abandonment creates a non-owned blocking ruin with zero refund; quick removes immediately; full processes sequentially and pauses at timeScale 0; all resolved invokes existing packing once; Packing later returns city control through existing coordinator behavior.
+- [ ] Write RED controller tests for: `CopyPlayerOwnedGroundInstances` filtering and stable ordering; `HasPlayerOwnedGroundInstances`; no ground ownership delegates exactly to `city.TryToggleDeployment(out _)`; Fortress with owned ground instances remains Fortress and opens manifest; inner instances never enter manifest; single/category/all assignments can mix; `AssignCategory` agrees with `GrayboxBuildingCatalogPresenter3D.CategoryOf`; unassigned blocks confirmation; abandonment creates a non-owned blocking ruin with zero refund; quick removes immediately; full processes sequentially and pauses at timeScale 0; `TryCommitEvacuation` validation failures leave all state unchanged; presentation exceptions fully roll back or raise the specified compound failure; all resolved invokes existing packing once; Packing later returns city control through existing coordinator behavior.
 
 - [ ] Include tests that an abandoned ruin still makes `BuildingGrid.IsOccupied` true and cannot produce/operate through the session state, while no new outpost, salvage or recovery semantics appear.
 
@@ -1313,11 +1436,13 @@ git commit -m "feat: add graybox building menu state"
   -logFile /tmp/wastecity-3d-building/task-07-red.log
 ```
 
-Expected RED: missing evacuation rule/controller methods only.
+Expected RED: the Task 6 treatment enum exists, but `BuildingEvacuationWork`, rule methods, the three session evacuation APIs, and `GrayboxEvacuationController3D` behavior are missing.
 
-- [ ] Implement pure rules using `ConstructionRefundRules`. Implement controller as a request interceptor around `GrayboxMobileCityController3D.TryToggleDeployment`; it must not write `CityDeploymentModel.Mode`, Transform, grid private cells or inventory internals.
+- [ ] Implement pure rules using `ConstructionRefundRules`. Implement controller as a request interceptor around exact existing API `GrayboxMobileCityController3D.TryToggleDeployment(out string failureReason)` and the session's `CopyPlayerOwnedGroundInstances`, `HasPlayerOwnedGroundInstances`, and `TryCommitEvacuation` APIs. Category batches call only presenter `CategoryOf`; the controller must not copy category mappings or write `CityDeploymentModel.Mode`, Transform, grid private cells or inventory internals.
 
 - [ ] Implement menu manifest rows and single/category/all controls using stable instance IDs. The controller owns work state; UI is projection only.
+
+- [ ] In `Configure`, subscribe once to the menu evacuation events; map them to `Assign`, `AssignCategory`, `AssignAll`, and `ConfirmManifest`, and unsubscribe all four in `OnDestroy`. Re-run Task 6 callback tests to protect the already-implemented construction listener pair.
 
 - [ ] Run focused GREEN and existing `CityDeploymentRulesTests`, `GrayboxMobileCityController3DTests`, and `GrayboxLeaderControlTests`.
 
@@ -1336,7 +1461,6 @@ Expected: no direct bypass matches.
 
 ```bash
 git add Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs
-git add Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
@@ -1363,7 +1487,7 @@ git commit -m "feat: add graybox evacuation handling"
 
 - [ ] Write RED tests for `ResolveRuntimeAvailability(false,false) == false`, and true for Editor or Development. Reflect serialized fields and assert none reference a conditionally compiled type.
 
-- [ ] Under the Editor test compilation, write RED command tests for resource +100/+1000/clear/set with capacity rules; single research/route/all unlock without relocking; safe Mobile/Fortress set; completing Deploying/Packing; construction 1×/10×/100×/immediate; exit/session recreation discarding all changes.
+- [ ] Under the Editor test compilation, write RED command tests for resource +100/+1000/clear/set with capacity rules; single research/route/all unlock without relocking; safe Mobile/Fortress set; completing Deploying/Packing; construction multiplier 1×/10×/100×; immediate completion finishing every existing site in the same frame through `CompleteAllConstructionForDevelopment`; immediate completion preserving the prior multiplier so the next site is not accelerated; exit/session recreation discarding all changes.
 
 - [ ] Add spy/model-state assertions proving commands only call `ResourceInventory`, `ResearchModel`, session methods and the city's dedicated development adapter. Assert no direct Transform assignment, grid field reflection or bypassed placement confirmation.
 
@@ -1386,11 +1510,11 @@ Expected RED: missing bootstrap/modifier and city development adapter only.
 - [ ] Add to `GrayboxMobileCityController3D`:
 
 ```csharp
-public void RestoreDeploymentForDevelopment(CityMode mode);
+public bool RestoreDeploymentForDevelopment(CityMode mode);
 public bool CompleteDeploymentTransitionForDevelopment();
 ```
 
-Both methods must call existing `CityDeploymentModel.Restore` or `Tick` and then the controller's existing presentation update. They must not set Transform, Collider or renderer as gameplay truth.
+`RestoreDeploymentForDevelopment` accepts only `Mobile` or `Fortress`, calls exact existing `CityDeploymentModel.Restore(mode, 0f)`, refreshes presentation, and returns true; transitional/undefined values return false without mutation. `CompleteDeploymentTransitionForDevelopment` returns false unless the current mode is Deploying/Packing, otherwise calls existing `CityDeploymentModel.Tick(float.MaxValue)`, refreshes presentation, and returns true. Neither method sets Transform, Collider or renderer as gameplay truth.
 
 - [ ] Run focused GREEN, then existing mobile city/deployment tests. Inspect the compiled-source boundary:
 
@@ -1478,6 +1602,8 @@ focused editable/keyboard UGUI
 
 When paused, building construction and gameplay actions remain disabled; UGUI navigation and already-approved camera Home/middle behavior remain available unless UI specifically owns that input.
 
+Digits and catalog card actions call only `menu.TrySelectQuickbarSlot`/`menu.TrySelectCatalogItem`; the input router has no session/presenter field and cannot inspect visibility, lock reasons or the 28-item mapping.
+
 - [ ] Run focused GREEN. Add a 300-call warmed allocation assertion for `ProcessCurrentInput` with unchanged device state; record the byte difference and require zero.
 
 - [ ] Run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`, then:
@@ -1515,10 +1641,32 @@ git commit -m "feat: route graybox building input"
 - Modify: `Assets/_Game/Scenes/GrayboxPrototype3D.unity`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs`
 
+**Interfaces:**
+
+```csharp
+public static class GrayboxSceneAuthoring
+{
+    public static void Configure();
+    public static void CaptureFoundationIdentity();
+    private static bool TryOpenAndValidateFoundation(
+        out Scene scene);
+    private static Scene CreateFoundationScene(
+        UniversalRenderPipelineAsset pipeline,
+        Material material);
+    private static void ValidateFoundationContract(Scene scene);
+    private static void EnsureBuildingContract(
+        Scene scene,
+        Material material);
+}
+```
+
+`CaptureFoundationIdentity` requires the absolute output path in `WASTECITY_GRAYBOX_IDENTITY_RESULT` and writes deterministic, name-sorted JSON with no timestamp, process ID or machine-dependent field. It contains the scene GUID plus `GlobalObjectId.GetGlobalObjectIdSlow(...).ToString()` for the existing root, `GrayboxUrpScope`, `GrayboxWorldView3D`, `GrayboxSceneBootstrap`, MobileCity GameObject/controller/Rigidbody, Leader GameObject/controller, CameraRig, Main Camera GameObject/component, `GrayboxInputRouter`, `GrayboxGroundProjector`, `GrayboxDirectControlCoordinator`, and `GrayboxCameraController3D`. It opens the scene read-only and never saves it.
+
 - [ ] Add RED scene-contract tests that open the real scene and require:
 
 ```text
 GrayboxPrototype3D/GrayboxBuilding/BuildingSession
+GrayboxPrototype3D/GrayboxBuilding/BuildingInteraction
 GrayboxPrototype3D/GrayboxBuilding/BuildingPresentation/InstanceRoot
 GrayboxPrototype3D/GrayboxBuilding/BuildingPresentation/InfrastructureRoot
 GrayboxPrototype3D/GrayboxBuilding/BuildingSurfaceProjector
@@ -1532,7 +1680,7 @@ GrayboxPrototype3D/GrayboxUI/EventSystem
 GrayboxPrototype3D/GrayboxActors/MobileCity/InnerCityPlatform
 ```
 
-Assert one EventSystem/InputSystemUIInputModule, one enabled GraphicRaycaster, all serialized references, base `GrayboxInputRouter` interceptor reference, 8×6 platform dimensions, no conditional modifier type serialization, no Missing Script, no 28 precreated card/building objects, and unchanged camera/city/leader/world contracts.
+Assert one EventSystem/InputSystemUIInputModule, one enabled GraphicRaycaster, all serialized references, base `GrayboxInputRouter` interceptor reference, 8×6 platform dimensions, no conditional modifier type serialization, no Missing Script, no 28 precreated card/building objects, and unchanged camera/city/leader/world contracts. Add a behavior test that builds an unsaved in-memory scene missing one foundation object and invokes `ValidateFoundationContract` through reflection, expecting `InvalidOperationException`; the test must not delete or alter the real scene asset. Add a source assertion that the existing-scene path cannot enter `NewScene`.
 
 - [ ] Run focused RED. It must fail only because the existing scene lacks new components/references:
 
@@ -1546,26 +1694,65 @@ Assert one EventSystem/InputSystemUIInputModule, one enabled GraphicRaycaster, a
   -logFile /tmp/wastecity-3d-building/task-10-red.log
 ```
 
-- [ ] Add direct assembly references to the Editor asmdef. Extend `TryOpenCompleteScene` so an old scene without the complete building contract is not accepted. Extend authoring to create and configure all listed objects, reuse `GrayboxLit`, and retain Build Settings order `GrayboxPrototype3D` index 0, `FormalPrototype` index 1.
+- [ ] Add direct `WasteCity.Graybox3D.Building`, `Unity.ugui`, and `Unity.InputSystem` references to the Editor asmdef.
 
-- [ ] Authoring must use the existing city object as the inner platform parent. The inner surface bottom/top alignment must keep gameplay grid local, and its Collider must only serve projector selection. No scene object represents individual catalog entries or 768 world cells.
+- [ ] Refactor authoring with this exact safety split:
 
-- [ ] Close any GUI Unity instance, confirm project lock removal, then run authoring twice:
+```text
+Scene asset absent
+  → after rendering assets are available, CreateFoundationScene may execute the existing foundation creation path
+
+Scene asset present
+  → Configure first opens existing scene before EnsureRenderer/EnsurePipeline/EnsureMaterial
+  → ValidateFoundationContract checks every frozen world/city/leader/camera/input object and serialized reference
+  → any missing/duplicate/broken foundation item throws InvalidOperationException before scene/rendering-asset modification or save
+  → only after validation may Configure ensure rendering assets
+  → EnsureBuildingContract incrementally EnsureChild/EnsureComponent/configures only the new building/UI subtree and new references
+```
+
+`TryOpenAndValidateFoundation` returns false only when the scene asset does not exist; an invalid existing scene throws. For an existing scene, neither it nor `EnsureBuildingContract` may call `EditorSceneManager.NewScene`, destroy/recreate the root, world, city, leader, camera, base systems, or replace existing components. The old `TryOpenCompleteScene == false → NewScene` branch must not be reused for a missing building contract.
+
+- [ ] `EnsureBuildingContract` must use the existing city object as the inner platform parent. The inner surface bottom/top alignment keeps gameplay grid local, and its Collider only serves projector selection. Reuse the single existing EventSystem when present; otherwise create one `EventSystem` plus `InputSystemUIInputModule`, call the verified Input System 1.7.0 public API `AssignDefaultActions()`, and do not create a project `.inputactions` asset. No scene object represents individual catalog entries or 768 world cells. Retain Build Settings order `GrayboxPrototype3D` index 0, `FormalPrototype` index 1.
+
+- [ ] After implementing but before the first `Configure`, close GUI Unity, confirm project lock removal, then capture the existing identity/GUID baseline:
 
 ```bash
+WASTECITY_GRAYBOX_IDENTITY_RESULT=/tmp/wastecity-3d-building/task-10-foundation-before.json \
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics -quit \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -executeMethod WasteCity.Editor.GrayboxSceneAuthoring.CaptureFoundationIdentity \
+  -logFile /tmp/wastecity-3d-building/task-10-identity-before.log
+
+shasum -a 256 \
+  Assets/_Game/Scenes/GrayboxPrototype3D.unity.meta \
+  Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset.meta \
+  Assets/_Game/Rendering/Graybox3D/GrayboxUniversalRenderer.asset.meta \
+  Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat.meta \
+  > /tmp/wastecity-3d-building/task-10-guids-before.sha256
+
 /Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
   -batchmode -nographics -quit \
   -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
   -executeMethod WasteCity.Editor.GrayboxSceneAuthoring.Configure \
   -logFile /tmp/wastecity-3d-building/task-10-authoring-1.log
 
+WASTECITY_GRAYBOX_IDENTITY_RESULT=/tmp/wastecity-3d-building/task-10-foundation-after-1.json \
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics -quit \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -executeMethod WasteCity.Editor.GrayboxSceneAuthoring.CaptureFoundationIdentity \
+  -logFile /tmp/wastecity-3d-building/task-10-identity-after-1.log
+
 shasum -a 256 \
-  Assets/_Game/Scenes/GrayboxPrototype3D.unity \
   Assets/_Game/Scenes/GrayboxPrototype3D.unity.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxUniversalRenderer.asset.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat.meta \
-  > /tmp/wastecity-3d-building/task-10-authoring-1.sha256
+  > /tmp/wastecity-3d-building/task-10-guids-after-1.sha256
+
+shasum -a 256 Assets/_Game/Scenes/GrayboxPrototype3D.unity \
+  > /tmp/wastecity-3d-building/task-10-scene-after-1.sha256
 
 /Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
   -batchmode -nographics -quit \
@@ -1573,19 +1760,36 @@ shasum -a 256 \
   -executeMethod WasteCity.Editor.GrayboxSceneAuthoring.Configure \
   -logFile /tmp/wastecity-3d-building/task-10-authoring-2.log
 
+WASTECITY_GRAYBOX_IDENTITY_RESULT=/tmp/wastecity-3d-building/task-10-foundation-after-2.json \
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics -quit \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -executeMethod WasteCity.Editor.GrayboxSceneAuthoring.CaptureFoundationIdentity \
+  -logFile /tmp/wastecity-3d-building/task-10-identity-after-2.log
+
 shasum -a 256 \
-  Assets/_Game/Scenes/GrayboxPrototype3D.unity \
   Assets/_Game/Scenes/GrayboxPrototype3D.unity.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxUniversalRenderer.asset.meta \
   Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat.meta \
-  > /tmp/wastecity-3d-building/task-10-authoring-2.sha256
+  > /tmp/wastecity-3d-building/task-10-guids-after-2.sha256
 
-cmp /tmp/wastecity-3d-building/task-10-authoring-1.sha256 \
-    /tmp/wastecity-3d-building/task-10-authoring-2.sha256
+shasum -a 256 Assets/_Game/Scenes/GrayboxPrototype3D.unity \
+  > /tmp/wastecity-3d-building/task-10-scene-after-2.sha256
+
+cmp /tmp/wastecity-3d-building/task-10-foundation-before.json \
+    /tmp/wastecity-3d-building/task-10-foundation-after-1.json
+cmp /tmp/wastecity-3d-building/task-10-foundation-before.json \
+    /tmp/wastecity-3d-building/task-10-foundation-after-2.json
+cmp /tmp/wastecity-3d-building/task-10-guids-before.sha256 \
+    /tmp/wastecity-3d-building/task-10-guids-after-1.sha256
+cmp /tmp/wastecity-3d-building/task-10-guids-before.sha256 \
+    /tmp/wastecity-3d-building/task-10-guids-after-2.sha256
+cmp /tmp/wastecity-3d-building/task-10-scene-after-1.sha256 \
+    /tmp/wastecity-3d-building/task-10-scene-after-2.sha256
 ```
 
-If the second authoring changes scene content or any existing GUID, stop. Do not normalize by regenerating `.meta`.
+Any first-pass change to a captured foundation `GlobalObjectId`/scene GUID/rendering GUID is a stop gate. Any second-pass scene-content change is also a stop gate. Do not normalize by regenerating `.meta` or accept changed local fileIDs because the final scene looks equivalent.
 
 - [ ] Run focused GREEN and inspect `EditorBuildSettings.asset` remains 3D index 0 and 2D index 1.
 
@@ -1678,7 +1882,7 @@ inner instances follow city and do not enter manifest
 
 Expected RED: only newly asserted runtime behavior not yet wired. If immediate `wasPressedThisFrame` diagnostics fail, stop and inspect the three saved InputSettings; do not bypass with direct router/controller calls.
 
-- [ ] Make only test-discovered minimal fixes within Task 1–10 approved production paths. If a failure requires a new production file or changes a frozen 2D/runtime/storage path, stop and request a plan boundary correction.
+- [ ] If any Task 11 RED exposes a production behavior defect or requires any production-file modification, stop immediately and report the failing assertion, actual runtime chain and exact required path. Revise and approve this plan before touching production; Task 11 authorizes only its PlayMode asmdef and the new PlayMode test/meta paths.
 
 - [ ] Run focused GREEN, then existing `GrayboxRuntimeSceneTests` focused. Confirm TearDown logs show all three InputSettings restored and no virtual devices remain.
 
@@ -1701,8 +1905,6 @@ git add Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs.meta
 git diff --cached --name-only
 git commit -m "test: cover graybox building runtime flow"
 ```
-
-If Task 11 required an approved production correction, stage only its exact affected paths in a separate preceding fix commit with a message naming the behavior. Never fold an unrelated correction into the test commit.
 
 ---
 
