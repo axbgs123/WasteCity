@@ -431,7 +431,7 @@ git diff -- Assets/_Game/Scripts Assets/_Game/Tests Docs
 
 Confirm no Package Manager or machine-specific files are staged and no build-menu visibility/filter code changed.
 
-- [ ] **Step 3: Commit implementation**
+- [x] **Step 3: Commit implementation**
 
 Stage only implementation, tests, and this plan:
 
@@ -439,11 +439,11 @@ Stage only implementation, tests, and this plan:
 git commit -m "feat: enforce building mobility rules"
 ```
 
-- [ ] **Step 4: Backwrite evidence**
+- [x] **Step 4: Backwrite evidence**
 
 Update the two controlled documents with the implementation hash and exact fresh verification totals. Keep `IDEA-0001` as `开发中`; state that inner-city placement UI, outposts, and real Windows smoke remain pending.
 
-- [ ] **Step 5: Commit documentation and push**
+- [x] **Step 5: Commit documentation and push**
 
 ```bash
 git commit -m "docs: record building mobility milestone"
