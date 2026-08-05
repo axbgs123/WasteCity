@@ -313,13 +313,13 @@ git status --short
 git log --oneline 7d6a502..HEAD
 ```
 
-- [ ] **Step 2: Push only the feature branch**
+- [x] **Step 2: Push only the feature branch**
 
 ```bash
 git push -u origin codex/camera-control
 ```
 
-- [ ] **Step 3: Prove local/remote identity**
+- [x] **Step 3: Prove local/remote identity**
 
 ```bash
 git rev-parse HEAD
