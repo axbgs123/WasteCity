@@ -18,5 +18,17 @@ namespace WasteCity.Tests
             Assert.That(Object.FindObjectOfType<PlaceholderMobileCity>(), Is.Not.Null);
             Assert.That(Camera.main, Is.Not.Null);
         }
+
+        [Test]
+        public void FormalPrototypeMainCameraHasCompleteCameraControlWiring()
+        {
+            EditorSceneManager.OpenScene("Assets/_Game/Scenes/FormalPrototype.unity");
+
+            var controller = Object.FindObjectOfType<FormalCameraController>();
+
+            Assert.That(controller, Is.Not.Null);
+            Assert.That(controller.gameObject, Is.EqualTo(Camera.main.gameObject));
+            Assert.That(controller.ReferencesReady, Is.True);
+        }
     }
 }

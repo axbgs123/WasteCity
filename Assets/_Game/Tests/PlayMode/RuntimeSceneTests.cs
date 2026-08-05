@@ -80,6 +80,127 @@ namespace WasteCity.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator CameraControl_MobileFollowsCityAndPreservesZ()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var controller = Object.FindObjectOfType<FormalCameraController>();
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var leader = Object.FindObjectOfType<FormalLeaderController>();
+
+            Assert.That(controller, Is.Not.Null);
+            city.RestoreDeployment(CityMode.Mobile, 0f);
+            leader.Restore(false, false, 0f, 0f, 0f);
+            city.transform.position = new Vector3(-3.5f, 4.25f, -1f);
+            float cameraZ = Camera.main.transform.position.z;
+
+            controller.TickCamera();
+
+            Assert.That(
+                controller.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.City));
+            Assert.That(
+                Camera.main.transform.position,
+                Is.EqualTo(new Vector3(-3.5f, 4.25f, cameraZ)));
+        }
+
+        [UnityTest]
+        public IEnumerator CameraControl_FreePersistsAndHomePreservesCityState()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var controller = Object.FindObjectOfType<FormalCameraController>();
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var world = Object.FindObjectOfType<PlaceholderWorldView>();
+
+            Assert.That(controller, Is.Not.Null);
+            city.RestoreDeployment(CityMode.Mobile, 0f);
+            Assert.That(
+                world.TryWorldToCell(
+                    city.transform.position,
+                    out int startX,
+                    out int startY),
+                Is.True);
+            FindReachableDestination(
+                world.Model,
+                startX,
+                startY,
+                out int targetX,
+                out int targetY);
+            Assert.That(
+                city.TrySetDestinationCell(targetX, targetY, out string reason),
+                Is.True,
+                reason);
+            controller.TickCamera();
+            controller.BeginFreeDrag();
+            controller.ApplyPointerDelta(
+                new Vector2(40f, -20f),
+                screenHeight: 200f);
+            controller.EndFreeDrag();
+            Vector3 freePosition = Camera.main.transform.position;
+            city.transform.position += new Vector3(2f, 1f, 0f);
+
+            controller.TickCamera();
+
+            Assert.That(controller.Mode, Is.EqualTo(CameraFollowMode.Free));
+            Assert.That(Camera.main.transform.position, Is.EqualTo(freePosition));
+            controller.ReturnToTarget();
+            Assert.That(
+                controller.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+            Assert.That(
+                Camera.main.transform.position.x,
+                Is.EqualTo(city.transform.position.x).Within(.001f));
+            Assert.That(
+                Camera.main.transform.position.y,
+                Is.EqualTo(city.transform.position.y).Within(.001f));
+            Assert.That(city.Deployment.Mode, Is.EqualTo(CityMode.Mobile));
+            Assert.That(city.AutopilotActive, Is.True);
+            Assert.That(city.DestinationX, Is.EqualTo(targetX));
+            Assert.That(city.DestinationY, Is.EqualTo(targetY));
+        }
+
+        [UnityTest]
+        public IEnumerator CameraControl_TargetSwitchRestoresLeaderFollow()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var controller = Object.FindObjectOfType<FormalCameraController>();
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var leader = Object.FindObjectOfType<FormalLeaderController>();
+
+            Assert.That(controller, Is.Not.Null);
+            city.RestoreDeployment(CityMode.Mobile, 0f);
+            leader.Restore(false, false, 0f, 0f, 0f);
+            controller.TickCamera();
+            controller.BeginFreeDrag();
+            controller.ApplyPointerDelta(
+                new Vector2(30f, 0f),
+                screenHeight: 200f);
+            city.RestoreDeployment(CityMode.Fortress, 0f);
+            leader.Restore(true, false, 0f, 0f, 0f);
+            leader.RestorePosition(6.5f, -4.25f, true);
+            float cameraZ = Camera.main.transform.position.z;
+
+            controller.TickCamera();
+
+            Assert.That(
+                controller.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+            Assert.That(
+                controller.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.Leader));
+            Assert.That(
+                Camera.main.transform.position,
+                Is.EqualTo(new Vector3(6.5f, -4.25f, cameraZ)));
+            Assert.That(city.Deployment.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(city.AutopilotActive, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator CityNavigation_AutopilotMovesCloserToReachableDestination()
         {
             SceneManager.LoadScene("FormalPrototype");
