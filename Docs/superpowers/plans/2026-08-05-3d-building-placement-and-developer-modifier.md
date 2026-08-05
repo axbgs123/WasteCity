@@ -765,7 +765,7 @@ namespace WasteCity.Building
 ```csharp
 namespace WasteCity.Graybox3D.Building
 {
-    public sealed class GrayboxEvacuationController3D : MonoBehaviour
+public sealed class GrayboxEvacuationController3D : MonoBehaviour
     {
         public bool IsManifestOpen { get; }
         public bool IsProcessing { get; }
@@ -788,6 +788,8 @@ namespace WasteCity.Graybox3D.Building
     }
 }
 ```
+
+`TryHandleDeploymentRequest()` reports **F request consumption**, not city-transition success. It returns true while a manifest/processing state owns F, and after making its one no-ground delegation to `city.TryToggleDeployment(out _)` even when that call returns false. The Task 9 base router must therefore not perform a fallback deployment call after a true result.
 
 只有 `Fortress` 收起且存在玩家拥有的外城完成建筑或施工点时打开清单。遗弃立即变为无功能、非玩家所有但仍占格的遗迹；快速拆除立即移除；完整拆除按稳定实例 ID 排序逐个推进。所有玩家拥有的外城实例处理完成后，仅调用既有精确 API `city.TryToggleDeployment(out _)` 继续 Packing。内城实例不进入清单并随城市移动。
 
@@ -1445,12 +1447,61 @@ git commit -m "feat: add graybox building menu state"
 - Modify: `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs.meta`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs.meta`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
+
+### Task 7 remediation A: atomic evacuation lock lifecycle and delegated F
+
+Remediations A, B, and C are separate remediation commits and separate independent reviews. This remediation is one independent Task 7 commit and one independent review. It is limited to the Task 7 approved production paths above and the named Task 7-owned tests. If implementation needs another production path, stop, revise this plan, and obtain approval before editing it. The evacuation result contract produced here is consumed by Task 9's already-approved input-router paths to complete the exact-once F gate; this work does not add an F10 reader. Task 11 alone owns virtual-device panel-click acceptance.
+
+- [ ] Add RED tests that attempt `TryCancelConstruction` through the direct construction controller request, the confirmation callback, and UGUI events for every `IsEvacuationLocked` instance. Each attempt must return false/no cancellation, accept a zero refund, and leave the instance model, presentation calls, and `CatalogRevision` unchanged.
+
+- [ ] Add RED tests that create a locked current FullDismantle item and locked later queue items, then call `CompleteAllConstructionForDevelopment`. Assert every locked item remains under construction with unchanged progress/presentation/revision while each unlocked eligible item completes normally.
+
+- [ ] Add RED lifecycle tests for manifest-open, processing, processing failure returning to an open manifest, evacuation completion, and controlled cleanup. Construction cancellation must be hidden or disabled while manifest/processing owns it, remain blocked after a failure returns to the manifest, and recover only after evacuation completion or the controlled cleanup path. UI state is a projection; the session's lock check is the final authority.
+
+- [ ] Add RED cleanup tests for `Configure(oldSession → newSession)`, `OnDisable`, `OnDestroy`, and repeated cleanup. With a spy presentation/menu/catalog, assert exactly one rollback per still-locked `rollbackWork` against the *old* session: unlock every remaining work item, increment `CatalogRevision` for each count-changing restoration, hide the manifest, release construction cancellation blocking, and clear controller references/buffers. Assert committed work is never rolled back and repeated cleanup has no extra model, presentation, menu, or revision mutation.
+
+- [ ] Add RED evacuation-result tests with a call-count city spy. The evacuation layer must report that it consumed F independently from whether the delegated `city.TryToggleDeployment(out _)` succeeded: when it has no player-owned ground building and the city call returns false, its single request is still consumed; manifest-open and processing states consume F without requesting deployment. Task 9 adds the base-router assertion that this result prevents a second request.
+
+- [ ] Run remediation RED:
+
+```bash
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -runTests -testPlatform EditMode \
+  -testFilter "WasteCity.Tests.GrayboxEvacuationTests;WasteCity.Tests.GrayboxBuildingSessionTests;WasteCity.Tests.GrayboxBuildingUiAndInputTests" \
+  -testResults /tmp/wastecity-3d-building/task-07-remediation-red.xml \
+  -logFile /tmp/wastecity-3d-building/task-07-remediation-red.log
+```
+
+Expected RED: only the missing lock-aware cancellation, lifecycle cleanup, and exact-once delegation behavior fails; an unrelated input, assembly, or UI failure is a stop gate.
+
+- [ ] Implement one idempotent controller cleanup routine invoked before `Configure` replaces dependencies and by `OnDisable`/`OnDestroy`. It must operate on the captured old session and only the still-locked rollback suffix, call `RollbackEvacuationLocksAfterFailure` once, hide the manifest, release cancellation blocking, and then clear local state. Remove each rollback item only after a successful commit. Do not unlock committed work or create a player-facing cancellation route for a confirmed queue.
+
+- [ ] Make `GrayboxConstructionController3D`, confirmation callbacks, and menu/UGUI cancellation all consult the session lock guard before any refund, removal, presentation update, or revision mutation. Make `CompleteAllConstructionForDevelopment` skip every lock. Make evacuation return one explicit consumed result after its single delegated F request, including a failed no-ground delegation; Task 9 must pass that result to the base router without a retry.
+
+- [ ] Run remediation GREEN using the same command with `task-07-remediation-green.*`, then run `CityDeploymentRulesTests`, `GrayboxMobileCityController3DTests`, and `GrayboxLeaderControlTests`.
+
+- [ ] Run the Task 7 remediation stop gates:
+
+```bash
+rg -n "TryCancelConstruction|IsEvacuationLocked|RollbackEvacuationLocksAfterFailure|OnDisable|OnDestroy|Configure" \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
+git diff --check
+```
+
+Expected: all cancellation routes converge on the session guard; cleanup is idempotent; no unlisted production path is changed.
 
 - [ ] Write RED pure-rule tests for completed and incomplete instances under Abandon, FullDismantle and QuickDismantle; assert 0/80/50 handling, 50% duration, remaining-ratio-first calculation, AwayFromZero rounding, clamping, and ordinal stable-ID queue order.
 
@@ -1499,12 +1550,14 @@ Expected: no direct bypass matches.
 git add Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs.meta
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs
 git add Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs.meta
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git diff --cached --name-only
 git commit -m "feat: add graybox evacuation handling"
 ```
@@ -1519,15 +1572,57 @@ git commit -m "feat: add graybox evacuation handling"
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs.meta`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs.meta`
-- Modify: `Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
+
+### Task 8 remediation B: public surface, shared composition, and Release lifecycle
+
+This remediation is one independent Task 8 commit and one independent review. Its approved production surface is exactly `GrayboxDeveloperModifierBootstrap3D.cs` and `GrayboxDeveloperModifier3D.cs`; `GrayboxMobileCityController3D` receives no new behavior. Its approved tests are exactly `GrayboxDeveloperModifierTests.cs` and `GrayboxBuildingUiAndInputTests.cs`. If another production path is required, stop and revise the plan before implementation.
+
+- [ ] Add reflection-based RED tests that freeze the public bootstrap surface to `IsRuntimeAvailable`, `IsPanelOpen`, `ResolveRuntimeAvailability`, `Configure(GrayboxBuildingSession3D, GrayboxMobileCityController3D, GrayboxBuildingWorldView3D, Canvas)`, and `TryTogglePanel`; freeze `DevelopmentConstructionSpeed { Normal = 1, Fast10 = 10, Fast100 = 100 }`; and freeze the modifier constructor plus `AddResource`, `SetResource`, `ClearResource`, `UnlockResearch` (bool result), `UnlockRoute` (bool result), `UnlockAllResearch`, `SetCityMode`, `CompleteCityTransition`, `SetConstructionSpeed(DevelopmentConstructionSpeed)`, and `CompleteAllConstruction` (void result). Conflicting public convenience APIs must be absent or private.
+
+- [ ] Add RED edit-time tests with `Application.isPlaying == false` that call `Awake`/`Configure` and prove no savable/generated panel, Canvas, EventSystem, `InputSystemUIInputModule`, or command object is created. Add Play Mode/Editor-or-Development tests that pass the shared Building Canvas and prove the panel is attached beneath it without creating a second Canvas or EventSystem; Task 10 remains the sole owner of the serialized EventSystem/InputSystemUIInputModule.
+
+- [ ] Add RED dependency/lifecycle tests for changing session, city, presentation, or Canvas; repeated `Configure` with identical dependencies; `OnDisable`; and `OnDestroy`. A dependency change must unsubscribe and destroy the old generated panel/service before lazily rebuilding with the new dependencies; identical configuration is idempotent; old buttons cannot mutate an old session after rebind or cleanup. Assert `IsPanelOpen` and `IsRuntimeAvailable` report the actual runtime state.
+
+- [ ] Add RED Release resolver tests: incomplete dependencies and Release must return `IsRuntimeAvailable == false`/`TryTogglePanel() == false` and create no UI, service, or Missing Script. Component-level `ExecuteEvents` tests only prove handler wiring; they do not claim the virtual Keyboard/Mouse plus `InputSystemUIInputModule` scene-Update click, which remains Task 11's blocking acceptance.
+
+- [ ] Run remediation RED:
+
+```bash
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -runTests -testPlatform EditMode \
+  -testFilter "WasteCity.Tests.GrayboxDeveloperModifierTests;WasteCity.Tests.GrayboxBuildingUiAndInputTests" \
+  -testResults /tmp/wastecity-3d-building/task-08-remediation-red.xml \
+  -logFile /tmp/wastecity-3d-building/task-08-remediation-red.log
+```
+
+Expected RED: only the frozen surface, shared-Canvas composition, or lifecycle/Release behaviors are absent. Any requested city-controller extension is a stop condition, not an implementation option.
+
+- [ ] Implement lazy runtime creation only when `Application.isPlaying`, the Editor/Development resolver, and complete dependencies all hold. Parent the generated panel under the supplied shared Building Canvas; never create a Canvas, EventSystem, or input module. Dispose listeners/generated objects before a dependency rebind and from `OnDisable`/`OnDestroy`; make equivalent configuration a no-op. Keep conditional modifier/service references out of serialized fields and Release paths inert.
+
+- [ ] Run remediation GREEN with the same command using `task-08-remediation-green.*`, then run the existing modifier and UI/input focused suites.
+
+- [ ] Run the Task 8 remediation stop gates:
+
+```bash
+rg -n "GrayboxMobileCityController3D" \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs
+git diff --exit-code -- Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs
+git diff --check
+```
+
+Expected: modifier calls use existing public city behavior only, the city controller is unchanged, and no second Canvas/EventSystem/input module is introduced.
 
 - [ ] Write RED tests for `ResolveRuntimeAvailability(false,false) == false`, and true for Editor or Development. Reflect serialized fields and assert none reference a conditionally compiled type. Assert the bootstrap declares no `Update` input loop and source-audit its `Awake`/lifecycle code for zero `Keyboard.current`, `f10Key`, or Input System polling; `TryTogglePanel` is the only panel-toggle entry.
 
-- [ ] Under the Editor test compilation, write RED command tests for resource +100/+1000/clear/set with capacity rules; single research/route/all unlock without relocking; safe Mobile/Fortress set; completing Deploying/Packing; construction multiplier 1×/10×/100×; immediate completion finishing every existing site in the same frame through `CompleteAllConstructionForDevelopment`; immediate completion preserving the prior multiplier so the next site is not accelerated; exit/session recreation discarding all changes.
+- [ ] Under the Editor test compilation, write RED command tests for resource +100/+1000/clear/set with capacity rules; single research/route/all unlock without relocking; the already-public city mode/transition behavior without extending `GrayboxMobileCityController3D`; construction multiplier 1×/10×/100×; immediate completion finishing every eligible unlocked site in the same frame through `CompleteAllConstructionForDevelopment`; immediate completion preserving the prior multiplier so the next site is not accelerated; exit/session recreation discarding all changes.
 
-- [ ] Add spy/model-state assertions proving commands only call `ResourceInventory`, `ResearchModel`, session methods and the city's dedicated development adapter. Assert no direct Transform assignment, grid field reflection or bypassed placement confirmation.
+- [ ] Add spy/model-state assertions proving commands only call `ResourceInventory`, `ResearchModel`, session methods, and existing public city APIs. Assert no direct Transform assignment, grid field reflection, city-controller extension, or bypassed placement confirmation.
 
 - [ ] Run focused RED:
 
@@ -1541,18 +1636,11 @@ git commit -m "feat: add graybox evacuation handling"
   -logFile /tmp/wastecity-3d-building/task-08-red.log
 ```
 
-Expected RED: missing bootstrap/modifier and city development adapter only.
+Expected RED: missing bootstrap/modifier behavior only. A need for a city development adapter is a stop gate because this task cannot add city-controller behavior.
 
 - [ ] Implement the always-compiled bootstrap with only normal serializable Unity/component fields. Place command service construction, panel creation, and `TryTogglePanel` behavior inside `#if UNITY_EDITOR || DEVELOPMENT_BUILD`; Release method bodies remain inert and deterministic. Do not declare an `Update` input reader and do not read Keyboard/F10 in `Awake`, `Update`, or any bootstrap lifecycle callback: Task 9's building input router is the sole reader.
 
-- [ ] Add to `GrayboxMobileCityController3D`:
-
-```csharp
-public bool RestoreDeploymentForDevelopment(CityMode mode);
-public bool CompleteDeploymentTransitionForDevelopment();
-```
-
-`RestoreDeploymentForDevelopment` accepts only `Mobile` or `Fortress`, calls exact existing `CityDeploymentModel.Restore(mode, 0f)`, refreshes presentation, and returns true; transitional/undefined values return false without mutation. `CompleteDeploymentTransitionForDevelopment` returns false unless the current mode is Deploying/Packing, otherwise calls existing `CityDeploymentModel.Tick(float.MaxValue)`, refreshes presentation, and returns true. Neither method sets Transform, Collider or renderer as gameplay truth.
+- [ ] Implement the modifier only against the pre-existing public city/session interfaces. Do not modify `GrayboxMobileCityController3D`, add a city development adapter, set Transform/Collider/renderer state, reflect into city/grid fields, or create a bypass around placement/deployment rules. If the frozen public `SetCityMode` or `CompleteCityTransition` contract cannot be satisfied through the existing public surface, stop and revise this plan before production edits.
 
 - [ ] Run focused GREEN, then existing mobile city/deployment tests. Inspect the compiled-source boundary:
 
@@ -1575,9 +1663,9 @@ git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstra
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs.meta
-git add Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs
 git add Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs.meta
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git diff --cached --name-only
 git commit -m "feat: add release safe graybox developer modifier"
 ```
@@ -1594,8 +1682,64 @@ git commit -m "feat: add release safe graybox developer modifier"
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - Create: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs.meta`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
+- Modify: `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs`
+- Modify: `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
+- Modify: `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`
+
+### Task 9 remediation C: dynamic correctness and profiler-backed zero allocation
+
+This remediation is one independent Task 9 commit and one independent review. It may modify only the Task 9 production/test paths listed above. Do not restore any cross-frame UI-hit, placement-legality, or preview-result cache. Reusable controller-owned workspaces/buffers and stable identity strings are allowed; global mutable static buffers and duplicated unlock/placement rules are not. Task 10/11 files and PlayMode scene tests remain out of scope.
+
+- [ ] Add RED dynamic-preview tests that enter `Previewing`, then execute button-up/no-button frames while pointer position is unchanged. `pointerActive` must include `Previewing`, and every non-UGUI frame must call `placement.UpdatePointer`. Change resource compatibility, inventory, city mode/position, occupancy, and unlock state between frames; assert the real UI classification and newly evaluated preview verdict change on the immediately following frame. A UGUI hit must suppress world preview reevaluation and confirmation.
+
+- [ ] Add RED workspace/API tests that preserve immutable compatible public APIs and existing caller semantics. The placement controller owns one reusable evaluation workspace/overload; `CurrentEvaluation` remains fully valid until that controller performs its next evaluation. Cover reusable unlock-failure/reason and placement-failure/footprint buffers, cached controller delegates/workspace, and WorldView reuse of only stable definition/node identity strings or existing visual references. Verify resource compatibility is reevaluated each frame and WorldView never retains legality/color results.
+
+- [ ] Add RED allocation tests with `ProfilerRecorder` as the primary measurement. Construct a real session, world, placement controller, and world view; warm them; then make 300 calls each that perform actual `RaycastAll`, placement `Evaluate`, and `ShowPreview`, recording actual GC Alloc samples/bytes and requiring `0 B`. Keep current-thread allocation counting only as an auxiliary diagnostic. Add three 300-call zero-allocation gates for idle input, real-UGUI middle-hold, and world/no-hit middle-hold.
+
+- [ ] Add RED UI-classification isolation tests. Disable the `GraphicRegistry` fallback and prove an active qualifying `GraphicRaycaster` result is the EventSystem primary positive; retain a separate fallback-only positive and a Physics-raycaster/world-collider negative. Do not count an arbitrary `EventSystem.RaycastAll` result as UI.
+
+- [ ] Add RED exact-once F integration tests with a call-count city spy and the Task 7 evacuation result. The base router must see a consumed F even when evacuation has no ground buildings and its one `city.TryToggleDeployment(out _)` call fails, so it makes no second deployment call. Manifest-open and processing likewise consume F with zero city calls. This verifies request consumption separately from city-transition success.
+
+- [ ] Run remediation RED:
+
+```bash
+/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
+  -batchmode -nographics \
+  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
+  -runTests -testPlatform EditMode \
+  -testFilter "WasteCity.Tests.BuildingUnlockTests;WasteCity.Tests.BuildingPlacementEvaluationTests;WasteCity.Tests.GrayboxBuildingProjectionAndViewTests;WasteCity.Tests.GrayboxBuildingUiAndInputTests;WasteCity.Tests.GrayboxCameraAndInputTests" \
+  -testResults /tmp/wastecity-3d-building/task-09-remediation-red.xml \
+  -logFile /tmp/wastecity-3d-building/task-09-remediation-red.log
+```
+
+Expected RED: only the missing dynamic execution/workspace/Profiler gates fail; an unexpected allocation from unrelated setup is a stop gate.
+
+- [ ] Implement the reusable evaluation workspace as controller-owned state and route all dynamic evaluation through the existing rule models. Clear/refill its buffers on every evaluation without allocating; retain validity until that controller's next evaluation. Cache delegates/workspace in the controller and only stable visual identity/references in WorldView. Do not add static mutable buffers, divergent rule copies, or a verdict cache.
+
+- [ ] Make `ProcessCurrentInput` classify UGUI on every active pointer frame and invoke `placement.UpdatePointer` on every non-UI Previewing frame, including no-button frames. Never confirm or reevaluate a world preview while UGUI owns the pointer. Pass Task 7's explicit evacuation-F consumption result into base routing so one delegated request, including a failed request, cannot be retried. Keep F10's scoped single reader and existing Task 9 suppression behavior unchanged.
+
+- [ ] Run remediation GREEN with the same command using `task-09-remediation-green.*`; record the exact `ProfilerRecorder` samples/bytes for all 300-call gates in the test output. Then run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`.
+
+- [ ] Run the Task 9 remediation stop gates:
+
+```bash
+rg -n "cache|Cached|static.*List|static.*Dictionary|static.*\[" \
+  Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
+  Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs \
+  Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs
+git diff --check
+```
+
+Expected: any result must be reviewed as a permitted reusable workspace/identity reference, never a cross-frame dynamic verdict cache or global mutable buffer.
 
 - [ ] Write RED base-router tests proving an interceptor is called before base frame processing and can independently suppress move, F deployment, right-click destination, middle drag and Home while unsuppressed channels retain existing behavior. Existing no-interceptor tests must remain unchanged.
 
@@ -1693,6 +1837,13 @@ git add Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs.meta
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs
+git add Assets/_Game/Scripts/Building/BuildingUnlockModel.cs
+git add Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs
+git add Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs
+git add Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs
+git add Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs
 git diff --cached --name-only
