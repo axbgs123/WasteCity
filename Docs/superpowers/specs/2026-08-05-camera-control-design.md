@@ -29,7 +29,7 @@
 
 镜头适配器只读取 `ControlTarget`，不得复制城市模式与招募状态的直接控制决策，也不得修改 `DirectControlRules`、`PlaceholderMobileCity` 或 `FormalLeaderController` 的玩法规则。
 
-当 `FormalLeaderController` 引用、领袖目标 Transform 或目标 GameObject 不可用时，镜头把有效目标解析为城市。城市引用不可用时保持当前镜头位置；任何缺失引用都不得把镜头移动到世界原点。
+当 `FormalLeaderController` 引用、启用状态、所属 GameObject、领袖目标 Transform 或目标 GameObject 不可用时，镜头把有效目标解析为城市。城市引用不可用时保持当前镜头位置；任何缺失引用都不得把镜头移动到世界原点。
 
 ## 3. 方案
 
@@ -106,7 +106,7 @@ public void TickCamera();
 
 1. `Update` 读取 `Mouse.current` 与 `Keyboard.current`；
 2. 中键按下调用 `BeginFreeDrag`；
-3. 中键保持时读取鼠标屏幕像素增量并调用 `ApplyPointerDelta`；
+3. 中键按下时记录当前屏幕位置作为拖动基准；保持与释放时用当前位置和上一位置之差调用 `ApplyPointerDelta`，避免混入按下前位移并保留释放前最后一段位移；
 4. 中键松开调用 `EndFreeDrag`，状态继续为 `Free`；
 5. `Home.wasPressedThisFrame` 调用 `ReturnToTarget`，同一帧立即对准；
 6. `LateUpdate` 调用 `TickCamera`，观察 `leader.ControlTarget`；

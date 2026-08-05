@@ -31,7 +31,7 @@
 - Create: `Assets/_Game/Tests/EditMode/CameraFollowModelTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/CameraFollowModelTests.cs.meta`
 
-- [ ] **Step 1: Write failing model tests**
+- [x] **Step 1: Write failing model tests**
 
 Cover:
 
@@ -47,7 +47,7 @@ effective target change while Free => Following
 same effective target while Free => remains Free
 ```
 
-- [ ] **Step 2: Run focused EditMode test and confirm RED**
+- [x] **Step 2: Run focused EditMode test and confirm RED**
 
 ```bash
 "/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity" \
@@ -61,15 +61,15 @@ same effective target while Free => remains Free
 
 Expected RED: compilation fails only because `CameraFollowModel` / `CameraFollowMode` do not exist.
 
-- [ ] **Step 3: Implement the minimum pure model**
+- [x] **Step 3: Implement the minimum pure model**
 
 Implement only the approved transitions. `ObserveTarget` resolves a requested leader to city when `leaderTargetAvailable == false`, returns whether the effective target changed, and restores `Following` only when it changed.
 
-- [ ] **Step 4: Run focused test and confirm GREEN**
+- [x] **Step 4: Run focused test and confirm GREEN**
 
 Repeat Step 2 with `green-model.xml` / `green-model.log`; require all selected tests to pass.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 git diff --check
@@ -94,7 +94,7 @@ git commit -m "feat: add camera follow state rules"
 - Create: `Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs.meta`
 
-- [ ] **Step 1: Write failing adapter tests**
+- [x] **Step 1: Write failing adapter tests**
 
 Cover:
 
@@ -106,7 +106,7 @@ Cover:
 - missing leader controller or target safely follows the city;
 - a city-to-leader effective target switch exits `Free` and snaps to the leader.
 
-- [ ] **Step 2: Run focused EditMode test and confirm RED**
+- [x] **Step 2: Run focused EditMode test and confirm RED**
 
 ```bash
 "/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity" \
@@ -120,7 +120,7 @@ Cover:
 
 Expected RED: compilation fails only because `FormalCameraController` does not exist.
 
-- [ ] **Step 3: Implement the minimum adapter**
+- [x] **Step 3: Implement the minimum adapter**
 
 Add:
 
@@ -135,14 +135,19 @@ public void Configure(
     Transform leaderFollowTarget);
 public void BeginFreeDrag();
 public void EndFreeDrag();
+public void ProcessPointerState(
+    Vector2 screenPosition,
+    bool pressedThisFrame,
+    bool releasedThisFrame,
+    float screenHeight);
 public void ApplyPointerDelta(Vector2 screenDelta, float screenHeight);
 public void ReturnToTarget();
 public void TickCamera();
 ```
 
-`Update` translates `Mouse.current.middleButton`, mouse delta, and `Keyboard.current.homeKey`. `LateUpdate` calls `TickCamera`. Do not read scaled or unscaled delta time.
+`Update` translates `Mouse.current.middleButton`, pointer-position snapshots, and `Keyboard.current.homeKey`. Press establishes a position baseline; hold and release apply position differences so pre-press movement is ignored and the final pre-release segment is retained. `LateUpdate` calls `TickCamera`. Do not read scaled or unscaled delta time.
 
-- [ ] **Step 4: Run focused test and confirm GREEN**
+- [x] **Step 4: Run focused test and confirm GREEN**
 
 Repeat Step 2 with `green-adapter.xml` / `green-adapter.log`; require all selected tests to pass.
 
@@ -156,7 +161,7 @@ Repeat Step 2 with `green-adapter.xml` / `green-adapter.log`; require all select
 - Modify: `Assets/_Game/Tests/EditMode/SceneContractTests.cs`
 - Modify: `Assets/_Game/Tests/PlayMode/RuntimeSceneTests.cs`
 
-- [ ] **Step 1: Write failing scene-contract and PlayMode tests**
+- [x] **Step 1: Write failing scene-contract and PlayMode tests**
 
 Before editing the scene, add tests for:
 
@@ -170,7 +175,7 @@ Before editing the scene, add tests for:
 - target switching while free returns and snaps;
 - camera operations preserve city autopilot and deployment state.
 
-- [ ] **Step 2: Run focused tests and confirm RED**
+- [x] **Step 2: Run focused tests and confirm RED**
 
 ```bash
 "/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity" \
@@ -192,15 +197,15 @@ Before editing the scene, add tests for:
 
 Expected RED: scene contract fails because the formal `Main Camera` has no adapter. Runtime camera assertions fail for the same missing connection.
 
-- [ ] **Step 3: Connect only the existing Main Camera**
+- [x] **Step 3: Connect only the existing Main Camera**
 
 Edit `FormalPrototype.unity` YAML to add `FormalCameraController` to the existing `Main Camera` and assign the existing Camera, city, leader controller, and leader visual Transform file IDs. Do not run project setup or rewrite unrelated scene YAML.
 
-- [ ] **Step 4: Run focused scene tests and confirm GREEN**
+- [x] **Step 4: Run focused scene tests and confirm GREEN**
 
 Repeat Step 2 with `green-scene-editmode.xml` and `green-scene-playmode.xml`; require all selected tests to pass.
 
-- [ ] **Step 5: Verify and commit adapter/scene**
+- [x] **Step 5: Verify and commit adapter/scene**
 
 ```bash
 git diff --check
@@ -227,7 +232,7 @@ git commit -m "feat: wire formal camera control"
 - Modify: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Modify: `Docs/superpowers/plans/2026-08-05-camera-control.md` (checkbox evidence only)
 
-- [ ] **Step 1: Run full EditMode**
+- [x] **Step 1: Run full EditMode**
 
 Write results to:
 
@@ -236,7 +241,7 @@ Write results to:
 /tmp/wastecity-camera-control/final-editmode.log
 ```
 
-- [ ] **Step 2: Run full PlayMode**
+- [x] **Step 2: Run full PlayMode**
 
 Write results to:
 
@@ -245,7 +250,7 @@ Write results to:
 /tmp/wastecity-camera-control/final-playmode.log
 ```
 
-- [ ] **Step 3: Run headless compile and Windows x86-64 build**
+- [x] **Step 3: Run headless compile and Windows x86-64 build**
 
 Use the repository's documented compile/build method. Write logs to:
 
@@ -260,7 +265,7 @@ Require a successful Mono x86-64 player build, then run:
 file Builds/Windows/WasteCity.exe
 ```
 
-- [ ] **Step 4: Prove protected areas are unchanged**
+- [x] **Step 4: Prove protected areas are unchanged**
 
 Compare against `7d6a502e35c3e8bde09d49fd3620b3a8f26c78f1`:
 
@@ -275,7 +280,7 @@ git diff --exit-code 7d6a502 -- \
 
 Extract the complete `### BUG-0001` section from the baseline and worktree, hash both, and require identical SHA-256 values.
 
-- [ ] **Step 5: Backwrite only verified evidence**
+- [x] **Step 5: Backwrite only verified evidence**
 
 Update:
 
@@ -283,7 +288,7 @@ Update:
 - `Docs/06` `IDEA-0001` with the implementation commit and exact verified evidence while preserving overall status `开发中`;
 - no byte in the `BUG-0001` section.
 
-- [ ] **Step 6: Verify and commit documentation**
+- [x] **Step 6: Verify and commit documentation**
 
 ```bash
 git diff --check
@@ -300,7 +305,7 @@ git commit -m "docs: record camera control milestone"
 
 ### Task 5: Push and final consistency proof
 
-- [ ] **Step 1: Final clean verification**
+- [x] **Step 1: Final clean verification**
 
 ```bash
 git diff --check
