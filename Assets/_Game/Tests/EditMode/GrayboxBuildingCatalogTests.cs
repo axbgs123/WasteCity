@@ -5,7 +5,9 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.City;
 using WasteCity.Content;
+using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
 
 namespace WasteCity.Tests
@@ -214,6 +216,60 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Describe_UsesOnlyMatchingCompletedSessionInstancesForPrerequisites()
+        {
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+            var presentation = new CatalogPresentation();
+            var gameObject = new GameObject("graybox-building-catalog-session-test");
+            cleanup.Add(gameObject);
+            var session = gameObject.AddComponent<GrayboxBuildingSession3D>();
+            session.Configure(true);
+            session.ConfigureDevelopmentFixture();
+            session.UnlockResearchForDevelopment("core.research.automated-machinery");
+            session.UnlockResearchForDevelopment("core.research.precision-assembly");
+
+            Assert.That(session.CompletedBuildingCount(null), Is.Zero);
+            Assert.That(session.CompletedBuildingCount(string.Empty), Is.Zero);
+            Assert.That(session.CompletedBuildingCount("unknown.building"), Is.Zero);
+            Assert.That(
+                presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    ValidSessionRequest(session, BuildingCatalog.Wall, 14, 10),
+                    presentation,
+                    out _,
+                    out _),
+                Is.True);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value), Is.EqualTo(1));
+            Assert.That(
+                presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    ValidSessionRequest(session, BuildingCatalog.Smelter, 10, 10),
+                    presentation,
+                    out _,
+                    out _),
+                Is.True);
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Smelter.Id.Value), Is.Zero);
+            Assert.That(
+                presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Smelter.Id.Value), Is.EqualTo(1));
+            Assert.That(
+                presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+        }
+
+        [Test]
         public void Interaction_StartsInactiveAndCapturesCatalogOrigin()
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
@@ -385,6 +441,38 @@ namespace WasteCity.Tests
                 definition);
         }
 
+        private static BuildingPlacementRequest ValidSessionRequest(
+            GrayboxBuildingSession3D session,
+            BuildingDefinition definition,
+            int x,
+            int y)
+        {
+            return new BuildingPlacementRequest(
+                definition,
+                session.GroundGrid,
+                BuildingSite.Ground,
+                BuildingOrientation.North,
+                x,
+                y,
+                12,
+                12,
+                session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                !definition.RequiresResourceNode,
+                definition.RequiresResourceNode ? "test.node" : null,
+                true,
+                BuildingUnlockModel.Evaluate(
+                    definition,
+                    session.Population,
+                    session.IsResearchCompleted,
+                    session.CompletedBuildingCount),
+                session.Inventory.CanSpend(definition.CostId, definition.Cost));
+        }
+
         private static ContentRoute[] AllRoutes()
         {
             return new[]
@@ -443,6 +531,22 @@ namespace WasteCity.Tests
             public bool HasContactedRoute(ContentRoute route)
             {
                 return contactedRoutes.Contains(route);
+            }
+        }
+
+        private sealed class CatalogPresentation : IGrayboxBuildingPresentation3D
+        {
+            public bool TryCreate(GrayboxBuildingInstance3D instance)
+            {
+                return true;
+            }
+
+            public void UpdateInstance(GrayboxBuildingInstance3D instance)
+            {
+            }
+
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
             }
         }
     }
