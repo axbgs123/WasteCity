@@ -3,7 +3,8 @@
 ## 1. 文档状态与基线
 
 - 需求记录：`IDEA-0003`
-- 需求状态：已明确、已批准、开发中
+- 需求状态：已明确、已批准
+- 实现状态：未实现
 - 文档性质：已批准设计规格
 - 运行时状态：尚未实现
 - 设计日期：2026-08-05
@@ -119,7 +120,8 @@ WasteCity.Editor / EditModeTests / PlayModeTests
 - `GrayboxBuildingInputRouter3D`：按批准的优先级消费建造输入；
 - `GrayboxBuildingMenuView3D`：底部两层菜单、搜索、详情、错误和撤离清单；
 - `GrayboxBuildingWorldView3D`：网格、预览、施工框架、完成占位和遗迹表现；
-- `GrayboxDeveloperModifier3D`：编译条件内的开发面板与会话命令。
+- `GrayboxDeveloperModifierBootstrap3D`：所有构建中均存在且可序列化的场景入口；Release 中惰性无行为；
+- `GrayboxDeveloperModifier3D`：仅由 Editor/Development 编译边界创建的开发面板、输入路由与会话命令，不被场景直接序列化引用。
 
 ### 4.4 Editor 与测试边界
 
@@ -308,22 +310,34 @@ West  = 270°
 
 暂停时，目录、选择、预览、撤离清单、中键拖动和 `Home` 可用；施工、完整拆除、城市移动和其他玩法推进停止。
 
-### 8.3 建造交互状态机
+### 8.3 UI 键盘焦点
+
+当搜索框、数值输入框或任何 UGUI 可编辑/键盘导航控件获得焦点时，UI 拥有当帧全部键盘事件的优先权：
+
+- 文字输入、方向导航、提交和取消先由当前 UI 控件处理；
+- `W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter` 等键不得同时进入城市、领袖、建造、部署、镜头或开发面板路由；
+- 输入搜索文字中的 `W/A/S/D/B/R` 和数字不能移动对象、开关目录、旋转预览或选择快捷栏；
+- UI 输入层向玩法层输出中性键盘帧，但仍按指针命中规则决定鼠标是否可进入世界；
+- 当前控件明确失去焦点后，从下一帧开始恢复玩法键盘输入。
+
+`Esc` 遵循两级消费：搜索框或其他可编辑控件有焦点时，第一次按键只执行该控件的取消/结束编辑语义并被 UI 消费；控件失焦后再次按 `Esc`，才交给目录或建造状态机。
+
+### 8.4 建造交互状态机
 
 ```text
 Inactive
-  ├─ B → CatalogOpen
+  ├─ B → CatalogOpen(returnState = Inactive)
   └─ 可见快捷键 → Previewing
 
 CatalogOpen
-  ├─ B / Esc / 右键空白 → Inactive
+  ├─ B / Esc / 右键空白 → returnState
   └─ 选择已解锁卡片 → Previewing，目录收起
 
 Previewing
   ├─ R → Previewing，方向顺时针 90°
   ├─ 左键合法位置 → ConfirmPlacement → Previewing
   ├─ 左键非法位置 → Previewing，显示原因
-  ├─ B → CatalogOpen，保留当前选择与方向
+  ├─ B → CatalogOpen(returnState = Previewing)，保留当前选择与方向
   └─ 右键 / Esc → Inactive，清除选择与预览
 
 ConfirmPlacement
@@ -331,7 +345,9 @@ ConfirmPlacement
   └─ 重新评估或提交失败 → 不改变会话
 ```
 
-人口、研究或前置不足的可见卡片置灰，只能悬停查看原因，不能进入 `Previewing`。已经解锁但当前材料不足的卡片仍可选择，进入红色预览但不能确认。隐藏卡片不会产生输入目标。
+`CatalogOpen` 必须记录打开来源。从 `Inactive` 打开的目录关闭后回到 `Inactive`；从 `Previewing` 打开的目录关闭后回到 `Previewing`，并保留原建筑选择与方向。因此从预览中按 `B` 打开目录后，第一次 `Esc` 只关闭目录，返回世界后再次 `Esc` 才取消建造选择。选择新卡片始终进入 `Previewing`。
+
+搜索框有焦点时，`Esc` 先按第 8.3 节由 UGUI 消费；只有失焦后的下一次 `Esc` 才执行上述目录返回。人口、研究或前置不足的可见卡片置灰，只能悬停查看原因，不能进入 `Previewing`。已经解锁但当前材料不足的卡片仍可选择，进入红色预览但不能确认。隐藏卡片不会产生输入目标。
 
 ## 9. 合法性评估
 
@@ -466,10 +482,12 @@ CancelConfirmation
 
 ```text
 remainingRatio = clamp(remaining / baseDuration, 0, 1)
-refund = clamp(floor(originalCost × remainingRatio × handlingRatio), 0, originalCost)
+rawRefund = max(0, originalCost × remainingRatio × handlingRatio)
+roundedRefund = Math.Round(rawRefund, MidpointRounding.AwayFromZero)
+refund = clamp((int)roundedRefund, 0, originalCost)
 ```
 
-舍入规则固定为向下取整。计算使用 `double` 中间值，最终转为整数并按 `0..originalCost` 限幅。每种资源独立计算。
+舍入规则固定为普通四舍五入，恰好 `0.5` 时远离零。原成本、剩余比例和处理比例先用非负 `double` 中间值相乘，再以 `MidpointRounding.AwayFromZero` 转为整数，并按 `0..originalCost` 限幅。每种资源独立计算。
 
 处理比例：
 
@@ -556,7 +574,9 @@ RequestPacking
 
 ### 13.1 可用边界
 
-开发面板使用 `F10` 开关，并同时满足编译与运行门：
+场景只序列化引用 `GrayboxDeveloperModifierBootstrap3D`。该 MonoBehaviour 在 Editor、Development 和 Release 中都必须存在、可加载且不产生 Missing Script；它不能持有仅条件编译类型的序列化字段。
+
+Bootstrap 在所有构建中默认惰性无行为。只有以下编译边界成立时，才可在运行时创建非序列化的开发 UI、`F10` 路由和命令服务：
 
 ```csharp
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -564,10 +584,12 @@ RequestPacking
 
 - Unity Editor 中始终可用；
 - Development Build 中可用；
-- 默认正式 `BuildWindows()` 中类型或入口不可用；
+- 默认正式 `BuildWindows()` 中 Bootstrap 保持无行为，不创建开发 UI、不注册 `F10`、不构造或调用开发命令；
 - 显式 2D 回归构建不接入该面板；
 - 面板必须醒目显示“开发模式”；
 - 所有修改在退出运行会话时丢弃。
+
+Release 场景加载和构建日志必须同时证明：没有可用修改器、没有开发 UI/命令入口、没有 Missing Script/MonoBehaviour 警告。不能通过从场景删除 Bootstrap 来区分构建类型，也不能让 authoring 在不同构建间重写场景。
 
 ### 13.2 命令
 
@@ -741,7 +763,7 @@ F 收起请求
 - 主原因优先级与完整原因集合；
 - 28 项普通目录唯一映射，两个升级型建筑排除；
 - 搜索不泄露隐藏内容；
-- 主动取消、80%、50%、0% 退款及向下取整/限幅；
+- 主动取消、80%、50%、0% 退款，包含小数部分低于、等于和高于 `0.5` 的确定性四舍五入与限幅；
 - 未完成施工先乘剩余比例；
 - 遗弃占格但失去所有权；
 - 单体、类别、全部与混合撤离；
@@ -758,7 +780,8 @@ F 收起请求
 - 稳定 VisualSlot、共享材质和 MPB；
 - 缺引用禁用输入并报告；
 - 开发修改器只调用会话模型 API；
-- 非 Development 编译边界下修改器不可用。
+- 场景序列化的开发 Bootstrap 在所有构建中类型可用，且不含对条件编译类型的序列化字段；
+- 非 Development 编译边界下 Bootstrap 惰性无行为，修改器 UI、输入和命令不可用。
 
 ### 17.3 PlayMode 场景测试
 
@@ -766,6 +789,9 @@ F 收起请求
 
 - `B → 选择 → 预览 → 施工 → 完成`；
 - `1–0`、`R`、左键、右键、`Esc`、`Delete`；
+- 从 `Inactive` 与 `Previewing` 打开目录后，`B/Esc/右键空白` 分别返回正确来源；从预览打开时保留建筑选择与方向；
+- 搜索框或其他 UGUI 键盘控件获得焦点后，用虚拟键盘输入 `W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter`，断言 UI 消费文字、导航、提交和取消，城市/领袖不移动、目录不切换、预览不旋转、快捷栏不变化、部署/镜头/开发面板不响应；失焦后的下一帧才恢复玩法输入；
+- 搜索框有焦点时第一次 `Esc` 只结束编辑，下一次 `Esc` 才关闭目录；若目录来自 `Previewing`，再下一次 `Esc` 才取消选择；
 - 建造右键不触发自动驾驶；
 - UI 点击不穿透；
 - WASD 与中键/`Home` 继续按既有语义工作；
@@ -790,7 +816,7 @@ F 收起请求
 - 显式 3D Development Windows 构建；
 - 显式 2D 回归 Windows 构建；
 - 三个 Windows 产物的 `file` 格式检查；
-- 非 Development 默认构建中开发修改器不可用；
+- 非 Development 默认构建中开发修改器不可用，场景无开发 UI/命令入口，构建与场景加载日志无 Missing Script/MonoBehaviour 警告；
 - schema、正式存档、冻结 2D 场景和测试零差异。
 
 真实 Windows 10/11 独立运行冒烟仍需在真实 Windows 环境补验，macOS 交叉构建和文件格式检查不能替代。
@@ -840,6 +866,7 @@ F 收起请求
 | 风险 | 后果 | 控制 |
 |---|---|---|
 | 建造右键与自动驾驶冲突 | 取消选择时城市误移动 | 建造输入优先消费并用 PlayMode 虚拟鼠标证明 |
+| 搜索框键盘穿透 | 输入文字时城市移动或预览旋转 | UI 焦点输出中性玩法键盘帧并用虚拟键盘覆盖保留键 |
 | 双网格坐标混淆 | 建筑漂移、占用错误 | 值类型表面命中显式携带站点和逻辑格 |
 | Collider 成为玩法真值 | 表现变化破坏规则 | Collider 只生成候选，规则层重新验证 |
 | 扣款与占格非原子 | 丢资源或幽灵占地 | 单一会话提交和失败回滚测试 |
@@ -847,6 +874,7 @@ F 收起请求
 | 撤离绕过城市状态机 | 非法 Packing | 只拦截请求，最终调用既有城市 API |
 | 遗迹不再占格 | 玩家无成本清场 | 中立遗迹注册表继续参与重叠规则 |
 | 开发面板进入正式版 | 发行作弊入口 | 双编译门、独立 Development 构建、非 Development 测试 |
+| 条件编译组件造成 Missing Script | Release 场景加载警告或引用丢失 | 常驻可序列化 Bootstrap，条件内只创建非序列化开发服务 |
 | 搜索泄露隐藏内容 | 提前暴露路线或特殊建筑 | 先构造可见集合，再搜索 |
 | 每格/每卡帧分配 | UI 和预览卡顿 | 合批网格、变更时刷新、300 tick 零分配门 |
 | 夹具被当作正式平衡 | 资源体验失真 | 明确开发标签、会话丢弃、数值集中 |
