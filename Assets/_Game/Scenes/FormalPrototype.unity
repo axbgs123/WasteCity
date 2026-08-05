@@ -377,6 +377,8 @@ MonoBehaviour:
   city: {fileID: 1740062253}
   visual: {fileID: 1481434006}
   research: {fileID: 443342353}
+  world: {fileID: 458706983}
+  moveSpeed: 5
 --- !u!114 &443342351
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -912,6 +914,7 @@ MonoBehaviour:
   guide: {fileID: 443342343}
   gameSpeed: {fileID: 443342342}
   clock: {fileID: 443342341}
+  leader: {fileID: 443342350}
 --- !u!4 &1311120285
 Transform:
   m_ObjectHideFlags: 0
@@ -1092,6 +1095,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   moveSpeed: 4
+  world: {fileID: 458706983}
 --- !u!61 &1740062254
 BoxCollider2D:
   m_ObjectHideFlags: 0

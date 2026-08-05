@@ -13,6 +13,7 @@ using WasteCity.Economy;
 using WasteCity.Population;
 using WasteCity.Research;
 using WasteCity.World;
+using WasteCity.Leader;
 
 namespace WasteCity.Tests.PlayMode
 {
@@ -61,6 +62,125 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(buildings.transform.parent, Is.EqualTo(city.transform)); Assert.That(Camera.main, Is.Not.Null);
             Assert.That(buildings.HasLocalTimeSource, Is.True);
             Assert.That(city.GetComponent<VisualSlot>()?.StableId, Is.EqualTo("core.city.mobile")); Assert.That(Object.FindObjectOfType<VisualLibraryProvider>()?.Library, Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator CityNavigation_FormalSceneWiresWorldAndObstaclePlaceholders()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+
+            Assert.That(city.NavigationReady, Is.True);
+            Assert.That(
+                Object.FindObjectsOfType<VisualSlot>()
+                    .Any(value => value.StableId.StartsWith("world.obstacle.")),
+                Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator CityNavigation_AutopilotMovesCloserToReachableDestination()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var world = Object.FindObjectOfType<PlaceholderWorldView>();
+            var gameSpeed = Object.FindObjectOfType<WasteCity.Core.GameSpeedController>();
+            gameSpeed.SetPaused(WasteCity.Core.GamePauseReason.Title, false);
+            Assert.That(
+                world.TryWorldToCell(city.transform.position, out int startX, out int startY),
+                Is.True);
+            FindReachableDestination(
+                world.Model,
+                startX,
+                startY,
+                out int targetX,
+                out int targetY);
+            Vector2 destination = world.CellToWorld(targetX, targetY);
+            float before = Vector2.Distance(city.transform.position, destination);
+
+            Assert.That(
+                city.TrySetDestinationCell(targetX, targetY, out string reason),
+                Is.True,
+                reason);
+            for (int frame = 0; frame < 8; frame++)
+                yield return new WaitForFixedUpdate();
+
+            Assert.That(
+                Vector2.Distance(city.transform.position, destination),
+                Is.LessThan(before));
+        }
+
+        [UnityTest]
+        public IEnumerator CityNavigation_DeploymentRejectsInvalidAndAcceptsLegalArea()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var world = Object.FindObjectOfType<PlaceholderWorldView>();
+            city.RestoreDeployment(CityMode.Mobile, 0f);
+            city.transform.position = world.CellToWorld(0, 0);
+
+            Assert.That(city.TryToggleDeployment(out string invalidReason), Is.False);
+            Assert.That(invalidReason, Is.EqualTo("展开失败：空间不足"));
+            Assert.That(city.Deployment.Mode, Is.EqualTo(CityMode.Mobile));
+
+            FindLegalDeploymentCenter(world.Model, out int legalX, out int legalY);
+            city.transform.position = world.CellToWorld(legalX, legalY);
+
+            Assert.That(
+                city.TryToggleDeployment(out string legalReason),
+                Is.True,
+                legalReason);
+            Assert.That(city.Deployment.Mode, Is.EqualTo(CityMode.Deploying));
+        }
+
+        [UnityTest]
+        public IEnumerator CityNavigation_SaveRoundTripRestoresAutopilotAndLeaderPosition()
+        {
+            SceneManager.LoadScene("FormalPrototype");
+            yield return null;
+            yield return null;
+            var saves = Object.FindObjectOfType<FormalSaveController>();
+            var city = Object.FindObjectOfType<PlaceholderMobileCity>();
+            var world = Object.FindObjectOfType<PlaceholderWorldView>();
+            var leader = Object.FindObjectOfType<FormalLeaderController>();
+            city.RestoreDeployment(CityMode.Mobile, 0f);
+            Assert.That(
+                world.TryWorldToCell(city.transform.position, out int startX, out int startY),
+                Is.True);
+            FindReachableDestination(
+                world.Model,
+                startX,
+                startY,
+                out int targetX,
+                out int targetY);
+            Assert.That(city.TrySetDestinationCell(targetX, targetY, out _), Is.True);
+            leader.Restore(true, false, 0f, 0f, 0f);
+            leader.RestorePosition(4.5f, -2.25f, true);
+
+            FormalSaveData data = saves.CaptureComplete();
+
+            Assert.That(data.cityAutopilotActive, Is.True);
+            Assert.That(data.cityDestinationX, Is.EqualTo(targetX));
+            Assert.That(data.cityDestinationY, Is.EqualTo(targetY));
+            Assert.That(data.leaderPositionSaved, Is.True);
+            Assert.That(data.leaderX, Is.EqualTo(4.5f));
+            Assert.That(data.leaderY, Is.EqualTo(-2.25f));
+            city.ApplyManualInput(Vector2.right);
+            leader.RestorePosition(9f, 9f, true);
+
+            Assert.That(saves.ApplyComplete(data, false), Is.True);
+            Assert.That(city.AutopilotActive, Is.True);
+            Assert.That(city.DestinationX, Is.EqualTo(targetX));
+            Assert.That(city.DestinationY, Is.EqualTo(targetY));
+            Assert.That(leader.Position.x, Is.EqualTo(4.5f).Within(.001f));
+            Assert.That(leader.Position.y, Is.EqualTo(-2.25f).Within(.001f));
+            city.RestoreDeployment(CityMode.Fortress, 0f);
+            Assert.That(leader.ControlTarget, Is.EqualTo(DirectControlTarget.Leader));
         }
 
         [UnityTest]
@@ -1247,6 +1367,50 @@ namespace WasteCity.Tests.PlayMode
             runtime.RestoreState(runtime.Health.Value.Maximum, 0f);
             item.AddComponent<PlaceholderAutomatedRepairBay>().Configure(runtime);
             return runtime;
+        }
+
+        private static void FindReachableDestination(
+            WorldMapModel map,
+            int startX,
+            int startY,
+            out int targetX,
+            out int targetY)
+        {
+            for (int x = 0; x < map.Width; x++)
+                for (int y = 0; y < map.Height; y++)
+                    if (System.Math.Abs(x - startX) + System.Math.Abs(y - startY) >= 2 &&
+                        CityPathfinder.TryFindPath(
+                            map,
+                            startX,
+                            startY,
+                            x,
+                            y,
+                            out _))
+                    {
+                        targetX = x;
+                        targetY = y;
+                        return;
+                    }
+            throw new AssertionException("Formal map has no reachable destination.");
+        }
+
+        private static void FindLegalDeploymentCenter(
+            WorldMapModel map,
+            out int selectedX,
+            out int selectedY)
+        {
+            for (int x = 0; x < map.Width; x++)
+                for (int y = 0; y < map.Height; y++)
+                    if (CityDeploymentRules.Validate(
+                            map,
+                            x,
+                            y) == CityDeploymentFailure.None)
+                    {
+                        selectedX = x;
+                        selectedY = y;
+                        return;
+                    }
+            throw new AssertionException("Formal map has no legal deployment center.");
         }
     }
 }

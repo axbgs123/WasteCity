@@ -5,6 +5,7 @@ using WasteCity.Combat;
 using WasteCity.Population;
 using WasteCity.Core;
 using WasteCity.Content;
+using WasteCity.Leader;
 
 namespace WasteCity.UI
 {
@@ -17,6 +18,7 @@ namespace WasteCity.UI
         [SerializeField] private OnboardingGuideController guide;
         [SerializeField] private GameSpeedController gameSpeed;
         [SerializeField] private FormalGameClockController clock;
+        [SerializeField] private FormalLeaderController leader;
         private void OnGUI()
         {
             string resources = economy == null ? string.Empty : RouteContentDisplayCatalog.InventorySummary(economy.Inventory);
@@ -26,7 +28,9 @@ namespace WasteCity.UI
             string guidance = guide == null ? "" : guide.CurrentInstruction;
             string speed = gameSpeed == null ? "" : $"时间 {gameSpeed.Model.Speed:0.#}×（空格暂停，[ 1×，] 2×）";
             string day = clock == null ? "" : $"第 {clock.Model.Day} 天 · {clock.Model.SecondsIntoDay / clock.Model.SecondsPerDay:P0}";
-            GUI.Box(new Rect(18, 18, 820, 285), $"废土移动城市 · 正式版技术原型\n世界种子 8128 · {day} · {mode} · {health} · {speed}\n{people}\n{resources}\n{guidance}\nWASD 驾驶 | F 展开/收起 | 堡垒状态在资源格按 E 采集\n所有视觉为待替换建模占位符");
+            string control=leader==null?"":$"直接控制：{(leader.ControlTarget==DirectControlTarget.Leader?"领袖":"移动城市")}";
+            string mobility=city==null?"":$"地形速度：{city.CurrentTerrainMultiplier:P0} · {city.LastMobilityMessage}";
+            GUI.Box(new Rect(18, 18, 820, 315), $"废土移动城市 · 正式版技术原型\n世界种子 8128 · {day} · {mode} · {health} · {speed}\n{control} · {mobility}\n{people}\n{resources}\n{guidance}\nWASD 直接控制 | 右键自动驾驶 | F 展开/收起 | 堡垒状态在资源格按 E 采集\n所有视觉为待替换建模占位符");
         }
     }
 }
