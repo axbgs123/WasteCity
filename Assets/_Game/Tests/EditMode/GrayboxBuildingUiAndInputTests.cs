@@ -410,6 +410,7 @@ namespace WasteCity.Tests
             UiFixture fixture = CreateMenuFixture();
             fixture.Interaction.ToggleCatalog();
             fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Assert.That(fixture.Menu.CatalogVisible, Is.True);
             Transform card = FindTransform(
                 fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
@@ -452,6 +453,101 @@ namespace WasteCity.Tests
             AssertNoAreaOverlap(detailsRect, nameRect);
             AssertNoAreaOverlap(detailsRect, costRect);
             AssertNoAreaOverlap(detailsRect, reasonRect);
+        }
+
+        [TestCase("core.building.smelter")]
+        [TestCase("core.building.assembler")]
+        public void Menu_HoverDetailsFitEveryPromisedFieldWithoutClipping(
+            string stableBuildingId)
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Assert.That(fixture.Menu.CatalogVisible, Is.True);
+            BuildingDefinition definition = BuildingCatalog.BuildMenu.Single(
+                candidate => candidate.Id.Value == stableBuildingId);
+            GrayboxBuildingCatalogItem3D item =
+                new GrayboxBuildingCatalogPresenter3D().Describe(
+                    fixture.Session,
+                    definition);
+            Transform card = FindTransform(
+                fixture.Canvas.transform,
+                "Catalog.Card." + stableBuildingId);
+            Transform details = FindTransform(card, "Details");
+            Text detailsText = FindComponent<Text>(
+                details,
+                "Details.Text");
+            Assert.That(item.Visibility, Is.EqualTo(
+                BuildingCatalogVisibility.Locked));
+
+            var pointer = new PointerEventData(fixture.EventSystem);
+            ExecuteEvents.Execute(
+                card.gameObject,
+                pointer,
+                ExecuteEvents.pointerEnterHandler);
+            ForceCanvasLayout(fixture.Canvas);
+
+            Assert.That(details.gameObject.activeSelf, Is.True);
+            Assert.That(
+                detailsText.preferredHeight,
+                Is.LessThanOrEqualTo(
+                    detailsText.rectTransform.rect.height + .01f),
+                detailsText.text);
+            Assert.That(
+                detailsText.verticalOverflow,
+                Is.EqualTo(VerticalWrapMode.Truncate));
+            Assert.That(detailsText.text, Does.Contain(definition.Name));
+            Assert.That(detailsText.text, Does.Contain("类别 生产"));
+            Assert.That(detailsText.text, Does.Contain("路线 核心"));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "占地 " + definition.Width + "×" +
+                    definition.Height));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "位置 " + BuildingMobilityRules.PlacementName(
+                        definition.Placement)));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "施工 " + definition.BuildSeconds + " 秒"));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "完整成本 " + definition.Cost + " " +
+                    definition.CostId));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "研究 " +
+                    (definition.RequiredResearchId ?? "无")));
+            Assert.That(
+                detailsText.text,
+                Does.Contain(
+                    "前置 " +
+                    (definition.RequiredBuildingId ?? "无")));
+            Assert.That(detailsText.text, Does.Contain("锁定原因 "));
+            foreach (string lockReason in item.LockReasons)
+                Assert.That(detailsText.text, Does.Contain(lockReason));
+
+            Rect detailsRect = ScreenRect(
+                fixture,
+                (RectTransform)details);
+            Rect cardRect = ScreenRect(
+                fixture,
+                (RectTransform)card);
+            Assert.That(
+                RectContains(cardRect, detailsRect),
+                Is.True,
+                "card " + cardRect + " details " + detailsRect);
+            Transform sibling = card.parent.GetChild(
+                card.GetSiblingIndex() == 0 ? 1 :
+                card.GetSiblingIndex() - 1);
+            AssertNoAreaOverlap(
+                cardRect,
+                ScreenRect(fixture, (RectTransform)sibling));
         }
 
         [Test]
@@ -835,9 +931,16 @@ namespace WasteCity.Tests
             fixture.EventSystem.RaycastAll(pointer, results);
             Assert.That(results, Is.Not.Empty);
             RaycastResult hit = results.First(result =>
-                result.gameObject == button.gameObject ||
-                result.gameObject.transform.IsChildOf(button.transform));
+                result.gameObject != null &&
+                result.gameObject.activeInHierarchy);
             Assert.That(hit.gameObject, Is.Not.Null);
+            GameObject resolved =
+                ExecuteEvents.GetEventHandler<IPointerClickHandler>(
+                    hit.gameObject);
+            Assert.That(
+                resolved,
+                Is.EqualTo(button.gameObject),
+                "The top real pointer hit must resolve to the expected button.");
             GameObject handled = ExecuteEvents.ExecuteHierarchy(
                 hit.gameObject,
                 pointer,
@@ -902,6 +1005,14 @@ namespace WasteCity.Tests
                 Mathf.Min(left.yMax, right.yMax) -
                 Mathf.Max(left.yMin, right.yMin));
             return width * height;
+        }
+
+        private static bool RectContains(Rect outer, Rect inner)
+        {
+            return inner.xMin >= outer.xMin - .01f &&
+                   inner.yMin >= outer.yMin - .01f &&
+                   inner.xMax <= outer.xMax + .01f &&
+                   inner.yMax <= outer.yMax + .01f;
         }
 
         private static void ForceCanvasLayout(Canvas canvas)

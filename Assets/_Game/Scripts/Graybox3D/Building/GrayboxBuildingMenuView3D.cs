@@ -414,10 +414,14 @@ namespace WasteCity.Graybox3D.Building
                 catalogRoot,
                 "Catalog.Cards");
             SetLayout(catalogCardsRoot, 596f, 0f, 0f, 1f);
+            catalogCardsRoot.GetComponent<LayoutElement>().minWidth =
+                596f;
             var cardLayout =
                 catalogCardsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             cardLayout.spacing = 3f;
             cardLayout.childForceExpandHeight = false;
+            cardLayout.childForceExpandWidth = false;
+            cardLayout.childControlWidth = false;
         }
 
         private void RefreshQuickbar()
@@ -474,8 +478,9 @@ namespace WasteCity.Graybox3D.Building
                 ? ButtonColor
                 : LockedColor;
             RectTransform rect = card.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 108f);
+            rect.sizeDelta = new Vector2(596f, 108f);
             SetLayout(rect, 596f, 108f, 0f);
+            rect.GetComponent<LayoutElement>().minWidth = 596f;
 
             RectTransform summary = CreateRect(rect, "Summary");
             PlaceFixed(summary, new Vector2(6f, 0f), new Vector2(220f, 96f));
@@ -523,10 +528,20 @@ namespace WasteCity.Graybox3D.Building
             detailsBackground.color =
                 new Color(.12f, .15f, .16f, .98f);
             detailsBackground.raycastTarget = false;
-            CreateLabel(
+            Text detailsText = CreateLabel(
                 details,
                 "Details.Text",
                 BuildDetails(item));
+            float detailsHeight = Mathf.Max(
+                96f,
+                Mathf.Ceil(detailsText.preferredHeight) + 4f);
+            float cardHeight = detailsHeight + 12f;
+            rect.sizeDelta = new Vector2(596f, cardHeight);
+            SetLayout(rect, 596f, cardHeight, 0f);
+            PlaceFixed(
+                details,
+                new Vector2(232f, 0f),
+                new Vector2(350f, detailsHeight));
             details.gameObject.SetActive(false);
             EventTrigger trigger =
                 card.gameObject.AddComponent<EventTrigger>();
