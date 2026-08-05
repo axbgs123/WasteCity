@@ -5,11 +5,11 @@
 ## 固定环境
 
 - Unity：`2022.3.62f1`（revision `4af31df58517`）
-- 渲染：URP 2D Renderer
+- 渲染：默认 `GrayboxPrototype3D` 使用场景作用域 URP；冻结的 `FormalPrototype` 保留 2D Renderer 作为回归基线
 - 平台：Windows 10/11 64 位
 - 输入：Unity Input System
 - 版本控制：Git + Git LFS
-- 当前分支：`master`
+- 默认编辑/正式构建入口：`Assets/_Game/Scenes/GrayboxPrototype3D.unity`
 
 Unity Hub 必须安装上述精确编辑器版本以及 Windows Build Support。工程版本也记录在 `ProjectSettings/ProjectVersion.txt`。
 
@@ -29,20 +29,21 @@ git status
 
 ## 首次验收
 
-1. 打开 `Assets/_Game/Scenes/FormalPrototype.unity`；
+1. 打开默认场景 `Assets/_Game/Scenes/GrayboxPrototype3D.unity`；
 2. 确认 Console 无持续错误；
 3. 运行全部 EditMode 和 PlayMode 测试；
-4. 通过菜单或批处理调用 `WasteCity.Editor.FormalBuildTools.BuildWindows`；
+4. 通过菜单或批处理调用 `WasteCity.Editor.FormalBuildTools.BuildWindows` 构建默认 3D 版本；
 5. 启动 `Builds/Windows/WasteCity.exe` 做独立运行冒烟；
-6. 开发前执行 `git status`，不要覆盖未提交改动。
+6. 如需冻结 2D 回归产物，调用 `WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D`，输出为 `Builds/Windows2D/WasteCity2D.exe`；
+7. 开发前执行 `git status`，不要覆盖未提交改动。
 
-当前自动化与构建基线（`2e13d6e`）：
+当前自动化与构建基线（`8ce573a`）：
 
-- EditMode：`282/282`；
-- PlayMode：`43/43`；
+- EditMode：`492/492`；
+- PlayMode：`58/58`；
 - Unity 无界面编译：0 错误；
-- Windows 构建：成功；
-- 存档 schema：`28`；
+- 默认 3D Windows 构建和显式 2D 回归构建均成功，两个产物均为 `PE32+ executable (GUI) x86-64`；
+- 存档 schema：`30`；首个 3D 基础阶段仍不读写正式存档；
 - 统一友军集结点、随城回归、死亡统计和组织再生已经实现；
 - 血肉路线感染闭环已经实现：生物伤害叠层、持续伤害、满层传播、精神控制清除、稳定美术替换槽和存档恢复；
 - 科技路线过载与无人系统已经实现：2×攻速、能量伤害 +30%、过热停火、侦查无人机、自动维修机甲反馈和状态恢复；
