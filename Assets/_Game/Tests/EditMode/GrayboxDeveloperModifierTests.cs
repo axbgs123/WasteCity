@@ -4,6 +4,7 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
@@ -88,6 +89,78 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Bootstrap_ExposesEveryModifierCommandAfterPanelToggle()
+        {
+            BootstrapFixture fixture = CreateBootstrapFixture();
+
+            Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
+            Assert.That(fixture.Panel.activeSelf, Is.True);
+            Assert.That(ButtonNamed(fixture.Panel, "Resource +100"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Resource +1000"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Clear Resource"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Set Resource"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock Research"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock Technology"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock Cultivation"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock Biological Ascension"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock Psionics"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Unlock All"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Set Mobile"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Set Fortress"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Complete Transition"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Multiplier 1x"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Multiplier 10x"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Multiplier 100x"), Is.Not.Null);
+            Assert.That(ButtonNamed(fixture.Panel, "Complete Construction"), Is.Not.Null);
+
+            InputNamed(fixture.Panel, "Resource Amount").text = "321";
+            ButtonNamed(fixture.Panel, "Set Resource").onClick.Invoke();
+            ButtonNamed(fixture.Panel, "Resource +100").onClick.Invoke();
+            Assert.That(fixture.Session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(421));
+            InputNamed(fixture.Panel, "Research Id").text =
+                "core.research.automated-machinery";
+            ButtonNamed(fixture.Panel, "Unlock Research").onClick.Invoke();
+            ButtonNamed(fixture.Panel, "Set Fortress").onClick.Invoke();
+            ButtonNamed(fixture.Panel, "Multiplier 10x").onClick.Invoke();
+            Assert.That(fixture.Session.IsResearchCompleted(
+                "core.research.automated-machinery"), Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(fixture.Session.ConstructionMultiplier, Is.EqualTo(10f));
+        }
+
+        [Test]
+        public void Modifier_UsesOnlyApprovedModelAndDevelopmentAdapterPaths()
+        {
+            string source = ReadSource("GrayboxDeveloperModifier3D.cs");
+
+            Assert.That(source, Does.Contain("session.Inventory.Add"));
+            Assert.That(source, Does.Contain("session.Inventory.Set"));
+            Assert.That(source, Does.Contain(
+                "session.UnlockResearchForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "session.UnlockRouteForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "session.UnlockAllResearchForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "city.RestoreDeploymentForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "city.CompleteDeploymentTransitionForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "session.SetConstructionMultiplierForDevelopment"));
+            Assert.That(source, Does.Contain(
+                "session.CompleteAllConstructionForDevelopment"));
+            Assert.That(source, Does.Not.Match(@"\btransform\s*\."));
+            Assert.That(source, Does.Not.Match(
+                @"\b(GroundGrid|InnerGrid)\s*\."));
+            Assert.That(source, Does.Not.Match(
+                @"BindingFlags|GetField|SetValue|FieldInfo"));
+            Assert.That(source, Does.Not.Match(
+                @"TryBeginConstruction|TryPlace|TryRestore"));
+            Assert.That(source, Does.Not.Match(@"\bdeployment\s*\."));
+        }
+
+        [Test]
         public void Commands_ApplyResourceOperationsWithinCapacity()
         {
             ModifierFixture fixture = CreateFixture();
@@ -135,6 +208,8 @@ namespace WasteCity.Tests
 
             Assert.That(fixture.Modifier.SetCityMode(CityMode.Fortress), Is.True);
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(fixture.Modifier.SetCityMode(CityMode.Mobile), Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Mobile));
             Assert.That(fixture.Modifier.SetCityMode(CityMode.Deploying), Is.False);
             fixture.City.Deployment.Restore(CityMode.Packing, 1f);
             Assert.That(fixture.Modifier.CompleteDeploymentTransition(), Is.True);
@@ -169,6 +244,13 @@ namespace WasteCity.Tests
                 GrayboxBuildingInstance3D>(instance =>
                     instance.State == GrayboxBuildingInstanceState.Completed));
             Assert.That(fixture.Session.ConstructionMultiplier, Is.EqualTo(10f));
+            GrayboxBuildingInstance3D next = Begin(
+                fixture.Session, 14, 10, presentation);
+            fixture.Session.TickConstruction(
+                .1f, CityMode.Fortress, false, presentation);
+            Assert.That(next.Progress.Remaining, Is.EqualTo(1f));
+            Assert.That(next.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
         }
 
         [Test]
@@ -180,12 +262,12 @@ namespace WasteCity.Tests
             fixture.Modifier.UnlockAllResearch();
             fixture.Modifier.SetConstructionMultiplier(100f);
 
-            fixture.Session.ConfigureDevelopmentFixture();
+            ModifierFixture freshFixture = CreateFixture();
 
-            Assert.That(fixture.Session.Inventory.Get(ResourceIds.Iron),
+            Assert.That(freshFixture.Session.Inventory.Get(ResourceIds.Iron),
                 Is.EqualTo(30));
-            Assert.That(fixture.Session.Research.CompletedCount, Is.Zero);
-            Assert.That(fixture.Session.ConstructionMultiplier, Is.EqualTo(1f));
+            Assert.That(freshFixture.Session.Research.CompletedCount, Is.Zero);
+            Assert.That(freshFixture.Session.ConstructionMultiplier, Is.EqualTo(1f));
         }
 
         [Test]
@@ -220,6 +302,42 @@ namespace WasteCity.Tests
                 session,
                 city,
                 new GrayboxDeveloperModifier3D(session, city));
+        }
+
+        private BootstrapFixture CreateBootstrapFixture()
+        {
+            ModifierFixture fixture = CreateFixture();
+            var presentationObject = Track(new GameObject("Presentation"));
+            GrayboxBuildingWorldView3D presentation =
+                presentationObject.AddComponent<GrayboxBuildingWorldView3D>();
+            var bootstrapObject = Track(new GameObject("Modifier Bootstrap"));
+            GrayboxDeveloperModifierBootstrap3D bootstrap =
+                bootstrapObject.AddComponent<
+                    GrayboxDeveloperModifierBootstrap3D>();
+            bootstrap.Configure(fixture.Session, fixture.City, presentation);
+            return new BootstrapFixture(
+                bootstrap,
+                fixture.Session,
+                fixture.City,
+                bootstrap.transform.Find("Graybox Developer Modifier")
+                    ?.gameObject);
+        }
+
+        private static Button ButtonNamed(GameObject root, string name)
+        {
+            foreach (Button button in root.GetComponentsInChildren<Button>(true))
+                if (button.name == name)
+                    return button;
+            return null;
+        }
+
+        private static InputField InputNamed(GameObject root, string name)
+        {
+            foreach (InputField input in
+                root.GetComponentsInChildren<InputField>(true))
+                if (input.name == name)
+                    return input;
+            return null;
         }
 
         private static GrayboxBuildingInstance3D Begin(
@@ -291,6 +409,26 @@ namespace WasteCity.Tests
             public GrayboxBuildingSession3D Session { get; }
             public GrayboxMobileCityController3D City { get; }
             public GrayboxDeveloperModifier3D Modifier { get; }
+        }
+
+        private sealed class BootstrapFixture
+        {
+            public BootstrapFixture(
+                GrayboxDeveloperModifierBootstrap3D bootstrap,
+                GrayboxBuildingSession3D session,
+                GrayboxMobileCityController3D city,
+                GameObject panel)
+            {
+                Bootstrap = bootstrap;
+                Session = session;
+                City = city;
+                Panel = panel;
+            }
+
+            public GrayboxDeveloperModifierBootstrap3D Bootstrap { get; }
+            public GrayboxBuildingSession3D Session { get; }
+            public GrayboxMobileCityController3D City { get; }
+            public GameObject Panel { get; }
         }
 
         private sealed class RecordingPresentation :

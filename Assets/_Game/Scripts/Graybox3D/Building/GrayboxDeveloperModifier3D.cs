@@ -14,6 +14,7 @@ namespace WasteCity.Graybox3D.Building
 
         private readonly GrayboxBuildingSession3D session;
         private readonly GrayboxMobileCityController3D city;
+        private readonly IGrayboxBuildingPresentation3D presentation;
         private string currentResource = ResourceIds.Iron;
 
         public GrayboxDeveloperModifier3D(
@@ -23,6 +24,16 @@ namespace WasteCity.Graybox3D.Building
             this.session = session ?? throw new ArgumentNullException(
                 nameof(session));
             this.city = city ?? throw new ArgumentNullException(nameof(city));
+        }
+
+        public GrayboxDeveloperModifier3D(
+            GrayboxBuildingSession3D session,
+            GrayboxMobileCityController3D city,
+            IGrayboxBuildingPresentation3D presentation)
+            : this(session, city)
+        {
+            this.presentation = presentation ?? throw new ArgumentNullException(
+                nameof(presentation));
         }
 
         public string CurrentResource => currentResource;
@@ -98,6 +109,13 @@ namespace WasteCity.Graybox3D.Building
             IGrayboxBuildingPresentation3D presentation)
         {
             session.CompleteAllConstructionForDevelopment(presentation);
+        }
+
+        public bool CompleteAllConstruction()
+        {
+            if (presentation == null) return false;
+            session.CompleteAllConstructionForDevelopment(presentation);
+            return true;
         }
     }
 }
