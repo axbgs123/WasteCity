@@ -46,13 +46,26 @@ namespace WasteCity.Graybox3D.Building
                 state = catalogReturnState;
         }
 
-        public void Select(BuildingDefinition definition)
+        public void Select(GrayboxBuildingCatalogItem3D item)
         {
-            if (definition == null) throw new ArgumentNullException(nameof(definition));
-            if (FindBuildMenuDefinition(definition.Id.Value) == null)
-                throw new ArgumentException("Definition is not in BuildingCatalog.BuildMenu.", nameof(definition));
+            if (state != GrayboxBuildingInteractionState.Inactive &&
+                state != GrayboxBuildingInteractionState.CatalogOpen &&
+                state != GrayboxBuildingInteractionState.Previewing)
+            {
+                throw new InvalidOperationException(
+                    "Selection is unavailable while confirmation is pending.");
+            }
+            if (item.Visibility != BuildingCatalogVisibility.Buildable ||
+                item.Definition == null ||
+                item.Category != GrayboxBuildingCatalogPresenter3D.CategoryOf(item.Definition) ||
+                item.Route != GrayboxBuildingCatalogPresenter3D.RouteOf(item.Definition))
+            {
+                throw new ArgumentException(
+                    "Only a canonical buildable catalog item may be selected.",
+                    nameof(item));
+            }
 
-            selectedBuildingId = definition.Id.Value;
+            selectedBuildingId = item.Definition.Id.Value;
             state = GrayboxBuildingInteractionState.Previewing;
         }
 

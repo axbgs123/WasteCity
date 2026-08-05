@@ -97,10 +97,20 @@ namespace WasteCity.Tests
             var presenter = new GrayboxBuildingCatalogPresenter3D();
             var context = new CatalogContext();
             var outside = new BuildingDefinition("core.building.outside", "外部建筑", 1, 1, "core.resource.stone", 1);
+            var forgedHousing = new BuildingDefinition(
+                BuildingCatalog.Housing.Id.Value,
+                "伪造住房",
+                1,
+                1,
+                "core.resource.stone",
+                1);
 
             Assert.Throws<ArgumentException>(() => GrayboxBuildingCatalogPresenter3D.CategoryOf(BuildingCatalog.HeavyMachineGunTurret));
             Assert.Throws<ArgumentException>(() => GrayboxBuildingCatalogPresenter3D.RouteOf(BuildingCatalog.SwordRidingPlatform));
             Assert.Throws<ArgumentException>(() => presenter.Describe(context, outside));
+            Assert.Throws<ArgumentException>(() => GrayboxBuildingCatalogPresenter3D.CategoryOf(forgedHousing));
+            Assert.Throws<ArgumentException>(() => GrayboxBuildingCatalogPresenter3D.RouteOf(forgedHousing));
+            Assert.Throws<ArgumentException>(() => presenter.Describe(context, forgedHousing));
         }
 
         [Test]
@@ -222,7 +232,7 @@ namespace WasteCity.Tests
         public void Interaction_RetainsPreviewSelectionAndOrientationAcrossCatalogAndReplacesCards()
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
-            interaction.Select(BuildingCatalog.MiningStation);
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
             interaction.RotateClockwise();
             interaction.ToggleCatalog();
 
@@ -233,7 +243,7 @@ namespace WasteCity.Tests
             Assert.That(interaction.Orientation, Is.EqualTo(BuildingOrientation.East));
 
             interaction.ToggleCatalog();
-            interaction.Select(BuildingCatalog.Housing);
+            interaction.Select(BuildableCard(BuildingCatalog.Housing));
             Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
             Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.Housing));
         }
@@ -242,7 +252,7 @@ namespace WasteCity.Tests
         public void Interaction_ResolvesCancelConfirmationDeterministically()
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
-            interaction.Select(BuildingCatalog.MiningStation);
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
             interaction.RequestCancelConstruction();
             Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CancelConfirmation));
 
@@ -256,11 +266,49 @@ namespace WasteCity.Tests
             Assert.That(interaction.Selected, Is.Null);
         }
 
+        [Test]
+        public void Interaction_RejectsHiddenLockedAndConfirmationStateSelections()
+        {
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+            GrayboxBuildingCatalogItem3D hidden = presenter.Describe(
+                new CatalogContext(),
+                BuildingCatalog.PowerPlant);
+            GrayboxBuildingCatalogItem3D locked = presenter.Describe(
+                new CatalogContext(contactedRoutes: new[] { ContentRoute.Technology }),
+                BuildingCatalog.PowerPlant);
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+
+            Assert.That(hidden.Visibility, Is.EqualTo(BuildingCatalogVisibility.Hidden));
+            Assert.That(locked.Visibility, Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.Throws<ArgumentException>(() => interaction.Select(hidden));
+            Assert.Throws<ArgumentException>(() => interaction.Select(locked));
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
+            interaction.RequestCancelConstruction();
+            Assert.Throws<InvalidOperationException>(() =>
+                interaction.Select(BuildableCard(BuildingCatalog.Housing)));
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
+        }
+
         private GrayboxBuildingInteractionModel3D CreateInteraction()
         {
             var gameObject = new GameObject("graybox-building-interaction-test");
             cleanup.Add(gameObject);
             return gameObject.AddComponent<GrayboxBuildingInteractionModel3D>();
+        }
+
+        private static GrayboxBuildingCatalogItem3D BuildableCard(
+            BuildingDefinition definition)
+        {
+            return new GrayboxBuildingCatalogPresenter3D().Describe(
+                new CatalogContext(
+                    population: 1000,
+                    allResearch: true,
+                    allPrerequisites: true,
+                    contactedRoutes: AllRoutes()),
+                definition);
         }
 
         private static ContentRoute[] AllRoutes()

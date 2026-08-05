@@ -25,7 +25,7 @@ namespace WasteCity.Graybox3D.Building
 
     public readonly struct GrayboxBuildingCatalogItem3D
     {
-        public GrayboxBuildingCatalogItem3D(
+        internal GrayboxBuildingCatalogItem3D(
             BuildingDefinition definition,
             BuildingMenuCategory category,
             ContentRoute route,
@@ -97,6 +97,12 @@ namespace WasteCity.Graybox3D.Building
                 { "psionics.building.shield-generator", BuildingMenuCategory.Route }
             };
 
+        private static readonly Dictionary<string, BuildingDefinition>
+            BuildMenuDefinitions = BuildingCatalog.BuildMenu.ToDictionary(
+                definition => definition.Id.Value,
+                definition => definition,
+                StringComparer.Ordinal);
+
         private static readonly IReadOnlyList<BuildingDefinition> quickbar =
             new ReadOnlyCollection<BuildingDefinition>(new[]
             {
@@ -117,6 +123,7 @@ namespace WasteCity.Graybox3D.Building
         static GrayboxBuildingCatalogPresenter3D()
         {
             if (Categories.Count != BuildMenuCount ||
+                BuildMenuDefinitions.Count != BuildMenuCount ||
                 BuildingCatalog.BuildMenu.Length != BuildMenuCount ||
                 BuildingCatalog.BuildMenu.Any(definition =>
                     definition == null || !Categories.ContainsKey(definition.Id.Value)))
@@ -125,8 +132,8 @@ namespace WasteCity.Graybox3D.Building
 
         public static BuildingMenuCategory CategoryOf(BuildingDefinition definition)
         {
-            if (definition == null ||
-                !Categories.TryGetValue(definition.Id.Value, out BuildingMenuCategory category))
+            BuildingDefinition canonical = CanonicalBuildMenuDefinition(definition);
+            if (!Categories.TryGetValue(canonical.Id.Value, out BuildingMenuCategory category))
                 throw new ArgumentException("Definition is not in BuildingCatalog.BuildMenu.", nameof(definition));
             return category;
         }
@@ -165,6 +172,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (context == null) throw new ArgumentNullException(nameof(context));
 
+            definition = CanonicalBuildMenuDefinition(definition);
             BuildingMenuCategory category = CategoryOf(definition);
             ContentRoute route = RouteOf(definition);
             if (route != ContentRoute.Core && !context.HasContactedRoute(route))
@@ -205,6 +213,22 @@ namespace WasteCity.Graybox3D.Building
                    definition.Id.Value.IndexOf(
                        visibleSearchText,
                        StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static BuildingDefinition CanonicalBuildMenuDefinition(
+            BuildingDefinition definition)
+        {
+            if (definition == null ||
+                !BuildMenuDefinitions.TryGetValue(
+                    definition.Id.Value,
+                    out BuildingDefinition canonical) ||
+                !ReferenceEquals(canonical, definition))
+            {
+                throw new ArgumentException(
+                    "Definition is not a canonical BuildingCatalog.BuildMenu entry.",
+                    nameof(definition));
+            }
+            return canonical;
         }
     }
 }
