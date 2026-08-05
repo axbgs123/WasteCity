@@ -154,9 +154,24 @@ namespace WasteCity.Graybox3D
             }
         }
 
+        public void TickGameplay(float deltaTime)
+        {
+            if (Time.timeScale <= 0f || leader == null)
+                return;
+
+            directControl?.Refresh();
+            DirectControlTarget target =
+                directControl?.ControlTarget ??
+                DirectControlTarget.City;
+            leader.TickControl(
+                target,
+                Mathf.Max(0f, deltaTime));
+        }
+
         private void Update()
         {
             ProcessFrame(ReadCurrentFrame());
+            TickGameplay(Time.deltaTime);
         }
 
         private void ProcessCameraInput(GrayboxInputFrame frame)

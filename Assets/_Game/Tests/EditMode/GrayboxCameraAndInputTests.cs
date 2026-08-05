@@ -195,7 +195,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void ProcessFrame_LeaderTargetRoutesWASDToLeader()
+        public void ProcessFrameThenTickGameplay_LeaderTargetMovesLeaderOnly()
         {
             RuntimeFixture fixture = CreateRuntimeFixture(true);
             fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
@@ -208,9 +208,7 @@ namespace WasteCity.Tests
                 CreateInputFrame(
                     new Vector2(3f, 4f),
                     new Vector2(640f, 360f)));
-            fixture.Leader.TickControl(
-                fixture.DirectControl.ControlTarget,
-                .1f);
+            fixture.Router.TickGameplay(.1f);
 
             Assert.That(
                 fixture.Leader.transform.position.x - leaderStart.x,
@@ -222,6 +220,104 @@ namespace WasteCity.Tests
                 fixture.Leader.transform.position.y,
                 Is.EqualTo(leaderStart.y));
             Assert.That(fixture.CityBody.position, Is.EqualTo(cityStart));
+        }
+
+        [Test]
+        public void TickGameplay_CityTargetDocksLeaderWithoutMovingCity()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.Leader.transform.position =
+                new Vector3(
+                    10f,
+                    fixture.Leader.transform.position.y,
+                    9f);
+            Vector3 cityStart = fixture.CityBody.position;
+
+            ProcessFrame(
+                fixture.Router,
+                CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f)));
+            fixture.Router.TickGameplay(.1f);
+
+            Assert.That(
+                fixture.Leader.transform.position,
+                Is.EqualTo(
+                    new Vector3(
+                        cityStart.x + 1.8f,
+                        fixture.Leader.transform.position.y,
+                        cityStart.z + 1.2f)));
+            Assert.That(fixture.CityBody.position, Is.EqualTo(cityStart));
+        }
+
+        [Test]
+        public void TickGameplay_PauseDoesNotMoveLeaderWithLatchedInput()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            fixture.DirectControl.Refresh();
+            ProcessFrame(
+                fixture.Router,
+                CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f)));
+            Vector3 leaderStart = fixture.Leader.transform.position;
+            Vector3 cityStart = fixture.CityBody.position;
+            Time.timeScale = 0f;
+
+            fixture.Router.TickGameplay(.1f);
+
+            Assert.That(
+                fixture.Leader.transform.position,
+                Is.EqualTo(leaderStart));
+            Assert.That(fixture.CityBody.position, Is.EqualTo(cityStart));
+        }
+
+        [Test]
+        public void TickGameplay_PauseDoesNotDockLeaderForCityTarget()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            fixture.DirectControl.Refresh();
+            ProcessFrame(
+                fixture.Router,
+                CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f)));
+            fixture.City.Deployment.Restore(CityMode.Mobile, 0f);
+            fixture.Leader.transform.position =
+                new Vector3(
+                    10f,
+                    fixture.Leader.transform.position.y,
+                    9f);
+            Vector3 leaderStart = fixture.Leader.transform.position;
+            Time.timeScale = 0f;
+
+            fixture.Router.TickGameplay(.1f);
+
+            Assert.That(
+                fixture.Leader.transform.position,
+                Is.EqualTo(leaderStart));
+        }
+
+        [Test]
+        public void TickGameplay_NegativeDeltaDoesNotMoveLeader()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            fixture.DirectControl.Refresh();
+            ProcessFrame(
+                fixture.Router,
+                CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f)));
+            Vector3 leaderStart = fixture.Leader.transform.position;
+
+            fixture.Router.TickGameplay(-1f);
+
+            Assert.That(
+                fixture.Leader.transform.position,
+                Is.EqualTo(leaderStart));
         }
 
         [Test]
@@ -556,9 +652,11 @@ namespace WasteCity.Tests
             RuntimeFixture fixture = CreateRuntimeFixture(true);
             var warmupFrameA = fixture.Router.ReadCurrentFrame();
             fixture.Router.ProcessFrame(warmupFrameA);
+            fixture.Router.TickGameplay(.016f);
             fixture.CameraController.TickCamera();
             var warmupFrameB = fixture.Router.ReadCurrentFrame();
             fixture.Router.ProcessFrame(warmupFrameB);
+            fixture.Router.TickGameplay(.016f);
             fixture.CameraController.TickCamera();
 
             long before = GC.GetAllocatedBytesForCurrentThread();
@@ -566,6 +664,7 @@ namespace WasteCity.Tests
             {
                 var frame = fixture.Router.ReadCurrentFrame();
                 fixture.Router.ProcessFrame(frame);
+                fixture.Router.TickGameplay(.016f);
                 fixture.CameraController.TickCamera();
             }
             long difference =
