@@ -270,6 +270,44 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Describe_LockedCompletedPrerequisiteReturnsDependentCardToLocked()
+        {
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+            var presentation = new CatalogPresentation();
+            var gameObject = new GameObject("graybox-building-catalog-lock-test");
+            cleanup.Add(gameObject);
+            var session = gameObject.AddComponent<GrayboxBuildingSession3D>();
+            session.Configure(true);
+            session.ConfigureDevelopmentFixture();
+            session.UnlockResearchForDevelopment("core.research.automated-machinery");
+            session.UnlockResearchForDevelopment("core.research.precision-assembly");
+            Assert.That(session.TryBeginConstruction(
+                ValidSessionRequest(session, BuildingCatalog.Smelter, 10, 10),
+                presentation,
+                out GrayboxBuildingInstance3D smelter,
+                out _), Is.True);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+            Assert.That(presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                smelter.StableInstanceId,
+                smelter.Placement.Definition.Cost,
+                smelter.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryLockEvacuationWork(new[] { work }, out _),
+                Is.True);
+
+            Assert.That(presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            session.RollbackEvacuationLocksAfterFailure(new[] { work });
+            Assert.That(presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+        }
+
+        [Test]
         public void Interaction_StartsInactiveAndCapturesCatalogOrigin()
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();

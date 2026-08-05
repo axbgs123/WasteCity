@@ -36,8 +36,8 @@ namespace WasteCity.Graybox3D.Building
         public PlacedBuilding Placement { get; }
         public ConstructionProgress Progress { get; }
         public GrayboxBuildingInstanceState State { get; private set; }
-        public bool IsPlayerOwned { get; }
-        public bool IsEvacuationLocked { get; }
+        public bool IsPlayerOwned { get; private set; }
+        public bool IsEvacuationLocked { get; private set; }
 
         internal void Complete()
         {
@@ -48,6 +48,25 @@ namespace WasteCity.Graybox3D.Building
         {
             Progress.Restore(remaining);
             State = GrayboxBuildingInstanceState.UnderConstruction;
+        }
+
+        internal void SetEvacuationLocked(bool value)
+        {
+            IsEvacuationLocked = value;
+        }
+
+        internal void Abandon()
+        {
+            IsPlayerOwned = false;
+            State = GrayboxBuildingInstanceState.AbandonedRuin;
+        }
+
+        internal void RestoreEvacuationState(
+            bool playerOwned,
+            GrayboxBuildingInstanceState state)
+        {
+            IsPlayerOwned = playerOwned;
+            State = state;
         }
     }
 
@@ -77,6 +96,8 @@ namespace WasteCity.Graybox3D.Building
         private readonly HashSet<ContentRoute> contactedRoutes =
             new HashSet<ContentRoute>();
         private List<GrayboxBuildingInstance3D> instances;
+        private readonly Dictionary<string, BuildingEvacuationWork> evacuationLocks =
+            new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
@@ -121,6 +142,7 @@ namespace WasteCity.Graybox3D.Building
             ConstructionMultiplier = 1f;
             contactedRoutes.Clear();
             instances = new List<GrayboxBuildingInstance3D>();
+            evacuationLocks.Clear();
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
@@ -279,6 +301,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 GrayboxBuildingInstance3D instance = instances[index];
                 if (instance.State != GrayboxBuildingInstanceState.UnderConstruction ||
+                    instance.IsEvacuationLocked ||
                     !BuildingMobilityRules.CanConstruct(
                         instance.Placement.Definition,
                         instance.Placement.Site,
@@ -323,6 +346,168 @@ namespace WasteCity.Graybox3D.Building
                     count++;
             }
             return count;
+        }
+
+        public bool HasPlayerOwnedGroundInstances
+        {
+            get
+            {
+                EnsureConfigured();
+                for (var index = 0; index < instances.Count; index++)
+                    if (instances[index].IsPlayerOwned &&
+                        instances[index].Placement.Site == BuildingSite.Ground)
+                        return true;
+                return false;
+            }
+        }
+
+        public void CopyPlayerOwnedGroundInstances(
+            List<GrayboxBuildingInstance3D> destination)
+        {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+            EnsureConfigured();
+            destination.Clear();
+            for (var index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (instance.IsPlayerOwned &&
+                    instance.Placement.Site == BuildingSite.Ground)
+                    destination.Add(instance);
+            }
+            destination.Sort((left, right) => string.CompareOrdinal(
+                left.StableInstanceId,
+                right.StableInstanceId));
+        }
+
+        public bool TryLockEvacuationWork(
+            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork,
+            out string failureReason)
+        {
+            EnsureConfigured();
+            failureReason = string.Empty;
+            if (fullDismantleWork == null || fullDismantleWork.Count == 0)
+            {
+                failureReason = "完整拆除队列为空";
+                return false;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < fullDismantleWork.Count; index++)
+            {
+                BuildingEvacuationWork work = fullDismantleWork[index];
+                int instanceIndex = FindInstanceIndex(work.StableInstanceId);
+                if (work.Treatment != BuildingEvacuationTreatment.FullDismantle ||
+                    !seen.Add(work.StableInstanceId) || instanceIndex < 0 ||
+                    !IsEligibleGroundInstance(instances[instanceIndex]) ||
+                    instances[instanceIndex].IsEvacuationLocked ||
+                    evacuationLocks.ContainsKey(work.StableInstanceId))
+                {
+                    failureReason = "完整拆除项目无效";
+                    return false;
+                }
+            }
+
+            var changedCompleted = new List<GrayboxBuildingInstance3D>();
+            try
+            {
+                for (var index = 0; index < fullDismantleWork.Count; index++)
+                {
+                    BuildingEvacuationWork work = fullDismantleWork[index];
+                    GrayboxBuildingInstance3D instance =
+                        instances[FindInstanceIndex(work.StableInstanceId)];
+                    bool countedBefore = IsCountedCompleted(instance);
+                    evacuationLocks.Add(work.StableInstanceId, work);
+                    instance.SetEvacuationLocked(true);
+                    if (countedBefore) changedCompleted.Add(instance);
+                }
+            }
+            catch
+            {
+                for (var index = 0; index < fullDismantleWork.Count; index++)
+                {
+                    BuildingEvacuationWork work = fullDismantleWork[index];
+                    if (!evacuationLocks.Remove(work.StableInstanceId)) continue;
+                    int instanceIndex = FindInstanceIndex(work.StableInstanceId);
+                    if (instanceIndex >= 0)
+                        instances[instanceIndex].SetEvacuationLocked(false);
+                }
+                throw;
+            }
+            for (var index = 0; index < changedCompleted.Count; index++)
+                AdvanceCatalogRevision();
+            return true;
+        }
+
+        public void RollbackEvacuationLocksAfterFailure(
+            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork)
+        {
+            if (fullDismantleWork == null) return;
+            EnsureConfigured();
+            for (var index = 0; index < fullDismantleWork.Count; index++)
+            {
+                BuildingEvacuationWork work = fullDismantleWork[index];
+                if (!evacuationLocks.TryGetValue(
+                        work.StableInstanceId,
+                        out BuildingEvacuationWork captured) ||
+                    !captured.Equals(work))
+                    continue;
+                evacuationLocks.Remove(work.StableInstanceId);
+                int instanceIndex = FindInstanceIndex(work.StableInstanceId);
+                if (instanceIndex < 0) continue;
+                GrayboxBuildingInstance3D instance = instances[instanceIndex];
+                bool countedAfter = instance.State ==
+                    GrayboxBuildingInstanceState.Completed &&
+                    instance.IsPlayerOwned;
+                instance.SetEvacuationLocked(false);
+                if (countedAfter) AdvanceCatalogRevision();
+            }
+        }
+
+        public bool TryCommitEvacuation(
+            in BuildingEvacuationWork work,
+            IGrayboxBuildingPresentation3D presentation,
+            out int acceptedRefund,
+            out string failureReason)
+        {
+            if (presentation == null)
+                throw new ArgumentNullException(nameof(presentation));
+            EnsureConfigured();
+            acceptedRefund = 0;
+            failureReason = string.Empty;
+            int instanceIndex = FindInstanceIndex(work.StableInstanceId);
+            if (instanceIndex < 0 ||
+                work.Treatment == BuildingEvacuationTreatment.Unassigned ||
+                !IsEligibleGroundInstance(instances[instanceIndex]))
+            {
+                failureReason = "撤离项目无效";
+                return false;
+            }
+
+            GrayboxBuildingInstance3D instance = instances[instanceIndex];
+            if (work.Treatment == BuildingEvacuationTreatment.FullDismantle &&
+                (!evacuationLocks.TryGetValue(
+                    work.StableInstanceId,
+                    out BuildingEvacuationWork captured) ||
+                 !captured.Equals(work)))
+            {
+                failureReason = "完整拆除快照不匹配";
+                return false;
+            }
+            if (instance.IsEvacuationLocked &&
+                work.Treatment != BuildingEvacuationTreatment.FullDismantle)
+            {
+                failureReason = "撤离项目已锁定";
+                return false;
+            }
+            if (work.Treatment == BuildingEvacuationTreatment.Abandon)
+                return TryAbandon(instance, presentation, out failureReason);
+            return TryRemoveEvacuatedInstance(
+                instanceIndex,
+                work,
+                presentation,
+                out acceptedRefund,
+                out failureReason);
         }
 
         public bool IsResearchCompleted(string id)
@@ -425,6 +610,123 @@ namespace WasteCity.Graybox3D.Building
         private void AdvanceCatalogRevision()
         {
             unchecked { catalogRevision++; }
+        }
+
+        private bool TryAbandon(
+            GrayboxBuildingInstance3D instance,
+            IGrayboxBuildingPresentation3D presentation,
+            out string failureReason)
+        {
+            bool wasCounted = IsCountedCompleted(instance);
+            bool playerOwned = instance.IsPlayerOwned;
+            GrayboxBuildingInstanceState state = instance.State;
+            instance.Abandon();
+            try
+            {
+                presentation.UpdateInstance(instance);
+            }
+            catch (Exception operationFailure)
+            {
+                instance.RestoreEvacuationState(playerOwned, state);
+                try
+                {
+                    presentation.UpdateInstance(instance);
+                }
+                catch (Exception restoreFailure)
+                {
+                    throw new InvalidOperationException(
+                        "Failed to restore presentation after evacuation failure.",
+                        new AggregateException(operationFailure, restoreFailure));
+                }
+                throw;
+            }
+            if (wasCounted) AdvanceCatalogRevision();
+            failureReason = string.Empty;
+            return true;
+        }
+
+        private bool TryRemoveEvacuatedInstance(
+            int instanceIndex,
+            in BuildingEvacuationWork work,
+            IGrayboxBuildingPresentation3D presentation,
+            out int acceptedRefund,
+            out string failureReason)
+        {
+            GrayboxBuildingInstance3D instance = instances[instanceIndex];
+            BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
+                ? InnerGrid
+                : GroundGrid;
+            int inventoryBefore = Inventory.Get(instance.Placement.Definition.CostId);
+            bool wasCounted = IsCountedCompleted(instance);
+            acceptedRefund = 0;
+            failureReason = string.Empty;
+            try { presentation.Remove(instance); }
+            catch (Exception removeFailure)
+            {
+                Exception restoreFailure = TryRestorePresentation(
+                    presentation,
+                    instance);
+                if (restoreFailure != null)
+                    throw new InvalidOperationException(
+                        "Failed to restore presentation after evacuation failure.",
+                        new AggregateException(removeFailure, restoreFailure));
+                throw;
+            }
+            if (!grid.Remove(instance.Placement))
+            {
+                Exception restoreFailure = TryRestorePresentation(presentation, instance);
+                if (restoreFailure != null)
+                    throw new InvalidOperationException(
+                        "Failed to restore presentation after evacuation grid failure.",
+                        restoreFailure);
+                failureReason = "撤离占格移除失败";
+                return false;
+            }
+
+            try
+            {
+                acceptedRefund = Inventory.Add(
+                    instance.Placement.Definition.CostId,
+                    work.Refund);
+                instances.RemoveAt(instanceIndex);
+                evacuationLocks.Remove(work.StableInstanceId);
+            }
+            catch
+            {
+                Inventory.Restore(instance.Placement.Definition.CostId, inventoryBefore);
+                grid.TryRestore(
+                    instance.Placement.Definition,
+                    instance.Placement.X,
+                    instance.Placement.Y,
+                    out _,
+                    instance.Placement.Site,
+                    instance.Placement.Orientation);
+                Exception restoreFailure = TryRestorePresentation(presentation, instance);
+                if (restoreFailure != null)
+                    throw new InvalidOperationException(
+                        "Failed to restore presentation after evacuation failure.",
+                        restoreFailure);
+                throw;
+            }
+            if (wasCounted) AdvanceCatalogRevision();
+            return true;
+        }
+
+        private static bool IsEligibleGroundInstance(
+            GrayboxBuildingInstance3D instance)
+        {
+            return instance != null &&
+                   instance.IsPlayerOwned &&
+                   instance.Placement.Site == BuildingSite.Ground;
+        }
+
+        private static bool IsCountedCompleted(
+            GrayboxBuildingInstance3D instance)
+        {
+            return instance != null &&
+                   instance.State == GrayboxBuildingInstanceState.Completed &&
+                   instance.IsPlayerOwned &&
+                   !instance.IsEvacuationLocked;
         }
 
         private BuildingPlacementRequest RefreshRequest(

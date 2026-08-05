@@ -1039,6 +1039,71 @@ namespace WasteCity.Tests
             Assert.That(session.Instances, Is.EqualTo(new[] { instance }));
         }
 
+        [Test]
+        public void CompletedBuildingCount_ExcludesLockedAndAbandonedGroundButCountsInnerCity()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D ground = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            GrayboxBuildingInstance3D inner = Begin(
+                session,
+                BuildingCatalog.Housing,
+                BuildingSite.InnerCity,
+                CityMode.Fortress,
+                1,
+                1,
+                presentation);
+            GrayboxBuildingInstance3D ruined = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                12,
+                10,
+                presentation);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.EqualTo(2));
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Housing.Id.Value),
+                Is.EqualTo(1));
+            Assert.That(session.TryCommitEvacuation(
+                BuildingEvacuationRules.Create(
+                    ruined.StableInstanceId,
+                    ruined.Placement.Definition.Cost,
+                    ruined.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.Abandon),
+                presentation,
+                out int refund,
+                out _), Is.True);
+            Assert.That(refund, Is.Zero);
+            BuildingEvacuationWork full = BuildingEvacuationRules.Create(
+                ground.StableInstanceId,
+                ground.Placement.Definition.Cost,
+                ground.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryLockEvacuationWork(new[] { full }, out _),
+                Is.True);
+
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.Zero);
+            Assert.That(session.CompletedBuildingCount(BuildingCatalog.Housing.Id.Value),
+                Is.EqualTo(1));
+            Assert.That(ruined.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(session.GroundGrid.IsOccupied(12, 10), Is.True);
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var gameObject = new GameObject("graybox-building-session-test");
