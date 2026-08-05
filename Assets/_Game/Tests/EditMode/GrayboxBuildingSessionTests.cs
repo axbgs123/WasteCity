@@ -132,6 +132,34 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void TryBeginConstruction_TwoSuccessfulCommitsAdvanceStableOrdinal()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+
+            GrayboxBuildingInstance3D first = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                12,
+                10,
+                presentation);
+
+            Assert.That(first.StableInstanceId, Is.EqualTo("building.instance.000001"));
+            Assert.That(second.StableInstanceId, Is.EqualTo("building.instance.000002"));
+            Assert.That(session.Instances, Is.EqualTo(new[] { first, second }));
+        }
+
+        [Test]
         public void TryBeginConstruction_RechecksInventoryAndLeavesAllStateUntouched()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -197,6 +225,60 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void TryBeginConstruction_PostSpendGridFailureRestoresInventoryAndOrdinal()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            session.Inventory.Set(ResourceIds.Stone, 0);
+            session.Inventory.SetDebtLimit(2);
+            var callbackCount = 0;
+            PlacedBuilding injectedPlacement = null;
+            session.Inventory.DebtIncreased += _ =>
+            {
+                callbackCount++;
+                session.GroundGrid.TryRestore(
+                    BuildingCatalog.Wall,
+                    10,
+                    10,
+                    out injectedPlacement);
+            };
+            BuildingPlacementRequest request = ValidRequest(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10);
+
+            bool result = session.TryBeginConstruction(
+                request,
+                presentation,
+                out GrayboxBuildingInstance3D instance,
+                out BuildingPlacementEvaluation evaluation);
+
+            Assert.That(result, Is.False);
+            Assert.That(evaluation.IsValid, Is.True);
+            Assert.That(callbackCount, Is.EqualTo(1));
+            Assert.That(injectedPlacement, Is.Not.Null);
+            Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.Zero);
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(1));
+            Assert.That(session.Instances, Is.Empty);
+            Assert.That(instance, Is.Null);
+            Assert.That(presentation.Created, Is.Empty);
+
+            Assert.That(session.GroundGrid.Remove(injectedPlacement), Is.True);
+            session.Inventory.Set(ResourceIds.Stone, 2);
+            Assert.That(
+                session.TryBeginConstruction(
+                    request,
+                    presentation,
+                    out GrayboxBuildingInstance3D retry,
+                    out _),
+                Is.True);
+            Assert.That(retry.StableInstanceId, Is.EqualTo("building.instance.000001"));
+        }
+
+        [Test]
         public void TryBeginConstruction_PresentationFalseRollsBackAndRetryReusesNextStableId()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -216,6 +298,8 @@ namespace WasteCity.Tests
             Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.EqualTo(stoneBefore));
             Assert.That(session.GroundGrid.Count, Is.Zero);
             Assert.That(session.Instances, Is.Empty);
+            Assert.That(presentation.Created, Is.Empty);
+            Assert.That(presentation.Removed, Has.Count.EqualTo(1));
 
             presentation.CreateResult = true;
             Assert.That(
@@ -253,6 +337,8 @@ namespace WasteCity.Tests
             Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.EqualTo(stoneBefore));
             Assert.That(session.GroundGrid.Count, Is.Zero);
             Assert.That(session.Instances, Is.Empty);
+            Assert.That(presentation.Created, Is.Empty);
+            Assert.That(presentation.Removed, Has.Count.EqualTo(1));
 
             presentation.CreateException = null;
             Assert.That(
@@ -263,6 +349,37 @@ namespace WasteCity.Tests
                     out _),
                 Is.True);
             Assert.That(retry.StableInstanceId, Is.EqualTo("building.instance.000001"));
+        }
+
+        [Test]
+        public void TryBeginConstruction_CleanupExceptionDoesNotMaskCreateException()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var createFailure = new InvalidOperationException("create failed");
+            var cleanupFailure = new InvalidOperationException("cleanup failed");
+            var presentation = new RecordingPresentation
+            {
+                CreateException = createFailure,
+                RemoveException = cleanupFailure
+            };
+            BuildingPlacementRequest request = ValidRequest(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10);
+            int stoneBefore = session.Inventory.Get(ResourceIds.Stone);
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.TryBeginConstruction(request, presentation, out _, out _));
+
+            Assert.That(thrown, Is.SameAs(createFailure));
+            Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.EqualTo(stoneBefore));
+            Assert.That(session.GroundGrid.Count, Is.Zero);
+            Assert.That(session.Instances, Is.Empty);
+            Assert.That(presentation.Created, Is.Empty);
+            Assert.That(presentation.Removed, Has.Count.EqualTo(1));
         }
 
         [Test]
@@ -319,9 +436,9 @@ namespace WasteCity.Tests
             Assert.That(ground.Progress.Remaining, Is.EqualTo(1f));
         }
 
-        [TestCase(1f, 9f)]
-        [TestCase(10f, 0f)]
-        [TestCase(100f, 0f)]
+        [TestCase(1f, 9.95f)]
+        [TestCase(10f, 9.5f)]
+        [TestCase(100f, 5f)]
         public void TickConstruction_UsesDevelopmentMultiplier(
             float multiplier,
             float expectedRemaining)
@@ -338,9 +455,11 @@ namespace WasteCity.Tests
                 presentation);
             session.SetConstructionMultiplierForDevelopment(multiplier);
 
-            session.TickConstruction(1f, CityMode.Fortress, false, presentation);
+            session.TickConstruction(.05f, CityMode.Fortress, false, presentation);
 
-            Assert.That(instance.Progress.Remaining, Is.EqualTo(expectedRemaining));
+            Assert.That(
+                instance.Progress.Remaining,
+                Is.EqualTo(expectedRemaining).Within(.0001f));
         }
 
         [Test]
@@ -579,6 +698,7 @@ namespace WasteCity.Tests
         {
             public bool CreateResult { get; set; } = true;
             public Exception CreateException { get; set; }
+            public Exception RemoveException { get; set; }
             public List<GrayboxBuildingInstance3D> Created { get; } =
                 new List<GrayboxBuildingInstance3D>();
             public List<GrayboxBuildingInstance3D> Updated { get; } =
@@ -588,8 +708,8 @@ namespace WasteCity.Tests
 
             public bool TryCreate(GrayboxBuildingInstance3D instance)
             {
+                Created.Add(instance);
                 if (CreateException != null) throw CreateException;
-                if (CreateResult) Created.Add(instance);
                 return CreateResult;
             }
 
@@ -600,7 +720,9 @@ namespace WasteCity.Tests
 
             public void Remove(GrayboxBuildingInstance3D instance)
             {
+                Created.Remove(instance);
                 Removed.Add(instance);
+                if (RemoveException != null) throw RemoveException;
             }
         }
     }

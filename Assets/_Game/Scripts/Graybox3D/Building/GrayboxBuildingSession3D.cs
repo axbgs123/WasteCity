@@ -63,6 +63,8 @@ namespace WasteCity.Graybox3D.Building
         private const int InnerGridWidth = 8;
         private const int InnerGridHeight = 6;
         private const int DevelopmentGroundBuildRadius = 8;
+        private const string PresentationCleanupFailureDataKey =
+            "WasteCity.Graybox3D.Building.PresentationCleanupFailure";
 
         [SerializeField] private bool developmentFixtureEnabled;
 
@@ -156,26 +158,36 @@ namespace WasteCity.Graybox3D.Building
                 CreateStableInstanceId(nextStableInstanceOrdinal),
                 placement,
                 new ConstructionProgress(refreshed.Definition.BuildSeconds));
+            bool presentationCreated;
             try
             {
-                if (!presentation.TryCreate(candidate))
-                {
-                    RollbackPlacement(
-                        refreshed.Grid,
-                        placement,
-                        refreshed.Definition.CostId,
-                        inventoryBefore);
-                    return false;
-                }
+                presentationCreated = presentation.TryCreate(candidate);
             }
-            catch
+            catch (Exception createFailure)
             {
+                Exception cleanupFailure =
+                    TryRemovePresentation(presentation, candidate);
                 RollbackPlacement(
                     refreshed.Grid,
                     placement,
                     refreshed.Definition.CostId,
                     inventoryBefore);
+                if (cleanupFailure != null)
+                    createFailure.Data[PresentationCleanupFailureDataKey] =
+                        cleanupFailure;
                 throw;
+            }
+            if (!presentationCreated)
+            {
+                Exception cleanupFailure =
+                    TryRemovePresentation(presentation, candidate);
+                RollbackPlacement(
+                    refreshed.Grid,
+                    placement,
+                    refreshed.Definition.CostId,
+                    inventoryBefore);
+                if (cleanupFailure != null) throw cleanupFailure;
+                return false;
             }
 
             instances.Add(candidate);
@@ -460,6 +472,21 @@ namespace WasteCity.Graybox3D.Building
         private static string CreateStableInstanceId(int ordinal)
         {
             return $"building.instance.{ordinal:000000}";
+        }
+
+        private static Exception TryRemovePresentation(
+            IGrayboxBuildingPresentation3D presentation,
+            GrayboxBuildingInstance3D candidate)
+        {
+            try
+            {
+                presentation.Remove(candidate);
+                return null;
+            }
+            catch (Exception cleanupFailure)
+            {
+                return cleanupFailure;
+            }
         }
 
         private void RollbackPlacement(
