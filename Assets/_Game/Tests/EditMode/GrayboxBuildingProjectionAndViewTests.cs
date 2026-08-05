@@ -196,6 +196,74 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Placement_EastNonSquareFootprintFeedsRotationOnlyCellsToEveryCheck()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[17, 12] = Cell(
+                traversal: WorldTraversalKind.DeepWater);
+            cells[18, 12] = Cell(
+                traversal: WorldTraversalKind.Ruins);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.Session.SetRouteContact(
+                WasteCity.Content.ContentRoute.BiologicalAscension,
+                true);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.BehemothPen.RequiredResearchId);
+            fixture.Session.Inventory.Set(
+                ResourceIds.BoneSteel,
+                BuildingCatalog.BehemothPen.Cost);
+            Assert.That(
+                fixture.Session.GroundGrid.TryRestore(
+                    BuildingCatalog.Wall,
+                    17,
+                    12,
+                    out _),
+                Is.True);
+            fixture.Interaction.Select(BuildingCatalog.BehemothPen);
+            fixture.Interaction.RotateClockwise();
+            PositionCameraAtCell(fixture, 17, 10);
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(
+                fixture.Interaction.Orientation,
+                Is.EqualTo(BuildingOrientation.East));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.RotatedWidth,
+                Is.EqualTo(2));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.RotatedHeight,
+                Is.EqualTo(3));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Footprint
+                    .Select(value => new Vector2Int(value.X, value.Y)),
+                Is.EqualTo(new[]
+                {
+                    new Vector2Int(17, 10),
+                    new Vector2Int(17, 11),
+                    new Vector2Int(17, 12),
+                    new Vector2Int(18, 10),
+                    new Vector2Int(18, 11),
+                    new Vector2Int(18, 12)
+                }));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures.Take(4),
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.Overlap,
+                    BuildingPlacementFailure.CityOccupied,
+                    BuildingPlacementFailure.InvalidTerrain,
+                    BuildingPlacementFailure.Obstacle
+                }));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.PrerequisiteBuildingRequired));
+        }
+
+        [Test]
         public void Placement_MiningHighlightsOnlyCompatibleCoordinateNode()
         {
             WorldCell[,] cells = OpenCells();
@@ -439,6 +507,172 @@ namespace WasteCity.Tests
                     BuildingPlacementFailure.InvalidTerrain,
                     BuildingPlacementFailure.Obstacle
                 }));
+        }
+
+        [Test]
+        public void Placement_RepeatedUpdatePointerKeepsPreviewMeshAndSlotIdentity()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            GrayboxVisualSlot slot = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            GameObject root = slot.gameObject;
+            MeshFilter filter = root.GetComponent<MeshFilter>();
+            Mesh mesh = filter.sharedMesh;
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            GrayboxVisualSlot refreshed = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            Assert.That(refreshed.gameObject, Is.SameAs(root));
+            Assert.That(
+                refreshed.GetComponent<MeshFilter>(),
+                Is.SameAs(filter));
+            Assert.That(filter.sharedMesh, Is.SameAs(mesh));
+            Assert.That(refreshed, Is.SameAs(slot));
+            Assert.That(
+                root.GetComponents<GrayboxVisualSlot>()
+                    .Count(
+                        value => value.StableId ==
+                        "building.preview.core.building.wall"),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WorldView_SameGeometryRefreshChangesOnlyTransformAndPropertyBlock()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            BuildingSurfaceHit firstHit = new BuildingSurfaceHit(
+                true,
+                BuildingSite.Ground,
+                20,
+                15,
+                new Vector3(4f, 0f, 3f),
+                "外城");
+            BuildingPlacementEvaluation valid = ValidEvaluation(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                20,
+                15,
+                CityMode.Fortress);
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Wall,
+                firstHit,
+                BuildingOrientation.North,
+                valid);
+            GrayboxVisualSlot slot = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            GameObject root = slot.gameObject;
+            MeshFilter filter = root.GetComponent<MeshFilter>();
+            Mesh mesh = filter.sharedMesh;
+            Vector3 position = root.transform.position;
+            Color green = PropertyColor(slot.Renderer);
+            BuildingPlacementEvaluation invalid =
+                BuildingPlacementRules.Evaluate(
+                    Request(
+                        fixture.Session,
+                        BuildingCatalog.Wall,
+                        BuildingSite.Ground,
+                        21,
+                        15,
+                        CityMode.Fortress,
+                        terrainPassable: false));
+            BuildingSurfaceHit secondHit = new BuildingSurfaceHit(
+                true,
+                BuildingSite.Ground,
+                21,
+                15,
+                new Vector3(5f, 0f, 3f),
+                "外城");
+
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Wall,
+                secondHit,
+                BuildingOrientation.North,
+                invalid);
+
+            GrayboxVisualSlot refreshed = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            Color red = PropertyColor(refreshed.Renderer);
+            Assert.That(refreshed.gameObject, Is.SameAs(root));
+            Assert.That(
+                refreshed.GetComponent<MeshFilter>(),
+                Is.SameAs(filter));
+            Assert.That(filter.sharedMesh, Is.SameAs(mesh));
+            Assert.That(refreshed, Is.SameAs(slot));
+            Assert.That(root.transform.position, Is.Not.EqualTo(position));
+            Assert.That(red, Is.Not.EqualTo(green));
+            Assert.That(red.r, Is.GreaterThan(red.g));
+            Assert.That(
+                root.GetComponents<GrayboxVisualSlot>()
+                    .Count(
+                        value => value.StableId ==
+                        "building.preview.core.building.wall"),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WorldView_GeometryChangeReusesSlotAndReleasesOldMesh()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            BuildingSurfaceHit hit = new BuildingSurfaceHit(
+                true,
+                BuildingSite.Ground,
+                20,
+                15,
+                new Vector3(4f, 0f, 3f),
+                "外城");
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Wall,
+                hit,
+                BuildingOrientation.North,
+                ValidEvaluation(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    BuildingSite.Ground,
+                    20,
+                    15,
+                    CityMode.Fortress));
+            GrayboxVisualSlot slot = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            MeshFilter filter = slot.GetComponent<MeshFilter>();
+            Mesh oldMesh = filter.sharedMesh;
+
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Housing,
+                hit,
+                BuildingOrientation.North,
+                ValidEvaluation(
+                    fixture.Session,
+                    BuildingCatalog.Housing,
+                    BuildingSite.Ground,
+                    20,
+                    15,
+                    CityMode.Fortress));
+
+            GrayboxVisualSlot refreshed = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.housing");
+            Assert.That(refreshed, Is.SameAs(slot));
+            Assert.That(
+                refreshed.GetComponent<MeshFilter>(),
+                Is.SameAs(filter));
+            Assert.That(filter.sharedMesh, Is.Not.SameAs(oldMesh));
+            Assert.That(oldMesh == null, Is.True);
+            Assert.That(
+                refreshed.gameObject
+                    .GetComponents<GrayboxVisualSlot>().Length,
+                Is.EqualTo(1));
         }
 
         [Test]

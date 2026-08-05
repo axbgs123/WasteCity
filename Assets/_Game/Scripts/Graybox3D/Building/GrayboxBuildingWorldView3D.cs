@@ -40,6 +40,7 @@ namespace WasteCity.Graybox3D.Building
             public MeshRenderer Renderer;
             public BoxCollider Collider;
             public Mesh Mesh;
+            public GrayboxVisualSlot SingleSlot;
             public GrayboxBuildingInstance3D Instance;
             public GrayboxBuildingInstanceState State;
         }
@@ -57,6 +58,10 @@ namespace WasteCity.Graybox3D.Building
             new List<Visual>();
         private Visual preview;
         private Visual innerGrid;
+        private int previewWidth;
+        private int previewHeight;
+        private BuildingSite previewSite;
+        private bool hasPreviewGeometry;
 
         public int InfrastructureRendererCount =>
             infrastructure.Count +
@@ -164,27 +169,37 @@ namespace WasteCity.Graybox3D.Building
             Color color = evaluation.IsValid
                 ? ValidPreviewColor
                 : InvalidPreviewColor;
-            Mesh mesh = CreateBlockMesh(
-                width,
-                height,
-                hit.Site == BuildingSite.InnerCity
-                    ? InnerCellSize
-                    : GroundCellSize,
-                .12f,
-                stableId);
             if (preview == null)
             {
                 preview = CreateVisual(
                     stableId,
                     infrastructureRoot,
-                    mesh,
+                    CreatePreviewMesh(
+                        width,
+                        height,
+                        hit.Site,
+                        stableId),
                     color,
                     false);
+                SetPreviewGeometry(width, height, hit.Site);
             }
             else
             {
                 preview.Root.SetActive(true);
-                ReplaceMesh(preview, mesh);
+                if (!MatchesPreviewGeometry(
+                        width,
+                        height,
+                        hit.Site))
+                {
+                    ReplaceMesh(
+                        preview,
+                        CreatePreviewMesh(
+                            width,
+                            height,
+                            hit.Site,
+                            stableId));
+                    SetPreviewGeometry(width, height, hit.Site);
+                }
                 ConfigureSingleSlot(preview, stableId, color);
             }
 
@@ -330,8 +345,15 @@ namespace WasteCity.Graybox3D.Building
             string stableId,
             Color color)
         {
-            ClearSlots(visual);
-            AddSlot(visual, stableId, color);
+            if (visual.SingleSlot == null)
+                visual.SingleSlot =
+                    visual.Root.AddComponent<GrayboxVisualSlot>();
+            visual.Root.name = stableId;
+            visual.SingleSlot.Configure(
+                stableId,
+                visual.Renderer,
+                color);
+            visual.SingleSlot.ApplyFallback(sharedMaterial);
         }
 
         private void ConfigureInstanceSlots(
@@ -385,6 +407,7 @@ namespace WasteCity.Graybox3D.Building
                 visual.Root.GetComponents<GrayboxVisualSlot>();
             for (var index = 0; index < slots.Length; index++)
                 DestroyOwned(slots[index]);
+            visual.SingleSlot = null;
         }
 
         private Mesh CreateInstanceMesh(
@@ -530,6 +553,44 @@ namespace WasteCity.Graybox3D.Building
                             height * cellSize - cellSize * .08f))
                 },
                 stableId + ".mesh");
+        }
+
+        private static Mesh CreatePreviewMesh(
+            int width,
+            int height,
+            BuildingSite site,
+            string stableId)
+        {
+            return CreateBlockMesh(
+                width,
+                height,
+                site == BuildingSite.InnerCity
+                    ? InnerCellSize
+                    : GroundCellSize,
+                .12f,
+                stableId);
+        }
+
+        private bool MatchesPreviewGeometry(
+            int width,
+            int height,
+            BuildingSite site)
+        {
+            return hasPreviewGeometry &&
+                previewWidth == width &&
+                previewHeight == height &&
+                previewSite == site;
+        }
+
+        private void SetPreviewGeometry(
+            int width,
+            int height,
+            BuildingSite site)
+        {
+            previewWidth = width;
+            previewHeight = height;
+            previewSite = site;
+            hasPreviewGeometry = true;
         }
 
         private static Mesh CreateNodeHighlightMesh(string stableId)
@@ -705,6 +766,7 @@ namespace WasteCity.Graybox3D.Building
             if (preview != null)
                 DestroyVisual(preview);
             preview = null;
+            hasPreviewGeometry = false;
             innerGrid = null;
         }
 
