@@ -1405,6 +1405,25 @@ yield return SceneManager.LoadSceneAsync(
 yield return null;
 ```
 
+batchmode/headless 输入验证使用明确的 manual update 边界：
+
+- SetUp 先保存 `InputSystem.settings.updateMode`，切换为
+  `InputSettings.UpdateMode.ProcessEventsManually`，再创建虚拟 Keyboard/Mouse
+  并分别调用 `MakeCurrent()`；不得依赖自动 PlayerLoop 输入更新或
+  `InputSystem.onAfterUpdate` 维持 current。
+- 每个输入 helper 严格执行 `QueueStateEvent` →
+  `InputSystem.Update()` → 在 yield 前立即断言 `Keyboard.current` /
+  `Mouse.current` 为对应虚拟设备，并断言目标 key/button 的
+  `isPressed`、`wasPressedThisFrame` 等所需状态可见 → `yield return null`，
+  让真实 `GrayboxInputRouter.Update` 消费该输入。
+- WASD 按下事件只手动处理一次，跨真实 `FixedUpdate` 保持按下；释放时再
+  排队空状态、调用 `InputSystem.Update()` 并 yield，不得逐帧调用玩法方法。
+- TearDown 使用 `try/finally`：恢复 `Time.timeScale = 1f`、卸载灰盒并加载
+  空测试场景；finally 无条件移除仅由 fixture 创建的设备并恢复原
+  `InputSystem.settings.updateMode`。
+- 测试不得直接调用 `ProcessFrame`、`ReadCurrentFrame`、`TickGameplay`、
+  城市/领袖 tick 或相机控制方法来绕过运行时主循环。
+
 覆盖：
 
 1. 对象树和全部序列化引用完整；恰好一个启用 scope、Main Camera、城市控制器、协调器。
