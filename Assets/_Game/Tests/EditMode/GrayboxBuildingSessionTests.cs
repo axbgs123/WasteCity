@@ -73,28 +73,55 @@ namespace WasteCity.Tests
         {
             GrayboxBuildingSession3D session = CreateSession();
             const string automatedMachinery = "core.research.automated-machinery";
+            uint revision = CatalogRevision(session);
 
             session.UnlockResearchForDevelopment(automatedMachinery);
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 1u)));
+            revision = CatalogRevision(session);
 
             Assert.That(session.IsResearchCompleted(automatedMachinery), Is.True);
             Assert.That(session.HasContactedRoute(ContentRoute.Technology), Is.False);
 
+            int researchBeforeRoute = session.Research.CompletedCount;
             session.UnlockRouteForDevelopment(ContentRoute.Technology);
 
             Assert.That(session.HasContactedRoute(ContentRoute.Technology), Is.True);
             Assert.That(
                 session.IsResearchCompleted("core.research.energy-weapons"),
                 Is.True);
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(
+                revision + 1u + (uint)(session.Research.CompletedCount - researchBeforeRoute))));
+            revision = CatalogRevision(session);
 
+            int researchBeforeAll = session.Research.CompletedCount;
+            var routesBeforeAll = new[]
+            {
+                session.HasContactedRoute(ContentRoute.Technology),
+                session.HasContactedRoute(ContentRoute.Cultivation),
+                session.HasContactedRoute(ContentRoute.BiologicalAscension),
+                session.HasContactedRoute(ContentRoute.Psionics)
+            };
+            var newlyContactedRoutes = 0;
+            for (var index = 0; index < routesBeforeAll.Length; index++)
+                if (!routesBeforeAll[index]) newlyContactedRoutes++;
             session.UnlockAllResearchForDevelopment();
 
             Assert.That(session.Research.CompletedCount, Is.EqualTo(ResearchCatalog.All.Length));
             Assert.That(session.HasContactedRoute(ContentRoute.Cultivation), Is.True);
             Assert.That(session.HasContactedRoute(ContentRoute.BiologicalAscension), Is.True);
             Assert.That(session.HasContactedRoute(ContentRoute.Psionics), Is.True);
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(
+                revision + (uint)newlyContactedRoutes +
+                (uint)(session.Research.CompletedCount - researchBeforeAll))));
+            revision = CatalogRevision(session);
+            session.UnlockAllResearchForDevelopment();
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
 
             session.SetRouteContact(ContentRoute.Technology, false);
             Assert.That(session.HasContactedRoute(ContentRoute.Technology), Is.False);
+            Assert.That(
+                CatalogRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
         }
 
         [Test]
@@ -120,10 +147,69 @@ namespace WasteCity.Tests
                 CityMode.Fortress, 10, 10, presentation);
             revision = CatalogRevision(session);
             session.TickConstruction(1f, CityMode.Fortress, false, presentation);
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
             Assert.That(CatalogRevision(session), Is.EqualTo(revision));
             session.TickConstruction(1f, CityMode.Fortress, false, presentation);
             Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 1u)));
             Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+        }
+
+        [Test]
+        public void CatalogRevision_BeginAndCancelPathsHaveExactZeroDelta()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            uint revision = CatalogRevision(session);
+            BuildingPlacementRequest invalidRequest = ValidRequest(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10);
+            session.Inventory.Set(ResourceIds.Stone, 0);
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    invalidRequest,
+                    presentation,
+                    out _,
+                    out _),
+                Is.False);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+            Assert.That(
+                session.TryCancelConstruction(
+                    "building.instance.missing",
+                    1d,
+                    presentation,
+                    out int missingRefund),
+                Is.False);
+            Assert.That(missingRefund, Is.Zero);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+
+            session.Inventory.Set(
+                ResourceIds.Stone,
+                BuildingCatalog.Wall.Cost);
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+            Assert.That(
+                session.TryCancelConstruction(
+                    instance.StableInstanceId,
+                    1d,
+                    presentation,
+                    out int acceptedRefund),
+                Is.True);
+            Assert.That(
+                acceptedRefund,
+                Is.EqualTo(BuildingCatalog.Wall.Cost));
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
         }
 
         [Test]
@@ -142,6 +228,23 @@ namespace WasteCity.Tests
                 session.TickConstruction(2f, CityMode.Fortress, false, presentation));
 
             Assert.That(CatalogRevision(session), Is.EqualTo(revision));
+        }
+
+        [Test]
+        public void CatalogRevision_FixtureRebuildsAreMonotonicAcrossUncheckedOverflow()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            typeof(GrayboxBuildingSession3D).GetField(
+                "catalogRevision",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic).SetValue(
+                session,
+                uint.MaxValue);
+
+            session.ConfigureDevelopmentFixture();
+            Assert.That(CatalogRevision(session), Is.Zero);
+            session.ConfigureDevelopmentFixture();
+            Assert.That(CatalogRevision(session), Is.EqualTo(1u));
         }
 
         [Test]
@@ -475,6 +578,7 @@ namespace WasteCity.Tests
                 presentation);
 
             session.TickConstruction(1f, CityMode.Mobile, false, presentation);
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { inner }));
             Assert.That(inner.Progress.Remaining, Is.EqualTo(4f));
             Assert.That(ground.Progress.Remaining, Is.EqualTo(2f));
 
@@ -598,8 +702,12 @@ namespace WasteCity.Tests
                 0,
                 presentation);
 
+            uint revision = CatalogRevision(session);
             session.CompleteAllConstructionForDevelopment(presentation);
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 2u)));
+            revision = CatalogRevision(session);
             session.CompleteAllConstructionForDevelopment(presentation);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
 
             Assert.That(ground.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
             Assert.That(inner.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
@@ -625,6 +733,7 @@ namespace WasteCity.Tests
                 presentation);
             instance.Progress.Restore(1.25f);
             string stableId = instance.StableInstanceId;
+            uint revision = CatalogRevision(session);
 
             InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
                 session.CompleteAllConstructionForDevelopment(presentation));
@@ -637,6 +746,7 @@ namespace WasteCity.Tests
                 session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
                 Is.Zero);
             Assert.That(presentation.Updated, Is.Empty);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
 
             presentation.UpdateException = null;
             session.CompleteAllConstructionForDevelopment(presentation);
@@ -648,6 +758,9 @@ namespace WasteCity.Tests
                 session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
                 Is.EqualTo(1));
             Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
+            Assert.That(
+                CatalogRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
         }
 
         [Test]
@@ -687,6 +800,7 @@ namespace WasteCity.Tests
             first.Progress.Restore(1.5f);
             second.Progress.Restore(.75f);
             third.Progress.Restore(.25f);
+            uint revision = CatalogRevision(session);
 
             InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
                 session.CompleteAllConstructionForDevelopment(presentation));
@@ -702,6 +816,8 @@ namespace WasteCity.Tests
                 session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
                 Is.EqualTo(1));
             Assert.That(presentation.Updated, Is.EqualTo(new[] { first }));
+            Assert.That(CatalogRevision(session), Is.EqualTo(unchecked(revision + 1u)));
+            uint revisionAfterFailure = CatalogRevision(session);
 
             presentation.UpdateException = null;
             session.CompleteAllConstructionForDevelopment(presentation);
@@ -715,6 +831,9 @@ namespace WasteCity.Tests
                 session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
                 Is.EqualTo(3));
             Assert.That(presentation.Updated, Is.EqualTo(new[] { first, second, third }));
+            Assert.That(
+                CatalogRevision(session),
+                Is.EqualTo(unchecked(revisionAfterFailure + 2u)));
         }
 
         [Test]

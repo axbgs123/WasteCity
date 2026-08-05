@@ -284,6 +284,57 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Menu_UpdateMakesResearchLockedCardInteractableWithoutExplicitRefresh()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            InvokeLifecycle(fixture.Menu, "Update");
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Button card = FindComponent<Button>(fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
+            Assert.That(card.interactable, Is.False);
+
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Smelter.RequiredResearchId);
+            InvokeLifecycle(fixture.Menu, "Update");
+
+            Assert.That(FindComponent<Button>(fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value).interactable,
+                Is.True);
+        }
+
+        [Test]
+        public void Menu_UpdateMakesCompletedPrerequisiteDependentCardInteractable()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Smelter.RequiredResearchId);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Assembler.RequiredResearchId);
+            InvokeLifecycle(fixture.Menu, "Update");
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Button before = FindComponent<Button>(fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Assembler.Id.Value);
+            Assert.That(before.interactable, Is.False);
+
+            var presentation = new RecordingPresentation();
+            BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Smelter,
+                10,
+                10,
+                presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                presentation);
+            InvokeLifecycle(fixture.Menu, "Update");
+
+            Assert.That(FindComponent<Button>(fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
+                Is.True);
+        }
+
+        [Test]
         public void Menu_DetailsAlwaysShowMinimumPopulationWhenSatisfiedOrLocked()
         {
             UiFixture fixture = CreateMenuFixture();
@@ -357,6 +408,90 @@ namespace WasteCity.Tests
                     pointerPosition),
                 Is.True);
             Assert.That(guard.ConsumeFocusedEscape(fixture.EventSystem), Is.True);
+        }
+
+        [Test]
+        public void UiGuard_UsesQualifyingEventSystemGraphicAfterEmptyFallbackCache()
+        {
+            var guard = new GrayboxUiInputGuard3D();
+            EventSystem emptyEventSystem =
+                Create<EventSystem>("EmptyEventSystem");
+            Canvas emptyCanvas = Create<Canvas>("EmptyFallbackCanvas");
+            emptyCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            GraphicRaycaster emptyRaycaster =
+                emptyCanvas.gameObject.AddComponent<GraphicRaycaster>();
+            RegisterHeadlessEditModeRaycaster(emptyRaycaster);
+            Assert.That(
+                guard.IsPointerOverUi(emptyEventSystem, ScreenCenter),
+                Is.False);
+
+            UiFixture fixture = CreateMenuFixture();
+            Button button = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.0");
+            Assert.That(button, Is.Not.Null);
+            ForceCanvasLayout(fixture.Canvas);
+            Vector2 pointerPosition = RectCenter(fixture, button);
+            GraphicRaycaster raycaster =
+                button.GetComponentInParent<GraphicRaycaster>();
+            var results = new List<RaycastResult>();
+            fixture.EventSystem.RaycastAll(
+                new PointerEventData(fixture.EventSystem)
+                {
+                    position = pointerPosition
+                },
+                results);
+
+            Assert.That(
+                results.Any(result => result.module == raycaster),
+                Is.True);
+            Assert.That(
+                guard.IsPointerOverUi(
+                    fixture.EventSystem,
+                    pointerPosition),
+                Is.True);
+        }
+
+        [Test]
+        public void UiGuard_UsesGraphicRegistryWhenEventSystemGraphicReturnsNoResults()
+        {
+            EventSystem eventSystem =
+                Create<EventSystem>("FallbackEventSystem");
+            Canvas canvas = Create<Canvas>("FallbackCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.GetComponent<RectTransform>().sizeDelta =
+                new Vector2(640f, 480f);
+            NoResultsGraphicRaycaster raycaster =
+                canvas.gameObject.AddComponent<NoResultsGraphicRaycaster>();
+            RegisterHeadlessEditModeRaycaster(raycaster);
+            GameObject target = NewObject("FallbackGraphicTarget");
+            RectTransform rect = target.AddComponent<RectTransform>();
+            rect.SetParent(canvas.transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            Image image = target.AddComponent<Image>();
+            image.raycastTarget = true;
+            ForceCanvasLayout(canvas);
+
+            var results = new List<RaycastResult>();
+            eventSystem.RaycastAll(new PointerEventData(eventSystem)
+            {
+                position = ScreenCenter
+            }, results);
+            Assert.That(
+                results.Any(result =>
+                    result.module is GraphicRaycaster graphicRaycaster &&
+                    graphicRaycaster.isActiveAndEnabled &&
+                    graphicRaycaster.GetComponent<Canvas>()
+                        .isActiveAndEnabled),
+                Is.False);
+            Assert.That(
+                new GrayboxUiInputGuard3D().IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.True);
         }
 
         [Test]
@@ -1143,6 +1278,29 @@ namespace WasteCity.Tests
             return instance;
         }
 
+        private static GrayboxBuildingInstance3D BeginGroundConstruction(
+            GrayboxBuildingSession3D session,
+            BuildingDefinition definition,
+            int x,
+            int y,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            var request = new BuildingPlacementRequest(
+                definition, session.GroundGrid, BuildingSite.Ground,
+                BuildingOrientation.North, x, y, 12, 12,
+                session.GroundBuildRadius, CityMode.Fortress, true, false,
+                true, true, !definition.RequiresResourceNode,
+                definition.RequiresResourceNode ? "test.node" : null, true,
+                BuildingUnlockModel.Evaluate(definition, session.Population,
+                    session.IsResearchCompleted, session.CompletedBuildingCount),
+                session.Inventory.CanSpend(definition.CostId, definition.Cost));
+            Assert.That(session.TryBeginConstruction(request, presentation,
+                out GrayboxBuildingInstance3D instance,
+                out BuildingPlacementEvaluation evaluation), Is.True,
+                evaluation.PrimaryFailure.ToString());
+            return instance;
+        }
+
         private T Create<T>(string name) where T : Component
         {
             GameObject gameObject = NewObject(name);
@@ -1468,6 +1626,15 @@ namespace WasteCity.Tests
             }
 
             public void Remove(GrayboxBuildingInstance3D instance)
+            {
+            }
+        }
+
+        private sealed class NoResultsGraphicRaycaster : GraphicRaycaster
+        {
+            public override void Raycast(
+                PointerEventData eventData,
+                List<RaycastResult> resultAppendList)
             {
             }
         }
