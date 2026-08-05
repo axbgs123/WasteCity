@@ -1,5 +1,10 @@
 {
   "name": "WasteCity.PlayModeTests",
-  "references": ["WasteCity.Game"],
+  "references": [
+    "WasteCity.Game",
+    "WasteCity.Graybox3D",
+    "Unity.InputSystem",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
   "optionalUnityReferences": ["TestAssemblies"]
 }

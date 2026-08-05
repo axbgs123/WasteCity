@@ -12,11 +12,14 @@ namespace WasteCity.Graybox3D
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private GrayboxWorldView3D worldView;
         [SerializeField] private GrayboxMobileCityController3D city;
+        [SerializeField]
+        private bool developmentFixtureRecruited;
 
         private Vector2 manualInput;
 
         public LeaderModel Model { get; } = new LeaderModel();
-        public bool DevelopmentFixtureRecruited { get; private set; }
+        public bool DevelopmentFixtureRecruited =>
+            developmentFixtureRecruited;
 
         public void Configure(
             GrayboxWorldView3D worldView,
@@ -25,18 +28,27 @@ namespace WasteCity.Graybox3D
         {
             this.worldView = worldView;
             this.city = city;
-            DevelopmentFixtureRecruited =
+            this.developmentFixtureRecruited =
                 developmentFixtureRecruited;
+            ApplyDevelopmentFixture();
+        }
 
-            if (developmentFixtureRecruited)
-            {
-                Model.Restore(
-                    true,
-                    false,
-                    0f,
-                    0f,
-                    0f);
-            }
+        private void Awake()
+        {
+            ApplyDevelopmentFixture();
+        }
+
+        private void ApplyDevelopmentFixture()
+        {
+            if (!developmentFixtureRecruited)
+                return;
+
+            Model.Restore(
+                true,
+                false,
+                0f,
+                0f,
+                0f);
         }
 
         public void ApplyManualInput(Vector2 input)

@@ -40,9 +40,6 @@ namespace WasteCity.Editor
             UniversalRenderPipelineAsset pipeline =
                 EnsurePipeline(renderer);
             Material material = EnsureMaterial(litShader);
-            EditorUtility.SetDirty(renderer);
-            EditorUtility.SetDirty(pipeline);
-            EditorUtility.SetDirty(material);
             AssetDatabase.SaveAssets();
 
             Scene scene = BuildScene(pipeline, material);
@@ -54,6 +51,8 @@ namespace WasteCity.Editor
                 throw new InvalidOperationException(
                     $"Graybox scene was saved to unexpected path " +
                     $"'{scene.path}'.");
+
+            EnsureBuildSettings();
         }
 
         private static UniversalRendererData EnsureRenderer()
@@ -100,11 +99,20 @@ namespace WasteCity.Editor
                 throw new InvalidOperationException(
                     "URP renderer serialization contract is unavailable.");
 
-            rendererList.arraySize = 1;
-            rendererList.GetArrayElementAtIndex(0).objectReferenceValue =
-                renderer;
-            defaultRenderer.intValue = 0;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
+            bool changed =
+                rendererList.arraySize != 1 ||
+                rendererList.GetArrayElementAtIndex(0)
+                    .objectReferenceValue != renderer ||
+                defaultRenderer.intValue != 0;
+            if (changed)
+            {
+                rendererList.arraySize = 1;
+                rendererList.GetArrayElementAtIndex(0)
+                    .objectReferenceValue = renderer;
+                defaultRenderer.intValue = 0;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(pipeline);
+            }
             return pipeline;
         }
 
@@ -120,9 +128,10 @@ namespace WasteCity.Editor
                 };
                 AssetDatabase.CreateAsset(material, MaterialPath);
             }
-            else
+            else if (material.shader != litShader)
             {
                 material.shader = litShader;
+                EditorUtility.SetDirty(material);
             }
 
             return material;
@@ -132,6 +141,9 @@ namespace WasteCity.Editor
             UniversalRenderPipelineAsset pipeline,
             Material material)
         {
+            if (TryOpenCompleteScene(out Scene existing))
+                return existing;
+
             Scene scene = EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
@@ -160,7 +172,188 @@ namespace WasteCity.Editor
                     .AddComponent<GrayboxSceneBootstrap>();
             bootstrap.Configure(renderScope, worldView);
 
+            Transform actors =
+                NewChild(root.transform, "GrayboxActors");
+            GrayboxMobileCityController3D city =
+                CreateMobileCity(actors, worldView, material);
+            GrayboxLeaderController3D leader =
+                CreateLeader(actors, worldView, city, material);
+
+            Transform cameraRig =
+                NewChild(root.transform, "CameraRig");
+            cameraRig.position = new Vector3(
+                city.transform.position.x,
+                0f,
+                city.transform.position.z);
+            Transform cameraTransform =
+                NewChild(cameraRig, "Main Camera");
+            cameraTransform.localPosition =
+                new Vector3(0f, 18f, -14f);
+            cameraTransform.localEulerAngles =
+                new Vector3(52f, 0f, 0f);
+            Camera camera =
+                cameraTransform.gameObject.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 13f;
+            cameraTransform.gameObject.tag = "MainCamera";
+
+            Transform directControlTransform =
+                NewChild(systems, "GrayboxDirectControl");
+            GrayboxDirectControlCoordinator directControl =
+                directControlTransform.gameObject.AddComponent<
+                    GrayboxDirectControlCoordinator>();
+            directControl.Configure(city, leader);
+
+            Transform projectorTransform =
+                NewChild(systems, "GrayboxGroundProjector");
+            GrayboxGroundProjector projector =
+                projectorTransform.gameObject
+                    .AddComponent<GrayboxGroundProjector>();
+            projector.Configure(camera, worldView);
+
+            GrayboxCameraController3D cameraController =
+                cameraRig.gameObject.AddComponent<
+                    GrayboxCameraController3D>();
+            cameraController.Configure(
+                camera,
+                cameraRig,
+                city,
+                leader,
+                directControl,
+                projector);
+
+            Transform inputTransform =
+                NewChild(systems, "GrayboxInputRouter");
+            GrayboxInputRouter inputRouter =
+                inputTransform.gameObject
+                    .AddComponent<GrayboxInputRouter>();
+            inputRouter.Configure(
+                city,
+                leader,
+                directControl,
+                projector,
+                cameraController);
+
             return scene;
+        }
+
+        private static bool TryOpenCompleteScene(out Scene scene)
+        {
+            scene = default;
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                    ScenePath) == null)
+                return false;
+
+            scene = EditorSceneManager.OpenScene(
+                ScenePath,
+                OpenSceneMode.Single);
+            GameObject root =
+                GameObject.Find("GrayboxPrototype3D");
+            return root != null &&
+                   root.transform.Find(
+                       "GrayboxRenderScope") != null &&
+                   root.transform.Find(
+                       "GrayboxWorld/TerrainRoot") != null &&
+                   root.transform.Find(
+                       "GrayboxActors/MobileCity") != null &&
+                   root.transform.Find(
+                       "GrayboxActors/Leader_CenJin") != null &&
+                   root.transform.Find(
+                       "CameraRig/Main Camera") != null &&
+                   UnityEngine.Object.FindObjectsOfType<
+                       GrayboxInputRouter>(true).Length == 1 &&
+                   UnityEngine.Object.FindObjectsOfType<
+                       GrayboxGroundProjector>(true).Length == 1 &&
+                   UnityEngine.Object.FindObjectsOfType<
+                       GrayboxDirectControlCoordinator>(true).Length == 1;
+        }
+
+        private static GrayboxMobileCityController3D CreateMobileCity(
+            Transform actors,
+            GrayboxWorldView3D worldView,
+            Material material)
+        {
+            Transform cityTransform =
+                NewChild(actors, "MobileCity");
+            var coordinates = new PlanarCoordinateMapper3D(
+                GrayboxSceneBootstrap.WorldWidth,
+                GrayboxSceneBootstrap.WorldHeight);
+            coordinates.TryCellToWorld(
+                8,
+                7,
+                .5f,
+                out Vector3 cityPosition);
+            cityTransform.position = cityPosition;
+
+            Rigidbody body =
+                cityTransform.gameObject.AddComponent<Rigidbody>();
+            BoxCollider bodyCollider =
+                cityTransform.gameObject.AddComponent<BoxCollider>();
+            bodyCollider.size = new Vector3(3f, 1f, 2f);
+
+            GameObject visual =
+                GameObject.CreatePrimitive(PrimitiveType.Cube);
+            visual.name = "MobileCityVisual";
+            visual.transform.SetParent(cityTransform, false);
+            visual.transform.localScale =
+                new Vector3(3f, 1f, 2f);
+            UnityEngine.Object.DestroyImmediate(
+                visual.GetComponent<Collider>());
+            MeshRenderer renderer =
+                visual.GetComponent<MeshRenderer>();
+            var slot = visual.AddComponent<GrayboxVisualSlot>();
+            slot.Configure(
+                "core.city.mobile",
+                renderer,
+                new Color(.9f, .48f, .1f));
+            slot.ApplyFallback(material);
+
+            GrayboxMobileCityController3D city =
+                cityTransform.gameObject.AddComponent<
+                    GrayboxMobileCityController3D>();
+            city.Configure(worldView, body, bodyCollider);
+            return city;
+        }
+
+        private static GrayboxLeaderController3D CreateLeader(
+            Transform actors,
+            GrayboxWorldView3D worldView,
+            GrayboxMobileCityController3D city,
+            Material material)
+        {
+            GameObject leaderObject =
+                GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            leaderObject.name = "Leader_CenJin";
+            leaderObject.transform.SetParent(actors, false);
+            leaderObject.transform.position =
+                city.transform.position +
+                new Vector3(1.8f, .5f, 1.2f);
+            MeshRenderer renderer =
+                leaderObject.GetComponent<MeshRenderer>();
+            var slot =
+                leaderObject.AddComponent<GrayboxVisualSlot>();
+            slot.Configure(
+                "core.character.cen-jin",
+                renderer,
+                new Color(.2f, .68f, .92f));
+            slot.ApplyFallback(material);
+
+            GrayboxLeaderController3D leader =
+                leaderObject.AddComponent<
+                    GrayboxLeaderController3D>();
+            leader.Configure(worldView, city, true);
+            return leader;
+        }
+
+        private static void EnsureBuildSettings()
+        {
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(
+                    "Assets/_Game/Scenes/FormalPrototype.unity",
+                    true),
+                new EditorBuildSettingsScene(ScenePath, true)
+            };
         }
 
         private static Transform NewChild(

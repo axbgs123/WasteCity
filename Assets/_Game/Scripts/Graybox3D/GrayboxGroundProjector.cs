@@ -5,14 +5,25 @@ namespace WasteCity.Graybox3D
     public sealed class GrayboxGroundProjector : MonoBehaviour
     {
         [SerializeField] private Camera controlledCamera;
-        private PlanarCoordinateMapper3D coordinates;
+        [SerializeField] private GrayboxWorldView3D worldView;
+        private PlanarCoordinateMapper3D injectedCoordinates;
 
         public void Configure(
             Camera camera,
             PlanarCoordinateMapper3D coordinates)
         {
             controlledCamera = camera;
-            this.coordinates = coordinates;
+            worldView = null;
+            injectedCoordinates = coordinates;
+        }
+
+        public void Configure(
+            Camera camera,
+            GrayboxWorldView3D worldView)
+        {
+            controlledCamera = camera;
+            this.worldView = worldView;
+            injectedCoordinates = null;
         }
 
         public bool TryProjectToPlane(
@@ -41,6 +52,8 @@ namespace WasteCity.Graybox3D
             out int cellX,
             out int cellY)
         {
+            PlanarCoordinateMapper3D coordinates =
+                injectedCoordinates ?? worldView?.Coordinates;
             if (!TryProjectToPlane(
                     screenPosition,
                     out worldPoint) ||
