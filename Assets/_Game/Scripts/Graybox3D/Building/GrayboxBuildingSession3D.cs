@@ -43,6 +43,12 @@ namespace WasteCity.Graybox3D.Building
         {
             State = GrayboxBuildingInstanceState.Completed;
         }
+
+        internal void RestoreConstruction(float remaining)
+        {
+            Progress.Restore(remaining);
+            State = GrayboxBuildingInstanceState.UnderConstruction;
+        }
     }
 
     public interface IGrayboxBuildingPresentation3D
@@ -216,19 +222,42 @@ namespace WasteCity.Graybox3D.Building
             BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
                 ? InnerGrid
                 : GroundGrid;
-            if (!grid.Remove(instance.Placement)) return false;
-
             double remainingRatio =
                 instance.Progress.Remaining / instance.Progress.BaseDuration;
             int refund = ConstructionRefundRules.Calculate(
                 instance.Placement.Definition.Cost,
                 remainingRatio,
                 handlingRatio);
+            try
+            {
+                presentation.Remove(instance);
+            }
+            catch (Exception removeFailure)
+            {
+                Exception restoreFailure =
+                    TryRestorePresentation(presentation, instance);
+                if (restoreFailure != null)
+                    throw CreatePresentationRestoreFailure(
+                        removeFailure,
+                        restoreFailure);
+                throw;
+            }
+
+            if (!grid.Remove(instance.Placement))
+            {
+                Exception restoreFailure =
+                    TryRestorePresentation(presentation, instance);
+                if (restoreFailure != null)
+                    throw new InvalidOperationException(
+                        "Failed to restore presentation after grid removal failed.",
+                        restoreFailure);
+                return false;
+            }
+
             acceptedRefund = Inventory.Add(
                 instance.Placement.Definition.CostId,
                 refund);
             instances.RemoveAt(index);
-            presentation.Remove(instance);
             return true;
         }
 
@@ -259,7 +288,15 @@ namespace WasteCity.Graybox3D.Building
                     ConstructionMultiplier);
                 if (instance.Progress.Remaining >= remainingBefore) continue;
                 if (completed) instance.Complete();
-                presentation.UpdateInstance(instance);
+                try
+                {
+                    presentation.UpdateInstance(instance);
+                }
+                catch
+                {
+                    instance.RestoreConstruction(remainingBefore);
+                    throw;
+                }
             }
         }
 
@@ -487,6 +524,51 @@ namespace WasteCity.Graybox3D.Building
             {
                 return cleanupFailure;
             }
+        }
+
+        private static Exception TryRestorePresentation(
+            IGrayboxBuildingPresentation3D presentation,
+            GrayboxBuildingInstance3D instance)
+        {
+            try
+            {
+                if (presentation.TryCreate(instance)) return null;
+            }
+            catch (Exception restoreFailure)
+            {
+                return restoreFailure;
+            }
+
+            try
+            {
+                presentation.Remove(instance);
+            }
+            catch (Exception restoreFailure)
+            {
+                return restoreFailure;
+            }
+
+            try
+            {
+                return presentation.TryCreate(instance)
+                    ? null
+                    : new InvalidOperationException(
+                        "Presentation recreation returned false.");
+            }
+            catch (Exception restoreFailure)
+            {
+                return restoreFailure;
+            }
+        }
+
+        private static InvalidOperationException
+            CreatePresentationRestoreFailure(
+                Exception operationFailure,
+                Exception restoreFailure)
+        {
+            return new InvalidOperationException(
+                "Failed to restore presentation after cancellation failure.",
+                new AggregateException(operationFailure, restoreFailure));
         }
 
         private void RollbackPlacement(

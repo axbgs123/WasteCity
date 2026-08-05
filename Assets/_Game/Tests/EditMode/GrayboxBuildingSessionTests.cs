@@ -487,6 +487,49 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void TickConstruction_UpdateFailureRollsBackProgressAndCanRetrySameInstance()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var updateFailure = new InvalidOperationException("update failed");
+            var presentation = new RecordingPresentation
+            {
+                UpdateException = updateFailure
+            };
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            string stableId = instance.StableInstanceId;
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.TickConstruction(2f, CityMode.Fortress, false, presentation));
+
+            Assert.That(thrown, Is.SameAs(updateFailure));
+            Assert.That(instance.StableInstanceId, Is.EqualTo(stableId));
+            Assert.That(instance.Progress.Remaining, Is.EqualTo(2f));
+            Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.Zero);
+            Assert.That(presentation.Updated, Is.Empty);
+
+            presentation.UpdateException = null;
+            session.TickConstruction(2f, CityMode.Fortress, false, presentation);
+
+            Assert.That(instance.StableInstanceId, Is.EqualTo(stableId));
+            Assert.That(instance.Progress.IsComplete, Is.True);
+            Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.EqualTo(1));
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
+        }
+
+        [Test]
         public void CompleteAllConstructionForDevelopment_CompletesEveryPendingInstance()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -626,6 +669,99 @@ namespace WasteCity.Tests
             Assert.That(presentation.Removed, Is.EqualTo(new[] { instance }));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TryCancelConstruction_RemoveFailureRestoresPresentationWithoutCommitting(
+            bool throwAfterSideEffect)
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation =
+                new CancellationFaultPresentation(throwAfterSideEffect);
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            int stoneBeforeCancellation =
+                session.Inventory.Get(ResourceIds.Stone);
+            var acceptedRefund = -1;
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.TryCancelConstruction(
+                    instance.StableInstanceId,
+                    1d,
+                    presentation,
+                    out acceptedRefund));
+
+            Assert.That(thrown, Is.SameAs(presentation.RemoveFailure));
+            Assert.That(acceptedRefund, Is.Zero);
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Stone),
+                Is.EqualTo(stoneBeforeCancellation));
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(1));
+            Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.True);
+            Assert.That(session.Instances, Is.EqualTo(new[] { instance }));
+            Assert.That(presentation.Contains(instance), Is.True);
+
+            Assert.That(
+                session.TryCancelConstruction(
+                    instance.StableInstanceId,
+                    1d,
+                    presentation,
+                    out acceptedRefund),
+                Is.True);
+            Assert.That(acceptedRefund, Is.EqualTo(BuildingCatalog.Wall.Cost));
+            Assert.That(session.GroundGrid.Count, Is.Zero);
+            Assert.That(session.Instances, Is.Empty);
+            Assert.That(presentation.Contains(instance), Is.False);
+        }
+
+        [Test]
+        public void TryCancelConstruction_RestoreFailureThrowsCompoundAfterSessionRollback()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var restoreFailure = new InvalidOperationException("restore failed");
+            var presentation = new CancellationFaultPresentation(
+                throwAfterSideEffect: true)
+            {
+                RestoreException = restoreFailure
+            };
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            int stoneBeforeCancellation =
+                session.Inventory.Get(ResourceIds.Stone);
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.TryCancelConstruction(
+                    instance.StableInstanceId,
+                    1d,
+                    presentation,
+                    out _));
+
+            Assert.That(thrown.Message, Does.Contain("restore presentation"));
+            var failures = thrown.InnerException as AggregateException;
+            Assert.That(failures, Is.Not.Null);
+            Assert.That(
+                failures.InnerExceptions,
+                Does.Contain(presentation.RemoveFailure));
+            Assert.That(failures.InnerExceptions, Does.Contain(restoreFailure));
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Stone),
+                Is.EqualTo(stoneBeforeCancellation));
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(1));
+            Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.True);
+            Assert.That(session.Instances, Is.EqualTo(new[] { instance }));
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var gameObject = new GameObject("graybox-building-session-test");
@@ -644,7 +780,7 @@ namespace WasteCity.Tests
             CityMode mode,
             int x,
             int y,
-            RecordingPresentation presentation)
+            IGrayboxBuildingPresentation3D presentation)
         {
             Assert.That(
                 session.TryBeginConstruction(
@@ -699,6 +835,7 @@ namespace WasteCity.Tests
             public bool CreateResult { get; set; } = true;
             public Exception CreateException { get; set; }
             public Exception RemoveException { get; set; }
+            public Exception UpdateException { get; set; }
             public List<GrayboxBuildingInstance3D> Created { get; } =
                 new List<GrayboxBuildingInstance3D>();
             public List<GrayboxBuildingInstance3D> Updated { get; } =
@@ -715,6 +852,7 @@ namespace WasteCity.Tests
 
             public void UpdateInstance(GrayboxBuildingInstance3D instance)
             {
+                if (UpdateException != null) throw UpdateException;
                 Updated.Add(instance);
             }
 
@@ -723,6 +861,57 @@ namespace WasteCity.Tests
                 Created.Remove(instance);
                 Removed.Add(instance);
                 if (RemoveException != null) throw RemoveException;
+            }
+        }
+
+        private sealed class CancellationFaultPresentation :
+            IGrayboxBuildingPresentation3D
+        {
+            private readonly bool throwAfterSideEffect;
+            private readonly List<GrayboxBuildingInstance3D> existing =
+                new List<GrayboxBuildingInstance3D>();
+            private bool removeFaultArmed = true;
+            private int createCalls;
+
+            public CancellationFaultPresentation(bool throwAfterSideEffect)
+            {
+                this.throwAfterSideEffect = throwAfterSideEffect;
+                RemoveFailure =
+                    new InvalidOperationException("remove failed");
+            }
+
+            public InvalidOperationException RemoveFailure { get; }
+            public Exception RestoreException { get; set; }
+
+            public bool Contains(GrayboxBuildingInstance3D instance)
+            {
+                return existing.Contains(instance);
+            }
+
+            public bool TryCreate(GrayboxBuildingInstance3D instance)
+            {
+                createCalls++;
+                if (createCalls > 1 && RestoreException != null)
+                    throw RestoreException;
+                if (existing.Contains(instance)) return false;
+                existing.Add(instance);
+                return true;
+            }
+
+            public void UpdateInstance(GrayboxBuildingInstance3D instance)
+            {
+            }
+
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
+                if (removeFaultArmed)
+                {
+                    removeFaultArmed = false;
+                    if (!throwAfterSideEffect) throw RemoveFailure;
+                    existing.Remove(instance);
+                    throw RemoveFailure;
+                }
+                existing.Remove(instance);
             }
         }
     }
