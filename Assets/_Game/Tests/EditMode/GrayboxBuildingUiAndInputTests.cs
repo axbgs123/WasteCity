@@ -300,6 +300,79 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_UiReleaseEndsWorldDragWithoutStaleContinuation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            Button quickbar = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.0");
+            ForceCanvasLayout(fixture.Canvas);
+            Vector2 uiPointer = RectCenter(fixture.Ui, quickbar);
+            Vector2 worldStart = ScreenCenter + Vector2.right * 100f;
+
+            Transform cameraRig =
+                NewObject("InputCameraRig").transform;
+            GrayboxGroundProjector groundProjector =
+                Create<GrayboxGroundProjector>(
+                    "InputGroundProjector");
+            groundProjector.Configure(
+                fixture.Camera,
+                fixture.World.Coordinates);
+            GrayboxCameraController3D cameraController =
+                Create<GrayboxCameraController3D>(
+                    "InputCameraController");
+            cameraController.Configure(
+                fixture.Camera,
+                cameraRig,
+                fixture.City,
+                null,
+                null,
+                groundProjector);
+            GrayboxInputRouter baseRouter =
+                Create<GrayboxInputRouter>("InputBaseRouter");
+            baseRouter.Configure(
+                fixture.City,
+                null,
+                null,
+                groundProjector,
+                cameraController);
+            baseRouter.ConfigureInputInterceptor(fixture.Router);
+
+            RouteMiddleInput(
+                fixture.Router,
+                baseRouter,
+                worldStart,
+                held: true);
+            Assert.That(
+                cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
+
+            GrayboxInputSuppression release = RouteMiddleInput(
+                fixture.Router,
+                baseRouter,
+                uiPointer,
+                held: false);
+            Assert.That(release.CameraDrag, Is.True);
+
+            GrayboxInputSuppression uiPress = RouteMiddleInput(
+                fixture.Router,
+                baseRouter,
+                uiPointer,
+                held: true);
+            Assert.That(uiPress.CameraDrag, Is.True);
+            Vector3 beforeLeavingUi = cameraRig.position;
+
+            GrayboxInputSuppression worldHold = RouteMiddleInput(
+                fixture.Router,
+                baseRouter,
+                ScreenCenter,
+                held: true);
+
+            Assert.That(worldHold.CameraDrag, Is.False);
+            Assert.That(cameraRig.position, Is.EqualTo(beforeLeavingUi));
+        }
+
+        [Test]
         public void InputRouter_FocusedKeyboardStillClassifiesUiPointerChannels()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -462,6 +535,56 @@ namespace WasteCity.Tests
 
             TestContext.WriteLine(
                 "Task9ProcessCurrentInputAllocationDifference=" +
+                difference);
+            Assert.That(difference, Is.Zero);
+        }
+
+        [Test]
+        public void InputRouter_UiMiddleHoldAllocatesZeroAcross300Calls()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            Button quickbar = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.0");
+            ForceCanvasLayout(fixture.Canvas);
+            QueueMouseState(
+                RectCenter(fixture.Ui, quickbar),
+                middleHeld: true);
+            QueueMouseState(
+                RectCenter(fixture.Ui, quickbar),
+                middleHeld: true);
+            fixture.Router.ProcessCurrentInput();
+            fixture.Router.ProcessCurrentInput();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                fixture.Router.ProcessCurrentInput();
+            long difference =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+
+            TestContext.WriteLine(
+                "Task9UiMiddleHoldAllocationDifference=" +
+                difference);
+            Assert.That(difference, Is.Zero);
+        }
+
+        [Test]
+        public void InputRouter_StablePreviewAllocatesZeroAcross300Calls()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            SetPointer(ScreenCenter);
+            fixture.Router.ProcessCurrentInput();
+            fixture.Router.ProcessCurrentInput();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                fixture.Router.ProcessCurrentInput();
+            long difference =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+
+            TestContext.WriteLine(
+                "Task9StablePreviewAllocationDifference=" +
                 difference);
             Assert.That(difference, Is.Zero);
         }
@@ -1691,6 +1814,38 @@ namespace WasteCity.Tests
                 });
             InputSystem.Update();
             return suppression;
+        }
+
+        private GrayboxInputSuppression RouteMiddleInput(
+            GrayboxBuildingInputRouter3D buildingRouter,
+            GrayboxInputRouter baseRouter,
+            Vector2 position,
+            bool held)
+        {
+            QueueMouseState(position, held);
+            GrayboxInputSuppression suppression =
+                buildingRouter.ProcessCurrentInput();
+            baseRouter.ProcessFrame(
+                baseRouter.ReadCurrentFrame(),
+                suppression);
+            return suppression;
+        }
+
+        private void QueueMouseState(
+            Vector2 position,
+            bool middleHeld)
+        {
+            EnsureInputDevices();
+            testPointer = position;
+            MouseState state = new MouseState
+            {
+                position = position
+            };
+            if (middleHeld)
+                state = state.WithButton(MouseButton.Middle);
+            InputSystem.QueueStateEvent(testMouse, state);
+            InputSystem.Update();
+            Assert.That(Mouse.current, Is.SameAs(testMouse));
         }
 
         private void SetPointer(Vector2 position)

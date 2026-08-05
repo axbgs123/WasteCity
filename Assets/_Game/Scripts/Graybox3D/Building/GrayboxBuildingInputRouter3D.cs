@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using WasteCity.Building;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -19,6 +20,15 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField]
         private GrayboxDeveloperModifierBootstrap3D developer;
 
+        private Mouse classifiedPointerDevice;
+        private Vector2 classifiedPointerPosition;
+        private bool classifiedPointerOverUi;
+        private bool hasPointerClassification;
+        private Vector2 previewPointerPosition;
+        private BuildingDefinition previewDefinition;
+        private BuildingOrientation previewOrientation;
+        private bool hasPreviewPointerState;
+
         public void Configure(
             GrayboxBuildingMenuView3D menu,
             GrayboxBuildingInteractionModel3D interaction,
@@ -33,6 +43,8 @@ namespace WasteCity.Graybox3D.Building
             this.construction = construction;
             this.evacuation = evacuation;
             this.developer = developer;
+            hasPointerClassification = false;
+            hasPreviewPointerState = false;
         }
 
         public GrayboxInputSuppression ProcessCurrentInput()
@@ -54,10 +66,10 @@ namespace WasteCity.Graybox3D.Building
                  mouse.middleButton.wasPressedThisFrame ||
                  mouse.middleButton.isPressed ||
                  mouse.middleButton.wasReleasedThisFrame);
-            bool pointerOverUi =
-                pointerActive &&
-                menu != null &&
-                menu.IsPointerOverUi(pointerPosition);
+            bool pointerOverUi = ClassifyPointerOverUi(
+                mouse,
+                pointerPosition,
+                pointerActive);
 
             if (menu != null && menu.HasKeyboardFocus())
             {
@@ -99,11 +111,19 @@ namespace WasteCity.Graybox3D.Building
                 interaction.State ==
                 GrayboxBuildingInteractionState.Previewing)
             {
-                placement?.UpdatePointer(pointerPosition);
+                if (PreviewPointerChanged(pointerPosition))
+                {
+                    placement?.UpdatePointer(pointerPosition);
+                    RememberPreviewPointer(pointerPosition);
+                }
                 if (!paused &&
                     mouse != null &&
                     mouse.leftButton.wasPressedThisFrame)
                     placement?.ConfirmCurrentPlacement(out _);
+            }
+            else
+            {
+                hasPreviewPointerState = false;
             }
 
             if (!paused &&
@@ -130,6 +150,51 @@ namespace WasteCity.Graybox3D.Building
                 destination: pointerOverUi || wasBuildMode,
                 cameraDrag: pointerOverUi,
                 home: false);
+        }
+
+        private bool ClassifyPointerOverUi(
+            Mouse mouse,
+            Vector2 pointerPosition,
+            bool pointerActive)
+        {
+            if (!pointerActive)
+                return false;
+
+            bool pointerEdge =
+                mouse.leftButton.wasPressedThisFrame ||
+                mouse.rightButton.wasPressedThisFrame ||
+                mouse.middleButton.wasPressedThisFrame ||
+                mouse.middleButton.wasReleasedThisFrame;
+            if (!hasPointerClassification ||
+                mouse != classifiedPointerDevice ||
+                pointerPosition != classifiedPointerPosition ||
+                pointerEdge)
+            {
+                classifiedPointerDevice = mouse;
+                classifiedPointerPosition = pointerPosition;
+                classifiedPointerOverUi =
+                    menu != null &&
+                    menu.IsPointerOverUi(pointerPosition);
+                hasPointerClassification = true;
+            }
+
+            return classifiedPointerOverUi;
+        }
+
+        private bool PreviewPointerChanged(Vector2 pointerPosition)
+        {
+            return !hasPreviewPointerState ||
+                   pointerPosition != previewPointerPosition ||
+                   interaction.Selected != previewDefinition ||
+                   interaction.Orientation != previewOrientation;
+        }
+
+        private void RememberPreviewPointer(Vector2 pointerPosition)
+        {
+            previewPointerPosition = pointerPosition;
+            previewDefinition = interaction.Selected;
+            previewOrientation = interaction.Orientation;
+            hasPreviewPointerState = true;
         }
 
         private void ProcessKeyboardActions(Keyboard keyboard)

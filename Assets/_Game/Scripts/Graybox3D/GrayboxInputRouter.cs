@@ -227,8 +227,7 @@ namespace WasteCity.Graybox3D
                     frame.PointerPosition);
             }
 
-            if (!suppression.CameraDrag &&
-                frame.MiddleReleased)
+            if (frame.MiddleReleased)
                 cameraController.EndFreeDrag();
             if (!suppression.Home &&
                 frame.HomePressed)
