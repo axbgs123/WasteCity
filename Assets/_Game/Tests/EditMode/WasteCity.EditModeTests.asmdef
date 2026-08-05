@@ -1,6 +1,6 @@
 {
   "name": "WasteCity.EditModeTests",
-  "references": ["WasteCity.Game"],
+  "references": ["WasteCity.Game", "WasteCity.Graybox3D"],
   "optionalUnityReferences": ["TestAssemblies"],
   "includePlatforms": ["Editor"]
 }
