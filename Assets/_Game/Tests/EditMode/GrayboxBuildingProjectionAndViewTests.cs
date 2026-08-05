@@ -457,11 +457,23 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void WorldView_ExplicitReconfigureKeepsExactlyOneGridPerSite()
+        public void WorldView_ExplicitReconfigureReplacesOnlyOwnedVisuals()
         {
             WorldFixture fixture = CreateWorldFixture();
             Transform infrastructureRoot =
                 fixture.Presentation.transform.Find("infrastructure");
+            Transform oldGround = Slot(
+                fixture.Presentation,
+                "building.grid.ground").transform;
+            Mesh unrelatedMesh = Track(CreateSentinelMesh());
+            Transform instanceSentinel = AddMeshSentinel(
+                fixture.InstanceRoot,
+                "unrelated-instance-sentinel",
+                unrelatedMesh);
+            Transform infrastructureSentinel = AddMeshSentinel(
+                infrastructureRoot,
+                "unrelated-infrastructure-sentinel",
+                unrelatedMesh);
 
             fixture.Presentation.Configure(
                 fixture.InstanceRoot,
@@ -469,6 +481,15 @@ namespace WasteCity.Tests
                 fixture.Material,
                 fixture.City);
 
+            Assert.That(oldGround == null, Is.True);
+            Assert.That(instanceSentinel != null, Is.True);
+            Assert.That(infrastructureSentinel != null, Is.True);
+            Assert.That(
+                instanceSentinel.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(unrelatedMesh));
+            Assert.That(
+                infrastructureSentinel.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(unrelatedMesh));
             Assert.That(
                 infrastructureRoot
                     .GetComponentsInChildren<GrayboxVisualSlot>(true)
@@ -493,7 +514,8 @@ namespace WasteCity.Tests
         {
             yield return new EnterPlayMode();
             GameObject source = CreatePrefabLikePresentationRoot(
-                out Material material);
+                out Material material,
+                out Mesh unrelatedMesh);
             GameObject clone = Track(
                 UnityEngine.Object.Instantiate(source));
             clone.name = "serialized-presentation-clone";
@@ -526,7 +548,19 @@ namespace WasteCity.Tests
                 Is.EqualTo(1));
             Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
             Assert.That(instanceRoot, Is.Not.Null);
-            Assert.That(instanceRoot.childCount, Is.Zero);
+            Transform instanceSentinel =
+                instanceRoot.Find("unrelated-instance-sentinel");
+            Transform infrastructureSentinel =
+                infrastructureRoot.Find(
+                    "unrelated-infrastructure-sentinel");
+            Assert.That(instanceSentinel != null, Is.True);
+            Assert.That(infrastructureSentinel != null, Is.True);
+            Assert.That(
+                instanceSentinel.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(unrelatedMesh));
+            Assert.That(
+                infrastructureSentinel.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(unrelatedMesh));
             Assert.That(
                 ground.Renderer.sharedMaterial,
                 Is.SameAs(material));
@@ -563,6 +597,44 @@ namespace WasteCity.Tests
                 3,
                 false);
             Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
+
+            UnityEngine.Object.Destroy(clone);
+            UnityEngine.Object.Destroy(source);
+            yield return null;
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator WorldView_ActiveSerializedClonePreservesSourceGeneratedMesh()
+        {
+            yield return new EnterPlayMode();
+            GameObject source = CreatePrefabLikePresentationRoot(
+                out _,
+                out _);
+            GrayboxBuildingWorldView3D sourceView =
+                source.GetComponentInChildren<GrayboxBuildingWorldView3D>();
+            GrayboxVisualSlot sourceGround = Slot(
+                sourceView,
+                "building.grid.ground");
+            Mesh sourceGroundMesh =
+                sourceGround.GetComponent<MeshFilter>().sharedMesh;
+
+            GameObject clone = Track(
+                UnityEngine.Object.Instantiate(source));
+            yield return null;
+
+            Assert.That(sourceGroundMesh != null, Is.True);
+            Assert.That(
+                sourceGround.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(sourceGroundMesh));
+            Assert.That(sourceGroundMesh.vertexCount, Is.GreaterThan(0));
+            Assert.That(
+                clone.GetComponentInChildren<GrayboxBuildingWorldView3D>()
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                    .Count(
+                        value => value.StableId ==
+                            "building.grid.ground"),
+                Is.EqualTo(1));
 
             UnityEngine.Object.Destroy(clone);
             UnityEngine.Object.Destroy(source);
@@ -1006,7 +1078,8 @@ namespace WasteCity.Tests
         }
 
         private GameObject CreatePrefabLikePresentationRoot(
-            out Material material)
+            out Material material,
+            out Mesh unrelatedMesh)
         {
             GameObject root =
                 Track(new GameObject("serialized-presentation-source"));
@@ -1029,8 +1102,44 @@ namespace WasteCity.Tests
                 infrastructure,
                 material,
                 city);
-            NewChild(instances, "serialized-old-instance-visual");
+            unrelatedMesh = Track(CreateSentinelMesh());
+            AddMeshSentinel(
+                instances,
+                "unrelated-instance-sentinel",
+                unrelatedMesh);
+            AddMeshSentinel(
+                infrastructure,
+                "unrelated-infrastructure-sentinel",
+                unrelatedMesh);
             return root;
+        }
+
+        private static Transform AddMeshSentinel(
+            Transform parent,
+            string name,
+            Mesh sharedMesh)
+        {
+            Transform sentinel = NewChild(parent, name);
+            sentinel.gameObject.AddComponent<MeshFilter>().sharedMesh =
+                sharedMesh;
+            return sentinel;
+        }
+
+        private static Mesh CreateSentinelMesh()
+        {
+            var mesh = new Mesh
+            {
+                name = "unrelated-shared-mesh",
+                vertices = new[]
+                {
+                    Vector3.zero,
+                    Vector3.right,
+                    Vector3.forward
+                },
+                triangles = new[] { 0, 2, 1 }
+            };
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         private GrayboxBuildingSurfaceProjector3D CreateProjector(

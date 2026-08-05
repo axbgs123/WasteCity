@@ -49,6 +49,9 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private Transform infrastructureRoot;
         [SerializeField] private Material sharedMaterial;
         [SerializeField] private GrayboxMobileCityController3D city;
+        [SerializeField, HideInInspector]
+        private List<GameObject> ownedVisualRoots =
+            new List<GameObject>();
 
         private readonly Dictionary<string, Visual> instances =
             new Dictionary<string, Visual>(StringComparer.Ordinal);
@@ -335,6 +338,7 @@ namespace WasteCity.Graybox3D.Building
         {
             var root = new GameObject(stableId);
             root.transform.SetParent(parent, false);
+            RegisterOwnedRoot(root);
             var filter = root.AddComponent<MeshFilter>();
             var renderer = root.AddComponent<MeshRenderer>();
             filter.sharedMesh = mesh;
@@ -780,9 +784,16 @@ namespace WasteCity.Graybox3D.Building
 
         private void ClearGenerated()
         {
-            ClearOwnedChildren(instanceRoot);
-            if (infrastructureRoot != instanceRoot)
-                ClearOwnedChildren(infrastructureRoot);
+            foreach (Visual visual in instances.Values)
+                DestroyVisual(visual);
+            foreach (Visual visual in nodeHighlights.Values)
+                DestroyVisual(visual);
+            for (var index = infrastructure.Count - 1;
+                 index >= 0;
+                 index--)
+                DestroyVisual(infrastructure[index]);
+            DestroyVisual(preview);
+            ClearSerializedOwnedRoots();
             instances.Clear();
             nodeHighlights.Clear();
             infrastructure.Clear();
@@ -792,32 +803,38 @@ namespace WasteCity.Graybox3D.Building
             runtimeInitialized = false;
         }
 
-        private static void ClearOwnedChildren(Transform root)
+        private void RegisterOwnedRoot(GameObject root)
         {
-            if (root == null)
-                return;
-            for (var index = root.childCount - 1; index >= 0; index--)
-            {
-                GameObject owned = root.GetChild(index).gameObject;
-                owned.SetActive(false);
-                MeshFilter[] filters =
-                    owned.GetComponentsInChildren<MeshFilter>(true);
-                for (var filterIndex = 0;
-                     filterIndex < filters.Length;
-                     filterIndex++)
-                {
-                    Mesh mesh = filters[filterIndex].sharedMesh;
-                    filters[filterIndex].sharedMesh = null;
-                    DestroyOwned(mesh);
-                }
-                DestroyOwned(owned);
-            }
+            if (ownedVisualRoots == null)
+                ownedVisualRoots = new List<GameObject>();
+            ownedVisualRoots.Add(root);
         }
 
-        private static void DestroyVisual(Visual visual)
+        private void ClearSerializedOwnedRoots()
+        {
+            if (ownedVisualRoots == null)
+                return;
+            for (var index = ownedVisualRoots.Count - 1;
+                 index >= 0;
+                 index--)
+            {
+                GameObject owned = ownedVisualRoots[index];
+                if (owned == null)
+                    continue;
+                owned.SetActive(false);
+                DestroyOwned(owned);
+            }
+            ownedVisualRoots.Clear();
+        }
+
+        private void DestroyVisual(Visual visual)
         {
             if (visual == null)
                 return;
+            if (ownedVisualRoots != null)
+                ownedVisualRoots.Remove(visual.Root);
+            if (visual.Root != null)
+                visual.Root.SetActive(false);
             DestroyOwned(visual.Root);
             DestroyOwned(visual.Mesh);
         }
