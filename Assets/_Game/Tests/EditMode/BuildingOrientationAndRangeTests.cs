@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using WasteCity.Building;
 using WasteCity.Economy;
@@ -31,6 +32,74 @@ namespace WasteCity.Tests
             BuildingOrientation expected)
         {
             Assert.That(BuildingOrientationRules.RotateClockwise(orientation), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void OrientationHelpersRejectValuesOutsideTheFourApprovedDirections()
+        {
+            var invalid = (BuildingOrientation)99;
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                BuildingOrientationRules.RotateClockwise(invalid));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                BuildingOrientationRules.Width(ThreeByTwo, invalid));
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                BuildingOrientationRules.Height(ThreeByTwo, invalid));
+        }
+
+        [Test]
+        public void OrientationAwareGridApisRejectInvalidValuesWithoutMutation()
+        {
+            var invalid = (BuildingOrientation)99;
+            var placementGrid = new BuildingGrid(5, 5);
+            var inventory = new ResourceInventory(10);
+            inventory.Add(ResourceIds.Alloy, 1);
+
+            Assert.That(
+                placementGrid.ContainsFootprint(ThreeByTwo, 1, 1, invalid),
+                Is.False);
+            Assert.That(
+                placementGrid.CanPlace(ThreeByTwo, 1, 1, BuildingSite.Ground, invalid),
+                Is.False);
+            Assert.That(
+                placementGrid.TryPlace(
+                    ThreeByTwo,
+                    1,
+                    1,
+                    inventory,
+                    false,
+                    out var placed,
+                    BuildingSite.Ground,
+                    invalid),
+                Is.False);
+            Assert.That(placed, Is.Null);
+            Assert.That(placementGrid.Count, Is.Zero);
+            Assert.That(inventory.Get(ResourceIds.Alloy), Is.EqualTo(1));
+
+            var restoreGrid = new BuildingGrid(5, 5);
+            Assert.That(
+                restoreGrid.TryRestore(
+                    ThreeByTwo,
+                    1,
+                    1,
+                    out var restored,
+                    BuildingSite.Ground,
+                    invalid),
+                Is.False);
+            Assert.That(restored, Is.Null);
+            Assert.That(restoreGrid.Count, Is.Zero);
+        }
+
+        [Test]
+        public void InnerRangeRejectsValuesOutsideTheFourApprovedDirections()
+        {
+            Assert.That(
+                BuildingRangeRules.IsInnerFootprintInBounds(
+                    ThreeByTwo,
+                    0,
+                    0,
+                    (BuildingOrientation)99),
+                Is.False);
         }
 
         [Test]
@@ -77,6 +146,66 @@ namespace WasteCity.Tests
             Assert.That(grid.Count, Is.Zero);
         }
 
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void GridCanPlaceRejectsExtremeCoordinates(int x)
+        {
+            var grid = new BuildingGrid(5, 5);
+
+            Assert.That(
+                grid.CanPlace(
+                    ThreeByTwo,
+                    x,
+                    0,
+                    BuildingSite.Ground,
+                    BuildingOrientation.North),
+                Is.False);
+            Assert.That(grid.Count, Is.Zero);
+        }
+
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void GridTryPlaceRejectsExtremeCoordinatesWithoutSpendingOrPersisting(int x)
+        {
+            var grid = new BuildingGrid(5, 5);
+            var inventory = new ResourceInventory(10);
+            inventory.Add(ResourceIds.Alloy, 1);
+
+            Assert.That(
+                grid.TryPlace(
+                    ThreeByTwo,
+                    x,
+                    0,
+                    inventory,
+                    false,
+                    out var placed,
+                    BuildingSite.Ground,
+                    BuildingOrientation.North),
+                Is.False);
+            Assert.That(placed, Is.Null);
+            Assert.That(grid.Count, Is.Zero);
+            Assert.That(inventory.Get(ResourceIds.Alloy), Is.EqualTo(1));
+        }
+
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void GridTryRestoreRejectsExtremeCoordinatesWithoutPersisting(int x)
+        {
+            var grid = new BuildingGrid(5, 5);
+
+            Assert.That(
+                grid.TryRestore(
+                    ThreeByTwo,
+                    x,
+                    0,
+                    out var placed,
+                    BuildingSite.Ground,
+                    BuildingOrientation.North),
+                Is.False);
+            Assert.That(placed, Is.Null);
+            Assert.That(grid.Count, Is.Zero);
+        }
+
         [Test]
         public void ExistingNoOrientationApisKeepNorthCoordinatesAndCounts()
         {
@@ -119,6 +248,28 @@ namespace WasteCity.Tests
             Assert.That(BuildingRangeRules.IsSupportedGroundRadius(0), Is.False);
             Assert.That(BuildingRangeRules.IsSupportedGroundRadius(10), Is.False);
             Assert.That(BuildingRangeRules.IsSupportedGroundRadius(25), Is.False);
+        }
+
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void GroundRangeRejectsExtremeCoordinatesWithoutThrowing(int cellX)
+        {
+            Assert.That(
+                BuildingRangeRules.IsGroundCellInRange(0, 0, cellX, 0, 8),
+                Is.False);
+        }
+
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void InnerRangeRejectsExtremeCoordinatesWithoutThrowing(int x)
+        {
+            Assert.That(
+                BuildingRangeRules.IsInnerFootprintInBounds(
+                    ThreeByTwo,
+                    x,
+                    0,
+                    BuildingOrientation.North),
+                Is.False);
         }
 
         [TestCase(12)]

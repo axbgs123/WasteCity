@@ -61,6 +61,24 @@ namespace WasteCity.Tests
                 BuildingPlacementFailure.OutOfBounds);
         }
 
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void ExtremeGroundCoordinatesReturnApprovedBoundaryFailures(int x)
+        {
+            var evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(x: x, y: 0, cityX: 0, cityY: 0));
+
+            Assert.That(evaluation.IsValid, Is.False);
+            Assert.That(evaluation.PrimaryFailure, Is.EqualTo(BuildingPlacementFailure.OutOfBounds));
+            Assert.That(
+                evaluation.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.OutOfBounds,
+                    BuildingPlacementFailure.OutsideBuildRange
+                }));
+        }
+
         [Test]
         public void UnsupportedSiteReportsUnsupportedSite()
         {

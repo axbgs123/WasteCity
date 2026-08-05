@@ -48,13 +48,7 @@ namespace WasteCity.Graybox3D.Building
 
         public void Select(GrayboxBuildingCatalogItem3D item)
         {
-            if (state != GrayboxBuildingInteractionState.Inactive &&
-                state != GrayboxBuildingInteractionState.CatalogOpen &&
-                state != GrayboxBuildingInteractionState.Previewing)
-            {
-                throw new InvalidOperationException(
-                    "Selection is unavailable while confirmation is pending.");
-            }
+            EnsureSelectionAllowed();
             if (item.Visibility != BuildingCatalogVisibility.Buildable ||
                 item.Definition == null ||
                 item.Category != GrayboxBuildingCatalogPresenter3D.CategoryOf(item.Definition) ||
@@ -65,7 +59,18 @@ namespace WasteCity.Graybox3D.Building
                     nameof(item));
             }
 
-            selectedBuildingId = item.Definition.Id.Value;
+            Select(item.Definition);
+        }
+
+        public void Select(BuildingDefinition definition)
+        {
+            EnsureSelectionAllowed();
+            if (!IsCanonicalBuildMenuDefinition(definition))
+                throw new ArgumentException(
+                    "Only a canonical BuildMenu definition may be selected.",
+                    nameof(definition));
+
+            selectedBuildingId = definition.Id.Value;
             state = GrayboxBuildingInteractionState.Previewing;
         }
 
@@ -111,6 +116,25 @@ namespace WasteCity.Graybox3D.Building
                 if (definition.Id.Value == stableId) return definition;
             }
             return null;
+        }
+
+        private static bool IsCanonicalBuildMenuDefinition(BuildingDefinition definition)
+        {
+            if (definition == null) return false;
+            foreach (BuildingDefinition candidate in BuildingCatalog.BuildMenu)
+                if (ReferenceEquals(candidate, definition)) return true;
+            return false;
+        }
+
+        private void EnsureSelectionAllowed()
+        {
+            if (state != GrayboxBuildingInteractionState.Inactive &&
+                state != GrayboxBuildingInteractionState.CatalogOpen &&
+                state != GrayboxBuildingInteractionState.Previewing)
+            {
+                throw new InvalidOperationException(
+                    "Selection is unavailable while confirmation is pending.");
+            }
         }
     }
 }

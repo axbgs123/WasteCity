@@ -249,6 +249,47 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Interaction_DefinitionSelectionSupportsTheFrozenTaskSixSignature()
+        {
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+
+            interaction.Select(BuildingCatalog.MiningStation);
+
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
+            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
+        }
+
+        [Test]
+        public void Interaction_DefinitionSelectionRejectsForgedBuildMenuIdentity()
+        {
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+            var forgedMiningStation = new BuildingDefinition(
+                BuildingCatalog.MiningStation.Id.Value,
+                "伪造采矿站",
+                2,
+                2,
+                BuildingCatalog.MiningStation.CostId,
+                BuildingCatalog.MiningStation.Cost);
+
+            Assert.Throws<ArgumentException>(() => interaction.Select(forgedMiningStation));
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+            Assert.That(interaction.Selected, Is.Null);
+        }
+
+        [Test]
+        public void Interaction_DefinitionSelectionRejectsCancelConfirmationState()
+        {
+            GrayboxBuildingInteractionModel3D interaction = CreateInteraction();
+            interaction.Select(BuildableCard(BuildingCatalog.MiningStation));
+            interaction.RequestCancelConstruction();
+
+            Assert.Throws<InvalidOperationException>(() =>
+                interaction.Select(BuildingCatalog.Housing));
+            Assert.That(interaction.State, Is.EqualTo(GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.MiningStation));
+        }
+
+        [Test]
         public void Interaction_ResolvesCancelConfirmationDeterministically()
         {
             GrayboxBuildingInteractionModel3D interaction = CreateInteraction();

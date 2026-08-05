@@ -20,7 +20,9 @@ namespace WasteCity.Building
         public static bool IsGroundCellInRange(int cityX, int cityY, int cellX, int cellY, int radius)
         {
             return IsSupportedGroundRadius(radius) &&
-                   Math.Max(Math.Abs(cellX - cityX), Math.Abs(cellY - cityY)) <= radius;
+                   Math.Max(
+                       Math.Abs((long)cellX - cityX),
+                       Math.Abs((long)cellY - cityY)) <= radius;
         }
 
         public static bool IsInnerFootprintInBounds(
@@ -29,10 +31,10 @@ namespace WasteCity.Building
             int y,
             BuildingOrientation orientation)
         {
-            if (definition == null) return false;
+            if (definition == null || !BuildingOrientationRules.IsValid(orientation)) return false;
             return x >= 0 && y >= 0 &&
-                   x + BuildingOrientationRules.Width(definition, orientation) <= InnerGridWidth &&
-                   y + BuildingOrientationRules.Height(definition, orientation) <= InnerGridHeight;
+                   (long)x + BuildingOrientationRules.Width(definition, orientation) <= InnerGridWidth &&
+                   (long)y + BuildingOrientationRules.Height(definition, orientation) <= InnerGridHeight;
         }
     }
 }

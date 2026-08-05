@@ -137,10 +137,10 @@ namespace WasteCity.Building
         }
         public bool ContainsFootprint(BuildingDefinition definition, int x, int y, BuildingOrientation orientation = BuildingOrientation.North)
         {
-            if (definition == null) return false;
+            if (definition == null || !BuildingOrientationRules.IsValid(orientation)) return false;
             return x >= 0 && y >= 0
-                && x + BuildingOrientationRules.Width(definition, orientation) <= Width
-                && y + BuildingOrientationRules.Height(definition, orientation) <= Height;
+                && (long)x + BuildingOrientationRules.Width(definition, orientation) <= Width
+                && (long)y + BuildingOrientationRules.Height(definition, orientation) <= Height;
         }
         public bool IsOccupied(int x, int y)
         {

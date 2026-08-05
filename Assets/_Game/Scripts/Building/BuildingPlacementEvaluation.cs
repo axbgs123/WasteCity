@@ -156,7 +156,14 @@ namespace WasteCity.Building
                 rotatedHeight = BuildingOrientationRules.Height(request.Definition, request.Orientation);
                 for (var dx = 0; dx < rotatedWidth; dx++)
                     for (var dy = 0; dy < rotatedHeight; dy++)
-                        footprint.Add(new BuildingCell(request.X + dx, request.Y + dy));
+                    {
+                        var cellX = (long)request.X + dx;
+                        var cellY = (long)request.Y + dy;
+                        if (cellX < int.MinValue || cellX > int.MaxValue ||
+                            cellY < int.MinValue || cellY > int.MaxValue)
+                            continue;
+                        footprint.Add(new BuildingCell((int)cellX, (int)cellY));
+                    }
             }
 
             if (!request.ProjectionSucceeded) failures.Add(BuildingPlacementFailure.ProjectionFailed);
