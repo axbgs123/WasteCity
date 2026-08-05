@@ -1,11 +1,16 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
+using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 
 namespace WasteCity.Tests
@@ -253,6 +258,76 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Session_CopyPlayerOwnedGroundInstancesFiltersAndOrdersStableIds()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D firstGround = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, presentation);
+            Begin(
+                session, BuildingCatalog.Housing, BuildingSite.InnerCity,
+                1, 1, presentation);
+            GrayboxBuildingInstance3D abandonedGround = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, presentation);
+            GrayboxBuildingInstance3D lastGround = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                14, 10, presentation);
+            BuildingEvacuationWork abandon = BuildingEvacuationRules.Create(
+                abandonedGround.StableInstanceId,
+                abandonedGround.Placement.Definition.Cost,
+                abandonedGround.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { abandon }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryCommitEvacuation(
+                abandon, presentation, out _, out string commitFailure),
+                Is.True, commitFailure);
+            var destination = new List<GrayboxBuildingInstance3D>
+            {
+                abandonedGround
+            };
+            ReverseSessionInstances(session);
+
+            session.CopyPlayerOwnedGroundInstances(destination);
+
+            Assert.That(session.HasPlayerOwnedGroundInstances, Is.True);
+            Assert.That(
+                destination.Select(instance => instance.StableInstanceId),
+                Is.EqualTo(new[]
+                {
+                    firstGround.StableInstanceId,
+                    lastGround.StableInstanceId
+                }));
+        }
+
+        [Test]
+        public void Controller_OwnedGroundKeepsFortressAndOpensFilteredManifest()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D ground = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            Begin(
+                fixture.Session, BuildingCatalog.Housing,
+                BuildingSite.InnerCity, 1, 1, fixture.Presentation);
+
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.QuickDismantle), Is.EqualTo(1));
+            Assert.That(fixture.Controller.Assign(
+                ground.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+        }
+
+        [Test]
         public void Controller_LocksFullQueueBeforeTimerAndPauseDoesNotAdvanceIt()
         {
             EvacuationFixture fixture = CreateFixture();
@@ -385,6 +460,185 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Controller_FullFailureRestoresEveryCountedLockAndReopensManifest()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D first = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+            fixture.Session.SetConstructionMultiplierForDevelopment(100f);
+            fixture.Session.TickConstruction(
+                .1f, CityMode.Fortress, false, fixture.Presentation);
+            uint revisionBeforeConfirmation = fixture.Session.CatalogRevision;
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(fixture.Session.CatalogRevision,
+                Is.EqualTo(revisionBeforeConfirmation + 2));
+            Assert.That(first.IsEvacuationLocked, Is.True);
+            Assert.That(second.IsEvacuationLocked, Is.True);
+            SetEvacuationPresentation(
+                fixture.Controller,
+                new FailingPresentation { ThrowRemove = true });
+
+            Assert.Throws<InvalidOperationException>(() =>
+                fixture.Controller.Tick(20f, false));
+
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(first.IsEvacuationLocked, Is.False);
+            Assert.That(second.IsEvacuationLocked, Is.False);
+            Assert.That(fixture.Session.CompletedBuildingCount(
+                BuildingCatalog.Wall.Id.Value), Is.EqualTo(2));
+            Assert.That(fixture.Session.CatalogRevision,
+                Is.EqualTo(revisionBeforeConfirmation + 4));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+        }
+
+        [Test]
+        public void Controller_FullRestoreFailureSurfacesCompoundAfterAllLockCleanup()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D first = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+            fixture.Session.SetConstructionMultiplierForDevelopment(100f);
+            fixture.Session.TickConstruction(
+                .1f, CityMode.Fortress, false, fixture.Presentation);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            var presentation = new FailingPresentation
+            {
+                ThrowRemove = true,
+                ThrowCreate = true
+            };
+            SetEvacuationPresentation(fixture.Controller, presentation);
+
+            InvalidOperationException thrown =
+                Assert.Throws<InvalidOperationException>(() =>
+                    fixture.Controller.Tick(20f, false));
+
+            Assert.That(thrown.Message, Does.Contain("restore presentation"));
+            var compound = thrown.InnerException as AggregateException;
+            Assert.That(compound, Is.Not.Null);
+            Assert.That(compound.InnerExceptions,
+                Does.Contain(presentation.RemoveFailure));
+            Assert.That(compound.InnerExceptions,
+                Does.Contain(presentation.CreateFailure));
+            Assert.That(first.IsEvacuationLocked, Is.False);
+            Assert.That(second.IsEvacuationLocked, Is.False);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+        }
+
+        [Test]
+        public void Controller_FullCommitConsumesLockAndPackingReturnsCoordinatorOnce()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D ground = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            var leaderObject = new GameObject("evacuation-leader");
+            cleanup.Add(leaderObject);
+            var leader = leaderObject.AddComponent<GrayboxLeaderController3D>();
+            leader.Configure(null, fixture.City, true);
+            var coordinatorObject = new GameObject("evacuation-coordinator");
+            cleanup.Add(coordinatorObject);
+            var coordinator =
+                coordinatorObject.AddComponent<GrayboxDirectControlCoordinator>();
+            coordinator.Configure(fixture.City, leader);
+            Assert.That(coordinator.Refresh(), Is.True);
+            Assert.That(coordinator.ControlTarget,
+                Is.EqualTo(DirectControlTarget.Leader));
+            var targetChanges = new List<DirectControlTarget>();
+            coordinator.TargetChanged += targetChanges.Add;
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(1));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            BuildingEvacuationWork snapshot = fixture.Controller.Work[0];
+
+            fixture.Controller.Tick(20f, false);
+
+            Assert.That(fixture.Session.Instances.Contains(ground), Is.False);
+            Assert.That(ground.IsEvacuationLocked, Is.False);
+            AssertEvacuationWorkConsumed(
+                fixture.Session,
+                ground.StableInstanceId);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(fixture.City.LastFailureReason, Is.Empty);
+            Assert.That(coordinator.Refresh(), Is.True);
+            Assert.That(coordinator.ControlTarget,
+                Is.EqualTo(DirectControlTarget.City));
+            Assert.That(targetChanges,
+                Is.EqualTo(new[] { DirectControlTarget.City }));
+            fixture.Controller.Tick(20f, false);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(fixture.City.LastFailureReason, Is.Empty);
+            Assert.That(coordinator.Refresh(), Is.False);
+            Assert.That(targetChanges, Has.Count.EqualTo(1));
+            Assert.That(fixture.Session.TryCommitEvacuation(
+                snapshot, fixture.Presentation, out _, out string failure),
+                Is.False);
+            Assert.That(failure, Is.Not.Empty);
+        }
+
+        [Test]
+        public void Menu_UpdateRestoresDependentCardAfterControllerFailureCleanup()
+        {
+            EvacuationFixture fixture = CreateFixture(configureMenu: true);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Smelter.RequiredResearchId);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Assembler.RequiredResearchId);
+            GrayboxBuildingInstance3D smelter = Begin(
+                fixture.Session, BuildingCatalog.Smelter, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.SetConstructionMultiplierForDevelopment(100f);
+            fixture.Session.TickConstruction(
+                .1f, CityMode.Fortress, false, fixture.Presentation);
+            InvokeMenuUpdate(fixture.Menu);
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Assert.That(FindButton(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
+                Is.True);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.Assign(
+                smelter.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            InvokeMenuUpdate(fixture.Menu);
+            Assert.That(FindButton(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
+                Is.False);
+            SetEvacuationPresentation(
+                fixture.Controller,
+                new FailingPresentation { ThrowRemove = true });
+
+            Assert.Throws<InvalidOperationException>(() =>
+                fixture.Controller.Tick(20f, false));
+            InvokeMenuUpdate(fixture.Menu);
+
+            Assert.That(FindButton(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
+                Is.True);
+        }
+
+        [Test]
         public void Controller_CategorySingleAndAllAssignmentsCanMix()
         {
             EvacuationFixture fixture = CreateFixture();
@@ -449,7 +703,7 @@ namespace WasteCity.Tests
             return session;
         }
 
-        private EvacuationFixture CreateFixture()
+        private EvacuationFixture CreateFixture(bool configureMenu = false)
         {
             var session = CreateSession();
             var cityObject = new GameObject("evacuation-city");
@@ -476,11 +730,98 @@ namespace WasteCity.Tests
             var menuObject = new GameObject("evacuation-menu");
             cleanup.Add(menuObject);
             var menu = menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            Canvas canvas = null;
+            GrayboxBuildingInteractionModel3D interaction = null;
+            if (configureMenu)
+            {
+                var eventObject = new GameObject("evacuation-event-system");
+                cleanup.Add(eventObject);
+                var eventSystem = eventObject.AddComponent<EventSystem>();
+                var canvasObject = new GameObject("evacuation-canvas");
+                cleanup.Add(canvasObject);
+                canvas = canvasObject.AddComponent<Canvas>();
+                var interactionObject =
+                    new GameObject("evacuation-interaction");
+                cleanup.Add(interactionObject);
+                interaction = interactionObject
+                    .AddComponent<GrayboxBuildingInteractionModel3D>();
+                menu.Configure(canvas, eventSystem, session, interaction);
+            }
             var controllerObject = new GameObject("evacuation-controller");
             cleanup.Add(controllerObject);
             var controller = controllerObject.AddComponent<GrayboxEvacuationController3D>();
             controller.Configure(session, city, presentation, menu);
-            return new EvacuationFixture(session, city, presentation, controller);
+            return new EvacuationFixture(
+                session,
+                city,
+                presentation,
+                controller,
+                menu,
+                canvas,
+                interaction);
+        }
+
+        private static void SetEvacuationPresentation(
+            GrayboxEvacuationController3D controller,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            FieldInfo field = typeof(GrayboxEvacuationController3D).GetField(
+                "evacuationPresentation",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null,
+                "Controller must retain the presentation through its interface boundary.");
+            field.SetValue(controller, presentation);
+        }
+
+        private static void ReverseSessionInstances(
+            GrayboxBuildingSession3D session)
+        {
+            FieldInfo field = typeof(GrayboxBuildingSession3D).GetField(
+                "instances",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var instances =
+                field.GetValue(session) as List<GrayboxBuildingInstance3D>;
+            Assert.That(instances, Is.Not.Null);
+            instances.Reverse();
+        }
+
+        private static void AssertEvacuationWorkConsumed(
+            GrayboxBuildingSession3D session,
+            string stableInstanceId)
+        {
+            foreach (string fieldName in new[]
+                     {
+                         "evacuationLocks",
+                         "evacuationSnapshots"
+                     })
+            {
+                FieldInfo field = typeof(GrayboxBuildingSession3D).GetField(
+                    fieldName,
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                var values = field.GetValue(session) as IDictionary;
+                Assert.That(values, Is.Not.Null);
+                Assert.That(values.Contains(stableInstanceId), Is.False,
+                    fieldName + " retained consumed Full work.");
+            }
+        }
+
+        private static void InvokeMenuUpdate(GrayboxBuildingMenuView3D menu)
+        {
+            typeof(GrayboxBuildingMenuView3D).GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(menu, null);
+        }
+
+        private static Button FindButton(Transform root, string name)
+        {
+            Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
+            for (var index = 0; index < transforms.Length; index++)
+                if (transforms[index].name == name)
+                    return transforms[index].GetComponent<Button>();
+            return null;
         }
 
         private static GrayboxBuildingInstance3D Begin(
@@ -520,11 +861,20 @@ namespace WasteCity.Tests
         private sealed class FailingPresentation : IGrayboxBuildingPresentation3D
         {
             public bool ThrowRemove { get; set; }
-            public bool TryCreate(GrayboxBuildingInstance3D instance) => true;
+            public bool ThrowCreate { get; set; }
+            public InvalidOperationException RemoveFailure { get; } =
+                new InvalidOperationException("remove");
+            public InvalidOperationException CreateFailure { get; } =
+                new InvalidOperationException("create");
+            public bool TryCreate(GrayboxBuildingInstance3D instance)
+            {
+                if (ThrowCreate) throw CreateFailure;
+                return true;
+            }
             public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
             public void Remove(GrayboxBuildingInstance3D instance)
             {
-                if (ThrowRemove) throw new InvalidOperationException("remove");
+                if (ThrowRemove) throw RemoveFailure;
             }
         }
 
@@ -534,18 +884,27 @@ namespace WasteCity.Tests
                 GrayboxBuildingSession3D session,
                 WasteCity.Graybox3D.GrayboxMobileCityController3D city,
                 GrayboxBuildingWorldView3D presentation,
-                GrayboxEvacuationController3D controller)
+                GrayboxEvacuationController3D controller,
+                GrayboxBuildingMenuView3D menu,
+                Canvas canvas,
+                GrayboxBuildingInteractionModel3D interaction)
             {
                 Session = session;
                 City = city;
                 Presentation = presentation;
                 Controller = controller;
+                Menu = menu;
+                Canvas = canvas;
+                Interaction = interaction;
             }
 
             public GrayboxBuildingSession3D Session { get; }
             public WasteCity.Graybox3D.GrayboxMobileCityController3D City { get; }
             public GrayboxBuildingWorldView3D Presentation { get; }
             public GrayboxEvacuationController3D Controller { get; }
+            public GrayboxBuildingMenuView3D Menu { get; }
+            public Canvas Canvas { get; }
+            public GrayboxBuildingInteractionModel3D Interaction { get; }
         }
     }
 }

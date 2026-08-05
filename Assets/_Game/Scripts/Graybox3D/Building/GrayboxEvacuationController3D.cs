@@ -13,6 +13,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxBuildingWorldView3D presentation;
         [SerializeField] private GrayboxBuildingMenuView3D menu;
+        private IGrayboxBuildingPresentation3D evacuationPresentation;
 
         private readonly List<GrayboxBuildingInstance3D> manifest =
             new List<GrayboxBuildingInstance3D>();
@@ -53,6 +54,7 @@ namespace WasteCity.Graybox3D.Building
             this.session = session;
             this.city = city;
             this.presentation = presentation;
+            evacuationPresentation = presentation;
             this.menu = menu;
             ClearProcessingState();
             if (isActiveAndEnabled) SubscribeMenu();
@@ -176,7 +178,7 @@ namespace WasteCity.Graybox3D.Building
                     if (item.Treatment == BuildingEvacuationTreatment.FullDismantle)
                         continue;
                     if (!session.TryCommitEvacuation(
-                            item, presentation, out _, out _))
+                            item, EvacuationPresentation, out _, out _))
                     {
                         FailProcessing();
                         return false;
@@ -209,7 +211,7 @@ namespace WasteCity.Graybox3D.Building
             try
             {
                 if (!session.TryCommitEvacuation(
-                        current, presentation, out _, out _))
+                        current, EvacuationPresentation, out _, out _))
                 {
                     FailProcessing();
                     return;
@@ -270,7 +272,11 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private bool IsConfigured =>
-            session != null && city != null && presentation != null && menu != null;
+            session != null && city != null &&
+            EvacuationPresentation != null && menu != null;
+
+        private IGrayboxBuildingPresentation3D EvacuationPresentation =>
+            evacuationPresentation ?? presentation;
 
         private void Update()
         {

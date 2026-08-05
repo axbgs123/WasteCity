@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
@@ -270,7 +271,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Describe_LockedCompletedPrerequisiteReturnsDependentCardToLocked()
+        public void Describe_OnlyOwnedUnlockedCompletedPrerequisiteUnlocksDependentCard()
         {
             var presenter = new GrayboxBuildingCatalogPresenter3D();
             var presentation = new CatalogPresentation();
@@ -307,6 +308,38 @@ namespace WasteCity.Tests
             session.RollbackEvacuationLocksAfterFailure(new[] { work });
             Assert.That(presenter.Describe(session, BuildingCatalog.Assembler).Visibility,
                 Is.EqualTo(BuildingCatalogVisibility.Buildable));
+
+            SetEvacuationState(
+                smelter,
+                false,
+                GrayboxBuildingInstanceState.Completed);
+            Assert.That(presenter.Describe(
+                    session,
+                    BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+
+            SetEvacuationState(
+                smelter,
+                true,
+                GrayboxBuildingInstanceState.Completed);
+            BuildingEvacuationWork abandon = BuildingEvacuationRules.Create(
+                smelter.StableInstanceId,
+                smelter.Placement.Definition.Cost,
+                smelter.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { abandon }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryCommitEvacuation(
+                abandon,
+                presentation,
+                out _,
+                out string abandonFailure), Is.True, abandonFailure);
+            Assert.That(presenter.Describe(
+                    session,
+                    BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
         }
 
         [Test]
@@ -522,6 +555,18 @@ namespace WasteCity.Tests
                 ContentRoute.BiologicalAscension,
                 ContentRoute.Psionics
             };
+        }
+
+        private static void SetEvacuationState(
+            GrayboxBuildingInstance3D instance,
+            bool playerOwned,
+            GrayboxBuildingInstanceState state)
+        {
+            MethodInfo method = typeof(GrayboxBuildingInstance3D).GetMethod(
+                "RestoreEvacuationState",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(instance, new object[] { playerOwned, state });
         }
 
         private readonly struct CatalogExpectation

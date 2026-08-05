@@ -754,6 +754,7 @@ namespace WasteCity.Graybox3D.Building
                 acceptedRefund = Inventory.Add(
                     instance.Placement.Definition.CostId,
                     work.Refund);
+                instance.SetEvacuationLocked(false);
                 instances.RemoveAt(instanceIndex);
                 evacuationLocks.Remove(work.StableInstanceId);
                 evacuationSnapshots.Remove(work.StableInstanceId);

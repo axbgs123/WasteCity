@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
@@ -1109,6 +1110,132 @@ namespace WasteCity.Tests
             Assert.That(session.GroundGrid.IsOccupied(12, 10), Is.True);
         }
 
+        [Test]
+        public void CompletedBuildingCount_CoversEveryOwnershipSiteAndDismantlePermutation()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            Begin(
+                session, BuildingCatalog.Housing, BuildingSite.InnerCity,
+                CityMode.Fortress, 1, 1, presentation);
+            GrayboxBuildingInstance3D nonOwnedCompleted = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 12, 10, presentation);
+            GrayboxBuildingInstance3D ruin = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 14, 10, presentation);
+            GrayboxBuildingInstance3D currentFull = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 16, 10, presentation);
+            GrayboxBuildingInstance3D laterLocked = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 18, 10, presentation);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(
+                .1f, CityMode.Fortress, false, presentation);
+            SetEvacuationState(
+                nonOwnedCompleted,
+                false,
+                GrayboxBuildingInstanceState.Completed);
+            BuildingEvacuationWork abandon = BuildingEvacuationRules.Create(
+                ruin.StableInstanceId,
+                ruin.Placement.Definition.Cost,
+                ruin.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { abandon }, out string abandonCaptureFailure),
+                Is.True, abandonCaptureFailure);
+            Assert.That(session.TryCommitEvacuation(
+                abandon, presentation, out _, out string abandonFailure),
+                Is.True, abandonFailure);
+            BuildingEvacuationWork currentWork =
+                BuildingEvacuationRules.Create(
+                    currentFull.StableInstanceId,
+                    currentFull.Placement.Definition.Cost,
+                    currentFull.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.FullDismantle);
+            BuildingEvacuationWork laterWork =
+                BuildingEvacuationRules.Create(
+                    laterLocked.StableInstanceId,
+                    laterLocked.Placement.Definition.Cost,
+                    laterLocked.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { currentWork, laterWork }, out string fullCaptureFailure),
+                Is.True, fullCaptureFailure);
+            Assert.That(session.TryLockEvacuationWork(
+                new[] { currentWork, laterWork }, out string lockFailure),
+                Is.True, lockFailure);
+
+            Assert.That(nonOwnedCompleted.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(nonOwnedCompleted.IsPlayerOwned, Is.False);
+            Assert.That(ruin.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(currentFull.IsEvacuationLocked, Is.True);
+            Assert.That(laterLocked.IsEvacuationLocked, Is.True);
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.Wall.Id.Value), Is.EqualTo(1));
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.Housing.Id.Value), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AbandonedRuinCannotReenterSessionOperationsButKeepsGridOccupied()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D ruin = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            BuildingEvacuationWork abandon = BuildingEvacuationRules.Create(
+                ruin.StableInstanceId,
+                ruin.Placement.Definition.Cost,
+                ruin.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { abandon }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryCommitEvacuation(
+                abandon, presentation, out int refund, out string commitFailure),
+                Is.True, commitFailure);
+            float remainingAfterAbandon = ruin.Progress.Remaining;
+
+            session.TickConstruction(
+                100f, CityMode.Fortress, false, presentation);
+            var ownedGround = new List<GrayboxBuildingInstance3D>();
+            session.CopyPlayerOwnedGroundInstances(ownedGround);
+            BuildingEvacuationWork attemptedRecovery =
+                BuildingEvacuationRules.Create(
+                    ruin.StableInstanceId,
+                    ruin.Placement.Definition.Cost,
+                    ruin.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.QuickDismantle);
+
+            Assert.That(refund, Is.Zero);
+            Assert.That(ruin.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(ruin.Progress.Remaining,
+                Is.EqualTo(remainingAfterAbandon));
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.Wall.Id.Value), Is.Zero);
+            Assert.That(session.HasPlayerOwnedGroundInstances, Is.False);
+            Assert.That(ownedGround, Is.Empty);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { attemptedRecovery }, out string recoveryFailure),
+                Is.False);
+            Assert.That(recoveryFailure, Is.Not.Empty);
+            Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.True);
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var gameObject = new GameObject("graybox-building-session-test");
@@ -1126,6 +1253,18 @@ namespace WasteCity.Tests
                 "CatalogRevision");
             Assert.That(property, Is.Not.Null);
             return (uint)property.GetValue(session);
+        }
+
+        private static void SetEvacuationState(
+            GrayboxBuildingInstance3D instance,
+            bool playerOwned,
+            GrayboxBuildingInstanceState state)
+        {
+            MethodInfo method = typeof(GrayboxBuildingInstance3D).GetMethod(
+                "RestoreEvacuationState",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(instance, new object[] { playerOwned, state });
         }
 
         private static GrayboxBuildingInstance3D Begin(
