@@ -294,6 +294,22 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void OutOfBoundsPrecedesInvalidCityModeForMobileGroundConstruction()
+        {
+            var evaluation = BuildingPlacementRules.Evaluate(
+                CreateRequest(x: 31, y: 31, cityX: 30, cityY: 30, cityMode: CityMode.Mobile));
+
+            Assert.That(evaluation.PrimaryFailure, Is.EqualTo(BuildingPlacementFailure.OutOfBounds));
+            Assert.That(
+                evaluation.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.OutOfBounds,
+                    BuildingPlacementFailure.InvalidCityMode
+                }));
+        }
+
+        [Test]
         public void CompatibleMiningNodeIsExposedOnlyForCompatibleMiningPlacement()
         {
             var mining = new BuildingDefinition("test.building.node", "Node", 2, 2, ResourceIds.Alloy, 1, true);
