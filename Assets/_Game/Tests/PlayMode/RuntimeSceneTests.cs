@@ -101,6 +101,7 @@ namespace WasteCity.Tests.PlayMode
             data.iron = 250;
             data.population = 100;
             data.populationCapacity = 200;
+            data.cityMode = (int)CityMode.Fortress;
             data.buildings = new[]
             {
                 new BuildingSnapshot { definitionId = BuildingCatalog.Housing.Id.Value, x = 0, y = 0, health = 250, constructionRemaining = 0f },
@@ -1203,6 +1204,7 @@ namespace WasteCity.Tests.PlayMode
             item.AddComponent<HealthComponent>();
             var runtime = item.AddComponent<BuildingRuntime>();
             runtime.Configure(definition, economy);
+            runtime.RestoreState(runtime.Health.Value.Maximum, 0f);
             var turret = item.AddComponent<PlaceholderTurret>();
             turret.Configure(economy, runtime, null, modifier, research);
             return item;

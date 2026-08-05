@@ -22,6 +22,7 @@ namespace WasteCity.Building
         private FormalEconomyController economy;
         private FormalPopulationController population;
         private bool effectApplied;
+        private bool completionNotified;
         private IProductivitySource productivity;
         private SpriteRenderer visual;
         private bool suppressRemoval;
@@ -32,11 +33,16 @@ namespace WasteCity.Building
         public ConstructionProgress Construction { get; private set; }
         public RepairProcess Repair { get; private set; }
         public bool HasLogistics { get; private set; } = true;
+        public BuildingSite Site { get; private set; } = BuildingSite.Ground;
+        public bool IsOperational => Construction != null &&
+                                     Construction.IsComplete &&
+                                     HasLogistics &&
+                                     (city == null || BuildingMobilityRules.CanOperate(Definition, Site, city.Deployment.Mode));
         public event Action<BuildingRuntime> Completed;
         public event Action<BuildingRuntime> Removed;
-        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null, ILocalTimeScaleSource localTime = null, PlaceholderMobileCity city = null, ResearchController research = null)
+        public void Configure(BuildingDefinition definition, FormalEconomyController economy = null, FormalPopulationController population = null, IProductivitySource productivity = null, ILocalTimeScaleSource localTime = null, PlaceholderMobileCity city = null, ResearchController research = null, BuildingSite site = BuildingSite.Ground)
         {
-            Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; this.localTime = localTime; this.city=city; this.research=research; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
+            Definition = definition; this.economy = economy; this.population = population; this.productivity = productivity; this.localTime = localTime; this.city=city; this.research=research; Site=site; visual = GetComponent<SpriteRenderer>(); Health = GetComponent<HealthComponent>();
             Health.Configure(RouteTechnologyEffects.BuildingMaximumHealth(definition.MaximumHealth,research!=null&&research.HasAlloyArmor), definition.Id.Value == "core.building.wall" ? ArmorType.Heavy : ArmorType.Light);
             Health.Value.Died += () => Destroy(gameObject);
             Construction = new ConstructionProgress(definition.BuildSeconds);
@@ -46,28 +52,38 @@ namespace WasteCity.Building
         private void Update()
         {
             SyncResearchEffects();
-            if(Construction != null && Construction.IsComplete && research != null)regeneration.Tick(Time.deltaTime,Definition.Id.Value=="core.building.wall",research.HasTissueRegeneration,research.HasCarapaceGrowth,Health.Value,economy?.Inventory);
-            if(city!=null&&!city.LongWorkAllowed)return;
+            SyncOperationalEffect();
+            if(IsOperational && research != null)regeneration.Tick(Time.deltaTime,Definition.Id.Value=="core.building.wall",research.HasTissueRegeneration,research.HasCarapaceGrowth,Health.Value,economy?.Inventory);
             float multiplier = (productivity?.ConstructionMultiplier ?? 1f) * (localTime?.MultiplierFor(this) ?? 1f);
-            if (Construction != null && !Construction.IsComplete) { if (Construction.Tick(Time.deltaTime, multiplier)) FinishConstruction(); return; }
-            if (Repair != null && !Repair.IsComplete && Repair.Tick(Time.deltaTime, multiplier)) { Health.Value.Heal(Repair.HealAmount); Repair = null; }
+            if (Construction != null && !Construction.IsComplete)
+            {
+                if ((city == null || BuildingMobilityRules.CanConstruct(Definition, Site, city.Deployment.Mode)) && Construction.Tick(Time.deltaTime, multiplier)) FinishConstruction();
+                return;
+            }
+            if (IsOperational && Repair != null && !Repair.IsComplete && Repair.Tick(Time.deltaTime, multiplier)) { Health.Value.Heal(Repair.HealAmount); Repair = null; }
         }
-        private void FinishConstruction() { if (effectApplied) return; if(HasLogistics){ApplyEffect(1);effectApplied=true;} if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this); }
+        private void FinishConstruction() { if (completionNotified) return; completionNotified=true;SyncOperationalEffect();if (visual != null) visual.color = Color.Lerp(visual.color, Color.white, .35f); Completed?.Invoke(this); }
         public bool TryStartRepair()
         {
-            if (!Construction.IsComplete || !HasLogistics || Repair != null || Health.Value.Current >= Health.Value.Maximum || economy == null || !economy.Inventory.TrySpend(ResourceIds.Biomass, 1)) return false;
+            if (!IsOperational || Repair != null || Health.Value.Current >= Health.Value.Maximum || economy == null || !economy.Inventory.TrySpend(ResourceIds.Biomass, 1)) return false;
             Repair = new RepairProcess(); return true;
         }
         public void RestoreState(int health, float remaining, float repairRemaining = 0f, int shield = 0) { Health.Value.Restore(health,shield); Construction.Restore(remaining); if (Construction.IsComplete) FinishConstruction(); if (repairRemaining > 0f) { Repair = new RepairProcess(); Repair.Restore(repairRemaining); } }
         public void PrepareForRestore() { if (effectApplied) { ApplyEffect(-1); effectApplied = false; } Removed?.Invoke(this); suppressRemoval = true; }
         public void PrepareForUpgrade(){if(effectApplied){ApplyEffect(-1);effectApplied=false;}suppressRemoval=true;}
         public void SetLocalTimeSource(ILocalTimeScaleSource value) => localTime = value;
-        public void SetLogistics(bool connected){if(HasLogistics==connected)return;HasLogistics=connected;if(!Construction.IsComplete)return;if(connected&&!effectApplied){ApplyEffect(1);effectApplied=true;}else if(!connected&&effectApplied){ApplyEffect(-1);effectApplied=false;}}
+        public void SetLogistics(bool connected){if(HasLogistics==connected)return;HasLogistics=connected;SyncOperationalEffect();}
         private void OnDestroy() { if (effectApplied) ApplyEffect(-1); if (!suppressRemoval) Removed?.Invoke(this); }
         private void ApplyEffect(int direction)
         {
             if (Definition.Id.Value == "core.building.housing") population?.AddCapacity(50 * direction);
             if (Definition.Id.Value == "core.building.warehouse") economy?.Inventory.AddCapacity(150 * direction);
+        }
+        private void SyncOperationalEffect()
+        {
+            bool shouldApply=IsOperational;
+            if(shouldApply&&!effectApplied){ApplyEffect(1);effectApplied=true;}
+            else if(!shouldApply&&effectApplied){ApplyEffect(-1);effectApplied=false;}
         }
         private void SyncResearchEffects()
         {
@@ -89,7 +105,7 @@ namespace WasteCity.Building
         public void SetCombatModifierSource(ITurretCombatModifierSource value)=>combatModifier=value;
         private void Update()
         {
-            if (economy == null || runtime == null || !runtime.HasLogistics) return;infectionEmitter.Tick(Time.deltaTime,false);swordIntentEmitter.Tick(Time.deltaTime,false); PlaceholderEnemy nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f)*RouteTechnologyEffects.TowerRangeMultiplier(runtime.Definition.Id.Value,research!=null&&research.HasSwordRiding);float best = range*range;
+            if (economy == null || runtime == null || !runtime.IsOperational) return;infectionEmitter.Tick(Time.deltaTime,false);swordIntentEmitter.Tick(Time.deltaTime,false); PlaceholderEnemy nearest = null; bool physical=profile.DamageType==DamageType.Physical;float range=profile.Range*(physical?(research?.TurretRangeMultiplier??1f):1f)*RouteTechnologyEffects.TowerRangeMultiplier(runtime.Definition.Id.Value,research!=null&&research.HasSwordRiding);float best = range*range;
             foreach (var enemy in UnityEngine.Object.FindObjectsOfType<PlaceholderEnemy>())
             { var health = enemy.GetComponent<HealthComponent>(); if (enemy.IsControlled||health.Value.IsDead) continue; float sqr = ((Vector2)(enemy.transform.position - transform.position)).sqrMagnitude; if (sqr < best) { best = sqr; nearest = enemy; } }
             if (nearest != null)
@@ -110,7 +126,7 @@ namespace WasteCity.Building
         public void Configure(BuildingRuntime building) => runtime = building;
         private void Update()
         {
-            if(runtime==null||!runtime.HasLogistics||!pulse.Tick(Time.deltaTime))return;
+            if(runtime==null||!runtime.IsOperational||!pulse.Tick(Time.deltaTime))return;
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
                 if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)building.Health.Value.GrantShield(25,100);
         }
@@ -127,7 +143,7 @@ namespace WasteCity.Building
         private void Update()
         {
             repairVisualAngle+=Time.deltaTime*90f;if(repairMarker!=null)repairMarker.transform.localPosition=new Vector3(Mathf.Cos(repairVisualAngle*Mathf.Deg2Rad)*.8f,Mathf.Sin(repairVisualAngle*Mathf.Deg2Rad)*.8f,-.15f);
-            if(runtime==null||!runtime.HasLogistics||!repair.Tick(Time.deltaTime))return;
+            if(runtime==null||!runtime.IsOperational||!repair.Tick(Time.deltaTime))return;
             foreach(var building in UnityEngine.Object.FindObjectsOfType<BuildingRuntime>())
                 if(building.Construction.IsComplete&&((Vector2)(building.transform.position-transform.position)).sqrMagnitude<=36f)repair.Repair(building.Health.Value);
         }

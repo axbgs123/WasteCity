@@ -54,7 +54,7 @@ namespace WasteCity.World
             bayStates.Clear();
             foreach (BuildingRuntime runtime in Object.FindObjectsOfType<BuildingRuntime>())
                 if (runtime.Definition != null && runtime.Definition.Id.Value == BuildingCatalog.AutomatedRepairBay.Id.Value)
-                    bayStates.Add(new DroneBayState(runtime.Construction.IsComplete, runtime.HasLogistics));
+                    bayStates.Add(new DroneBayState(runtime.Construction.IsComplete, runtime.IsOperational));
 
             int targetCount = ScoutDroneDeploymentRules.ActiveCount(
                 research != null && research.HasUnmannedSystems,

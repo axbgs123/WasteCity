@@ -123,6 +123,7 @@ namespace WasteCity.Content
         {
             if (definition == null) return "无效建筑";
             return $"{definition.Name} [{RouteName(BuildingRoute(definition))}]\n" +
+                   $"位置：{BuildingMobilityRules.PlacementName(definition.Placement)} · 运行：{BuildingMobilityRules.OperationName(definition.Operation)}\n" +
                    $"成本：{ResourceName(definition.CostId)} {definition.Cost} · 尺寸：{definition.Width}×{definition.Height} · 建造：{definition.BuildSeconds:0.#}秒 · 耐久：{definition.MaximumHealth}\n" +
                    $"功能：{BuildingFunction(definition)}\n" +
                    $"解锁：{BuildingUnlockSummary(definition)}";

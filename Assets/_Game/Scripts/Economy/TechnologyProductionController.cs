@@ -42,7 +42,7 @@ namespace WasteCity.Economy
 
         private void Update()
         {
-            var runtimes=UnityEngine.Object.FindObjectsOfType<BuildingRuntime>().Where(value=>value.Construction.IsComplete&&value.HasLogistics).ToArray();
+            var runtimes=UnityEngine.Object.FindObjectsOfType<BuildingRuntime>().Where(value=>value.IsOperational).ToArray();
             var activeMining=runtimes.Where(value=>value.Definition.Id.Value=="core.building.mining-station").ToArray();
             int productionUnits=legacyEffects?.Model?.ProductionUnits(activeMining.Length)??activeMining.Length;
             int bonusUnits=Mathf.Max(0,productionUnits-activeMining.Length);ActiveMines=DepletedMines=FullMines=0;

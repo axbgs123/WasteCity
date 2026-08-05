@@ -40,10 +40,10 @@ namespace WasteCity.Combat
         {
             HandleRallyInput();
             if (city == null || buildings == null || economy == null || !city.LongWorkAllowed) return;
-            int workshops = buildings.CompletedCount(BuildingCatalog.PuppetWorkshop.Id.Value);
+            int workshops = buildings.OperationalCount(BuildingCatalog.PuppetWorkshop.Id.Value);
             int produced = fabrication.Tick(Time.deltaTime, workshops, PuppetCount, economy.Inventory);
             for (int i = 0; i < produced; i++) SpawnPuppet();
-            int pens = buildings.CompletedCount(BuildingCatalog.BehemothPen.Id.Value);
+            int pens = buildings.OperationalCount(BuildingCatalog.BehemothPen.Id.Value);
             int bred = breeding.Tick(Time.deltaTime, pens, BehemothCount, economy.Inventory);
             for (int i = 0; i < bred; i++) SpawnBehemoth();
         }
@@ -163,8 +163,8 @@ namespace WasteCity.Combat
 
         private void OnGUI()
         {
-            int workshops = buildings == null ? 0 : buildings.CompletedCount(BuildingCatalog.PuppetWorkshop.Id.Value);
-            int pens = buildings == null ? 0 : buildings.CompletedCount(BuildingCatalog.BehemothPen.Id.Value);
+            int workshops = buildings == null ? 0 : buildings.OperationalCount(BuildingCatalog.PuppetWorkshop.Id.Value);
+            int pens = buildings == null ? 0 : buildings.OperationalCount(BuildingCatalog.BehemothPen.Id.Value);
             if (workshops > 0) GUI.Box(new Rect(Screen.width - 230f, 174f, 215f, 52f), $"傀儡 {PuppetCount}/{fabrication.Capacity(workshops)}\n制造进度 {fabrication.Progress:0.0}/{PuppetFabricationModel.SecondsPerUnit:0}s");
             if (pens > 0) GUI.Box(new Rect(Screen.width - 230f, 232f, 215f, 52f), $"巨兽 {BehemothCount}/{breeding.Capacity(pens)}\n培育进度 {breeding.Progress:0.0}/{BehemothBreedingModel.SecondsPerUnit:0}s");
             string rally = Commands.HasFixedRally ? "固定集结点" : "跟随移动城市";

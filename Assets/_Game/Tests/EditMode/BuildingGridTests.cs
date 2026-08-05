@@ -40,5 +40,39 @@ namespace WasteCity.Tests
             Assert.That(restored.Definition.Id.Value, Is.EqualTo("core.building.housing")); Assert.That(inventory.Get(ResourceIds.Alloy), Is.Zero);
             Assert.That(grid.TryRestore(BuildingCatalog.All[1], 2, 2, out _), Is.False);
         }
+
+        [Test]
+        public void ExistingPlacementCallsDefaultToGround()
+        {
+            var grid = new BuildingGrid(8, 8);
+
+            Assert.That(
+                grid.TryRestore(BuildingCatalog.Housing, 1, 1, out var placed),
+                Is.True);
+
+            Assert.That(placed.Site, Is.EqualTo(BuildingSite.Ground));
+        }
+
+        [Test]
+        public void UnsupportedSiteIsRejectedBeforeResourcesAreSpent()
+        {
+            var inventory = new ResourceInventory(100);
+            inventory.Add(ResourceIds.Stone, 20);
+            var grid = new BuildingGrid(8, 8);
+
+            Assert.That(
+                grid.TryPlace(
+                    BuildingCatalog.Smelter,
+                    1,
+                    1,
+                    inventory,
+                    false,
+                    out _,
+                    BuildingSite.InnerCity),
+                Is.False);
+
+            Assert.That(inventory.Get(ResourceIds.Stone), Is.EqualTo(20));
+            Assert.That(grid.Count, Is.Zero);
+        }
     }
 }

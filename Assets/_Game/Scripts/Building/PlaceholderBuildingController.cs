@@ -83,7 +83,7 @@ namespace WasteCity.Building
             item.transform.localScale = new Vector3(placed.Definition.Width * 0.9f, placed.Definition.Height * 0.9f, 1f);
             var renderer = item.AddComponent<SpriteRenderer>(); renderer.sprite = square; renderer.sortingOrder = 8; renderer.color = ColorFor(placed.Definition.Id.Value);
             VisualSlot.Attach(item, placed.Definition.Id.Value, renderer, renderer.color);
-            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime, city, research);
+            item.AddComponent<HealthComponent>(); var runtime = item.AddComponent<BuildingRuntime>(); runtime.Configure(placed.Definition, economy, population, population, localTime, city, research, placed.Site);
             placements[runtime] = placed;
             runtime.Completed += OnCompleted; runtime.Removed += OnRemoved;
             if (health >= 0) runtime.RestoreState(health, remaining, repairRemaining, shield);
@@ -100,7 +100,7 @@ namespace WasteCity.Building
             BuildingPlaced?.Invoke(runtime.Definition);
         }
         private void OnRemoved(BuildingRuntime runtime) { if (placements.TryGetValue(runtime, out var placed)) { grid.Remove(placed); placements.Remove(runtime); } if (runtime.Construction != null && runtime.Construction.IsComplete) BuildingRemoved?.Invoke(runtime.Definition); RefreshLogistics(); }
-        public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, health = pair.Key.Health.Value.Current, shield = pair.Key.Health.Value.Shield, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
+        public BuildingSnapshot[] CaptureSnapshots() => placements.Select(pair => new BuildingSnapshot { definitionId = pair.Key.Definition.Id.Value, x = pair.Value.X, y = pair.Value.Y, site = (int)pair.Value.Site, health = pair.Key.Health.Value.Current, shield = pair.Key.Health.Value.Shield, constructionRemaining = pair.Key.Construction.Remaining, repairRemaining = pair.Key.Repair?.Remaining ?? 0f }).ToArray();
         public void SetLocalTimeSource(LocalHasteController value) { localTime = value; foreach (var runtime in placements.Keys) runtime.SetLocalTimeSource(value); }
         private ITurretCombatModifierSource TurretModifier=>technology!=null?technology:leader;
         public void SetTurretFireRateSource(FormalLeaderController value){leader=value;foreach(var turret in UnityEngine.Object.FindObjectsOfType<PlaceholderTurret>())turret.SetCombatModifierSource(TurretModifier);}
@@ -116,7 +116,7 @@ namespace WasteCity.Building
             return x >= 0 && y >= 0 && x < world.Model.Width && y < world.Model.Height;
         }
         public int CompletedCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&(runtime.Definition.Id.Value==id||(id=="core.building.machine-gun-turret"&&runtime.Definition.Id.Value=="core.building.heavy-machine-gun-turret")));
-        public int OperationalCount(string id)=>placements.Keys.Count(runtime=>runtime.Construction.IsComplete&&runtime.HasLogistics&&runtime.Definition.Id.Value==id);
+        public int OperationalCount(string id)=>placements.Keys.Count(runtime=>runtime.IsOperational&&runtime.Definition.Id.Value==id);
         public bool CanBuild(BuildingDefinition definition,out string reason)
         {
             bool unlocked=BuildingUnlockModel.IsUnlocked(definition,population.Model.Current,id=>research.Model.IsCompleted(new StableId(id)),CompletedCount,out _);
@@ -154,7 +154,8 @@ namespace WasteCity.Building
             foreach (var snapshot in snapshots)
             {
                 var definition = BuildingCatalog.All.FirstOrDefault(value => value.Id.Value == snapshot.definitionId);
-                if (definition != null && grid.TryRestore(definition, snapshot.x, snapshot.y, out var placed)) CreateRuntime(placed, snapshot.health, snapshot.constructionRemaining, snapshot.repairRemaining, snapshot.shield);
+                BuildingSite site=Enum.IsDefined(typeof(BuildingSite),snapshot.site)?(BuildingSite)snapshot.site:BuildingSite.Ground;
+                if (definition != null && grid.TryRestore(definition, snapshot.x, snapshot.y, out var placed, site)) CreateRuntime(placed, snapshot.health, snapshot.constructionRemaining, snapshot.repairRemaining, snapshot.shield);
             }
         }
         private void TryRepairAtMouse()
@@ -181,5 +182,5 @@ namespace WasteCity.Building
         }
     }
     [Serializable]
-    public sealed class BuildingSnapshot { public string definitionId; public int x, y, health, shield; public float constructionRemaining, repairRemaining; }
+    public sealed class BuildingSnapshot { public string definitionId; public int x, y, site, health, shield; public float constructionRemaining, repairRemaining; }
 }

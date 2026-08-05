@@ -47,9 +47,21 @@ namespace WasteCity.Tests
                 StringAssert.Contains($"成本：{RouteContentDisplayCatalog.ResourceName(definition.CostId)} {definition.Cost}", summary, definition.Id.Value);
                 StringAssert.Contains("功能：", summary, definition.Id.Value);
                 StringAssert.Contains("解锁：", summary, definition.Id.Value);
+                StringAssert.Contains("位置：", summary, definition.Id.Value);
+                StringAssert.Contains("运行：", summary, definition.Id.Value);
                 Assert.That(summary, Does.Not.Contain("未登记功能"), definition.Id.Value);
                 AssertHasNoRawStableId(summary);
             }
+        }
+
+        [Test]
+        public void BuildingSummaryUsesApprovedFriendlyMobilityTerms()
+        {
+            string housing = RouteContentDisplayCatalog.BuildingSummary(BuildingCatalog.Housing);
+            string mining = RouteContentDisplayCatalog.BuildingSummary(BuildingCatalog.MiningStation);
+
+            StringAssert.Contains("位置：两者皆可 · 运行：移动可运行", housing);
+            StringAssert.Contains("位置：地面 · 运行：地形依赖", mining);
         }
 
         [Test]
