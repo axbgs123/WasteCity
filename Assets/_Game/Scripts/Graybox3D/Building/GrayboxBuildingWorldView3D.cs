@@ -62,6 +62,7 @@ namespace WasteCity.Graybox3D.Building
         private int previewHeight;
         private BuildingSite previewSite;
         private bool hasPreviewGeometry;
+        private bool runtimeInitialized;
 
         public int InfrastructureRendererCount =>
             infrastructure.Count +
@@ -89,8 +90,7 @@ namespace WasteCity.Graybox3D.Building
             this.infrastructureRoot = infrastructureRoot;
             this.sharedMaterial = sharedMaterial;
             this.city = city;
-            CreateGridVisuals();
-            AlignCityVisuals();
+            TryRehydrate();
         }
 
         public bool TryCreate(GrayboxBuildingInstance3D instance)
@@ -295,6 +295,17 @@ namespace WasteCity.Graybox3D.Building
                 if (visual.Instance.Placement.Site ==
                     BuildingSite.InnerCity)
                     ApplyInstanceTransform(visual);
+        }
+
+        private void Awake()
+        {
+            TryRehydrate();
+        }
+
+        private void OnEnable()
+        {
+            if (!runtimeInitialized)
+                TryRehydrate();
         }
 
         private void CreateGridVisuals()
@@ -752,22 +763,55 @@ namespace WasteCity.Graybox3D.Building
                     "Configure the graybox building view before use.");
         }
 
+        private bool TryRehydrate()
+        {
+            if (instanceRoot == null ||
+                infrastructureRoot == null ||
+                sharedMaterial == null ||
+                city == null)
+                return false;
+
+            ClearGenerated();
+            CreateGridVisuals();
+            AlignCityVisuals();
+            runtimeInitialized = true;
+            return true;
+        }
+
         private void ClearGenerated()
         {
-            foreach (Visual visual in instances.Values)
-                DestroyVisual(visual);
+            ClearOwnedChildren(instanceRoot);
+            if (infrastructureRoot != instanceRoot)
+                ClearOwnedChildren(infrastructureRoot);
             instances.Clear();
-            foreach (Visual visual in nodeHighlights.Values)
-                DestroyVisual(visual);
             nodeHighlights.Clear();
-            for (var index = 0; index < infrastructure.Count; index++)
-                DestroyVisual(infrastructure[index]);
             infrastructure.Clear();
-            if (preview != null)
-                DestroyVisual(preview);
             preview = null;
             hasPreviewGeometry = false;
             innerGrid = null;
+            runtimeInitialized = false;
+        }
+
+        private static void ClearOwnedChildren(Transform root)
+        {
+            if (root == null)
+                return;
+            for (var index = root.childCount - 1; index >= 0; index--)
+            {
+                GameObject owned = root.GetChild(index).gameObject;
+                owned.SetActive(false);
+                MeshFilter[] filters =
+                    owned.GetComponentsInChildren<MeshFilter>(true);
+                for (var filterIndex = 0;
+                     filterIndex < filters.Length;
+                     filterIndex++)
+                {
+                    Mesh mesh = filters[filterIndex].sharedMesh;
+                    filters[filterIndex].sharedMesh = null;
+                    DestroyOwned(mesh);
+                }
+                DestroyOwned(owned);
+            }
         }
 
         private static void DestroyVisual(Visual visual)

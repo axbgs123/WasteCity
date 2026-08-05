@@ -1,9 +1,11 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.TestTools;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -26,6 +28,13 @@ namespace WasteCity.Tests
                 if (cleanup[index] != null)
                     UnityEngine.Object.DestroyImmediate(cleanup[index]);
             cleanup.Clear();
+        }
+
+        [UnityTearDown]
+        public IEnumerator ExitPlayModeAfterLifecycleTest()
+        {
+            if (Application.isPlaying)
+                yield return new ExitPlayMode();
         }
 
         [Test]
@@ -445,6 +454,120 @@ namespace WasteCity.Tests
                     .GetComponentsInChildren<Transform>(true)
                     .Length,
                 Is.LessThan(20));
+        }
+
+        [Test]
+        public void WorldView_ExplicitReconfigureKeepsExactlyOneGridPerSite()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            Transform infrastructureRoot =
+                fixture.Presentation.transform.Find("infrastructure");
+
+            fixture.Presentation.Configure(
+                fixture.InstanceRoot,
+                infrastructureRoot,
+                fixture.Material,
+                fixture.City);
+
+            Assert.That(
+                infrastructureRoot
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                    .Count(
+                        value => value.StableId ==
+                        "building.grid.ground"),
+                Is.EqualTo(1));
+            Assert.That(
+                infrastructureRoot
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                    .Count(
+                        value => value.StableId ==
+                        "building.grid.inner-city"),
+                Is.EqualTo(1));
+            Assert.That(
+                fixture.Presentation.InfrastructureRendererCount,
+                Is.EqualTo(2));
+        }
+
+        [UnityTest]
+        public IEnumerator WorldView_ActiveSerializedCloneRehydratesOwnedGridsAndFollowsCity()
+        {
+            yield return new EnterPlayMode();
+            GameObject source = CreatePrefabLikePresentationRoot(
+                out Material material);
+            GameObject clone = Track(
+                UnityEngine.Object.Instantiate(source));
+            clone.name = "serialized-presentation-clone";
+            yield return null;
+
+            GrayboxBuildingWorldView3D view =
+                clone.GetComponentInChildren<GrayboxBuildingWorldView3D>();
+            GrayboxMobileCityController3D city =
+                clone.GetComponentInChildren<GrayboxMobileCityController3D>();
+            Transform infrastructureRoot =
+                view.transform.Find("infrastructure");
+            Transform instanceRoot = view.transform.Find("instances");
+            GrayboxVisualSlot[] slots =
+                infrastructureRoot
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true);
+            GrayboxVisualSlot ground = slots.Single(
+                value => value.StableId == "building.grid.ground");
+            GrayboxVisualSlot inner = slots.Single(
+                value => value.StableId == "building.grid.inner-city");
+
+            Assert.That(
+                slots.Count(
+                    value => value.StableId ==
+                    "building.grid.ground"),
+                Is.EqualTo(1));
+            Assert.That(
+                slots.Count(
+                    value => value.StableId ==
+                    "building.grid.inner-city"),
+                Is.EqualTo(1));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
+            Assert.That(instanceRoot, Is.Not.Null);
+            Assert.That(instanceRoot.childCount, Is.Zero);
+            Assert.That(
+                ground.Renderer.sharedMaterial,
+                Is.SameAs(material));
+            Assert.That(
+                inner.Renderer.sharedMaterial,
+                Is.SameAs(material));
+
+            Vector3 innerBefore = inner.transform.position;
+            Vector3 motion = new Vector3(3f, 0f, 2f);
+            city.transform.position += motion;
+            yield return null;
+
+            Assert.That(
+                inner.transform.position,
+                Is.EqualTo(innerBefore + motion));
+
+            view.ShowCompatibleResourceNode(
+                "world.resource-node.2.3",
+                2,
+                3,
+                true);
+            GrayboxVisualSlot node = infrastructureRoot
+                .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                .Single(
+                    value => value.StableId ==
+                    "building.node-highlight.world.resource-node.2.3");
+            Assert.That(
+                node.Renderer.sharedMaterial,
+                Is.SameAs(material));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(3));
+            view.ShowCompatibleResourceNode(
+                "world.resource-node.2.3",
+                2,
+                3,
+                false);
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
+
+            UnityEngine.Object.Destroy(clone);
+            UnityEngine.Object.Destroy(source);
+            yield return null;
+            yield return new ExitPlayMode();
         }
 
         [Test]
@@ -880,6 +1003,34 @@ namespace WasteCity.Tests
                 placement,
                 instanceRoot,
                 buildingMaterial);
+        }
+
+        private GameObject CreatePrefabLikePresentationRoot(
+            out Material material)
+        {
+            GameObject root =
+                Track(new GameObject("serialized-presentation-source"));
+            Transform cityRoot = NewChild(root.transform, "city");
+            GrayboxMobileCityController3D city =
+                cityRoot.gameObject
+                    .AddComponent<GrayboxMobileCityController3D>();
+            Transform presentationRoot =
+                NewChild(root.transform, "presentation");
+            Transform instances =
+                NewChild(presentationRoot, "instances");
+            Transform infrastructure =
+                NewChild(presentationRoot, "infrastructure");
+            material = Track(CreateTestMaterial());
+            GrayboxBuildingWorldView3D view =
+                presentationRoot.gameObject
+                    .AddComponent<GrayboxBuildingWorldView3D>();
+            view.Configure(
+                instances,
+                infrastructure,
+                material,
+                city);
+            NewChild(instances, "serialized-old-instance-visual");
+            return root;
         }
 
         private GrayboxBuildingSurfaceProjector3D CreateProjector(
