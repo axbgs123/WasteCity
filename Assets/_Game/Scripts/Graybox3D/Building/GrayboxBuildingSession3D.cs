@@ -402,9 +402,18 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxBuildingInstance3D instance = instances[index];
                 if (instance.State != GrayboxBuildingInstanceState.UnderConstruction)
                     continue;
+                float remainingBefore = instance.Progress.Remaining;
                 instance.Progress.Restore(0f);
                 instance.Complete();
-                presentation.UpdateInstance(instance);
+                try
+                {
+                    presentation.UpdateInstance(instance);
+                }
+                catch
+                {
+                    instance.RestoreConstruction(remainingBefore);
+                    throw;
+                }
             }
         }
 

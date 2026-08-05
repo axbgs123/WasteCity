@@ -560,6 +560,117 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CompleteAllConstructionForDevelopment_UpdateFailureRestoresAndRetriesSameInstance()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var updateFailure = new InvalidOperationException("complete-all update failed");
+            var presentation = new RecordingPresentation
+            {
+                UpdateException = updateFailure
+            };
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            instance.Progress.Restore(1.25f);
+            string stableId = instance.StableInstanceId;
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.CompleteAllConstructionForDevelopment(presentation));
+
+            Assert.That(thrown, Is.SameAs(updateFailure));
+            Assert.That(instance.StableInstanceId, Is.EqualTo(stableId));
+            Assert.That(instance.Progress.Remaining, Is.EqualTo(1.25f));
+            Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.Zero);
+            Assert.That(presentation.Updated, Is.Empty);
+
+            presentation.UpdateException = null;
+            session.CompleteAllConstructionForDevelopment(presentation);
+
+            Assert.That(instance.StableInstanceId, Is.EqualTo(stableId));
+            Assert.That(instance.Progress.IsComplete, Is.True);
+            Assert.That(instance.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.EqualTo(1));
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
+        }
+
+        [Test]
+        public void CompleteAllConstructionForDevelopment_LaterFailurePreservesCommittedAndPendingOrder()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var updateFailure = new InvalidOperationException("second update failed");
+            var presentation = new RecordingPresentation
+            {
+                UpdateException = updateFailure,
+                UpdateExceptionOnCall = 2
+            };
+            GrayboxBuildingInstance3D first = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                12,
+                10,
+                presentation);
+            GrayboxBuildingInstance3D third = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                14,
+                10,
+                presentation);
+            first.Progress.Restore(1.5f);
+            second.Progress.Restore(.75f);
+            third.Progress.Restore(.25f);
+
+            InvalidOperationException thrown = Assert.Throws<InvalidOperationException>(() =>
+                session.CompleteAllConstructionForDevelopment(presentation));
+
+            Assert.That(thrown, Is.SameAs(updateFailure));
+            Assert.That(first.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(first.Progress.Remaining, Is.Zero);
+            Assert.That(second.State, Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(second.Progress.Remaining, Is.EqualTo(.75f));
+            Assert.That(third.State, Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(third.Progress.Remaining, Is.EqualTo(.25f));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.EqualTo(1));
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { first }));
+
+            presentation.UpdateException = null;
+            session.CompleteAllConstructionForDevelopment(presentation);
+
+            Assert.That(first.StableInstanceId, Is.EqualTo("building.instance.000001"));
+            Assert.That(second.StableInstanceId, Is.EqualTo("building.instance.000002"));
+            Assert.That(third.StableInstanceId, Is.EqualTo("building.instance.000003"));
+            Assert.That(second.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(third.State, Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(
+                session.CompletedBuildingCount(BuildingCatalog.Wall.Id.Value),
+                Is.EqualTo(3));
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { first, second, third }));
+        }
+
+        [Test]
         public void CompletedBuildingCount_CountsOnlyMatchingCompletedGroundAndInnerInstances()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -836,6 +947,8 @@ namespace WasteCity.Tests
             public Exception CreateException { get; set; }
             public Exception RemoveException { get; set; }
             public Exception UpdateException { get; set; }
+            public int UpdateExceptionOnCall { get; set; } = 1;
+            private int updateCalls;
             public List<GrayboxBuildingInstance3D> Created { get; } =
                 new List<GrayboxBuildingInstance3D>();
             public List<GrayboxBuildingInstance3D> Updated { get; } =
@@ -852,7 +965,10 @@ namespace WasteCity.Tests
 
             public void UpdateInstance(GrayboxBuildingInstance3D instance)
             {
-                if (UpdateException != null) throw UpdateException;
+                updateCalls++;
+                if (UpdateException != null &&
+                    updateCalls == UpdateExceptionOnCall)
+                    throw UpdateException;
                 Updated.Add(instance);
             }
 
