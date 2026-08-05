@@ -3,6 +3,9 @@
   "references": [
     "WasteCity.Game",
     "WasteCity.Graybox3D",
+    "WasteCity.Graybox3D.Building",
+    "Unity.InputSystem",
+    "Unity.ugui",
     "Unity.RenderPipelines.Universal.Runtime"
   ],
   "optionalUnityReferences": ["TestAssemblies"],

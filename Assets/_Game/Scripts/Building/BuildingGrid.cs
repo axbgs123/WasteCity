@@ -70,22 +70,36 @@ namespace WasteCity.Building
         public int X { get; }
         public int Y { get; }
         public BuildingSite Site { get; }
-        public PlacedBuilding(BuildingDefinition definition, int x, int y, BuildingSite site = BuildingSite.Ground) { Definition = definition; X = x; Y = y; Site = site; }
+        public BuildingOrientation Orientation { get; }
+        public PlacedBuilding(BuildingDefinition definition, int x, int y, BuildingSite site = BuildingSite.Ground)
+            : this(definition, x, y, site, BuildingOrientation.North) { }
+        public PlacedBuilding(BuildingDefinition definition, int x, int y, BuildingSite site, BuildingOrientation orientation)
+        { Definition = definition; X = x; Y = y; Site = site; Orientation = orientation; }
     }
 
     public sealed class BuildingGrid
     {
         private readonly PlacedBuilding[,] cells;
         public int Count { get; private set; }
-        public BuildingGrid(int width, int height) => cells = new PlacedBuilding[Math.Max(1, width), Math.Max(1, height)];
+        public int Width { get; }
+        public int Height { get; }
+        public BuildingGrid(int width, int height)
+        {
+            Width = Math.Max(1, width);
+            Height = Math.Max(1, height);
+            cells = new PlacedBuilding[Width, Height];
+        }
         public bool TryPlace(BuildingDefinition definition, int x, int y, ResourceInventory inventory, bool coversResource, out PlacedBuilding placed, BuildingSite site = BuildingSite.Ground)
         {
+            return TryPlace(definition, x, y, inventory, coversResource, out placed, site, BuildingOrientation.North);
+        }
+        public bool TryPlace(BuildingDefinition definition, int x, int y, ResourceInventory inventory, bool coversResource, out PlacedBuilding placed, BuildingSite site, BuildingOrientation orientation)
+        {
             placed = null; if (definition == null || inventory == null || !BuildingMobilityRules.SupportsSite(definition, site) || (definition.RequiresResourceNode && !coversResource)) return false;
-            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++)
-            { int px = x + dx, py = y + dy; if (px < 0 || py < 0 || px >= cells.GetLength(0) || py >= cells.GetLength(1) || cells[px, py] != null) return false; }
+            if (!CanOccupy(definition, x, y, orientation)) return false;
             if (!inventory.TrySpend(definition.CostId, definition.Cost)) return false;
-            placed = new PlacedBuilding(definition, x, y, site);
-            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++) cells[x + dx, y + dy] = placed;
+            placed = new PlacedBuilding(definition, x, y, site, orientation);
+            Occupy(placed);
             Count++; return true;
         }
         public bool Remove(PlacedBuilding placed)
@@ -97,24 +111,56 @@ namespace WasteCity.Building
         }
         public bool TryRestore(BuildingDefinition definition, int x, int y, out PlacedBuilding placed, BuildingSite site = BuildingSite.Ground)
         {
+            return TryRestore(definition, x, y, out placed, site, BuildingOrientation.North);
+        }
+        public bool TryRestore(BuildingDefinition definition, int x, int y, out PlacedBuilding placed, BuildingSite site, BuildingOrientation orientation)
+        {
             placed = null; if (definition == null || !BuildingMobilityRules.SupportsSite(definition, site)) return false;
-            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++)
-            { int px = x + dx, py = y + dy; if (px < 0 || py < 0 || px >= cells.GetLength(0) || py >= cells.GetLength(1) || cells[px, py] != null) return false; }
-            placed = new PlacedBuilding(definition, x, y, site);
-            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++) cells[x + dx, y + dy] = placed;
+            if (!CanOccupy(definition, x, y, orientation)) return false;
+            placed = new PlacedBuilding(definition, x, y, site, orientation);
+            Occupy(placed);
             Count++; return true;
         }
         public bool TryUpgrade(PlacedBuilding placed,BuildingDefinition target,ResourceInventory inventory,string costId,int cost,out PlacedBuilding upgraded)
         {
             upgraded=null;if(placed==null||target==null||inventory==null||!BuildingMobilityRules.SupportsSite(target,placed.Site)||placed.Definition.Width!=target.Width||placed.Definition.Height!=target.Height||!inventory.TrySpend(costId,cost))return false;
-            upgraded=new PlacedBuilding(target,placed.X,placed.Y,placed.Site);for(int x=0;x<cells.GetLength(0);x++)for(int y=0;y<cells.GetLength(1);y++)if(ReferenceEquals(cells[x,y],placed))cells[x,y]=upgraded;return true;
+            upgraded=new PlacedBuilding(target,placed.X,placed.Y,placed.Site,placed.Orientation);for(int x=0;x<cells.GetLength(0);x++)for(int y=0;y<cells.GetLength(1);y++)if(ReferenceEquals(cells[x,y],placed))cells[x,y]=upgraded;return true;
         }
         public bool CanPlace(BuildingDefinition definition, int x, int y, BuildingSite site = BuildingSite.Ground)
         {
+            return CanPlace(definition, x, y, site, BuildingOrientation.North);
+        }
+        public bool CanPlace(BuildingDefinition definition, int x, int y, BuildingSite site, BuildingOrientation orientation)
+        {
             if (definition == null || !BuildingMobilityRules.SupportsSite(definition, site)) return false;
-            for (int dx = 0; dx < definition.Width; dx++) for (int dy = 0; dy < definition.Height; dy++)
-            { int px=x+dx,py=y+dy;if(px<0||py<0||px>=cells.GetLength(0)||py>=cells.GetLength(1)||cells[px,py]!=null)return false; }
+            return CanOccupy(definition, x, y, orientation);
+        }
+        public bool ContainsFootprint(BuildingDefinition definition, int x, int y, BuildingOrientation orientation = BuildingOrientation.North)
+        {
+            if (definition == null) return false;
+            return x >= 0 && y >= 0
+                && x + BuildingOrientationRules.Width(definition, orientation) <= Width
+                && y + BuildingOrientationRules.Height(definition, orientation) <= Height;
+        }
+        public bool IsOccupied(int x, int y)
+        {
+            return x >= 0 && y >= 0 && x < Width && y < Height && cells[x, y] != null;
+        }
+        private bool CanOccupy(BuildingDefinition definition, int x, int y, BuildingOrientation orientation)
+        {
+            if (!ContainsFootprint(definition, x, y, orientation)) return false;
+            var width = BuildingOrientationRules.Width(definition, orientation);
+            var height = BuildingOrientationRules.Height(definition, orientation);
+            for (int dx = 0; dx < width; dx++) for (int dy = 0; dy < height; dy++)
+                if (IsOccupied(x + dx, y + dy)) return false;
             return true;
+        }
+        private void Occupy(PlacedBuilding placed)
+        {
+            var width = BuildingOrientationRules.Width(placed.Definition, placed.Orientation);
+            var height = BuildingOrientationRules.Height(placed.Definition, placed.Orientation);
+            for (int dx = 0; dx < width; dx++) for (int dy = 0; dy < height; dy++)
+                cells[placed.X + dx, placed.Y + dy] = placed;
         }
     }
 }

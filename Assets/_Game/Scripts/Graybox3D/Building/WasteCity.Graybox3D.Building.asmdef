@@ -1,0 +1,11 @@
+{
+  "name": "WasteCity.Graybox3D.Building",
+  "rootNamespace": "WasteCity.Graybox3D.Building",
+  "references": [
+    "WasteCity.Game",
+    "WasteCity.Graybox3D",
+    "Unity.InputSystem",
+    "Unity.ugui"
+  ],
+  "autoReferenced": true
+}
