@@ -9,6 +9,8 @@ namespace WasteCity.Graybox3D.Building
     {
         private readonly List<RaycastResult> raycastResults =
             new List<RaycastResult>();
+        private readonly List<GraphicRaycaster> fallbackRaycasters =
+            new List<GraphicRaycaster>();
         private EventSystem pointerEventSystem;
         private PointerEventData pointerEventData;
         private int escapeConsumedFrame = -1;
@@ -37,6 +39,7 @@ namespace WasteCity.Graybox3D.Building
                 pointerEventSystem = eventSystem;
                 pointerEventData =
                     new PointerEventData(eventSystem);
+                RefreshFallbackRaycasters();
             }
             pointerEventData.Reset();
             pointerEventData.position = screenPosition;
@@ -60,13 +63,12 @@ namespace WasteCity.Graybox3D.Building
             raycastResults.Clear();
             if (hit) return true;
 
-            GraphicRaycaster[] raycasters =
-                UnityEngine.Object.FindObjectsOfType<GraphicRaycaster>();
             for (var raycasterIndex = 0;
-                 raycasterIndex < raycasters.Length;
+                 raycasterIndex < fallbackRaycasters.Count;
                  raycasterIndex++)
             {
-                GraphicRaycaster raycaster = raycasters[raycasterIndex];
+                GraphicRaycaster raycaster =
+                    fallbackRaycasters[raycasterIndex];
                 if (raycaster == null || !raycaster.isActiveAndEnabled)
                     continue;
                 Canvas canvas = raycaster.GetComponent<Canvas>();
@@ -96,6 +98,13 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             return false;
+        }
+
+        private void RefreshFallbackRaycasters()
+        {
+            fallbackRaycasters.Clear();
+            fallbackRaycasters.AddRange(
+                UnityEngine.Object.FindObjectsOfType<GraphicRaycaster>());
         }
 
         public bool ConsumeFocusedEscape(EventSystem eventSystem)

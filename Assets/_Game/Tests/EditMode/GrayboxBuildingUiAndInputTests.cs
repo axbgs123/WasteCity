@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -683,6 +684,70 @@ namespace WasteCity.Tests
                 raycastDifference);
             Assert.That(raycastDifference, Is.EqualTo(300));
             Assert.That(difference, Is.Zero);
+        }
+
+        [Test]
+        public void InputRouter_WorldMiddleHoldAllocatesZeroAcross300Calls()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(
+                    out GameObject pointerTarget);
+            pointerTarget.SetActive(false);
+            ForceCanvasLayout(fixture.Canvas);
+            QueueMouseState(ScreenCenter, middleHeld: true);
+            QueueMouseState(ScreenCenter, middleHeld: true);
+            Assert.That(
+                fixture.Router.ProcessCurrentInput().CameraDrag,
+                Is.False);
+            fixture.Router.ProcessCurrentInput();
+
+            GrayboxInputSuppression lastSuppression = default;
+            int raycastsBefore = raycaster.RaycastCalls;
+            ProfilerRecorder allocationRecorder =
+                ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory,
+                    "GC.Alloc",
+                    2048,
+                    ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+            {
+                lastSuppression =
+                    fixture.Router.ProcessCurrentInput();
+            }
+            long difference =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            int raycastDifference =
+                raycaster.RaycastCalls - raycastsBefore;
+            allocationRecorder.Stop();
+            long profiledDifference = 0;
+            for (var index = 0;
+                 index < allocationRecorder.Count;
+                 index++)
+            {
+                ProfilerRecorderSample sample =
+                    allocationRecorder.GetSample(index);
+                profiledDifference +=
+                    sample.Value * sample.Count;
+            }
+            allocationRecorder.Dispose();
+
+            TestContext.WriteLine(
+                "Task9WorldMiddleHoldAllocationDifference=" +
+                difference);
+            TestContext.WriteLine(
+                "Task9WorldMiddleHoldProfiledAllocationDifference=" +
+                profiledDifference);
+            TestContext.WriteLine(
+                "Task9WorldMiddleHoldRaycastDifference=" +
+                raycastDifference);
+            Assert.That(lastSuppression.CameraDrag, Is.False);
+            Assert.That(raycastDifference, Is.EqualTo(300));
+            Assert.That(difference, Is.Zero);
+            Assert.That(profiledDifference, Is.Zero);
         }
 
         [Test]
