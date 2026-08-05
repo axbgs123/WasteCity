@@ -1407,10 +1407,17 @@ yield return null;
 
 batchmode/headless 输入验证使用明确的 manual update 边界：
 
-- SetUp 先保存 `InputSystem.settings.updateMode`，切换为
-  `InputSettings.UpdateMode.ProcessEventsManually`，再创建虚拟 Keyboard/Mouse
-  并分别调用 `MakeCurrent()`；不得依赖自动 PlayerLoop 输入更新或
-  `InputSystem.onAfterUpdate` 维持 current。
+- Unity Editor 无 Game View 焦点时，无参 `InputSystem.Update()` 的默认
+  update type 会落到 Editor buffer；Editor buffer 翻转不更新设备的 player
+  update step，因此 `isPressed` 可以为 true 而 `wasPressedThisFrame` 为
+  false。fixture 必须用公开设置把 headless 输入路由到 player/manual update，
+  不得修改生产输入链。
+- SetUp 先保存 `InputSystem.settings.updateMode`、
+  `backgroundBehavior` 和 `editorInputBehaviorInPlayMode`，再依次设置
+  `ProcessEventsManually`、`BackgroundBehavior.IgnoreFocus` 和
+  `EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView`；完成后
+  创建虚拟 Keyboard/Mouse 并分别调用 `MakeCurrent()`。不得依赖自动
+  PlayerLoop 输入更新或 `InputSystem.onAfterUpdate` 维持 current。
 - 每个输入 helper 严格执行 `QueueStateEvent` →
   `InputSystem.Update()` → 在 yield 前立即断言 `Keyboard.current` /
   `Mouse.current` 为对应虚拟设备，并断言目标 key/button 的
@@ -1419,8 +1426,10 @@ batchmode/headless 输入验证使用明确的 manual update 边界：
 - WASD 按下事件只手动处理一次，跨真实 `FixedUpdate` 保持按下；释放时再
   排队空状态、调用 `InputSystem.Update()` 并 yield，不得逐帧调用玩法方法。
 - TearDown 使用 `try/finally`：恢复 `Time.timeScale = 1f`、卸载灰盒并加载
-  空测试场景；finally 无条件移除仅由 fixture 创建的设备并恢复原
-  `InputSystem.settings.updateMode`。
+  空测试场景；finally 无条件移除仅由 fixture 创建的设备，并恢复原
+  `updateMode`、`editorInputBehaviorInPlayMode` 和 `backgroundBehavior`。
+  测试必须断言正常清理后的三项值，finally 结构必须保证异常路径也逐项恢复，
+  且不得把运行时测试设置写入项目资产。
 - 测试不得直接调用 `ProcessFrame`、`ReadCurrentFrame`、`TickGameplay`、
   城市/领袖 tick 或相机控制方法来绕过运行时主循环。
 
