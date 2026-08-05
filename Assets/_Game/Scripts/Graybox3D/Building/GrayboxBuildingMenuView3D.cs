@@ -72,6 +72,31 @@ namespace WasteCity.Graybox3D.Building
             SyncCatalogVisibility();
         }
 
+        private void OnDestroy()
+        {
+            if (uiRoot != null)
+            {
+                uiRoot.gameObject.SetActive(false);
+                DestroyGenerated(uiRoot.gameObject);
+            }
+            uiRoot = null;
+            quickbarRoot = null;
+            catalogRoot = null;
+            catalogCardsRoot = null;
+            evacuationRoot = null;
+            searchField = null;
+            CancelSelectedConstructionRequested = null;
+            CancelConstructionConfirmationResolved = null;
+            EvacuationItemTreatmentRequested = null;
+            EvacuationCategoryTreatmentRequested = null;
+            EvacuationAllTreatmentRequested = null;
+            EvacuationConfirmationRequested = null;
+            canvas = null;
+            eventSystem = null;
+            session = null;
+            interaction = null;
+        }
+
         public void Configure(
             Canvas canvas,
             EventSystem eventSystem,
@@ -292,6 +317,12 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(1f, 0f),
                 new Vector2(-8f, 8f),
                 new Vector2(190f, 102f));
+            var constructionLayout =
+                construction.gameObject.AddComponent<VerticalLayoutGroup>();
+            constructionLayout.padding = new RectOffset(5, 5, 5, 5);
+            constructionLayout.spacing = 3f;
+            constructionLayout.childForceExpandWidth = true;
+            constructionLayout.childForceExpandHeight = false;
             CreateButton(
                 construction,
                 "Construction.Cancel",
@@ -339,6 +370,7 @@ namespace WasteCity.Graybox3D.Building
                 catalogRoot,
                 "Catalog.Categories");
             categories.sizeDelta = new Vector2(0f, 34f);
+            SetLayout(categories, 0f, 34f, 1f);
             var categoryLayout =
                 categories.gameObject.AddComponent<HorizontalLayoutGroup>();
             categoryLayout.spacing = 3f;
@@ -357,6 +389,7 @@ namespace WasteCity.Graybox3D.Building
                 catalogRoot,
                 "Catalog.Routes");
             routes.sizeDelta = new Vector2(0f, 34f);
+            SetLayout(routes, 0f, 34f, 1f);
             var routeLayout =
                 routes.gameObject.AddComponent<HorizontalLayoutGroup>();
             routeLayout.spacing = 3f;
@@ -380,6 +413,7 @@ namespace WasteCity.Graybox3D.Building
             catalogCardsRoot = CreateRect(
                 catalogRoot,
                 "Catalog.Cards");
+            SetLayout(catalogCardsRoot, 596f, 0f, 0f, 1f);
             var cardLayout =
                 catalogCardsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             cardLayout.spacing = 3f;
@@ -440,22 +474,55 @@ namespace WasteCity.Graybox3D.Building
                 ? ButtonColor
                 : LockedColor;
             RectTransform rect = card.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(0f, 70f);
-            CreateLabel(
-                rect,
+            rect.sizeDelta = new Vector2(0f, 108f);
+            SetLayout(rect, 596f, 108f, 0f);
+
+            RectTransform summary = CreateRect(rect, "Summary");
+            PlaceFixed(summary, new Vector2(6f, 0f), new Vector2(220f, 96f));
+            Text name = CreateLabel(
+                summary,
                 "Name",
                 definition.Name);
-            CreateLabel(
-                rect,
+            AnchorInside(
+                name.rectTransform,
+                new Vector2(0f, .68f),
+                Vector2.one,
+                Vector2.zero,
+                Vector2.zero);
+            Text cost = CreateLabel(
+                summary,
                 "Cost",
                 "成本 " + definition.Cost + " " + definition.CostId);
+            AnchorInside(
+                cost.rectTransform,
+                new Vector2(0f, .36f),
+                new Vector2(1f, .66f),
+                Vector2.zero,
+                Vector2.zero);
             if (!string.IsNullOrEmpty(item.PrimaryLockReason))
-                CreateLabel(
-                    rect,
+            {
+                Text reason = CreateLabel(
+                    summary,
                     "PrimaryReason",
                     item.PrimaryLockReason);
+                AnchorInside(
+                    reason.rectTransform,
+                    Vector2.zero,
+                    new Vector2(1f, .34f),
+                    Vector2.zero,
+                    Vector2.zero);
+            }
 
             RectTransform details = CreateRect(rect, "Details");
+            PlaceFixed(
+                details,
+                new Vector2(232f, 0f),
+                new Vector2(350f, 96f));
+            Image detailsBackground =
+                details.gameObject.AddComponent<Image>();
+            detailsBackground.color =
+                new Color(.12f, .15f, .16f, .98f);
+            detailsBackground.raycastTarget = false;
             CreateLabel(
                 details,
                 "Details.Text",
@@ -505,10 +572,12 @@ namespace WasteCity.Graybox3D.Building
             RectTransform row = CreateRect(
                 evacuationRoot,
                 "Evacuation.Item." + instance.StableInstanceId);
-            CreateLabel(
+            ConfigureEvacuationRow(row);
+            Text label = CreateLabel(
                 row,
                 "Label",
                 instance.Placement.Definition.Name);
+            SetLayout(label.rectTransform, 72f, 30f, 0f);
             CreateTreatmentButtons(
                 row,
                 treatment => EvacuationItemTreatmentRequested?.Invoke(
@@ -522,7 +591,10 @@ namespace WasteCity.Graybox3D.Building
             RectTransform row = CreateRect(
                 evacuationRoot,
                 "Evacuation.Category." + value);
-            CreateLabel(row, "Label", CategoryLabel(value));
+            ConfigureEvacuationRow(row);
+            Text label =
+                CreateLabel(row, "Label", CategoryLabel(value));
+            SetLayout(label.rectTransform, 72f, 30f, 0f);
             CreateTreatmentButtons(
                 row,
                 treatment =>
@@ -537,7 +609,9 @@ namespace WasteCity.Graybox3D.Building
             RectTransform row = CreateRect(
                 evacuationRoot,
                 "Evacuation.All");
-            CreateLabel(row, "Label", "全部");
+            ConfigureEvacuationRow(row);
+            Text label = CreateLabel(row, "Label", "全部");
+            SetLayout(label.rectTransform, 72f, 30f, 0f);
             CreateTreatmentButtons(
                 row,
                 treatment =>
@@ -586,6 +660,7 @@ namespace WasteCity.Graybox3D.Building
         {
             RectTransform rect = CreateRect(parent, name);
             rect.sizeDelta = new Vector2(0f, 34f);
+            SetLayout(rect, 0f, 34f, 1f);
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = Color.white;
             var input = rect.gameObject.AddComponent<InputField>();
@@ -613,9 +688,11 @@ namespace WasteCity.Graybox3D.Building
             image.color = ButtonColor;
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
+            SetLayout(rect, 80f, 30f, 1f);
             if (callback != null)
                 button.onClick.AddListener(() => callback());
-            CreateLabel(rect, "Label", label);
+            if (!string.IsNullOrEmpty(label))
+                CreateLabel(rect, "Label", label);
             return button;
         }
 
@@ -674,6 +751,57 @@ namespace WasteCity.Graybox3D.Building
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
+        }
+
+        private static void AnchorInside(
+            RectTransform rect,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 offsetMin,
+            Vector2 offsetMax)
+        {
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+        }
+
+        private static void PlaceFixed(
+            RectTransform rect,
+            Vector2 anchoredPosition,
+            Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0f, .5f);
+            rect.anchorMax = new Vector2(0f, .5f);
+            rect.pivot = new Vector2(0f, .5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+        }
+
+        private static void ConfigureEvacuationRow(RectTransform row)
+        {
+            SetLayout(row, 0f, 32f, 1f);
+            var layout =
+                row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 3f;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+        }
+
+        private static void SetLayout(
+            RectTransform rect,
+            float preferredWidth,
+            float preferredHeight,
+            float flexibleWidth,
+            float flexibleHeight = 0f)
+        {
+            LayoutElement element =
+                rect.GetComponent<LayoutElement>() ??
+                rect.gameObject.AddComponent<LayoutElement>();
+            element.preferredWidth = preferredWidth;
+            element.preferredHeight = preferredHeight;
+            element.flexibleWidth = flexibleWidth;
+            element.flexibleHeight = flexibleHeight;
         }
 
         private static void AddTrigger(

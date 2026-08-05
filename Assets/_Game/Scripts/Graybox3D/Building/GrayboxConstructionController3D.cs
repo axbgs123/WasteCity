@@ -167,7 +167,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
-            TickConstruction(Time.unscaledDeltaTime);
+            TickConstruction(Time.deltaTime);
         }
 
         private void OnEnable()
@@ -219,7 +219,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void UnsubscribeMenu()
         {
-            if (menu == null) return;
+            if (ReferenceEquals(menu, null)) return;
             menu.CancelSelectedConstructionRequested -=
                 OnCancelSelectedConstructionRequested;
             menu.CancelConstructionConfirmationResolved -=
@@ -228,7 +228,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void SubscribeMenu()
         {
-            if (menu == null) return;
+            if (ReferenceEquals(menu, null)) return;
             UnsubscribeMenu();
             menu.CancelSelectedConstructionRequested +=
                 OnCancelSelectedConstructionRequested;
