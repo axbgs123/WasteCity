@@ -967,9 +967,19 @@ git commit -m "feat: author independent graybox 3d scene"
 - 当前格的 Ruins `.65`、Wetland `.55`、Rocky `.8`、普通 `1` 倍率影响位移。
 - Deploying/Fortress/Packing 不移动。
 - 展开前调用现有 `CityDeploymentRules.Validate`；OutsideWorld、Blocked、UnstableGround 原枚举和原文字保持。
-- 成功 `Mobile -> Deploying`，3 秒后 Fortress；`Fortress -> Packing`，5 秒后 Mobile。
+- 成功 `Mobile -> Deploying`，3 秒后 Fortress；`Fortress -> Packing`，4.99 秒时仍为 Packing，再推进 `.02` 秒后为 Mobile。
 - 形状和 BoxCollider 随 Progress 插值，但 Mode 只来自 `CityDeploymentModel`。
 - 城市在四种 Mode 下始终保留 `core.city.mobile` 稳定视觉 ID。
+
+EditMode 的 Rigidbody 测试夹具必须在 `SetUp` 保存当前
+`Physics.simulationMode` 并切换为 `SimulationMode.Script`，在
+`TearDown` 中无条件恢复原值。所有需要观察 `Rigidbody.MovePosition`
+实际提交结果的正向移动、阻挡和非 Mobile 测试，在每次
+`TickMovement` 后统一调用夹具 helper：先执行
+`Physics.SyncTransforms()`，再以固定物理小步
+`Physics.Simulate(Time.fixedDeltaTime)`（当前为 `.02` 秒）推进一次。
+物理模拟步长不得使用待测 `TickMovement` 的逻辑 delta，且
+`Physics.Simulate` 不得进入生产组件。
 
 关键规则唯一性测试使用规则输出作期望：
 
@@ -986,6 +996,7 @@ public void TickMovement_UsesExistingTerrainMultiplier(
     float expected = fixture.Speed * CityTerrainRules.SpeedMultiplier(cell);
     fixture.Controller.ApplyManualInput(Vector2.right);
     fixture.Controller.TickMovement(1f);
+    fixture.SimulateFixedStep();
     Assert.That(fixture.Body.position.x - fixture.Start.x,
         Is.EqualTo(expected).Within(.0001f));
     Assert.That(fixture.Body.position.y, Is.EqualTo(fixture.Start.y));
