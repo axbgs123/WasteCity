@@ -235,14 +235,30 @@ namespace WasteCity.Tests
                 targetX,
                 targetY,
                 0f,
-                out Vector3 targetWorld);
-            targetWorld += new Vector3(.5f, 0f, .5f);
+                out Vector3 destinationWorld);
+            Vector3 clickWorld =
+                destinationWorld + new Vector3(.5f, 0f, .5f);
 
             yield return ClickMouse(
                 MouseButton.Right,
-                camera.WorldToScreenPoint(targetWorld));
+                camera.WorldToScreenPoint(clickWorld));
 
             Assert.That(city.AutopilotActive, Is.True);
+            Assert.That(city.Destination.HasValue, Is.True);
+            Assert.That(city.Destination.Value.X, Is.EqualTo(targetX));
+            Assert.That(city.Destination.Value.Y, Is.EqualTo(targetY));
+            Rigidbody body = city.GetComponent<Rigidbody>();
+            float distanceBefore = Vector2.Distance(
+                new Vector2(body.position.x, body.position.z),
+                new Vector2(destinationWorld.x, destinationWorld.z));
+
+            for (int step = 0; step < 3; step++)
+                yield return new WaitForFixedUpdate();
+
+            float distanceAfter = Vector2.Distance(
+                new Vector2(body.position.x, body.position.z),
+                new Vector2(destinationWorld.x, destinationWorld.z));
+            Assert.That(distanceAfter, Is.LessThan(distanceBefore));
             Assert.That(city.Destination.HasValue, Is.True);
             Assert.That(city.Destination.Value.X, Is.EqualTo(targetX));
             Assert.That(city.Destination.Value.Y, Is.EqualTo(targetY));
@@ -317,6 +333,23 @@ namespace WasteCity.Tests
             GrayboxDirectControlCoordinator coordinator =
                 Object.FindObjectOfType<
                     GrayboxDirectControlCoordinator>();
+            GrayboxCameraController3D cameraController =
+                Object.FindObjectOfType<
+                    GrayboxCameraController3D>();
+            Transform rig = Camera.main.transform.parent;
+            Vector2 dragStart = new Vector2(
+                Screen.width * .5f,
+                Screen.height * .5f);
+            Vector2 dragEnd =
+                dragStart + new Vector2(100f, 40f);
+
+            yield return DragMouse(dragStart, dragEnd);
+            Assert.That(
+                cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
+            Assert.That(
+                cameraController.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.City));
 
             city.Deployment.Restore(CityMode.Fortress, 0f);
             leader.transform.position = city.transform.position;
@@ -324,6 +357,18 @@ namespace WasteCity.Tests
             Assert.That(
                 coordinator.ControlTarget,
                 Is.EqualTo(DirectControlTarget.Leader));
+            Assert.That(
+                cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+            Assert.That(
+                cameraController.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.Leader));
+            Assert.That(
+                rig.position.x,
+                Is.EqualTo(leader.transform.position.x).Within(.001f));
+            Assert.That(
+                rig.position.z,
+                Is.EqualTo(leader.transform.position.z).Within(.001f));
             Vector3 cityBefore = city.transform.position;
             Vector3 leaderBefore = leader.transform.position;
 
@@ -334,17 +379,39 @@ namespace WasteCity.Tests
                 Is.GreaterThan(leaderBefore.z));
             Assert.That(city.transform.position, Is.EqualTo(cityBefore));
 
+            yield return DragMouse(dragStart, dragEnd);
+            Assert.That(
+                cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
+            Assert.That(
+                cameraController.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.Leader));
+
             city.Deployment.Restore(CityMode.Packing, .001f);
             for (int frame = 0;
                  frame < 60 &&
                  (city.Mode != CityMode.Mobile ||
-                  coordinator.ControlTarget != DirectControlTarget.City);
+                  coordinator.ControlTarget != DirectControlTarget.City ||
+                  cameraController.Mode != CameraFollowMode.Following ||
+                  cameraController.CurrentTarget != DirectControlTarget.City);
                  frame++)
                 yield return null;
             Assert.That(city.Mode, Is.EqualTo(CityMode.Mobile));
             Assert.That(
                 coordinator.ControlTarget,
                 Is.EqualTo(DirectControlTarget.City));
+            Assert.That(
+                cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+            Assert.That(
+                cameraController.CurrentTarget,
+                Is.EqualTo(DirectControlTarget.City));
+            Assert.That(
+                rig.position.x,
+                Is.EqualTo(city.transform.position.x).Within(.001f));
+            Assert.That(
+                rig.position.z,
+                Is.EqualTo(city.transform.position.z).Within(.001f));
         }
 
         [UnityTest]
