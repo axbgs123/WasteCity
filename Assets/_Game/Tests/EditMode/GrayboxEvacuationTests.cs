@@ -345,6 +345,76 @@ namespace WasteCity.Tests
             Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.False);
         }
 
+        [Test]
+        public void Controller_ProcessesFullQueueSequentiallyAndKeepsLaterWorkLocked()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D first = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            GrayboxBuildingInstance3D later = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+            float laterRemaining = later.Progress.Remaining;
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(later.IsEvacuationLocked, Is.True);
+            BuildingEvacuationWork snapshot = fixture.Controller.Work[1];
+            fixture.Session.TickConstruction(20f, CityMode.Fortress, false,
+                fixture.Presentation);
+            Assert.That(later.Progress.Remaining, Is.EqualTo(laterRemaining));
+            fixture.Controller.Tick(20f, false);
+
+            Assert.That(fixture.Session.Instances.Contains(first), Is.False);
+            Assert.That(fixture.Session.Instances.Contains(later), Is.True);
+            Assert.That(later.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Controller.Work[1].RemainingRatio,
+                Is.EqualTo(snapshot.RemainingRatio));
+            Assert.That(fixture.Controller.Work[1].Refund,
+                Is.EqualTo(snapshot.Refund));
+            Assert.That(fixture.Controller.Work[1].DismantleSeconds,
+                Is.EqualTo(snapshot.DismantleSeconds));
+            fixture.Controller.Tick(20f, false);
+            Assert.That(fixture.Session.Instances.Contains(later), Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            fixture.Controller.Tick(20f, false);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
+        [Test]
+        public void Controller_CategorySingleAndAllAssignmentsCanMix()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            GrayboxBuildingInstance3D housing = Begin(
+                fixture.Session, BuildingCatalog.Housing, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignCategory(
+                BuildingMenuCategory.Basic,
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.Abandon), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.QuickDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.Abandon), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+
+            Assert.That(wall.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(fixture.Session.Instances.Contains(housing), Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var gameObject = new GameObject("graybox-evacuation-test");
