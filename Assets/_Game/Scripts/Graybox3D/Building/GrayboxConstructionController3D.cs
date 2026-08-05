@@ -13,12 +13,13 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxConstructionController3D : MonoBehaviour
     {
-        private GrayboxBuildingSession3D session;
-        private GrayboxMobileCityController3D city;
-        private GrayboxBuildingWorldView3D presentation;
+        [SerializeField] private GrayboxBuildingSession3D session;
+        [SerializeField] private GrayboxMobileCityController3D city;
+        [SerializeField] private GrayboxBuildingWorldView3D presentation;
+        [SerializeField]
         private GrayboxBuildingInteractionModel3D interaction;
-        private Camera controlledCamera;
-        private GrayboxBuildingMenuView3D menu;
+        [SerializeField] private Camera controlledCamera;
+        [SerializeField] private GrayboxBuildingMenuView3D menu;
         private string selectedStableInstanceId;
 
         public void Configure(
@@ -50,7 +51,8 @@ namespace WasteCity.Graybox3D.Building
             this.controlledCamera = controlledCamera;
             this.menu = menu;
             selectedStableInstanceId = null;
-            SubscribeMenu();
+            if (isActiveAndEnabled)
+                SubscribeMenu();
         }
 
         public bool SelectAt(Vector2 screenPosition)

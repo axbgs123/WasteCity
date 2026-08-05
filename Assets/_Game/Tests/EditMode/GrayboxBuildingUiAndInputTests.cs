@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,6 +7,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.TestTools;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
@@ -105,6 +107,42 @@ namespace WasteCity.Tests
                 Is.Not.Null);
             Assert.That(fixture.Menu.CatalogVisible, Is.False);
             Assert.That(fixture.Menu.EvacuationVisible, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator
+            Menu_SerializedCloneLifecycleBuildsExactlyOneRuntimeTree()
+        {
+            yield return new EnterPlayMode();
+            UiFixture fixture = CreateMenuFixture(true);
+            yield return null;
+
+            Assert.That(
+                NamedTransforms(
+                    fixture.Canvas.transform,
+                    "GrayboxBuildingUi.Root").Count,
+                Is.EqualTo(1));
+            Assert.That(
+                NamedComponents<Button>(
+                    fixture.Canvas.transform,
+                    "QuickbarSlot.").Count,
+                Is.EqualTo(10));
+
+            fixture.Menu.enabled = false;
+            fixture.Menu.enabled = true;
+            fixture.Menu.Configure(
+                fixture.Canvas,
+                fixture.EventSystem,
+                fixture.Session,
+                fixture.Interaction);
+            yield return null;
+
+            Assert.That(
+                NamedTransforms(
+                    fixture.Canvas.transform,
+                    "GrayboxBuildingUi.Root").Count,
+                Is.EqualTo(1));
+            yield return new ExitPlayMode();
         }
 
         [Test]
@@ -551,6 +589,50 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Menu_CatalogScrollMakesFirstAndLastOfTenAndTwentyEightReachable()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.RefreshCatalog();
+            ScrollRect scroll = FindComponent<ScrollRect>(
+                fixture.Canvas.transform,
+                "Catalog.Scroll");
+
+            Assert.That(scroll, Is.Not.Null);
+            Assert.That(
+                scroll.viewport.GetComponent<RectMask2D>(),
+                Is.Not.Null);
+            Assert.That(scroll.content.childCount, Is.EqualTo(10));
+            AssertScrollEndpointsReachable(fixture, scroll);
+
+            fixture.Session.SetRouteContact(ContentRoute.Technology, true);
+            fixture.Session.SetRouteContact(ContentRoute.Cultivation, true);
+            fixture.Session.SetRouteContact(
+                ContentRoute.BiologicalAscension,
+                true);
+            fixture.Session.SetRouteContact(ContentRoute.Psionics, true);
+            fixture.Menu.RefreshCatalog();
+
+            Assert.That(
+                scroll.content.childCount,
+                Is.EqualTo(
+                    GrayboxBuildingCatalogPresenter3D.BuildMenuCount));
+            AssertScrollEndpointsReachable(fixture, scroll);
+
+            scroll.verticalNormalizedPosition = 1f;
+            scroll.Rebuild(CanvasUpdate.PostLayout);
+            ForceCanvasLayout(fixture.Canvas);
+            Button first = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Catalog.Card." +
+                BuildingCatalog.MiningStation.Id.Value);
+            PointerClick(fixture, first);
+            Assert.That(
+                fixture.Interaction.Selected,
+                Is.SameAs(BuildingCatalog.MiningStation));
+        }
+
+        [Test]
         public void ConstructionController_ZeroProgressCancelsImmediatelyWithRefund()
         {
             ControllerFixture fixture = CreateControllerFixture();
@@ -745,6 +827,49 @@ namespace WasteCity.Tests
                 Is.EqualTo(1));
         }
 
+        [UnityTest]
+        public IEnumerator
+            ConstructionController_SerializedCloneLifecycleKeepsOneMenuDelegate()
+        {
+            yield return new EnterPlayMode();
+            ControllerFixture fixture = CreateControllerFixture(true);
+            yield return null;
+
+            Assert.That(
+                EventSubscriberCount(
+                    fixture.Menu,
+                    "CancelSelectedConstructionRequested"),
+                Is.EqualTo(1));
+            Assert.That(
+                EventSubscriberCount(
+                    fixture.Menu,
+                    "CancelConstructionConfirmationResolved"),
+                Is.EqualTo(1));
+
+            fixture.Controller.enabled = false;
+            fixture.Controller.enabled = true;
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.Presentation,
+                fixture.Interaction,
+                fixture.Camera,
+                fixture.Menu);
+            yield return null;
+
+            Assert.That(
+                EventSubscriberCount(
+                    fixture.Menu,
+                    "CancelSelectedConstructionRequested"),
+                Is.EqualTo(1));
+            Assert.That(
+                EventSubscriberCount(
+                    fixture.Menu,
+                    "CancelConstructionConfirmationResolved"),
+                Is.EqualTo(1));
+            yield return new ExitPlayMode();
+        }
+
         [Test]
         public void ConstructionController_UpdateUsesScaledDeltaTime()
         {
@@ -762,7 +887,8 @@ namespace WasteCity.Tests
                     "TickConstruction(Time.unscaledDeltaTime);"));
         }
 
-        private UiFixture CreateMenuFixture()
+        private UiFixture CreateMenuFixture(
+            bool cloneSerializedSource = false)
         {
             EventSystem eventSystem = Create<EventSystem>("EventSystem");
             eventSystem.gameObject.AddComponent<InputSystemUIInputModule>();
@@ -788,9 +914,29 @@ namespace WasteCity.Tests
             session.ConfigureDevelopmentFixture();
             GrayboxBuildingInteractionModel3D interaction =
                 Create<GrayboxBuildingInteractionModel3D>("Interaction");
-            GrayboxBuildingMenuView3D menu =
-                Create<GrayboxBuildingMenuView3D>("Menu");
-            menu.Configure(canvas, eventSystem, session, interaction);
+            GrayboxBuildingMenuView3D menu;
+            if (cloneSerializedSource)
+            {
+                GameObject source = NewObject("SerializedMenuSource");
+                GrayboxBuildingMenuView3D serializedMenu =
+                    source.AddComponent<GrayboxBuildingMenuView3D>();
+                serializedMenu.Configure(
+                    canvas,
+                    eventSystem,
+                    session,
+                    interaction);
+                source.SetActive(false);
+                GameObject clone = UnityEngine.Object.Instantiate(source);
+                clone.name = "SerializedMenuClone";
+                cleanup.Add(clone);
+                clone.SetActive(true);
+                menu = clone.GetComponent<GrayboxBuildingMenuView3D>();
+            }
+            else
+            {
+                menu = Create<GrayboxBuildingMenuView3D>("Menu");
+                menu.Configure(canvas, eventSystem, session, interaction);
+            }
             canvas.enabled = false;
             canvas.enabled = true;
             raycaster.enabled = false;
@@ -807,9 +953,10 @@ namespace WasteCity.Tests
                 menu);
         }
 
-        private ControllerFixture CreateControllerFixture()
+        private ControllerFixture CreateControllerFixture(
+            bool cloneSerializedSource = false)
         {
-            UiFixture ui = CreateMenuFixture();
+            UiFixture ui = CreateMenuFixture(cloneSerializedSource);
             GrayboxMobileCityController3D city =
                 Create<GrayboxMobileCityController3D>("City");
             GrayboxBuildingWorldView3D presentation =
@@ -831,15 +978,40 @@ namespace WasteCity.Tests
                 city);
             Camera camera = Create<Camera>("Camera");
             camera.pixelRect = new Rect(0f, 0f, 640f, 480f);
-            GrayboxConstructionController3D controller =
-                Create<GrayboxConstructionController3D>("Construction");
-            controller.Configure(
-                ui.Session,
-                city,
-                presentation,
-                ui.Interaction,
-                camera,
-                ui.Menu);
+            GrayboxConstructionController3D controller;
+            if (cloneSerializedSource)
+            {
+                GameObject source =
+                    NewObject("SerializedConstructionSource");
+                source.SetActive(false);
+                GrayboxConstructionController3D serializedController =
+                    source.AddComponent<GrayboxConstructionController3D>();
+                serializedController.Configure(
+                    ui.Session,
+                    city,
+                    presentation,
+                    ui.Interaction,
+                    camera,
+                    ui.Menu);
+                GameObject clone = UnityEngine.Object.Instantiate(source);
+                clone.name = "SerializedConstructionClone";
+                cleanup.Add(clone);
+                clone.SetActive(true);
+                controller =
+                    clone.GetComponent<GrayboxConstructionController3D>();
+            }
+            else
+            {
+                controller =
+                    Create<GrayboxConstructionController3D>("Construction");
+                controller.Configure(
+                    ui.Session,
+                    city,
+                    presentation,
+                    ui.Interaction,
+                    camera,
+                    ui.Menu);
+            }
             return new ControllerFixture(
                 ui,
                 city,
@@ -992,6 +1164,38 @@ namespace WasteCity.Tests
             Assert.That(
                 OverlapArea(left, right),
                 Is.EqualTo(0f).Within(.01f));
+        }
+
+        private static void AssertScrollEndpointsReachable(
+            UiFixture fixture,
+            ScrollRect scroll)
+        {
+            scroll.StopMovement();
+            ForceCanvasLayout(fixture.Canvas);
+            scroll.verticalNormalizedPosition = 1f;
+            scroll.Rebuild(CanvasUpdate.PostLayout);
+            ForceCanvasLayout(fixture.Canvas);
+            Rect topViewport = ScreenRect(fixture, scroll.viewport);
+            Rect first = ScreenRect(
+                fixture,
+                (RectTransform)scroll.content.GetChild(0));
+            Assert.That(
+                RectContains(topViewport, first),
+                Is.True,
+                "viewport " + topViewport + " first " + first);
+
+            scroll.verticalNormalizedPosition = 0f;
+            scroll.Rebuild(CanvasUpdate.PostLayout);
+            ForceCanvasLayout(fixture.Canvas);
+            Rect bottomViewport = ScreenRect(fixture, scroll.viewport);
+            Rect last = ScreenRect(
+                fixture,
+                (RectTransform)scroll.content.GetChild(
+                    scroll.content.childCount - 1));
+            Assert.That(
+                RectContains(bottomViewport, last),
+                Is.True,
+                "viewport " + bottomViewport + " last " + last);
         }
 
         private static float OverlapArea(Rect left, Rect right)

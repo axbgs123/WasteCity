@@ -22,6 +22,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private EventSystem eventSystem;
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxBuildingInteractionModel3D interaction;
+        [SerializeField]
+        private GrayboxBuildingPlacementController3D placement;
 
         private GrayboxBuildingCatalogPresenter3D presenter;
         private GrayboxUiInputGuard3D inputGuard;
@@ -30,10 +32,16 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform catalogRoot;
         private RectTransform catalogCardsRoot;
         private RectTransform evacuationRoot;
+        private RectTransform placementStatusRoot;
+        private Text placementStatusText;
         private InputField searchField;
         private BuildingMenuCategory? category;
         private ContentRoute? route;
         private string searchText = string.Empty;
+        private bool hasPlacementStatusCache;
+        private GrayboxBuildingInteractionState lastPlacementState;
+        private BuildingPlacementFailure lastPlacementFailure;
+        private bool lastPlacementValid;
 
         public bool CatalogVisible
         {
@@ -63,13 +71,19 @@ namespace WasteCity.Graybox3D.Building
 
         private void Awake()
         {
-            presenter = new GrayboxBuildingCatalogPresenter3D();
-            inputGuard = new GrayboxUiInputGuard3D();
+            EnsureRuntimeServices();
+            TryBuildSerializedUi();
+        }
+
+        private void OnEnable()
+        {
+            TryBuildSerializedUi();
         }
 
         private void Update()
         {
             SyncCatalogVisibility();
+            RefreshPlacementStatus();
         }
 
         private void OnDestroy()
@@ -84,6 +98,8 @@ namespace WasteCity.Graybox3D.Building
             catalogRoot = null;
             catalogCardsRoot = null;
             evacuationRoot = null;
+            placementStatusRoot = null;
+            placementStatusText = null;
             searchField = null;
             CancelSelectedConstructionRequested = null;
             CancelConstructionConfirmationResolved = null;
@@ -95,9 +111,92 @@ namespace WasteCity.Graybox3D.Building
             eventSystem = null;
             session = null;
             interaction = null;
+            placement = null;
         }
 
         public void Configure(
+            Canvas canvas,
+            EventSystem eventSystem,
+            GrayboxBuildingSession3D session,
+            GrayboxBuildingInteractionModel3D interaction)
+        {
+            ConfigureReferences(
+                canvas,
+                eventSystem,
+                session,
+                interaction);
+        }
+
+        public void Configure(
+            Canvas canvas,
+            EventSystem eventSystem,
+            GrayboxBuildingSession3D session,
+            GrayboxBuildingInteractionModel3D interaction,
+            GrayboxBuildingPlacementController3D placement)
+        {
+            if (placement == null)
+                throw new ArgumentNullException(nameof(placement));
+            this.placement = placement;
+            ConfigureReferences(
+                canvas,
+                eventSystem,
+                session,
+                interaction);
+        }
+
+        public void SetPlacementController(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            if (placement == null)
+                throw new ArgumentNullException(nameof(placement));
+            this.placement = placement;
+            hasPlacementStatusCache = false;
+            RefreshPlacementStatus();
+        }
+
+        public static string PlacementFailureMessage(
+            BuildingPlacementFailure failure)
+        {
+            switch (failure)
+            {
+                case BuildingPlacementFailure.None:
+                    return "可以放置";
+                case BuildingPlacementFailure.MissingReference:
+                    return "无法放置：缺少必要引用";
+                case BuildingPlacementFailure.ProjectionFailed:
+                    return "无法放置：未命中建造表面";
+                case BuildingPlacementFailure.OutOfBounds:
+                    return "无法放置：超出网格边界";
+                case BuildingPlacementFailure.UnsupportedSite:
+                    return "无法放置：建筑不支持当前区域";
+                case BuildingPlacementFailure.InvalidCityMode:
+                    return "无法放置：当前城市形态不可施工";
+                case BuildingPlacementFailure.OutsideBuildRange:
+                    return "无法放置：超出城市建造范围";
+                case BuildingPlacementFailure.Overlap:
+                    return "无法放置：与已有建筑重叠";
+                case BuildingPlacementFailure.CityOccupied:
+                    return "无法放置：占用移动城市范围";
+                case BuildingPlacementFailure.InvalidTerrain:
+                    return "无法放置：地形不允许施工";
+                case BuildingPlacementFailure.Obstacle:
+                    return "无法放置：存在地形障碍";
+                case BuildingPlacementFailure.IncompatibleResourceNode:
+                    return "无法放置：缺少兼容资源节点";
+                case BuildingPlacementFailure.ContentUnavailable:
+                    return "无法放置：内容尚未开放";
+                case BuildingPlacementFailure.PopulationRequired:
+                    return "无法放置：人口条件不足";
+                case BuildingPlacementFailure.PrerequisiteBuildingRequired:
+                    return "无法放置：前置建筑未完成";
+                case BuildingPlacementFailure.InsufficientMaterials:
+                    return "无法放置：材料不足";
+                default:
+                    return "无法放置：未知原因";
+            }
+        }
+
+        private void ConfigureReferences(
             Canvas canvas,
             EventSystem eventSystem,
             GrayboxBuildingSession3D session,
@@ -115,16 +214,9 @@ namespace WasteCity.Graybox3D.Building
             this.eventSystem = eventSystem;
             this.session = session;
             this.interaction = interaction;
-            if (presenter == null)
-                presenter = new GrayboxBuildingCatalogPresenter3D();
-            if (inputGuard == null)
-                inputGuard = new GrayboxUiInputGuard3D();
-
-            if (uiRoot != null)
-                DestroyGenerated(uiRoot.gameObject);
-            EnsureCanvasContract();
-            BuildUi();
-            RefreshCatalog();
+            EnsureRuntimeServices();
+            if (isActiveAndEnabled)
+                RebuildUi();
         }
 
         public void RefreshCatalog()
@@ -272,6 +364,71 @@ namespace WasteCity.Graybox3D.Building
             interaction != null &&
             uiRoot != null;
 
+        private bool HasSerializedUiReferences =>
+            canvas != null &&
+            eventSystem != null &&
+            session != null &&
+            interaction != null;
+
+        private void EnsureRuntimeServices()
+        {
+            if (presenter == null)
+                presenter = new GrayboxBuildingCatalogPresenter3D();
+            if (inputGuard == null)
+                inputGuard = new GrayboxUiInputGuard3D();
+        }
+
+        private void TryBuildSerializedUi()
+        {
+            EnsureRuntimeServices();
+            if (uiRoot != null || !HasSerializedUiReferences) return;
+            RebuildUi();
+        }
+
+        private void RebuildUi()
+        {
+            if (!HasSerializedUiReferences) return;
+            if (uiRoot != null)
+            {
+                uiRoot.name = "GrayboxBuildingUi.Retired";
+                uiRoot.gameObject.SetActive(false);
+                DestroyGenerated(uiRoot.gameObject);
+            }
+            uiRoot = null;
+            quickbarRoot = null;
+            catalogRoot = null;
+            catalogCardsRoot = null;
+            evacuationRoot = null;
+            placementStatusRoot = null;
+            placementStatusText = null;
+            searchField = null;
+            hasPlacementStatusCache = false;
+            RetireSerializedUiRoots();
+            EnsureCanvasContract();
+            BuildUi();
+            RefreshCatalog();
+            RefreshPlacementStatus();
+        }
+
+        private void RetireSerializedUiRoots()
+        {
+            Transform canvasTransform = canvas.transform;
+            for (var index = canvasTransform.childCount - 1;
+                 index >= 0;
+                 index--)
+            {
+                Transform child = canvasTransform.GetChild(index);
+                if (!string.Equals(
+                        child.name,
+                        "GrayboxBuildingUi.Root",
+                        StringComparison.Ordinal))
+                    continue;
+                child.name = "GrayboxBuildingUi.Retired";
+                child.gameObject.SetActive(false);
+                DestroyGenerated(child.gameObject);
+            }
+        }
+
         private void EnsureCanvasContract()
         {
             if (canvas.GetComponent<GraphicRaycaster>() == null)
@@ -351,6 +508,20 @@ namespace WasteCity.Graybox3D.Building
             evacuationLayout.spacing = 3f;
             evacuationLayout.padding = new RectOffset(6, 6, 6, 6);
             evacuationRoot.gameObject.SetActive(false);
+
+            placementStatusRoot = CreatePanel(
+                uiRoot,
+                "Placement.Status",
+                new Vector2(.5f, 1f),
+                new Vector2(.5f, 1f),
+                new Vector2(0f, -8f),
+                new Vector2(480f, 38f));
+            placementStatusText = CreateLabel(
+                placementStatusRoot,
+                "Placement.Status.Text",
+                string.Empty);
+            placementStatusText.fontSize = 15;
+            placementStatusRoot.gameObject.SetActive(false);
         }
 
         private void BuildCatalogChrome()
@@ -410,18 +581,51 @@ namespace WasteCity.Graybox3D.Building
                     () => SetRouteFilter(captured));
             }
 
-            catalogCardsRoot = CreateRect(
+            RectTransform scrollRoot = CreateRect(
                 catalogRoot,
+                "Catalog.Scroll");
+            scrollRoot.sizeDelta = new Vector2(596f, 224f);
+            SetLayout(scrollRoot, 596f, 224f, 0f);
+            scrollRoot.GetComponent<LayoutElement>().minWidth = 596f;
+            scrollRoot.GetComponent<LayoutElement>().minHeight = 224f;
+            Image scrollImage =
+                scrollRoot.gameObject.AddComponent<Image>();
+            scrollImage.color = new Color(1f, 1f, 1f, .01f);
+            var scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+
+            RectTransform viewport = CreateRect(
+                scrollRoot,
+                "Catalog.Viewport");
+            Stretch(viewport);
+            Image viewportImage =
+                viewport.gameObject.AddComponent<Image>();
+            viewportImage.color = new Color(0f, 0f, 0f, 0f);
+            viewportImage.raycastTarget = false;
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            catalogCardsRoot = CreateRect(
+                viewport,
                 "Catalog.Cards");
-            SetLayout(catalogCardsRoot, 596f, 0f, 0f, 1f);
-            catalogCardsRoot.GetComponent<LayoutElement>().minWidth =
-                596f;
+            catalogCardsRoot.anchorMin = new Vector2(0f, 1f);
+            catalogCardsRoot.anchorMax = new Vector2(1f, 1f);
+            catalogCardsRoot.pivot = new Vector2(.5f, 1f);
+            catalogCardsRoot.anchoredPosition = Vector2.zero;
+            catalogCardsRoot.sizeDelta = Vector2.zero;
             var cardLayout =
                 catalogCardsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             cardLayout.spacing = 3f;
             cardLayout.childForceExpandHeight = false;
-            cardLayout.childForceExpandWidth = false;
-            cardLayout.childControlWidth = false;
+            cardLayout.childForceExpandWidth = true;
+            cardLayout.childControlWidth = true;
+            var fitter =
+                catalogCardsRoot.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit =
+                ContentSizeFitter.FitMode.PreferredSize;
+            scroll.viewport = viewport;
+            scroll.content = catalogCardsRoot;
         }
 
         private void RefreshQuickbar()
@@ -666,6 +870,39 @@ namespace WasteCity.Graybox3D.Building
             catalogRoot.gameObject.SetActive(visible);
             if (visible)
                 RebuildCatalogCards();
+        }
+
+        private void RefreshPlacementStatus()
+        {
+            if (placementStatusRoot == null || interaction == null) return;
+            GrayboxBuildingInteractionState state = interaction.State;
+            BuildingPlacementEvaluation evaluation =
+                placement == null
+                    ? default
+                    : placement.CurrentEvaluation;
+            BuildingPlacementFailure failure =
+                evaluation.PrimaryFailure;
+            if (hasPlacementStatusCache &&
+                lastPlacementState == state &&
+                lastPlacementFailure == failure &&
+                lastPlacementValid == evaluation.IsValid)
+                return;
+
+            hasPlacementStatusCache = true;
+            lastPlacementState = state;
+            lastPlacementFailure = failure;
+            lastPlacementValid = evaluation.IsValid;
+            bool visible =
+                placement != null &&
+                state == GrayboxBuildingInteractionState.Previewing &&
+                !evaluation.IsValid &&
+                failure != BuildingPlacementFailure.None;
+            placementStatusRoot.gameObject.SetActive(visible);
+            if (visible)
+                placementStatusText.text =
+                    PlacementFailureMessage(failure);
+            else if (!string.IsNullOrEmpty(placementStatusText.text))
+                placementStatusText.text = string.Empty;
         }
 
         private static InputField CreateInputField(

@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -184,6 +186,9 @@ namespace WasteCity.Tests
             PositionCameraAtCell(fixture, 17, 13);
 
             fixture.Placement.UpdatePointer(ScreenCenter);
+            GrayboxBuildingMenuView3D menu =
+                CreatePlacementStatusMenu(fixture);
+            menu.SetPlacementController(fixture.Placement);
 
             Assert.That(fixture.Placement.CurrentHit.IsValid, Is.True);
             Assert.That(fixture.Placement.CurrentEvaluation.IsValid, Is.False);
@@ -202,6 +207,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Placement.CurrentEvaluation.CompatibleResourceNodeId,
                 Is.Not.EqualTo(ResourceIds.Iron));
+            Assert.That(
+                PlacementStatusText(menu).text,
+                Does.Contain("重叠"));
         }
 
         [Test]
@@ -344,6 +352,12 @@ namespace WasteCity.Tests
             fixture.Interaction.Select(BuildingCatalog.Wall);
             PositionCameraAtCell(fixture, 20, 15);
             fixture.Placement.UpdatePointer(ScreenCenter);
+            GrayboxBuildingMenuView3D menu =
+                CreatePlacementStatusMenu(fixture);
+            menu.SetPlacementController(fixture.Placement);
+            Assert.That(
+                PlacementStatusText(menu).gameObject.activeInHierarchy,
+                Is.False);
 
             Assert.That(
                 fixture.Placement.ConfirmCurrentPlacement(out _),
@@ -357,6 +371,7 @@ namespace WasteCity.Tests
 
             PositionCameraAtCell(fixture, 21, 15);
             fixture.Placement.UpdatePointer(ScreenCenter);
+            menu.SetPlacementController(fixture.Placement);
 
             Assert.That(fixture.Placement.CurrentEvaluation.IsValid, Is.False);
             Assert.That(
@@ -367,6 +382,34 @@ namespace WasteCity.Tests
                 "building.preview.core.building.wall");
             Color shown = PropertyColor(preview.Renderer);
             Assert.That(shown.r, Is.GreaterThan(shown.g));
+            Assert.That(
+                PlacementStatusText(menu).text,
+                Does.Contain("材料不足"));
+            Assert.That(
+                PlacementStatusText(menu).text,
+                Does.Not.Contain("重叠"));
+            Assert.That(
+                PlacementStatusText(menu).gameObject.activeInHierarchy,
+                Is.True);
+            fixture.Interaction.CancelPreview();
+            menu.SetPlacementController(fixture.Placement);
+            Assert.That(
+                PlacementStatusText(menu).gameObject.activeInHierarchy,
+                Is.False);
+        }
+
+        [Test]
+        public void Menu_PlacementFailureMessagesAreStableDistinctAndComplete()
+        {
+            string[] messages = Enum
+                .GetValues(typeof(BuildingPlacementFailure))
+                .Cast<BuildingPlacementFailure>()
+                .Select(GrayboxBuildingMenuView3D.PlacementFailureMessage)
+                .ToArray();
+
+            Assert.That(messages, Has.All.Not.Empty);
+            Assert.That(messages.Distinct().Count(), Is.EqualTo(
+                messages.Length));
         }
 
         [Test]
@@ -1075,6 +1118,38 @@ namespace WasteCity.Tests
                 placement,
                 instanceRoot,
                 buildingMaterial);
+        }
+
+        private GrayboxBuildingMenuView3D CreatePlacementStatusMenu(
+            WorldFixture fixture)
+        {
+            GameObject menuObject = Track(new GameObject("status-menu"));
+            GameObject eventObject = Track(new GameObject("status-event"));
+            EventSystem eventSystem =
+                eventObject.AddComponent<EventSystem>();
+            GameObject canvasObject = Track(new GameObject(
+                "status-canvas",
+                typeof(RectTransform)));
+            canvasObject.transform.SetParent(menuObject.transform, false);
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.GetComponent<RectTransform>().sizeDelta =
+                new Vector2(640f, 480f);
+            GrayboxBuildingMenuView3D menu =
+                menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            menu.Configure(
+                canvas,
+                eventSystem,
+                fixture.Session,
+                fixture.Interaction,
+                fixture.Placement);
+            return menu;
+        }
+
+        private static Text PlacementStatusText(
+            GrayboxBuildingMenuView3D menu)
+        {
+            return menu.GetComponentsInChildren<Text>(true)
+                .Single(value => value.name == "Placement.Status.Text");
         }
 
         private GameObject CreatePrefabLikePresentationRoot(
