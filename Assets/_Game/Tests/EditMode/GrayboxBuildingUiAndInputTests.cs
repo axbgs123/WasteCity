@@ -300,6 +300,40 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_HeldPointerTracksLiveGraphicVisibility()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            CreateCountingGraphicTarget(
+                out GameObject pointerTarget);
+            pointerTarget.SetActive(false);
+            ForceCanvasLayout(fixture.Canvas);
+            QueueMouseState(ScreenCenter, middleHeld: true);
+
+            GrayboxInputSuppression noHit =
+                fixture.Router.ProcessCurrentInput();
+
+            Assert.That(noHit.CameraDrag, Is.False);
+
+            pointerTarget.SetActive(true);
+            ForceCanvasLayout(fixture.Canvas);
+            QueueMouseState(ScreenCenter, middleHeld: true);
+
+            GrayboxInputSuppression opened =
+                fixture.Router.ProcessCurrentInput();
+
+            Assert.That(opened.CameraDrag, Is.True);
+
+            pointerTarget.SetActive(false);
+            ForceCanvasLayout(fixture.Canvas);
+            QueueMouseState(ScreenCenter, middleHeld: true);
+
+            GrayboxInputSuppression closed =
+                fixture.Router.ProcessCurrentInput();
+
+            Assert.That(closed.CameraDrag, Is.False);
+        }
+
+        [Test]
         public void InputRouter_UiReleaseEndsWorldDragWithoutStaleContinuation()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -521,6 +555,82 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_StablePreviewReevaluatesInventoryMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.InsufficientMaterials));
+
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                BuildingCatalog.Wall.Cost);
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+        }
+
+        [Test]
+        public void InputRouter_StablePreviewReevaluatesCityModeMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+
+            fixture.City.Deployment.Restore(CityMode.Mobile, 0f);
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(BuildingPlacementFailure.InvalidCityMode));
+        }
+
+        [Test]
+        public void InputRouter_StablePreviewReevaluatesGridOccupancyMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+            BuildingSurfaceHit hit =
+                fixture.Placement.CurrentHit;
+            Assert.That(hit.IsValid, Is.True);
+            Assert.That(hit.Site, Is.EqualTo(BuildingSite.Ground));
+            Assert.That(
+                fixture.Session.GroundGrid.TryRestore(
+                    BuildingCatalog.Wall,
+                    hit.X,
+                    hit.Y,
+                    out _),
+                Is.True);
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(BuildingPlacementFailure.Overlap));
+        }
+
+        [Test]
         public void InputRouter_ProcessCurrentInputAllocatesZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -543,28 +653,35 @@ namespace WasteCity.Tests
         public void InputRouter_UiMiddleHoldAllocatesZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
-            Button quickbar = FindComponent<Button>(
-                fixture.Canvas.transform,
-                "QuickbarSlot.0");
-            ForceCanvasLayout(fixture.Canvas);
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(out _);
             QueueMouseState(
-                RectCenter(fixture.Ui, quickbar),
+                ScreenCenter,
                 middleHeld: true);
             QueueMouseState(
-                RectCenter(fixture.Ui, quickbar),
+                ScreenCenter,
                 middleHeld: true);
-            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Router.ProcessCurrentInput().CameraDrag,
+                Is.True);
             fixture.Router.ProcessCurrentInput();
 
+            int raycastsBefore = raycaster.RaycastCalls;
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (var index = 0; index < 300; index++)
                 fixture.Router.ProcessCurrentInput();
             long difference =
                 GC.GetAllocatedBytesForCurrentThread() - before;
+            int raycastDifference =
+                raycaster.RaycastCalls - raycastsBefore;
 
             TestContext.WriteLine(
                 "Task9UiMiddleHoldAllocationDifference=" +
                 difference);
+            TestContext.WriteLine(
+                "Task9UiMiddleHoldRaycastDifference=" +
+                raycastDifference);
+            Assert.That(raycastDifference, Is.EqualTo(300));
             Assert.That(difference, Is.Zero);
         }
 
@@ -1909,6 +2026,37 @@ namespace WasteCity.Tests
             return result;
         }
 
+        private static void PrepareStableWallPreview(
+            InputRouterFixture fixture)
+        {
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            PositionInputCameraAtCell(fixture, 20, 15);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+        }
+
+        private CountingGraphicRaycaster CreateCountingGraphicTarget(
+            out GameObject target)
+        {
+            Canvas canvas = Create<Canvas>("CountingGraphicCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            CountingGraphicRaycaster raycaster =
+                canvas.gameObject.AddComponent<CountingGraphicRaycaster>();
+            RegisterHeadlessEditModeRaycaster(raycaster);
+            target = NewObject("CountingGraphicTarget");
+            RectTransform rect =
+                target.AddComponent<RectTransform>();
+            rect.SetParent(canvas.transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            Image image = target.AddComponent<Image>();
+            image.raycastTarget = true;
+            ForceCanvasLayout(canvas);
+            return raycaster;
+        }
+
         private static Transform NewChildObject(
             Transform parent,
             string name)
@@ -2488,6 +2636,19 @@ namespace WasteCity.Tests
                 PointerEventData eventData,
                 List<RaycastResult> resultAppendList)
             {
+            }
+        }
+
+        private sealed class CountingGraphicRaycaster : GraphicRaycaster
+        {
+            public int RaycastCalls { get; private set; }
+
+            public override void Raycast(
+                PointerEventData eventData,
+                List<RaycastResult> resultAppendList)
+            {
+                RaycastCalls++;
+                base.Raycast(eventData, resultAppendList);
             }
         }
 

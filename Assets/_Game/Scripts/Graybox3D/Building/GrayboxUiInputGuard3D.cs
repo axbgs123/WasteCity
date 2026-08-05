@@ -9,7 +9,8 @@ namespace WasteCity.Graybox3D.Building
     {
         private readonly List<RaycastResult> raycastResults =
             new List<RaycastResult>();
-        private GraphicRaycaster[] raycasters;
+        private EventSystem pointerEventSystem;
+        private PointerEventData pointerEventData;
         private int escapeConsumedFrame = -1;
 
         public bool HasKeyboardFocus(EventSystem eventSystem)
@@ -30,12 +31,19 @@ namespace WasteCity.Graybox3D.Building
             Vector2 screenPosition)
         {
             if (eventSystem == null) return false;
-            var pointer = new PointerEventData(eventSystem)
+            if (pointerEventData == null ||
+                pointerEventSystem != eventSystem)
             {
-                position = screenPosition
-            };
+                pointerEventSystem = eventSystem;
+                pointerEventData =
+                    new PointerEventData(eventSystem);
+            }
+            pointerEventData.Reset();
+            pointerEventData.position = screenPosition;
             raycastResults.Clear();
-            eventSystem.RaycastAll(pointer, raycastResults);
+            eventSystem.RaycastAll(
+                pointerEventData,
+                raycastResults);
             bool hit = false;
             for (var index = 0; index < raycastResults.Count; index++)
             {
@@ -52,9 +60,8 @@ namespace WasteCity.Graybox3D.Building
             raycastResults.Clear();
             if (hit) return true;
 
-            if (raycasters == null || raycasters.Length == 0)
-                raycasters =
-                    UnityEngine.Object.FindObjectsOfType<GraphicRaycaster>();
+            GraphicRaycaster[] raycasters =
+                UnityEngine.Object.FindObjectsOfType<GraphicRaycaster>();
             for (var raycasterIndex = 0;
                  raycasterIndex < raycasters.Length;
                  raycasterIndex++)
