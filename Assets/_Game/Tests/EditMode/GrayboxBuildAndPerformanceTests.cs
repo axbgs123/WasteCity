@@ -32,7 +32,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void BuildTools_ExposeSeparateFrozen2DAndGraybox3DTargets()
+        public void BuildTools_ExposeDefault3DLegacy2DAndExplicit3DTargets()
         {
             Type buildTools = FindLoadedType(FormalBuildToolsTypeName);
             Assert.That(buildTools, Is.Not.Null);
@@ -46,36 +46,56 @@ namespace WasteCity.Tests
                     "BuildWindowsGraybox3D",
                     BindingFlags.Public | BindingFlags.Static),
                 Is.Not.Null);
+            Assert.That(
+                buildTools.GetMethod(
+                    "BuildWindowsLegacy2D",
+                    BindingFlags.Public | BindingFlags.Static),
+                Is.Not.Null);
 
             string source = File.ReadAllText(
                 Path.Combine(
                     Application.dataPath,
                     "_Game/Editor/FormalBuildTools.cs"));
-            string frozen2D = ExtractMethodBlock(source, "BuildWindows");
-            string graybox3D =
+            string default3D = ExtractMethodBlock(source, "BuildWindows");
+            string explicitGraybox3D =
                 ExtractMethodBlock(source, "BuildWindowsGraybox3D");
-
-            StringAssert.Contains(
-                "Assets/_Game/Scenes/FormalPrototype.unity",
-                frozen2D);
-            StringAssert.Contains(
-                "Builds/Windows/WasteCity.exe",
-                frozen2D);
-            StringAssert.DoesNotContain("GrayboxPrototype3D", frozen2D);
-            StringAssert.Contains(
-                "BuildTarget.StandaloneWindows64",
-                frozen2D);
+            string legacy2D =
+                ExtractMethodBlock(source, "BuildWindowsLegacy2D");
 
             StringAssert.Contains(
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-                graybox3D);
+                default3D);
             StringAssert.Contains(
-                "Builds/Windows3D/WasteCityGraybox.exe",
-                graybox3D);
-            StringAssert.DoesNotContain("FormalPrototype", graybox3D);
+                "Builds/Windows/WasteCity.exe",
+                default3D);
+            StringAssert.DoesNotContain("FormalPrototype", default3D);
             StringAssert.Contains(
                 "BuildTarget.StandaloneWindows64",
-                graybox3D);
+                default3D);
+
+            StringAssert.Contains(
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                explicitGraybox3D);
+            StringAssert.Contains(
+                "Builds/Windows3D/WasteCityGraybox.exe",
+                explicitGraybox3D);
+            StringAssert.DoesNotContain(
+                "FormalPrototype",
+                explicitGraybox3D);
+            StringAssert.Contains(
+                "BuildTarget.StandaloneWindows64",
+                explicitGraybox3D);
+
+            StringAssert.Contains(
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+                legacy2D);
+            StringAssert.Contains(
+                "Builds/Windows2D/WasteCity2D.exe",
+                legacy2D);
+            StringAssert.DoesNotContain("GrayboxPrototype3D", legacy2D);
+            StringAssert.Contains(
+                "BuildTarget.StandaloneWindows64",
+                legacy2D);
         }
 
         [Test]

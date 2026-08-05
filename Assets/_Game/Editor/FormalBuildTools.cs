@@ -12,8 +12,20 @@ namespace WasteCity.Editor
             Directory.CreateDirectory("Builds/Windows");
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
-                scenes = new[] { "Assets/_Game/Scenes/FormalPrototype.unity" },
+                scenes = new[] { "Assets/_Game/Scenes/GrayboxPrototype3D.unity" },
                 locationPathName = "Builds/Windows/WasteCity.exe",
+                target = BuildTarget.StandaloneWindows64
+            });
+            if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());
+        }
+
+        public static void BuildWindowsLegacy2D()
+        {
+            Directory.CreateDirectory("Builds/Windows2D");
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/_Game/Scenes/FormalPrototype.unity" },
+                locationPathName = "Builds/Windows2D/WasteCity2D.exe",
                 target = BuildTarget.StandaloneWindows64
             });
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());

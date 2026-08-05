@@ -6,9 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/_Game/Scenes/FormalPrototype.unity
-    guid: 1e4380942b51d41418abec8d88733b5e
-  - enabled: 1
     path: Assets/_Game/Scenes/GrayboxPrototype3D.unity
     guid: 12e3c1674e00d4711a077044998357a8
+  - enabled: 1
+    path: Assets/_Game/Scenes/FormalPrototype.unity
+    guid: 1e4380942b51d41418abec8d88733b5e
   m_configObjects: {}

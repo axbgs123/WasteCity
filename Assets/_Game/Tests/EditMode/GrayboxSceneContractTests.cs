@@ -1,3 +1,4 @@
+using System.IO;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -261,7 +262,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void BuildSettings_KeepFormalFirstAndGrayboxSecond()
+        public void BuildSettings_KeepGrayboxFirstAndFormalSecond()
         {
             EditorBuildSettingsScene[] scenes =
                 EditorBuildSettings.scenes;
@@ -269,10 +270,47 @@ namespace WasteCity.Tests
             Assert.That(scenes[0].enabled, Is.True);
             Assert.That(
                 scenes[0].path,
+                Is.EqualTo(ScenePath));
+            Assert.That(scenes[1].enabled, Is.True);
+            Assert.That(
+                scenes[1].path,
                 Is.EqualTo(
                     "Assets/_Game/Scenes/FormalPrototype.unity"));
-            Assert.That(scenes[1].enabled, Is.True);
-            Assert.That(scenes[1].path, Is.EqualTo(ScenePath));
+        }
+
+        [TestCase("GrayboxSceneAuthoring.cs")]
+        [TestCase("FormalProjectSetup.cs")]
+        public void SceneAuthoringPaths_KeepGrayboxFirstAndFormalSecond(
+            string editorFileName)
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor",
+                    editorFileName));
+            string assignment =
+                ExtractBuildSettingsAssignment(source);
+            int grayboxIndex = assignment.IndexOf(
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                System.StringComparison.Ordinal);
+            if (grayboxIndex < 0)
+            {
+                grayboxIndex = assignment.IndexOf(
+                    "ScenePath",
+                    System.StringComparison.Ordinal);
+            }
+            int formalIndex = assignment.IndexOf(
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+                System.StringComparison.Ordinal);
+
+            Assert.That(
+                grayboxIndex,
+                Is.GreaterThanOrEqualTo(0),
+                editorFileName);
+            Assert.That(
+                formalIndex,
+                Is.GreaterThan(grayboxIndex),
+                editorFileName);
         }
 
         [Test]
@@ -307,6 +345,22 @@ namespace WasteCity.Tests
                 property.objectReferenceValue,
                 Is.SameAs(expected),
                 $"{owner.GetType().Name}.{propertyName}");
+        }
+
+        private static string ExtractBuildSettingsAssignment(
+            string source)
+        {
+            const string assignmentStart =
+                "EditorBuildSettings.scenes";
+            int start = source.LastIndexOf(
+                assignmentStart,
+                System.StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0));
+            int end = source.IndexOf(
+                ';',
+                start);
+            Assert.That(end, Is.GreaterThan(start));
+            return source.Substring(start, end - start + 1);
         }
     }
 }

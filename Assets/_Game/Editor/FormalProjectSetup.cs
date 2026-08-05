@@ -138,7 +138,15 @@ namespace WasteCity.Editor
             var hudData = new SerializedObject(hud); hudData.FindProperty("city").objectReferenceValue = city.GetComponent<PlaceholderMobileCity>(); hudData.FindProperty("economy").objectReferenceValue = economy; hudData.FindProperty("population").objectReferenceValue = population; hudData.FindProperty("cityHealth").objectReferenceValue = cityHealth; hudData.FindProperty("guide").objectReferenceValue = guide; hudData.FindProperty("gameSpeed").objectReferenceValue = gameSpeed; hudData.FindProperty("clock").objectReferenceValue = clock; hudData.ApplyModifiedPropertiesWithoutUndo();
             var title=systems.AddComponent<FormalTitleMenuController>();var titleData=new SerializedObject(title);titleData.FindProperty("saves").objectReferenceValue=saves;titleData.FindProperty("advancement").objectReferenceValue=advancement;titleData.ApplyModifiedPropertiesWithoutUndo();
             EditorSceneManager.SaveScene(scene, "Assets/_Game/Scenes/FormalPrototype.unity");
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/_Game/Scenes/FormalPrototype.unity", true) };
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene(
+                    "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                    true),
+                new EditorBuildSettingsScene(
+                    "Assets/_Game/Scenes/FormalPrototype.unity",
+                    true)
+            };
             PlayerSettings.productName = "Waste City"; PlayerSettings.companyName = "废土游戏";
             AssetDatabase.SaveAssets(); Debug.Log("Formal project foundation configured.");
         }
