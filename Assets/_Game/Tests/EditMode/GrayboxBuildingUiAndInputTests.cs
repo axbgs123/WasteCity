@@ -6,6 +6,8 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -14,6 +16,7 @@ using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.World;
 
 namespace WasteCity.Tests
 {
@@ -25,18 +28,29 @@ namespace WasteCity.Tests
         private readonly List<UnityEngine.Object> cleanup =
             new List<UnityEngine.Object>();
         private float originalTimeScale;
+        private Keyboard testKeyboard;
+        private Mouse testMouse;
+        private Vector2 testPointer = ScreenCenter;
+        private object inputTestFixture;
 
         [SetUp]
         public void SetUp()
         {
             originalTimeScale = Time.timeScale;
             Time.timeScale = 1f;
+            testPointer = ScreenCenter;
         }
 
         [TearDown]
         public void TearDown()
         {
             Time.timeScale = originalTimeScale;
+            if (testKeyboard != null && testKeyboard.added)
+                InputSystem.RemoveDevice(testKeyboard);
+            if (testMouse != null && testMouse.added)
+                InputSystem.RemoveDevice(testMouse);
+            testKeyboard = null;
+            testMouse = null;
             for (var index = 0; index < cleanup.Count; index++)
                 if (cleanup[index] != null &&
                     cleanup[index] is GameObject gameObject)
@@ -49,6 +63,12 @@ namespace WasteCity.Tests
                 if (cleanup[index] != null)
                     UnityEngine.Object.DestroyImmediate(cleanup[index]);
             cleanup.Clear();
+            if (inputTestFixture != null)
+            {
+                inputTestFixture.GetType().GetMethod("TearDown")
+                    .Invoke(inputTestFixture, null);
+                inputTestFixture = null;
+            }
         }
 
         [Test]
@@ -84,6 +104,366 @@ namespace WasteCity.Tests
             Assert.That(interaction.Selected, Is.Null);
             Assert.That(interaction.Orientation, Is.EqualTo(
                 BuildingOrientation.North));
+        }
+
+        [Test]
+        public void InputRouter_ImplementsTheGenericGrayboxInterceptor()
+        {
+            Type router = typeof(GrayboxBuildingMenuView3D).Assembly.GetType(
+                "WasteCity.Graybox3D.Building." +
+                "GrayboxBuildingInputRouter3D");
+
+            Assert.That(router, Is.Not.Null);
+            Assert.That(
+                typeof(GrayboxInputRouter).Assembly.GetType(
+                    "WasteCity.Graybox3D.IGrayboxInputInterceptor")
+                    .IsAssignableFrom(router),
+                Is.True);
+            Assert.That(
+                router.GetMethod(
+                    "ProcessCurrentInput",
+                    Type.EmptyTypes),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void InputRouter_BQuickbarRotateAndCancelFollowBuildState()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+
+            GrayboxInputSuppression catalog =
+                PressKey(fixture.Router, Key.B);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CatalogOpen));
+            Assert.That(catalog.Move, Is.False);
+
+            PressKey(fixture.Router, Key.Digit4);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+            Assert.That(fixture.Interaction.Selected, Is.SameAs(
+                BuildingCatalog.Wall));
+
+            PressKey(fixture.Router, Key.R);
+            Assert.That(fixture.Interaction.Orientation, Is.EqualTo(
+                BuildingOrientation.East));
+
+            GrayboxInputSuppression cancelled =
+                PressMouse(fixture.Router, MouseButton.Right);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(fixture.Interaction.Selected, Is.Null);
+            Assert.That(cancelled.Destination, Is.True);
+        }
+
+        [Test]
+        public void InputRouter_EscapeClosesCatalogThenCancelsPreview()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PressKey(fixture.Router, Key.B);
+
+            PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+
+            PressKey(fixture.Router, Key.B);
+            PressKey(fixture.Router, Key.Digit2);
+            Assert.That(fixture.Interaction.Selected, Is.SameAs(
+                BuildingCatalog.Housing));
+            PressKey(fixture.Router, Key.Escape);
+
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(fixture.Interaction.Selected, Is.Null);
+        }
+
+        [Test]
+        public void InputRouter_LeftClickConfirmsOnlyAValidPreview()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PositionInputCameraAtCell(fixture, 20, 15);
+            SetPointer(ScreenCenter);
+
+            PressMouse(fixture.Router, MouseButton.Left);
+
+            Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+
+            fixture.Interaction.CancelPreview();
+            PositionInputCameraOver(
+                fixture.Camera,
+                new Vector3(100f, 0f, 100f));
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PressMouse(fixture.Router, MouseButton.Left);
+
+            Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void InputRouter_DeleteUsesConstructionCancellationRules()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D zeroProgress =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    20,
+                    15,
+                    fixture.Presentation);
+            Assert.That(
+                fixture.Construction.SelectInstance(
+                    zeroProgress.StableInstanceId),
+                Is.True);
+
+            PressKey(fixture.Router, Key.Delete);
+
+            Assert.That(fixture.Session.Instances, Is.Empty);
+
+            GrayboxBuildingInstance3D progressed =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    20,
+                    15,
+                    fixture.Presentation);
+            fixture.Construction.TickConstruction(.5f);
+            Assert.That(
+                fixture.Construction.SelectInstance(
+                    progressed.StableInstanceId),
+                Is.True);
+            PressKey(fixture.Router, Key.Delete);
+
+            Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CancelConfirmation));
+        }
+
+        [Test]
+        public void InputRouter_FDelegatesToEvacuationBeforeBaseDeployment()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+
+            GrayboxInputSuppression suppression =
+                PressKey(fixture.Router, Key.F);
+
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(suppression.Deployment, Is.True);
+        }
+
+        [Test]
+        public void InputRouter_BuildModeKeepsMovementAndCameraButOwnsDestination()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            SetPointer(ScreenCenter);
+
+            GrayboxInputSuppression keyboard =
+                PressKey(fixture.Router, Key.W);
+            GrayboxInputSuppression pointer =
+                PressMouse(fixture.Router, MouseButton.Right);
+
+            Assert.That(keyboard.Move, Is.False);
+            Assert.That(keyboard.Home, Is.False);
+            Assert.That(pointer.CameraDrag, Is.False);
+            Assert.That(pointer.Destination, Is.True);
+        }
+
+        [Test]
+        public void InputRouter_UiPointerBlocksWorldClickAndCameraDrag()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            Button quickbar = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.0");
+            ForceCanvasLayout(fixture.Canvas);
+            SetPointer(RectCenter(fixture.Ui, quickbar));
+
+            GrayboxInputSuppression left =
+                PressMouse(fixture.Router, MouseButton.Left);
+            GrayboxInputSuppression middle =
+                PressMouse(fixture.Router, MouseButton.Middle);
+
+            Assert.That(left.Destination, Is.True);
+            Assert.That(middle.CameraDrag, Is.True);
+            Assert.That(fixture.Session.Instances, Is.Empty);
+        }
+
+        [Test]
+        public void InputRouter_FocusedKeyboardStillClassifiesUiPointerChannels()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Ui.Menu.RefreshCatalog();
+            InputField input = FindComponent<InputField>(
+                fixture.Canvas.transform,
+                "Catalog.Search");
+            fixture.EventSystem.GetComponent<InputSystemUIInputModule>()
+                .enabled = true;
+            fixture.EventSystem.SetSelectedGameObject(input.gameObject);
+            input.ActivateInputField();
+            Button quickbar = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.0");
+            ForceCanvasLayout(fixture.Canvas);
+            SetPointer(RectCenter(fixture.Ui, quickbar));
+
+            GrayboxInputSuppression suppression =
+                PressMouse(fixture.Router, MouseButton.Middle);
+
+            Assert.That(suppression.Move, Is.True);
+            Assert.That(suppression.Destination, Is.True);
+            Assert.That(suppression.CameraDrag, Is.True);
+            Assert.That(suppression.Home, Is.True);
+        }
+
+        [Test]
+        public void InputRouter_KeyboardFocusBlocksGameplayAndDeveloperKeys()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Ui.Menu.RefreshCatalog();
+            InputField input = FindComponent<InputField>(
+                fixture.Canvas.transform,
+                "Catalog.Search");
+            fixture.EventSystem.GetComponent<InputSystemUIInputModule>()
+                .enabled = true;
+            fixture.EventSystem.SetSelectedGameObject(input.gameObject);
+            input.ActivateInputField();
+            SetPointer(ScreenCenter);
+            Assert.That(fixture.Ui.Menu.HasKeyboardFocus(), Is.True);
+            GameObject panel = DeveloperPanel(fixture);
+            BuildingOrientation before = fixture.Interaction.Orientation;
+
+            Key[] blocked =
+            {
+                Key.W, Key.A, Key.S, Key.D, Key.B, Key.R,
+                Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4,
+                Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8,
+                Key.Digit9, Key.Digit0, Key.F, Key.F10,
+                Key.Home, Key.Delete, Key.Enter
+            };
+            for (var index = 0; index < blocked.Length; index++)
+            {
+                GrayboxInputSuppression suppression =
+                    PressKey(fixture.Router, blocked[index]);
+                Assert.That(
+                    suppression.Move,
+                    Is.True,
+                    blocked[index].ToString());
+                Assert.That(
+                    suppression.Deployment,
+                    Is.True,
+                    blocked[index].ToString());
+                Assert.That(
+                    suppression.Home,
+                    Is.True,
+                    blocked[index].ToString());
+            }
+
+            GrayboxInputSuppression escape =
+                PressKey(fixture.Router, Key.Escape);
+
+            Assert.That(escape.Move, Is.True);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CatalogOpen));
+            Assert.That(fixture.Interaction.Selected, Is.Null);
+            Assert.That(fixture.Interaction.Orientation, Is.EqualTo(before));
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
+            Assert.That(panel.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void InputRouter_FocusLossRestoresGameplayOnNextInputFrame()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Ui.Menu.RefreshCatalog();
+            InputField input = FindComponent<InputField>(
+                fixture.Canvas.transform,
+                "Catalog.Search");
+            InputSystemUIInputModule inputModule =
+                fixture.EventSystem.GetComponent<InputSystemUIInputModule>();
+            inputModule.enabled = true;
+            fixture.EventSystem.SetSelectedGameObject(input.gameObject);
+            input.ActivateInputField();
+            Assert.That(fixture.Ui.Menu.HasKeyboardFocus(), Is.True);
+            PressKey(fixture.Router, Key.B);
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CatalogOpen));
+
+            input.DeactivateInputField();
+            fixture.EventSystem.SetSelectedGameObject(null);
+            inputModule.enabled = false;
+            InputSystem.Update();
+            PressKey(fixture.Router, Key.B);
+
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+        }
+
+        [Test]
+        public void InputRouter_F10RunsOnceAfterFocusAndModalHandling()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            GameObject panel = DeveloperPanel(fixture);
+
+            PressKey(fixture.Router, Key.F10);
+            Assert.That(panel.activeSelf, Is.True);
+            PressKey(fixture.Router, Key.F10);
+            Assert.That(panel.activeSelf, Is.False);
+
+            fixture.Interaction.RequestCancelConstruction();
+            PressKey(fixture.Router, Key.F10);
+
+            Assert.That(panel.activeSelf, Is.False);
+        }
+
+        [Test]
+        public void InputRouter_OutsideBuildModeLeavesDigitsUnconsumed()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+
+            GrayboxInputSuppression suppression =
+                PressKey(fixture.Router, Key.Digit1);
+
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(fixture.Interaction.Selected, Is.Null);
+            Assert.That(suppression.Move, Is.False);
+            Assert.That(suppression.Deployment, Is.False);
+            Assert.That(suppression.Destination, Is.False);
+            Assert.That(suppression.CameraDrag, Is.False);
+            Assert.That(suppression.Home, Is.False);
+        }
+
+        [Test]
+        public void InputRouter_ProcessCurrentInputAllocatesZeroAcross300Calls()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Router.ProcessCurrentInput();
+            fixture.Router.ProcessCurrentInput();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                fixture.Router.ProcessCurrentInput();
+            long difference =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+
+            TestContext.WriteLine(
+                "Task9ProcessCurrentInputAllocationDifference=" +
+                difference);
+            Assert.That(difference, Is.Zero);
         }
 
         [Test]
@@ -1105,6 +1485,323 @@ namespace WasteCity.Tests
                     "TickConstruction(Time.unscaledDeltaTime);"));
         }
 
+        private InputRouterFixture CreateInputRouterFixture()
+        {
+            UiFixture ui = CreateMenuFixture();
+            Material worldMaterial = new Material(
+                Shader.Find("Hidden/InternalErrorShader"));
+            cleanup.Add(worldMaterial);
+            GameObject worldObject = NewObject("InputWorld");
+            Transform terrain =
+                NewChildObject(worldObject.transform, "Terrain");
+            Transform resources =
+                NewChildObject(worldObject.transform, "Resources");
+            Transform obstacles =
+                NewChildObject(worldObject.transform, "Obstacles");
+            GrayboxWorldView3D world =
+                worldObject.AddComponent<GrayboxWorldView3D>();
+            world.Configure(
+                terrain,
+                resources,
+                obstacles,
+                worldMaterial);
+            world.Generate(new WorldMapModel(OpenInputCells()));
+
+            GameObject cityObject = NewObject("InputCity");
+            Assert.That(
+                world.Coordinates.TryCellToWorld(
+                    16,
+                    12,
+                    .5f,
+                    out Vector3 cityPosition),
+                Is.True);
+            cityObject.transform.position = cityPosition;
+            Rigidbody body = cityObject.AddComponent<Rigidbody>();
+            BoxCollider bodyCollider =
+                cityObject.AddComponent<BoxCollider>();
+            GrayboxMobileCityController3D city =
+                cityObject.AddComponent<GrayboxMobileCityController3D>();
+            city.Configure(world, body, bodyCollider);
+
+            Camera camera = Create<Camera>("InputWorldCamera");
+            camera.pixelRect = new Rect(0f, 0f, 640f, 480f);
+            camera.orthographic = true;
+            camera.orthographicSize = 5f;
+            camera.aspect = 640f / 480f;
+            PositionInputCameraAtCell(world, camera, 20, 15);
+
+            GameObject innerObject = NewObject("InputInnerSurface");
+            innerObject.transform.SetParent(cityObject.transform, false);
+            BoxCollider inner = innerObject.AddComponent<BoxCollider>();
+            inner.enabled = false;
+            GrayboxBuildingSurfaceProjector3D projector =
+                Create<GrayboxBuildingSurfaceProjector3D>(
+                    "InputBuildingProjector");
+            projector.Configure(camera, world, city, inner);
+
+            GrayboxBuildingWorldView3D presentation =
+                Create<GrayboxBuildingWorldView3D>(
+                    "InputBuildingPresentation");
+            Transform instances =
+                NewChildObject(presentation.transform, "Instances");
+            Transform infrastructure =
+                NewChildObject(
+                    presentation.transform,
+                    "Infrastructure");
+            Material buildingMaterial = new Material(
+                Shader.Find("Hidden/InternalErrorShader"));
+            cleanup.Add(buildingMaterial);
+            presentation.Configure(
+                instances,
+                infrastructure,
+                buildingMaterial,
+                city);
+
+            GrayboxBuildingPlacementController3D placement =
+                Create<GrayboxBuildingPlacementController3D>(
+                    "InputPlacement");
+            placement.Configure(
+                ui.Session,
+                city,
+                world,
+                projector,
+                presentation,
+                ui.Interaction);
+            GrayboxConstructionController3D construction =
+                Create<GrayboxConstructionController3D>(
+                    "InputConstruction");
+            construction.Configure(
+                ui.Session,
+                city,
+                presentation,
+                ui.Interaction,
+                camera,
+                ui.Menu);
+            GrayboxEvacuationController3D evacuation =
+                Create<GrayboxEvacuationController3D>(
+                    "InputEvacuation");
+            evacuation.Configure(
+                ui.Session,
+                city,
+                presentation,
+                ui.Menu);
+            GrayboxDeveloperModifierBootstrap3D developer =
+                Create<GrayboxDeveloperModifierBootstrap3D>(
+                    "InputDeveloper");
+            developer.Configure(
+                ui.Session,
+                city,
+                presentation);
+            GrayboxBuildingInputRouter3D router =
+                Create<GrayboxBuildingInputRouter3D>("BuildingInput");
+            router.Configure(
+                ui.Menu,
+                ui.Interaction,
+                placement,
+                construction,
+                evacuation,
+                developer);
+            EnsureInputDevices();
+            SetPointer(ScreenCenter);
+            ui.EventSystem.SetSelectedGameObject(null);
+            InputSystemUIInputModule inputModule =
+                ui.EventSystem.GetComponent<InputSystemUIInputModule>();
+            if (inputModule != null)
+                inputModule.enabled = false;
+            return new InputRouterFixture(
+                ui,
+                world,
+                city,
+                camera,
+                presentation,
+                placement,
+                construction,
+                evacuation,
+                developer,
+                router);
+        }
+
+        private void EnsureInputDevices()
+        {
+            if (inputTestFixture == null)
+            {
+                Type fixtureType = Type.GetType(
+                    "UnityEngine.InputSystem.InputTestFixture, " +
+                    "Unity.InputSystem.TestFramework",
+                    true);
+                inputTestFixture = Activator.CreateInstance(fixtureType);
+                fixtureType.GetMethod("Setup")
+                    .Invoke(inputTestFixture, null);
+            }
+            if (testKeyboard == null)
+                testKeyboard = InputSystem.AddDevice<Keyboard>();
+            if (testMouse == null)
+                testMouse = InputSystem.AddDevice<Mouse>();
+            testKeyboard.MakeCurrent();
+            testMouse.MakeCurrent();
+        }
+
+        private GrayboxInputSuppression PressKey(
+            GrayboxBuildingInputRouter3D router,
+            Key key)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(key));
+            InputSystem.Update();
+            Assert.That(Keyboard.current, Is.SameAs(testKeyboard));
+            Assert.That(
+                testKeyboard[key].wasPressedThisFrame,
+                Is.True,
+                key.ToString());
+            GrayboxInputSuppression suppression =
+                router.ProcessCurrentInput();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState());
+            InputSystem.Update();
+            return suppression;
+        }
+
+        private GrayboxInputSuppression PressMouse(
+            GrayboxBuildingInputRouter3D router,
+            MouseButton button)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = testPointer
+                }.WithButton(button));
+            InputSystem.Update();
+            Assert.That(Mouse.current, Is.SameAs(testMouse));
+            Assert.That(
+                ButtonFor(testMouse, button).wasPressedThisFrame,
+                Is.True,
+                button.ToString());
+            GrayboxInputSuppression suppression =
+                router.ProcessCurrentInput();
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = testPointer
+                });
+            InputSystem.Update();
+            return suppression;
+        }
+
+        private void SetPointer(Vector2 position)
+        {
+            EnsureInputDevices();
+            testPointer = position;
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = position
+                });
+            InputSystem.Update();
+        }
+
+        private static UnityEngine.InputSystem.Controls.ButtonControl ButtonFor(
+            Mouse mouse,
+            MouseButton button)
+        {
+            switch (button)
+            {
+                case MouseButton.Left:
+                    return mouse.leftButton;
+                case MouseButton.Right:
+                    return mouse.rightButton;
+                case MouseButton.Middle:
+                    return mouse.middleButton;
+                case MouseButton.Forward:
+                    return mouse.forwardButton;
+                case MouseButton.Back:
+                    return mouse.backButton;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(button),
+                        button,
+                        null);
+            }
+        }
+
+        private static GameObject DeveloperPanel(
+            InputRouterFixture fixture)
+        {
+            Transform panel = fixture.Developer.transform.Find(
+                "Graybox Developer Modifier");
+            Assert.That(panel, Is.Not.Null);
+            return panel.gameObject;
+        }
+
+        private static WorldCell[,] OpenInputCells()
+        {
+            var result = new WorldCell[32, 24];
+            for (var x = 0; x < result.GetLength(0); x++)
+            for (var y = 0; y < result.GetLength(1); y++)
+            {
+                result[x, y] = new WorldCell(
+                    TerrainKind.Wasteland,
+                    null,
+                    0,
+                    WorldTraversalKind.Open);
+            }
+            return result;
+        }
+
+        private static Transform NewChildObject(
+            Transform parent,
+            string name)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(parent, false);
+            return child.transform;
+        }
+
+        private static void PositionInputCameraAtCell(
+            InputRouterFixture fixture,
+            int x,
+            int y)
+        {
+            PositionInputCameraAtCell(
+                fixture.World,
+                fixture.Camera,
+                x,
+                y);
+        }
+
+        private static void PositionInputCameraAtCell(
+            GrayboxWorldView3D world,
+            Camera camera,
+            int x,
+            int y)
+        {
+            Assert.That(
+                world.Coordinates.TryCellToWorld(
+                    x,
+                    y,
+                    0f,
+                    out Vector3 point),
+                Is.True);
+            PositionInputCameraOver(camera, point);
+        }
+
+        private static void PositionInputCameraOver(
+            Camera camera,
+            Vector3 point)
+        {
+            camera.transform.position =
+                new Vector3(point.x, point.y + 10f, point.z);
+            camera.transform.rotation =
+                Quaternion.Euler(90f, 0f, 0f);
+            Physics.SyncTransforms();
+        }
+
         private UiFixture CreateMenuFixture(
             bool cloneSerializedSource = false)
         {
@@ -1637,6 +2334,49 @@ namespace WasteCity.Tests
                 List<RaycastResult> resultAppendList)
             {
             }
+        }
+
+        private sealed class InputRouterFixture
+        {
+            public InputRouterFixture(
+                UiFixture ui,
+                GrayboxWorldView3D world,
+                GrayboxMobileCityController3D city,
+                Camera camera,
+                GrayboxBuildingWorldView3D presentation,
+                GrayboxBuildingPlacementController3D placement,
+                GrayboxConstructionController3D construction,
+                GrayboxEvacuationController3D evacuation,
+                GrayboxDeveloperModifierBootstrap3D developer,
+                GrayboxBuildingInputRouter3D router)
+            {
+                Ui = ui;
+                World = world;
+                City = city;
+                Camera = camera;
+                Presentation = presentation;
+                Placement = placement;
+                Construction = construction;
+                Evacuation = evacuation;
+                Developer = developer;
+                Router = router;
+            }
+
+            public UiFixture Ui { get; }
+            public Canvas Canvas => Ui.Canvas;
+            public EventSystem EventSystem => Ui.EventSystem;
+            public GrayboxBuildingSession3D Session => Ui.Session;
+            public GrayboxBuildingInteractionModel3D Interaction =>
+                Ui.Interaction;
+            public GrayboxWorldView3D World { get; }
+            public GrayboxMobileCityController3D City { get; }
+            public Camera Camera { get; }
+            public GrayboxBuildingWorldView3D Presentation { get; }
+            public GrayboxBuildingPlacementController3D Placement { get; }
+            public GrayboxConstructionController3D Construction { get; }
+            public GrayboxEvacuationController3D Evacuation { get; }
+            public GrayboxDeveloperModifierBootstrap3D Developer { get; }
+            public GrayboxBuildingInputRouter3D Router { get; }
         }
 
         private sealed class UiFixture

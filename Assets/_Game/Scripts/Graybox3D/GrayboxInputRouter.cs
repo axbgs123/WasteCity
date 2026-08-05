@@ -46,6 +46,7 @@ namespace WasteCity.Graybox3D
         [SerializeField] private GrayboxGroundProjector groundProjector;
         [SerializeField]
         private GrayboxCameraController3D cameraController;
+        [SerializeField] private MonoBehaviour inputInterceptor;
 
         public void Configure(
             GrayboxMobileCityController3D city,
@@ -59,6 +60,19 @@ namespace WasteCity.Graybox3D
             this.directControl = directControl;
             this.groundProjector = groundProjector;
             this.cameraController = cameraController;
+        }
+
+        public void ConfigureInputInterceptor(MonoBehaviour value)
+        {
+            if (value != null &&
+                !(value is IGrayboxInputInterceptor))
+            {
+                throw new System.ArgumentException(
+                    "Input interceptor must implement " +
+                    nameof(IGrayboxInputInterceptor) + ".",
+                    nameof(value));
+            }
+            inputInterceptor = value;
         }
 
         public GrayboxInputFrame ReadCurrentFrame()
@@ -114,7 +128,14 @@ namespace WasteCity.Graybox3D
 
         public void ProcessFrame(GrayboxInputFrame frame)
         {
-            ProcessCameraInput(frame);
+            ProcessFrame(frame, default);
+        }
+
+        public void ProcessFrame(
+            GrayboxInputFrame frame,
+            GrayboxInputSuppression suppression)
+        {
+            ProcessCameraInput(frame, suppression);
             if (Time.timeScale <= 0f)
                 return;
 
@@ -122,22 +143,26 @@ namespace WasteCity.Graybox3D
             DirectControlTarget target =
                 directControl?.ControlTarget ??
                 DirectControlTarget.City;
+            Vector2 move =
+                suppression.Move ? Vector2.zero : frame.Move;
             if (target == DirectControlTarget.Leader &&
                 leader != null)
             {
                 city?.ApplyManualInput(Vector2.zero);
-                leader.ApplyManualInput(frame.Move);
+                leader.ApplyManualInput(move);
             }
             else
             {
                 leader?.ApplyManualInput(Vector2.zero);
-                city?.ApplyManualInput(frame.Move);
+                city?.ApplyManualInput(move);
             }
 
-            if (frame.ToggleDeploymentPressed)
+            if (!suppression.Deployment &&
+                frame.ToggleDeploymentPressed)
                 city?.TryToggleDeployment(out _);
 
-            if (frame.DestinationPressed &&
+            if (!suppression.Destination &&
+                frame.DestinationPressed &&
                 city != null &&
                 city.Mode == CityMode.Mobile &&
                 groundProjector != null &&
@@ -170,29 +195,43 @@ namespace WasteCity.Graybox3D
 
         private void Update()
         {
-            ProcessFrame(ReadCurrentFrame());
+            GrayboxInputSuppression suppression = default;
+            if (inputInterceptor != null)
+            {
+                suppression =
+                    ((IGrayboxInputInterceptor)inputInterceptor)
+                    .ProcessCurrentInput();
+            }
+            GrayboxInputFrame frame = ReadCurrentFrame();
+            ProcessFrame(frame, suppression);
             TickGameplay(Time.deltaTime);
         }
 
-        private void ProcessCameraInput(GrayboxInputFrame frame)
+        private void ProcessCameraInput(
+            GrayboxInputFrame frame,
+            GrayboxInputSuppression suppression)
         {
             if (cameraController == null)
                 return;
 
-            if (frame.MiddlePressed)
+            if (!suppression.CameraDrag &&
+                frame.MiddlePressed)
             {
                 cameraController.BeginFreeDrag(
                     frame.PointerPosition);
             }
-            else if (frame.MiddleHeld)
+            else if (!suppression.CameraDrag &&
+                     frame.MiddleHeld)
             {
                 cameraController.ContinueFreeDrag(
                     frame.PointerPosition);
             }
 
-            if (frame.MiddleReleased)
+            if (!suppression.CameraDrag &&
+                frame.MiddleReleased)
                 cameraController.EndFreeDrag();
-            if (frame.HomePressed)
+            if (!suppression.Home &&
+                frame.HomePressed)
                 cameraController.ReturnToTarget();
         }
     }

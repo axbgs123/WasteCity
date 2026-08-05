@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using WasteCity.City;
 using WasteCity.Graybox3D;
 using WasteCity.World;
@@ -19,6 +21,7 @@ namespace WasteCity.Tests
         private readonly List<Camera> fixtureCameras =
             new List<Camera>();
         private SimulationMode originalSimulationMode;
+        private Keyboard testKeyboard;
 
         [SetUp]
         public void SetUp()
@@ -47,6 +50,9 @@ namespace WasteCity.Tests
                 }
 
                 cleanup.Clear();
+                if (testKeyboard != null && testKeyboard.added)
+                    InputSystem.RemoveDevice(testKeyboard);
+                testKeyboard = null;
             }
             finally
             {
@@ -148,6 +154,200 @@ namespace WasteCity.Tests
             AssertFrameProperty(frame, "MiddleHeld", true);
             AssertFrameProperty(frame, "MiddleReleased", false);
             AssertFrameProperty(frame, "HomePressed", true);
+        }
+
+        [Test]
+        public void InputRouter_ExposesGenericInterceptorAndSuppressionContract()
+        {
+            Type assemblyType = typeof(GrayboxInputRouter);
+            Type interceptor = assemblyType.Assembly.GetType(
+                "WasteCity.Graybox3D.IGrayboxInputInterceptor");
+            Type suppression = assemblyType.Assembly.GetType(
+                "WasteCity.Graybox3D.GrayboxInputSuppression");
+
+            Assert.That(interceptor, Is.Not.Null);
+            Assert.That(suppression, Is.Not.Null);
+            Assert.That(
+                assemblyType.GetMethod(
+                    "ConfigureInputInterceptor",
+                    new[] { typeof(MonoBehaviour) }),
+                Is.Not.Null);
+            Assert.That(
+                assemblyType.GetMethod(
+                    "ProcessFrame",
+                    new[] { GetInputFrameType(), suppression }),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void ConfigureInputInterceptor_RejectsUnrelatedMonoBehaviour()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+
+            Assert.Throws<ArgumentException>(
+                () => fixture.Router.ConfigureInputInterceptor(
+                    fixture.CameraController));
+        }
+
+        [Test]
+        public void Update_InterceptorSuppressesTheSameFrameBeforeBaseProcessing()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            RecordingInputInterceptor interceptor = Track(
+                new GameObject("InputInterceptor")
+                    .AddComponent<RecordingInputInterceptor>());
+            interceptor.Suppression = new GrayboxInputSuppression(
+                move: true,
+                deployment: false,
+                destination: false,
+                cameraDrag: false,
+                home: false);
+            fixture.Router.ConfigureInputInterceptor(interceptor);
+            testKeyboard = InputSystem.AddDevice<Keyboard>();
+            testKeyboard.MakeCurrent();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(Key.D));
+            InputSystem.Update();
+            Vector3 start = fixture.CityBody.position;
+
+            InvokeRouterUpdate(fixture.Router);
+            fixture.City.TickMovement(.1f);
+            fixture.SimulateFixedStep();
+
+            Assert.That(interceptor.Calls, Is.EqualTo(1));
+            Assert.That(fixture.CityBody.position, Is.EqualTo(start));
+        }
+
+        [Test]
+        public void ProcessFrame_MoveSuppressionLeavesHomeAvailable()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            Vector3 start = fixture.CityBody.position;
+            fixture.CameraController.BeginFreeDrag(
+                new Vector2(640f, 360f));
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f),
+                    homePressed: true),
+                new GrayboxInputSuppression(
+                    move: true,
+                    deployment: false,
+                    destination: false,
+                    cameraDrag: false,
+                    home: false));
+            fixture.City.TickMovement(.1f);
+            fixture.SimulateFixedStep();
+
+            Assert.That(fixture.CityBody.position, Is.EqualTo(start));
+            Assert.That(
+                fixture.CameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+        }
+
+        [Test]
+        public void ProcessFrame_DeploymentSuppressionLeavesMoveAvailable()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            Vector3 start = fixture.CityBody.position;
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.right,
+                    new Vector2(640f, 360f),
+                    toggleDeploymentPressed: true),
+                new GrayboxInputSuppression(
+                    move: false,
+                    deployment: true,
+                    destination: false,
+                    cameraDrag: false,
+                    home: false));
+            fixture.City.TickMovement(.1f);
+            fixture.SimulateFixedStep();
+
+            Assert.That(
+                fixture.CityBody.position.x - start.x,
+                Is.EqualTo(.4f).Within(.0001f));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Mobile));
+        }
+
+        [Test]
+        public void ProcessFrame_DestinationSuppressionLeavesMoveAvailable()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            Vector3 start = fixture.CityBody.position;
+            Vector3 targetScreen = fixture.Camera.WorldToScreenPoint(
+                new Vector3(2f, 0f, 0f));
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.right,
+                    targetScreen,
+                    destinationPressed: true),
+                new GrayboxInputSuppression(
+                    move: false,
+                    deployment: false,
+                    destination: true,
+                    cameraDrag: false,
+                    home: false));
+            fixture.City.TickMovement(.1f);
+            fixture.SimulateFixedStep();
+
+            Assert.That(
+                fixture.CityBody.position.x - start.x,
+                Is.EqualTo(.4f).Within(.0001f));
+            Assert.That(fixture.City.Destination, Is.Null);
+        }
+
+        [Test]
+        public void ProcessFrame_CameraDragSuppressionLeavesDeploymentAvailable()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.zero,
+                    new Vector2(740f, 410f),
+                    toggleDeploymentPressed: true,
+                    middlePressed: true,
+                    middleHeld: true),
+                new GrayboxInputSuppression(
+                    move: false,
+                    deployment: false,
+                    destination: false,
+                    cameraDrag: true,
+                    home: false));
+
+            Assert.That(
+                fixture.CameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Following));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Deploying));
+        }
+
+        [Test]
+        public void ProcessFrame_HomeSuppressionLeavesCameraDragAvailable()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.zero,
+                    new Vector2(640f, 360f),
+                    middlePressed: true,
+                    middleHeld: true,
+                    homePressed: true),
+                new GrayboxInputSuppression(
+                    move: false,
+                    deployment: false,
+                    destination: false,
+                    cameraDrag: false,
+                    home: true));
+
+            Assert.That(
+                fixture.CameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
         }
 
         [Test]
@@ -877,9 +1077,20 @@ namespace WasteCity.Tests
             MethodInfo method =
                 typeof(GrayboxInputRouter).GetMethod(
                     "ProcessFrame",
-                    BindingFlags.Instance | BindingFlags.Public);
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null,
+                    new[] { GetInputFrameType() },
+                    null);
             Assert.That(method, Is.Not.Null);
             method.Invoke(router, new[] { frame });
+        }
+
+        private static void InvokeRouterUpdate(GrayboxInputRouter router)
+        {
+            typeof(GrayboxInputRouter).GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(router, null);
         }
 
         private static void AssertFrameProperty(
@@ -990,6 +1201,20 @@ namespace WasteCity.Tests
                 CameraObject = cameraObject;
                 Camera = camera;
                 Projector = projector;
+            }
+        }
+
+        private sealed class RecordingInputInterceptor :
+            MonoBehaviour,
+            IGrayboxInputInterceptor
+        {
+            public int Calls { get; private set; }
+            public GrayboxInputSuppression Suppression { get; set; }
+
+            public GrayboxInputSuppression ProcessCurrentInput()
+            {
+                Calls++;
+                return Suppression;
             }
         }
 
