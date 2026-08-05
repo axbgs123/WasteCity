@@ -262,6 +262,26 @@ namespace WasteCity.Graybox3D
             UpdatePresentation();
         }
 
+        public bool RestoreDeploymentForDevelopment(CityMode mode)
+        {
+            EnsureDeployment();
+            if (mode != CityMode.Mobile && mode != CityMode.Fortress)
+                return false;
+            deployment.Restore(mode, 0f);
+            UpdatePresentation();
+            return true;
+        }
+
+        public bool CompleteDeploymentTransitionForDevelopment()
+        {
+            EnsureDeployment();
+            if (Mode != CityMode.Deploying && Mode != CityMode.Packing)
+                return false;
+            deployment.Tick(float.MaxValue);
+            UpdatePresentation();
+            return true;
+        }
+
         private bool NavigationReady =>
             worldView != null &&
             worldView.Model != null &&
