@@ -716,6 +716,60 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CompleteAllConstructionForDevelopment_SkipsEveryEvacuationLock()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D currentFull = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            GrayboxBuildingInstance3D unlocked = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 12, 10, presentation);
+            GrayboxBuildingInstance3D laterFull = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 14, 10, presentation);
+            currentFull.Progress.Restore(1.75f);
+            unlocked.Progress.Restore(1.25f);
+            laterFull.Progress.Restore(.75f);
+            var currentWork = BuildingEvacuationRules.Create(
+                currentFull.StableInstanceId,
+                currentFull.Placement.Definition.Cost,
+                currentFull.Progress.BaseDuration,
+                currentFull.Progress.Remaining / currentFull.Progress.BaseDuration,
+                BuildingEvacuationTreatment.FullDismantle);
+            var laterWork = BuildingEvacuationRules.Create(
+                laterFull.StableInstanceId,
+                laterFull.Placement.Definition.Cost,
+                laterFull.Progress.BaseDuration,
+                laterFull.Progress.Remaining / laterFull.Progress.BaseDuration,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { currentWork, laterWork }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryLockEvacuationWork(
+                new[] { currentWork, laterWork }, out string lockFailure),
+                Is.True, lockFailure);
+            uint revision = CatalogRevision(session);
+
+            session.CompleteAllConstructionForDevelopment(presentation);
+
+            Assert.That(currentFull.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(currentFull.Progress.Remaining, Is.EqualTo(1.75f));
+            Assert.That(currentFull.IsEvacuationLocked, Is.True);
+            Assert.That(laterFull.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(laterFull.Progress.Remaining, Is.EqualTo(.75f));
+            Assert.That(laterFull.IsEvacuationLocked, Is.True);
+            Assert.That(unlocked.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(unlocked.Progress.Remaining, Is.Zero);
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { unlocked }));
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision + 1));
+        }
+
+        [Test]
         public void CompleteAllConstructionForDevelopment_UpdateFailureRestoresAndRetriesSameInstance()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -945,6 +999,49 @@ namespace WasteCity.Tests
             Assert.That(session.InnerGrid.IsOccupied(0, 0), Is.False);
             Assert.That(session.Instances, Is.Empty);
             Assert.That(presentation.Removed, Is.EqualTo(new[] { instance }));
+        }
+
+        [Test]
+        public void TryCancelConstruction_EvacuationLockRejectsBeforeAnyMutation()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D instance = Begin(
+                session, BuildingCatalog.Wall, BuildingSite.Ground,
+                CityMode.Fortress, 10, 10, presentation);
+            instance.Progress.Restore(1.5f);
+            var work = BuildingEvacuationRules.Create(
+                instance.StableInstanceId,
+                instance.Placement.Definition.Cost,
+                instance.Progress.BaseDuration,
+                instance.Progress.Remaining / instance.Progress.BaseDuration,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryLockEvacuationWork(
+                new[] { work }, out string lockFailure),
+                Is.True, lockFailure);
+            int inventory = session.Inventory.Get(BuildingCatalog.Wall.CostId);
+            uint revision = CatalogRevision(session);
+
+            bool cancelled = session.TryCancelConstruction(
+                instance.StableInstanceId,
+                1d,
+                presentation,
+                out int acceptedRefund);
+
+            Assert.That(cancelled, Is.False);
+            Assert.That(acceptedRefund, Is.Zero);
+            Assert.That(session.Inventory.Get(BuildingCatalog.Wall.CostId),
+                Is.EqualTo(inventory));
+            Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.True);
+            Assert.That(session.Instances, Is.EqualTo(new[] { instance }));
+            Assert.That(instance.Progress.Remaining, Is.EqualTo(1.5f));
+            Assert.That(instance.IsEvacuationLocked, Is.True);
+            Assert.That(presentation.Removed, Is.Empty);
+            Assert.That(presentation.Updated, Is.Empty);
+            Assert.That(CatalogRevision(session), Is.EqualTo(revision));
         }
 
         [TestCase(false)]

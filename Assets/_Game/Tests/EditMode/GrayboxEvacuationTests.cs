@@ -398,7 +398,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Controller_UnassignedBlocksConfirmationAndNoGroundDelegatesOnce()
+        public void Controller_UnassignedBlocksConfirmationAndNoGroundConsumesRequests()
         {
             EvacuationFixture fixture = CreateFixture();
             GrayboxBuildingInstance3D wall = Begin(
@@ -417,7 +417,162 @@ namespace WasteCity.Tests
             EvacuationFixture emptyFixture = CreateFixture();
             Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.True);
             Assert.That(emptyFixture.City.Mode, Is.EqualTo(CityMode.Packing));
-            Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.False);
+            Assert.That(emptyFixture.Controller.TryHandleDeploymentRequest(), Is.True);
+        }
+
+        [Test]
+        public void Controller_ConsumesFWhenSingleNoGroundDelegationFails()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            var deployment = new DeploymentRequestSpy(
+                CityMode.Fortress,
+                toggleResult: false);
+            fixture.Controller.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Menu);
+
+            bool consumed = fixture.Controller.TryHandleDeploymentRequest();
+
+            Assert.That(consumed, Is.True);
+            Assert.That(deployment.ToggleCalls, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Controller_ManifestAndProcessingConsumeFWithoutDelegating()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D ground = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            var deployment = new DeploymentRequestSpy(
+                CityMode.Fortress,
+                toggleResult: false);
+            fixture.Controller.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Menu);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+            Assert.That(fixture.Controller.Assign(
+                ground.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(fixture.Controller.IsProcessing, Is.True);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+        }
+
+        [Test]
+        public void Controller_CancellationBlockTracksManifestFailureAndCompletion()
+        {
+            EvacuationFixture fixture = CreateFixture(configureMenu: true);
+            GrayboxBuildingInstance3D ground = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            Button cancel = FindButton(
+                fixture.Canvas.transform,
+                "Construction.Cancel");
+
+            Assert.That(cancel.interactable, Is.True);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(cancel.interactable, Is.False);
+            Assert.That(fixture.Controller.Assign(
+                ground.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(fixture.Controller.IsProcessing, Is.True);
+            Assert.That(cancel.interactable, Is.False);
+            SetEvacuationPresentation(
+                fixture.Controller,
+                new FailingPresentation { ThrowRemove = true });
+
+            Assert.Throws<InvalidOperationException>(() =>
+                fixture.Controller.Tick(20f, false));
+
+            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+            Assert.That(cancel.interactable, Is.False);
+            SetEvacuationPresentation(
+                fixture.Controller,
+                fixture.Presentation);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            fixture.Controller.Tick(20f, false);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+            Assert.That(cancel.interactable, Is.True);
+        }
+
+        [TestCase("Configure")]
+        [TestCase("OnDisable")]
+        [TestCase("OnDestroy")]
+        public void Controller_ControlledCleanupRollsBackOldSessionExactlyOnce(
+            string cleanupPath)
+        {
+            EvacuationFixture oldFixture = CreateFixture(configureMenu: true);
+            EvacuationFixture newFixture = CreateFixture(configureMenu: true);
+            GrayboxBuildingInstance3D committed = Begin(
+                oldFixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, oldFixture.Presentation);
+            GrayboxBuildingInstance3D stillLocked = Begin(
+                oldFixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, oldFixture.Presentation);
+            oldFixture.Session.SetConstructionMultiplierForDevelopment(100f);
+            oldFixture.Session.TickConstruction(
+                .1f, CityMode.Fortress, false, oldFixture.Presentation);
+            Assert.That(oldFixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(oldFixture.Controller.Assign(
+                committed.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.True);
+            Assert.That(oldFixture.Controller.Assign(
+                stillLocked.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(oldFixture.Controller.ConfirmManifest(), Is.True);
+            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
+            Assert.That(stillLocked.IsEvacuationLocked, Is.True);
+            uint beforeCleanup = oldFixture.Session.CatalogRevision;
+            Button oldCancel = FindButton(
+                oldFixture.Canvas.transform,
+                "Construction.Cancel");
+            Assert.That(oldCancel.interactable, Is.False);
+
+            InvokeCleanup(
+                oldFixture.Controller,
+                cleanupPath,
+                newFixture);
+
+            Assert.That(stillLocked.IsEvacuationLocked, Is.False);
+            Assert.That(oldFixture.Session.Instances.Contains(stillLocked), Is.True);
+            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
+            Assert.That(oldFixture.Session.CatalogRevision,
+                Is.EqualTo(beforeCleanup + 1));
+            Assert.That(oldFixture.Menu.EvacuationVisible, Is.False);
+            Assert.That(oldCancel.interactable, Is.True);
+            Assert.That(oldFixture.Controller.Work, Is.Empty);
+            Assert.That(oldFixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(oldFixture.Controller.IsProcessing, Is.False);
+            AssertControllerCleanupReferences(
+                oldFixture.Controller,
+                cleanupPath == "Configure" ? newFixture : default(EvacuationFixture));
+            uint afterFirstCleanup = oldFixture.Session.CatalogRevision;
+
+            InvokeCleanup(
+                oldFixture.Controller,
+                cleanupPath,
+                newFixture);
+
+            Assert.That(stillLocked.IsEvacuationLocked, Is.False);
+            Assert.That(oldFixture.Session.CatalogRevision,
+                Is.EqualTo(afterFirstCleanup));
+            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
+            Assert.That(oldCancel.interactable, Is.True);
+            Assert.That(oldFixture.Controller.Work, Is.Empty);
         }
 
         [Test]
@@ -815,6 +970,58 @@ namespace WasteCity.Tests
                 .Invoke(menu, null);
         }
 
+        private static void InvokeCleanup(
+            GrayboxEvacuationController3D controller,
+            string cleanupPath,
+            EvacuationFixture replacement)
+        {
+            if (cleanupPath == "Configure")
+            {
+                controller.Configure(
+                    replacement.Session,
+                    replacement.City,
+                    replacement.Presentation,
+                    replacement.Menu);
+                return;
+            }
+            typeof(GrayboxEvacuationController3D).GetMethod(
+                    cleanupPath,
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, null);
+        }
+
+        private static void AssertControllerCleanupReferences(
+            GrayboxEvacuationController3D controller,
+            EvacuationFixture replacement)
+        {
+            foreach (string fieldName in new[]
+                     {
+                         "session",
+                         "city",
+                         "presentation",
+                         "menu",
+                         "evacuationPresentation"
+                     })
+            {
+                FieldInfo field = typeof(GrayboxEvacuationController3D).GetField(
+                    fieldName,
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(field, Is.Not.Null);
+                object value = field.GetValue(controller);
+                if (replacement.Controller == null)
+                    Assert.That(value, Is.Null, fieldName);
+                else if (fieldName == "session")
+                    Assert.That(value, Is.SameAs(replacement.Session));
+                else if (fieldName == "city")
+                    Assert.That(value, Is.Not.Null);
+                else if (fieldName == "presentation" ||
+                         fieldName == "evacuationPresentation")
+                    Assert.That(value, Is.SameAs(replacement.Presentation));
+                else
+                    Assert.That(value, Is.SameAs(replacement.Menu));
+            }
+        }
+
         private static Button FindButton(Transform root, string name)
         {
             Transform[] transforms = root.GetComponentsInChildren<Transform>(true);
@@ -875,6 +1082,27 @@ namespace WasteCity.Tests
             public void Remove(GrayboxBuildingInstance3D instance)
             {
                 if (ThrowRemove) throw RemoveFailure;
+            }
+        }
+
+        private sealed class DeploymentRequestSpy : IGrayboxDeploymentRequest3D
+        {
+            private readonly bool toggleResult;
+
+            public DeploymentRequestSpy(CityMode mode, bool toggleResult)
+            {
+                Mode = mode;
+                this.toggleResult = toggleResult;
+            }
+
+            public CityMode Mode { get; }
+            public int ToggleCalls { get; private set; }
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                ToggleCalls++;
+                failureReason = toggleResult ? string.Empty : "rejected";
+                return toggleResult;
             }
         }
 

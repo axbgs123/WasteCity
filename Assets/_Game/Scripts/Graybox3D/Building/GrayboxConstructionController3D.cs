@@ -88,7 +88,8 @@ namespace WasteCity.Graybox3D.Building
                 FindInstance(selectedStableInstanceId);
             if (instance == null ||
                 instance.State !=
-                GrayboxBuildingInstanceState.UnderConstruction)
+                GrayboxBuildingInstanceState.UnderConstruction ||
+                instance.IsEvacuationLocked)
             {
                 selectedStableInstanceId = null;
                 return ConstructionCancelResult.NotFound;
@@ -131,7 +132,8 @@ namespace WasteCity.Graybox3D.Building
                 FindInstance(selectedStableInstanceId);
             if (instance == null ||
                 instance.State !=
-                GrayboxBuildingInstanceState.UnderConstruction)
+                GrayboxBuildingInstanceState.UnderConstruction ||
+                instance.IsEvacuationLocked)
             {
                 interaction.ResolveCancelConfirmation(false);
                 selectedStableInstanceId = null;

@@ -31,6 +31,7 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform quickbarRoot;
         private RectTransform catalogRoot;
         private RectTransform catalogCardsRoot;
+        private RectTransform constructionRoot;
         private RectTransform evacuationRoot;
         private RectTransform placementStatusRoot;
         private Text placementStatusText;
@@ -44,6 +45,10 @@ namespace WasteCity.Graybox3D.Building
         private bool lastPlacementValid;
         private bool hasCatalogRevision;
         private uint lastCatalogRevision;
+        private bool constructionCancellationBlocked;
+        private Button cancelConstructionButton;
+        private Button confirmCancellationButton;
+        private Button rejectCancellationButton;
 
         public bool CatalogVisible
         {
@@ -58,6 +63,8 @@ namespace WasteCity.Graybox3D.Building
         public bool EvacuationVisible =>
             evacuationRoot != null &&
             evacuationRoot.gameObject.activeSelf;
+        public bool ConstructionCancellationBlocked =>
+            constructionCancellationBlocked;
         public string SearchText => searchText;
 
         public event Action CancelSelectedConstructionRequested;
@@ -103,10 +110,14 @@ namespace WasteCity.Graybox3D.Building
             quickbarRoot = null;
             catalogRoot = null;
             catalogCardsRoot = null;
+            constructionRoot = null;
             evacuationRoot = null;
             placementStatusRoot = null;
             placementStatusText = null;
             searchField = null;
+            cancelConstructionButton = null;
+            confirmCancellationButton = null;
+            rejectCancellationButton = null;
             CancelSelectedConstructionRequested = null;
             CancelConstructionConfirmationResolved = null;
             EvacuationItemTreatmentRequested = null;
@@ -366,6 +377,18 @@ namespace WasteCity.Graybox3D.Building
             evacuationRoot.gameObject.SetActive(false);
         }
 
+        public void SetConstructionCancellationBlocked(bool blocked)
+        {
+            constructionCancellationBlocked = blocked;
+            bool interactable = !blocked;
+            if (cancelConstructionButton != null)
+                cancelConstructionButton.interactable = interactable;
+            if (confirmCancellationButton != null)
+                confirmCancellationButton.interactable = interactable;
+            if (rejectCancellationButton != null)
+                rejectCancellationButton.interactable = interactable;
+        }
+
         private bool IsConfigured =>
             canvas != null &&
             eventSystem != null &&
@@ -476,7 +499,7 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(620f, 350f));
             BuildCatalogChrome();
 
-            RectTransform construction = CreatePanel(
+            constructionRoot = CreatePanel(
                 uiRoot,
                 "Construction",
                 new Vector2(1f, 0f),
@@ -484,26 +507,28 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(-8f, 8f),
                 new Vector2(190f, 102f));
             var constructionLayout =
-                construction.gameObject.AddComponent<VerticalLayoutGroup>();
+                constructionRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             constructionLayout.padding = new RectOffset(5, 5, 5, 5);
             constructionLayout.spacing = 3f;
             constructionLayout.childForceExpandWidth = true;
             constructionLayout.childForceExpandHeight = false;
-            CreateButton(
-                construction,
+            cancelConstructionButton = CreateButton(
+                constructionRoot,
                 "Construction.Cancel",
                 "取消选中施工",
                 () => CancelSelectedConstructionRequested?.Invoke());
-            CreateButton(
-                construction,
+            confirmCancellationButton = CreateButton(
+                constructionRoot,
                 "Construction.Confirm.Yes",
                 "确认取消",
                 () => CancelConstructionConfirmationResolved?.Invoke(true));
-            CreateButton(
-                construction,
+            rejectCancellationButton = CreateButton(
+                constructionRoot,
                 "Construction.Confirm.No",
                 "返回施工",
                 () => CancelConstructionConfirmationResolved?.Invoke(false));
+            SetConstructionCancellationBlocked(
+                constructionCancellationBlocked);
 
             evacuationRoot = CreatePanel(
                 uiRoot,

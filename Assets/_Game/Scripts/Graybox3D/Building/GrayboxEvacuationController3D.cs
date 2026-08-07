@@ -7,6 +7,12 @@ using WasteCity.Graybox3D;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public interface IGrayboxDeploymentRequest3D
+    {
+        WasteCity.City.CityMode Mode { get; }
+        bool TryToggleDeployment(out string failureReason);
+    }
+
     public sealed class GrayboxEvacuationController3D : MonoBehaviour
     {
         [SerializeField] private GrayboxBuildingSession3D session;
@@ -14,6 +20,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxBuildingWorldView3D presentation;
         [SerializeField] private GrayboxBuildingMenuView3D menu;
         private IGrayboxBuildingPresentation3D evacuationPresentation;
+        private IGrayboxDeploymentRequest3D deploymentRequest;
 
         private readonly List<GrayboxBuildingInstance3D> manifest =
             new List<GrayboxBuildingInstance3D>();
@@ -50,22 +57,68 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(presentation));
             if (menu == null) throw new ArgumentNullException(nameof(menu));
 
-            UnsubscribeMenu();
+            ConfigureCore(
+                session,
+                city,
+                new CityDeploymentRequestAdapter(city),
+                presentation,
+                presentation,
+                menu);
+        }
+
+        public void Configure(
+            GrayboxBuildingSession3D session,
+            IGrayboxDeploymentRequest3D deploymentRequest,
+            IGrayboxBuildingPresentation3D presentation,
+            GrayboxBuildingMenuView3D menu)
+        {
+            if (session == null) throw new ArgumentNullException(nameof(session));
+            if (deploymentRequest == null)
+                throw new ArgumentNullException(nameof(deploymentRequest));
+            if (presentation == null)
+                throw new ArgumentNullException(nameof(presentation));
+            if (menu == null) throw new ArgumentNullException(nameof(menu));
+
+            ConfigureCore(
+                session,
+                null,
+                deploymentRequest,
+                null,
+                presentation,
+                menu);
+        }
+
+        private void ConfigureCore(
+            GrayboxBuildingSession3D session,
+            GrayboxMobileCityController3D city,
+            IGrayboxDeploymentRequest3D deploymentRequest,
+            GrayboxBuildingWorldView3D presentation,
+            IGrayboxBuildingPresentation3D evacuationPresentation,
+            GrayboxBuildingMenuView3D menu)
+        {
+            CleanupController();
             this.session = session;
             this.city = city;
+            this.deploymentRequest = deploymentRequest;
             this.presentation = presentation;
-            evacuationPresentation = presentation;
+            this.evacuationPresentation = evacuationPresentation;
             this.menu = menu;
-            ClearProcessingState();
+            ResetLocalState();
+            menu.SetConstructionCancellationBlocked(false);
             if (isActiveAndEnabled) SubscribeMenu();
         }
 
         public bool TryHandleDeploymentRequest()
         {
-            if (!IsConfigured || IsManifestOpen || IsProcessing) return false;
+            if (!IsConfigured) return false;
+            if (IsManifestOpen || IsProcessing) return true;
             if (!session.HasPlayerOwnedGroundInstances)
-                return city.TryToggleDeployment(out _);
-            if (city.Mode != WasteCity.City.CityMode.Fortress) return false;
+            {
+                deploymentRequest.TryToggleDeployment(out _);
+                return true;
+            }
+            if (deploymentRequest.Mode != WasteCity.City.CityMode.Fortress)
+                return false;
 
             session.CopyPlayerOwnedGroundInstances(manifest);
             assignments.Clear();
@@ -73,6 +126,7 @@ namespace WasteCity.Graybox3D.Building
             fullQueue.Clear();
             rollbackWork.Clear();
             IsManifestOpen = true;
+            menu.SetConstructionCancellationBlocked(true);
             menu.ShowEvacuation(manifest);
             return true;
         }
@@ -236,9 +290,11 @@ namespace WasteCity.Graybox3D.Building
         private bool FinishIfResolved()
         {
             if (session.HasPlayerOwnedGroundInstances) return true;
-            bool packed = city.TryToggleDeployment(out _);
-            if (packed) ClearProcessingState();
-            return packed;
+            deploymentRequest.TryToggleDeployment(out _);
+            ResetLocalState();
+            menu.HideEvacuation();
+            menu.SetConstructionCancellationBlocked(false);
+            return true;
         }
 
         private void FailProcessing()
@@ -250,10 +306,11 @@ namespace WasteCity.Graybox3D.Building
             remainingSeconds = 0f;
             ClearWorkOnly();
             session.CopyPlayerOwnedGroundInstances(manifest);
+            menu.SetConstructionCancellationBlocked(true);
             menu.ShowEvacuation(manifest);
         }
 
-        private void ClearProcessingState()
+        private void ResetLocalState()
         {
             IsManifestOpen = false;
             IsProcessing = false;
@@ -272,7 +329,7 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private bool IsConfigured =>
-            session != null && city != null &&
+            session != null && deploymentRequest != null &&
             EvacuationPresentation != null && menu != null;
 
         private IGrayboxBuildingPresentation3D EvacuationPresentation =>
@@ -290,13 +347,12 @@ namespace WasteCity.Graybox3D.Building
 
         private void OnDisable()
         {
-            UnsubscribeMenu();
+            CleanupController();
         }
 
         private void OnDestroy()
         {
-            UnsubscribeMenu();
-            menu = null;
+            CleanupController();
         }
 
         private void OnItemTreatmentRequested(
@@ -341,6 +397,52 @@ namespace WasteCity.Graybox3D.Building
             menu.EvacuationCategoryTreatmentRequested -= OnCategoryTreatmentRequested;
             menu.EvacuationAllTreatmentRequested -= OnAllTreatmentRequested;
             menu.EvacuationConfirmationRequested -= OnConfirmationRequested;
+        }
+
+        private void CleanupController()
+        {
+            GrayboxBuildingSession3D oldSession = session;
+            GrayboxBuildingMenuView3D oldMenu = menu;
+            UnsubscribeMenu();
+            try
+            {
+                if (oldSession != null && rollbackWork.Count > 0)
+                    oldSession.RollbackEvacuationLocksAfterFailure(rollbackWork);
+            }
+            finally
+            {
+                if (oldMenu != null)
+                {
+                    oldMenu.HideEvacuation();
+                    oldMenu.SetConstructionCancellationBlocked(false);
+                }
+                ResetLocalState();
+                session = null;
+                city = null;
+                deploymentRequest = null;
+                presentation = null;
+                evacuationPresentation = null;
+                menu = null;
+            }
+        }
+
+        private sealed class CityDeploymentRequestAdapter :
+            IGrayboxDeploymentRequest3D
+        {
+            private readonly GrayboxMobileCityController3D city;
+
+            public CityDeploymentRequestAdapter(
+                GrayboxMobileCityController3D city)
+            {
+                this.city = city;
+            }
+
+            public WasteCity.City.CityMode Mode => city.Mode;
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                return city.TryToggleDeployment(out failureReason);
+            }
         }
     }
 }

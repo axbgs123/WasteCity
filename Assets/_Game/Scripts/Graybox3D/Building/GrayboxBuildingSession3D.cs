@@ -244,7 +244,8 @@ namespace WasteCity.Graybox3D.Building
             if (index < 0) return false;
 
             GrayboxBuildingInstance3D instance = instances[index];
-            if (instance.State != GrayboxBuildingInstanceState.UnderConstruction)
+            if (instance.State != GrayboxBuildingInstanceState.UnderConstruction ||
+                instance.IsEvacuationLocked)
                 return false;
 
             BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
@@ -654,7 +655,8 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < instances.Count; index++)
             {
                 GrayboxBuildingInstance3D instance = instances[index];
-                if (instance.State != GrayboxBuildingInstanceState.UnderConstruction)
+                if (instance.State != GrayboxBuildingInstanceState.UnderConstruction ||
+                    instance.IsEvacuationLocked)
                     continue;
                 float remainingBefore = instance.Progress.Remaining;
                 instance.Progress.Restore(0f);

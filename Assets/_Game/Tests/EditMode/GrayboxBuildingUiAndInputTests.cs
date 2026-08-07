@@ -1585,6 +1585,97 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void ConstructionController_DirectRequestRejectsLockedZeroProgress()
+        {
+            ControllerFixture fixture = CreateControllerFixture();
+            GrayboxBuildingInstance3D instance = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            LockForFullEvacuation(fixture.Session, instance);
+            int inventory = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            uint revision = fixture.Session.CatalogRevision;
+            Assert.That(fixture.Controller.SelectInstance(
+                instance.StableInstanceId), Is.True);
+
+            ConstructionCancelResult result =
+                fixture.Controller.RequestCancelSelected();
+
+            Assert.That(result, Is.EqualTo(ConstructionCancelResult.NotFound));
+            Assert.That(fixture.Session.Instances, Is.EqualTo(new[] { instance }));
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId), Is.EqualTo(inventory));
+            Assert.That(instance.Progress.Remaining,
+                Is.EqualTo(instance.Progress.BaseDuration));
+            Assert.That(instance.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+        }
+
+        [Test]
+        public void ConstructionController_ConfirmationCallbackRejectsNewlyLockedItem()
+        {
+            ControllerFixture fixture = CreateControllerFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D instance = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            fixture.Controller.TickConstruction(.5f);
+            Assert.That(fixture.Controller.SelectInstance(
+                instance.StableInstanceId), Is.True);
+            Assert.That(fixture.Controller.RequestCancelSelected(),
+                Is.EqualTo(ConstructionCancelResult.ConfirmationRequired));
+            LockForFullEvacuation(fixture.Session, instance);
+            float remaining = instance.Progress.Remaining;
+            int inventory = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            uint revision = fixture.Session.CatalogRevision;
+
+            bool cancelled = fixture.Controller.ResolveCancelSelected(true);
+
+            Assert.That(cancelled, Is.False);
+            Assert.That(fixture.Session.Instances, Is.EqualTo(new[] { instance }));
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId), Is.EqualTo(inventory));
+            Assert.That(instance.Progress.Remaining, Is.EqualTo(remaining));
+            Assert.That(instance.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+        }
+
+        [Test]
+        public void ConstructionController_UguiCancelEventRejectsLockedItem()
+        {
+            ControllerFixture fixture = CreateControllerFixture();
+            GrayboxBuildingInstance3D instance = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            LockForFullEvacuation(fixture.Session, instance);
+            int inventory = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            uint revision = fixture.Session.CatalogRevision;
+            Assert.That(fixture.Controller.SelectInstance(
+                instance.StableInstanceId), Is.True);
+
+            Click(fixture.Canvas.transform, "Construction.Cancel");
+
+            Assert.That(fixture.Session.Instances, Is.EqualTo(new[] { instance }));
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId), Is.EqualTo(inventory));
+            Assert.That(instance.Progress.Remaining,
+                Is.EqualTo(instance.Progress.BaseDuration));
+            Assert.That(instance.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+        }
+
+        [Test]
         public void ConstructionController_SelectAtResolvesColliderStableId()
         {
             ControllerFixture fixture = CreateControllerFixture();
@@ -2364,6 +2455,24 @@ namespace WasteCity.Tests
                 out BuildingPlacementEvaluation evaluation), Is.True,
                 evaluation.PrimaryFailure.ToString());
             return instance;
+        }
+
+        private static void LockForFullEvacuation(
+            GrayboxBuildingSession3D session,
+            GrayboxBuildingInstance3D instance)
+        {
+            var work = BuildingEvacuationRules.Create(
+                instance.StableInstanceId,
+                instance.Placement.Definition.Cost,
+                instance.Progress.BaseDuration,
+                instance.Progress.Remaining / instance.Progress.BaseDuration,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out string captureFailure),
+                Is.True, captureFailure);
+            Assert.That(session.TryLockEvacuationWork(
+                new[] { work }, out string lockFailure),
+                Is.True, lockFailure);
         }
 
         private T Create<T>(string name) where T : Component
