@@ -1,3 +1,7 @@
+using System;
+using System.Collections;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using WasteCity.Building;
 
@@ -16,5 +20,153 @@ namespace WasteCity.Tests
         [Test] public void AlchemyChamberRequiresAlchemyAndArtifactWorkshop(){Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.AlchemyChamber,200,id=>id=="core.research.alchemy",id=>id==BuildingCatalog.ArtifactWorkshop.Id.Value?1:0,out _),Is.True);Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.AlchemyChamber,200,_=>true,_=>0,out _),Is.False);}
         [Test] public void PuppetWorkshopRequiresPuppetryAndArtifactWorkshop(){Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.PuppetWorkshop,200,id=>id=="core.research.puppetry",id=>id==BuildingCatalog.ArtifactWorkshop.Id.Value?1:0,out _),Is.True);Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.PuppetWorkshop,200,_=>true,_=>0,out _),Is.False);}
         [Test] public void BehemothPenRequiresBreedingResearchAndChamber(){Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.BehemothPen,200,id=>id=="core.research.behemoth-breeding",id=>id==BuildingCatalog.BreedingChamber.Id.Value?1:0,out _),Is.True);Assert.That(BuildingUnlockModel.IsUnlocked(BuildingCatalog.BehemothPen,200,_=>true,_=>0,out _),Is.False);}
+
+        [Test]
+        public void WorkspaceApi_ReusesPrivateBuffersUntilItsNextEvaluation()
+        {
+            Type workspaceType = typeof(BuildingUnlockModel).Assembly.GetType(
+                "WasteCity.Building.BuildingUnlockEvaluationWorkspace");
+            Assert.That(workspaceType, Is.Not.Null);
+            Assert.That(workspaceType.IsPublic, Is.True);
+            Assert.That(workspaceType.GetConstructor(Type.EmptyTypes), Is.Not.Null);
+            MethodInfo evaluate = typeof(BuildingUnlockModel).GetMethod(
+                "Evaluate",
+                new[]
+                {
+                    typeof(BuildingDefinition),
+                    typeof(int),
+                    typeof(Func<string, bool>),
+                    typeof(Func<string, int>),
+                    workspaceType
+                });
+            Assert.That(evaluate, Is.Not.Null);
+
+            var definition = new BuildingDefinition(
+                "test.building.workspace-unlock",
+                "Workspace Unlock",
+                1,
+                1,
+                WasteCity.Economy.ResourceIds.Alloy,
+                1,
+                minimumPopulation: 10,
+                requiredResearchId: "test.research.workspace",
+                requiredBuildingId: "test.building.required");
+            object workspace = Activator.CreateInstance(workspaceType);
+            object otherWorkspace = Activator.CreateInstance(workspaceType);
+            var first = (BuildingUnlockEvaluation)evaluate.Invoke(
+                null,
+                new object[]
+                {
+                    definition,
+                    0,
+                    new Func<string, bool>(_ => false),
+                    new Func<string, int>(_ => 0),
+                    workspace
+                });
+            Assert.That(
+                first.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingUnlockFailure.Population,
+                    BuildingUnlockFailure.Research,
+                    BuildingUnlockFailure.RequiredBuilding
+                }));
+            Assert.That(first.Reasons, Has.Count.EqualTo(3));
+
+            evaluate.Invoke(
+                null,
+                new object[]
+                {
+                    definition,
+                    20,
+                    new Func<string, bool>(_ => true),
+                    new Func<string, int>(_ => 1),
+                    otherWorkspace
+                });
+            Assert.That(first.Failures, Has.Count.EqualTo(3));
+            Assert.That(first.Reasons, Has.Count.EqualTo(3));
+
+            evaluate.Invoke(
+                null,
+                new object[]
+                {
+                    definition,
+                    20,
+                    new Func<string, bool>(_ => true),
+                    new Func<string, int>(_ => 1),
+                    workspace
+                });
+            Assert.That(first.Failures, Is.Empty);
+            Assert.That(first.Reasons, Is.Empty);
+
+            AssertNoPublicMutableBufferOrReset(workspaceType);
+            AssertNoStaticMutableBuffer(workspaceType);
+        }
+
+        [Test]
+        public void LegacyEvaluate_ReturnsIndependentImmutableSnapshots()
+        {
+            var definition = new BuildingDefinition(
+                "test.building.legacy-unlock-snapshot",
+                "Legacy Unlock Snapshot",
+                1,
+                1,
+                WasteCity.Economy.ResourceIds.Alloy,
+                1,
+                minimumPopulation: 10);
+            BuildingUnlockEvaluation locked =
+                BuildingUnlockModel.Evaluate(
+                    definition,
+                    0,
+                    _ => true,
+                    _ => 1);
+            BuildingUnlockEvaluation unlocked =
+                BuildingUnlockModel.Evaluate(
+                    definition,
+                    20,
+                    _ => true,
+                    _ => 1);
+
+            Assert.That(
+                locked.Failures,
+                Is.EqualTo(new[] { BuildingUnlockFailure.Population }));
+            Assert.That(locked.Reasons, Has.Count.EqualTo(1));
+            Assert.That(unlocked.Failures, Is.Empty);
+            Assert.That(unlocked.Reasons, Is.Empty);
+            Assert.That(locked.Failures, Is.Not.SameAs(unlocked.Failures));
+            Assert.That(locked.Reasons, Is.Not.SameAs(unlocked.Reasons));
+        }
+
+        private static void AssertNoPublicMutableBufferOrReset(Type type)
+        {
+            Assert.That(
+                type.GetFields(BindingFlags.Public | BindingFlags.Instance),
+                Is.Empty);
+            Assert.That(
+                type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(property =>
+                        property.PropertyType.IsArray ||
+                        typeof(IList).IsAssignableFrom(property.PropertyType)),
+                Is.Empty);
+            Assert.That(
+                type.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(method =>
+                        method.Name == "Clear" ||
+                        method.Name == "Reset"),
+                Is.Empty);
+        }
+
+        private static void AssertNoStaticMutableBuffer(Type type)
+        {
+            Assert.That(
+                type.GetFields(
+                        BindingFlags.Static |
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic)
+                    .Where(field =>
+                        field.FieldType.IsArray ||
+                        typeof(IList).IsAssignableFrom(field.FieldType)),
+                Is.Empty);
+        }
     }
 }

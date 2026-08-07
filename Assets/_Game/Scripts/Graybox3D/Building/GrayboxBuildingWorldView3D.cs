@@ -65,6 +65,8 @@ namespace WasteCity.Graybox3D.Building
         private int previewHeight;
         private BuildingSite previewSite;
         private bool hasPreviewGeometry;
+        private BuildingDefinition previewDefinition;
+        private string previewStableId;
         private bool runtimeInitialized;
 
         public int InfrastructureRendererCount =>
@@ -168,7 +170,7 @@ namespace WasteCity.Graybox3D.Building
             int height = BuildingOrientationRules.Height(
                 definition,
                 orientation);
-            string stableId = "building.preview." + definition.Id.Value;
+            string stableId = PreviewStableId(definition);
             Color color = evaluation.IsValid
                 ? ValidPreviewColor
                 : InvalidPreviewColor;
@@ -799,8 +801,21 @@ namespace WasteCity.Graybox3D.Building
             infrastructure.Clear();
             preview = null;
             hasPreviewGeometry = false;
+            previewDefinition = null;
+            previewStableId = null;
             innerGrid = null;
             runtimeInitialized = false;
+        }
+
+        private string PreviewStableId(BuildingDefinition definition)
+        {
+            if (ReferenceEquals(previewDefinition, definition) &&
+                previewStableId != null)
+                return previewStableId;
+            previewDefinition = definition;
+            previewStableId =
+                "building.preview." + definition.Id.Value;
+            return previewStableId;
         }
 
         private void RegisterOwnedRoot(GameObject root)

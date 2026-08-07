@@ -839,6 +839,61 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PlacementController_OwnsOneWorkspaceAndCachedRuleDelegates()
+        {
+            Type workspaceType =
+                typeof(BuildingPlacementRules).Assembly.GetType(
+                    "WasteCity.Building." +
+                    "BuildingPlacementEvaluationWorkspace");
+            Assert.That(workspaceType, Is.Not.Null);
+            FieldInfo[] fields =
+                typeof(GrayboxBuildingPlacementController3D).GetFields(
+                    BindingFlags.Instance |
+                    BindingFlags.NonPublic);
+
+            Assert.That(
+                fields.Count(field =>
+                    field.FieldType == workspaceType),
+                Is.EqualTo(1));
+            Assert.That(
+                fields.Count(field =>
+                    field.FieldType == typeof(Func<string, bool>)),
+                Is.EqualTo(1));
+            Assert.That(
+                fields.Count(field =>
+                    field.FieldType == typeof(Func<string, int>)),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void WorldView_DoesNotRetainDynamicEvaluationOrColorVerdicts()
+        {
+            FieldInfo[] fields =
+                typeof(GrayboxBuildingWorldView3D).GetFields(
+                    BindingFlags.Instance |
+                    BindingFlags.Public |
+                    BindingFlags.NonPublic);
+
+            Assert.That(
+                fields.Where(field =>
+                    field.FieldType ==
+                        typeof(BuildingPlacementEvaluation) ||
+                    field.FieldType ==
+                        typeof(BuildingPlacementFailure) ||
+                    field.FieldType == typeof(Color)),
+                Is.Empty);
+            Assert.That(
+                fields.Where(field =>
+                    field.Name.IndexOf(
+                        "legality",
+                        StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    field.Name.IndexOf(
+                        "validity",
+                        StringComparison.OrdinalIgnoreCase) >= 0),
+                Is.Empty);
+        }
+
+        [Test]
         public void WorldView_SameGeometryRefreshChangesOnlyTransformAndPropertyBlock()
         {
             WorldFixture fixture = CreateWorldFixture();

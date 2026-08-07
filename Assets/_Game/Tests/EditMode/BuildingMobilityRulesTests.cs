@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using NUnit.Framework;
+using Unity.Profiling;
 using WasteCity.Building;
 using WasteCity.City;
 
@@ -116,6 +118,86 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void BuildingSiteLegalValuesRemainExactlyGroundZeroAndInnerCityOne()
+        {
+            Assert.That((int)BuildingSite.Ground, Is.Zero);
+            Assert.That((int)BuildingSite.InnerCity, Is.EqualTo(1));
+            Assert.That(
+                BuildingMobilityRules.SupportsSite(
+                    BuildingCatalog.Housing,
+                    BuildingSite.Ground),
+                Is.True);
+            Assert.That(
+                BuildingMobilityRules.SupportsSite(
+                    BuildingCatalog.Housing,
+                    BuildingSite.InnerCity),
+                Is.True);
+        }
+
+        [TestCase(-1)]
+        [TestCase(2)]
+        [TestCase(int.MinValue)]
+        [TestCase(int.MaxValue)]
+        public void InvalidBuildingSiteValuesNeverSupportOrConstruct(int rawSite)
+        {
+            BuildingSite invalidSite = (BuildingSite)rawSite;
+
+            Assert.That(
+                BuildingMobilityRules.SupportsSite(
+                    BuildingCatalog.Housing,
+                    invalidSite),
+                Is.False);
+            Assert.That(
+                BuildingMobilityRules.CanConstruct(
+                    BuildingCatalog.Housing,
+                    invalidSite,
+                    CityMode.Fortress),
+                Is.False);
+        }
+
+        [Test]
+        public void MobilityRulesProfilerRecordsZeroAcross300Calls()
+        {
+            Action supportsSiteCall = () =>
+                BuildingMobilityRules.SupportsSite(
+                    BuildingCatalog.Housing,
+                    BuildingSite.InnerCity);
+            Action canConstructCall = () =>
+                BuildingMobilityRules.CanConstruct(
+                    BuildingCatalog.Housing,
+                    BuildingSite.InnerCity,
+                    CityMode.Fortress);
+            supportsSiteCall();
+            canConstructCall();
+
+            AllocationMeasurement supportsSite =
+                Profile300Calls(supportsSiteCall);
+            AllocationMeasurement canConstruct =
+                Profile300Calls(canConstructCall);
+
+            TestContext.WriteLine(
+                "Task9SupportsSiteProfilerSamples=" +
+                supportsSite.Samples);
+            TestContext.WriteLine(
+                "Task9SupportsSiteProfilerBytes=" +
+                supportsSite.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9SupportsSiteCurrentThreadBytes=" +
+                supportsSite.CurrentThreadBytes);
+            TestContext.WriteLine(
+                "Task9CanConstructProfilerSamples=" +
+                canConstruct.Samples);
+            TestContext.WriteLine(
+                "Task9CanConstructProfilerBytes=" +
+                canConstruct.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9CanConstructCurrentThreadBytes=" +
+                canConstruct.CurrentThreadBytes);
+            Assert.That(supportsSite.ProfiledBytes, Is.Zero);
+            Assert.That(canConstruct.ProfiledBytes, Is.Zero);
+        }
+
+        [Test]
         public void TerrainDependentBuildingOnlyUsesGroundFortressRule()
         {
             Assert.That(
@@ -156,6 +238,54 @@ namespace WasteCity.Tests
         {
             return new TestCaseData(definition, placement, operation)
                 .SetName($"{definition.Name}_uses_{placement}_{operation}");
+        }
+
+        private static AllocationMeasurement Profile300Calls(Action action)
+        {
+            ProfilerRecorder recorder =
+                ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory,
+                    "GC.Alloc",
+                    2048,
+                    ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                action();
+            long currentThreadBytes =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            recorder.Stop();
+            int samples = recorder.Count;
+            long profiledBytes = 0;
+            for (var index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample =
+                    recorder.GetSample(index);
+                profiledBytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+            return new AllocationMeasurement(
+                samples,
+                profiledBytes,
+                currentThreadBytes);
+        }
+
+        private readonly struct AllocationMeasurement
+        {
+            public AllocationMeasurement(
+                int samples,
+                long profiledBytes,
+                long currentThreadBytes)
+            {
+                Samples = samples;
+                ProfiledBytes = profiledBytes;
+                CurrentThreadBytes = currentThreadBytes;
+            }
+
+            public int Samples { get; }
+            public long ProfiledBytes { get; }
+            public long CurrentThreadBytes { get; }
         }
     }
 }

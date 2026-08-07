@@ -33,6 +33,44 @@ namespace WasteCity.Building
         }
     }
 
+    public sealed class BuildingUnlockEvaluationWorkspace
+    {
+        private readonly List<BuildingUnlockFailure> failures =
+            new List<BuildingUnlockFailure>();
+        private readonly List<string> reasons =
+            new List<string>();
+        private readonly ReadOnlyCollection<BuildingUnlockFailure>
+            readOnlyFailures;
+        private readonly ReadOnlyCollection<string> readOnlyReasons;
+
+        public BuildingUnlockEvaluationWorkspace()
+        {
+            readOnlyFailures =
+                new ReadOnlyCollection<BuildingUnlockFailure>(
+                    failures);
+            readOnlyReasons =
+                new ReadOnlyCollection<string>(reasons);
+        }
+
+        internal IReadOnlyList<BuildingUnlockFailure> Failures =>
+            readOnlyFailures;
+        internal IReadOnlyList<string> Reasons => readOnlyReasons;
+
+        internal void Prepare()
+        {
+            failures.Clear();
+            reasons.Clear();
+        }
+
+        internal void Add(
+            BuildingUnlockFailure failure,
+            string reason)
+        {
+            failures.Add(failure);
+            reasons.Add(reason);
+        }
+    }
+
     public static class BuildingUnlockModel
     {
         public static BuildingUnlockEvaluation Evaluate(
@@ -41,34 +79,61 @@ namespace WasteCity.Building
             Func<string, bool> researchCompleted,
             Func<string, int> completedBuildings)
         {
-            var failures = new List<BuildingUnlockFailure>();
-            var reasons = new List<string>();
+            var workspace =
+                new BuildingUnlockEvaluationWorkspace();
+            BuildingUnlockEvaluation evaluation = Evaluate(
+                definition,
+                population,
+                researchCompleted,
+                completedBuildings,
+                workspace);
+            return new BuildingUnlockEvaluation(
+                Snapshot(evaluation.Failures),
+                Snapshot(evaluation.Reasons));
+        }
+
+        public static BuildingUnlockEvaluation Evaluate(
+            BuildingDefinition definition,
+            int population,
+            Func<string, bool> researchCompleted,
+            Func<string, int> completedBuildings,
+            BuildingUnlockEvaluationWorkspace workspace)
+        {
+            if (workspace == null)
+                throw new ArgumentNullException(nameof(workspace));
+            workspace.Prepare();
             if (definition == null)
             {
-                failures.Add(BuildingUnlockFailure.InvalidDefinition);
-                reasons.Add("无效建筑");
+                workspace.Add(
+                    BuildingUnlockFailure.InvalidDefinition,
+                    "无效建筑");
             }
             else
             {
                 if (population < definition.MinimumPopulation)
                 {
-                    failures.Add(BuildingUnlockFailure.Population);
-                    reasons.Add($"需要人口 {definition.MinimumPopulation}");
+                    workspace.Add(
+                        BuildingUnlockFailure.Population,
+                        $"需要人口 {definition.MinimumPopulation}");
                 }
                 if (!string.IsNullOrEmpty(definition.RequiredResearchId) &&
                     (researchCompleted == null || !researchCompleted(definition.RequiredResearchId)))
                 {
-                    failures.Add(BuildingUnlockFailure.Research);
-                    reasons.Add($"需要研究 {definition.RequiredResearchId}");
+                    workspace.Add(
+                        BuildingUnlockFailure.Research,
+                        $"需要研究 {definition.RequiredResearchId}");
                 }
                 if (!string.IsNullOrEmpty(definition.RequiredBuildingId) &&
                     (completedBuildings == null || completedBuildings(definition.RequiredBuildingId) <= 0))
                 {
-                    failures.Add(BuildingUnlockFailure.RequiredBuilding);
-                    reasons.Add($"需要先完成 {definition.RequiredBuildingId}");
+                    workspace.Add(
+                        BuildingUnlockFailure.RequiredBuilding,
+                        $"需要先完成 {definition.RequiredBuildingId}");
                 }
             }
-            return new BuildingUnlockEvaluation(Snapshot(failures), Snapshot(reasons));
+            return new BuildingUnlockEvaluation(
+                workspace.Failures,
+                workspace.Reasons);
         }
 
         public static bool IsUnlocked(BuildingDefinition definition,int population,Func<string,bool> researchCompleted,Func<string,int> completedBuildings,out string reason)
@@ -78,9 +143,13 @@ namespace WasteCity.Building
             return evaluation.IsUnlocked;
         }
 
-        private static IReadOnlyList<T> Snapshot<T>(List<T> values)
+        private static ReadOnlyCollection<T> Snapshot<T>(
+            IReadOnlyList<T> values)
         {
-            return new ReadOnlyCollection<T>(values.ToArray());
+            var snapshot = new T[values.Count];
+            for (var index = 0; index < values.Count; index++)
+                snapshot[index] = values[index];
+            return new ReadOnlyCollection<T>(snapshot);
         }
     }
 }

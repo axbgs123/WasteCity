@@ -263,6 +263,114 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_FailedNoGroundDelegationIsNotRetriedByBaseRouter()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            var deployment = new SharedDeploymentRequestSpy(
+                CityMode.Fortress,
+                false);
+            fixture.Evacuation.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Ui.Menu);
+            GrayboxInputRouter baseRouter =
+                Create<GrayboxInputRouter>("SharedDeploymentBaseRouter");
+            baseRouter.Configure(
+                fixture.City,
+                null,
+                null,
+                null,
+                null);
+            baseRouter.ConfigureDeploymentRequest(deployment);
+            var frame = new GrayboxInputFrame(
+                Vector2.zero,
+                ScreenCenter,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false);
+
+            GrayboxInputSuppression suppression =
+                PressKey(fixture.Router, Key.F);
+            baseRouter.ProcessFrame(frame, suppression);
+
+            Assert.That(suppression.Deployment, Is.True);
+            Assert.That(deployment.ToggleCalls, Is.EqualTo(1));
+
+            baseRouter.ProcessFrame(frame, default);
+
+            Assert.That(deployment.ToggleCalls, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void InputRouter_ManifestAndProcessingConsumeFWithoutBaseRetry()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    20,
+                    15,
+                    fixture.Presentation);
+            var deployment = new SharedDeploymentRequestSpy(
+                CityMode.Fortress,
+                false);
+            fixture.Evacuation.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Ui.Menu);
+            GrayboxInputRouter baseRouter =
+                Create<GrayboxInputRouter>("ManifestDeploymentBaseRouter");
+            baseRouter.Configure(
+                fixture.City,
+                null,
+                null,
+                null,
+                null);
+            baseRouter.ConfigureDeploymentRequest(deployment);
+            var frame = new GrayboxInputFrame(
+                Vector2.zero,
+                ScreenCenter,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false);
+
+            GrayboxInputSuppression manifest =
+                PressKey(fixture.Router, Key.F);
+            baseRouter.ProcessFrame(frame, manifest);
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+
+            GrayboxInputSuppression openManifest =
+                PressKey(fixture.Router, Key.F);
+            baseRouter.ProcessFrame(frame, openManifest);
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True);
+
+            GrayboxInputSuppression processing =
+                PressKey(fixture.Router, Key.F);
+            baseRouter.ProcessFrame(frame, processing);
+
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+        }
+
+        [Test]
         public void InputRouter_BuildModeKeepsMovementAndCameraButOwnsDestination()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -595,6 +703,27 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_ButtonUpPreviewFrameReevaluatesInventory()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+            PressMouse(fixture.Router, MouseButton.Middle);
+            Assert.That(
+                testMouse.middleButton.wasReleasedThisFrame,
+                Is.True);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.InsufficientMaterials));
+        }
+
+        [Test]
         public void InputRouter_StablePreviewReevaluatesCityModeMutation()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -644,26 +773,199 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void InputRouter_ProcessCurrentInputAllocatesZeroAcross300Calls()
+        public void InputRouter_StablePreviewReevaluatesCityPositionMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+            Assert.That(
+                fixture.World.Coordinates.TryCellToWorld(
+                    0,
+                    0,
+                    .5f,
+                    out Vector3 movedCityPosition),
+                Is.True);
+            fixture.City.transform.position = movedCityPosition;
+            Physics.SyncTransforms();
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.OutsideBuildRange));
+        }
+
+        [Test]
+        public void InputRouter_StablePreviewReevaluatesResourceCompatibility()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            PositionInputCameraAtCell(fixture, 20, 15);
+            SetWorldCell(
+                fixture.World.Model,
+                20,
+                15,
+                new WorldCell(
+                    TerrainKind.Rocky,
+                    WasteCity.Economy.ResourceIds.Iron,
+                    100,
+                    WorldTraversalKind.Open));
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId,
+                Is.EqualTo("world.resource-node.20.15"));
+            SetWorldCell(
+                fixture.World.Model,
+                20,
+                15,
+                new WorldCell(
+                    TerrainKind.Rocky,
+                    WasteCity.Economy.ResourceIds.Stone,
+                    100,
+                    WorldTraversalKind.Open));
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.IncompatibleResourceNode));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId,
+                Is.Null);
+        }
+
+        [Test]
+        public void InputRouter_StablePreviewReevaluatesUnlockMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            PositionInputCameraAtCell(fixture, 20, 15);
+            fixture.Interaction.Select(BuildingCatalog.Smelter);
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.ContentUnavailable));
+            fixture.Session.UnlockResearchForDevelopment(
+                "core.research.automated-machinery");
+
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+        }
+
+        [Test]
+        public void InputRouter_UiOwnedPreviewFrameKeepsPreviousWorldVerdict()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.InsufficientMaterials));
+            IReadOnlyList<BuildingPlacementFailure> previousFailures =
+                fixture.Placement.CurrentEvaluation.Failures;
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(
+                    out GameObject pointerTarget);
+            Canvas pointerCanvas = raycaster.GetComponent<Canvas>();
+            Image pointerGraphic =
+                pointerTarget.GetComponent<Image>();
+            Assert.That(
+                GraphicRegistry
+                    .GetGraphicsForCanvas(pointerCanvas)
+                    .Contains(pointerGraphic),
+                Is.True);
+            var primaryResults = new List<RaycastResult>();
+            fixture.Ui.EventSystem.RaycastAll(
+                new PointerEventData(fixture.Ui.EventSystem)
+                {
+                    position = ScreenCenter
+                },
+                primaryResults);
+            Assert.That(
+                primaryResults.Any(result =>
+                    result.module == raycaster &&
+                    result.gameObject == pointerTarget),
+                Is.True,
+                "The newly registered Graphic must be a real " +
+                "EventSystem primary hit.");
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                BuildingCatalog.Wall.Cost);
+            int raycastsBefore = raycaster.RaycastCalls;
+
+            GrayboxInputSuppression uiSuppression =
+                fixture.Router.ProcessCurrentInput();
+
+            TestContext.WriteLine(
+                "Task9UiOwnedPreviewRaycasts=" +
+                (raycaster.RaycastCalls - raycastsBefore));
+            TestContext.WriteLine(
+                "Task9UiOwnedPreviewCameraDrag=" +
+                uiSuppression.CameraDrag);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.SameAs(previousFailures));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Does.Contain(
+                    BuildingPlacementFailure.InsufficientMaterials));
+
+            pointerTarget.SetActive(false);
+            ForceCanvasLayout(pointerCanvas);
+            fixture.Router.ProcessCurrentInput();
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+        }
+
+        [Test]
+        public void InputRouter_IdleProfilerRecordsZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
             fixture.Router.ProcessCurrentInput();
             fixture.Router.ProcessCurrentInput();
+            Action measuredCall = () => fixture.Router.ProcessCurrentInput();
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            for (var index = 0; index < 300; index++)
-                fixture.Router.ProcessCurrentInput();
-            long difference =
-                GC.GetAllocatedBytesForCurrentThread() - before;
+            AllocationMeasurement measurement =
+                Profile300Calls(measuredCall);
 
             TestContext.WriteLine(
-                "Task9ProcessCurrentInputAllocationDifference=" +
-                difference);
-            Assert.That(difference, Is.Zero);
+                "Task9IdleProfilerSamples=" +
+                measurement.Samples);
+            TestContext.WriteLine(
+                "Task9IdleProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9IdleCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
         }
 
         [Test]
-        public void InputRouter_UiMiddleHoldAllocatesZeroAcross300Calls()
+        public void InputRouter_UiMiddleHoldProfilerRecordsZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
             CountingGraphicRaycaster raycaster =
@@ -680,26 +982,31 @@ namespace WasteCity.Tests
             fixture.Router.ProcessCurrentInput();
 
             int raycastsBefore = raycaster.RaycastCalls;
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            for (var index = 0; index < 300; index++)
-                fixture.Router.ProcessCurrentInput();
-            long difference =
-                GC.GetAllocatedBytesForCurrentThread() - before;
+            Action measuredCall = () => fixture.Router.ProcessCurrentInput();
+            AllocationMeasurement measurement =
+                Profile300Calls(measuredCall);
             int raycastDifference =
                 raycaster.RaycastCalls - raycastsBefore;
 
             TestContext.WriteLine(
-                "Task9UiMiddleHoldAllocationDifference=" +
-                difference);
+                "Task9UiMiddleHoldProfilerSamples=" +
+                measurement.Samples);
+            TestContext.WriteLine(
+                "Task9UiMiddleHoldProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9UiMiddleHoldCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
             TestContext.WriteLine(
                 "Task9UiMiddleHoldRaycastDifference=" +
                 raycastDifference);
             Assert.That(raycastDifference, Is.EqualTo(300));
-            Assert.That(difference, Is.Zero);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
         }
 
         [Test]
-        public void InputRouter_WorldMiddleHoldAllocatesZeroAcross300Calls()
+        public void InputRouter_WorldMiddleHoldProfilerRecordsZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
             CountingGraphicRaycaster raycaster =
@@ -714,73 +1021,169 @@ namespace WasteCity.Tests
                 Is.False);
             fixture.Router.ProcessCurrentInput();
 
-            GrayboxInputSuppression lastSuppression = default;
+            GrayboxInputSuppression lastSuppression =
+                fixture.Router.ProcessCurrentInput();
             int raycastsBefore = raycaster.RaycastCalls;
-            ProfilerRecorder allocationRecorder =
-                ProfilerRecorder.StartNew(
-                    ProfilerCategory.Memory,
-                    "GC.Alloc",
-                    2048,
-                    ProfilerRecorderOptions.StartImmediately |
-                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
-                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            for (var index = 0; index < 300; index++)
-            {
+            Action measuredCall = () =>
                 lastSuppression =
                     fixture.Router.ProcessCurrentInput();
-            }
-            long difference =
-                GC.GetAllocatedBytesForCurrentThread() - before;
+            AllocationMeasurement measurement =
+                Profile300Calls(measuredCall);
             int raycastDifference =
                 raycaster.RaycastCalls - raycastsBefore;
-            allocationRecorder.Stop();
-            long profiledDifference = 0;
-            for (var index = 0;
-                 index < allocationRecorder.Count;
-                 index++)
-            {
-                ProfilerRecorderSample sample =
-                    allocationRecorder.GetSample(index);
-                profiledDifference +=
-                    sample.Value * sample.Count;
-            }
-            allocationRecorder.Dispose();
 
             TestContext.WriteLine(
-                "Task9WorldMiddleHoldAllocationDifference=" +
-                difference);
+                "Task9WorldMiddleHoldProfilerSamples=" +
+                measurement.Samples);
             TestContext.WriteLine(
-                "Task9WorldMiddleHoldProfiledAllocationDifference=" +
-                profiledDifference);
+                "Task9WorldMiddleHoldProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9WorldMiddleHoldCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
             TestContext.WriteLine(
                 "Task9WorldMiddleHoldRaycastDifference=" +
                 raycastDifference);
             Assert.That(lastSuppression.CameraDrag, Is.False);
             Assert.That(raycastDifference, Is.EqualTo(300));
-            Assert.That(difference, Is.Zero);
-            Assert.That(profiledDifference, Is.Zero);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
         }
 
         [Test]
-        public void InputRouter_StablePreviewAllocatesZeroAcross300Calls()
+        public void
+            InputRouter_DynamicPlacementPipelineProfilerRecordsZeroAcross300Calls()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(
+                    out GameObject pointerTarget);
+            pointerTarget.SetActive(false);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
             fixture.Interaction.Select(BuildingCatalog.Wall);
             SetPointer(ScreenCenter);
             fixture.Router.ProcessCurrentInput();
             fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
 
-            long before = GC.GetAllocatedBytesForCurrentThread();
-            for (var index = 0; index < 300; index++)
-                fixture.Router.ProcessCurrentInput();
-            long difference =
-                GC.GetAllocatedBytesForCurrentThread() - before;
+            int raycastsBefore = raycaster.RaycastCalls;
+            Action measuredCall = () => fixture.Router.ProcessCurrentInput();
+            AllocationMeasurement measurement =
+                Profile300Calls(measuredCall);
+            int raycastDifference =
+                raycaster.RaycastCalls - raycastsBefore;
 
             TestContext.WriteLine(
-                "Task9StablePreviewAllocationDifference=" +
-                difference);
-            Assert.That(difference, Is.Zero);
+                "Task9DynamicPlacementProfilerSamples=" +
+                measurement.Samples);
+            TestContext.WriteLine(
+                "Task9DynamicPlacementProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9DynamicPlacementCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            TestContext.WriteLine(
+                "Task9DynamicPlacementRaycastDifference=" +
+                raycastDifference);
+            Assert.That(raycastDifference, Is.EqualTo(300));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+        }
+
+        [Test]
+        public void
+            PlacementPipelineStagesProfilerRecordZeroAcross300Calls()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            fixture.Router.ProcessCurrentInput();
+            fixture.Router.ProcessCurrentInput();
+            BuildingSurfaceHit hit = fixture.Placement.CurrentHit;
+            BuildingPlacementEvaluation evaluation =
+                fixture.Placement.CurrentEvaluation;
+            var workspace =
+                new BuildingPlacementEvaluationWorkspace();
+            BuildingUnlockEvaluation unlock =
+                BuildingUnlockModel.Evaluate(
+                    BuildingCatalog.Wall,
+                    fixture.Session.Population,
+                    fixture.Session.IsResearchCompleted,
+                    fixture.Session.CompletedBuildingCount,
+                    workspace.Unlock);
+            var request = new BuildingPlacementRequest(
+                BuildingCatalog.Wall,
+                fixture.Session.GroundGrid,
+                BuildingSite.Ground,
+                BuildingOrientation.North,
+                hit.X,
+                hit.Y,
+                16,
+                12,
+                fixture.Session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                false,
+                null,
+                true,
+                unlock,
+                true);
+
+            Action evaluationCall = () =>
+                BuildingPlacementRules.Evaluate(
+                    request,
+                    workspace);
+            Action viewCall = () =>
+                fixture.Presentation.ShowPreview(
+                    BuildingCatalog.Wall,
+                    hit,
+                    BuildingOrientation.North,
+                    evaluation);
+            Action updatePointerCall = () =>
+                fixture.Placement.UpdatePointer(ScreenCenter);
+            evaluationCall();
+            viewCall();
+            updatePointerCall();
+
+            AllocationMeasurement rules =
+                Profile300Calls(evaluationCall);
+            AllocationMeasurement view =
+                Profile300Calls(viewCall);
+            AllocationMeasurement updatePointer =
+                Profile300Calls(updatePointerCall);
+
+            TestContext.WriteLine(
+                "Task9WorkspaceEvaluateProfilerSamples=" +
+                rules.Samples);
+            TestContext.WriteLine(
+                "Task9WorkspaceEvaluateProfilerBytes=" +
+                rules.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9ShowPreviewProfilerSamples=" +
+                view.Samples);
+            TestContext.WriteLine(
+                "Task9ShowPreviewProfilerBytes=" +
+                view.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9UpdatePointerProfilerSamples=" +
+                updatePointer.Samples);
+            TestContext.WriteLine(
+                "Task9UpdatePointerProfilerBytes=" +
+                updatePointer.ProfiledBytes);
+            Assert.That(rules.ProfiledBytes, Is.Zero);
+            Assert.That(rules.CurrentThreadBytes, Is.Zero);
+            Assert.That(view.ProfiledBytes, Is.Zero);
+            Assert.That(view.CurrentThreadBytes, Is.Zero);
+            Assert.That(updatePointer.ProfiledBytes, Is.Zero);
+            Assert.That(updatePointer.CurrentThreadBytes, Is.Zero);
         }
 
         [Test]
@@ -1147,6 +1550,29 @@ namespace WasteCity.Tests
                     fixture.EventSystem,
                     pointerPosition),
                 Is.True);
+        }
+
+        [Test]
+        public void UiGuard_EventSystemGraphicIsPrimaryWithoutRegistryFallback()
+        {
+            EventSystem eventSystem =
+                Create<EventSystem>("PrimaryOnlyEventSystem");
+            Canvas canvas = Create<Canvas>("PrimaryOnlyCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            PrimaryOnlyGraphicRaycaster raycaster =
+                canvas.gameObject
+                    .AddComponent<PrimaryOnlyGraphicRaycaster>();
+            RegisterHeadlessEditModeRaycaster(raycaster);
+            Assert.That(
+                GraphicRegistry.GetGraphicsForCanvas(canvas),
+                Is.Empty);
+
+            bool overUi = new GrayboxUiInputGuard3D().IsPointerOverUi(
+                eventSystem,
+                ScreenCenter);
+
+            Assert.That(overUi, Is.True);
+            Assert.That(raycaster.RaycastCalls, Is.EqualTo(1));
         }
 
         [Test]
@@ -2215,6 +2641,21 @@ namespace WasteCity.Tests
             return result;
         }
 
+        private static void SetWorldCell(
+            WorldMapModel model,
+            int x,
+            int y,
+            WorldCell value)
+        {
+            var field = typeof(WorldMapModel).GetField(
+                "cells",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var cells = (WorldCell[,])field.GetValue(model);
+            cells[x, y] = value;
+        }
+
         private static void PrepareStableWallPreview(
             InputRouterFixture fixture)
         {
@@ -2227,11 +2668,25 @@ namespace WasteCity.Tests
             out GameObject target)
         {
             Canvas canvas = Create<Canvas>("CountingGraphicCanvas");
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            Camera uiCamera =
+                Create<Camera>("CountingGraphicCamera");
+            uiCamera.orthographic = true;
+            uiCamera.transform.position =
+                new Vector3(0f, 0f, -10f);
+            uiCamera.pixelRect =
+                new Rect(0f, 0f, 640f, 480f);
+            var renderTexture =
+                new RenderTexture(640, 480, 0);
+            cleanup.Add(renderTexture);
+            uiCamera.targetTexture = renderTexture;
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = uiCamera;
+            canvas.planeDistance = 1f;
             canvas.sortingOrder = 100;
+            canvas.GetComponent<RectTransform>().sizeDelta =
+                new Vector2(640f, 480f);
             CountingGraphicRaycaster raycaster =
                 canvas.gameObject.AddComponent<CountingGraphicRaycaster>();
-            RegisterHeadlessEditModeRaycaster(raycaster);
             target = NewObject("CountingGraphicTarget");
             RectTransform rect =
                 target.AddComponent<RectTransform>();
@@ -2242,7 +2697,15 @@ namespace WasteCity.Tests
             rect.offsetMax = Vector2.zero;
             Image image = target.AddComponent<Image>();
             image.raycastTarget = true;
+            image.enabled = false;
+            image.enabled = true;
+            canvas.enabled = false;
+            canvas.enabled = true;
+            raycaster.enabled = false;
+            raycaster.enabled = true;
+            RegisterHeadlessEditModeRaycaster(raycaster);
             ForceCanvasLayout(canvas);
+            uiCamera.Render();
             return raycaster;
         }
 
@@ -2895,6 +3358,26 @@ namespace WasteCity.Tests
             }
         }
 
+        private sealed class PrimaryOnlyGraphicRaycaster : GraphicRaycaster
+        {
+            public int RaycastCalls { get; private set; }
+
+            public override void Raycast(
+                PointerEventData eventData,
+                List<RaycastResult> resultAppendList)
+            {
+                RaycastCalls++;
+                resultAppendList.Add(
+                    new RaycastResult
+                    {
+                        gameObject = gameObject,
+                        module = this,
+                        distance = 0f,
+                        index = resultAppendList.Count
+                    });
+            }
+        }
+
         private sealed class NoResultsGraphicRaycaster : GraphicRaycaster
         {
             public override void Raycast(
@@ -2915,6 +3398,79 @@ namespace WasteCity.Tests
                 RaycastCalls++;
                 base.Raycast(eventData, resultAppendList);
             }
+        }
+
+        private sealed class SharedDeploymentRequestSpy :
+            IGrayboxDeploymentRequest3D,
+            IGrayboxDeploymentRequest
+        {
+            private readonly bool result;
+
+            public SharedDeploymentRequestSpy(
+                CityMode mode,
+                bool result)
+            {
+                Mode = mode;
+                this.result = result;
+            }
+
+            public CityMode Mode { get; }
+            public int ToggleCalls { get; private set; }
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                ToggleCalls++;
+                failureReason = result ? string.Empty : "rejected";
+                return result;
+            }
+        }
+
+        private static AllocationMeasurement Profile300Calls(Action action)
+        {
+            ProfilerRecorder recorder =
+                ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory,
+                    "GC.Alloc",
+                    2048,
+                    ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                action();
+            long currentThreadBytes =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            recorder.Stop();
+            int samples = recorder.Count;
+            long profiledBytes = 0;
+            for (var index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample =
+                    recorder.GetSample(index);
+                profiledBytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+            return new AllocationMeasurement(
+                samples,
+                profiledBytes,
+                currentThreadBytes);
+        }
+
+        private readonly struct AllocationMeasurement
+        {
+            public AllocationMeasurement(
+                int samples,
+                long profiledBytes,
+                long currentThreadBytes)
+            {
+                Samples = samples;
+                ProfiledBytes = profiledBytes;
+                CurrentThreadBytes = currentThreadBytes;
+            }
+
+            public int Samples { get; }
+            public long ProfiledBytes { get; }
+            public long CurrentThreadBytes { get; }
         }
 
         private sealed class InputRouterFixture

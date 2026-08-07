@@ -135,20 +135,86 @@ namespace WasteCity.Building
         }
     }
 
+    public sealed class BuildingPlacementEvaluationWorkspace
+    {
+        private readonly List<BuildingPlacementFailure> failures =
+            new List<BuildingPlacementFailure>();
+        private readonly List<BuildingCell> footprint =
+            new List<BuildingCell>();
+        private readonly ReadOnlyCollection<BuildingPlacementFailure>
+            readOnlyFailures;
+        private readonly ReadOnlyCollection<BuildingCell>
+            readOnlyFootprint;
+
+        public BuildingPlacementEvaluationWorkspace()
+        {
+            readOnlyFailures =
+                new ReadOnlyCollection<BuildingPlacementFailure>(
+                    failures);
+            readOnlyFootprint =
+                new ReadOnlyCollection<BuildingCell>(footprint);
+            Unlock = new BuildingUnlockEvaluationWorkspace();
+        }
+
+        public BuildingUnlockEvaluationWorkspace Unlock { get; }
+
+        internal IReadOnlyList<BuildingPlacementFailure> Failures =>
+            readOnlyFailures;
+        internal IReadOnlyList<BuildingCell> Footprint =>
+            readOnlyFootprint;
+
+        internal void Prepare()
+        {
+            failures.Clear();
+            footprint.Clear();
+        }
+
+        internal void AddFailure(BuildingPlacementFailure failure)
+        {
+            failures.Add(failure);
+        }
+
+        internal void AddFootprintCell(BuildingCell cell)
+        {
+            footprint.Add(cell);
+        }
+    }
+
     public static class BuildingPlacementRules
     {
         public static BuildingPlacementEvaluation Evaluate(in BuildingPlacementRequest request)
         {
-            var failures = new List<BuildingPlacementFailure>();
-            var footprint = new List<BuildingCell>();
+            var workspace =
+                new BuildingPlacementEvaluationWorkspace();
+            BuildingPlacementEvaluation evaluation =
+                Evaluate(request, workspace);
+            return new BuildingPlacementEvaluation(
+                Snapshot(evaluation.Failures),
+                evaluation.Site,
+                evaluation.Orientation,
+                evaluation.RotatedWidth,
+                evaluation.RotatedHeight,
+                evaluation.CompatibleResourceNodeId,
+                Snapshot(evaluation.Footprint));
+        }
+
+        public static BuildingPlacementEvaluation Evaluate(
+            in BuildingPlacementRequest request,
+            BuildingPlacementEvaluationWorkspace workspace)
+        {
+            if (workspace == null)
+                throw new ArgumentNullException(nameof(workspace));
+            workspace.Prepare();
             var hasDefinition = request.Definition != null;
             var hasGrid = request.Grid != null;
-            var hasValidOrientation = Enum.IsDefined(typeof(BuildingOrientation), request.Orientation);
+            var hasValidOrientation =
+                BuildingOrientationRules.IsValid(request.Orientation);
             var rotatedWidth = 0;
             var rotatedHeight = 0;
 
             if (!hasDefinition || !hasGrid || !hasValidOrientation)
-                failures.Add(BuildingPlacementFailure.MissingReference);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.MissingReference);
 
             if (hasDefinition && hasValidOrientation)
             {
@@ -162,54 +228,85 @@ namespace WasteCity.Building
                         if (cellX < int.MinValue || cellX > int.MaxValue ||
                             cellY < int.MinValue || cellY > int.MaxValue)
                             continue;
-                        footprint.Add(new BuildingCell((int)cellX, (int)cellY));
+                        workspace.AddFootprintCell(
+                            new BuildingCell(
+                                (int)cellX,
+                                (int)cellY));
                     }
             }
 
-            if (!request.ProjectionSucceeded) failures.Add(BuildingPlacementFailure.ProjectionFailed);
+            if (!request.ProjectionSucceeded)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.ProjectionFailed);
 
             var footprintInBounds = hasDefinition && hasGrid && hasValidOrientation &&
                 (request.Site == BuildingSite.InnerCity
                     ? BuildingRangeRules.IsInnerFootprintInBounds(request.Definition, request.X, request.Y, request.Orientation)
                     : request.Grid.ContainsFootprint(request.Definition, request.X, request.Y, request.Orientation));
             if (hasDefinition && hasGrid && hasValidOrientation && !footprintInBounds)
-                failures.Add(BuildingPlacementFailure.OutOfBounds);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.OutOfBounds);
 
             var supportsSite = hasDefinition && BuildingMobilityRules.SupportsSite(request.Definition, request.Site);
-            if (hasDefinition && !supportsSite) failures.Add(BuildingPlacementFailure.UnsupportedSite);
+            if (hasDefinition && !supportsSite)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.UnsupportedSite);
             if (supportsSite && !BuildingMobilityRules.CanConstruct(request.Definition, request.Site, request.CityMode))
-                failures.Add(BuildingPlacementFailure.InvalidCityMode);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.InvalidCityMode);
 
-            if (hasDefinition && hasValidOrientation && request.Site == BuildingSite.Ground && !IsGroundFootprintInRange(request, footprint))
-                failures.Add(BuildingPlacementFailure.OutsideBuildRange);
-            if (hasGrid && footprintInBounds && IsAnyFootprintCellOccupied(request.Grid, footprint))
-                failures.Add(BuildingPlacementFailure.Overlap);
-            if (request.FootprintTouchesCity) failures.Add(BuildingPlacementFailure.CityOccupied);
-            if (!request.TerrainPassable) failures.Add(BuildingPlacementFailure.InvalidTerrain);
-            if (!request.ObstacleFree) failures.Add(BuildingPlacementFailure.Obstacle);
+            if (hasDefinition && hasValidOrientation &&
+                request.Site == BuildingSite.Ground &&
+                !IsGroundFootprintInRange(
+                    request,
+                    workspace.Footprint))
+                workspace.AddFailure(
+                    BuildingPlacementFailure.OutsideBuildRange);
+            if (hasGrid && footprintInBounds &&
+                IsAnyFootprintCellOccupied(
+                    request.Grid,
+                    workspace.Footprint))
+                workspace.AddFailure(
+                    BuildingPlacementFailure.Overlap);
+            if (request.FootprintTouchesCity)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.CityOccupied);
+            if (!request.TerrainPassable)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.InvalidTerrain);
+            if (!request.ObstacleFree)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.Obstacle);
             var hasCompatibleResourceNode = request.CoversCompatibleResourceNode &&
                 !string.IsNullOrEmpty(request.CompatibleResourceNodeId);
             if (hasDefinition && request.Definition.RequiresResourceNode && !hasCompatibleResourceNode)
-                failures.Add(BuildingPlacementFailure.IncompatibleResourceNode);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.IncompatibleResourceNode);
             if (!request.ContentVisible || ContainsUnlockFailure(request.Unlock, BuildingUnlockFailure.Research))
-                failures.Add(BuildingPlacementFailure.ContentUnavailable);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.ContentUnavailable);
             if (ContainsUnlockFailure(request.Unlock, BuildingUnlockFailure.Population))
-                failures.Add(BuildingPlacementFailure.PopulationRequired);
+                workspace.AddFailure(
+                    BuildingPlacementFailure.PopulationRequired);
             if (ContainsUnlockFailure(request.Unlock, BuildingUnlockFailure.RequiredBuilding))
-                failures.Add(BuildingPlacementFailure.PrerequisiteBuildingRequired);
-            if (!request.CanAfford) failures.Add(BuildingPlacementFailure.InsufficientMaterials);
+                workspace.AddFailure(
+                    BuildingPlacementFailure
+                        .PrerequisiteBuildingRequired);
+            if (!request.CanAfford)
+                workspace.AddFailure(
+                    BuildingPlacementFailure.InsufficientMaterials);
 
             var nodeId = hasDefinition && request.Definition.RequiresResourceNode && hasCompatibleResourceNode
                 ? request.CompatibleResourceNodeId
                 : null;
             return new BuildingPlacementEvaluation(
-                Snapshot(failures),
+                workspace.Failures,
                 request.Site,
                 request.Orientation,
                 rotatedWidth,
                 rotatedHeight,
                 nodeId,
-                Snapshot(footprint));
+                workspace.Footprint);
         }
 
         private static bool IsGroundFootprintInRange(
@@ -242,9 +339,13 @@ namespace WasteCity.Building
             return false;
         }
 
-        private static IReadOnlyList<T> Snapshot<T>(List<T> values)
+        private static ReadOnlyCollection<T> Snapshot<T>(
+            IReadOnlyList<T> values)
         {
-            return new ReadOnlyCollection<T>(values.ToArray());
+            var snapshot = new T[values.Count];
+            for (var index = 0; index < values.Count; index++)
+                snapshot[index] = values[index];
+            return new ReadOnlyCollection<T>(snapshot);
         }
     }
 }

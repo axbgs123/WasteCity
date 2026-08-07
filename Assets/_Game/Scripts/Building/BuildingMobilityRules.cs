@@ -1,4 +1,3 @@
-using System;
 using WasteCity.City;
 
 namespace WasteCity.Building
@@ -27,7 +26,11 @@ namespace WasteCity.Building
     {
         public static bool SupportsSite(BuildingDefinition definition, BuildingSite site)
         {
-            if (definition == null || !Enum.IsDefined(typeof(BuildingSite), site)) return false;
+            bool validSite =
+                site == BuildingSite.Ground ||
+                site == BuildingSite.InnerCity;
+            if (definition == null || !validSite)
+                return false;
             return definition.Placement == BuildingPlacement.Either ||
                    (definition.Placement == BuildingPlacement.Ground && site == BuildingSite.Ground) ||
                    (definition.Placement == BuildingPlacement.InnerCity && site == BuildingSite.InnerCity);

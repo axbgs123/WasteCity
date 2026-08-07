@@ -1,5 +1,10 @@
 namespace WasteCity.Graybox3D
 {
+    public interface IGrayboxDeploymentRequest
+    {
+        bool TryToggleDeployment(out string failureReason);
+    }
+
     public readonly struct GrayboxInputSuppression
     {
         public bool Move { get; }

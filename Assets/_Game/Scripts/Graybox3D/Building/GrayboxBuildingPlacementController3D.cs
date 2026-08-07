@@ -20,6 +20,14 @@ namespace WasteCity.Graybox3D.Building
         private Vector2 lastScreenPosition;
         private bool hasPointer;
         private string highlightedNodeId;
+        private readonly BuildingPlacementEvaluationWorkspace
+            evaluationWorkspace =
+                new BuildingPlacementEvaluationWorkspace();
+        private Func<string, bool> researchCompleted;
+        private Func<string, int> completedBuildings;
+        private string[] resourceNodeVisualIds;
+        private int resourceNodeVisualWidth;
+        private int resourceNodeVisualHeight;
 
         public BuildingPlacementEvaluation CurrentEvaluation
         {
@@ -43,6 +51,15 @@ namespace WasteCity.Graybox3D.Building
             this.projector = projector;
             this.presentation = presentation;
             this.interaction = interaction;
+            researchCompleted =
+                session == null
+                    ? null
+                    : session.IsResearchCompleted;
+            completedBuildings =
+                session == null
+                    ? null
+                    : session.CompletedBuildingCount;
+            ConfigureResourceNodeIdentityWorkspace(world);
             hasPointer = false;
             HidePreview();
         }
@@ -107,7 +124,8 @@ namespace WasteCity.Graybox3D.Building
             {
                 HidePreview();
                 CurrentEvaluation = BuildingPlacementRules.Evaluate(
-                    MissingRequest(definition));
+                    MissingRequest(definition),
+                    evaluationWorkspace);
                 return false;
             }
 
@@ -115,7 +133,8 @@ namespace WasteCity.Graybox3D.Building
             {
                 CurrentHit = BuildingSurfaceHit.Invalid;
                 CurrentEvaluation = BuildingPlacementRules.Evaluate(
-                    ProjectionFailedRequest(definition));
+                    ProjectionFailedRequest(definition),
+                    evaluationWorkspace);
                 ClearNodeHighlight();
                 presentation.HidePreview();
                 return false;
@@ -123,7 +142,8 @@ namespace WasteCity.Graybox3D.Building
 
             CurrentHit = hit;
             CurrentEvaluation = BuildingPlacementRules.Evaluate(
-                CreateRequest(definition, hit));
+                CreateRequest(definition, hit),
+                evaluationWorkspace);
             presentation.ShowPreview(
                 definition,
                 hit,
@@ -192,7 +212,7 @@ namespace WasteCity.Graybox3D.Building
                     {
                         coversCompatibleNode = true;
                         compatibleNodeId =
-                            CreateResourceNodeVisualId(x, y);
+                            ResourceNodeVisualId(x, y);
                     }
                 }
             }
@@ -206,8 +226,9 @@ namespace WasteCity.Graybox3D.Building
                 BuildingUnlockModel.Evaluate(
                     definition,
                     session.Population,
-                    session.IsResearchCompleted,
-                    session.CompletedBuildingCount);
+                    researchCompleted,
+                    completedBuildings,
+                    evaluationWorkspace.Unlock);
             bool canAfford = definition != null &&
                 session.Inventory.CanSpend(
                     definition.CostId,
@@ -286,8 +307,9 @@ namespace WasteCity.Graybox3D.Building
                 BuildingUnlockModel.Evaluate(
                     definition,
                     session.Population,
-                    session.IsResearchCompleted,
-                    session.CompletedBuildingCount),
+                    researchCompleted,
+                    completedBuildings,
+                    evaluationWorkspace.Unlock),
                 definition != null &&
                 session.Inventory.CanSpend(
                     definition.CostId,
@@ -347,7 +369,9 @@ namespace WasteCity.Graybox3D.Building
                     cell.Y >= world.Model.Height)
                     continue;
                 if (string.Equals(
-                        CreateResourceNodeVisualId(cell.X, cell.Y),
+                        ExistingResourceNodeVisualId(
+                            cell.X,
+                            cell.Y),
                         nodeId,
                         StringComparison.Ordinal))
                     return cell;
@@ -366,6 +390,56 @@ namespace WasteCity.Graybox3D.Building
                 0,
                 false);
             highlightedNodeId = null;
+        }
+
+        private void ConfigureResourceNodeIdentityWorkspace(
+            GrayboxWorldView3D configuredWorld)
+        {
+            WorldMapModel model = configuredWorld?.Model;
+            if (model == null)
+            {
+                resourceNodeVisualIds = null;
+                resourceNodeVisualWidth = 0;
+                resourceNodeVisualHeight = 0;
+                return;
+            }
+
+            resourceNodeVisualWidth = model.Width;
+            resourceNodeVisualHeight = model.Height;
+            resourceNodeVisualIds =
+                new string[
+                    resourceNodeVisualWidth *
+                    resourceNodeVisualHeight];
+        }
+
+        private string ResourceNodeVisualId(int x, int y)
+        {
+            if (!IsResourceNodeIdentityInBounds(x, y))
+                return CreateResourceNodeVisualId(x, y);
+            int index = y * resourceNodeVisualWidth + x;
+            string stableId = resourceNodeVisualIds[index];
+            if (stableId != null)
+                return stableId;
+            stableId = CreateResourceNodeVisualId(x, y);
+            resourceNodeVisualIds[index] = stableId;
+            return stableId;
+        }
+
+        private string ExistingResourceNodeVisualId(int x, int y)
+        {
+            if (!IsResourceNodeIdentityInBounds(x, y))
+                return null;
+            return resourceNodeVisualIds[
+                y * resourceNodeVisualWidth + x];
+        }
+
+        private bool IsResourceNodeIdentityInBounds(int x, int y)
+        {
+            return resourceNodeVisualIds != null &&
+                x >= 0 &&
+                y >= 0 &&
+                x < resourceNodeVisualWidth &&
+                y < resourceNodeVisualHeight;
         }
     }
 }

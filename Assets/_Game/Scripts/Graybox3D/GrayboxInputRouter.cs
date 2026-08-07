@@ -47,6 +47,7 @@ namespace WasteCity.Graybox3D
         [SerializeField]
         private GrayboxCameraController3D cameraController;
         [SerializeField] private MonoBehaviour inputInterceptor;
+        private IGrayboxDeploymentRequest deploymentRequest;
 
         public void Configure(
             GrayboxMobileCityController3D city,
@@ -60,6 +61,10 @@ namespace WasteCity.Graybox3D
             this.directControl = directControl;
             this.groundProjector = groundProjector;
             this.cameraController = cameraController;
+            deploymentRequest =
+                city == null
+                    ? null
+                    : new CityDeploymentRequestAdapter(city);
         }
 
         public void ConfigureInputInterceptor(MonoBehaviour value)
@@ -73,6 +78,12 @@ namespace WasteCity.Graybox3D
                     nameof(value));
             }
             inputInterceptor = value;
+        }
+
+        public void ConfigureDeploymentRequest(
+            IGrayboxDeploymentRequest value)
+        {
+            deploymentRequest = value;
         }
 
         public GrayboxInputFrame ReadCurrentFrame()
@@ -159,7 +170,12 @@ namespace WasteCity.Graybox3D
 
             if (!suppression.Deployment &&
                 frame.ToggleDeploymentPressed)
-                city?.TryToggleDeployment(out _);
+            {
+                if (deploymentRequest == null && city != null)
+                    deploymentRequest =
+                        new CityDeploymentRequestAdapter(city);
+                deploymentRequest?.TryToggleDeployment(out _);
+            }
 
             if (!suppression.Destination &&
                 frame.DestinationPressed &&
@@ -232,6 +248,23 @@ namespace WasteCity.Graybox3D
             if (!suppression.Home &&
                 frame.HomePressed)
                 cameraController.ReturnToTarget();
+        }
+
+        private sealed class CityDeploymentRequestAdapter :
+            IGrayboxDeploymentRequest
+        {
+            private readonly GrayboxMobileCityController3D city;
+
+            public CityDeploymentRequestAdapter(
+                GrayboxMobileCityController3D city)
+            {
+                this.city = city;
+            }
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                return city.TryToggleDeployment(out failureReason);
+            }
         }
     }
 }

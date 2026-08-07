@@ -180,6 +180,23 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_ExposesPublicDeploymentRequestSeam()
+        {
+            Type router = typeof(GrayboxInputRouter);
+            Type deploymentRequest = router.Assembly.GetType(
+                "WasteCity.Graybox3D.IGrayboxDeploymentRequest");
+
+            Assert.That(deploymentRequest, Is.Not.Null);
+            Assert.That(deploymentRequest.IsInterface, Is.True);
+            Assert.That(deploymentRequest.IsPublic, Is.True);
+            Assert.That(
+                router.GetMethod(
+                    "ConfigureDeploymentRequest",
+                    new[] { deploymentRequest }),
+                Is.Not.Null);
+        }
+
+        [Test]
         public void ConfigureInputInterceptor_RejectsUnrelatedMonoBehaviour()
         {
             RuntimeFixture fixture = CreateRuntimeFixture(true);
@@ -540,6 +557,25 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.City.Mode,
                 Is.EqualTo(CityMode.Packing));
+        }
+
+        [Test]
+        public void ProcessFrame_UsesConfiguredDeploymentRequestExactlyOnce()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            var deploymentRequest = new DeploymentRequestSpy(false);
+            fixture.Router.ConfigureDeploymentRequest(deploymentRequest);
+
+            ProcessFrame(
+                fixture.Router,
+                CreateInputFrame(
+                    Vector2.zero,
+                    new Vector2(640f, 360f),
+                    toggleDeploymentPressed: true));
+
+            Assert.That(deploymentRequest.ToggleCalls, Is.EqualTo(1));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
         }
 
         [Test]
@@ -1215,6 +1251,26 @@ namespace WasteCity.Tests
             {
                 Calls++;
                 return Suppression;
+            }
+        }
+
+        private sealed class DeploymentRequestSpy :
+            IGrayboxDeploymentRequest
+        {
+            private readonly bool result;
+
+            public DeploymentRequestSpy(bool result)
+            {
+                this.result = result;
+            }
+
+            public int ToggleCalls { get; private set; }
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                ToggleCalls++;
+                failureReason = result ? string.Empty : "rejected";
+                return result;
             }
         }
 

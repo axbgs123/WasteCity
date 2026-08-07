@@ -47,9 +47,14 @@ namespace WasteCity.Graybox3D.Building
                 interaction != null &&
                 interaction.State !=
                 GrayboxBuildingInteractionState.Inactive;
+            bool previewing =
+                interaction != null &&
+                interaction.State ==
+                GrayboxBuildingInteractionState.Previewing;
             bool pointerActive =
                 mouse != null &&
-                (mouse.leftButton.wasPressedThisFrame ||
+                (previewing ||
+                 mouse.leftButton.wasPressedThisFrame ||
                  mouse.rightButton.wasPressedThisFrame ||
                  mouse.middleButton.wasPressedThisFrame ||
                  mouse.middleButton.isPressed ||
@@ -92,12 +97,14 @@ namespace WasteCity.Graybox3D.Building
                 developer?.TryTogglePanel();
 
             ProcessKeyboardActions(keyboard);
+            previewing =
+                interaction != null &&
+                interaction.State ==
+                GrayboxBuildingInteractionState.Previewing;
 
             bool paused = Time.timeScale <= 0f;
             if (!pointerOverUi &&
-                interaction != null &&
-                interaction.State ==
-                GrayboxBuildingInteractionState.Previewing)
+                previewing)
             {
                 placement?.UpdatePointer(pointerPosition);
                 if (!paused &&

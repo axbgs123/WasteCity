@@ -1,5 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using WasteCity.Building;
 using WasteCity.City;
@@ -439,6 +442,154 @@ namespace WasteCity.Tests
             var reasons = evaluation.Reasons as IList<string>;
             Assert.That(reasons, Is.Not.Null);
             Assert.Throws<NotSupportedException>(() => reasons.Add("unexpected"));
+        }
+
+        [Test]
+        public void WorkspaceApi_ReusesPlacementAndUnlockBuffersUntilNextCall()
+        {
+            Type assemblyType = typeof(BuildingPlacementRules);
+            Type workspaceType = assemblyType.Assembly.GetType(
+                "WasteCity.Building.BuildingPlacementEvaluationWorkspace");
+            Type unlockWorkspaceType = assemblyType.Assembly.GetType(
+                "WasteCity.Building.BuildingUnlockEvaluationWorkspace");
+
+            Assert.That(workspaceType, Is.Not.Null);
+            Assert.That(workspaceType.IsPublic, Is.True);
+            Assert.That(workspaceType.GetConstructor(Type.EmptyTypes), Is.Not.Null);
+            Assert.That(unlockWorkspaceType, Is.Not.Null);
+            PropertyInfo unlockProperty = workspaceType.GetProperty("Unlock");
+            Assert.That(unlockProperty, Is.Not.Null);
+            Assert.That(
+                unlockProperty.PropertyType,
+                Is.EqualTo(unlockWorkspaceType));
+            MethodInfo evaluate = typeof(BuildingPlacementRules).GetMethod(
+                "Evaluate",
+                new[]
+                {
+                    typeof(BuildingPlacementRequest).MakeByRefType(),
+                    workspaceType
+                });
+            Assert.That(evaluate, Is.Not.Null);
+
+            object workspace = Activator.CreateInstance(workspaceType);
+            object otherWorkspace = Activator.CreateInstance(workspaceType);
+            var invalid = (BuildingPlacementEvaluation)evaluate.Invoke(
+                null,
+                new object[] { CreateRequest(canAfford: false), workspace });
+            Assert.That(
+                invalid.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.InsufficientMaterials
+                }));
+            Assert.That(invalid.Footprint, Has.Count.EqualTo(4));
+            Assert.That(invalid.Footprint[0].X, Is.EqualTo(11));
+            Assert.That(invalid.Footprint[0].Y, Is.EqualTo(11));
+            Assert.That(invalid.Footprint[1].X, Is.EqualTo(11));
+            Assert.That(invalid.Footprint[1].Y, Is.EqualTo(12));
+            Assert.That(invalid.Footprint[2].X, Is.EqualTo(12));
+            Assert.That(invalid.Footprint[2].Y, Is.EqualTo(11));
+            Assert.That(invalid.Footprint[3].X, Is.EqualTo(12));
+            Assert.That(invalid.Footprint[3].Y, Is.EqualTo(12));
+
+            evaluate.Invoke(
+                null,
+                new object[] { CreateRequest(x: 12, y: 12), otherWorkspace });
+            Assert.That(
+                invalid.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.InsufficientMaterials
+                }));
+            Assert.That(invalid.Footprint[0].X, Is.EqualTo(11));
+
+            evaluate.Invoke(
+                null,
+                new object[] { CreateRequest(x: 12, y: 12), workspace });
+            Assert.That(invalid.Failures, Is.Empty);
+            Assert.That(invalid.Footprint[0].X, Is.EqualTo(12));
+            Assert.That(invalid.Footprint[0].Y, Is.EqualTo(12));
+
+            AssertNoPublicMutableBufferOrReset(
+                workspaceType,
+                unlockWorkspaceType);
+            AssertNoStaticMutableBuffer(
+                workspaceType,
+                unlockWorkspaceType);
+        }
+
+        [Test]
+        public void LegacyPlacementEvaluate_ReturnsIndependentSnapshots()
+        {
+            BuildingPlacementEvaluation first =
+                BuildingPlacementRules.Evaluate(
+                    CreateRequest(canAfford: false));
+            BuildingPlacementEvaluation second =
+                BuildingPlacementRules.Evaluate(
+                    CreateRequest(x: 12, y: 12));
+
+            Assert.That(
+                first.Failures,
+                Is.EqualTo(new[]
+                {
+                    BuildingPlacementFailure.InsufficientMaterials
+                }));
+            Assert.That(first.Footprint[0].X, Is.EqualTo(11));
+            Assert.That(second.Failures, Is.Empty);
+            Assert.That(second.Footprint[0].X, Is.EqualTo(12));
+            Assert.That(first.Failures, Is.Not.SameAs(second.Failures));
+            Assert.That(first.Footprint, Is.Not.SameAs(second.Footprint));
+        }
+
+        private static void AssertNoPublicMutableBufferOrReset(
+            params Type[] types)
+        {
+            foreach (Type type in types)
+            {
+                Assert.That(
+                    type.GetFields(
+                        BindingFlags.Public |
+                        BindingFlags.Instance),
+                    Is.Empty,
+                    type.Name);
+                Assert.That(
+                    type.GetProperties(
+                            BindingFlags.Public |
+                            BindingFlags.Instance)
+                        .Where(property =>
+                            property.Name != "Unlock" &&
+                            (property.PropertyType.IsArray ||
+                             typeof(IList).IsAssignableFrom(
+                                 property.PropertyType))),
+                    Is.Empty,
+                    type.Name);
+                Assert.That(
+                    type.GetMethods(
+                            BindingFlags.Public |
+                            BindingFlags.Instance)
+                        .Where(method =>
+                            method.Name == "Clear" ||
+                            method.Name == "Reset"),
+                    Is.Empty,
+                    type.Name);
+            }
+        }
+
+        private static void AssertNoStaticMutableBuffer(params Type[] types)
+        {
+            foreach (Type type in types)
+                Assert.That(
+                    type.GetFields(
+                            BindingFlags.Static |
+                            BindingFlags.Public |
+                            BindingFlags.NonPublic)
+                        .Where(field =>
+                            field.FieldType.IsArray ||
+                            typeof(IList).IsAssignableFrom(
+                                field.FieldType) ||
+                            types.Contains(field.FieldType)),
+                    Is.Empty,
+                    type.Name);
         }
 
         private static BuildingPlacementRequest CreateRequest(
