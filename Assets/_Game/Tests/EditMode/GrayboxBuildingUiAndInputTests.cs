@@ -158,6 +158,56 @@ namespace WasteCity.Tests
 
         [Test]
         public void
+            InputRouter_SameFrameBuildSelectionAndRightClickNeverStartsAutopilot()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            GrayboxGroundProjector groundProjector =
+                Create<GrayboxGroundProjector>(
+                    "SameFrameBuildGroundProjector");
+            groundProjector.Configure(
+                fixture.Camera,
+                fixture.World.Coordinates);
+            Assert.That(
+                groundProjector.TryProjectToCell(
+                    ScreenCenter,
+                    out _,
+                    out _,
+                    out _),
+                Is.True);
+            GrayboxInputRouter baseRouter =
+                Create<GrayboxInputRouter>(
+                    "SameFrameBuildBaseRouter");
+            baseRouter.Configure(
+                fixture.City,
+                null,
+                null,
+                groundProjector,
+                null);
+            ForwardingInputInterceptor interceptor =
+                Create<ForwardingInputInterceptor>(
+                    "SameFrameBuildInterceptor");
+            interceptor.Target = fixture.Router;
+            baseRouter.ConfigureInputInterceptor(interceptor);
+
+            RouteCombinedInputThroughBaseRouter(
+                baseRouter,
+                true,
+                Key.B,
+                Key.Digit4);
+
+            Assert.That(interceptor.Calls, Is.EqualTo(1));
+            Assert.That(interceptor.LastSuppression.Destination, Is.True);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Inactive));
+            Assert.That(fixture.Interaction.Selected, Is.Null);
+            Assert.That(fixture.City.AutopilotActive, Is.False);
+            Assert.That(fixture.City.Destination, Is.Null);
+        }
+
+        [Test]
+        public void
             InputRouter_QuickbarPreviewTransitionClassifiesStationaryUiBeforeWorld()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -330,6 +380,75 @@ namespace WasteCity.Tests
             Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
             Assert.That(fixture.Interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.CancelConfirmation));
+        }
+
+        [Test]
+        public void
+            InputRouter_SameFrameDeleteModalSuppressesFAndEveryBaseChannel()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D progressed =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    20,
+                    15,
+                    fixture.Presentation);
+            fixture.Construction.TickConstruction(.5f);
+            Assert.That(
+                fixture.Construction.SelectInstance(
+                    progressed.StableInstanceId),
+                Is.True);
+            var deployment = new SharedDeploymentRequestSpy(
+                CityMode.Fortress,
+                false);
+            fixture.Evacuation.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Ui.Menu);
+            GrayboxInputRouter baseRouter =
+                Create<GrayboxInputRouter>(
+                    "SameFrameDeleteBaseRouter");
+            baseRouter.Configure(
+                fixture.City,
+                null,
+                null,
+                null,
+                null);
+            baseRouter.ConfigureDeploymentRequest(deployment);
+            ForwardingInputInterceptor interceptor =
+                Create<ForwardingInputInterceptor>(
+                    "SameFrameDeleteInterceptor");
+            interceptor.Target = fixture.Router;
+            baseRouter.ConfigureInputInterceptor(interceptor);
+
+            RouteCombinedInputThroughBaseRouter(
+                baseRouter,
+                false,
+                Key.Delete,
+                Key.F);
+
+            Assert.That(interceptor.Calls, Is.EqualTo(1));
+            Assert.That(interceptor.LastSuppression.Move, Is.True);
+            Assert.That(
+                interceptor.LastSuppression.Deployment,
+                Is.True);
+            Assert.That(
+                interceptor.LastSuppression.Destination,
+                Is.True);
+            Assert.That(
+                interceptor.LastSuppression.CameraDrag,
+                Is.True);
+            Assert.That(interceptor.LastSuppression.Home, Is.True);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
+            Assert.That(fixture.Evacuation.IsProcessing, Is.False);
+            Assert.That(deployment.ToggleCalls, Is.Zero);
         }
 
         [Test]
@@ -1867,6 +1986,90 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void
+            UiGuard_DynamicallyCreatedFallbackIsLiveAndDisableIsImmediate()
+        {
+            EventSystem eventSystem =
+                Create<EventSystem>("DynamicFallbackEventSystem");
+            var guard = new GrayboxUiInputGuard3D();
+            Assert.That(
+                guard.IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.False);
+
+            Canvas canvas = Create<Canvas>("DynamicFallbackCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.GetComponent<RectTransform>().sizeDelta =
+                new Vector2(640f, 480f);
+            NoResultsGraphicRaycaster raycaster =
+                canvas.gameObject
+                    .AddComponent<NoResultsGraphicRaycaster>();
+            RegisterHeadlessEditModeRaycaster(raycaster);
+            Image image = CreateFallbackGraphic(
+                canvas,
+                "DynamicFallbackGraphic");
+            ForceCanvasLayout(canvas);
+            Assert.That(
+                GraphicRegistry.GetGraphicsForCanvas(canvas)
+                    .Contains(image),
+                Is.True);
+
+            Assert.That(
+                guard.IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.True);
+
+            raycaster.enabled = false;
+
+            Assert.That(
+                guard.IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.False);
+        }
+
+        [Test]
+        public void UiGuard_DynamicallyEnabledFallbackIsLiveOnNextCall()
+        {
+            EventSystem eventSystem =
+                Create<EventSystem>("EnabledFallbackEventSystem");
+            Canvas canvas = Create<Canvas>("EnabledFallbackCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.GetComponent<RectTransform>().sizeDelta =
+                new Vector2(640f, 480f);
+            NoResultsGraphicRaycaster raycaster =
+                canvas.gameObject
+                    .AddComponent<NoResultsGraphicRaycaster>();
+            Image image = CreateFallbackGraphic(
+                canvas,
+                "EnabledFallbackGraphic");
+            canvas.gameObject.SetActive(false);
+            RegisterHeadlessEditModeRaycaster(raycaster);
+            var guard = new GrayboxUiInputGuard3D();
+
+            Assert.That(
+                guard.IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.False);
+
+            canvas.gameObject.SetActive(true);
+            ForceCanvasLayout(canvas);
+            Assert.That(
+                GraphicRegistry.GetGraphicsForCanvas(canvas)
+                    .Contains(image),
+                Is.True);
+
+            Assert.That(
+                guard.IsPointerOverUi(
+                    eventSystem,
+                    ScreenCenter),
+                Is.True);
+        }
+
+        [Test]
         public void UiGuard_PhysicsRaycastResultDoesNotCapturePointerAsUi()
         {
             UiFixture fixture = CreateMenuFixture();
@@ -2803,6 +3006,54 @@ namespace WasteCity.Tests
             InputSystem.Update();
         }
 
+        private void RouteCombinedInputThroughBaseRouter(
+            GrayboxInputRouter router,
+            bool rightPressed,
+            params Key[] keys)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(keys));
+            MouseState mouseState = new MouseState
+            {
+                position = testPointer
+            };
+            if (rightPressed)
+                mouseState =
+                    mouseState.WithButton(MouseButton.Right);
+            InputSystem.QueueStateEvent(testMouse, mouseState);
+            InputSystem.Update();
+            for (var index = 0; index < keys.Length; index++)
+            {
+                Assert.That(
+                    testKeyboard[keys[index]].wasPressedThisFrame,
+                    Is.True,
+                    keys[index].ToString());
+            }
+            Assert.That(
+                testMouse.rightButton.wasPressedThisFrame,
+                Is.EqualTo(rightPressed));
+
+            typeof(GrayboxInputRouter)
+                .GetMethod(
+                    "Update",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)
+                .Invoke(router, null);
+
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState());
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = testPointer
+                });
+            InputSystem.Update();
+        }
+
         private GrayboxInputSuppression PressMouse(
             GrayboxBuildingInputRouter3D router,
             MouseButton button)
@@ -3364,6 +3615,23 @@ namespace WasteCity.Tests
             }
         }
 
+        private Image CreateFallbackGraphic(
+            Canvas canvas,
+            string name)
+        {
+            GameObject target = NewObject(name);
+            RectTransform rect =
+                target.AddComponent<RectTransform>();
+            rect.SetParent(canvas.transform, false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            Image image = target.AddComponent<Image>();
+            image.raycastTarget = true;
+            return image;
+        }
+
         private static void AssertReadable(Rect rect)
         {
             AssertReadable(rect, "control");
@@ -3697,6 +3965,26 @@ namespace WasteCity.Tests
                 ToggleCalls++;
                 failureReason = result ? string.Empty : "rejected";
                 return result;
+            }
+        }
+
+        private sealed class ForwardingInputInterceptor :
+            MonoBehaviour,
+            IGrayboxInputInterceptor
+        {
+            public GrayboxBuildingInputRouter3D Target { get; set; }
+            public int Calls { get; private set; }
+            public GrayboxInputSuppression LastSuppression
+            {
+                get;
+                private set;
+            }
+
+            public GrayboxInputSuppression ProcessCurrentInput()
+            {
+                Calls++;
+                LastSuppression = Target.ProcessCurrentInput();
+                return LastSuppression;
             }
         }
 

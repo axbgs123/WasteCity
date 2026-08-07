@@ -9,8 +9,6 @@ namespace WasteCity.Graybox3D.Building
     {
         private readonly List<RaycastResult> raycastResults =
             new List<RaycastResult>();
-        private readonly List<GraphicRaycaster> fallbackRaycasters =
-            new List<GraphicRaycaster>();
         private EventSystem pointerEventSystem;
         private PointerEventData pointerEventData;
         private int escapeConsumedFrame = -1;
@@ -39,7 +37,6 @@ namespace WasteCity.Graybox3D.Building
                 pointerEventSystem = eventSystem;
                 pointerEventData =
                     new PointerEventData(eventSystem);
-                RefreshFallbackRaycasters();
             }
             pointerEventData.Reset();
             pointerEventData.position = screenPosition;
@@ -63,12 +60,15 @@ namespace WasteCity.Graybox3D.Building
             raycastResults.Clear();
             if (hit) return true;
 
+            List<BaseRaycaster> liveRaycasters =
+                RaycasterManager.GetRaycasters();
             for (var raycasterIndex = 0;
-                 raycasterIndex < fallbackRaycasters.Count;
+                 raycasterIndex < liveRaycasters.Count;
                  raycasterIndex++)
             {
                 GraphicRaycaster raycaster =
-                    fallbackRaycasters[raycasterIndex];
+                    liveRaycasters[raycasterIndex]
+                        as GraphicRaycaster;
                 if (raycaster == null || !raycaster.isActiveAndEnabled)
                     continue;
                 Canvas canvas = raycaster.GetComponent<Canvas>();
@@ -76,7 +76,8 @@ namespace WasteCity.Graybox3D.Building
                     !canvas.isActiveAndEnabled)
                     continue;
                 IList<Graphic> graphics =
-                    GraphicRegistry.GetGraphicsForCanvas(canvas);
+                    GraphicRegistry
+                        .GetRaycastableGraphicsForCanvas(canvas);
                 for (var graphicIndex = 0;
                      graphicIndex < graphics.Count;
                      graphicIndex++)
@@ -98,13 +99,6 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             return false;
-        }
-
-        private void RefreshFallbackRaycasters()
-        {
-            fallbackRaycasters.Clear();
-            fallbackRaycasters.AddRange(
-                UnityEngine.Object.FindObjectsOfType<GraphicRaycaster>());
         }
 
         public bool ConsumeFocusedEscape(EventSystem eventSystem)

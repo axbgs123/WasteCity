@@ -47,6 +47,7 @@ namespace WasteCity.Graybox3D.Building
                 interaction != null &&
                 interaction.State !=
                 GrayboxBuildingInteractionState.Inactive;
+            bool buildInputOwnedThisFrame = wasBuildMode;
             bool previewing =
                 interaction != null &&
                 interaction.State ==
@@ -98,11 +99,16 @@ namespace WasteCity.Graybox3D.Building
                 keyboard.f10Key.wasPressedThisFrame)
                 developer?.TryTogglePanel();
 
-            ProcessKeyboardActions(keyboard);
+            buildInputOwnedThisFrame |=
+                ProcessKeyboardActions(keyboard);
             previewing =
                 interaction != null &&
                 interaction.State ==
                 GrayboxBuildingInteractionState.Previewing;
+            buildInputOwnedThisFrame |=
+                interaction != null &&
+                interaction.State !=
+                GrayboxBuildingInteractionState.Inactive;
             if (previewing &&
                 !pointerClassified &&
                 mouse != null &&
@@ -129,6 +135,11 @@ namespace WasteCity.Graybox3D.Building
                 keyboard.deleteKey.wasPressedThisFrame)
                 construction?.RequestCancelSelected();
 
+            if (interaction != null &&
+                interaction.State ==
+                GrayboxBuildingInteractionState.CancelConfirmation)
+                return SuppressAll();
+
             bool deployment = paused;
             if (!paused &&
                 keyboard != null &&
@@ -140,37 +151,75 @@ namespace WasteCity.Graybox3D.Building
             if (!pointerOverUi &&
                 mouse != null &&
                 mouse.rightButton.wasPressedThisFrame)
-                CancelBuildState();
+            {
+                bool rightClickOwned =
+                    interaction != null &&
+                    interaction.State !=
+                    GrayboxBuildingInteractionState.Inactive;
+                if (rightClickOwned)
+                {
+                    buildInputOwnedThisFrame = true;
+                    CancelBuildState();
+                }
+            }
+
+            bool isBuildMode =
+                interaction != null &&
+                interaction.State !=
+                GrayboxBuildingInteractionState.Inactive;
 
             return new GrayboxInputSuppression(
                 move: false,
                 deployment: deployment,
-                destination: pointerOverUi || wasBuildMode,
+                destination:
+                    pointerOverUi ||
+                    buildInputOwnedThisFrame ||
+                    isBuildMode,
                 cameraDrag: pointerOverUi,
                 home: false);
         }
 
-        private void ProcessKeyboardActions(Keyboard keyboard)
+        private bool ProcessKeyboardActions(Keyboard keyboard)
         {
             if (keyboard == null || interaction == null)
-                return;
+                return false;
+
+            bool owned = false;
 
             if (keyboard.bKey.wasPressedThisFrame)
+            {
                 interaction.ToggleCatalog();
+                owned = true;
+            }
 
             if (interaction.State !=
                 GrayboxBuildingInteractionState.Inactive)
             {
                 int quickbarIndex = QuickbarIndex(keyboard);
                 if (quickbarIndex >= 0)
+                {
                     menu?.TrySelectQuickbarSlot(quickbarIndex);
+                    owned = true;
+                }
             }
 
-            if (keyboard.rKey.wasPressedThisFrame)
+            if (keyboard.rKey.wasPressedThisFrame &&
+                interaction.State !=
+                GrayboxBuildingInteractionState.Inactive)
+            {
                 interaction.RotateClockwise();
+                owned = true;
+            }
 
-            if (keyboard.escapeKey.wasPressedThisFrame)
+            if (keyboard.escapeKey.wasPressedThisFrame &&
+                interaction.State !=
+                GrayboxBuildingInteractionState.Inactive)
+            {
                 CancelBuildState();
+                owned = true;
+            }
+
+            return owned;
         }
 
         private void CancelBuildState()
