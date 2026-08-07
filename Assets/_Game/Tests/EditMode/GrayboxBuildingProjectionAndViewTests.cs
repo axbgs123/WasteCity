@@ -977,6 +977,108 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void
+            PlacementController_OnEnableStartsNewWorkspaceWithoutConfigureAndPreservesOldEvaluation()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[19, 15] = Cell(ResourceIds.Iron);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Smelter.RequiredResearchId);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Assembler.RequiredResearchId);
+            Begin(
+                fixture,
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                12,
+                15,
+                CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Assert.That(
+                fixture.Session.CompletedBuildingCount(
+                    BuildingCatalog.Smelter.Id.Value),
+                Is.EqualTo(1));
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 18, 14);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            BuildingPlacementEvaluation oldEvaluation =
+                fixture.Placement.CurrentEvaluation;
+            BuildingPlacementFailure[] oldFailures =
+                oldEvaluation.Failures.ToArray();
+            Vector2Int[] oldFootprint =
+                FootprintSnapshot(oldEvaluation);
+            object oldWorkspace =
+                PlacementWorkspace(fixture.Placement);
+            Assert.That(oldFootprint.Length, Is.EqualTo(4));
+            Assert.That(
+                oldFailures,
+                Is.Empty);
+            Assert.That(
+                oldEvaluation.CompatibleResourceNodeId,
+                Is.EqualTo("world.resource-node.19.15"));
+
+            InvokePlacementLifecycle(
+                fixture.Placement,
+                "OnDisable");
+            ClearTransientPlacementCaches(fixture.Placement);
+            InvokePlacementLifecycle(
+                fixture.Placement,
+                "OnEnable");
+
+            Assert.That(
+                PlacementWorkspace(fixture.Placement),
+                Is.Not.Null.And.Not.SameAs(oldWorkspace));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Footprint,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentHit.IsValid,
+                Is.False);
+
+            fixture.Interaction.Select(BuildingCatalog.Assembler);
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True,
+                fixture.Placement.CurrentEvaluation
+                    .PrimaryFailure.ToString());
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.Empty);
+
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 18, 14);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            string firstNodeId =
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId;
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            string secondNodeId =
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId;
+
+            Assert.That(
+                firstNodeId,
+                Is.EqualTo("world.resource-node.19.15"));
+            Assert.That(secondNodeId, Is.SameAs(firstNodeId));
+            Assert.That(
+                oldEvaluation.Failures,
+                Is.EqualTo(oldFailures));
+            Assert.That(
+                FootprintSnapshot(oldEvaluation),
+                Is.EqualTo(oldFootprint));
+        }
+
+        [Test]
         public void WorldView_DoesNotRetainDynamicEvaluationOrColorVerdicts()
         {
             FieldInfo[] fields =
@@ -1673,6 +1775,46 @@ namespace WasteCity.Tests
                         BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null);
             method.Invoke(placement, null);
+        }
+
+        private static void ClearTransientPlacementCaches(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            SetPlacementField(
+                placement,
+                "researchCompleted",
+                null);
+            SetPlacementField(
+                placement,
+                "completedBuildings",
+                null);
+            SetPlacementField(
+                placement,
+                "resourceNodeVisualIds",
+                null);
+            SetPlacementField(
+                placement,
+                "resourceNodeVisualWidth",
+                0);
+            SetPlacementField(
+                placement,
+                "resourceNodeVisualHeight",
+                0);
+        }
+
+        private static void SetPlacementField(
+            GrayboxBuildingPlacementController3D placement,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field =
+                typeof(GrayboxBuildingPlacementController3D)
+                    .GetField(
+                        fieldName,
+                        BindingFlags.Instance |
+                        BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(placement, value);
         }
 
         private static string[] InstanceSlotIds(Transform root)

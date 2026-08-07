@@ -51,6 +51,11 @@ namespace WasteCity.Graybox3D.Building
             this.projector = projector;
             this.presentation = presentation;
             this.interaction = interaction;
+            BeginConfiguredLifetime();
+        }
+
+        private void BeginConfiguredLifetime()
+        {
             evaluationWorkspace =
                 new BuildingPlacementEvaluationWorkspace();
             researchCompleted =
@@ -449,6 +454,12 @@ namespace WasteCity.Graybox3D.Building
                 y < resourceNodeVisualHeight;
         }
 
+        private void OnEnable()
+        {
+            if (evaluationWorkspace == null)
+                BeginConfiguredLifetime();
+        }
+
         private void OnDisable()
         {
             DiscardConfiguredLifetime();
@@ -477,6 +488,11 @@ namespace WasteCity.Graybox3D.Building
             CurrentHit = BuildingSurfaceHit.Invalid;
             CurrentEvaluation = default;
             evaluationWorkspace = null;
+            researchCompleted = null;
+            completedBuildings = null;
+            resourceNodeVisualIds = null;
+            resourceNodeVisualWidth = 0;
+            resourceNodeVisualHeight = 0;
         }
     }
 }
