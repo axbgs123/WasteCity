@@ -2036,6 +2036,32 @@ if comm -23 "$task9_changed" "$task9_allowlist" | grep -q .; then
   comm -23 "$task9_changed" "$task9_allowlist" >&2
   exit 1
 fi
+task9_static_pattern='^\+.*\bstatic\b.*(?:List<|Dictionary<|\[\]|BuildingUnlockEvaluationWorkspace|BuildingPlacementEvaluationWorkspace)'
+task9_cache_pattern='^\+.*(?:cached.*(?:Evaluation|Legality|Preview|UiHit)|(?:Evaluation|Legality|Preview|UiHit).*cached)'
+for task9_prohibited_static in \
+  '+ private static readonly List<int> Buffer = new();' \
+  '+ private static readonly Dictionary<string, int> Index = new();' \
+  '+ private static readonly int[] Cells = new int[4];' \
+  '+ private static readonly BuildingPlacementEvaluationWorkspace Workspace = new();'; do
+  printf '%s\n' "$task9_prohibited_static" | rg --pcre2 -q "$task9_static_pattern" || {
+    echo "Task 9 static-buffer pattern did not match prohibited added line" >&2
+    exit 1
+  }
+done
+if printf '%s\n' '  private readonly List<int> instanceBuffer = new();' | rg --pcre2 -q "$task9_static_pattern"; then
+  echo "Task 9 static-buffer pattern matched an allowed instance field" >&2
+  exit 1
+fi
+printf '%s\n' '+ private BuildingPlacementEvaluation cachedPreviewEvaluation;' | \
+  rg --pcre2 -q "$task9_cache_pattern" || {
+  echo "Task 9 dynamic-cache pattern did not match prohibited added line" >&2
+  exit 1
+}
+if printf '%s\n' '  private BuildingPlacementEvaluation currentEvaluation;' | \
+  rg --pcre2 -q "$task9_cache_pattern"; then
+  echo "Task 9 dynamic-cache pattern matched an allowed instance field" >&2
+  exit 1
+fi
 if git diff -U0 "$task9_remediation_base" -- \
   Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
   Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
@@ -2043,7 +2069,7 @@ if git diff -U0 "$task9_remediation_base" -- \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs | \
-  rg --pcre2 -n '^\\+.*\\bstatic\\b.*(?:List<|Dictionary<|\\[\\]|BuildingUnlockEvaluationWorkspace|BuildingPlacementEvaluationWorkspace)'; then
+  rg --pcre2 -n "$task9_static_pattern"; then
   echo "Task 9 remediation must not add a global mutable buffer" >&2
   exit 1
 fi
@@ -2051,7 +2077,7 @@ if git diff -U0 "$task9_remediation_base" -- \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs | \
-  rg --pcre2 -n '^\\+.*(?:cached.*(?:Evaluation|Legality|Preview|UiHit)|(?:Evaluation|Legality|Preview|UiHit).*cached)'; then
+  rg --pcre2 -n "$task9_cache_pattern"; then
   echo "Task 9 remediation must not add a cross-frame dynamic verdict cache" >&2
   exit 1
 fi
