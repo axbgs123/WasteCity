@@ -235,17 +235,19 @@ namespace WasteCity.Tests
         public void
             ProfilerRecorderPositiveControlCapturesDeliberateAllocation()
         {
+            var retainedAllocations = new object[64];
             ProfilerRecorder recorder =
                 ProfilerRecorder.StartNew(
                     ProfilerCategory.Memory,
                     "GC.Alloc",
-                    32,
+                    256,
                     ProfilerRecorderOptions.StartImmediately |
                     ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
                     ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
-            var allocation = new byte[1024];
-            allocation[0] = 47;
-            GC.KeepAlive(allocation);
+            int allocationChecksum =
+                AllocateAndRetainPositiveControlObjects(
+                    retainedAllocations);
+            GC.KeepAlive(retainedAllocations);
             recorder.Stop();
             int samples = recorder.Count;
             long profiledBytes = 0;
@@ -263,7 +265,13 @@ namespace WasteCity.Tests
             TestContext.WriteLine(
                 "Task9ProfilerPositiveControlBytes=" +
                 profiledBytes);
-            Assert.That(allocation[0], Is.EqualTo(47));
+            Assert.That(allocationChecksum, Is.EqualTo(69632));
+            Assert.That(
+                (byte[])retainedAllocations[0],
+                Has.Length.EqualTo(1024));
+            Assert.That(
+                (byte[])retainedAllocations[63],
+                Has.Length.EqualTo(1087));
             Assert.That(samples, Is.GreaterThan(0));
             Assert.That(profiledBytes, Is.GreaterThan(0));
         }
@@ -309,6 +317,25 @@ namespace WasteCity.Tests
         {
             return new TestCaseData(definition, placement, operation)
                 .SetName($"{definition.Name}_uses_{placement}_{operation}");
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int AllocateAndRetainPositiveControlObjects(
+            object[] retainedAllocations)
+        {
+            var checksum = 0;
+            for (var index = 0;
+                 index < retainedAllocations.Length;
+                 index++)
+            {
+                var allocation = new byte[1024 + index];
+                allocation[0] = (byte)(index + 1);
+                retainedAllocations[index] = allocation;
+                checksum += allocation.Length + allocation[0];
+            }
+
+            return checksum;
         }
 
         private static AllocationMeasurement Profile300Calls(Action action)
