@@ -158,17 +158,41 @@ namespace WasteCity.Tests
         [Test]
         public void MobilityRulesProfilerRecordsZeroAcross300Calls()
         {
+            int supportsSiteCalls = 0;
+            int supportedSites = 0;
             Action supportsSiteCall = () =>
-                BuildingMobilityRules.SupportsSite(
-                    BuildingCatalog.Housing,
-                    BuildingSite.InnerCity);
+            {
+                BuildingSite site =
+                    (supportsSiteCalls & 1) == 0
+                        ? BuildingSite.Ground
+                        : BuildingSite.InnerCity;
+                supportsSiteCalls++;
+                if (BuildingMobilityRules.SupportsSite(
+                        BuildingCatalog.Smelter,
+                        site))
+                    supportedSites++;
+            };
+            int canConstructCalls = 0;
+            int constructibleStates = 0;
             Action canConstructCall = () =>
-                BuildingMobilityRules.CanConstruct(
-                    BuildingCatalog.Housing,
-                    BuildingSite.InnerCity,
-                    CityMode.Fortress);
+            {
+                CityMode mode =
+                    (canConstructCalls & 1) == 0
+                        ? CityMode.Fortress
+                        : CityMode.Mobile;
+                canConstructCalls++;
+                if (BuildingMobilityRules.CanConstruct(
+                        BuildingCatalog.Smelter,
+                        BuildingSite.Ground,
+                        mode))
+                    constructibleStates++;
+            };
             supportsSiteCall();
             canConstructCall();
+            supportsSiteCalls = 0;
+            supportedSites = 0;
+            canConstructCalls = 0;
+            constructibleStates = 0;
 
             AllocationMeasurement supportsSite =
                 Profile300Calls(supportsSiteCall);
@@ -193,8 +217,55 @@ namespace WasteCity.Tests
             TestContext.WriteLine(
                 "Task9CanConstructCurrentThreadBytes=" +
                 canConstruct.CurrentThreadBytes);
+            TestContext.WriteLine(
+                "Task9SupportsSiteObservable=" +
+                supportedSites + "/" + supportsSiteCalls);
+            TestContext.WriteLine(
+                "Task9CanConstructObservable=" +
+                constructibleStates + "/" + canConstructCalls);
+            Assert.That(supportsSiteCalls, Is.EqualTo(300));
+            Assert.That(supportedSites, Is.EqualTo(150));
+            Assert.That(canConstructCalls, Is.EqualTo(300));
+            Assert.That(constructibleStates, Is.EqualTo(150));
             Assert.That(supportsSite.ProfiledBytes, Is.Zero);
             Assert.That(canConstruct.ProfiledBytes, Is.Zero);
+        }
+
+        [Test]
+        public void
+            ProfilerRecorderPositiveControlCapturesDeliberateAllocation()
+        {
+            ProfilerRecorder recorder =
+                ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory,
+                    "GC.Alloc",
+                    32,
+                    ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            var allocation = new byte[1024];
+            allocation[0] = 47;
+            GC.KeepAlive(allocation);
+            recorder.Stop();
+            int samples = recorder.Count;
+            long profiledBytes = 0;
+            for (var index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample =
+                    recorder.GetSample(index);
+                profiledBytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+
+            TestContext.WriteLine(
+                "Task9ProfilerPositiveControlSamples=" +
+                samples);
+            TestContext.WriteLine(
+                "Task9ProfilerPositiveControlBytes=" +
+                profiledBytes);
+            Assert.That(allocation[0], Is.EqualTo(47));
+            Assert.That(samples, Is.GreaterThan(0));
+            Assert.That(profiledBytes, Is.GreaterThan(0));
         }
 
         [Test]

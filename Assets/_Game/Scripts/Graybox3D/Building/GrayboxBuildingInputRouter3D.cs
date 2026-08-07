@@ -59,9 +59,11 @@ namespace WasteCity.Graybox3D.Building
                  mouse.middleButton.wasPressedThisFrame ||
                  mouse.middleButton.isPressed ||
                  mouse.middleButton.wasReleasedThisFrame);
-            bool pointerOverUi =
+            bool pointerClassified =
                 pointerActive &&
-                menu != null &&
+                menu != null;
+            bool pointerOverUi =
+                pointerClassified &&
                 menu.IsPointerOverUi(pointerPosition);
 
             if (menu != null && menu.HasKeyboardFocus())
@@ -101,6 +103,15 @@ namespace WasteCity.Graybox3D.Building
                 interaction != null &&
                 interaction.State ==
                 GrayboxBuildingInteractionState.Previewing;
+            if (previewing &&
+                !pointerClassified &&
+                mouse != null &&
+                menu != null)
+            {
+                pointerOverUi =
+                    menu.IsPointerOverUi(pointerPosition);
+                pointerClassified = true;
+            }
 
             bool paused = Time.timeScale <= 0f;
             if (!pointerOverUi &&

@@ -157,6 +157,96 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void
+            InputRouter_QuickbarPreviewTransitionClassifiesStationaryUiBeforeWorld()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            SetPointer(ScreenCenter);
+            PressKey(fixture.Router, Key.B);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.CatalogOpen));
+            BuildingPlacementEvaluation previousEvaluation =
+                fixture.Placement.CurrentEvaluation;
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(out _);
+            int raycastsBefore = raycaster.RaycastCalls;
+
+            PressKey(fixture.Router, Key.Digit4);
+
+            int transitionRaycasts =
+                raycaster.RaycastCalls - raycastsBefore;
+            TestContext.WriteLine(
+                "Task9QuickbarTransitionRaycasts=" +
+                transitionRaycasts);
+            Assert.That(
+                transitionRaycasts,
+                Is.EqualTo(1));
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Previewing));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.SameAs(previousEvaluation.Failures));
+            Assert.That(
+                fixture.Placement.CurrentHit.IsValid,
+                Is.False);
+        }
+
+        [Test]
+        public void
+            InputRouter_CatalogReturnToPreviewClassifiesStationaryUiBeforeWorld()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            PrepareStableWallPreview(fixture);
+            SetPointer(ScreenCenter);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True);
+            PressKey(fixture.Router, Key.B);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.CatalogOpen));
+            BuildingPlacementEvaluation previousEvaluation =
+                fixture.Placement.CurrentEvaluation;
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+            CountingGraphicRaycaster raycaster =
+                CreateCountingGraphicTarget(out _);
+            int raycastsBefore = raycaster.RaycastCalls;
+
+            PressKey(fixture.Router, Key.B);
+
+            int transitionRaycasts =
+                raycaster.RaycastCalls - raycastsBefore;
+            TestContext.WriteLine(
+                "Task9CatalogReturnTransitionRaycasts=" +
+                transitionRaycasts);
+            TestContext.WriteLine(
+                "Task9CatalogReturnEvaluationValid=" +
+                previousEvaluation.IsValid + "/" +
+                fixture.Placement.CurrentEvaluation.IsValid);
+            Assert.That(
+                transitionRaycasts,
+                Is.EqualTo(1));
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Previewing));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.EqualTo(previousEvaluation.IsValid));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.PrimaryFailure,
+                Is.EqualTo(previousEvaluation.PrimaryFailure));
+        }
+
+        [Test]
         public void InputRouter_EscapeClosesCatalogThenCancelsPreview()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -284,25 +374,19 @@ namespace WasteCity.Tests
                 null,
                 null);
             baseRouter.ConfigureDeploymentRequest(deployment);
-            var frame = new GrayboxInputFrame(
-                Vector2.zero,
-                ScreenCenter,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false);
+            baseRouter.ConfigureInputInterceptor(fixture.Router);
 
-            GrayboxInputSuppression suppression =
-                PressKey(fixture.Router, Key.F);
-            baseRouter.ProcessFrame(frame, suppression);
-
-            Assert.That(suppression.Deployment, Is.True);
+            PressKeyThroughBaseRouter(baseRouter, Key.F);
             Assert.That(deployment.ToggleCalls, Is.EqualTo(1));
+            int interceptedCalls = deployment.ToggleCalls;
 
-            baseRouter.ProcessFrame(frame, default);
+            baseRouter.ConfigureInputInterceptor(null);
+            PressKeyThroughBaseRouter(baseRouter, Key.F);
 
+            TestContext.WriteLine(
+                "Task9FailedDelegationObservable=" +
+                interceptedCalls + "/" +
+                deployment.ToggleCalls);
             Assert.That(deployment.ToggleCalls, Is.EqualTo(2));
         }
 
@@ -335,25 +419,13 @@ namespace WasteCity.Tests
                 null,
                 null);
             baseRouter.ConfigureDeploymentRequest(deployment);
-            var frame = new GrayboxInputFrame(
-                Vector2.zero,
-                ScreenCenter,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false);
+            baseRouter.ConfigureInputInterceptor(fixture.Router);
 
-            GrayboxInputSuppression manifest =
-                PressKey(fixture.Router, Key.F);
-            baseRouter.ProcessFrame(frame, manifest);
+            PressKeyThroughBaseRouter(baseRouter, Key.F);
             Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
             Assert.That(deployment.ToggleCalls, Is.Zero);
 
-            GrayboxInputSuppression openManifest =
-                PressKey(fixture.Router, Key.F);
-            baseRouter.ProcessFrame(frame, openManifest);
+            PressKeyThroughBaseRouter(baseRouter, Key.F);
             Assert.That(deployment.ToggleCalls, Is.Zero);
             Assert.That(
                 fixture.Evacuation.Assign(
@@ -363,10 +435,11 @@ namespace WasteCity.Tests
             Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
             Assert.That(fixture.Evacuation.IsProcessing, Is.True);
 
-            GrayboxInputSuppression processing =
-                PressKey(fixture.Router, Key.F);
-            baseRouter.ProcessFrame(frame, processing);
+            PressKeyThroughBaseRouter(baseRouter, Key.F);
 
+            TestContext.WriteLine(
+                "Task9ManifestProcessingToggleCalls=" +
+                deployment.ToggleCalls);
             Assert.That(deployment.ToggleCalls, Is.Zero);
         }
 
@@ -1067,9 +1140,41 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Placement.CurrentEvaluation.IsValid,
                 Is.True);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+            fixture.Router.ProcessCurrentInput();
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                BuildingCatalog.Wall.Cost);
+            fixture.Router.ProcessCurrentInput();
 
             int raycastsBefore = raycaster.RaycastCalls;
-            Action measuredCall = () => fixture.Router.ProcessCurrentInput();
+            int measuredCalls = 0;
+            int validEvaluations = 0;
+            int insufficientEvaluations = 0;
+            int unexpectedEvaluations = 0;
+            Action measuredCall = () =>
+            {
+                bool canAfford =
+                    (measuredCalls & 1) == 0;
+                fixture.Session.Inventory.Set(
+                    BuildingCatalog.Wall.CostId,
+                    canAfford
+                        ? BuildingCatalog.Wall.Cost
+                        : 0);
+                measuredCalls++;
+                fixture.Router.ProcessCurrentInput();
+                if (fixture.Placement.CurrentEvaluation.IsValid)
+                    validEvaluations++;
+                else if (
+                    fixture.Placement.CurrentEvaluation
+                        .PrimaryFailure ==
+                    BuildingPlacementFailure.InsufficientMaterials)
+                    insufficientEvaluations++;
+                else
+                    unexpectedEvaluations++;
+            };
             AllocationMeasurement measurement =
                 Profile300Calls(measuredCall);
             int raycastDifference =
@@ -1087,10 +1192,17 @@ namespace WasteCity.Tests
             TestContext.WriteLine(
                 "Task9DynamicPlacementRaycastDifference=" +
                 raycastDifference);
+            TestContext.WriteLine(
+                "Task9DynamicPlacementObservable=" +
+                validEvaluations + "/" +
+                insufficientEvaluations + "/" +
+                unexpectedEvaluations + "/" +
+                measuredCalls);
             Assert.That(raycastDifference, Is.EqualTo(300));
-            Assert.That(
-                fixture.Placement.CurrentEvaluation.IsValid,
-                Is.True);
+            Assert.That(measuredCalls, Is.EqualTo(300));
+            Assert.That(validEvaluations, Is.EqualTo(150));
+            Assert.That(insufficientEvaluations, Is.EqualTo(150));
+            Assert.That(unexpectedEvaluations, Is.Zero);
             Assert.That(measurement.ProfiledBytes, Is.Zero);
             Assert.That(measurement.CurrentThreadBytes, Is.Zero);
         }
@@ -1105,8 +1217,6 @@ namespace WasteCity.Tests
             fixture.Router.ProcessCurrentInput();
             fixture.Router.ProcessCurrentInput();
             BuildingSurfaceHit hit = fixture.Placement.CurrentHit;
-            BuildingPlacementEvaluation evaluation =
-                fixture.Placement.CurrentEvaluation;
             var workspace =
                 new BuildingPlacementEvaluationWorkspace();
             BuildingUnlockEvaluation unlock =
@@ -1116,7 +1226,7 @@ namespace WasteCity.Tests
                     fixture.Session.IsResearchCompleted,
                     fixture.Session.CompletedBuildingCount,
                     workspace.Unlock);
-            var request = new BuildingPlacementRequest(
+            var validRequest = new BuildingPlacementRequest(
                 BuildingCatalog.Wall,
                 fixture.Session.GroundGrid,
                 BuildingSite.Ground,
@@ -1136,22 +1246,137 @@ namespace WasteCity.Tests
                 true,
                 unlock,
                 true);
-
-            Action evaluationCall = () =>
+            var invalidRequest = new BuildingPlacementRequest(
+                BuildingCatalog.Wall,
+                fixture.Session.GroundGrid,
+                BuildingSite.Ground,
+                BuildingOrientation.North,
+                hit.X,
+                hit.Y,
+                16,
+                12,
+                fixture.Session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                false,
+                null,
+                true,
+                unlock,
+                false);
+            var validViewWorkspace =
+                new BuildingPlacementEvaluationWorkspace();
+            var invalidViewWorkspace =
+                new BuildingPlacementEvaluationWorkspace();
+            BuildingPlacementEvaluation validEvaluation =
                 BuildingPlacementRules.Evaluate(
-                    request,
-                    workspace);
+                    validRequest,
+                    validViewWorkspace);
+            BuildingPlacementEvaluation invalidEvaluation =
+                BuildingPlacementRules.Evaluate(
+                    invalidRequest,
+                    invalidViewWorkspace);
+            int evaluationCalls = 0;
+            int validRuleEvaluations = 0;
+            int invalidRuleEvaluations = 0;
+            Action evaluationCall = () =>
+            {
+                BuildingPlacementEvaluation result =
+                    BuildingPlacementRules.Evaluate(
+                        (evaluationCalls & 1) == 0
+                            ? validRequest
+                            : invalidRequest,
+                        workspace);
+                evaluationCalls++;
+                if (result.IsValid)
+                    validRuleEvaluations++;
+                else if (
+                    result.PrimaryFailure ==
+                    BuildingPlacementFailure.InsufficientMaterials)
+                    invalidRuleEvaluations++;
+            };
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Wall,
+                hit,
+                BuildingOrientation.North,
+                validEvaluation);
+            fixture.Presentation.ShowPreview(
+                BuildingCatalog.Wall,
+                hit,
+                BuildingOrientation.North,
+                invalidEvaluation);
+            GrayboxVisualSlot previewSlot =
+                fixture.Presentation
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                    .Single(value =>
+                        value.StableId ==
+                        "building.preview.core.building.wall");
+            int viewCalls = 0;
+            int validPreviewColors = 0;
+            int invalidPreviewColors = 0;
             Action viewCall = () =>
+            {
+                BuildingPlacementEvaluation selectedEvaluation =
+                    (viewCalls & 1) == 0
+                        ? validEvaluation
+                        : invalidEvaluation;
                 fixture.Presentation.ShowPreview(
                     BuildingCatalog.Wall,
                     hit,
                     BuildingOrientation.North,
-                    evaluation);
+                    selectedEvaluation);
+                viewCalls++;
+                Color observed = previewSlot.FallbackColor;
+                if (observed.g > observed.r)
+                    validPreviewColors++;
+                else if (observed.r > observed.g)
+                    invalidPreviewColors++;
+            };
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                0);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                BuildingCatalog.Wall.Cost);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            int updatePointerCalls = 0;
+            int validPointerEvaluations = 0;
+            int invalidPointerEvaluations = 0;
             Action updatePointerCall = () =>
+            {
+                fixture.Session.Inventory.Set(
+                    BuildingCatalog.Wall.CostId,
+                    (updatePointerCalls & 1) == 0
+                        ? BuildingCatalog.Wall.Cost
+                        : 0);
+                updatePointerCalls++;
                 fixture.Placement.UpdatePointer(ScreenCenter);
+                if (fixture.Placement.CurrentEvaluation.IsValid)
+                    validPointerEvaluations++;
+                else if (
+                    fixture.Placement.CurrentEvaluation
+                        .PrimaryFailure ==
+                    BuildingPlacementFailure.InsufficientMaterials)
+                    invalidPointerEvaluations++;
+            };
+            evaluationCall();
             evaluationCall();
             viewCall();
+            viewCall();
             updatePointerCall();
+            updatePointerCall();
+            evaluationCalls = 0;
+            validRuleEvaluations = 0;
+            invalidRuleEvaluations = 0;
+            viewCalls = 0;
+            validPreviewColors = 0;
+            invalidPreviewColors = 0;
+            updatePointerCalls = 0;
+            validPointerEvaluations = 0;
+            invalidPointerEvaluations = 0;
 
             AllocationMeasurement rules =
                 Profile300Calls(evaluationCall);
@@ -1178,6 +1403,30 @@ namespace WasteCity.Tests
             TestContext.WriteLine(
                 "Task9UpdatePointerProfilerBytes=" +
                 updatePointer.ProfiledBytes);
+            TestContext.WriteLine(
+                "Task9WorkspaceEvaluateObservable=" +
+                validRuleEvaluations + "/" +
+                invalidRuleEvaluations + "/" +
+                evaluationCalls);
+            TestContext.WriteLine(
+                "Task9ShowPreviewObservable=" +
+                validPreviewColors + "/" +
+                invalidPreviewColors + "/" +
+                viewCalls);
+            TestContext.WriteLine(
+                "Task9UpdatePointerObservable=" +
+                validPointerEvaluations + "/" +
+                invalidPointerEvaluations + "/" +
+                updatePointerCalls);
+            Assert.That(evaluationCalls, Is.EqualTo(300));
+            Assert.That(validRuleEvaluations, Is.EqualTo(150));
+            Assert.That(invalidRuleEvaluations, Is.EqualTo(150));
+            Assert.That(viewCalls, Is.EqualTo(300));
+            Assert.That(validPreviewColors, Is.EqualTo(150));
+            Assert.That(invalidPreviewColors, Is.EqualTo(150));
+            Assert.That(updatePointerCalls, Is.EqualTo(300));
+            Assert.That(validPointerEvaluations, Is.EqualTo(150));
+            Assert.That(invalidPointerEvaluations, Is.EqualTo(150));
             Assert.That(rules.ProfiledBytes, Is.Zero);
             Assert.That(rules.CurrentThreadBytes, Is.Zero);
             Assert.That(view.ProfiledBytes, Is.Zero);
@@ -2526,6 +2775,32 @@ namespace WasteCity.Tests
                 new KeyboardState());
             InputSystem.Update();
             return suppression;
+        }
+
+        private void PressKeyThroughBaseRouter(
+            GrayboxInputRouter router,
+            Key key)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(key));
+            InputSystem.Update();
+            Assert.That(Keyboard.current, Is.SameAs(testKeyboard));
+            Assert.That(
+                testKeyboard[key].wasPressedThisFrame,
+                Is.True,
+                key.ToString());
+            typeof(GrayboxInputRouter)
+                .GetMethod(
+                    "Update",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic)
+                .Invoke(router, null);
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState());
+            InputSystem.Update();
         }
 
         private GrayboxInputSuppression PressMouse(
