@@ -83,6 +83,8 @@ namespace WasteCity.Graybox3D
         public void ConfigureDeploymentRequest(
             IGrayboxDeploymentRequest value)
         {
+            if (value == null)
+                throw new System.ArgumentNullException(nameof(value));
             deploymentRequest = value;
         }
 
@@ -171,9 +173,6 @@ namespace WasteCity.Graybox3D
             if (!suppression.Deployment &&
                 frame.ToggleDeploymentPressed)
             {
-                if (deploymentRequest == null && city != null)
-                    deploymentRequest =
-                        new CityDeploymentRequestAdapter(city);
                 deploymentRequest?.TryToggleDeployment(out _);
             }
 
@@ -223,6 +222,16 @@ namespace WasteCity.Graybox3D
             TickGameplay(Time.deltaTime);
         }
 
+        private void OnDisable()
+        {
+            deploymentRequest = null;
+        }
+
+        private void OnDestroy()
+        {
+            deploymentRequest = null;
+        }
+
         private void ProcessCameraInput(
             GrayboxInputFrame frame,
             GrayboxInputSuppression suppression)
@@ -260,6 +269,8 @@ namespace WasteCity.Graybox3D
             {
                 this.city = city;
             }
+
+            public CityMode Mode => city.Mode;
 
             public bool TryToggleDeployment(out string failureReason)
             {

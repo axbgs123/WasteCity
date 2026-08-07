@@ -20,9 +20,8 @@ namespace WasteCity.Graybox3D.Building
         private Vector2 lastScreenPosition;
         private bool hasPointer;
         private string highlightedNodeId;
-        private readonly BuildingPlacementEvaluationWorkspace
-            evaluationWorkspace =
-                new BuildingPlacementEvaluationWorkspace();
+        private BuildingPlacementEvaluationWorkspace
+            evaluationWorkspace;
         private Func<string, bool> researchCompleted;
         private Func<string, int> completedBuildings;
         private string[] resourceNodeVisualIds;
@@ -45,12 +44,15 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingWorldView3D presentation,
             GrayboxBuildingInteractionModel3D interaction)
         {
+            DiscardConfiguredLifetime();
             this.session = session;
             this.city = city;
             this.world = world;
             this.projector = projector;
             this.presentation = presentation;
             this.interaction = interaction;
+            evaluationWorkspace =
+                new BuildingPlacementEvaluationWorkspace();
             researchCompleted =
                 session == null
                     ? null
@@ -60,8 +62,6 @@ namespace WasteCity.Graybox3D.Building
                     ? null
                     : session.CompletedBuildingCount;
             ConfigureResourceNodeIdentityWorkspace(world);
-            hasPointer = false;
-            HidePreview();
         }
 
         public static string CreateResourceNodeVisualId(
@@ -114,6 +114,13 @@ namespace WasteCity.Graybox3D.Building
 
         private bool EvaluatePointer(Vector2 screenPosition)
         {
+            if (evaluationWorkspace == null)
+            {
+                HidePreview();
+                CurrentEvaluation = default;
+                return false;
+            }
+
             BuildingDefinition definition = interaction?.Selected;
             if (definition == null ||
                 session == null ||
@@ -440,6 +447,36 @@ namespace WasteCity.Graybox3D.Building
                 y >= 0 &&
                 x < resourceNodeVisualWidth &&
                 y < resourceNodeVisualHeight;
+        }
+
+        private void OnDisable()
+        {
+            DiscardConfiguredLifetime();
+        }
+
+        private void OnDestroy()
+        {
+            DiscardConfiguredLifetime();
+        }
+
+        private void DiscardConfiguredLifetime()
+        {
+            if (!string.IsNullOrEmpty(highlightedNodeId) &&
+                presentation != null)
+            {
+                presentation.ShowCompatibleResourceNode(
+                    highlightedNodeId,
+                    0,
+                    0,
+                    false);
+            }
+            highlightedNodeId = null;
+            presentation?.HidePreview();
+            hasPointer = false;
+            lastScreenPosition = default;
+            CurrentHit = BuildingSurfaceHit.Invalid;
+            CurrentEvaluation = default;
+            evaluationWorkspace = null;
         }
     }
 }

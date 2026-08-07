@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -190,10 +191,40 @@ namespace WasteCity.Tests
             Assert.That(deploymentRequest.IsInterface, Is.True);
             Assert.That(deploymentRequest.IsPublic, Is.True);
             Assert.That(
+                deploymentRequest.GetProperties(
+                    BindingFlags.Instance |
+                    BindingFlags.Public)
+                    .Select(property => property.Name),
+                Is.EqualTo(new[] { "Mode" }));
+            PropertyInfo mode = deploymentRequest.GetProperty("Mode");
+            Assert.That(mode.PropertyType, Is.EqualTo(typeof(CityMode)));
+            Assert.That(mode.CanRead, Is.True);
+            Assert.That(mode.CanWrite, Is.False);
+            Assert.That(
+                deploymentRequest.GetMethod(
+                    "TryToggleDeployment",
+                    new[]
+                    {
+                        typeof(string).MakeByRefType()
+                    }),
+                Is.Not.Null);
+            Assert.That(
                 router.GetMethod(
                     "ConfigureDeploymentRequest",
                     new[] { deploymentRequest }),
                 Is.Not.Null);
+            Type adapter = router.GetNestedType(
+                "CityDeploymentRequestAdapter",
+                BindingFlags.NonPublic);
+            Assert.That(adapter, Is.Not.Null);
+            PropertyInfo adapterMode = adapter.GetProperty(
+                "Mode",
+                BindingFlags.Instance |
+                BindingFlags.Public);
+            Assert.That(adapterMode, Is.Not.Null);
+            Assert.That(
+                adapterMode.PropertyType,
+                Is.EqualTo(typeof(CityMode)));
         }
 
         [Test]
@@ -204,6 +235,18 @@ namespace WasteCity.Tests
             Assert.Throws<ArgumentException>(
                 () => fixture.Router.ConfigureInputInterceptor(
                     fixture.CameraController));
+        }
+
+        [Test]
+        public void ConfigureDeploymentRequest_RejectsNull()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+
+            ArgumentNullException exception =
+                Assert.Throws<ArgumentNullException>(
+                    () => fixture.Router.ConfigureDeploymentRequest(null));
+
+            Assert.That(exception.ParamName, Is.EqualTo("value"));
         }
 
         [Test]
@@ -564,7 +607,8 @@ namespace WasteCity.Tests
         {
             RuntimeFixture fixture = CreateRuntimeFixture(true);
             fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
-            var deploymentRequest = new DeploymentRequestSpy(false);
+            var deploymentRequest =
+                new DeploymentRequestSpy(CityMode.Fortress, false);
             fixture.Router.ConfigureDeploymentRequest(deploymentRequest);
 
             ProcessFrame(
@@ -576,6 +620,45 @@ namespace WasteCity.Tests
 
             Assert.That(deploymentRequest.ToggleCalls, Is.EqualTo(1));
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+        }
+
+        [TestCase("OnDisable")]
+        [TestCase("OnDestroy")]
+        public void DeploymentRequest_TeardownDropsOldRequestAndReconfigureRestoresNew(
+            string lifecycleMethod)
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            var oldRequest =
+                new DeploymentRequestSpy(CityMode.Fortress, false);
+            fixture.Router.ConfigureDeploymentRequest(oldRequest);
+            object toggleFrame = CreateInputFrame(
+                Vector2.zero,
+                new Vector2(640f, 360f),
+                toggleDeploymentPressed: true);
+            ProcessFrame(fixture.Router, toggleFrame);
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
+
+            InvokeRouterLifecycle(
+                fixture.Router,
+                lifecycleMethod);
+            InvokeRouterLifecycle(
+                fixture.Router,
+                lifecycleMethod);
+            ProcessFrame(fixture.Router, toggleFrame);
+
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
+            Assert.That(
+                fixture.City.Mode,
+                Is.EqualTo(CityMode.Fortress));
+
+            var replacement =
+                new DeploymentRequestSpy(CityMode.Mobile, false);
+            fixture.Router.ConfigureDeploymentRequest(replacement);
+            ProcessFrame(fixture.Router, toggleFrame);
+
+            Assert.That(replacement.ToggleCalls, Is.EqualTo(1));
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
         }
 
         [Test]
@@ -1223,6 +1306,18 @@ namespace WasteCity.Tests
             return value;
         }
 
+        private static void InvokeRouterLifecycle(
+            GrayboxInputRouter router,
+            string methodName)
+        {
+            MethodInfo method = typeof(GrayboxInputRouter).GetMethod(
+                methodName,
+                BindingFlags.Instance |
+                BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(router, null);
+        }
+
         private sealed class ProjectionFixture
         {
             public GameObject CameraObject { get; }
@@ -1259,11 +1354,15 @@ namespace WasteCity.Tests
         {
             private readonly bool result;
 
-            public DeploymentRequestSpy(bool result)
+            public DeploymentRequestSpy(
+                CityMode mode,
+                bool result)
             {
+                Mode = mode;
                 this.result = result;
             }
 
+            public CityMode Mode { get; }
             public int ToggleCalls { get; private set; }
 
             public bool TryToggleDeployment(out string failureReason)

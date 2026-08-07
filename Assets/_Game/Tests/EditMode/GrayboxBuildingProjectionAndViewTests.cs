@@ -866,6 +866,117 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PlacementController_ConfigureStartsNewWorkspaceAndPreservesOldEvaluation()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            BuildingPlacementEvaluation oldEvaluation =
+                fixture.Placement.CurrentEvaluation;
+            BuildingPlacementFailure[] oldFailures =
+                oldEvaluation.Failures.ToArray();
+            Vector2Int[] oldFootprint =
+                FootprintSnapshot(oldEvaluation);
+            object oldWorkspace =
+                PlacementWorkspace(fixture.Placement);
+            Assert.That(
+                oldFailures,
+                Does.Contain(
+                    BuildingPlacementFailure.IncompatibleResourceNode));
+            Assert.That(oldFootprint.Length, Is.EqualTo(4));
+
+            fixture.Placement.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                PlacementProjector(fixture.Placement),
+                fixture.Presentation,
+                fixture.Interaction);
+
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Footprint,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentHit.IsValid,
+                Is.False);
+            Assert.That(
+                PlacementWorkspace(fixture.Placement),
+                Is.Not.SameAs(oldWorkspace));
+
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PositionCameraAtCell(fixture, 21, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(
+                oldEvaluation.Failures,
+                Is.EqualTo(oldFailures));
+            Assert.That(
+                FootprintSnapshot(oldEvaluation),
+                Is.EqualTo(oldFootprint));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Footprint.Count,
+                Is.EqualTo(1));
+        }
+
+        [TestCase("OnDisable")]
+        [TestCase("OnDestroy")]
+        public void PlacementController_TeardownDiscardsWorkspaceResultAndPreviewIdempotently(
+            string lifecycleMethod)
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            object oldWorkspace =
+                PlacementWorkspace(fixture.Placement);
+            GrayboxVisualSlot preview = Slot(
+                fixture.Presentation,
+                "building.preview.core.building.wall");
+            Assert.That(preview.gameObject.activeInHierarchy, Is.True);
+
+            InvokePlacementLifecycle(
+                fixture.Placement,
+                lifecycleMethod);
+            InvokePlacementLifecycle(
+                fixture.Placement,
+                lifecycleMethod);
+
+            Assert.That(
+                PlacementWorkspace(fixture.Placement),
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Failures,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.Footprint,
+                Is.Null);
+            Assert.That(
+                fixture.Placement.CurrentHit.IsValid,
+                Is.False);
+            Assert.That(preview.gameObject.activeInHierarchy, Is.False);
+
+            fixture.Placement.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                PlacementProjector(fixture.Placement),
+                fixture.Presentation,
+                fixture.Interaction);
+
+            Assert.That(
+                PlacementWorkspace(fixture.Placement),
+                Is.Not.Null.And.Not.SameAs(oldWorkspace));
+        }
+
+        [Test]
         public void WorldView_DoesNotRetainDynamicEvaluationOrColorVerdicts()
         {
             FieldInfo[] fields =
@@ -1513,6 +1624,55 @@ namespace WasteCity.Tests
             var block = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(block);
             return block.GetColor(Shader.PropertyToID("_BaseColor"));
+        }
+
+        private static Vector2Int[] FootprintSnapshot(
+            in BuildingPlacementEvaluation evaluation)
+        {
+            return evaluation.Footprint
+                .Select(cell => new Vector2Int(cell.X, cell.Y))
+                .ToArray();
+        }
+
+        private static object PlacementWorkspace(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            FieldInfo field =
+                typeof(GrayboxBuildingPlacementController3D)
+                    .GetField(
+                        "evaluationWorkspace",
+                        BindingFlags.Instance |
+                        BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return field.GetValue(placement);
+        }
+
+        private static GrayboxBuildingSurfaceProjector3D PlacementProjector(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            FieldInfo field =
+                typeof(GrayboxBuildingPlacementController3D)
+                    .GetField(
+                        "projector",
+                        BindingFlags.Instance |
+                        BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (GrayboxBuildingSurfaceProjector3D)
+                field.GetValue(placement);
+        }
+
+        private static void InvokePlacementLifecycle(
+            GrayboxBuildingPlacementController3D placement,
+            string methodName)
+        {
+            MethodInfo method =
+                typeof(GrayboxBuildingPlacementController3D)
+                    .GetMethod(
+                        methodName,
+                        BindingFlags.Instance |
+                        BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(placement, null);
         }
 
         private static string[] InstanceSlotIds(Transform root)

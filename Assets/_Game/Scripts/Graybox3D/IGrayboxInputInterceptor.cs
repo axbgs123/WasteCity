@@ -2,6 +2,7 @@ namespace WasteCity.Graybox3D
 {
     public interface IGrayboxDeploymentRequest
     {
+        WasteCity.City.CityMode Mode { get; }
         bool TryToggleDeployment(out string failureReason);
     }
 
