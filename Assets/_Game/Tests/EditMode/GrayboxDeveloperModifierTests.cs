@@ -79,6 +79,7 @@ namespace WasteCity.Tests
                 Is.Empty);
             PropertyInfo[] bootstrapProperties = bootstrapType.GetProperties(
                 BindingFlags.Instance |
+                BindingFlags.Static |
                 BindingFlags.Public |
                 BindingFlags.DeclaredOnly);
             Assert.That(
@@ -94,6 +95,7 @@ namespace WasteCity.Tests
                 Assert.That(property.CanRead, Is.True);
                 Assert.That(property.GetMethod, Is.Not.Null);
                 Assert.That(property.GetMethod.IsPublic, Is.True);
+                Assert.That(property.GetMethod.IsStatic, Is.False);
                 Assert.That(property.CanWrite, Is.False);
                 Assert.That(property.SetMethod, Is.Null);
             }
@@ -152,6 +154,7 @@ namespace WasteCity.Tests
             Assert.That(
                 modifierType.GetProperties(
                     BindingFlags.Instance |
+                    BindingFlags.Static |
                     BindingFlags.Public |
                     BindingFlags.DeclaredOnly),
                 Is.Empty);
