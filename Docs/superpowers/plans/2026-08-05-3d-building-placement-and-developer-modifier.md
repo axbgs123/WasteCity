@@ -36,6 +36,7 @@
 | `Assets/_Game/Scripts/Building/BuildingRangeRules.cs` + `.meta` | Create | 外城切比雪夫半径 8/12/24 与内城 8×6 边界判断 |
 | `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs` + `.meta` | Create | 有序合法性失败原因、请求与结果值类型；不依赖 Unity |
 | `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs` | Modify | 新增多原因 `Evaluate`，旧 `IsUnlocked` 保持首要原因兼容 |
+| `Assets/_Game/Scripts/Building/BuildingMobilityRules.cs` | Modify | 用精确站点值比较保留合法/非法枚举语义，并消除动态放置热路径中的 `Enum.IsDefined` 装箱分配 |
 | `Assets/_Game/Scripts/Building/ConstructionRefundRules.cs` + `.meta` | Create | 每资源 `AwayFromZero` 退款和 `0..originalCost` 限幅 |
 | `Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs` + `.meta` | Create | 遗弃、完整拆除、快速拆除、未完成施工剩余比例与稳定队列规则 |
 
@@ -81,6 +82,7 @@
 | `Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef` | Modify | 直接引用新建造程序集与 UGUI；保留现有直接依赖 |
 | `Assets/_Game/Tests/EditMode/BuildingOrientationAndRangeTests.cs` + `.meta` | Create | 旋转、旧 API、半径和内城边界 |
 | `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs` + `.meta` | Create | 有序合法性与多重解锁原因 |
+| `Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs` | Modify | 精确站点值语义与 300 次真实 `SupportsSite`/`CanConstruct` 的 `ProfilerRecorder` 零分配门 |
 | `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs` + `.meta` | Create | 28 项唯一映射、分类/路线/搜索/快捷栏/隐藏 |
 | `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs` + `.meta` | Create | fixture、原子扣款、施工、取消和退款 |
 | `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs` + `.meta` | Create | 双网格投影、VisualSlot、共享材质和对象预算 |
@@ -1908,17 +1910,19 @@ git commit -m "feat: add release safe graybox developer modifier"
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - Modify: `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs`
 - Modify: `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`
+- Modify: `Assets/_Game/Scripts/Building/BuildingMobilityRules.cs`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
 - Modify: `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`
 
 ### Task 9 remediation C: dynamic correctness and profiler-backed zero allocation
 
-This remediation is one independent Task 9 commit and one independent review, performed after the original Task 9 commit; the original Task 9 staging checklist is historical baseline only and does not authorize remediation changes. It may modify only the Task 9 production/test paths listed above. Do not restore any cross-frame UI-hit, placement-legality, or preview-result cache. Reusable controller-owned workspaces/buffers and stable identity strings are allowed; global mutable static buffers and duplicated unlock/placement rules are not. Task 10/11 files and PlayMode scene tests remain out of scope.
+This remediation is one independent Task 9 code commit and one independent review, performed after the original Task 9 commit; its approved scope correction is first recorded as a separate documentation-only commit. The original Task 9 staging checklist is historical baseline only and does not authorize remediation changes. It may modify only the Task 9 production/test paths listed above. Do not restore any cross-frame UI-hit, placement-legality, or preview-result cache. Reusable controller-owned workspaces/buffers and stable identity strings are allowed; global mutable static buffers and duplicated unlock/placement rules are not. Task 10/11 files and PlayMode scene tests remain out of scope.
 
 - [ ] Start after the original Task 9 commit with only Task 9-owned paths clean; snapshot the permitted MCP/user dirty state, which is never staged or committed:
 
@@ -1941,10 +1945,12 @@ if ! git diff --quiet -- \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs \
   Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
   Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
+  Assets/_Game/Scripts/Building/BuildingMobilityRules.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
   Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs \
   Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs \
+  Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs \
@@ -1955,10 +1961,12 @@ if ! git diff --quiet -- \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs \
   Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
   Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
+  Assets/_Game/Scripts/Building/BuildingMobilityRules.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
   Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs \
   Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs \
+  Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs; then
@@ -1968,7 +1976,7 @@ fi
 git rev-parse HEAD > /tmp/wastecity-3d-building/task-09-remediation-base.txt
 ```
 
-The remediation-only allowlist is exactly these existing paths: `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`, `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`, `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs`, `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`, `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`, `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs`, `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`, `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`, and `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`. No `.meta`, scene, Task 10, Task 11, or PlayMode path is allowed.
+The remediation-only allowlist is exactly these existing paths: `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`, `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`, `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs`, `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`, `Assets/_Game/Scripts/Building/BuildingMobilityRules.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`, `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`, `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`, `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs`, `Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs`, `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`, `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`, and `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`. No `.meta`, scene, Task 10, Task 11, or PlayMode path is allowed.
 
 - [ ] Add RED dynamic-preview tests that enter `Previewing`, then execute button-up/no-button frames while pointer position is unchanged. `pointerActive` must include `Previewing`, and every non-UGUI frame must call `placement.UpdatePointer`. Change resource compatibility, inventory, city mode/position, occupancy, and unlock state between frames; assert the real UI classification and newly evaluated preview verdict change on the immediately following frame. A UGUI hit must suppress world preview reevaluation and confirmation.
 
@@ -1977,6 +1985,8 @@ The remediation-only allowlist is exactly these existing paths: `Assets/_Game/Sc
 - [ ] Add reflection/source-contract RED tests for the frozen cross-assembly workspace API: public `BuildingUnlockEvaluationWorkspace()`; public `BuildingPlacementEvaluationWorkspace()` and `Unlock`; public five-argument `BuildingUnlockModel.Evaluate(..., BuildingUnlockEvaluationWorkspace)`; and public `BuildingPlacementRules.Evaluate(in BuildingPlacementRequest, BuildingPlacementEvaluationWorkspace)`. Assert the legacy overloads still produce independent immutable snapshots, the workspace overload results are invalidated only by the next call using that same workspace, the controller owns exactly one private workspace per configured lifetime, and neither workspace exposes mutable buffers/reset APIs or uses a static mutable backing store.
 
 - [ ] Add RED allocation tests with `ProfilerRecorder` as the primary measurement. Construct a real session, world, placement controller, and world view; warm them; then make 300 calls each that perform actual `RaycastAll`, placement `Evaluate`, and `ShowPreview`, recording actual GC Alloc samples/bytes and requiring `0 B`. Keep current-thread allocation counting only as an auxiliary diagnostic. Add three 300-call zero-allocation gates for idle input, real-UGUI middle-hold, and world/no-hit middle-hold.
+
+- [ ] Add RED mobility-rule boundary and allocation tests before changing production. Preserve the exact legal enum values `BuildingSite.Ground == 0` and `BuildingSite.InnerCity == 1`; reject a negative value, `2`, `int.MinValue`, and `int.MaxValue`. Measure 300 real `BuildingMobilityRules.SupportsSite` calls and 300 real `BuildingMobilityRules.CanConstruct` calls with `ProfilerRecorder`, require `0 B`, and record the current nonzero RED samples/bytes caused by `Enum.IsDefined(typeof(BuildingSite), site)` boxing in the dynamic placement hot path.
 
 - [ ] Add RED UI-classification isolation tests. Disable the `GraphicRegistry` fallback and prove an active qualifying `GraphicRaycaster` result is the EventSystem primary positive; retain a separate fallback-only positive and a Physics-raycaster/world-collider negative. Do not count an arbitrary `EventSystem.RaycastAll` result as UI.
 
@@ -1989,18 +1999,20 @@ The remediation-only allowlist is exactly these existing paths: `Assets/_Game/Sc
   -batchmode -nographics \
   -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
   -runTests -testPlatform EditMode \
-  -testFilter "WasteCity.Tests.BuildingUnlockTests;WasteCity.Tests.BuildingPlacementEvaluationTests;WasteCity.Tests.GrayboxBuildingProjectionAndViewTests;WasteCity.Tests.GrayboxBuildingUiAndInputTests;WasteCity.Tests.GrayboxCameraAndInputTests" \
+  -testFilter "WasteCity.Tests.BuildingUnlockTests;WasteCity.Tests.BuildingPlacementEvaluationTests;WasteCity.Tests.BuildingMobilityRulesTests;WasteCity.Tests.GrayboxBuildingProjectionAndViewTests;WasteCity.Tests.GrayboxBuildingUiAndInputTests;WasteCity.Tests.GrayboxCameraAndInputTests" \
   -testResults /tmp/wastecity-3d-building/task-09-remediation-red.xml \
   -logFile /tmp/wastecity-3d-building/task-09-remediation-red.log
 ```
 
-Expected RED: only the missing dynamic execution/workspace/Profiler gates fail; an unexpected allocation from unrelated setup is a stop gate.
+Expected RED: only the missing dynamic execution/workspace/Profiler gates fail. The mobility profiler gate must specifically expose the known `Enum.IsDefined` boxing allocation in `SupportsSite`/`CanConstruct`; any other allocation from unrelated setup is a stop gate.
 
 - [ ] Implement the reusable evaluation workspace as controller-owned state and route all dynamic evaluation through the existing rule models. Clear/refill its buffers on every evaluation without allocating; retain validity until that controller's next evaluation. Cache delegates/workspace in the controller and only stable visual identity/references in WorldView. Do not add static mutable buffers, divergent rule copies, or a verdict cache.
 
+- [ ] Replace the allocation-causing `Enum.IsDefined` site validation only with `site == BuildingSite.Ground || site == BuildingSite.InnerCity`, and remove the now-unused `System` import. Do not add a cache or duplicate mobility/placement rules.
+
 - [ ] Make `ProcessCurrentInput` classify UGUI on every active pointer frame and invoke `placement.UpdatePointer` on every non-UI Previewing frame, including no-button frames. Never confirm or reevaluate a world preview while UGUI owns the pointer. Pass Task 7's explicit evacuation-F consumption result into base routing so one delegated request, including a failed request, cannot be retried. Keep F10's scoped single reader and existing Task 9 suppression behavior unchanged.
 
-- [ ] Run remediation GREEN with the same command using `task-09-remediation-green.*`; record the exact `ProfilerRecorder` samples/bytes for all 300-call gates in the test output. Then run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`.
+- [ ] Run remediation GREEN with the same command using `task-09-remediation-green.*`; record the exact `ProfilerRecorder` samples/bytes for all 300-call gates in the test output. The 300-call `SupportsSite`, `CanConstruct`, workspace `Evaluate`, and full `UpdatePointer` measurements must each report `0 B`. Then run existing `GrayboxCameraAndInputTests` and `GrayboxLeaderControlTests`.
 
 - [ ] Run the Task 9 remediation stop gates:
 
@@ -2015,10 +2027,12 @@ printf '%s\n' \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs \
   Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
   Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
+  Assets/_Game/Scripts/Building/BuildingMobilityRules.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
   Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs \
   Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs \
+  Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs \
@@ -2097,10 +2111,12 @@ printf '%s\n' \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs \
   Assets/_Game/Scripts/Building/BuildingUnlockModel.cs \
   Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs \
+  Assets/_Game/Scripts/Building/BuildingMobilityRules.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs \
   Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs \
   Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs \
   Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs \
+  Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs \
   Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs \
@@ -2111,10 +2127,12 @@ git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs
 git add Assets/_Game/Scripts/Building/BuildingUnlockModel.cs
 git add Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs
+git add Assets/_Game/Scripts/Building/BuildingMobilityRules.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs
 git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs
 git add Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs
 git add Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs
+git add Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs
 git add Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs
