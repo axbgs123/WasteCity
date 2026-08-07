@@ -222,6 +222,13 @@ namespace WasteCity.Graybox3D
             TickGameplay(Time.deltaTime);
         }
 
+        private void OnEnable()
+        {
+            if (deploymentRequest == null && city != null)
+                deploymentRequest =
+                    new CityDeploymentRequestAdapter(city);
+        }
+
         private void OnDisable()
         {
             deploymentRequest = null;

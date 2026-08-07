@@ -622,6 +622,74 @@ namespace WasteCity.Tests
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
         }
 
+        [Test]
+        public void
+            DeploymentRequest_OnEnableRestoresConcreteCityAdapterAfterTeardown()
+        {
+            WorldCell[,] cells =
+                FilledMap(32, 24, OpenCell());
+            cells[16, 12] = new WorldCell(
+                TerrainKind.Wasteland,
+                null,
+                0,
+                WorldTraversalKind.Cliff);
+            var deploymentMap = new WorldMapModel(cells);
+            Assert.That(
+                CityDeploymentRules.Validate(deploymentMap, 16, 12),
+                Is.Not.EqualTo(CityDeploymentFailure.None));
+            Assert.That(
+                CityDeploymentRules.Validate(deploymentMap, 10, 10),
+                Is.EqualTo(CityDeploymentFailure.None));
+            RuntimeFixture fixture =
+                CreateRuntimeFixture(true, cells);
+            var oldRequest =
+                new DeploymentRequestSpy(CityMode.Mobile, false);
+            fixture.Router.ConfigureDeploymentRequest(oldRequest);
+            object toggleFrame = CreateInputFrame(
+                Vector2.zero,
+                new Vector2(640f, 360f),
+                toggleDeploymentPressed: true);
+
+            InvokeRouterLifecycle(fixture.Router, "OnEnable");
+            ProcessFrame(fixture.Router, toggleFrame);
+
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
+            Assert.That(
+                fixture.City.LastDeploymentFailure,
+                Is.EqualTo(CityDeploymentFailure.None));
+
+            InvokeRouterLifecycle(fixture.Router, "OnDisable");
+            InvokeRouterLifecycle(fixture.Router, "OnEnable");
+            ProcessFrame(fixture.Router, toggleFrame);
+
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Mobile));
+            Assert.That(
+                fixture.City.LastDeploymentFailure,
+                Is.Not.EqualTo(CityDeploymentFailure.None));
+
+            Assert.That(
+                fixture.World.Coordinates.TryCellToWorld(
+                    10,
+                    10,
+                    .5f,
+                    out Vector3 validPosition),
+                Is.True);
+            fixture.CityBody.position = validPosition;
+            fixture.City.transform.position = validPosition;
+            Physics.SyncTransforms();
+
+            ProcessFrame(fixture.Router, toggleFrame);
+
+            Assert.That(oldRequest.ToggleCalls, Is.EqualTo(1));
+            Assert.That(
+                fixture.City.LastDeploymentFailure,
+                Is.EqualTo(CityDeploymentFailure.None));
+            Assert.That(
+                fixture.City.Mode,
+                Is.EqualTo(CityMode.Deploying));
+        }
+
         [TestCase("OnDisable")]
         [TestCase("OnDestroy")]
         public void DeploymentRequest_TeardownDropsOldRequestAndReconfigureRestoresNew(
@@ -1019,7 +1087,8 @@ namespace WasteCity.Tests
         }
 
         private RuntimeFixture CreateRuntimeFixture(
-            bool developmentFixtureRecruited)
+            bool developmentFixtureRecruited,
+            WorldCell[,] cells = null)
         {
             Shader shader = Shader.Find("Hidden/InternalErrorShader");
             Assert.That(shader, Is.Not.Null);
@@ -1040,6 +1109,7 @@ namespace WasteCity.Tests
             world.Configure(terrain, resources, obstacles, material);
             world.Generate(
                 new WorldMapModel(
+                    cells ??
                     FilledMap(32, 24, OpenCell())));
 
             var cityObject = Track(new GameObject("MobileCity"));
