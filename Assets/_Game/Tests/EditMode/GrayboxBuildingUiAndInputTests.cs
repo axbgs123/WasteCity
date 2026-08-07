@@ -450,7 +450,10 @@ namespace WasteCity.Tests
             input.ActivateInputField();
             SetPointer(ScreenCenter);
             Assert.That(fixture.Ui.Menu.HasKeyboardFocus(), Is.True);
-            GameObject panel = DeveloperPanel(fixture);
+            Assert.That(fixture.Developer.IsRuntimeAvailable, Is.False);
+            Assert.That(
+                fixture.Canvas.transform.Find("Graybox Developer Modifier"),
+                Is.Null);
             BuildingOrientation before = fixture.Interaction.Orientation;
 
             Key[] blocked =
@@ -488,7 +491,9 @@ namespace WasteCity.Tests
             Assert.That(fixture.Interaction.Selected, Is.Null);
             Assert.That(fixture.Interaction.Orientation, Is.EqualTo(before));
             Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
-            Assert.That(panel.activeSelf, Is.False);
+            Assert.That(
+                fixture.Canvas.transform.Find("Graybox Developer Modifier"),
+                Is.Null);
         }
 
         [Test]
@@ -521,20 +526,27 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void InputRouter_F10RunsOnceAfterFocusAndModalHandling()
+        public void
+            InputRouter_F10RemainsInertOutsidePlayModeAfterFocusAndModalHandling()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
-            GameObject panel = DeveloperPanel(fixture);
+            Assert.That(fixture.Developer.IsRuntimeAvailable, Is.False);
 
             PressKey(fixture.Router, Key.F10);
-            Assert.That(panel.activeSelf, Is.True);
+            Assert.That(
+                fixture.Canvas.transform.Find("Graybox Developer Modifier"),
+                Is.Null);
             PressKey(fixture.Router, Key.F10);
-            Assert.That(panel.activeSelf, Is.False);
+            Assert.That(
+                fixture.Canvas.transform.Find("Graybox Developer Modifier"),
+                Is.Null);
 
             fixture.Interaction.RequestCancelConstruction();
             PressKey(fixture.Router, Key.F10);
 
-            Assert.That(panel.activeSelf, Is.False);
+            Assert.That(
+                fixture.Canvas.transform.Find("Graybox Developer Modifier"),
+                Is.Null);
         }
 
         [Test]
@@ -2016,7 +2028,8 @@ namespace WasteCity.Tests
             developer.Configure(
                 ui.Session,
                 city,
-                presentation);
+                presentation,
+                ui.Canvas);
             GrayboxBuildingInputRouter3D router =
                 Create<GrayboxBuildingInputRouter3D>("BuildingInput");
             router.Configure(
@@ -2185,15 +2198,6 @@ namespace WasteCity.Tests
                         button,
                         null);
             }
-        }
-
-        private static GameObject DeveloperPanel(
-            InputRouterFixture fixture)
-        {
-            Transform panel = fixture.Developer.transform.Find(
-                "Graybox Developer Modifier");
-            Assert.That(panel, Is.Not.Null);
-            return panel.gameObject;
         }
 
         private static WorldCell[,] OpenInputCells()

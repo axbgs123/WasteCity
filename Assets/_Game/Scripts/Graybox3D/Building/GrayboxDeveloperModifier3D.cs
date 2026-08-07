@@ -4,80 +4,69 @@ using UnityEngine;
 using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
+using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
     public sealed class GrayboxDeveloperModifier3D
     {
-        private const int ResourceIncrement = 100;
-        private const int LargeResourceIncrement = 1000;
-
         private readonly GrayboxBuildingSession3D session;
         private readonly GrayboxMobileCityController3D city;
-        private readonly IGrayboxBuildingPresentation3D presentation;
-        private string currentResource = ResourceIds.Iron;
-
-        public GrayboxDeveloperModifier3D(
-            GrayboxBuildingSession3D session,
-            GrayboxMobileCityController3D city)
-        {
-            this.session = session ?? throw new ArgumentNullException(
-                nameof(session));
-            this.city = city ?? throw new ArgumentNullException(nameof(city));
-        }
+        private readonly GrayboxBuildingWorldView3D presentation;
 
         public GrayboxDeveloperModifier3D(
             GrayboxBuildingSession3D session,
             GrayboxMobileCityController3D city,
-            IGrayboxBuildingPresentation3D presentation)
-            : this(session, city)
+            GrayboxBuildingWorldView3D presentation)
         {
+            this.session = session ?? throw new ArgumentNullException(
+                nameof(session));
+            this.city = city ?? throw new ArgumentNullException(nameof(city));
             this.presentation = presentation ?? throw new ArgumentNullException(
                 nameof(presentation));
         }
 
-        public string CurrentResource => currentResource;
-
-        public bool SetCurrentResource(string resourceId)
+        public bool AddResource(string resourceId, int amount)
         {
-            if (Array.IndexOf(ResourceIds.All, resourceId) < 0)
+            if (!IsKnownResource(resourceId) || amount <= 0)
                 return false;
-            currentResource = resourceId;
+            session.Inventory.Add(resourceId, amount);
             return true;
         }
 
-        public int AddCurrentResource100()
+        public bool SetResource(string resourceId, int amount)
         {
-            return session.Inventory.Add(currentResource, ResourceIncrement);
-        }
-
-        public int AddCurrentResource1000()
-        {
-            return session.Inventory.Add(
-                currentResource,
-                LargeResourceIncrement);
-        }
-
-        public void ClearCurrentResource()
-        {
-            session.Inventory.Set(currentResource, 0);
-        }
-
-        public bool SetCurrentResourceAmount(int amount)
-        {
-            if (amount < 0) return false;
-            session.Inventory.Set(currentResource, amount);
+            if (!IsKnownResource(resourceId) || amount < 0)
+                return false;
+            session.Inventory.Set(resourceId, amount);
             return true;
         }
 
-        public void UnlockResearch(string researchId)
+        public bool ClearResource(string resourceId)
         {
+            if (!IsKnownResource(resourceId))
+                return false;
+            session.Inventory.Set(resourceId, 0);
+            return true;
+        }
+
+        public bool UnlockResearch(string researchId)
+        {
+            if (ResearchCatalog.Find(researchId) == null)
+                return false;
             session.UnlockResearchForDevelopment(researchId);
+            return true;
         }
 
-        public void UnlockRoute(ContentRoute route)
+        public bool UnlockRoute(ContentRoute route)
         {
+            if (route != ContentRoute.Technology &&
+                route != ContentRoute.Cultivation &&
+                route != ContentRoute.BiologicalAscension &&
+                route != ContentRoute.Psionics)
+                return false;
             session.UnlockRouteForDevelopment(route);
+            return true;
         }
 
         public void UnlockAllResearch()
@@ -92,30 +81,29 @@ namespace WasteCity.Graybox3D.Building
             return city.RestoreDeploymentForDevelopment(mode);
         }
 
-        public bool CompleteDeploymentTransition()
+        public bool CompleteCityTransition()
         {
             return city.CompleteDeploymentTransitionForDevelopment();
         }
 
-        public bool SetConstructionMultiplier(float multiplier)
+        public bool SetConstructionSpeed(DevelopmentConstructionSpeed speed)
         {
-            if (multiplier != 1f && multiplier != 10f && multiplier != 100f)
+            if (speed != DevelopmentConstructionSpeed.Normal &&
+                speed != DevelopmentConstructionSpeed.Fast10 &&
+                speed != DevelopmentConstructionSpeed.Fast100)
                 return false;
-            session.SetConstructionMultiplierForDevelopment(multiplier);
+            session.SetConstructionMultiplierForDevelopment((float)speed);
             return true;
         }
 
-        public void CompleteAllConstruction(
-            IGrayboxBuildingPresentation3D presentation)
+        public void CompleteAllConstruction()
         {
             session.CompleteAllConstructionForDevelopment(presentation);
         }
 
-        public bool CompleteAllConstruction()
+        private static bool IsKnownResource(string resourceId)
         {
-            if (presentation == null) return false;
-            session.CompleteAllConstructionForDevelopment(presentation);
-            return true;
+            return Array.IndexOf(ResourceIds.All, resourceId) >= 0;
         }
     }
 }

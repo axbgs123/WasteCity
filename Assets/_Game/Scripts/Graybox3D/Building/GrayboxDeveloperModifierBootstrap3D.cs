@@ -3,23 +3,59 @@ using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 #endif
 
 namespace WasteCity.Graybox3D.Building
 {
+    public enum DevelopmentConstructionSpeed
+    {
+        Normal = 1,
+        Fast10 = 10,
+        Fast100 = 100
+    }
+
     public sealed class GrayboxDeveloperModifierBootstrap3D : MonoBehaviour
     {
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxBuildingWorldView3D presentation;
+        [SerializeField] private Canvas canvas;
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private GrayboxDeveloperModifier3D modifier;
         private GameObject panelRoot;
 #endif
+
+        public bool IsRuntimeAvailable
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return Application.isPlaying &&
+                    isActiveAndEnabled &&
+                    ResolveRuntimeAvailability(
+                        Application.isEditor,
+                        Debug.isDebugBuild) &&
+                    modifier != null &&
+                    panelRoot != null;
+#else
+                return false;
+#endif
+            }
+        }
+
+        public bool IsPanelOpen
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return IsRuntimeAvailable && panelRoot.activeSelf;
+#else
+                return false;
+#endif
+            }
+        }
 
         public static bool ResolveRuntimeAvailability(
             bool isEditor,
@@ -31,11 +67,21 @@ namespace WasteCity.Graybox3D.Building
         public void Configure(
             GrayboxBuildingSession3D session,
             GrayboxMobileCityController3D city,
-            GrayboxBuildingWorldView3D presentation)
+            GrayboxBuildingWorldView3D presentation,
+            Canvas canvas)
         {
+            if (this.session == session &&
+                this.city == city &&
+                this.presentation == presentation &&
+                this.canvas == canvas)
+                return;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            DisposeDevelopmentSurface();
+#endif
             this.session = session;
             this.city = city;
             this.presentation = presentation;
+            this.canvas = canvas;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             TryCreateDevelopmentSurface();
 #endif
@@ -44,7 +90,8 @@ namespace WasteCity.Graybox3D.Building
         public bool TryTogglePanel()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            if (panelRoot == null) return false;
+            if (!IsRuntimeAvailable)
+                return false;
             panelRoot.SetActive(!panelRoot.activeSelf);
             return true;
 #else
@@ -59,13 +106,44 @@ namespace WasteCity.Graybox3D.Building
 #endif
         }
 
+        private void OnEnable()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            TryCreateDevelopmentSurface();
+#endif
+        }
+
+        private void OnDisable()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            DisposeDevelopmentSurface();
+#endif
+        }
+
+        private void OnDestroy()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            DisposeDevelopmentSurface();
+#endif
+        }
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private void TryCreateDevelopmentSurface()
         {
-            if (panelRoot != null || session == null || city == null ||
-                presentation == null)
+            if (!Application.isPlaying ||
+                !isActiveAndEnabled ||
+                !ResolveRuntimeAvailability(
+                    Application.isEditor,
+                    Debug.isDebugBuild) ||
+                session == null ||
+                city == null ||
+                presentation == null ||
+                canvas == null)
                 return;
-            EnsureEventSystem();
+            if (modifier != null && panelRoot != null)
+                return;
+
+            DisposeDevelopmentSurface();
             modifier = new GrayboxDeveloperModifier3D(
                 session,
                 city,
@@ -73,18 +151,30 @@ namespace WasteCity.Graybox3D.Building
             CreatePanel();
         }
 
+        private void DisposeDevelopmentSurface()
+        {
+            modifier = null;
+            if (panelRoot == null)
+                return;
+
+            Button[] buttons = panelRoot.GetComponentsInChildren<Button>(true);
+            for (var index = 0; index < buttons.Length; index++)
+                buttons[index].onClick.RemoveAllListeners();
+            GameObject ownedPanel = panelRoot;
+            panelRoot = null;
+            ownedPanel.SetActive(false);
+            if (Application.isPlaying)
+                Destroy(ownedPanel);
+            else
+                DestroyImmediate(ownedPanel);
+        }
+
         private void CreatePanel()
         {
             panelRoot = new GameObject(
                 "Graybox Developer Modifier",
-                typeof(RectTransform),
-                typeof(Canvas),
-                typeof(CanvasScaler),
-                typeof(GraphicRaycaster));
-            panelRoot.transform.SetParent(transform, false);
-            Canvas canvas = panelRoot.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 100;
+                typeof(RectTransform));
+            panelRoot.transform.SetParent(canvas.transform, false);
             RectTransform root = (RectTransform)panelRoot.transform;
             root.anchorMin = new Vector2(1f, .5f);
             root.anchorMax = new Vector2(1f, .5f);
@@ -102,23 +192,24 @@ namespace WasteCity.Graybox3D.Building
             CreateLabel(root, "Development Mode Label", "开发模式");
             InputField resourceId = CreateInput(
                 root, "Resource Id", ResourceIds.Iron);
-            CreateButton(root, "Select Resource", "选择资源", () =>
-                modifier.SetCurrentResource(resourceId.text));
             CreateButton(root, "Resource +100", "资源 +100", () =>
-                modifier.AddCurrentResource100());
+                modifier.AddResource(resourceId.text, 100));
             CreateButton(root, "Resource +1000", "资源 +1000", () =>
-                modifier.AddCurrentResource1000());
+                modifier.AddResource(resourceId.text, 1000));
             CreateButton(root, "Clear Resource", "资源清零", () =>
-                modifier.ClearCurrentResource());
+                modifier.ClearResource(resourceId.text));
             InputField resourceAmount = CreateInput(
                 root, "Resource Amount", "0");
             CreateButton(root, "Set Resource", "设置资源", () =>
             {
                 if (int.TryParse(resourceAmount.text, out int amount))
-                    modifier.SetCurrentResourceAmount(amount);
+                    modifier.SetResource(resourceId.text, amount);
             });
 
-            InputField researchId = CreateInput(root, "Research Id", string.Empty);
+            InputField researchId = CreateInput(
+                root,
+                "Research Id",
+                string.Empty);
             CreateButton(root, "Unlock Research", "解锁单项研究", () =>
                 modifier.UnlockResearch(researchId.text));
             CreateButton(root, "Unlock Technology", "解锁科技路线", () =>
@@ -137,43 +228,19 @@ namespace WasteCity.Graybox3D.Building
             CreateButton(root, "Set Fortress", "切换 Fortress", () =>
                 modifier.SetCityMode(CityMode.Fortress));
             CreateButton(root, "Complete Transition", "完成形态转换", () =>
-                modifier.CompleteDeploymentTransition());
+                modifier.CompleteCityTransition());
             CreateButton(root, "Multiplier 1x", "施工 1×", () =>
-                modifier.SetConstructionMultiplier(1f));
+                modifier.SetConstructionSpeed(
+                    DevelopmentConstructionSpeed.Normal));
             CreateButton(root, "Multiplier 10x", "施工 10×", () =>
-                modifier.SetConstructionMultiplier(10f));
+                modifier.SetConstructionSpeed(
+                    DevelopmentConstructionSpeed.Fast10));
             CreateButton(root, "Multiplier 100x", "施工 100×", () =>
-                modifier.SetConstructionMultiplier(100f));
+                modifier.SetConstructionSpeed(
+                    DevelopmentConstructionSpeed.Fast100));
             CreateButton(root, "Complete Construction", "立即完成施工", () =>
                 modifier.CompleteAllConstruction());
             panelRoot.SetActive(false);
-        }
-
-        private static EventSystem EnsureEventSystem()
-        {
-            EventSystem eventSystem = EventSystem.current;
-            if (eventSystem == null)
-            {
-                EventSystem[] existing =
-                    FindObjectsOfType<EventSystem>();
-                if (existing.Length > 0)
-                    eventSystem = existing[0];
-            }
-
-            if (eventSystem == null)
-            {
-                var root = new GameObject("Graybox Developer EventSystem");
-                eventSystem = root.AddComponent<EventSystem>();
-            }
-
-            BaseInputModule module = eventSystem.GetComponent<
-                BaseInputModule>();
-            if (module == null)
-                module = eventSystem.gameObject.AddComponent<
-                    InputSystemUIInputModule>();
-            if (!module.enabled)
-                module.enabled = true;
-            return eventSystem;
         }
 
         private static InputField CreateInput(
