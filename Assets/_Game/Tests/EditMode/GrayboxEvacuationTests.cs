@@ -476,19 +476,20 @@ namespace WasteCity.Tests
             GrayboxBuildingInstance3D ground = Begin(
                 fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
                 10, 10, fixture.Presentation);
-            Button cancel = FindButton(
-                fixture.Canvas.transform,
-                "Construction.Cancel");
+            Button[] constructionButtons = ConstructionButtons(fixture.Canvas);
 
-            Assert.That(cancel.interactable, Is.True);
+            AssertConstructionButtons(constructionButtons, true);
+            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.False);
             Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
-            Assert.That(cancel.interactable, Is.False);
+            AssertConstructionButtons(constructionButtons, false);
+            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.True);
             Assert.That(fixture.Controller.Assign(
                 ground.StableInstanceId,
                 BuildingEvacuationTreatment.FullDismantle), Is.True);
             Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
             Assert.That(fixture.Controller.IsProcessing, Is.True);
-            Assert.That(cancel.interactable, Is.False);
+            AssertConstructionButtons(constructionButtons, false);
+            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.True);
             SetEvacuationPresentation(
                 fixture.Controller,
                 new FailingPresentation { ThrowRemove = true });
@@ -498,7 +499,8 @@ namespace WasteCity.Tests
 
             Assert.That(fixture.Controller.IsManifestOpen, Is.True);
             Assert.That(fixture.Controller.IsProcessing, Is.False);
-            Assert.That(cancel.interactable, Is.False);
+            AssertConstructionButtons(constructionButtons, false);
+            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.True);
             SetEvacuationPresentation(
                 fixture.Controller,
                 fixture.Presentation);
@@ -506,7 +508,8 @@ namespace WasteCity.Tests
             fixture.Controller.Tick(20f, false);
             Assert.That(fixture.Controller.IsManifestOpen, Is.False);
             Assert.That(fixture.Controller.IsProcessing, Is.False);
-            Assert.That(cancel.interactable, Is.True);
+            AssertConstructionButtons(constructionButtons, true);
+            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.False);
         }
 
         [TestCase("Configure")]
@@ -517,49 +520,66 @@ namespace WasteCity.Tests
         {
             EvacuationFixture oldFixture = CreateFixture(configureMenu: true);
             EvacuationFixture newFixture = CreateFixture(configureMenu: true);
-            GrayboxBuildingInstance3D committed = Begin(
+            GrayboxBuildingInstance3D committedFull = Begin(
                 oldFixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
                 10, 10, oldFixture.Presentation);
-            GrayboxBuildingInstance3D stillLocked = Begin(
+            GrayboxBuildingInstance3D pendingFull = Begin(
                 oldFixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
                 12, 10, oldFixture.Presentation);
+            GrayboxBuildingInstance3D laterFull = Begin(
+                oldFixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                14, 10, oldFixture.Presentation);
             oldFixture.Session.SetConstructionMultiplierForDevelopment(100f);
             oldFixture.Session.TickConstruction(
                 .1f, CityMode.Fortress, false, oldFixture.Presentation);
             Assert.That(oldFixture.Controller.TryHandleDeploymentRequest(), Is.True);
-            Assert.That(oldFixture.Controller.Assign(
-                committed.StableInstanceId,
-                BuildingEvacuationTreatment.QuickDismantle), Is.True);
-            Assert.That(oldFixture.Controller.Assign(
-                stillLocked.StableInstanceId,
-                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(oldFixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(3));
             Assert.That(oldFixture.Controller.ConfirmManifest(), Is.True);
-            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
-            Assert.That(stillLocked.IsEvacuationLocked, Is.True);
+            oldFixture.Controller.Tick(20f, false);
+            Assert.That(oldFixture.Session.Instances.Contains(committedFull), Is.False);
+            Assert.That(committedFull.IsEvacuationLocked, Is.False);
+            Assert.That(pendingFull.IsEvacuationLocked, Is.True);
+            Assert.That(laterFull.IsEvacuationLocked, Is.True);
             uint beforeCleanup = oldFixture.Session.CatalogRevision;
-            Button oldCancel = FindButton(
-                oldFixture.Canvas.transform,
-                "Construction.Cancel");
-            Assert.That(oldCancel.interactable, Is.False);
+            Button[] oldConstructionButtons =
+                ConstructionButtons(oldFixture.Canvas);
+            AssertConstructionButtons(oldConstructionButtons, false);
 
             InvokeCleanup(
                 oldFixture.Controller,
                 cleanupPath,
                 newFixture);
 
-            Assert.That(stillLocked.IsEvacuationLocked, Is.False);
-            Assert.That(oldFixture.Session.Instances.Contains(stillLocked), Is.True);
-            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
+            Assert.That(pendingFull.IsEvacuationLocked, Is.False);
+            Assert.That(laterFull.IsEvacuationLocked, Is.False);
+            Assert.That(oldFixture.Session.Instances.Contains(pendingFull), Is.True);
+            Assert.That(oldFixture.Session.Instances.Contains(laterFull), Is.True);
+            Assert.That(oldFixture.Session.Instances.Contains(committedFull), Is.False);
             Assert.That(oldFixture.Session.CatalogRevision,
-                Is.EqualTo(beforeCleanup + 1));
+                Is.EqualTo(beforeCleanup + 2));
             Assert.That(oldFixture.Menu.EvacuationVisible, Is.False);
-            Assert.That(oldCancel.interactable, Is.True);
+            AssertConstructionButtons(oldConstructionButtons, true);
             Assert.That(oldFixture.Controller.Work, Is.Empty);
             Assert.That(oldFixture.Controller.IsManifestOpen, Is.False);
             Assert.That(oldFixture.Controller.IsProcessing, Is.False);
             AssertControllerCleanupReferences(
                 oldFixture.Controller,
                 cleanupPath == "Configure" ? newFixture : default(EvacuationFixture));
+            Assert.That(CleanupDiagnosticCount(
+                oldFixture.Controller,
+                "cleanupRollbackInvocationCount"), Is.EqualTo(1));
+            Assert.That(CleanupDiagnosticCount(
+                oldFixture.Controller,
+                "cleanupMenuReleaseInvocationCount"), Is.EqualTo(1));
+            Assert.That(
+                CleanupRollbackSnapshot(oldFixture.Controller)
+                    .Select(item => item.StableInstanceId),
+                Is.EqualTo(new[]
+                {
+                    pendingFull.StableInstanceId,
+                    laterFull.StableInstanceId
+                }));
             uint afterFirstCleanup = oldFixture.Session.CatalogRevision;
 
             InvokeCleanup(
@@ -567,12 +587,19 @@ namespace WasteCity.Tests
                 cleanupPath,
                 newFixture);
 
-            Assert.That(stillLocked.IsEvacuationLocked, Is.False);
+            Assert.That(pendingFull.IsEvacuationLocked, Is.False);
+            Assert.That(laterFull.IsEvacuationLocked, Is.False);
             Assert.That(oldFixture.Session.CatalogRevision,
                 Is.EqualTo(afterFirstCleanup));
-            Assert.That(oldFixture.Session.Instances.Contains(committed), Is.False);
-            Assert.That(oldCancel.interactable, Is.True);
+            Assert.That(oldFixture.Session.Instances.Contains(committedFull), Is.False);
+            AssertConstructionButtons(oldConstructionButtons, true);
             Assert.That(oldFixture.Controller.Work, Is.Empty);
+            Assert.That(CleanupDiagnosticCount(
+                oldFixture.Controller,
+                "cleanupRollbackInvocationCount"), Is.EqualTo(1));
+            Assert.That(CleanupDiagnosticCount(
+                oldFixture.Controller,
+                "cleanupMenuReleaseInvocationCount"), Is.EqualTo(1));
         }
 
         [Test]
@@ -1019,6 +1046,49 @@ namespace WasteCity.Tests
                     Assert.That(value, Is.SameAs(replacement.Presentation));
                 else
                     Assert.That(value, Is.SameAs(replacement.Menu));
+            }
+        }
+
+        private static int CleanupDiagnosticCount(
+            GrayboxEvacuationController3D controller,
+            string fieldName)
+        {
+            FieldInfo field = typeof(GrayboxEvacuationController3D).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            return (int)field.GetValue(controller);
+        }
+
+        private static IReadOnlyList<BuildingEvacuationWork>
+            CleanupRollbackSnapshot(GrayboxEvacuationController3D controller)
+        {
+            FieldInfo field = typeof(GrayboxEvacuationController3D).GetField(
+                "cleanupRollbackSnapshot",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, "cleanupRollbackSnapshot");
+            return (IReadOnlyList<BuildingEvacuationWork>)field.GetValue(controller);
+        }
+
+        private static Button[] ConstructionButtons(Canvas canvas)
+        {
+            return new[]
+            {
+                FindButton(canvas.transform, "Construction.Cancel"),
+                FindButton(canvas.transform, "Construction.Confirm.Yes"),
+                FindButton(canvas.transform, "Construction.Confirm.No")
+            };
+        }
+
+        private static void AssertConstructionButtons(
+            IEnumerable<Button> buttons,
+            bool interactable)
+        {
+            foreach (Button button in buttons)
+            {
+                Assert.That(button, Is.Not.Null);
+                Assert.That(button.interactable, Is.EqualTo(interactable),
+                    button.name);
             }
         }
 

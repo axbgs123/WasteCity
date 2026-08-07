@@ -20,6 +20,8 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxBuildingInteractionModel3D interaction;
         [SerializeField] private Camera controlledCamera;
         [SerializeField] private GrayboxBuildingMenuView3D menu;
+        private IGrayboxBuildingPresentation3D cancellationPresentation;
+        private int cancellationDelegationCount;
         private string selectedStableInstanceId;
 
         public void Configure(
@@ -50,6 +52,7 @@ namespace WasteCity.Graybox3D.Building
             this.interaction = interaction;
             this.controlledCamera = controlledCamera;
             this.menu = menu;
+            cancellationPresentation = presentation;
             selectedStableInstanceId = null;
             if (isActiveAndEnabled)
                 SubscribeMenu();
@@ -75,7 +78,8 @@ namespace WasteCity.Graybox3D.Building
                 FindInstance(stableInstanceId);
             if (instance == null ||
                 instance.State !=
-                GrayboxBuildingInstanceState.UnderConstruction)
+                GrayboxBuildingInstanceState.UnderConstruction ||
+                instance.IsEvacuationLocked)
                 return false;
             selectedStableInstanceId = instance.StableInstanceId;
             return true;
@@ -97,10 +101,8 @@ namespace WasteCity.Graybox3D.Building
 
             if (instance.Progress.Normalized <= 0f)
             {
-                bool cancelled = session.TryCancelConstruction(
+                bool cancelled = TryDelegateCancellation(
                     instance.StableInstanceId,
-                    1d,
-                    presentation,
                     out _);
                 if (!cancelled)
                     return ConstructionCancelResult.NotFound;
@@ -140,10 +142,8 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
-            bool cancelled = session.TryCancelConstruction(
+            bool cancelled = TryDelegateCancellation(
                 instance.StableInstanceId,
-                1d,
-                presentation,
                 out _);
             interaction.ResolveCancelConfirmation(cancelled);
             if (cancelled)
@@ -219,6 +219,18 @@ namespace WasteCity.Graybox3D.Building
                     return instance;
             }
             return null;
+        }
+
+        private bool TryDelegateCancellation(
+            string stableInstanceId,
+            out int acceptedRefund)
+        {
+            cancellationDelegationCount++;
+            return session.TryCancelConstruction(
+                stableInstanceId,
+                1d,
+                cancellationPresentation ?? presentation,
+                out acceptedRefund);
         }
 
         private void UnsubscribeMenu()

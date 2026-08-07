@@ -1588,18 +1588,23 @@ namespace WasteCity.Tests
         public void ConstructionController_DirectRequestRejectsLockedZeroProgress()
         {
             ControllerFixture fixture = CreateControllerFixture();
+            var routePresentation = new CancellationRoutePresentation();
+            SetCancellationPresentation(
+                fixture.Controller,
+                routePresentation);
             GrayboxBuildingInstance3D instance = BeginGroundConstruction(
                 fixture.Session,
                 BuildingCatalog.Wall,
                 20,
                 15,
                 fixture.Presentation);
+            Assert.That(fixture.Controller.SelectInstance(
+                instance.StableInstanceId), Is.True);
             LockForFullEvacuation(fixture.Session, instance);
             int inventory = fixture.Session.Inventory.Get(
                 BuildingCatalog.Wall.CostId);
             uint revision = fixture.Session.CatalogRevision;
-            Assert.That(fixture.Controller.SelectInstance(
-                instance.StableInstanceId), Is.True);
+            int delegations = CancellationDelegationCount(fixture.Controller);
 
             ConstructionCancelResult result =
                 fixture.Controller.RequestCancelSelected();
@@ -1612,12 +1617,20 @@ namespace WasteCity.Tests
                 Is.EqualTo(instance.Progress.BaseDuration));
             Assert.That(instance.IsEvacuationLocked, Is.True);
             Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+            Assert.That(CancellationDelegationCount(fixture.Controller),
+                Is.EqualTo(delegations));
+            Assert.That(routePresentation.TotalCalls, Is.Zero);
+            Assert.That(SelectedStableInstanceId(fixture.Controller), Is.Null);
         }
 
         [Test]
         public void ConstructionController_ConfirmationCallbackRejectsNewlyLockedItem()
         {
             ControllerFixture fixture = CreateControllerFixture();
+            var routePresentation = new CancellationRoutePresentation();
+            SetCancellationPresentation(
+                fixture.Controller,
+                routePresentation);
             fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
             GrayboxBuildingInstance3D instance = BeginGroundConstruction(
                 fixture.Session,
@@ -1635,6 +1648,7 @@ namespace WasteCity.Tests
             int inventory = fixture.Session.Inventory.Get(
                 BuildingCatalog.Wall.CostId);
             uint revision = fixture.Session.CatalogRevision;
+            int delegations = CancellationDelegationCount(fixture.Controller);
 
             bool cancelled = fixture.Controller.ResolveCancelSelected(true);
 
@@ -1645,24 +1659,35 @@ namespace WasteCity.Tests
             Assert.That(instance.Progress.Remaining, Is.EqualTo(remaining));
             Assert.That(instance.IsEvacuationLocked, Is.True);
             Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+            Assert.That(CancellationDelegationCount(fixture.Controller),
+                Is.EqualTo(delegations));
+            Assert.That(routePresentation.TotalCalls, Is.Zero);
+            Assert.That(SelectedStableInstanceId(fixture.Controller), Is.Null);
+            Assert.That(fixture.Interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
         }
 
         [Test]
         public void ConstructionController_UguiCancelEventRejectsLockedItem()
         {
             ControllerFixture fixture = CreateControllerFixture();
+            var routePresentation = new CancellationRoutePresentation();
+            SetCancellationPresentation(
+                fixture.Controller,
+                routePresentation);
             GrayboxBuildingInstance3D instance = BeginGroundConstruction(
                 fixture.Session,
                 BuildingCatalog.Wall,
                 20,
                 15,
                 fixture.Presentation);
+            Assert.That(fixture.Controller.SelectInstance(
+                instance.StableInstanceId), Is.True);
             LockForFullEvacuation(fixture.Session, instance);
             int inventory = fixture.Session.Inventory.Get(
                 BuildingCatalog.Wall.CostId);
             uint revision = fixture.Session.CatalogRevision;
-            Assert.That(fixture.Controller.SelectInstance(
-                instance.StableInstanceId), Is.True);
+            int delegations = CancellationDelegationCount(fixture.Controller);
 
             Click(fixture.Canvas.transform, "Construction.Cancel");
 
@@ -1673,6 +1698,10 @@ namespace WasteCity.Tests
                 Is.EqualTo(instance.Progress.BaseDuration));
             Assert.That(instance.IsEvacuationLocked, Is.True);
             Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+            Assert.That(CancellationDelegationCount(fixture.Controller),
+                Is.EqualTo(delegations));
+            Assert.That(routePresentation.TotalCalls, Is.Zero);
+            Assert.That(SelectedStableInstanceId(fixture.Controller), Is.Null);
         }
 
         [Test]
@@ -2475,6 +2504,42 @@ namespace WasteCity.Tests
                 Is.True, lockFailure);
         }
 
+        private static void SetCancellationPresentation(
+            GrayboxConstructionController3D controller,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            var field = typeof(GrayboxConstructionController3D).GetField(
+                "cancellationPresentation",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null,
+                "Controller must expose the cancellation delegation seam.");
+            field.SetValue(controller, presentation);
+        }
+
+        private static int CancellationDelegationCount(
+            GrayboxConstructionController3D controller)
+        {
+            var field = typeof(GrayboxConstructionController3D).GetField(
+                "cancellationDelegationCount",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null,
+                "Controller must count session cancellation delegations.");
+            return (int)field.GetValue(controller);
+        }
+
+        private static string SelectedStableInstanceId(
+            GrayboxConstructionController3D controller)
+        {
+            var field = typeof(GrayboxConstructionController3D).GetField(
+                "selectedStableInstanceId",
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (string)field.GetValue(controller);
+        }
+
         private T Create<T>(string name) where T : Component
         {
             GameObject gameObject = NewObject(name);
@@ -2801,6 +2866,28 @@ namespace WasteCity.Tests
 
             public void Remove(GrayboxBuildingInstance3D instance)
             {
+            }
+        }
+
+        private sealed class CancellationRoutePresentation :
+            IGrayboxBuildingPresentation3D
+        {
+            public int TotalCalls { get; private set; }
+
+            public bool TryCreate(GrayboxBuildingInstance3D instance)
+            {
+                TotalCalls++;
+                return true;
+            }
+
+            public void UpdateInstance(GrayboxBuildingInstance3D instance)
+            {
+                TotalCalls++;
+            }
+
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
+                TotalCalls++;
             }
         }
 

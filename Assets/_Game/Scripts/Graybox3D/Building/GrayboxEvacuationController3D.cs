@@ -32,7 +32,12 @@ namespace WasteCity.Graybox3D.Building
             new List<BuildingEvacuationWork>();
         private readonly List<BuildingEvacuationWork> rollbackWork =
             new List<BuildingEvacuationWork>();
+        private readonly List<BuildingEvacuationWork> cleanupRollbackSnapshot =
+            new List<BuildingEvacuationWork>();
         private readonly ReadOnlyCollection<BuildingEvacuationWork> readOnlyWork;
+        private int cleanupRollbackInvocationCount;
+        private int cleanupMenuReleaseInvocationCount;
+        private bool ownsConstructionCancellation;
         private int fullQueueIndex;
         private float remainingSeconds;
 
@@ -126,6 +131,7 @@ namespace WasteCity.Graybox3D.Building
             fullQueue.Clear();
             rollbackWork.Clear();
             IsManifestOpen = true;
+            ownsConstructionCancellation = true;
             menu.SetConstructionCancellationBlocked(true);
             menu.ShowEvacuation(manifest);
             return true;
@@ -314,6 +320,7 @@ namespace WasteCity.Graybox3D.Building
         {
             IsManifestOpen = false;
             IsProcessing = false;
+            ownsConstructionCancellation = false;
             manifest.Clear();
             assignments.Clear();
             ClearWorkOnly();
@@ -403,19 +410,17 @@ namespace WasteCity.Graybox3D.Building
         {
             GrayboxBuildingSession3D oldSession = session;
             GrayboxBuildingMenuView3D oldMenu = menu;
+            bool releaseOldMenu = ownsConstructionCancellation;
             UnsubscribeMenu();
             try
             {
                 if (oldSession != null && rollbackWork.Count > 0)
-                    oldSession.RollbackEvacuationLocksAfterFailure(rollbackWork);
+                    RollbackCleanupWork(oldSession);
             }
             finally
             {
-                if (oldMenu != null)
-                {
-                    oldMenu.HideEvacuation();
-                    oldMenu.SetConstructionCancellationBlocked(false);
-                }
+                if (oldMenu != null && releaseOldMenu)
+                    ReleaseCleanupMenu(oldMenu);
                 ResetLocalState();
                 session = null;
                 city = null;
@@ -424,6 +429,23 @@ namespace WasteCity.Graybox3D.Building
                 evacuationPresentation = null;
                 menu = null;
             }
+        }
+
+        private void RollbackCleanupWork(
+            GrayboxBuildingSession3D oldSession)
+        {
+            cleanupRollbackInvocationCount++;
+            cleanupRollbackSnapshot.Clear();
+            for (var index = 0; index < rollbackWork.Count; index++)
+                cleanupRollbackSnapshot.Add(rollbackWork[index]);
+            oldSession.RollbackEvacuationLocksAfterFailure(rollbackWork);
+        }
+
+        private void ReleaseCleanupMenu(GrayboxBuildingMenuView3D oldMenu)
+        {
+            cleanupMenuReleaseInvocationCount++;
+            oldMenu.HideEvacuation();
+            oldMenu.SetConstructionCancellationBlocked(false);
         }
 
         private sealed class CityDeploymentRequestAdapter :
