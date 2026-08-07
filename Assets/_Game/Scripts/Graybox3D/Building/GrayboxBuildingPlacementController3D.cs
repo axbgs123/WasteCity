@@ -190,6 +190,7 @@ namespace WasteCity.Graybox3D.Building
                 world.Model != null &&
                 world.Coordinates != null)
             {
+                EnsureResourceNodeIdentityWorkspace();
                 int width = BuildingOrientationRules.Width(
                     definition,
                     interaction.Orientation);
@@ -422,6 +423,17 @@ namespace WasteCity.Graybox3D.Building
                 new string[
                     resourceNodeVisualWidth *
                     resourceNodeVisualHeight];
+        }
+
+        private void EnsureResourceNodeIdentityWorkspace()
+        {
+            WorldMapModel model = world?.Model;
+            if (model == null ||
+                (resourceNodeVisualIds != null &&
+                 resourceNodeVisualWidth == model.Width &&
+                 resourceNodeVisualHeight == model.Height))
+                return;
+            ConfigureResourceNodeIdentityWorkspace(world);
         }
 
         private string ResourceNodeVisualId(int x, int y)

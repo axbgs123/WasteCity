@@ -6,7 +6,9 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using Unity.Profiling;
 using UnityEngine.TestTools;
+using UnityEngine.TestTools.Utils;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
@@ -1078,6 +1080,96 @@ namespace WasteCity.Tests
                 Is.EqualTo(oldFootprint));
         }
 
+        [TestCase(
+            ResourceIds.Iron,
+            19,
+            15,
+            "world.resource-node.19.15",
+            3f,
+            3f)]
+        [TestCase(
+            ResourceIds.EnergyCrystal,
+            18,
+            14,
+            "world.resource-node.18.14",
+            2f,
+            2f)]
+        public void
+            PlacementController_SceneEnableBeforeWorldGenerateLazilyBuildsStableNodeIdentity(
+                string resourceId,
+                int nodeX,
+                int nodeY,
+                string expectedNodeId,
+                float expectedHighlightX,
+                float expectedHighlightZ)
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[nodeX, nodeY] = Cell(resourceId);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress,
+                true);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            PositionCameraAtCell(fixture, 18, 14);
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            string firstNodeId =
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId;
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.IsValid,
+                Is.True,
+                fixture.Placement.CurrentEvaluation
+                    .PrimaryFailure.ToString());
+            Assert.That(firstNodeId, Is.EqualTo(expectedNodeId));
+            GrayboxVisualSlot[] highlights =
+                NodeSlots(fixture.Presentation).ToArray();
+            Assert.That(highlights, Has.Length.EqualTo(1));
+            GrayboxVisualSlot highlight = highlights[0];
+            Assert.That(
+                highlight.StableId,
+                Is.EqualTo(
+                    "building.node-highlight." +
+                    expectedNodeId));
+            Assert.That(
+                highlight.transform.position,
+                Is.EqualTo(new Vector3(
+                    expectedHighlightX,
+                    .035f,
+                    expectedHighlightZ))
+                    .Using(Vector3ComparerWithEqualsOperator.Instance));
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            string secondNodeId =
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId;
+            Assert.That(secondNodeId, Is.SameAs(firstNodeId));
+
+            Action warmedUpdate = () =>
+                fixture.Placement.UpdatePointer(ScreenCenter);
+            warmedUpdate();
+            warmedUpdate();
+            AllocationMeasurement measurement =
+                Profile300Calls(warmedUpdate);
+
+            TestContext.WriteLine(
+                "SceneOrderNodeIdentityProfilerSamples=" +
+                measurement.Samples);
+            TestContext.WriteLine(
+                "SceneOrderNodeIdentityProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "SceneOrderNodeIdentityCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            Assert.That(
+                fixture.Placement.CurrentEvaluation
+                    .CompatibleResourceNodeId,
+                Is.SameAs(firstNodeId));
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+        }
+
         [Test]
         public void WorldView_DoesNotRetainDynamicEvaluationOrColorVerdicts()
         {
@@ -1359,7 +1451,8 @@ namespace WasteCity.Tests
 
         private WorldFixture CreateWorldFixture(
             WorldCell[,] cells = null,
-            CityMode cityMode = CityMode.Mobile)
+            CityMode cityMode = CityMode.Mobile,
+            bool generateAfterPlacementOnEnable = false)
         {
             GameObject worldObject = Track(new GameObject("world"));
             Transform terrain = NewChild(worldObject.transform, "terrain");
@@ -1369,7 +1462,9 @@ namespace WasteCity.Tests
             GrayboxWorldView3D world =
                 worldObject.AddComponent<GrayboxWorldView3D>();
             world.Configure(terrain, resources, obstacles, worldMaterial);
-            world.Generate(new WorldMapModel(cells ?? OpenCells()));
+            var model = new WorldMapModel(cells ?? OpenCells());
+            if (!generateAfterPlacementOnEnable)
+                world.Generate(model);
 
             GameObject cityObject = Track(new GameObject("city"));
             cityObject.transform.position = new Vector3(0f, .5f, 0f);
@@ -1421,16 +1516,39 @@ namespace WasteCity.Tests
                 city);
 
             GameObject placementObject = Track(new GameObject("placement"));
+            if (generateAfterPlacementOnEnable)
+                placementObject.SetActive(false);
             GrayboxBuildingPlacementController3D placement =
                 placementObject
                     .AddComponent<GrayboxBuildingPlacementController3D>();
-            placement.Configure(
-                session,
-                city,
-                world,
-                projector,
-                presentation,
-                interaction);
+            if (generateAfterPlacementOnEnable)
+            {
+                SetPlacementField(placement, "session", session);
+                SetPlacementField(placement, "city", city);
+                SetPlacementField(placement, "world", world);
+                SetPlacementField(placement, "projector", projector);
+                SetPlacementField(
+                    placement,
+                    "presentation",
+                    presentation);
+                SetPlacementField(
+                    placement,
+                    "interaction",
+                    interaction);
+                placementObject.SetActive(true);
+                InvokePlacementLifecycle(placement, "OnEnable");
+                world.Generate(model);
+            }
+            else
+            {
+                placement.Configure(
+                    session,
+                    city,
+                    world,
+                    projector,
+                    presentation,
+                    interaction);
+            }
 
             return new WorldFixture(
                 world,
@@ -1817,6 +1935,37 @@ namespace WasteCity.Tests
             field.SetValue(placement, value);
         }
 
+        private static AllocationMeasurement Profile300Calls(Action action)
+        {
+            ProfilerRecorder recorder =
+                ProfilerRecorder.StartNew(
+                    ProfilerCategory.Memory,
+                    "GC.Alloc",
+                    2048,
+                    ProfilerRecorderOptions.StartImmediately |
+                    ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                    ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+                action();
+            long currentThreadBytes =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+            recorder.Stop();
+            int samples = recorder.Count;
+            long profiledBytes = 0;
+            for (var index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample =
+                    recorder.GetSample(index);
+                profiledBytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+            return new AllocationMeasurement(
+                samples,
+                profiledBytes,
+                currentThreadBytes);
+        }
+
         private static string[] InstanceSlotIds(Transform root)
         {
             return root
@@ -1904,6 +2053,23 @@ namespace WasteCity.Tests
                 InstanceRoot = instanceRoot;
                 Material = material;
             }
+        }
+
+        private readonly struct AllocationMeasurement
+        {
+            public AllocationMeasurement(
+                int samples,
+                long profiledBytes,
+                long currentThreadBytes)
+            {
+                Samples = samples;
+                ProfiledBytes = profiledBytes;
+                CurrentThreadBytes = currentThreadBytes;
+            }
+
+            public int Samples { get; }
+            public long ProfiledBytes { get; }
+            public long CurrentThreadBytes { get; }
         }
     }
 }
