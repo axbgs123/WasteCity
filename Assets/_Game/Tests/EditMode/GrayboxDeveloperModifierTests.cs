@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -62,16 +64,39 @@ namespace WasteCity.Tests
         {
             Type bootstrapType = typeof(GrayboxDeveloperModifierBootstrap3D);
             Assert.That(
-                bootstrapType.GetProperties(
+                bootstrapType.GetFields(
                     BindingFlags.Instance |
+                    BindingFlags.Static |
                     BindingFlags.Public |
-                    BindingFlags.DeclaredOnly)
-                    .Select(property => property.Name),
+                    BindingFlags.DeclaredOnly),
+                Is.Empty);
+            Assert.That(
+                bootstrapType.GetEvents(
+                    BindingFlags.Instance |
+                    BindingFlags.Static |
+                    BindingFlags.Public |
+                    BindingFlags.DeclaredOnly),
+                Is.Empty);
+            PropertyInfo[] bootstrapProperties = bootstrapType.GetProperties(
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.DeclaredOnly);
+            Assert.That(
+                bootstrapProperties.Select(property => property.Name),
                 Is.EquivalentTo(new[]
                 {
                     "IsRuntimeAvailable",
                     "IsPanelOpen"
                 }));
+            foreach (PropertyInfo property in bootstrapProperties)
+            {
+                Assert.That(property.PropertyType, Is.EqualTo(typeof(bool)));
+                Assert.That(property.CanRead, Is.True);
+                Assert.That(property.GetMethod, Is.Not.Null);
+                Assert.That(property.GetMethod.IsPublic, Is.True);
+                Assert.That(property.CanWrite, Is.False);
+                Assert.That(property.SetMethod, Is.Null);
+            }
             Assert.That(
                 PublicMethodSignatures(bootstrapType),
                 Is.EquivalentTo(new[]
@@ -98,6 +123,20 @@ namespace WasteCity.Tests
                 Is.EqualTo(new[] { 1, 10, 100 }));
 
             Type modifierType = typeof(GrayboxDeveloperModifier3D);
+            Assert.That(
+                modifierType.GetFields(
+                    BindingFlags.Instance |
+                    BindingFlags.Static |
+                    BindingFlags.Public |
+                    BindingFlags.DeclaredOnly),
+                Is.Empty);
+            Assert.That(
+                modifierType.GetEvents(
+                    BindingFlags.Instance |
+                    BindingFlags.Static |
+                    BindingFlags.Public |
+                    BindingFlags.DeclaredOnly),
+                Is.Empty);
             ConstructorInfo[] constructors = modifierType.GetConstructors(
                 BindingFlags.Instance | BindingFlags.Public);
             Assert.That(constructors, Has.Length.EqualTo(1));
@@ -151,6 +190,65 @@ namespace WasteCity.Tests
                     false,
                     true),
                 Is.True);
+        }
+
+        [Test]
+        public void Bootstrap_ReleaseProjectionIsInertAndContainsNoRuntimeSurface()
+        {
+            string releaseSource = ProjectReleaseSource(ReadSource(
+                "GrayboxDeveloperModifierBootstrap3D.cs"));
+
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "public bool IsRuntimeAvailable")),
+                Is.EqualTo("{ get { return false; } }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "public bool IsPanelOpen")),
+                Is.EqualTo("{ get { return false; } }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "public bool TryTogglePanel()")),
+                Is.EqualTo("{ return false; }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "private void Awake()")),
+                Is.EqualTo("{ }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "private void OnEnable()")),
+                Is.EqualTo("{ }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "private void OnDisable()")),
+                Is.EqualTo("{ }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "private void OnDestroy()")),
+                Is.EqualTo("{ }"));
+            Assert.That(
+                releaseSource,
+                Does.Not.Contain("GrayboxDeveloperModifier3D"));
+            Assert.That(
+                releaseSource,
+                Does.Not.Contain("TryCreateDevelopmentSurface"));
+            Assert.That(
+                releaseSource,
+                Does.Not.Contain("CreatePanel"));
+            Assert.That(
+                releaseSource,
+                Does.Not.Contain("DisposeDevelopmentSurface"));
+            Assert.That(
+                releaseSource,
+                Does.Not.Contain("Graybox Developer Modifier"));
+            Assert.That(releaseSource, Does.Not.Contain("new GameObject"));
         }
 
         [Test]
@@ -395,10 +493,17 @@ namespace WasteCity.Tests
                             new GameObject("Replacement City")).AddComponent<
                                 GrayboxMobileCityController3D>();
                     else if (dependencyIndex == 2)
+                    {
                         nextPresentation = RuntimeTrack(
                             owned,
                             new GameObject("Replacement Presentation"))
                             .AddComponent<GrayboxBuildingWorldView3D>();
+                        ConfigureRuntimePresentation(
+                            owned,
+                            nextPresentation,
+                            nextCity,
+                            "Replacement");
+                    }
                     else
                         nextCanvas = CreateRuntimeCanvas(
                             owned,
@@ -433,6 +538,38 @@ namespace WasteCity.Tests
                     Assert.That(
                         nextSession.Inventory.Get(ResourceIds.Iron),
                         Is.EqualTo(100));
+                    if (dependencyIndex == 1)
+                    {
+                        Assert.That(oldSession, Is.SameAs(nextSession));
+                        Assert.That(fixture.City.Mode, Is.EqualTo(
+                            CityMode.Mobile));
+                        Assert.That(nextCity.Mode, Is.EqualTo(
+                            CityMode.Mobile));
+                        ButtonNamed(panel, "Set Fortress").onClick.Invoke();
+                        Assert.That(fixture.City.Mode, Is.EqualTo(
+                            CityMode.Mobile));
+                        Assert.That(nextCity.Mode, Is.EqualTo(
+                            CityMode.Fortress));
+                    }
+                    else if (dependencyIndex == 2)
+                    {
+                        GrayboxBuildingInstance3D construction = Begin(
+                            nextSession,
+                            20,
+                            10,
+                            new RecordingPresentation());
+                        Assert.Throws<InvalidOperationException>(() =>
+                            fixture.Presentation.UpdateInstance(construction));
+                        Assert.DoesNotThrow(() =>
+                            nextPresentation.UpdateInstance(construction));
+                        Assert.DoesNotThrow(() =>
+                            ButtonNamed(panel, "Complete Construction")
+                                .onClick.Invoke());
+                        Assert.That(
+                            construction.State,
+                            Is.EqualTo(
+                                GrayboxBuildingInstanceState.Completed));
+                    }
 
                     fixture.Session = nextSession;
                     fixture.City = nextCity;
@@ -809,6 +946,75 @@ namespace WasteCity.Tests
                 name));
         }
 
+        private static string ProjectReleaseSource(string source)
+        {
+            var result = new StringBuilder();
+            var parents = new Stack<bool>();
+            bool active = true;
+            string[] lines = source.Replace("\r\n", "\n").Split('\n');
+            for (var index = 0; index < lines.Length; index++)
+            {
+                string directive = lines[index].Trim();
+                if (directive == "#if UNITY_EDITOR || DEVELOPMENT_BUILD")
+                {
+                    parents.Push(active);
+                    active = false;
+                    continue;
+                }
+                if (directive == "#else")
+                {
+                    Assert.That(parents, Is.Not.Empty);
+                    active = parents.Peek();
+                    continue;
+                }
+                if (directive == "#endif")
+                {
+                    Assert.That(parents, Is.Not.Empty);
+                    active = parents.Pop();
+                    continue;
+                }
+                if (directive.StartsWith("#if", StringComparison.Ordinal))
+                    Assert.Fail("Unexpected preprocessor condition: " +
+                        directive);
+                if (active)
+                    result.AppendLine(lines[index]);
+            }
+            Assert.That(parents, Is.Empty);
+            return result.ToString();
+        }
+
+        private static string ExtractMemberBody(
+            string source,
+            string declaration)
+        {
+            int declarationIndex = source.IndexOf(
+                declaration,
+                StringComparison.Ordinal);
+            Assert.That(
+                declarationIndex,
+                Is.GreaterThanOrEqualTo(0),
+                "Missing declaration " + declaration);
+            int bodyStart = source.IndexOf('{', declarationIndex);
+            Assert.That(bodyStart, Is.GreaterThan(declarationIndex));
+            var depth = 0;
+            for (var index = bodyStart; index < source.Length; index++)
+            {
+                if (source[index] == '{')
+                    depth++;
+                else if (source[index] == '}' && --depth == 0)
+                    return source.Substring(
+                        bodyStart,
+                        index - bodyStart + 1);
+            }
+            Assert.Fail("Unclosed member body for " + declaration);
+            return null;
+        }
+
+        private static string NormalizeWhitespace(string value)
+        {
+            return Regex.Replace(value, @"\s+", " ").Trim();
+        }
+
         private static IEnumerable<string> PublicMethodSignatures(Type type)
         {
             return type.GetMethods(
@@ -898,6 +1104,29 @@ namespace WasteCity.Tests
             return session;
         }
 
+        private static void ConfigureRuntimePresentation(
+            List<UnityEngine.Object> owned,
+            GrayboxBuildingWorldView3D presentation,
+            GrayboxMobileCityController3D city,
+            string prefix)
+        {
+            Transform instanceRoot = RuntimeTrack(
+                owned,
+                new GameObject(prefix + " Instance Root")).transform;
+            Transform infrastructureRoot = RuntimeTrack(
+                owned,
+                new GameObject(prefix + " Infrastructure Root")).transform;
+            Shader shader = Shader.Find("Hidden/InternalErrorShader") ??
+                Shader.Find("Unlit/Color");
+            var material = new Material(shader);
+            owned.Add(material);
+            presentation.Configure(
+                instanceRoot,
+                infrastructureRoot,
+                material,
+                city);
+        }
+
         private static Canvas CreateRuntimeCanvas(
             List<UnityEngine.Object> owned,
             string name)
@@ -981,6 +1210,14 @@ namespace WasteCity.Tests
             public GrayboxBuildingWorldView3D Presentation { get; set; }
             public Canvas Canvas { get; set; }
             public EventSystem EventSystem { get; }
+        }
+
+        private sealed class RecordingPresentation :
+            IGrayboxBuildingPresentation3D
+        {
+            public bool TryCreate(GrayboxBuildingInstance3D instance) => true;
+            public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
+            public void Remove(GrayboxBuildingInstance3D instance) { }
         }
 
     }
