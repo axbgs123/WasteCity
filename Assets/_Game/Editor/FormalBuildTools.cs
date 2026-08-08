@@ -42,5 +42,18 @@ namespace WasteCity.Editor
             });
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());
         }
+
+        public static void BuildWindowsGraybox3DDevelopment()
+        {
+            Directory.CreateDirectory("Builds/Windows3DDevelopment");
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { "Assets/_Game/Scenes/GrayboxPrototype3D.unity" },
+                locationPathName = "Builds/Windows3DDevelopment/WasteCityGrayboxDev.exe",
+                target = BuildTarget.StandaloneWindows64,
+                options = BuildOptions.Development
+            });
+            if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());
+        }
     }
 }

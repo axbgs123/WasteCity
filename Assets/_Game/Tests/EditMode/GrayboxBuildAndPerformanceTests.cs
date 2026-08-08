@@ -4,7 +4,11 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Building;
+using WasteCity.City;
+using WasteCity.Economy;
 using WasteCity.Graybox3D;
+using WasteCity.Graybox3D.Building;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -15,6 +19,7 @@ namespace WasteCity.Tests
             "WasteCity.Editor.FormalBuildTools";
         private const string PerformanceProbeTypeName =
             "WasteCity.Editor.GrayboxPerformanceProbe";
+        private const int BuildingInstanceCount = 128;
 
         private readonly List<UnityEngine.Object> cleanup =
             new List<UnityEngine.Object>();
@@ -96,6 +101,49 @@ namespace WasteCity.Tests
             StringAssert.Contains(
                 "BuildTarget.StandaloneWindows64",
                 legacy2D);
+            StringAssert.DoesNotContain(
+                "BuildOptions.Development",
+                default3D);
+            StringAssert.DoesNotContain(
+                "BuildOptions.Development",
+                explicitGraybox3D);
+            StringAssert.DoesNotContain(
+                "BuildOptions.Development",
+                legacy2D);
+        }
+
+        [Test]
+        public void BuildTools_ExposeIsolatedGraybox3DDevelopmentTarget()
+        {
+            Type buildTools = FindLoadedType(FormalBuildToolsTypeName);
+            Assert.That(buildTools, Is.Not.Null);
+            MethodInfo method = buildTools?.GetMethod(
+                "BuildWindowsGraybox3DDevelopment",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FormalBuildTools.cs"));
+            string development = ExtractMethodBlock(
+                source,
+                "BuildWindowsGraybox3DDevelopment");
+            StringAssert.Contains(
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                development);
+            StringAssert.DoesNotContain("FormalPrototype", development);
+            StringAssert.Contains(
+                "Builds/Windows3DDevelopment/WasteCityGrayboxDev.exe",
+                development);
+            StringAssert.Contains(
+                "BuildTarget.StandaloneWindows64",
+                development);
+            StringAssert.Contains(
+                "BuildOptions.Development",
+                development);
         }
 
         [Test]
@@ -109,6 +157,146 @@ namespace WasteCity.Tests
             Assert.That(method, Is.Not.Null);
             Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
             Assert.That(method?.GetParameters(), Is.Empty);
+        }
+
+        [Test]
+        public void PerformanceProbe_ExposesFiveRunBuildingEntryPoint()
+        {
+            Type probe = FindLoadedType(PerformanceProbeTypeName);
+            Assert.That(probe, Is.Not.Null);
+            MethodInfo method = probe?.GetMethod(
+                "MeasureBuildingPerformance",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxPerformanceProbe.cs"));
+            StringAssert.Contains(
+                "WASTECITY_BUILDING_PERF_RESULT",
+                source);
+            StringAssert.Contains("MeasureBuildingPerformance", source);
+            StringAssert.Contains("GrayboxSceneBootstrap.WorldSeedValue", source);
+            StringAssert.Contains("BuildingInstanceCount", source);
+        }
+
+        [Test]
+        public void PerformanceProbe_ExposesExternalGuiProfilerSummaryEntryPoint()
+        {
+            Type probe = FindLoadedType(PerformanceProbeTypeName);
+            Assert.That(probe, Is.Not.Null);
+            MethodInfo method = probe?.GetMethod(
+                "SummarizeGuiProfilerCapture",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxPerformanceProbe.cs"));
+            StringAssert.Contains(
+                "WASTECITY_GUI_PROFILER_INPUT",
+                source);
+            StringAssert.Contains(
+                "WASTECITY_GUI_PROFILER_RESULT",
+                source);
+            StringAssert.Contains("LoadProfile", source);
+            StringAssert.Contains("RawFrameDataView", source);
+        }
+
+        [Test]
+        public void MixedBuildingPopulation_StaysWithinStructuralBudgets()
+        {
+            BuildingPerformanceFixture fixture =
+                CreateBuildingPerformanceFixture();
+
+            int completed = 0;
+            int construction = 0;
+            int ruins = 0;
+            for (var index = 0;
+                 index < fixture.Session.Instances.Count;
+                 index++)
+            {
+                switch (fixture.Session.Instances[index].State)
+                {
+                    case GrayboxBuildingInstanceState.Completed:
+                        completed++;
+                        break;
+                    case GrayboxBuildingInstanceState.UnderConstruction:
+                        construction++;
+                        break;
+                    case GrayboxBuildingInstanceState.AbandonedRuin:
+                        ruins++;
+                        break;
+                }
+            }
+
+            int persistentObjectCount =
+                fixture.Root.GetComponentsInChildren<Transform>(true).Length;
+            int catalogObjectCount = 0;
+            Transform[] transforms =
+                fixture.Root.GetComponentsInChildren<Transform>(true);
+            for (var index = 0; index < transforms.Length; index++)
+                if (transforms[index].name.StartsWith(
+                        "Catalog.Card.",
+                        StringComparison.Ordinal))
+                    catalogObjectCount++;
+
+            TestContext.WriteLine(
+                "BuildingInstanceCount=" +
+                fixture.Session.Instances.Count);
+            TestContext.WriteLine(
+                "BuildingStateCounts=" + completed + "/" +
+                construction + "/" + ruins);
+            TestContext.WriteLine(
+                "BuildingInstanceRendererCount=" +
+                fixture.Presentation.InstanceRendererCount);
+            TestContext.WriteLine(
+                "BuildingInfrastructureRendererCount=" +
+                fixture.Presentation.InfrastructureRendererCount);
+            TestContext.WriteLine(
+                "BuildingPersistentObjectCount=" + persistentObjectCount);
+            TestContext.WriteLine(
+                "PrecreatedCatalogObjectCount=" + catalogObjectCount);
+
+            Assert.That(
+                fixture.Session.Instances.Count,
+                Is.EqualTo(BuildingInstanceCount));
+            Assert.That(completed, Is.GreaterThan(0));
+            Assert.That(construction, Is.GreaterThan(0));
+            Assert.That(ruins, Is.GreaterThan(0));
+            Assert.That(
+                fixture.Presentation.InstanceRendererCount,
+                Is.LessThanOrEqualTo(BuildingInstanceCount));
+            Assert.That(
+                fixture.Presentation.InfrastructureRendererCount,
+                Is.LessThanOrEqualTo(8));
+            Assert.That(persistentObjectCount, Is.LessThan(32 * 24));
+            Assert.That(catalogObjectCount, Is.Zero);
+        }
+
+        [Test]
+        public void BuildingAdapters_AllocateNoManagedBytesAcross300Calls()
+        {
+            BuildingPerformanceFixture fixture =
+                CreateBuildingPerformanceFixture();
+            fixture.TickAll();
+            fixture.TickAll();
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (var frame = 0; frame < 300; frame++)
+                fixture.TickAll();
+            long difference =
+                GC.GetAllocatedBytesForCurrentThread() - before;
+
+            TestContext.WriteLine(
+                "BuildingAdapterAllocationDifference=" + difference);
+            Assert.That(difference, Is.Zero);
         }
 
         [Test]
@@ -257,6 +445,227 @@ namespace WasteCity.Tests
                 cameraController);
         }
 
+        private BuildingPerformanceFixture
+            CreateBuildingPerformanceFixture()
+        {
+            GrayboxWorldView3D world = CreateWorldView();
+            world.Generate(
+                new WorldMapModel(
+                    GrayboxSceneBootstrap.WorldWidth,
+                    GrayboxSceneBootstrap.WorldHeight,
+                    new WorldSeed(
+                        GrayboxSceneBootstrap.WorldSeedValue)));
+
+            Material material = Track(CreateTestMaterial());
+            var root = Track(new GameObject("BuildingPerformanceRoot"));
+            var cityObject = new GameObject("MobileCity");
+            cityObject.transform.SetParent(root.transform, false);
+            world.Coordinates.TryCellToWorld(
+                16,
+                12,
+                .5f,
+                out Vector3 cityPosition);
+            cityObject.transform.position = cityPosition;
+            Rigidbody body = cityObject.AddComponent<Rigidbody>();
+            BoxCollider bodyCollider = cityObject.AddComponent<BoxCollider>();
+            var cityVisual = new GameObject("Visual");
+            cityVisual.transform.SetParent(cityObject.transform, false);
+            MeshRenderer cityRenderer =
+                cityVisual.AddComponent<MeshRenderer>();
+            cityRenderer.sharedMaterial = material;
+            GrayboxVisualSlot citySlot =
+                cityVisual.AddComponent<GrayboxVisualSlot>();
+            citySlot.Configure(
+                "core.city.mobile",
+                cityRenderer,
+                new Color(.9f, .48f, .1f));
+            citySlot.ApplyFallback(material);
+            GrayboxMobileCityController3D city =
+                cityObject.AddComponent<GrayboxMobileCityController3D>();
+            city.Configure(world, body, bodyCollider);
+            Assert.That(
+                city.RestoreDeploymentForDevelopment(CityMode.Fortress),
+                Is.True);
+
+            var sessionObject = new GameObject("BuildingSession");
+            sessionObject.transform.SetParent(root.transform, false);
+            GrayboxBuildingSession3D session =
+                sessionObject.AddComponent<GrayboxBuildingSession3D>();
+            session.ConfigureDevelopmentFixture();
+            session.Inventory.Set(ResourceIds.Stone, 5000);
+
+            Transform instanceRoot =
+                NewChild(root.transform, "InstanceRoot");
+            Transform infrastructureRoot =
+                NewChild(root.transform, "InfrastructureRoot");
+            var presentationObject = new GameObject("BuildingPresentation");
+            presentationObject.transform.SetParent(root.transform, false);
+            GrayboxBuildingWorldView3D presentation =
+                presentationObject.AddComponent<
+                    GrayboxBuildingWorldView3D>();
+            presentation.Configure(
+                instanceRoot,
+                infrastructureRoot,
+                material,
+                city);
+
+            var cells = new List<BuildingCell>(BuildingInstanceCount);
+            for (var y = 4;
+                 y <= 20 && cells.Count < BuildingInstanceCount;
+                 y++)
+            {
+                for (var x = 8;
+                     x <= 24 && cells.Count < BuildingInstanceCount;
+                     x++)
+                {
+                    if (Math.Abs(x - 16) <= 1 &&
+                        Math.Abs(y - 12) <= 1)
+                        continue;
+                    cells.Add(new BuildingCell(x, y));
+                }
+            }
+            Assert.That(cells.Count, Is.EqualTo(BuildingInstanceCount));
+
+            const int completedCount = 43;
+            const int constructionCount = 43;
+            for (var index = 0; index < completedCount; index++)
+                BeginWall(
+                    session,
+                    presentation,
+                    cells[index].X,
+                    cells[index].Y);
+            session.TickConstruction(
+                10f,
+                CityMode.Fortress,
+                false,
+                presentation);
+
+            for (var index = completedCount;
+                 index < completedCount + constructionCount;
+                 index++)
+                BeginWall(
+                    session,
+                    presentation,
+                    cells[index].X,
+                    cells[index].Y);
+
+            for (var index = completedCount + constructionCount;
+                 index < BuildingInstanceCount;
+                 index++)
+            {
+                GrayboxBuildingInstance3D ruin = BeginWall(
+                    session,
+                    presentation,
+                    cells[index].X,
+                    cells[index].Y);
+                BuildingEvacuationWork work =
+                    BuildingEvacuationRules.Create(
+                        ruin.StableInstanceId,
+                        ruin.Placement.Definition.Cost,
+                        ruin.Progress.BaseDuration,
+                        1d,
+                        BuildingEvacuationTreatment.Abandon);
+                Assert.That(
+                    session.TryCaptureEvacuationWork(
+                        new[] { work },
+                        out string captureFailure),
+                    Is.True,
+                    captureFailure);
+                Assert.That(
+                    session.TryCommitEvacuation(
+                        work,
+                        presentation,
+                        out _,
+                        out string commitFailure),
+                    Is.True,
+                    commitFailure);
+            }
+
+            var menuObject = new GameObject("BuildingMenu");
+            menuObject.transform.SetParent(root.transform, false);
+            GrayboxBuildingMenuView3D menu =
+                menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            var interactionObject = new GameObject("BuildingInteraction");
+            interactionObject.transform.SetParent(root.transform, false);
+            GrayboxBuildingInteractionModel3D interaction =
+                interactionObject.AddComponent<
+                    GrayboxBuildingInteractionModel3D>();
+            var evacuationObject = new GameObject("Evacuation");
+            evacuationObject.transform.SetParent(root.transform, false);
+            GrayboxEvacuationController3D evacuation =
+                evacuationObject.AddComponent<
+                    GrayboxEvacuationController3D>();
+            evacuation.Configure(
+                session,
+                city,
+                presentation,
+                menu);
+            var inputObject = new GameObject("BuildingInput");
+            inputObject.transform.SetParent(root.transform, false);
+            GrayboxBuildingInputRouter3D input =
+                inputObject.AddComponent<GrayboxBuildingInputRouter3D>();
+            input.Configure(
+                menu,
+                interaction,
+                null,
+                null,
+                evacuation,
+                null);
+
+            return new BuildingPerformanceFixture(
+                root,
+                session,
+                presentation,
+                evacuation,
+                input);
+        }
+
+        private static GrayboxBuildingInstance3D BeginWall(
+            GrayboxBuildingSession3D session,
+            IGrayboxBuildingPresentation3D presentation,
+            int x,
+            int y)
+        {
+            BuildingDefinition definition = BuildingCatalog.Wall;
+            BuildingUnlockEvaluation unlock =
+                BuildingUnlockModel.Evaluate(
+                    definition,
+                    session.Population,
+                    session.IsResearchCompleted,
+                    session.CompletedBuildingCount);
+            var request = new BuildingPlacementRequest(
+                definition,
+                session.GroundGrid,
+                BuildingSite.Ground,
+                BuildingOrientation.North,
+                x,
+                y,
+                16,
+                12,
+                session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                true,
+                null,
+                true,
+                unlock,
+                session.Inventory.CanSpend(
+                    definition.CostId,
+                    definition.Cost));
+            Assert.That(
+                session.TryBeginConstruction(
+                    request,
+                    presentation,
+                    out GrayboxBuildingInstance3D instance,
+                    out BuildingPlacementEvaluation evaluation),
+                Is.True,
+                evaluation.PrimaryFailure.ToString());
+            return instance;
+        }
+
         private GrayboxWorldView3D CreateWorldView()
         {
             var root = Track(new GameObject("GrayboxWorld"));
@@ -366,6 +775,40 @@ namespace WasteCity.Tests
                 router.ProcessFrame(inputFrame);
                 router.TickGameplay(.016f);
                 cameraController.TickCamera();
+            }
+        }
+
+        private sealed class BuildingPerformanceFixture
+        {
+            public BuildingPerformanceFixture(
+                GameObject root,
+                GrayboxBuildingSession3D session,
+                GrayboxBuildingWorldView3D presentation,
+                GrayboxEvacuationController3D evacuation,
+                GrayboxBuildingInputRouter3D input)
+            {
+                Root = root;
+                Session = session;
+                Presentation = presentation;
+                Evacuation = evacuation;
+                Input = input;
+            }
+
+            public GameObject Root { get; }
+            public GrayboxBuildingSession3D Session { get; }
+            public GrayboxBuildingWorldView3D Presentation { get; }
+            public GrayboxEvacuationController3D Evacuation { get; }
+            public GrayboxBuildingInputRouter3D Input { get; }
+
+            public void TickAll()
+            {
+                Input.ProcessCurrentInput();
+                Session.TickConstruction(
+                    .016f,
+                    CityMode.Mobile,
+                    false,
+                    Presentation);
+                Evacuation.Tick(.016f, false);
             }
         }
     }
