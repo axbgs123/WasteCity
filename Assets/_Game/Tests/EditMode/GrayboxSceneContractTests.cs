@@ -1,15 +1,25 @@
+using System;
+using System.Collections;
 using System.IO;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
+using UnityEngine.UI;
 using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.Graybox3D;
+using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.World;
+using Object = UnityEngine.Object;
 
 namespace WasteCity.Tests
 {
@@ -329,6 +339,341 @@ namespace WasteCity.Tests
                 Is.Empty);
         }
 
+        [Test]
+        public void Scene_HasCompleteSerializedBuildingContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = GameObject.Find("GrayboxPrototype3D");
+
+            Transform building = RequiredChild(root, "GrayboxBuilding");
+            GrayboxBuildingSession3D session =
+                RequiredComponent<GrayboxBuildingSession3D>(
+                    building, "BuildingSession");
+            GrayboxBuildingInteractionModel3D interaction =
+                RequiredComponent<GrayboxBuildingInteractionModel3D>(
+                    building, "BuildingInteraction");
+            Transform presentationRoot =
+                RequiredChild(building.gameObject, "BuildingPresentation");
+            Transform instanceRoot =
+                RequiredChild(presentationRoot.gameObject, "InstanceRoot");
+            Transform infrastructureRoot =
+                RequiredChild(
+                    presentationRoot.gameObject,
+                    "InfrastructureRoot");
+            GrayboxBuildingWorldView3D presentation =
+                presentationRoot.GetComponent<GrayboxBuildingWorldView3D>();
+            Assert.That(presentation, Is.Not.Null);
+            GrayboxBuildingSurfaceProjector3D surfaceProjector =
+                RequiredComponent<GrayboxBuildingSurfaceProjector3D>(
+                    building, "BuildingSurfaceProjector");
+            GrayboxBuildingPlacementController3D placement =
+                RequiredComponent<GrayboxBuildingPlacementController3D>(
+                    building, "BuildingPlacement");
+            GrayboxConstructionController3D construction =
+                RequiredComponent<GrayboxConstructionController3D>(
+                    building, "Construction");
+            GrayboxEvacuationController3D evacuation =
+                RequiredComponent<GrayboxEvacuationController3D>(
+                    building, "Evacuation");
+            GrayboxBuildingInputRouter3D buildingInput =
+                RequiredComponent<GrayboxBuildingInputRouter3D>(
+                    building, "BuildingInput");
+            GrayboxDeveloperModifierBootstrap3D developer =
+                RequiredComponent<GrayboxDeveloperModifierBootstrap3D>(
+                    building, "DeveloperModifierBootstrap");
+
+            Transform ui = RequiredChild(root, "GrayboxUI");
+            Transform canvasTransform =
+                RequiredChild(ui.gameObject, "BuildingCanvas");
+            Canvas canvas = canvasTransform.GetComponent<Canvas>();
+            GraphicRaycaster raycaster =
+                canvasTransform.GetComponent<GraphicRaycaster>();
+            GrayboxBuildingMenuView3D menu =
+                canvasTransform.GetComponent<GrayboxBuildingMenuView3D>();
+            Transform eventSystemTransform =
+                RequiredChild(ui.gameObject, "EventSystem");
+            EventSystem eventSystem =
+                eventSystemTransform.GetComponent<EventSystem>();
+            InputSystemUIInputModule inputModule =
+                eventSystemTransform.GetComponent<
+                    InputSystemUIInputModule>();
+            Assert.That(canvas, Is.Not.Null);
+            Assert.That(raycaster, Is.Not.Null);
+            Assert.That(raycaster.enabled, Is.True);
+            Assert.That(menu, Is.Not.Null);
+            Assert.That(eventSystem, Is.Not.Null);
+            Assert.That(inputModule, Is.Not.Null);
+            Assert.That(
+                Object.FindObjectsOfType<Canvas>(true).Length,
+                Is.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GraphicRaycaster>(true).Length,
+                Is.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<EventSystem>(true).Length,
+                Is.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    InputSystemUIInputModule>(true).Length,
+                Is.EqualTo(1));
+
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<
+                    GrayboxMobileCityController3D>(true);
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            Camera camera = Camera.main;
+            Transform platform = RequiredChild(
+                city.gameObject,
+                "InnerCityPlatform");
+            BoxCollider innerSurface =
+                platform.GetComponent<BoxCollider>();
+            MeshFilter platformFilter =
+                platform.GetComponent<MeshFilter>();
+            MeshRenderer platformRenderer =
+                platform.GetComponent<MeshRenderer>();
+            Assert.That(innerSurface, Is.Not.Null);
+            Assert.That(platformFilter, Is.Not.Null);
+            Assert.That(platformFilter.sharedMesh, Is.Not.Null);
+            Assert.That(platformRenderer, Is.Not.Null);
+            Assert.That(
+                platform.GetComponentsInChildren<MeshRenderer>(true).Length,
+                Is.EqualTo(1));
+            Vector3 absoluteScale = new Vector3(
+                Mathf.Abs(platform.localScale.x),
+                Mathf.Abs(platform.localScale.y),
+                Mathf.Abs(platform.localScale.z));
+            Vector3 visibleSize = Vector3.Scale(
+                platformFilter.sharedMesh.bounds.size,
+                absoluteScale);
+            Vector3 selectionSize = Vector3.Scale(
+                innerSurface.size,
+                absoluteScale);
+            Assert.That(visibleSize.x, Is.EqualTo(2.56f).Within(.001f));
+            Assert.That(visibleSize.z, Is.EqualTo(1.92f).Within(.001f));
+            Assert.That(selectionSize.x, Is.EqualTo(2.56f).Within(.001f));
+            Assert.That(selectionSize.z, Is.EqualTo(1.92f).Within(.001f));
+            Assert.That(
+                platformRenderer.sharedMaterial,
+                Is.SameAs(
+                    AssetDatabase.LoadAssetAtPath<Material>(MaterialPath)));
+            BoxCollider cityCollider = city.GetComponent<BoxCollider>();
+            float cityBodyTop =
+                cityCollider.center.y + cityCollider.size.y * .5f;
+            float platformTop =
+                platform.localPosition.y +
+                absoluteScale.y *
+                (innerSurface.center.y + innerSurface.size.y * .5f);
+            Assert.That(
+                platformTop,
+                Is.EqualTo(cityBodyTop + .01f).Within(.001f));
+
+            AssertReference(presentation, "instanceRoot", instanceRoot);
+            AssertReference(
+                presentation,
+                "infrastructureRoot",
+                infrastructureRoot);
+            AssertReference(
+                presentation,
+                "sharedMaterial",
+                AssetDatabase.LoadAssetAtPath<Material>(MaterialPath));
+            AssertReference(presentation, "city", city);
+            AssertReference(surfaceProjector, "controlledCamera", camera);
+            AssertReference(surfaceProjector, "worldView", world);
+            AssertReference(surfaceProjector, "city", city);
+            AssertReference(surfaceProjector, "innerCitySurface", innerSurface);
+            AssertReference(placement, "session", session);
+            AssertReference(placement, "city", city);
+            AssertReference(placement, "world", world);
+            AssertReference(placement, "projector", surfaceProjector);
+            AssertReference(placement, "presentation", presentation);
+            AssertReference(placement, "interaction", interaction);
+            AssertReference(construction, "session", session);
+            AssertReference(construction, "city", city);
+            AssertReference(construction, "presentation", presentation);
+            AssertReference(construction, "interaction", interaction);
+            AssertReference(construction, "controlledCamera", camera);
+            AssertReference(construction, "menu", menu);
+            AssertReference(evacuation, "session", session);
+            AssertReference(evacuation, "city", city);
+            AssertReference(evacuation, "presentation", presentation);
+            AssertReference(evacuation, "menu", menu);
+            AssertReference(menu, "canvas", canvas);
+            AssertReference(menu, "eventSystem", eventSystem);
+            AssertReference(menu, "session", session);
+            AssertReference(menu, "interaction", interaction);
+            AssertReference(menu, "placement", placement);
+            AssertReference(buildingInput, "menu", menu);
+            AssertReference(buildingInput, "interaction", interaction);
+            AssertReference(buildingInput, "placement", placement);
+            AssertReference(buildingInput, "construction", construction);
+            AssertReference(buildingInput, "evacuation", evacuation);
+            AssertReference(buildingInput, "developer", developer);
+            AssertReference(developer, "session", session);
+            AssertReference(developer, "city", city);
+            AssertReference(developer, "presentation", presentation);
+            AssertReference(developer, "canvas", canvas);
+            AssertReference(
+                Object.FindObjectOfType<GrayboxInputRouter>(true),
+                "inputInterceptor",
+                buildingInput);
+
+            var sessionData = new SerializedObject(session);
+            Assert.That(
+                sessionData.FindProperty("developmentFixtureEnabled")
+                    .boolValue,
+                Is.True);
+            var developerData = new SerializedObject(developer);
+            Assert.That(developerData.FindProperty("modifier"), Is.Null);
+            Assert.That(developerData.FindProperty("panelRoot"), Is.Null);
+
+            foreach (GameObject gameObject in
+                     Object.FindObjectsOfType<GameObject>(true))
+            {
+                Assert.That(
+                    GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(
+                        gameObject),
+                    Is.Zero,
+                    gameObject.name);
+            }
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxVisualSlot>(true),
+                Has.None.Matches<GrayboxVisualSlot>(
+                    slot => slot.StableId != null &&
+                            slot.StableId.StartsWith(
+                                "building.",
+                                StringComparison.Ordinal)));
+            Assert.That(
+                canvasTransform.GetComponentsInChildren<Button>(true),
+                Is.Empty,
+                "Catalog and quickbar buttons must be runtime generated.");
+            Assert.That(instanceRoot.childCount, Is.Zero);
+            Assert.That(infrastructureRoot.childCount, Is.Zero);
+            Assert.That(canvasTransform.childCount, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator Scene_ReopenedUiModuleHasUsablePublicActions()
+        {
+            Scene scene =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Assert.That(EditorSceneManager.SaveScene(scene), Is.True);
+            EditorSceneManager.NewScene(
+                NewSceneSetup.EmptyScene,
+                NewSceneMode.Single);
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            yield return null;
+
+            InputSystemUIInputModule module =
+                Object.FindObjectOfType<InputSystemUIInputModule>(true);
+            Assert.That(module, Is.Not.Null);
+            AssertUsableAction(module.point, "point");
+            AssertUsableAction(module.leftClick, "leftClick");
+            AssertUsableAction(module.move, "move");
+            AssertUsableAction(module.submit, "submit");
+            AssertUsableAction(module.cancel, "cancel");
+        }
+
+        [Test]
+        public void Authoring_RejectsAnExistingSceneWithMissingFoundation()
+        {
+            Scene scene = EditorSceneManager.NewScene(
+                NewSceneSetup.EmptyScene,
+                NewSceneMode.Single);
+            new GameObject("GrayboxPrototype3D");
+            Type authoring = Type.GetType(
+                "WasteCity.Editor.GrayboxSceneAuthoring, WasteCity.Editor");
+            Assert.That(authoring, Is.Not.Null);
+            MethodInfo validate = authoring.GetMethod(
+                "ValidateFoundationContract",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(validate, Is.Not.Null);
+
+            TargetInvocationException exception =
+                Assert.Throws<TargetInvocationException>(
+                    () => validate.Invoke(null, new object[] { scene }));
+            Assert.That(
+                exception.InnerException,
+                Is.TypeOf<InvalidOperationException>());
+        }
+
+        [Test]
+        public void Authoring_RejectsWrongPipelineBeforeMutation()
+        {
+            Scene scene =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GrayboxUrpScope scope =
+                Object.FindObjectOfType<GrayboxUrpScope>(true);
+            UniversalRenderPipelineAsset expected =
+                AssetDatabase.LoadAssetAtPath<
+                    UniversalRenderPipelineAsset>(PipelinePath);
+            try
+            {
+                SetSerializedReference(scope, "pipelineAsset", null);
+                AssertValidationThrows(scene);
+            }
+            finally
+            {
+                SetSerializedReference(scope, "pipelineAsset", expected);
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
+        }
+
+        [Test]
+        public void Authoring_RejectsWrongWorldMaterialBeforeMutation()
+        {
+            Scene scene =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            Material expected =
+                AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+            try
+            {
+                SetSerializedReference(world, "sharedMaterial", null);
+                AssertValidationThrows(scene);
+            }
+            finally
+            {
+                SetSerializedReference(world, "sharedMaterial", expected);
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            }
+        }
+
+        [Test]
+        public void Authoring_ExistingScenePathValidatesBeforeMutation()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxSceneAuthoring.cs"));
+            string existingPath = ExtractMethod(
+                source,
+                "private static bool TryOpenAndValidateFoundation",
+                "private static Scene CreateFoundationScene");
+            Assert.That(existingPath, Does.Not.Contain("NewScene"));
+            string configure = ExtractMethod(
+                source,
+                "public static void Configure",
+                "public static void CaptureFoundationIdentity");
+            Assert.That(
+                configure.IndexOf(
+                    "TryOpenAndValidateFoundation",
+                    StringComparison.Ordinal),
+                Is.LessThan(
+                    configure.IndexOf(
+                        "EnsureRenderer",
+                        StringComparison.Ordinal)));
+            Assert.That(
+                configure.IndexOf(
+                    "NormalizeSceneBytes",
+                    StringComparison.Ordinal),
+                Is.GreaterThan(
+                    configure.IndexOf(
+                        "SaveScene",
+                        StringComparison.Ordinal)));
+        }
+
         private static void AssertReference(
             Object owner,
             string propertyName,
@@ -361,6 +706,84 @@ namespace WasteCity.Tests
                 start);
             Assert.That(end, Is.GreaterThan(start));
             return source.Substring(start, end - start + 1);
+        }
+
+        private static Transform RequiredChild(
+            GameObject parent,
+            string path)
+        {
+            Assert.That(parent, Is.Not.Null, path);
+            Transform child = parent.transform.Find(path);
+            Assert.That(child, Is.Not.Null, path);
+            return child;
+        }
+
+        private static T RequiredComponent<T>(
+            Transform parent,
+            string childName)
+            where T : Component
+        {
+            Transform child = RequiredChild(parent.gameObject, childName);
+            T component = child.GetComponent<T>();
+            Assert.That(component, Is.Not.Null, childName);
+            return component;
+        }
+
+        private static void AssertUsableAction(
+            InputActionReference reference,
+            string propertyName)
+        {
+            Assert.That(reference, Is.Not.Null, propertyName);
+            Assert.That(reference.action, Is.Not.Null, propertyName);
+            Assert.That(
+                reference.action.bindings.Count,
+                Is.GreaterThan(0),
+                propertyName);
+        }
+
+        private static string ExtractMethod(
+            string source,
+            string startMarker,
+            string endMarker)
+        {
+            int start = source.IndexOf(
+                startMarker,
+                StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), startMarker);
+            int end = source.IndexOf(
+                endMarker,
+                start + startMarker.Length,
+                StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThan(start), endMarker);
+            return source.Substring(start, end - start);
+        }
+
+        private static void AssertValidationThrows(Scene scene)
+        {
+            Type authoring = Type.GetType(
+                "WasteCity.Editor.GrayboxSceneAuthoring, WasteCity.Editor");
+            MethodInfo validate = authoring.GetMethod(
+                "ValidateFoundationContract",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            TargetInvocationException exception =
+                Assert.Throws<TargetInvocationException>(
+                    () => validate.Invoke(null, new object[] { scene }));
+            Assert.That(
+                exception.InnerException,
+                Is.TypeOf<InvalidOperationException>());
+        }
+
+        private static void SetSerializedReference(
+            Object owner,
+            string propertyName,
+            Object value)
+        {
+            var serialized = new SerializedObject(owner);
+            SerializedProperty property =
+                serialized.FindProperty(propertyName);
+            Assert.That(property, Is.Not.Null, propertyName);
+            property.objectReferenceValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

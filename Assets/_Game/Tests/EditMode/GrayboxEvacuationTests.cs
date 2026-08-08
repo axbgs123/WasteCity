@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -421,6 +422,41 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Controller_SerializedReferencesRestoreFirstEnableAndReenable()
+        {
+            EvacuationFixture fixture = CreateSerializedLifecycleFixture();
+            GameObject controllerObject = fixture.Controller.gameObject;
+
+            Assert.That(controllerObject.activeSelf, Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            controllerObject.SetActive(true);
+
+            Assert.That(MenuSubscriberCount(
+                fixture.Menu,
+                fixture.Controller), Is.EqualTo(1));
+            Assert.That(
+                fixture.Controller.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            controllerObject.SetActive(false);
+            Assert.That(MenuSubscriberCount(
+                fixture.Menu,
+                fixture.Controller), Is.Zero);
+            AssertSerializedReferences(fixture.Controller, fixture);
+
+            controllerObject.SetActive(true);
+            Assert.That(MenuSubscriberCount(
+                fixture.Menu,
+                fixture.Controller), Is.EqualTo(1));
+            Assert.That(
+                fixture.Controller.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
+        [Test]
         public void Controller_ConsumesFWhenSingleNoGroundDelegationFails()
         {
             EvacuationFixture fixture = CreateFixture();
@@ -565,7 +601,14 @@ namespace WasteCity.Tests
             Assert.That(oldFixture.Controller.IsProcessing, Is.False);
             AssertControllerCleanupReferences(
                 oldFixture.Controller,
-                cleanupPath == "Configure" ? newFixture : default(EvacuationFixture));
+                cleanupPath,
+                oldFixture,
+                newFixture);
+            Assert.That(
+                MenuSubscriberCount(
+                    oldFixture.Menu,
+                    oldFixture.Controller),
+                Is.Zero);
             Assert.That(CleanupDiagnosticCount(
                 oldFixture.Controller,
                 "cleanupRollbackInvocationCount"), Is.EqualTo(1));
@@ -600,6 +643,11 @@ namespace WasteCity.Tests
             Assert.That(CleanupDiagnosticCount(
                 oldFixture.Controller,
                 "cleanupMenuReleaseInvocationCount"), Is.EqualTo(1));
+            Assert.That(
+                MenuSubscriberCount(
+                    oldFixture.Menu,
+                    oldFixture.Controller),
+                Is.Zero);
         }
 
         [Test]
@@ -943,6 +991,48 @@ namespace WasteCity.Tests
                 interaction);
         }
 
+        private EvacuationFixture CreateSerializedLifecycleFixture()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var cityObject = new GameObject("serialized-evacuation-city");
+            cleanup.Add(cityObject);
+            var city = cityObject.AddComponent<
+                WasteCity.Graybox3D.GrayboxMobileCityController3D>();
+            city.Deployment.Restore(CityMode.Fortress, 0f);
+
+            var presentationObject =
+                new GameObject("serialized-evacuation-presentation");
+            cleanup.Add(presentationObject);
+            var presentation = presentationObject.AddComponent<
+                GrayboxBuildingWorldView3D>();
+            var menuObject = new GameObject("serialized-evacuation-menu");
+            cleanup.Add(menuObject);
+            var menu = menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            var controllerObject =
+                new GameObject("serialized-evacuation-controller");
+            controllerObject.SetActive(false);
+            cleanup.Add(controllerObject);
+            var controller = controllerObject.AddComponent<
+                GrayboxEvacuationController3D>();
+            controller.runInEditMode = true;
+            var serialized = new SerializedObject(controller);
+            serialized.FindProperty("session").objectReferenceValue = session;
+            serialized.FindProperty("city").objectReferenceValue = city;
+            serialized.FindProperty("presentation").objectReferenceValue =
+                presentation;
+            serialized.FindProperty("menu").objectReferenceValue = menu;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            return new EvacuationFixture(
+                session,
+                city,
+                presentation,
+                controller,
+                menu,
+                null,
+                null);
+        }
+
         private static void SetEvacuationPresentation(
             GrayboxEvacuationController3D controller,
             IGrayboxBuildingPresentation3D presentation)
@@ -1019,6 +1109,8 @@ namespace WasteCity.Tests
 
         private static void AssertControllerCleanupReferences(
             GrayboxEvacuationController3D controller,
+            string cleanupPath,
+            EvacuationFixture original,
             EvacuationFixture replacement)
         {
             foreach (string fieldName in new[]
@@ -1035,7 +1127,21 @@ namespace WasteCity.Tests
                     BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.That(field, Is.Not.Null);
                 object value = field.GetValue(controller);
-                if (replacement.Controller == null)
+                if (cleanupPath == "OnDestroy")
+                    Assert.That(value, Is.Null, fieldName);
+                else if (cleanupPath == "OnDisable" &&
+                         fieldName == "session")
+                    Assert.That(value, Is.SameAs(original.Session));
+                else if (cleanupPath == "OnDisable" &&
+                         fieldName == "city")
+                    Assert.That(value, Is.SameAs(original.City));
+                else if (cleanupPath == "OnDisable" &&
+                         fieldName == "presentation")
+                    Assert.That(value, Is.SameAs(original.Presentation));
+                else if (cleanupPath == "OnDisable" &&
+                         fieldName == "menu")
+                    Assert.That(value, Is.SameAs(original.Menu));
+                else if (cleanupPath == "OnDisable")
                     Assert.That(value, Is.Null, fieldName);
                 else if (fieldName == "session")
                     Assert.That(value, Is.SameAs(replacement.Session));
@@ -1047,6 +1153,39 @@ namespace WasteCity.Tests
                 else
                     Assert.That(value, Is.SameAs(replacement.Menu));
             }
+        }
+
+        private static void AssertSerializedReferences(
+            GrayboxEvacuationController3D controller,
+            EvacuationFixture fixture)
+        {
+            var serialized = new SerializedObject(controller);
+            Assert.That(
+                serialized.FindProperty("session").objectReferenceValue,
+                Is.SameAs(fixture.Session));
+            Assert.That(
+                serialized.FindProperty("city").objectReferenceValue,
+                Is.SameAs(fixture.City));
+            Assert.That(
+                serialized.FindProperty("presentation").objectReferenceValue,
+                Is.SameAs(fixture.Presentation));
+            Assert.That(
+                serialized.FindProperty("menu").objectReferenceValue,
+                Is.SameAs(fixture.Menu));
+        }
+
+        private static int MenuSubscriberCount(
+            GrayboxBuildingMenuView3D menu,
+            GrayboxEvacuationController3D controller)
+        {
+            FieldInfo field = typeof(GrayboxBuildingMenuView3D).GetField(
+                "EvacuationConfirmationRequested",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var listeners = field.GetValue(menu) as Delegate;
+            if (listeners == null) return 0;
+            return listeners.GetInvocationList().Count(
+                listener => ReferenceEquals(listener.Target, controller));
         }
 
         private static int CleanupDiagnosticCount(

@@ -101,7 +101,7 @@ namespace WasteCity.Graybox3D.Building
             IGrayboxBuildingPresentation3D evacuationPresentation,
             GrayboxBuildingMenuView3D menu)
         {
-            CleanupController();
+            CleanupController(true);
             this.session = session;
             this.city = city;
             this.deploymentRequest = deploymentRequest;
@@ -349,17 +349,18 @@ namespace WasteCity.Graybox3D.Building
 
         private void OnEnable()
         {
+            RestoreSerializedRuntimeDependencies();
             SubscribeMenu();
         }
 
         private void OnDisable()
         {
-            CleanupController();
+            CleanupController(false);
         }
 
         private void OnDestroy()
         {
-            CleanupController();
+            CleanupController(true);
         }
 
         private void OnItemTreatmentRequested(
@@ -406,7 +407,16 @@ namespace WasteCity.Graybox3D.Building
             menu.EvacuationConfirmationRequested -= OnConfirmationRequested;
         }
 
-        private void CleanupController()
+        private void RestoreSerializedRuntimeDependencies()
+        {
+            if (session == null || city == null || presentation == null ||
+                menu == null)
+                return;
+            deploymentRequest = new CityDeploymentRequestAdapter(city);
+            evacuationPresentation = presentation;
+        }
+
+        private void CleanupController(bool clearSerializedDependencies)
         {
             GrayboxBuildingSession3D oldSession = session;
             GrayboxBuildingMenuView3D oldMenu = menu;
@@ -422,12 +432,15 @@ namespace WasteCity.Graybox3D.Building
                 if (oldMenu != null && releaseOldMenu)
                     ReleaseCleanupMenu(oldMenu);
                 ResetLocalState();
-                session = null;
-                city = null;
                 deploymentRequest = null;
-                presentation = null;
                 evacuationPresentation = null;
-                menu = null;
+                if (clearSerializedDependencies)
+                {
+                    session = null;
+                    city = null;
+                    presentation = null;
+                    menu = null;
+                }
             }
         }
 
