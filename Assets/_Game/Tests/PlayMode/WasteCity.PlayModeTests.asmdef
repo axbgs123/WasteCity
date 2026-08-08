@@ -3,6 +3,7 @@
   "references": [
     "WasteCity.Game",
     "WasteCity.Graybox3D",
+    "WasteCity.Graybox3D.Building",
     "Unity.InputSystem",
     "Unity.RenderPipelines.Universal.Runtime"
   ],

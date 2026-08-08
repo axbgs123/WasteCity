@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.Content;
@@ -49,6 +50,10 @@ namespace WasteCity.Graybox3D.Building
         private Button cancelConstructionButton;
         private Button confirmCancellationButton;
         private Button rejectCancellationButton;
+        private readonly Dictionary<Keyboard, Action<char>>
+            textInputBindings =
+                new Dictionary<Keyboard, Action<char>>();
+        private bool observesInputDevices;
 
         public bool CatalogVisible
         {
@@ -87,6 +92,12 @@ namespace WasteCity.Graybox3D.Building
         private void OnEnable()
         {
             TryBuildSerializedUi();
+            BindTextInput();
+        }
+
+        private void OnDisable()
+        {
+            UnbindTextInput();
         }
 
         private void Update()
@@ -101,6 +112,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void OnDestroy()
         {
+            UnbindTextInput();
             if (uiRoot != null)
             {
                 uiRoot.gameObject.SetActive(false);
@@ -438,8 +450,106 @@ namespace WasteCity.Graybox3D.Building
             RetireSerializedUiRoots();
             EnsureCanvasContract();
             BuildUi();
+            BindTextInput();
             RefreshCatalog();
             RefreshPlacementStatus();
+        }
+
+        private void BindTextInput()
+        {
+            if (!isActiveAndEnabled) return;
+            if (!observesInputDevices)
+            {
+                InputSystem.onDeviceChange += OnInputDeviceChange;
+                observesInputDevices = true;
+            }
+
+            for (var index = 0; index < InputSystem.devices.Count; index++)
+                if (InputSystem.devices[index] is Keyboard keyboard)
+                    BindKeyboard(keyboard);
+        }
+
+        private void UnbindTextInput()
+        {
+            if (observesInputDevices)
+            {
+                InputSystem.onDeviceChange -= OnInputDeviceChange;
+                observesInputDevices = false;
+            }
+
+            foreach (KeyValuePair<Keyboard, Action<char>> binding in
+                     textInputBindings)
+                binding.Key.onTextInput -= binding.Value;
+            textInputBindings.Clear();
+        }
+
+        private void OnInputDeviceChange(
+            InputDevice device,
+            InputDeviceChange change)
+        {
+            if (!(device is Keyboard keyboard)) return;
+            switch (change)
+            {
+                case InputDeviceChange.Added:
+                case InputDeviceChange.Reconnected:
+                case InputDeviceChange.Enabled:
+                    BindKeyboard(keyboard);
+                    break;
+                case InputDeviceChange.Removed:
+                case InputDeviceChange.Disconnected:
+                case InputDeviceChange.Disabled:
+                    UnbindKeyboard(keyboard);
+                    break;
+            }
+        }
+
+        private void BindKeyboard(Keyboard keyboard)
+        {
+            if (keyboard == null || textInputBindings.ContainsKey(keyboard))
+                return;
+            Action<char> callback = character =>
+                OnTextInput(keyboard, character);
+            textInputBindings.Add(keyboard, callback);
+            keyboard.onTextInput += callback;
+        }
+
+        private void UnbindKeyboard(Keyboard keyboard)
+        {
+            if (keyboard == null ||
+                !textInputBindings.TryGetValue(
+                    keyboard,
+                    out Action<char> callback))
+                return;
+            keyboard.onTextInput -= callback;
+            textInputBindings.Remove(keyboard);
+        }
+
+        private void OnTextInput(Keyboard source, char character)
+        {
+            if (!isActiveAndEnabled ||
+                source == null ||
+                !ReferenceEquals(source, Keyboard.current) ||
+                searchField == null ||
+                eventSystem == null ||
+                eventSystem.currentSelectedGameObject !=
+                    searchField.gameObject ||
+                !searchField.isFocused)
+                return;
+
+            int anchor = Mathf.Clamp(
+                searchField.selectionAnchorPosition,
+                0,
+                searchField.text.Length);
+            int focus = Mathf.Clamp(
+                searchField.selectionFocusPosition,
+                0,
+                searchField.text.Length);
+            int start = Mathf.Min(anchor, focus);
+            int length = Mathf.Abs(anchor - focus);
+            searchField.text =
+                searchField.text.Remove(start, length)
+                    .Insert(start, character.ToString());
+            searchField.caretPosition = start + 1;
         }
 
         private void RetireSerializedUiRoots()
