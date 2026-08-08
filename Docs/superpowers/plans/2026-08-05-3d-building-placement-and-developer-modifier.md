@@ -22,6 +22,8 @@
 - `IDEA-0003` 在本计划编写阶段保持 `未实现`。只有实现与完整验证事实得到调度方批准后，最后一个任务才能按当批指令回写状态；没有明确状态变更指令时保持 `未实现`。`BUG-0001` 保持 `已明确 / 已批准 / 不适用`，原始描述与复现事实不改写。
 - 每个提交前运行 `git diff --check`，逐项核对暂存文件；禁止 `git add .`、通配整个目录或混入构建产物、Profiler 数据、截图、日志、`Library/`、`Logs/`、`UserSettings/`。
 - 每项性能门区分自动化结构/分配测试和开发机 GUI 实测；无界面环境不能用 NUnit 分配断言替代真实 1920×1080 Profiler 证据。
+- Task 11–13 的继续执行基线为 `066a0a3ce35b85a45bbbfec6c76148d5519af152`。其父链中的 `c8dc82f68da6797c816708c8c3bb64a63aab94fc`（第一版正式美术样板规格/`IDEA-0004`）与 `066a0a3ce35b85a45bbbfec6c76148d5519af152`（第一版美术源资源生产计划）是已批准、只读保留的后续输入；本计划不得改写、回退或开始执行它们。
+- Task 11–13 开始前已存在且必须原样保留的 MCP/Unity 外部工作树状态精确为：` M Packages/manifest.json`、` M Packages/packages-lock.json`、`?? ProjectSettings/PackageManagerSettings.asset`、`?? ProjectSettings/URPProjectSettings.asset`。每次 GUI Unity 前后必须记录这四个路径的 Git 状态与 SHA-256；不得暂存、清理、移动或覆盖它们。最终 index 必须为空，`git status --short` 必须精确只剩这四行。
 
 ---
 
@@ -2682,7 +2684,7 @@ rg -n "Missing (Script|MonoBehaviour)|The referenced script.*missing" \
 
 Expected: Development option occurs only in the new Development method; no Missing Script/MonoBehaviour warnings. Combine this with `ResolveRuntimeAvailability(false,false) == false`, scene serialization inspection, and default build options to prove Release has no modifier UI/command entry. Runtime confirmation on actual Windows remains part of the pending smoke.
 
-- [ ] Collect real GUI Profiler evidence. Launch the exact worktree directly:
+- [ ] 在启动 GUI Unity 前，对以下四个预存路径记录 `git status --short -- <paths>` 与 SHA-256 到 `/tmp/wastecity-3d-building/task-12-profiler/protected-before/`：`Packages/manifest.json`、`Packages/packages-lock.json`、`ProjectSettings/PackageManagerSettings.asset`、`ProjectSettings/URPProjectSettings.asset`。Collect real GUI Profiler evidence. Launch the exact worktree directly:
 
 ```bash
 open -na /Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app --args \
@@ -2691,20 +2693,21 @@ open -na /Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app --args \
 
 Open `GrayboxPrototype3D`, set Game View to Full HD 1920×1080, enter Play, open Profiler Timeline with Deep Profile off, wait at least two frames, then record 300 consecutive frames. Save `.data`, Game View screenshot and Profiler screenshot under `/tmp/wastecity-3d-building/task-12-profiler/`. Record average FPS/frame time and the building input/session/construction/evacuation samples' GC Alloc. Gates: 60 FPS target on the development machine and adapter-owned samples 0 B GC Alloc. If reliable GUI capture is unavailable, stop and report the environment boundary; NUnit allocation results do not replace it.
 
-- [ ] Close GUI Unity normally. If GUI startup generates untracked `ProjectSettings/PackageManagerSettings.asset`, move it to `/tmp/wastecity-3d-building/task-12-profiler/gui-generated-PackageManagerSettings.asset` after closing Unity and confirm the repository path returns to its baseline state. Do not delete or submit it.
+- [ ] Close GUI Unity normally. Repeat the exact four-path Git-status and SHA-256 snapshot under `/tmp/wastecity-3d-building/task-12-profiler/protected-after/` and require byte/status identity with the pre-GUI snapshot. The pre-existing `ProjectSettings/PackageManagerSettings.asset` and `ProjectSettings/URPProjectSettings.asset` must never be moved, deleted, overwritten or submitted. If GUI Unity creates any additional untracked file outside those four protected paths, restore only that new side effect according to the existing plan and record it under `/tmp`; do not misclassify any of the four baseline paths as a new GUI side effect.
 
 - [ ] Run final frozen-range checks:
 
 ```bash
 git diff --check
-git diff --exit-code f6bbed8 -- Assets/_Game/Scenes/FormalPrototype.unity
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Persistence
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Save
-git diff --exit-code f6bbed8 -- Packages
-git diff --exit-code f6bbed8 -- ProjectSettings/GraphicsSettings.asset
-git diff --exit-code f6bbed8 -- ProjectSettings/QualitySettings.asset
-git diff --exit-code f6bbed8 -- ProjectSettings/PackageManagerSettings.asset
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scenes/FormalPrototype.unity
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Persistence
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Save
+git diff --exit-code f6bbed8..HEAD -- Packages
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/GraphicsSettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/QualitySettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/PackageManagerSettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/URPProjectSettings.asset
 rg -n "CurrentSchema|schema" Assets/_Game/Scripts/Persistence Assets/_Game/Scripts/Save
 ```
 
@@ -2735,7 +2738,7 @@ Build products, logs, XML, JSON, Profiler data and screenshots remain untracked/
 
 - [ ] Before touching Docs/06, extract the entire `BUG-0001` section from the frozen plan base and current HEAD using the same deterministic section-boundary script already used in prior milestones. Save both files under `/tmp/wastecity-3d-building/task-13/` and record SHA-256.
 
-- [ ] Ask the dispatching thread for the exact allowed `IDEA-0003` implementation-status transition after independent verification. If no explicit transition is supplied, keep `未实现` and only record evidence in wording explicitly approved for this batch. Never infer `开发中` or `已实现` from local test success.
+- [ ] 本批已获得受控状态授权：只有 Task 11、Task 12、独立复审和全部证据均通过后，才可将 `IDEA-0003` 从 `未实现` 改为 `已实现待验证`。不得标记为 `已验证`，因为真实 Windows 10/11 独立程序冒烟仍待补。Docs/06 只允许修改总表中的 `IDEA-0003` 行和 `### IDEA-0003` 详细段；`BUG-0001` 必须字节不变，`IDEA-0001`、`IDEA-0002`、`IDEA-0004` 也必须分别字节不变。
 
 - [ ] Update Docs/05 only with verified facts:
 
@@ -2749,9 +2752,10 @@ default 3D entry remains
 formal save/schema 30 unchanged
 production/logistics/combat/outpost/formal evacuation/formal save remain excluded
 real Windows 10/11 standalone smoke remains pending
+retain links to the approved IDEA-0004 art sample specification/production plan, but state that art production has not started and do not execute either document
 ```
 
-- [ ] Update Docs/06 only within IDEA-0003 as explicitly approved: add actual implementation commits and verification evidence, preserve approved product rules and exclusions, and use the dispatcher-approved status. Do not modify IDEA-0001, any other idea/bug, or BUG-0001.
+- [ ] Update Docs/06 only in the `IDEA-0003` summary-table row and `### IDEA-0003` detailed section: add actual implementation commits and verification evidence, preserve approved product rules and exclusions, and use `已实现待验证`. Extract `BUG-0001`、`IDEA-0001`、`IDEA-0002`、`IDEA-0004` from the pre-edit commit and post-edit worktree with identical deterministic boundaries, then require byte-for-byte `cmp` identity for all four protected records.
 
 - [ ] Extract current BUG-0001 with the identical script and prove byte identity:
 
@@ -2788,19 +2792,21 @@ git commit -m "docs: record verified 3d building milestone"
 - [ ] Run final scope proof relative to `f6bbed8`:
 
 ```bash
-git diff --exit-code f6bbed8 -- Assets/_Game/Scenes/FormalPrototype.unity
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Persistence
-git diff --exit-code f6bbed8 -- Assets/_Game/Scripts/Save
-git diff --exit-code f6bbed8 -- Packages
-git diff --exit-code f6bbed8 -- ProjectSettings/GraphicsSettings.asset
-git diff --exit-code f6bbed8 -- ProjectSettings/QualitySettings.asset
-git diff --exit-code f6bbed8 -- ProjectSettings/PackageManagerSettings.asset
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scenes/FormalPrototype.unity
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Persistence
+git diff --exit-code f6bbed8..HEAD -- Assets/_Game/Scripts/Save
+git diff --exit-code f6bbed8..HEAD -- Packages
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/GraphicsSettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/QualitySettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/PackageManagerSettings.asset
+git diff --exit-code f6bbed8..HEAD -- ProjectSettings/URPProjectSettings.asset
 git diff --check f6bbed8..HEAD
+test -z "$(git diff --cached --name-only)"
 git status --short
 ```
 
-Expected: all protected comparisons exit 0, diff check clean, status empty.
+Expected: all protected commit-to-commit comparisons exit 0, diff check clean, index empty, and raw status is exactly the four pre-existing MCP/Unity lines recorded in Global Constraints. A completely empty worktree is neither required nor allowed if it would mean the protected external files were moved, cleaned or overwritten.
 
 - [ ] Push normally and prove all three SHAs:
 
