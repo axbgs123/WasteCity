@@ -879,6 +879,11 @@ namespace WasteCity.Tests
             Vector3 cityBefore = city.transform.position;
             Vector3 innerBefore = innerSlot.transform.position;
             yield return HoldKey(Key.W, 2);
+            yield return WaitForInnerCityPresentation(
+                city.transform,
+                innerSlot.transform,
+                cityBefore,
+                innerBefore);
             Vector3 cityDelta = city.transform.position - cityBefore;
             Vector3 innerDelta = innerSlot.transform.position - innerBefore;
             Assert.That(innerDelta.x, Is.EqualTo(cityDelta.x).Within(.001f));
@@ -1341,6 +1346,23 @@ namespace WasteCity.Tests
             Assert.That(actual.x, Is.EqualTo(expected.x).Within(.001f));
             Assert.That(actual.y, Is.EqualTo(expected.y).Within(.001f));
             Assert.That(actual.z, Is.EqualTo(expected.z).Within(.001f));
+        }
+
+        private static IEnumerator WaitForInnerCityPresentation(
+            Transform city,
+            Transform inner,
+            Vector3 cityBefore,
+            Vector3 innerBefore)
+        {
+            for (var frame = 0; frame < 4; frame++)
+            {
+                yield return null;
+                Vector3 cityDelta = city.position - cityBefore;
+                Vector3 innerDelta = inner.position - innerBefore;
+                if (Mathf.Abs(innerDelta.x - cityDelta.x) <= .001f &&
+                    Mathf.Abs(innerDelta.z - cityDelta.z) <= .001f)
+                    yield break;
+            }
         }
 
         private static IEnumerator WaitForCompletion(
