@@ -10,9 +10,9 @@
 
 ## Global Constraints
 
-- 执行 worktree 固定为 `/Users/baiyan1/Documents/WasteCity-3d-graybox-foundation`，分支固定为 `codex/3d-building-design`；计划执行前必须确认父提交为计划提交本身且其父链包含 `f6bbed8cf33bf183dd11504d46546d26bd9649f7`。
+- Task 12–13 的 Windows 继续执行 worktree 固定为 `C:\Users\czc1\Documents\ae\WasteCity-Task12-13`，分支固定为 `codex/3d-building-design`；开始前必须确认 `HEAD`、tracking ref 与 `git ls-remote` 均为调度方指定的 `61919fdadcb8877ba9fc64fb2aaecb62b6f77ecc`，且父链包含 `f6bbed8cf33bf183dd11504d46546d26bd9649f7`。Task 1–11 中保留的旧 macOS 命令只作为历史执行记录，不在本机重放。
 - 每个实现任务严格执行 RED → 核对失败原因 → 最小 GREEN → focused 回归 → 范围检查 → 精确提交。任何 RED 若包含未预期的程序集、Unity API、序列化、物理或输入错误，立即停止并报告。
-- Unity 测试命令固定使用 `/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity`，`-runTests` 命令不得带 `-quit`，结果与日志写入独立 `/tmp/wastecity-3d-building/` 子目录。
+- Task 12–13 的 Unity 命令固定使用 `D:\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe`，`-runTests` 命令不得带 `-quit`，结果与日志写入仓库外绝对目录 `C:\Users\czc1\AppData\Local\Temp\wastecity-3d-building\`。PowerShell 调用使用 `& $UnityExe`，环境变量在启动 Unity 前通过 `$env:<NAME>` 设置并在对应命令后移除。
 - 新增 `.cs`、`.asmdef`、场景组件或目录时，必须由 Unity 生成或显式保留配套 `.meta`；禁止复制其他资源的 GUID。重新 authoring 前后必须比较所有既有 `.meta` GUID。
 - 不修改 `Assets/_Game/Scenes/FormalPrototype.unity`、`PlaceholderBuildingController`、冻结 2D 控制器、正式存档读写、schema 30、`Packages/`、`ProjectSettings/GraphicsSettings.asset`、`ProjectSettings/QualitySettings.asset`、`ProjectSettings/PackageManagerSettings.asset`。
 - `BuildingCatalog.BuildMenu` 是普通目录唯一来源；`HeavyMachineGunTurret` 与 `SwordRidingPlatform` 只保留升级边界，绝不进入普通菜单。
@@ -23,7 +23,7 @@
 - 每个提交前运行 `git diff --check`，逐项核对暂存文件；禁止 `git add .`、通配整个目录或混入构建产物、Profiler 数据、截图、日志、`Library/`、`Logs/`、`UserSettings/`。
 - 每项性能门区分自动化结构/分配测试和开发机 GUI 实测；无界面环境不能用 NUnit 分配断言替代真实 1920×1080 Profiler 证据。
 - Task 11–13 的继续执行基线为 `066a0a3ce35b85a45bbbfec6c76148d5519af152`。其父链中的 `c8dc82f68da6797c816708c8c3bb64a63aab94fc`（第一版正式美术样板规格/`IDEA-0004`）与 `066a0a3ce35b85a45bbbfec6c76148d5519af152`（第一版美术源资源生产计划）是已批准、只读保留的后续输入；本计划不得改写、回退或开始执行它们。
-- Task 11–13 开始前已存在且必须原样保留的 MCP/Unity 外部工作树状态精确为：` M Packages/manifest.json`、` M Packages/packages-lock.json`、`?? ProjectSettings/PackageManagerSettings.asset`、`?? ProjectSettings/URPProjectSettings.asset`。每次 GUI Unity 前后必须记录这四个路径的 Git 状态与 SHA-256；不得暂存、清理、移动或覆盖它们。最终 index 必须为空，`git status --short` 必须精确只剩这四行。
+- 新 Windows 电脑从全新克隆的干净 `git status --short` 开始，不人为制造旧电脑的四项 MCP/Unity 本地改动。首次启动 Unity 前，记录 `Packages/manifest.json`、`Packages/packages-lock.json`、`ProjectSettings/PackageManagerSettings.asset`、`ProjectSettings/URPProjectSettings.asset` 的存在性、Git 状态与 SHA-256（不存在也要记录）；GUI Unity 关闭后重复记录并比较。Unity 新生成的本机副作用先记录路径、状态和 SHA，再判断是否可清理；不得提交无关的 `Packages`、`ProjectSettings`、`Library`、`Logs`、`UserSettings`、`Builds` 或 Profiler 文件。最终 index 必须为空，最终 `git status --short` 必须回到本机开始 Task 12 前记录的干净基线。
 
 ---
 
@@ -2567,6 +2567,15 @@ git commit -m "test: cover graybox building runtime flow"
 - Modify: `Assets/_Game/Editor/GrayboxPerformanceProbe.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs`
 
+Windows 继续执行命令先统一设置以下 PowerShell 变量；本节后续命令中的日志、XML、JSON、Profiler 数据和截图都必须位于该仓库外证据目录：
+
+```powershell
+$UnityExe = 'D:\Unity\Hub\Editor\2022.3.62f1\Editor\Unity.exe'
+$ProjectPath = 'C:\Users\czc1\Documents\ae\WasteCity-Task12-13'
+$EvidenceRoot = 'C:\Users\czc1\AppData\Local\Temp\wastecity-3d-building'
+New-Item -ItemType Directory -Force -Path $EvidenceRoot | Out-Null
+```
+
 - [ ] Add RED build tests requiring:
 
 ```csharp
@@ -2593,14 +2602,13 @@ The 300-call loop may call explicit adapter methods in EditMode for allocation m
 
 - [ ] Run focused RED:
 
-```bash
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -runTests -testPlatform EditMode \
-  -testFilter WasteCity.Tests.GrayboxBuildAndPerformanceTests \
-  -testResults /tmp/wastecity-3d-building/task-12-red.xml \
-  -logFile /tmp/wastecity-3d-building/task-12-red.log
+```powershell
+& $UnityExe -batchmode -nographics `
+  -projectPath $ProjectPath `
+  -runTests -testPlatform EditMode `
+  -testFilter WasteCity.Tests.GrayboxBuildAndPerformanceTests `
+  -testResults (Join-Path $EvidenceRoot 'task-12-red.xml') `
+  -logFile (Join-Path $EvidenceRoot 'task-12-red.log')
 ```
 
 Expected RED: missing Development build/probe contracts and performance behavior only.
@@ -2611,101 +2619,93 @@ Expected RED: missing Development build/probe contracts and performance behavior
 
 - [ ] Run the five-sample probe:
 
-```bash
-WASTECITY_BUILDING_PERF_RESULT=/tmp/wastecity-3d-building/task-12-building-performance.json \
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics -quit \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -executeMethod WasteCity.Editor.GrayboxPerformanceProbe.MeasureBuildingPerformance \
-  -logFile /tmp/wastecity-3d-building/task-12-building-performance.log
+```powershell
+$env:WASTECITY_BUILDING_PERF_RESULT = Join-Path $EvidenceRoot 'task-12-building-performance.json'
+& $UnityExe -batchmode -nographics -quit `
+  -projectPath $ProjectPath `
+  -executeMethod WasteCity.Editor.GrayboxPerformanceProbe.MeasureBuildingPerformance `
+  -logFile (Join-Path $EvidenceRoot 'task-12-building-performance.log')
+Remove-Item Env:WASTECITY_BUILDING_PERF_RESULT
 ```
 
 Record all five values and median. The median gate is ≤250 ms, infrastructure ≤8 Renderers, and 128 instances ≤128 instance Renderers. If the probe cannot create and clean real state, stop; do not substitute constants.
 
 - [ ] Run complete EditMode:
 
-```bash
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -runTests -testPlatform EditMode \
-  -testResults /tmp/wastecity-3d-building/task-12-editmode.xml \
-  -logFile /tmp/wastecity-3d-building/task-12-editmode.log
+```powershell
+& $UnityExe -batchmode -nographics `
+  -projectPath $ProjectPath `
+  -runTests -testPlatform EditMode `
+  -testResults (Join-Path $EvidenceRoot 'task-12-editmode.xml') `
+  -logFile (Join-Path $EvidenceRoot 'task-12-editmode.log')
 ```
 
 Record the actual total and zero failures. Do not prefill a future count.
 
 - [ ] Run complete PlayMode:
 
-```bash
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -runTests -testPlatform PlayMode \
-  -testResults /tmp/wastecity-3d-building/task-12-playmode.xml \
-  -logFile /tmp/wastecity-3d-building/task-12-playmode.log
+```powershell
+& $UnityExe -batchmode -nographics `
+  -projectPath $ProjectPath `
+  -runTests -testPlatform PlayMode `
+  -testResults (Join-Path $EvidenceRoot 'task-12-playmode.xml') `
+  -logFile (Join-Path $EvidenceRoot 'task-12-playmode.log')
 ```
 
 Record the actual total and zero failures. If the frozen `SwordIntent` WaitForSeconds boundary flakes once with zero relevant diff, rerun the single test and one full suite, report both outcomes, and do not edit frozen combat code/tests.
 
 - [ ] Run headless compile:
 
-```bash
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics -quit \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -logFile /tmp/wastecity-3d-building/task-12-compile.log
+```powershell
+& $UnityExe -batchmode -nographics -quit `
+  -projectPath $ProjectPath `
+  -logFile (Join-Path $EvidenceRoot 'task-12-compile.log')
 ```
 
 - [ ] Build default Release 3D, Development 3D, and legacy 2D after ensuring no GUI Unity lock:
 
-```bash
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics -quit \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindows \
-  -logFile /tmp/wastecity-3d-building/task-12-build-release3d.log
+```powershell
+& $UnityExe -batchmode -nographics -quit `
+  -projectPath $ProjectPath `
+  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindows `
+  -logFile (Join-Path $EvidenceRoot 'task-12-build-release3d.log')
 
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics -quit \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment \
-  -logFile /tmp/wastecity-3d-building/task-12-build-development3d.log
+& $UnityExe -batchmode -nographics -quit `
+  -projectPath $ProjectPath `
+  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment `
+  -logFile (Join-Path $EvidenceRoot 'task-12-build-development3d.log')
 
-/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity \
-  -batchmode -nographics -quit \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation \
-  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D \
-  -logFile /tmp/wastecity-3d-building/task-12-build-legacy2d.log
+& $UnityExe -batchmode -nographics -quit `
+  -projectPath $ProjectPath `
+  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D `
+  -logFile (Join-Path $EvidenceRoot 'task-12-build-legacy2d.log')
 
-file Builds/Windows/WasteCity.exe
-file Builds/Windows3DDevelopment/WasteCityGrayboxDev.exe
-file Builds/Windows2D/WasteCity2D.exe
+# 使用本机可用的系统/工具链 PE 检查器分别验证三个产物的 PE32+、GUI、x86-64 字段，
+# 并把完整原始输出保存到 $EvidenceRoot；不得只以文件扩展名作为证据。
 ```
 
-All three must be `PE32+ executable (GUI) x86-64`. macOS must not run them and no compatibility layer may be installed. Real Windows 10/11 smoke remains pending.
+All three must be `PE32+ executable (GUI) x86-64`. 本机为真实 Windows 10/11 环境时，应在构建后分别执行短时独立运行冒烟并保存运行日志；只有确实无法完成时才记录为待补，不得用格式检查替代冒烟。
 
 - [ ] Prove Release/Development separation:
 
-```bash
+```powershell
 rg -n "BuildOptions.Development" Assets/_Game/Editor/FormalBuildTools.cs
-rg -n "Missing (Script|MonoBehaviour)|The referenced script.*missing" \
-  /tmp/wastecity-3d-building/task-12-build-release3d.log \
-  /tmp/wastecity-3d-building/task-12-build-development3d.log
+rg -n "Missing (Script|MonoBehaviour)|The referenced script.*missing" `
+  (Join-Path $EvidenceRoot 'task-12-build-release3d.log') `
+  (Join-Path $EvidenceRoot 'task-12-build-development3d.log')
 ```
 
 Expected: Development option occurs only in the new Development method; no Missing Script/MonoBehaviour warnings. Combine this with `ResolveRuntimeAvailability(false,false) == false`, scene serialization inspection, and default build options to prove Release has no modifier UI/command entry. Runtime confirmation on actual Windows remains part of the pending smoke.
 
-- [ ] 在启动 GUI Unity 前，对以下四个预存路径记录 `git status --short -- <paths>` 与 SHA-256 到 `/tmp/wastecity-3d-building/task-12-profiler/protected-before/`：`Packages/manifest.json`、`Packages/packages-lock.json`、`ProjectSettings/PackageManagerSettings.asset`、`ProjectSettings/URPProjectSettings.asset`。Collect real GUI Profiler evidence. Launch the exact worktree directly:
+- [ ] 在启动 GUI Unity 前，对以下四个保护路径记录存在性、`git status --short -- <paths>` 与 SHA-256 到 `$EvidenceRoot\task-12-profiler\protected-before\`：`Packages/manifest.json`、`Packages/packages-lock.json`、`ProjectSettings/PackageManagerSettings.asset`、`ProjectSettings/URPProjectSettings.asset`。全新克隆中不存在的文件记录为 absent，不得人为创建。Collect real GUI Profiler evidence. Launch the exact worktree directly:
 
-```bash
-open -na /Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app --args \
-  -projectPath /Users/baiyan1/Documents/WasteCity-3d-graybox-foundation
+```powershell
+Start-Process -FilePath $UnityExe -ArgumentList '-projectPath', $ProjectPath
 ```
 
-Open `GrayboxPrototype3D`, set Game View to Full HD 1920×1080, enter Play, open Profiler Timeline with Deep Profile off, wait at least two frames, then record 300 consecutive frames. Save `.data`, Game View screenshot and Profiler screenshot under `/tmp/wastecity-3d-building/task-12-profiler/`. Record average FPS/frame time and the building input/session/construction/evacuation samples' GC Alloc. Gates: 60 FPS target on the development machine and adapter-owned samples 0 B GC Alloc. If reliable GUI capture is unavailable, stop and report the environment boundary; NUnit allocation results do not replace it.
+Open `GrayboxPrototype3D`, set Game View to Full HD 1920×1080, enter Play, open Profiler Timeline with Deep Profile off, wait at least two frames, then record 300 consecutive frames. Save `.data`, Game View screenshot and Profiler screenshot under `$EvidenceRoot\task-12-profiler\`. Record average FPS/frame time and the building input/session/construction/evacuation samples' GC Alloc. Gates: 60 FPS target on the development machine and adapter-owned samples 0 B GC Alloc. If reliable GUI capture is unavailable, stop and report the environment boundary; NUnit allocation results do not replace it.
 
-- [ ] Close GUI Unity normally. Repeat the exact four-path Git-status and SHA-256 snapshot under `/tmp/wastecity-3d-building/task-12-profiler/protected-after/` and require byte/status identity with the pre-GUI snapshot. The pre-existing `ProjectSettings/PackageManagerSettings.asset` and `ProjectSettings/URPProjectSettings.asset` must never be moved, deleted, overwritten or submitted. If GUI Unity creates any additional untracked file outside those four protected paths, restore only that new side effect according to the existing plan and record it under `/tmp`; do not misclassify any of the four baseline paths as a new GUI side effect.
+- [ ] Close GUI Unity normally. Repeat the exact four-path existence/Git-status/SHA-256 snapshot under `$EvidenceRoot\task-12-profiler\protected-after\` and require identity with the clean-clone pre-GUI snapshot. If Unity creates or changes any protected path or produces another untracked machine-only file, record the exact new side effect under `$EvidenceRoot` before deciding whether it is safely removable; never stage or commit it.
 
 - [ ] Run final frozen-range checks:
 
@@ -2745,6 +2745,8 @@ Build products, logs, XML, JSON, Profiler data and screenshots remain untracked/
 
 - Modify only after verification and dispatch approval: `Docs/05-Formal-Development-Roadmap-ZH.md`
 - Modify only after verification and dispatch approval: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
+
+Windows 继续执行使用 `$Task13Evidence = Join-Path $EvidenceRoot 'task-13'` 并通过 `New-Item -ItemType Directory -Force` 创建；本节历史示例中的 `/tmp/wastecity-3d-building/task-13/` 等价映射到该仓库外绝对目录。SHA-256 使用 `Get-FileHash -Algorithm SHA256`，逐字节一致性使用 `[System.IO.File]::ReadAllBytes(...)` 后比较长度与内容，或使用本机可用的二进制比较工具。
 
 - [ ] Confirm all Task 12 evidence exists and contains actual pass/build/performance values. If any gate is incomplete, do not edit completion facts.
 
@@ -2818,7 +2820,7 @@ test -z "$(git diff --cached --name-only)"
 git status --short
 ```
 
-Expected: all protected commit-to-commit comparisons exit 0, diff check clean, index empty, and raw status is exactly the four pre-existing MCP/Unity lines recorded in Global Constraints. A completely empty worktree is neither required nor allowed if it would mean the protected external files were moved, cleaned or overwritten.
+Expected: all protected commit-to-commit comparisons exit 0, diff check clean, index empty, and raw status exactly matches this Windows clone在 Task 12 前记录的干净基线。不得为了匹配旧电脑状态而制造、移动、清理或覆盖任何受保护文件。
 
 - [ ] Push normally and prove all three SHAs:
 
