@@ -2459,6 +2459,7 @@ git commit -m "feat: wire graybox building scene"
 
 **Files:**
 
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
 - Modify: `Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef`
 - Create: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`
 - Create: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs.meta`
@@ -2521,7 +2522,17 @@ inner instances follow city and do not enter manifest
 
 Expected RED: only newly asserted runtime behavior not yet wired. If immediate `wasPressedThisFrame` diagnostics fail, stop and inspect the three saved InputSettings; do not bypass with direct router/controller calls.
 
-- [ ] If any Task 11 RED exposes a production behavior defect or requires any production-file modification, stop immediately and report the failing assertion, actual runtime chain and exact required path. Revise and approve this plan before touching production; Task 11 authorizes only its PlayMode asmdef and the new PlayMode test/meta paths.
+- [ ] The approved focused RED proves that real `QueueTextEvent` reaches the current virtual `Keyboard`, while the focused generated legacy UGUI `Catalog.Search` remains empty because no production bridge forwards `Keyboard.onTextInput` to the `InputField`. Preserve and rerun that exact RED before production changes. Task 11 additionally authorizes only `GrayboxBuildingMenuView3D.cs` for this repair; no new helper, assembly dependency or other production path is pre-approved. If another production path is required, stop and report it before editing.
+
+- [ ] Implement the minimum Input System → legacy UGUI text bridge in `GrayboxBuildingMenuView3D`, which owns the generated `Catalog.Search` lifecycle:
+  - use public Input System 1.7.0 `Keyboard.onTextInput` and public `InputField` APIs;
+  - receive committed Unicode text only while the component is active/enabled, `searchField` exists, and that exact field has real `EventSystem`/`InputField` focus;
+  - route the text mutation through the existing `InputField.onValueChanged → SetSearchText → catalog refresh` chain; do not duplicate filtering, visibility, interaction or router rules;
+  - subscribe at most once after enable/UI rebuild; unbind on disable/destroy; re-enable/UI rebuild/current-keyboard replacement or removal must recover without double writes or exceptions when `Keyboard.current` is null;
+  - disabled, destroyed or unfocused fields must ignore text; after re-enable one text event must append exactly one character;
+  - do not introduce idle-frame polling or allocation. Character entry itself is not subject to the 0 B steady-frame gate. Backspace/Delete/Home/End/left/right editing is not required by this repair; if implemented, it must use public `InputField` behavior and must not double-handle existing Escape/submit/cancel semantics.
+
+- [ ] Extend the real-scene virtual-device RED/GREEN with lifecycle coverage: disabled menu receives no committed text, re-enabled menu receives one character exactly once, and current keyboard replacement/removal recovers through real device flow if the production implementation binds per keyboard. Tests may not assign `InputField.text`, call `SetSearchText`, `ProcessEvent`, either router, gameplay tick, construction tick or camera methods. Existing UGUI-focus suppression of `W/A/S/D/B/R/1–0/F/F10/Home/Delete/Esc/Enter` must remain unchanged.
 
 - [ ] Run focused GREEN, then existing `GrayboxRuntimeSceneTests` focused. Confirm TearDown logs show all three InputSettings restored and no virtual devices remain.
 
@@ -2541,6 +2552,7 @@ Expected: no prohibited direct calls in the new PlayMode test.
 git add Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef
 git add Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs
 git add Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs.meta
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs
 git diff --cached --name-only
 git commit -m "test: cover graybox building runtime flow"
 ```
