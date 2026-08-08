@@ -7,7 +7,7 @@ import zipfile
 from pathlib import Path
 
 
-SEED = 813027
+SEED = 813118
 RATIOS = {
     "mud": 0.45,
     "water": 0.20,
@@ -225,9 +225,9 @@ def generate_maps(args: argparse.Namespace):
     luminance = concept[..., 0] * 0.2126 + concept[..., 1] * 0.7152 + concept[..., 2] * 0.0722
     broad_light = gaussian(np, luminance, max(10.0, size / 8.0))
     target_luminance = np.clip(
-        0.30 + (luminance - broad_light) * 0.68 + (broad_light - broad_light.mean()) * 0.08,
-        0.10,
-        0.58,
+        0.29 + (luminance - broad_light) * 0.88 + (broad_light - broad_light.mean()) * 0.08,
+        0.07,
+        0.68,
     )
     flattened = np.clip(concept * (target_luminance / np.maximum(luminance, 0.05))[..., None], 0.0, 1.0)
     flattened = np.clip(periodic_component(np, flattened), 0.0, 1.0)
@@ -242,18 +242,25 @@ def generate_maps(args: argparse.Namespace):
     warmth = flattened[..., 0] - flattened[..., 2]
     olive = flattened[..., 1] - 0.55 * flattened[..., 0] - 0.45 * flattened[..., 2]
     darkness = 1.0 - luminance
-    independent_macro = fractal_noise(np, size, [(5, 0.50), (11, 0.31), (19, 0.19)], SEED + 1)
+    independent_macro = fractal_noise(np, size, [(9, 0.45), (17, 0.33), (29, 0.22)], SEED + 1)
     independent_fine = fractal_noise(np, size, [(38, 0.43), (73, 0.34), (131, 0.23)], SEED + 201)
 
     total = size * size
     available = np.ones((size, size), dtype=bool)
     categories = {}
-    scores = {
+    raw_scores = {
         "water": -texture_energy * 2.0 + olive * 0.85 + blur_large * 0.30 + independent_macro * 0.14,
         "sludge": darkness * 1.15 + texture_energy * 0.42 - warmth * 0.32 + independent_fine * 0.12,
         "dry": warmth * 1.20 + blur_medium * 0.40 + texture_energy * 0.18 + independent_macro * 0.10,
         "root": np.maximum(high_band, 0.0) * 1.8 + texture_energy * 0.90 + independent_fine * 0.16,
         "transition": warmth * 0.78 - np.abs(medium_band) * 0.35 + independent_macro * 0.20,
+    }
+    scores = {
+        "water": gaussian(np, raw_scores["water"], max(6.0, size / 2048.0 * 24.0)),
+        "sludge": gaussian(np, raw_scores["sludge"], max(5.0, size / 2048.0 * 18.0)),
+        "dry": gaussian(np, raw_scores["dry"], max(5.0, size / 2048.0 * 22.0)),
+        "root": raw_scores["root"],
+        "transition": gaussian(np, raw_scores["transition"], max(6.0, size / 2048.0 * 26.0)),
     }
     for name in ("water", "sludge", "dry", "root", "transition"):
         categories[name] = pick_top(np, scores[name], available, round(total * RATIOS[name]))
@@ -274,17 +281,23 @@ def generate_maps(args: argparse.Namespace):
         return np.array([int(value[index : index + 2], 16) / 255.0 for index in (0, 2, 4)], dtype=np.float32)
 
     anchors = {
-        "mud": hex_rgb("3C3829"),
-        "water": hex_rgb("454934"),
-        "dry": hex_rgb("69533A"),
+        "mud": hex_rgb("3B3428"),
+        "water": hex_rgb("3B4033"),
+        "dry": hex_rgb("644D35"),
         "sludge": hex_rgb("28302D"),
-        "root": hex_rgb("594630"),
-        "transition": hex_rgb("795B38"),
+        "root": hex_rgb("4D3B2B"),
+        "transition": hex_rgb("775836"),
     }
-    mixes = {"mud": 0.26, "water": 0.30, "dry": 0.22, "sludge": 0.34, "root": 0.25, "transition": 0.24}
+    mixes = {"mud": 0.10, "water": 0.15, "dry": 0.12, "sludge": 0.18, "root": 0.10, "transition": 0.12}
+    smooth_factors = {"mud": 0.10, "water": 0.35, "dry": 0.04, "sludge": 0.10, "root": 0.0, "transition": 0.06}
+    flattened_smooth = np.stack(
+        [gaussian(np, flattened[..., channel], max(1.5, size / 2048.0 * 5.0)) for channel in range(3)],
+        axis=2,
+    )
     base = np.zeros((size, size, 3), dtype=np.float32)
     for name in RATIOS:
-        tint = flattened * (1.0 - mixes[name]) + anchors[name] * mixes[name]
+        source_color = flattened * (1.0 - smooth_factors[name]) + flattened_smooth * smooth_factors[name]
+        tint = source_color * (1.0 - mixes[name]) + anchors[name] * mixes[name]
         base += masks[name][..., None] * tint
     base = np.clip(periodic_component(np, base), 0.0, 1.0)
 
@@ -328,12 +341,12 @@ def generate_maps(args: argparse.Namespace):
         + masks["transition"] * (0.40 + 0.24 * independent_fine)
     )
     smoothness = (
-        masks["mud"] * (0.45 + 0.17 * independent_fine)
-        + masks["water"] * (0.70 + 0.16 * independent_fine)
-        + masks["dry"] * (0.14 + 0.10 * independent_fine)
-        + masks["sludge"] * (0.50 + 0.16 * independent_fine)
-        + masks["root"] * (0.13 + 0.10 * independent_fine)
-        + masks["transition"] * (0.16 + 0.11 * independent_fine)
+        masks["mud"] * (0.45 + 0.13 * independent_fine)
+        + masks["water"] * (0.70 + 0.12 * independent_fine)
+        + masks["dry"] * (0.12 + 0.09 * independent_fine)
+        + masks["sludge"] * (0.46 + 0.14 * independent_fine)
+        + masks["root"] * (0.11 + 0.09 * independent_fine)
+        + masks["transition"] * (0.14 + 0.10 * independent_fine)
     )
     mask_rgba = np.stack((metallic, ao, np.clip(detail, 0.0, 1.0), np.clip(smoothness, 0.0, 1.0)), axis=2)
 
@@ -483,9 +496,9 @@ def build_blender(args: argparse.Namespace):
         obj.location = location
         return obj
 
-    light("Key_Area", "AREA", 1050.0, (2.5, -3.5, 7.5), (1.0, 0.82, 0.63), 5.0)
-    light("Fill_Area", "AREA", 650.0, (-4.5, 1.5, 5.0), (0.45, 0.62, 0.80), 4.0)
-    light("Rim_Area", "AREA", 900.0, (4.0, 4.0, 6.0), (0.72, 0.82, 1.0), 3.0)
+    light("Key_Area", "AREA", 700.0, (2.5, -3.5, 7.5), (1.0, 0.84, 0.68), 6.0)
+    light("Fill_Area", "AREA", 280.0, (-4.5, 1.5, 5.0), (0.60, 0.62, 0.60), 6.0)
+    light("Rim_Area", "AREA", 420.0, (4.0, 4.0, 6.0), (0.70, 0.72, 0.70), 5.0)
 
     camera_data = bpy.data.cameras.new("Camera_DefaultTiltedOrtho")
     camera = bpy.data.objects.new("Camera_DefaultTiltedOrtho", camera_data)
@@ -515,7 +528,7 @@ def build_blender(args: argparse.Namespace):
     notes = bpy.data.texts.new("README_Wetland_Golden.txt")
     notes.write(
         "Waste City Wetland terrain first-pass material sample.\n"
-        "User-approved AI concept informed the BaseColor rebuild; seed 813027.\n"
+        "User-approved AI concept informed the revised BaseColor rebuild; seed 813118.\n"
         "Height and Mask were independently reconstructed; no grayscale channel forgery.\n"
         f"Authored and rendered with Blender {bpy.app.version_string} (EEVEE).\n"
         "No gameplay truth and no third-party stock texture input.\n"
