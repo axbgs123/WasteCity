@@ -19,6 +19,10 @@
 - 模型导入比例 `1.0`，`Y` 向上，`+Z` 为正面，静态建筑根位于占地中心且底面为 `Y=0`。
 - 五座样板建筑必须支持 `0°/90°/180°/270°`，第一版以一个主要 Renderer 为目标。
 - BaseColor 为 sRGB；Normal、Mask 和其他数据贴图为 Linear；URP Mask Map 为 R Metallic、G Occlusion、B Detail Mask、A Smoothness。
+- 第一版地形固定为七类：`Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff`；不得自行合并、改名或把资源节点类别混入地形类别。
+- `Crystal` 是能晶化地表材质，`ResourceNodes/EnergyCrystal` 是可采集能晶节点，两者必须是独立资产；地表只表达视觉材质，不得持有资源节点、产量、储量、可采集状态或任何玩法真值。
+- 地形采用风格化 PBR，以暖黄干旱废土为母底色，贴图为主、少量模型装饰为辅；`Wasteland`、`Rocky`、`Wetland`、`Crystal` 使用柔和混合，`Ruins` 以柔化碎边自然衔接但不模糊规则范围，`DeepWater` 和 `Cliff` 必须维持清晰可读的玩法边界。
+- 每类正式地形的基础交付为 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask 和 16-bit Height；不得只完成 BaseColor 后把其余数据贴图登记为完成。
 - 资源不得持有成本、施工、生命、攻击、占地、解锁、城市状态或存档真值。
 - 所有 `.png`、`.fbx`、`.blend`、`.wav` 使用仓库现有 Git LFS 规则，不修改 `.gitattributes`。
 - 所有外部资源必须记录作者、来源、许可证、商业使用权和证据路径；许可证不明确的资源不得进入交接包。
@@ -448,7 +452,7 @@ git commit -m "art: complete mining station golden sample"
 
 ---
 
-## Task 9: 完成六种地形与十二种环境装饰
+## Task 9: 完成七种地形与十二种环境装饰
 
 **Files:**
 - Create: `ArtSource/FirstPass/Environment/Terrain/*`
@@ -457,11 +461,13 @@ git commit -m "art: complete mining station golden sample"
 - Create: `Assets/_Game/Art/FirstPass/Environment/Props/*`
 
 **Interfaces:**
-- Consumes: 色板、URP Mask 合同和现有六类地形语义。
+- Consumes: 色板、URP Mask 合同和现有七类地形语义。
 - Produces: 无缝地形材质与无玩法碰撞的装饰包。
 
-- [ ] 为普通、废墟、湿地、岩石、深水、悬崖制作 2048 BaseColor/Normal/Mask 和预览图。
-- [ ] 使用 4×4 平铺预览检查接缝；Normal 和 Mask 导入为 Linear。
+- [ ] 按 `Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff` 七类逐一制作 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask、16-bit Height、分层源文件和固定预览图；先以独立子计划完成 `Wasteland` 黄金样板，未批准前不得批量制作其余六类。
+- [ ] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
+- [ ] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
+- [ ] `Wasteland`、`Rocky`、`Wetland`、`Crystal` 之间的色相、粗糙度和高度变化应支持柔和混合；`Ruins` 使用积尘、碎屑等柔化边缘但保持规则范围，`DeepWater` 和 `Cliff` 的轮廓、明度与材质响应保持清晰玩法边界。
 - [ ] 制作小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰。
 - [ ] 每种装饰 200–2,000 三角面，至少两种缩放或旋转变体，共享材质图集并允许 GPU Instancing。
 - [ ] Prefab 不包含玩法 Collider、Rigidbody 或 WasteCity MonoBehaviour。
@@ -555,7 +561,7 @@ Assets/_Game/ArtIntegration/VisualLibrary.asset
 
 - [ ] **Step 4: 归档离线验收图**
 
-`AcceptanceShots.md` 链接移动/展开城市、平台比例、领袖、五建筑四方向、两节点、六地形、十二装饰、28 图标总览、UI组件、施工、遗迹和八 VFX 的固定预览；不得把未接线预览描述成游戏运行截图。
+`AcceptanceShots.md` 链接移动/展开城市、平台比例、领袖、五建筑四方向、两节点、七地形、十二装饰、28 图标总览、UI组件、施工、遗迹和八 VFX 的固定预览；不得把未接线预览描述成游戏运行截图。
 
 - [ ] **Step 5: 最终登记状态**
 
