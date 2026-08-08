@@ -6,7 +6,7 @@
 
 **Architecture:** 本计划只负责美术前期、源资源、导入资源、登记表和离线/Unity 导入前验证，不修改玩法、场景、VisualSlot 或正式运行时。资源以 `ArtSource/FirstPass/` 保存源工程，以 `Assets/_Game/Art/FirstPass/` 保存 Unity 可导入文件；采矿站先走完整黄金样板流程，模板冻结后再并行生产城市/角色/建筑、UI、环境与反馈三条轨道。
 
-**Tech Stack:** Blender、FBX、PNG、SVG、WAV 48 kHz/24-bit、Unity 2022.3.62f1、URP 14.0.12、Git LFS、Unity Test Framework、macOS 开发机与 Windows x86-64 构建验收。
+**Tech Stack:** Blender 5.2.0 LTS、Blender MCP v1.2、FBX、PNG、SVG、WAV 48 kHz/24-bit、Unity 2022.3.62f1、URP 14.0.12、Git LFS、Unity Test Framework、macOS 开发机与 Windows x86-64 构建验收。
 
 ## Global Constraints
 
@@ -14,7 +14,8 @@
 - Task 13 未通过全部测试、构建、性能与文档门时，本计划不得开始。
 - 本计划不修改 `Assets/_Game/Scenes/`、`Assets/_Game/Scripts/`、`Assets/_Game/Editor/GrayboxSceneAuthoring.cs`、`Packages/`、`ProjectSettings/`、schema、存档或玩法定义。
 - 本计划结束时不把正式资源接入运行时；Unity 表现映射必须在 Task 13 最终接口上另写设计规格和实施计划。
-- 模型源文件使用 `.blend`，交换文件使用 `.fbx`，Unity 图片使用 PNG，矢量源使用 SVG，音频源使用 48 kHz、24-bit WAV。
+- 模型源文件使用 `.blend`；Unity 模型主交付与交换格式固定为 `.fbx`。glTF 2.0/GLB 只作为次要预览或跨工具交换格式，不得替代 FBX 正式交付；Unity 图片使用 PNG，矢量源使用 SVG，音频源使用 48 kHz、24-bit WAV。
+- 制作机基线为 Blender 5.2.0 LTS 与 Blender MCP v1.2，并启用 FBX、glTF 2.0、UV Layout、SVG、BVH、Cycles 和 Pose Library；MCP 与这些扩展只服务于制作流程，不作为 Unity 运行时依赖。
 - 外城模型尺寸读取 Task 13 最终 `BuildingDefinition`；内城平台固定 `8×6`、每格 `0.32`、完整表面 `2.56×1.92`。
 - 模型导入比例 `1.0`，`Y` 向上，`+Z` 为正面，静态建筑根位于占地中心且底面为 `Y=0`。
 - 五座样板建筑必须支持 `0°/90°/180°/270°`，第一版以一个主要 Renderer 为目标。
