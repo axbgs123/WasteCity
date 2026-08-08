@@ -509,12 +509,30 @@ namespace WasteCity.Tests
             Assert.That(placement.CurrentHit.X, Is.InRange(0, 7));
             Assert.That(placement.CurrentHit.Y, Is.InRange(0, 5));
             Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
-            Vector3 cityBefore = city.transform.position;
-            yield return HoldKey(Key.W, 2);
-            Assert.That(city.transform.position.z, Is.GreaterThan(cityBefore.z));
-            Assert.That(interaction.State, Is.EqualTo(
-                GrayboxBuildingInteractionState.Previewing));
-            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            yield return HoldMovementAndAssertPreview(
+                city.transform,
+                Key.W,
+                Vector2.up,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                city.transform,
+                Key.S,
+                Vector2.down,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                city.transform,
+                Key.A,
+                Vector2.left,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                city.transform,
+                Key.D,
+                Vector2.right,
+                interaction,
+                placement);
 
             Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
             modifier.SetResource(ResourceIds.Stone, BuildingCatalog.Wall.Cost);
@@ -548,14 +566,30 @@ namespace WasteCity.Tests
 
             modifier.SetResource(ResourceIds.Stone, 1000);
             yield return MoveToValidGroundPreview(city, world, placement);
-            Vector3 leaderBefore = leader.transform.position;
-            yield return HoldKey(Key.W, 2);
-            Assert.That(
-                leader.transform.position.z,
-                Is.GreaterThan(leaderBefore.z));
-            Assert.That(interaction.State, Is.EqualTo(
-                GrayboxBuildingInteractionState.Previewing));
-            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            yield return HoldMovementAndAssertPreview(
+                leader.transform,
+                Key.W,
+                Vector2.up,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                leader.transform,
+                Key.S,
+                Vector2.down,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                leader.transform,
+                Key.A,
+                Vector2.left,
+                interaction,
+                placement);
+            yield return HoldMovementAndAssertPreview(
+                leader.transform,
+                Key.D,
+                Vector2.right,
+                interaction,
+                placement);
         }
 
         [UnityTest]
@@ -934,9 +968,7 @@ namespace WasteCity.Tests
             Assert.That(
                 session.Instances.Contains(warehouseQuick),
                 Is.False);
-            Assert.That(
-                city.Mode,
-                Is.EqualTo(CityMode.Packing).Or.EqualTo(CityMode.Mobile));
+            Assert.That(city.Mode, Is.EqualTo(CityMode.Packing));
         }
 
         [UnityTest]
@@ -1256,6 +1288,50 @@ namespace WasteCity.Tests
                 yield return new WaitForFixedUpdate();
             QueueKeyboard();
             yield return null;
+        }
+
+        private IEnumerator HoldMovementAndAssertPreview(
+            Transform actor,
+            Key key,
+            Vector2 expectedDirection,
+            GrayboxBuildingInteractionModel3D interaction,
+            GrayboxBuildingPlacementController3D placement)
+        {
+            BuildingDefinition selected = interaction.Selected;
+            BuildingOrientation orientation = interaction.Orientation;
+            yield return new WaitForFixedUpdate();
+            yield return null;
+            Vector3 before = actor.position;
+
+            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            yield return HoldKey(key, 2);
+
+            Vector3 delta = actor.position - before;
+            if (expectedDirection.x > 0f)
+                Assert.That(delta.x, Is.GreaterThan(.001f), key.ToString());
+            else if (expectedDirection.x < 0f)
+                Assert.That(delta.x, Is.LessThan(-.001f), key.ToString());
+            else
+                Assert.That(
+                    delta.x,
+                    Is.EqualTo(0f).Within(.001f),
+                    key.ToString());
+
+            if (expectedDirection.y > 0f)
+                Assert.That(delta.z, Is.GreaterThan(.001f), key.ToString());
+            else if (expectedDirection.y < 0f)
+                Assert.That(delta.z, Is.LessThan(-.001f), key.ToString());
+            else
+                Assert.That(
+                    delta.z,
+                    Is.EqualTo(0f).Within(.001f),
+                    key.ToString());
+
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+            Assert.That(interaction.Selected, Is.SameAs(selected));
+            Assert.That(interaction.Orientation, Is.EqualTo(orientation));
+            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
         }
 
         private static void AssertPositionUnchanged(
