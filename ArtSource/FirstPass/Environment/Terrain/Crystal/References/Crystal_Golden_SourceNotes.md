@@ -15,6 +15,8 @@ Codex 内置图像生成工具以项目中已批准的 `Wasteland_Approved_AI_Co
 
 第二稿只降低晶脉亮度、饱和度、宽度和总长度，减少碎裂纹并恢复暖黄荒土主导比例。用户查看第二稿后回复“通过”，批准 `Crystal_Approved_AI_Concept_v002.png` 进入正式 PBR 重建。未使用照片、扫描、材质商店、Poly Haven、Sketchfab、Hyper3D 或其他第三方纹理。生成概念的商业使用依据为项目用户委托并批准用于 WasteCity 私有项目；具体权利仍受生成时所用 OpenAI 服务条款与项目账户条款约束。
 
+用户随后查看正式重建的 4×4 平铺检查图、默认倾斜正交预览图和 PBR 材质检查图，并于 2026-08-09 回复“通过”，正式批准本版 `Crystal` 地表材质。该正式验收不改变 `Crystal` 地表与 `ResourceNodes/EnergyCrystal` 可采集节点之间的资产及玩法边界。
+
 ## 最终概念修订提示词
 
 ```text

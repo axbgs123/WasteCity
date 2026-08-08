@@ -3,13 +3,13 @@
 ## 记录状态
 
 - 关联需求：`IDEA-0004`
-- 生产状态：用户已批准 v2 概念方向；正式重建与制作方自动化验收完成，等待用户查看正式预览
+- 生产状态：正式重建、制作方自动化验收和用户视觉验收均已完成
 - 概念批准：用户查看 `Crystal v2` 概念预览并回复“通过”
-- 正式验收：待用户查看 4×4、默认倾斜正交和 PBR 检查图后确认
+- 正式验收：用户查看 4×4、默认倾斜正交和 PBR 检查图后，于 2026-08-09 回复“通过”
 - 修订日期：2026-08-09
 - 操作者：Codex，代表 WasteCity 项目执行受控资产生产
 - 范围：仅 `Crystal` 地表材质；未接入 Unity 运行时，未创建能晶节点、晶簇模型、FBX、Prefab、Collider 或其他后续地形
-- Git：本记录与正式候选资产位于同一提交，提交信息为 `art: add approved crystal terrain material`；若用户否决正式预览，以后续普通提交重制，不改写历史
+- Git：正式候选资产提交为 `3bf23e68ccd7eb68cf6c2582dc669b7b433e5955`（`art: add approved crystal terrain material`）；用户正式批准由后续纯文档提交记录，不改写候选资产历史
 
 ## 来源与许可证
 
@@ -63,7 +63,7 @@ Height 由共享区域权重、独立周期宏观场、独立周期高频场、�
 | `ArtSource/FirstPass/Environment/Terrain/Crystal/Crystal_Golden_Master.kra` | 6 个命名图层 | `a50c73410d2412f1a33d1ee5fb085aa896da6b7bd1fcb513790564cdb5485152` |
 | `ArtSource/FirstPass/Environment/Terrain/Crystal/Crystal_Golden_Generator.blend` | Blender 5.2.0 LTS，四张贴图已打包 | `a3e5ee1f599b7c8711340945a348c173a39aff7501e1f3b0b606915f1519a4be` |
 | `ArtSource/FirstPass/Environment/Terrain/Crystal/Crystal_Golden_Generator.py` | UTF-8 Python，可重复生成源 | `8a835403ed0983eeb07275469efce97c4d7958130c727be95ee1ab7b055c218a` |
-| `ArtSource/FirstPass/Environment/Terrain/Crystal/References/Crystal_Golden_SourceNotes.md` | UTF-8 Markdown | `bd6a92ec8107ad7f22b23279ae73203775e57fbee81d5e66babafae5e87ed6b4` |
+| `ArtSource/FirstPass/Environment/Terrain/Crystal/References/Crystal_Golden_SourceNotes.md` | UTF-8 Markdown | `8cb882494440cfea28f275c9d0909db1381b2d02eaa073c123c12be5ab59bf4d` |
 | `Docs/Art/FirstPass/Terrain/Crystal/QA_Terrain_Crystal_Tiling4x4.png` | 2048² RGB 8-bit | `f72110171cecf532f9e032f98023687c899ff326535d43ef9324457c404cf51e` |
 | `Docs/Art/FirstPass/Terrain/Crystal/QA_Terrain_Crystal_DefaultOrtho.png` | 1920×1080 RGBA 8-bit | `3143e089be6a3b6ada22ba36d69a3adee0a0e313166c35c20af28b2ec331c5c6` |
 | `Docs/Art/FirstPass/Terrain/Crystal/QA_Terrain_Crystal_PBRCheck.png` | 1920×1080 RGBA 8-bit | `e8faae8f3513202616a4628bf8bc6fa5fc5c3b5b178fe02aef65f73b3b994252` |
@@ -81,5 +81,6 @@ Height 由共享区域权重、独立周期宏观场、独立周期高频场、�
 - 默认倾斜正交预览仍先读作暖黄荒土，玻化区和灰青晶壳提供第二层辨识；没有资源节点、直立晶体或可采集物。
 - PBR 平面和球体检查显示玻化区 Smoothness 高于荒土；高光来自独立 Mask Alpha，不存在 BaseColor 烘焙高光或 Emission 光晕。
 - `.kra` 含最终 BaseColor 和五类覆盖遮罩；`.blend` 已由 Blender 5.2.0 LTS 无界面重开，场景元数据为 `gameplay_truth=none`，四张正式贴图全部打包。
+- 用户于 2026-08-09 查看 4×4 平铺、默认倾斜正交和 PBR 三张正式检查图后回复“通过”，本版 `Crystal` 正式材质视觉验收通过。
 - 正式场景、玩法代码、地形枚举、通行规则、稳定 ID、资源节点、Packages 和 ProjectSettings 均未修改。
 - 未制作 `Ruins`、`DeepWater` 或 `Cliff` 正式贴图，也未制作可采集能晶节点或其他模型。

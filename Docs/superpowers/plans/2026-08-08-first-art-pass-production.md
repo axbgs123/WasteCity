@@ -469,7 +469,7 @@ git commit -m "art: complete mining station golden sample"
   - [x] `Wasteland`：黄金样板已完成并由用户验收通过。
   - [x] `Rocky`：正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Wetland`：首版正式预览被否决；重制后的正式贴图、分层源和固定预览已完成，并由用户验收通过。
-  - [ ] `Crystal`：概念已批准，正式贴图、分层源和固定预览已完成制作方验收，等待用户查看正式预览。
+  - [x] `Crystal`：概念、正式贴图、分层源和固定预览均已完成，并由用户验收通过。
   - [ ] `Ruins`、`DeepWater`、`Cliff`：尚未开始正式制作。
 - [ ] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
 - [ ] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
