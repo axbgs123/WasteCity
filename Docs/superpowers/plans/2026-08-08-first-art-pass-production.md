@@ -471,7 +471,7 @@ git commit -m "art: complete mining station golden sample"
   - [x] `Rocky`：正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Wetland`：首版正式预览被否决；重制后的正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Crystal`：概念、正式贴图、分层源和固定预览均已完成，并由用户验收通过。
-  - [ ] `Ruins`：正式地表贴图、分层源和固定预览已完成并由用户验收通过；八件低模模块参考板已由用户批准，Blender/FBX 候选、默认倾斜正交/顶视/线框 QA 已完成，等待用户视觉验收，尚未接入 Unity。
+  - [x] `Ruins`：正式地表贴图、分层源和固定预览已完成并由用户验收通过；八件低模模块按批准参考板完成重制，使用 `3–7` 个多材质分区，并通过默认倾斜正交、普通荒地组合、顶视和线框 QA。用户于 2026-08-09 明确批准当前模型；尚未接入 Unity。
   - [ ] `DeepWater`、`Cliff`：尚未开始正式制作。
 - [ ] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
 - [ ] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。

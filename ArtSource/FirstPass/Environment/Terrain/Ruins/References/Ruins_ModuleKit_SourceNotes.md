@@ -1,13 +1,13 @@
 # 大型废墟 `Ruins` 低模模块包来源说明
 
 - 关联需求：`IDEA-0004`
-- 资产：`Ruins` 八件低模环境模块候选
+- 资产：`Ruins` 八件已批准低模环境模块
 - 制作日期：2026-08-09
 - 参考图：`Ruins_Modules_Approved_AI_Reference_v001.png`
 - 参考图 SHA-256：`f72aa401942a0956f9d027486eb9639acc18825ef06f22776c5b0336f333458c`
-- 批准记录：用户在查看 4×2 八件模块参考板后明确回复“通过”，随后才开始 Blender 建模
+- 批准记录：用户在查看 4×2 八件模块参考板后明确回复“通过”，随后才开始 Blender 建模；首版模型被否决后，按参考板逐件重建并增加模型内多材质分区与普通荒地组合预览，用户于 2026-08-09 明确回复“可以了”，批准当前版本
 - 玩法真值：无；模型只提供环境视觉，不定义通行、资源、交互、碰撞或稳定 ID
-- Unity 接入：本候选未接入正式场景、Prefab 或材质；八个 FBX 仅作为后续受控接入输入
+- Unity 接入：当前已批准模型未接入正式场景、Prefab 或材质；八个 FBX 仅作为后续受控接入输入
 
 ## 输入来源与许可证
 
@@ -16,8 +16,9 @@
 | 输入 | 用途 | SHA-256 |
 |---|---|---|
 | `Ruins_Approved_AI_Concept_v001.png` | 工业废土造型与构成语言 | `f6c45cb0e9c8af0ce197c30080be6aa56ab74f3fd47eb165d8e7cb2a89de5834` |
-| `T_Terrain_Ruins_BaseColor.png` | 混凝土、沥青、积尘、锈蚀和骨料色彩 | `9bd361a9bb35deadda446bcd3a92daad67643b4c95b1e5b11bee007f56e17a5a` |
+| `T_Terrain_Ruins_BaseColor/Normal/Mask/Height.png` | 混凝土、沥青、积尘、锈蚀和骨料的共享 PBR 基础 | BaseColor `9bd361a9bb35deadda446bcd3a92daad67643b4c95b1e5b11bee007f56e17a5a`；Normal `4df13aa0877887065d4a892e0556d3cebd136b6084c2f4b2ae11b0f060569c5b`；Mask `34518e94df7a000ddf55749b84905fd33a7b94e61bae6539701c55c1aa5a88f7`；Height `15028f343750416c6b980e8e34664d69d9b07591fc2649982241abb7cac03404` |
 | `QA_Terrain_Ruins_PBRCheck.png` | 粗糙度、对比度和默认镜头可读性 | `63d5013293eb6df6f3c529996e29dbde4a179e62926744bacfc3ed82d89da7d5` |
+| `T_Terrain_Wasteland_BaseColor/Normal/Mask/Height.png` | 薄尘膜综合色温与普通荒地组合预览 | BaseColor `af95139005f9642fe209e5025fc126cf5a9fd514bc3846932cedf83dedea39ff`；Normal `48a8505e1c1a590356d2198836a4f463194cf8db9f2075c4e9b9e1e09e610742`；Mask `2e6906519e234b90abadf5deac531786950dfa2ab03bce80d2bacdbbb9c164f2`；Height `087b8c2fe636495761639d55b6e72521e6086b704c73aaa125b6e81bfaf83ad0` |
 
 没有使用照片、扫描、资产商店模型、Sketchfab、Poly Haven、Hyper3D 或其他第三方模型/贴图。参考板的商业使用依据为项目用户委托并批准用于 WasteCity 私有项目；具体权利受生成时所用 OpenAI 服务条款与项目账户条款约束。Blender 5.2.0 LTS 和 Python 只作为制作工具，不提供外部资产。
 
@@ -64,7 +65,7 @@ Avoid: more or fewer than eight modules, duplicated module designs, joined diora
 
 1. 以参考板的剪影、相对高度和材料分区为约束，使用盒体、低边圆柱、折线钢筋和不规则碎块程序化搭建。
 2. 每件模块合并为一个独立 Mesh，应用变换，生成可编辑 UV，并把原点放在世界原点、最低点校正到 Blender `Z=0`。
-3. 使用共享的风化混凝土、损坏地坪、暖黄积尘、氧化钢和旧标线材质预览；不把预览材质声明为最终 Unity 材质。
+3. 使用完整混凝土表皮、裸露骨料、暗色地坪/沟槽、暖黄碎尘、薄尘膜、氧化钢和旧标线多材质分区预览；薄尘膜与组合地面直接引用已批准 `Wasteland` PBR 资产，但不把 Blender 预览材质声明为最终 Unity 材质。
 4. 每件控制在 200–2,000 三角面；除细长瓦砾堆允许略超一格外，其余模型占地接近或小于一个外城逻辑格。
 5. 以 `-Z Forward / Y Up / Scale 1.0` 单独导出 FBX，不导出灯光、相机、碰撞体或玩法组件。
-6. 在 Blender 5.2.0 LTS 中回读 `.blend` 和全部八个 FBX，并输出默认倾斜正交、顶视和线框三张固定 QA 图。
+6. 在 Blender 5.2.0 LTS 中回读 `.blend` 和全部八个 FBX，并输出默认倾斜正交、普通荒地组合、顶视和线框四张固定 QA 图。
