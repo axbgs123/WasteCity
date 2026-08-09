@@ -466,17 +466,17 @@ git commit -m "art: complete mining station golden sample"
 - Consumes: 色板、URP Mask 合同和现有七类地形语义。
 - Produces: 无缝地形材质与无玩法碰撞的装饰包。
 
-- [ ] 按 `Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff` 七类逐一制作 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask、16-bit Height、分层源文件和固定预览图；先以独立子计划完成 `Wasteland` 黄金样板，未批准前不得批量制作其余六类。
+- [x] 按 `Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff` 七类逐一制作 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask、16-bit Height、分层源文件和固定预览图；先以独立子计划完成 `Wasteland` 黄金样板，未批准前不得批量制作其余六类。
   - [x] `Wasteland`：黄金样板已完成并由用户验收通过。
   - [x] `Rocky`：正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Wetland`：首版正式预览被否决；重制后的正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Crystal`：概念、正式贴图、分层源和固定预览均已完成，并由用户验收通过。
   - [x] `Ruins`：正式地表贴图、分层源和固定预览已完成并由用户验收通过；八件低模模块按批准参考板完成重制，使用 `3–7` 个多材质分区，并通过默认倾斜正交、普通荒地组合、顶视和线框 QA。用户于 2026-08-09 明确批准当前模型；尚未接入 Unity。
   - [x] `DeepWater`：批准概念、2048×2048 BaseColor/Normal/URP Mask/16-bit Height、五层 OpenRaster 源、Blender 检查源和三张固定 QA 已完成；首轮正式结果因不像水被否决，连续水体重制版于 2026-08-09 由用户验收通过；尚未接入 Unity，也未制作正式水面模型。
-  - [ ] `Cliff`：尚未开始正式制作。
-- [ ] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
-- [ ] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
-- [ ] `Wasteland`、`Rocky`、`Wetland`、`Crystal` 之间的色相、粗糙度和高度变化应支持柔和混合；`Ruins` 使用积尘、碎屑等柔化边缘但保持规则范围，`DeepWater` 和 `Cliff` 的轮廓、明度与材质响应保持清晰玩法边界。
+  - [x] `Cliff`：批准参考板、2048×2048 BaseColor/Normal/URP Mask/16-bit Height、六层 OpenRaster 源、Blender 材质源、六件多材质模块、六个 FBX 和八张固定 QA 已完成；用户于 2026-08-09 验收通过。FBX 回读验证通过；尚未接入 Unity、Prefab、Collider 或玩法系统。
+- [x] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
+- [x] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
+- [x] `Wasteland`、`Rocky`、`Wetland`、`Crystal` 之间的色相、粗糙度和高度变化应支持柔和混合；`Ruins` 使用积尘、碎屑等柔化边缘但保持规则范围，`DeepWater` 和 `Cliff` 的轮廓、明度与材质响应保持清晰玩法边界。
 - [ ] 制作小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰。
 - [ ] 每种装饰 200–2,000 三角面，至少两种缩放或旋转变体，共享材质图集并允许 GPU Instancing。
 - [ ] Prefab 不包含玩法 Collider、Rigidbody 或 WasteCity MonoBehaviour。
