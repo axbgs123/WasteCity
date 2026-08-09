@@ -409,6 +409,7 @@ git commit -m "art: complete mining station golden sample"
 - [ ] 创建 `PF_City_Mobile.prefab` 和 `PF_City_InnerPlatform.prefab`，不加入玩法脚本或玩法 Collider。
 - [ ] 运行验证器和默认相机临时场景人工检查，确认移动/展开轮廓、平台格线和领袖比例。
 - [x] 2026-08-09 已由用户批准移动形态、同城堡垒形态和 `8×6` 内城平台三张白底单物体概念参考；本项只代表造型参考完成，LOD、动画、FBX、Prefab 与 Unity 接入仍未开始。
+- [x] 2026-08-09 已由用户批准 `Mobile → Deploy 33% → Deploy 66% → Fortress` 四帧白底机械顺序参考；`Pack` 使用反向顺序作视觉参考。正式动画层级、Pivot、接触事件、动画曲线、FBX 与 Animator 仍未开始。
 - [ ] 更新登记与许可证并提交：`git commit -m "art: complete mobile city sample"`。
 
 ---
