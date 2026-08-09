@@ -477,7 +477,8 @@ git commit -m "art: complete mining station golden sample"
 - [x] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
 - [x] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
 - [x] `Wasteland`、`Rocky`、`Wetland`、`Crystal` 之间的色相、粗糙度和高度变化应支持柔和混合；`Ruins` 使用积尘、碎屑等柔化边缘但保持规则范围，`DeepWater` 和 `Cliff` 的轮廓、明度与材质响应保持清晰玩法边界。
-- [ ] 制作小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰。
+- [x] 完成小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰的白底单物件参考图；十二张 `512×512` 独立 PNG 与总览板已于 2026-08-09 由用户批准。
+- [ ] 十二种装饰的模型、FBX、Prefab 与 Unity 接入暂不制作：用户已明确取消由当前开发者继续建模；批准参考图只作为未来美术人员接手依据，不代表本项 3D 交付完成。
 - [ ] 每种装饰 200–2,000 三角面，至少两种缩放或旋转变体，共享材质图集并允许 GPU Instancing。
 - [ ] Prefab 不包含玩法 Collider、Rigidbody 或 WasteCity MonoBehaviour。
 - [ ] 运行验证器与临时 32×24 展示场景人工检查，不修改正式场景。
