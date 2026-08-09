@@ -500,9 +500,10 @@ git commit -m "art: complete mining station golden sample"
 - Consumes: 28 个 BuildMenu 稳定 ID、色板和固定图标相机规范。
 - Produces: 完整目录视觉和后续 UGUI 映射所需 Sprite 源。
 
-- [ ] 建立固定图标渲染场景规范：相机角度、正交尺寸、灯光、阴影、透明背景和占屏边距固定。
-- [ ] 为 28 个普通目录稳定 ID各输出 `1024×1024` 原图和 `256×256` Unity PNG；五正式模型用固定场景渲染，其余 23 项使用批准概念渲染。
-- [ ] 明确排除 `core.building.heavy-machine-gun-turret` 和 `cultivation.building.sword-riding-platform`。
+- [x] 为概念参考固定三分之四俯视正交相机、暖色棚拍光、纯白背景、单主体和统一占屏边距；4 张路线源板与 28 张独立图已通过用户验收。
+- [x] 为 28 个普通目录稳定 ID 各输出一张已批准 `512×512` 白底概念参考，并生成按 `BuildingCatalog.BuildMenu` 顺序排列的 7×4 QA 板。
+- [ ] 正式 `1024×1024` 透明原图、`256×256` Unity PNG、Sprite 导入和运行时映射不在本轮白底参考范围内，尚未完成。
+- [x] 明确排除 `core.building.heavy-machine-gun-turret` 和 `cultivation.building.sword-riding-platform`。
 - [ ] 制作基础/生产/物流/防御/路线五分类图标，科技/修仙/生物/灵能四路线图标。
 - [ ] 制作放置、旋转、取消、删除、施工、暂停、完成、遗弃、完整拆除、快速拆除、内城、外城十二操作图标。
 - [ ] 制作十格快捷栏、完整目录、分类/路线标签、搜索、建筑卡、详情、成本、锁定原因、施工进度、取消确认、撤离清单、错误提示和按钮五态九宫格切图。
