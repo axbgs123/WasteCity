@@ -19,6 +19,7 @@
 - 外城模型尺寸读取 Task 13 最终 `BuildingDefinition`；内城平台固定 `8×6`、每格 `0.32`、完整表面 `2.56×1.92`。
 - 模型导入比例 `1.0`，`Y` 向上，`+Z` 为正面，静态建筑根位于占地中心且底面为 `Y=0`。
 - 五座样板建筑必须支持 `0°/90°/180°/270°`，第一版以一个主要 Renderer 为目标。
+- 所有建模类资产必须先生成一张可执行参考图或参考板并取得用户明确批准，之后才能开始 Blender 白模或正式建模；参考图需登记来源、生成方法、许可证与批准日期。
 - BaseColor 为 sRGB；Normal、Mask 和其他数据贴图为 Linear；URP Mask Map 为 R Metallic、G Occlusion、B Detail Mask、A Smoothness。
 - 第一版地形固定为七类：`Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff`；不得自行合并、改名或把资源节点类别混入地形类别。
 - `Crystal` 是能晶化地表材质，`ResourceNodes/EnergyCrystal` 是可采集能晶节点，两者必须是独立资产；地表只表达视觉材质，不得持有资源节点、产量、储量、可采集状态或任何玩法真值。
@@ -470,7 +471,7 @@ git commit -m "art: complete mining station golden sample"
   - [x] `Rocky`：正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Wetland`：首版正式预览被否决；重制后的正式贴图、分层源和固定预览已完成，并由用户验收通过。
   - [x] `Crystal`：概念、正式贴图、分层源和固定预览均已完成，并由用户验收通过。
-  - [ ] `Ruins`：概念已批准，正式贴图、分层源和固定预览已完成制作方验收，等待用户查看正式预览；6–8 个低模模块尚未开始。
+  - [ ] `Ruins`：正式地表贴图、分层源和固定预览已完成并由用户验收通过；低模模块仍需先完成参考板批准门，尚未开始建模。
   - [ ] `DeepWater`、`Cliff`：尚未开始正式制作。
 - [ ] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
 - [ ] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
