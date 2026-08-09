@@ -408,6 +408,7 @@ git commit -m "art: complete mining station golden sample"
 - [ ] 完成不超过两套 4096 的城市纹理集，并记录实际显存。
 - [ ] 创建 `PF_City_Mobile.prefab` 和 `PF_City_InnerPlatform.prefab`，不加入玩法脚本或玩法 Collider。
 - [ ] 运行验证器和默认相机临时场景人工检查，确认移动/展开轮廓、平台格线和领袖比例。
+- [x] 2026-08-09 已由用户批准移动形态、同城堡垒形态和 `8×6` 内城平台三张白底单物体概念参考；本项只代表造型参考完成，LOD、动画、FBX、Prefab 与 Unity 接入仍未开始。
 - [ ] 更新登记与许可证并提交：`git commit -m "art: complete mobile city sample"`。
 
 ---
@@ -445,6 +446,7 @@ git commit -m "art: complete mining station golden sample"
 - Produces: 完整五建筑正式样板和第二种资源节点。
 
 - [ ] 每座先完成三视概念并用默认俯视缩略图复核轮廓。
+- [x] 2026-08-09 已由用户批准 `MiningStation`、`Housing`、`Warehouse`、`Wall`、`MachineGunTurret` 五张默认俯视白底单物体造型参考；正式三视图、模型、LOD、FBX、Prefab 与 Unity 接入仍未开始。批准的采矿站参考不包含资源节点。
 - [ ] Housing/Warehouse 按普通建筑预算完成 LOD；Wall 允许更低预算；MachineGunTurret 按 8k–15k/3k–7k/0.8k–2.5k 完成 LOD。
 - [ ] 机枪塔视觉炮头可以有动画层级，但不得包含瞄准、攻击或伤害脚本。
 - [ ] 城墙四方向旋转后必须无空隙且不得越过 1×1 底座。
