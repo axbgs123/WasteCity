@@ -11,6 +11,7 @@
 - 坐标：Blender 内部 Z-up；FBX 使用 `-Z Forward / Y Up / Scale 1.0`
 - Pivot：每件模型原点为 `(0,0,0)`，底面在 Blender `Z=0`，导入 Unity 后对应底面 `Y=0`
 - 接入状态：未接入 Unity 场景、Prefab、材质或 VisualSlot
+- 交付提交：`323f5e2`（已推送 `codex/first-art-pass-terrain`）
 - 玩法边界：没有 Collider、Rigidbody、WasteCity MonoBehaviour、资源节点、通行规则或稳定 ID；模型仅为可替换视觉资产
 
 ## 逐件规格
