@@ -1431,6 +1431,13 @@ git commit -m "test: verify first terrain runtime scene"
 - Modify after rejected visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset`
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
+- Modify after the real GUI memory capture exceeds the approved budget: `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
+- Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
+- Regenerate in place with the same GUID: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset`
+- Create for deterministic native-resolution evidence: `Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs`
+- Create: `Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta`
+- Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs`
+- Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta`
 - Create after capture: `Docs/Art/FirstPass/Terrain/RuntimeIntegration/` approved PNG screenshots and one MP4 recording only after the user approves committing them
 
 **Interfaces:**
@@ -1657,6 +1664,121 @@ Open this exact worktree in Unity 2022.3.62f1, load `GrayboxPrototype3D`, set Ga
 
 Record CPU/GPU frame time, FPS, Draw Calls, SetPass, Renderer count, total texture memory, four array memory, and GC allocation for `FirstArtTerrainRenderer3D`/terrain adapters. Target is ≥60 FPS, one formal terrain Renderer, approximately ≤120 MB terrain runtime texture memory, and 0 B per-frame managed allocation after warm-up. Do not use batchmode or NUnit data as a substitute.
 
+- [ ] **Step 7A: Correct the measured Mask-array memory overrun without changing source art**
+
+This correction is active because the real loaded four-array payload measured
+`233.33 MiB`: BaseColor and Normal are each BC7-sized, Height is 1024/R8, but
+the 2048 linear Mask is RGBA32 and alone consumes `149.33 MiB`. The approved
+design explicitly requires adjusting runtime-array format/resolution before
+visual approval when the array budget is materially exceeded.
+
+Add a failing builder test before changing production. It must require the real
+Mask to be `TextureFormat.BC7` and the four loaded arrays to remain within a
+`128 MiB` hard ceiling when measured with
+`Profiler.GetRuntimeMemorySizeLong`; RED must show that the current Mask is
+RGBA32 and the current sum exceeds the ceiling. Preserve the existing exact 2048 size,
+seven-slice order, 12 mip levels, linear color space, Repeat wrap, source GUID,
+source PNG bytes, source `.meta` bytes, importer readability/platform settings,
+generated Mask GUID and two-build deterministic identity contracts.
+
+Change only `FirstArtTerrainAssetBuilder.cs` to build the runtime Mask as 2048
+linear BC7 at `TextureCompressionQuality.Best`. Keep the seven source Mask PNGs
+and their import policy uncompressed and untouched. Use per-slice temporary
+readable linear RGBA32 staging textures, render/read mip 0 without color-space
+conversion, generate the mip chain, call `EditorUtility.CompressTexture`, copy
+all compressed mips into one BC7 `Texture2DArray`, and destroy every temporary
+Texture/RenderTexture in `finally`. The existing all-arrays preflight and
+persist-after-success transaction remains in force; a compression/readback/copy
+failure must leave all four persistent arrays and all source assets byte- and
+GUID-identical to their pre-call state.
+
+The GREEN test must require:
+
+```text
+Mask: 2048×2048×7, 12 mips, linear BC7, Repeat;
+BaseColor/Normal/Height formats and dimensions unchanged;
+sum of Profiler.GetRuntimeMemorySizeLong for the four loaded arrays ≤128 MiB;
+expected sum reported near the approved approximately-120-MB target;
+64 deterministic mip-0 sample coordinates per slice against the source Mask,
+with each channel absolute error ≤16 and mean absolute channel error ≤4;
+two builds preserve all source states, all four array GUIDs and identical second-build contents;
+the Mask `.meta` GUID is unchanged and the regenerated `.asset` remains Git LFS-backed.
+```
+
+Regenerate `TA_Terrain_Mask.asset` in place only after the focused tests pass.
+Then rerun asset-builder, profile, shader, scene-contract, performance and real
+runtime scene focused suites. Any source asset/meta change, unsupported BC7
+result, missing Mask channel, >128 MiB loaded sum or visual shader failure is a
+stop gate; do not reduce source resolution or alter the Shader/Profile to hide it.
+
+- [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
+
+Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
+It must refuse to run outside Play Mode, outside `GrayboxPrototype3D`, without
+seed 8128, without the approved Profile/pipeline/material, or without exactly
+one presented formal terrain Renderer. It writes only beneath
+`/tmp/wastecity-first-terrain/`; it never edits or saves the scene, Profile,
+Material, arrays, camera prefab, gameplay state, Packages or ProjectSettings.
+
+The tool must snapshot and restore in nested `try/finally`: camera and rig
+transforms, orthographic size, target texture, presenter enabled state,
+fallback visibility, `Time.captureFramerate`, render target and every registered
+Editor update callback. A failure or cancellation leaves zero callbacks,
+temporary textures or changed runtime state.
+
+For stills, search the real 32×24 model rather than assuming screen positions:
+
+```text
+find and record exact adjacent cell coordinates for Wasteland–Rocky,
+Wasteland–Wetland, Wasteland–Crystal, Ruins–non-Ruins,
+DeepWater–passable shore and Cliff–passable edge;
+find and record one 2×2 neighborhood containing at least three distinct approved layers;
+center the unchanged 52° orthographic camera on each recorded midpoint;
+render directly from the real Game camera into a 1920×1080 RenderTexture;
+write raw PNGs with no Editor chrome, cursor, selection or Gizmos;
+write a JSON manifest containing seed, scene, pipeline/material IDs, filename,
+cell coordinates/layers, camera/rig transform, orthographic size and 1920×1080 dimensions.
+```
+
+`01-map-overview` must show the complete map; `02-default-game-camera` must use
+the untouched default gameplay framing; `03`–`09` must use their recorded named
+boundaries rather than a shared center/zoom sequence. `10` must be a genuine
+same-camera side-by-side comparison: left formal terrain, right the seven
+graybox fallback surface groups after a temporary presenter disable, with all
+state restored afterward. The two halves and the final comparison must be
+distinct and the final PNG exactly 1920×1080.
+
+For DeepWater, lock the same camera on the recorded shore, set
+`Time.captureFramerate = 30`, and capture one new lossless 1920×1080 camera frame
+on each of 300 distinct increasing `Time.frameCount` values. Encode those exact
+300 PNG frames with ffmpeg to H.264, 30 fps, exactly 10 seconds. Verify the
+camera/rig matrices are identical for all frames, frame hashes are not all
+identical, the shoreline occupies a readable portion of the image, and no frame
+contains Editor UI. Do not synthesize repeats from sparse screenshots.
+
+Extend `GrayboxPerformanceProbe` and its focused tests so the real GUI evidence
+also writes a terrain-runtime JSON containing: active scene/worktree, Game View
+target `1920×1080`, formal Renderer count, Profile/Material identity, each loaded
+array's dimensions/depth/format and
+`Profiler.GetRuntimeMemorySizeLong`, summed array memory, and the fact that
+`FirstArtTerrainRenderer3D` declares no `Update`/`LateUpdate` CPU water loop.
+The 300-frame Profiler summary must include an explicit terrain-presenter marker
+entry; zero occurrences/zero GC is accepted only together with the structural
+no-Update proof and the live one-renderer runtime JSON. Continue to record Draw
+Calls/SetPass and total Editor texture memory from the real GUI Stats/Profiler.
+
+On this macOS Metal Editor, a displayed GPU value of `-- ms` may be recorded as
+**unavailable**, not zero and not passed. Preserve the screenshot and defer a
+numerical GPU-time gate to the already-unresolved real Windows 10/11 GPU smoke;
+CPU frame time, ≥60 FPS, exact 300-frame range, one formal Renderer, ≤128 MiB
+four-array loaded sum and terrain-adapter 0 B remain mandatory now.
+
+After this correction, regenerate the Profiler `.data`, terrain-runtime JSON,
+summary, Stats/Profiler screenshots, all ten stills, manifest and continuous
+MP4. Delete/replace the earlier invalid `/tmp` evidence package so it cannot be
+mistaken for the approved set, then repeat the independent pre-visual technical
+review before asking the user to judge aesthetics.
+
 - [ ] **Step 8: Capture the fixed visual acceptance set**
 
 With seed 8128, the default 52° orthographic camera, the same URP pipeline, 1920×1080 and unchanged exposure, capture:
@@ -1686,7 +1808,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
