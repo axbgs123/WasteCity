@@ -734,6 +734,8 @@ git commit -m "build: generate first terrain texture arrays"
 ### Task 5: Add the URP Master Shader, Material and Profile Asset
 
 **Files:**
+- Modify for approved review correction: `Docs/superpowers/specs/2026-08-10-first-terrain-runtime-integration-design.md`
+- Modify for approved review correction: `Docs/superpowers/plans/2026-08-10-first-terrain-runtime-integration.md`
 - Create: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials.meta`
 - Create: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat`
 - Create: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat.meta`
@@ -832,6 +834,24 @@ public void Profile_RejectsMismatchedPrimaryArrayDimensionsWithDeterministicErro
 
 The test scope owns and destroys the transient Profile, Material, and four Texture2DArrays. It must exercise the public `Configure`/`TryValidate` contract with real Unity objects, not a mock or source-text assertion.
 
+For review fix round 1, add mutation-sensitive Shader tests before production edits. Use real Shader compilation, Material pass discovery and Shader variants wherever Unity exposes the behavior. A narrowly scoped Shader-source contract is permitted only for fragment-path relationships that cannot be isolated through the Editor API. The tests must fail if any of these contracts is removed:
+
+1. final `UniversalFragmentPBR` RGB is passed through URP `MixFog` while alpha is preserved;
+2. Mask B gates only the sampled layer's tangent-space normal detail;
+3. `_ADDITIONAL_LIGHTS_VERTEX` computes `VertexLighting` in the vertex stage, carries it through varyings and assigns `InputData.vertexLighting`;
+4. the Material exposes a functional opaque `ShadowCaster` pass that compiles as a `PassType.ShadowCaster` variant;
+5. the final weighted tangent-space normal uses finite/length checks and falls back to `(0,0,1)` rather than directly normalizing a zero or opposing blend.
+
+Freeze the Mask B acceptance fixtures with decoded tangent-space normal `(0.6,0,0.8)`:
+
+```text
+B = 0.0 -> (0, 0, 1)
+B = 1.0 -> (0.6, 0, 0.8)
+B = 0.5 -> normalize(0.3, 0, 0.9) ~= (0.31622777, 0, 0.9486833)
+```
+
+The intermediate result must differ from both endpoints. Apply B after DeepWater's two moving normals are combined. No test or implementation may add a Detail texture, a new Shader property, or let B affect albedo, Metallic, AO, Smoothness, Height/control weights or any other channel.
+
 - [ ] **Step 2: Run RED**
 
 ```bash
@@ -892,6 +912,8 @@ float4 specialWeights = SAMPLE_TEXTURE2D(_ControlB, sampler_ControlB, mapUV);
 
 Then extract exactly seven weights, normalize, select the highest three with deterministic index tie-breaking, and sample only those three array slices. For each selected layer sample BaseColor, Normal, Mask and Height with world UV `input.positionWS.xz / _CellsPerTexture`. Multiply each weight by a bounded Height term, normalize again, blend all PBR channels, and unpack tangent-space normals before combining them.
 
+Mask B is not discarded after Mask blending. For each selected layer, safely normalize `lerp(float3(0,0,1), decodedNormalTS, saturate(mask.b))`, then include that gated per-layer normal in weighted blending. For DeepWater, combine the two moving decoded normals first and apply the same B gate to that combined layer normal. `B=0` is flat, `B=1` is full decoded/animated detail, and intermediate B is the continuous safely normalized interpolation. B has no effect on any non-normal output and introduces no new texture or property.
+
 When a selected index equals `5` (DeepWater), sample that same normal slice again at `worldUV * _WaterNormalScaleB + _Time.y * _WaterVelocityB`; the first water sample uses `_Time.y * _WaterVelocityA`. Blend the two normals and apply only a small Smoothness/highlight modulation. No branch may sample a seventh full PBR set.
 
 Add this low-frequency deterministic macro tint, with `_MacroVariation` clamped to `[0,.05]`; it must not alter control weights or gameplay boundaries:
@@ -935,7 +957,7 @@ Expected: focused tests pass; compile exits 0; logs contain no `Shader error`, `
 - [ ] **Step 7: Commit Task 5**
 
 ```bash
-git add Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader.meta Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs.meta
+git add Docs/superpowers/specs/2026-08-10-first-terrain-runtime-integration-design.md Docs/superpowers/plans/2026-08-10-first-terrain-runtime-integration.md Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader.meta Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs.meta
 git diff --cached --check
 git commit -m "feat: add first terrain URP master material"
 ```

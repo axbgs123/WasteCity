@@ -340,7 +340,25 @@ BaseColor、Normal、Mask 和 Height 使用相同地表权重。Height 仅用于
 
 普通边界采样两个主要层；三岔点最多采样三个最高权重层。区域中心不得为零权重层支付完整七层采样成本。
 
-### 10.4 深水
+### 10.4 Detail Mask 法线强度
+
+Mask B 的唯一首批语义冻结为“该层切线空间法线细节强度”。每个被选中的地表层先解码自己的切线空间 Normal，再执行：
+
+```hlsl
+float detailStrength = saturate(mask.b);
+float3 gatedNormalTS = SafeNormalizeTangentNormal(
+    lerp(float3(0.0, 0.0, 1.0), decodedNormalTS, detailStrength));
+```
+
+`SafeNormalizeTangentNormal` 在输入长度接近零或含非有限值时返回 `(0,0,1)`。只有完成上述逐层门控后，该层法线才能进入三层加权混合。DeepWater 先组合该层的两次移动法线采样，再由同一层的 Mask B 对组合结果执行同样门控。
+
+- `B=0` 必须得到平坦切线空间法线 `(0,0,1)`；
+- `B=1` 必须得到安全归一化后的完整解码/动画法线；
+- `0<B<1` 必须得到平坦法线与完整法线之间的安全归一化连续结果；
+- B 不得改变 BaseColor、Metallic、Ambient Occlusion、Smoothness、Height 权重、控制权重或任何其他通道；
+- 首批不得为此新增纹理、Shader 属性、运行时对象或第二套细节系统。
+
+### 10.5 深水
 
 DeepWater 使用同一 Normal 层进行两次采样：
 
