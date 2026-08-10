@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering.Universal;
@@ -33,6 +34,30 @@ namespace WasteCity.Editor
             "Runtime/Data/UniversalRendererData.asset";
         private const string LitShaderName =
             "Universal Render Pipeline/Lit";
+        private const string TerrainProfileGuid =
+            "c2c0273740a844e7bbbee5d059d8af8e";
+        private const string TerrainMaterialGuid =
+            "aea10c6322a834daf8dd881841c99f7a";
+        private const string TerrainShaderGuid =
+            "c22a7d023c25475194aa0de160b7543e";
+        private const string TerrainBaseColorGuid =
+            "b1f08156ff6c64dbca1d51a8132ccc2d";
+        private const string TerrainNormalGuid =
+            "11955d2e24e2d4226b06b086fe3b072a";
+        private const string TerrainMaskGuid =
+            "417640ccdd04a4121a7180da2ce71277";
+        private const string TerrainHeightGuid =
+            "9263e65e9f2694421b9fbdb96b3f49a3";
+
+        private const string FirstBaseColorSourcePath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
+            "Wasteland/T_Terrain_Wasteland_BaseColor.png";
+        private const string FirstNormalSourcePath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
+            "Wasteland/T_Terrain_Wasteland_Normal.png";
+        private const string FirstMaskSourcePath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
+            "Wasteland/T_Terrain_Wasteland_Mask.png";
 
         [Serializable]
         private sealed class FoundationIdentity
@@ -48,12 +73,37 @@ namespace WasteCity.Editor
             public string globalObjectId;
         }
 
+        private sealed class ApprovedTerrainAssets
+        {
+            public FirstArtTerrainProfile3D Profile;
+            public Material Material;
+            public Shader Shader;
+            public Texture2DArray BaseColor;
+            public Texture2DArray Normal;
+            public Texture2DArray Mask;
+            public Texture2DArray Height;
+        }
+
         public static void Configure()
         {
             bool hasExistingScene =
                 TryOpenAndValidateFoundation(out Scene scene);
 
-            FirstArtTerrainAssetBuilder.BuildRuntimeAssets();
+            if (hasExistingScene)
+            {
+                ValidateFirstArtTerrainSceneStructure(
+                    scene,
+                    AssetDatabase.LoadAssetAtPath<
+                        FirstArtTerrainProfile3D>(
+                            FirstArtTerrainAssetBuilder.ProfilePath));
+            }
+
+            ApprovedTerrainAssets terrainAssets =
+                EnsureApprovedTerrainAssets();
+            if (hasExistingScene)
+                ValidateFirstArtTerrainContractWithAssets(
+                    scene,
+                    terrainAssets);
 
             Shader litShader = Shader.Find(LitShaderName);
             if (litShader == null)
@@ -72,7 +122,7 @@ namespace WasteCity.Editor
             if (!hasExistingScene)
                 scene = CreateFoundationScene(pipeline, material);
             EnsureBuildingContract(scene, material);
-            EnsureFirstArtTerrainContract(scene);
+            EnsureFirstArtTerrainContract(scene, terrainAssets.Profile);
             ValidateFirstArtTerrainContract(scene);
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
@@ -641,7 +691,9 @@ namespace WasteCity.Editor
             EditorSceneManager.MarkSceneDirty(scene);
         }
 
-        private static void EnsureFirstArtTerrainContract(Scene scene)
+        private static void EnsureFirstArtTerrainContract(
+            Scene scene,
+            FirstArtTerrainProfile3D profile)
         {
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform world = RequireChild(root.transform, "GrayboxWorld");
@@ -649,9 +701,6 @@ namespace WasteCity.Editor
                 EnsureChild(world, "FirstArtTerrainPresentation");
             FirstArtTerrainRenderer3D presenter =
                 EnsureComponent<FirstArtTerrainRenderer3D>(owner);
-            FirstArtTerrainProfile3D profile =
-                AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
-                    FirstArtTerrainAssetBuilder.ProfilePath);
             if (profile == null)
             {
                 throw new InvalidOperationException(
@@ -670,79 +719,50 @@ namespace WasteCity.Editor
 
         private static void ValidateFirstArtTerrainContract(Scene scene)
         {
+            ValidateFirstArtTerrainContractWithAssets(
+                scene,
+                LoadApprovedTerrainAssetsOrThrow());
+        }
+
+        private static void ValidateFirstArtTerrainContractWithAssets(
+            Scene scene,
+            ApprovedTerrainAssets assets)
+        {
+            FirstArtTerrainRenderer3D presenter =
+                ValidateFirstArtTerrainSceneStructure(
+                    scene,
+                    assets.Profile);
+            RequireReference(presenter, "profile", assets.Profile);
+        }
+
+        private static FirstArtTerrainRenderer3D
+            ValidateFirstArtTerrainSceneStructure(
+                Scene scene,
+                FirstArtTerrainProfile3D approvedProfile)
+        {
             if (!scene.IsValid() || !scene.isLoaded)
             {
                 throw new InvalidOperationException(
                     "The first-art terrain scene must be loaded.");
             }
 
-            FirstArtTerrainProfile3D approvedProfile =
-                RequireAsset<FirstArtTerrainProfile3D>(
-                    FirstArtTerrainAssetBuilder.ProfilePath);
-            Material approvedMaterial = RequireAsset<Material>(
-                FirstArtTerrainAssetBuilder.MaterialPath);
-            Shader approvedShader = RequireAsset<Shader>(
-                FirstArtTerrainAssetBuilder.ShaderPath);
-            Texture2DArray approvedBaseColor =
-                RequireAsset<Texture2DArray>(
-                    FirstArtTerrainAssetBuilder.BaseColorArrayPath);
-            Texture2DArray approvedNormal = RequireAsset<Texture2DArray>(
-                FirstArtTerrainAssetBuilder.NormalArrayPath);
-            Texture2DArray approvedMask = RequireAsset<Texture2DArray>(
-                FirstArtTerrainAssetBuilder.MaskArrayPath);
-            Texture2DArray approvedHeight = RequireAsset<Texture2DArray>(
-                FirstArtTerrainAssetBuilder.HeightArrayPath);
-            if (!approvedProfile.TryValidate(out string error))
-                throw new InvalidOperationException(error);
-
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform world = RequireChild(root.transform, "GrayboxWorld");
-            Transform owner =
-                RequireChild(world, "FirstArtTerrainPresentation");
-            FirstArtTerrainRenderer3D presenter =
-                RequireSingle<FirstArtTerrainRenderer3D>(scene);
-            GrayboxSceneBootstrap bootstrap =
-                RequireSingle<GrayboxSceneBootstrap>(scene);
-
-            RequireOwner(presenter, owner);
-            RequireReference(presenter, "profile", approvedProfile);
-            RequireReference(
-                bootstrap,
-                "terrainPresentationBehaviour",
-                presenter);
-
-            if (approvedProfile.Material != approvedMaterial ||
-                approvedProfile.BaseColorArray != approvedBaseColor ||
-                approvedProfile.NormalArray != approvedNormal ||
-                approvedProfile.MaskArray != approvedMask ||
-                approvedProfile.HeightArray != approvedHeight)
+            Transform owner = null;
+            var namedOwners = 0;
+            foreach (GameObject gameObject in FindSceneGameObjects(scene))
             {
-                throw new InvalidOperationException(
-                    "The approved terrain profile asset references are " +
-                    "invalid.");
-            }
-            if (approvedMaterial.shader != approvedShader ||
-                approvedShader.name !=
-                    FirstArtTerrainProfile3D.RequiredShaderName ||
-                approvedMaterial.GetTexture("_BaseColorArray") !=
-                    approvedBaseColor ||
-                approvedMaterial.GetTexture("_NormalArray") !=
-                    approvedNormal ||
-                approvedMaterial.GetTexture("_MaskArray") !=
-                    approvedMask ||
-                approvedMaterial.GetTexture("_HeightArray") !=
-                    approvedHeight)
-            {
-                throw new InvalidOperationException(
-                    "The approved terrain Material, Shader, or texture " +
-                    "array references are invalid.");
-            }
-
-            foreach (Transform descendant in
-                     owner.GetComponentsInChildren<Transform>(true))
-            {
-                if (descendant != owner && string.Equals(
-                        descendant.name,
+                int missingScriptCount =
+                    GameObjectUtility
+                        .GetMonoBehavioursWithMissingScriptCount(gameObject);
+                if (missingScriptCount != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Scene object '{gameObject.name}' contains " +
+                        $"{missingScriptCount} missing script(s).");
+                }
+                if (string.Equals(
+                        gameObject.name,
                         "RuntimeSurface",
                         StringComparison.Ordinal))
                 {
@@ -750,13 +770,345 @@ namespace WasteCity.Editor
                         "RuntimeSurface must not be serialized in the " +
                         "graybox scene.");
                 }
+                if (!string.Equals(
+                        gameObject.name,
+                        "FirstArtTerrainPresentation",
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                namedOwners++;
+                owner = gameObject.transform;
             }
-            if (owner.GetComponentsInChildren<Collider>(true).Length != 0)
+            if (namedOwners != 1)
             {
                 throw new InvalidOperationException(
-                    "The first-art terrain presenter must not own a " +
-                    "Collider.");
+                    "The scene requires exactly one GameObject named " +
+                    "FirstArtTerrainPresentation; found " +
+                    $"{namedOwners}.");
             }
+            if (owner.parent != world)
+            {
+                throw new InvalidOperationException(
+                    "FirstArtTerrainPresentation must be a direct child " +
+                    "of GrayboxWorld.");
+            }
+
+            FirstArtTerrainRenderer3D presenter =
+                RequireSingle<FirstArtTerrainRenderer3D>(scene);
+            GrayboxSceneBootstrap bootstrap =
+                RequireSingle<GrayboxSceneBootstrap>(scene);
+
+            RequireOwner(presenter, owner);
+            RequireReference(
+                bootstrap,
+                "terrainPresentationBehaviour",
+                presenter);
+            if (approvedProfile != null)
+                RequireReference(presenter, "profile", approvedProfile);
+
+            if (owner.childCount != 0)
+            {
+                throw new InvalidOperationException(
+                    "FirstArtTerrainPresentation must not contain " +
+                    "serialized children.");
+            }
+
+            Component[] components =
+                owner.GetComponents<Component>();
+            if (components.Length != 2)
+            {
+                throw new InvalidOperationException(
+                    "FirstArtTerrainPresentation may contain only its " +
+                    "Transform and FirstArtTerrainRenderer3D.");
+            }
+            var transformCount = 0;
+            var presenterCount = 0;
+            foreach (Component component in components)
+            {
+                if (component == null)
+                    throw new InvalidOperationException(
+                        "FirstArtTerrainPresentation contains a missing " +
+                        "script component.");
+                if (component is Transform)
+                    transformCount++;
+                if (ReferenceEquals(component, presenter))
+                    presenterCount++;
+            }
+            if (transformCount != 1 || presenterCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "FirstArtTerrainPresentation component ownership is " +
+                    "invalid.");
+            }
+
+            return presenter;
+        }
+
+        private static ApprovedTerrainAssets EnsureApprovedTerrainAssets()
+        {
+            if (TryLoadApprovedTerrainAssets(
+                    out ApprovedTerrainAssets assets,
+                    out _))
+            {
+                return assets;
+            }
+
+            FirstArtTerrainAssetBuilder.BuildRuntimeAssets();
+            if (!TryLoadApprovedTerrainAssets(out assets, out string error))
+            {
+                throw new InvalidOperationException(
+                    "Terrain runtime asset repair did not restore the " +
+                    $"approved contract: {error}");
+            }
+            return assets;
+        }
+
+        private static ApprovedTerrainAssets
+            LoadApprovedTerrainAssetsOrThrow()
+        {
+            if (!TryLoadApprovedTerrainAssets(
+                    out ApprovedTerrainAssets assets,
+                    out string error))
+            {
+                throw new InvalidOperationException(
+                    $"Approved terrain assets are invalid: {error}");
+            }
+            return assets;
+        }
+
+        private static bool TryLoadApprovedTerrainAssets(
+            out ApprovedTerrainAssets assets,
+            out string error)
+        {
+            assets = new ApprovedTerrainAssets();
+            if (!TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.ProfilePath,
+                    TerrainProfileGuid,
+                    out assets.Profile,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.MaterialPath,
+                    TerrainMaterialGuid,
+                    out assets.Material,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.ShaderPath,
+                    TerrainShaderGuid,
+                    out assets.Shader,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.BaseColorArrayPath,
+                    TerrainBaseColorGuid,
+                    out assets.BaseColor,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.NormalArrayPath,
+                    TerrainNormalGuid,
+                    out assets.Normal,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.MaskArrayPath,
+                    TerrainMaskGuid,
+                    out assets.Mask,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtTerrainAssetBuilder.HeightArrayPath,
+                    TerrainHeightGuid,
+                    out assets.Height,
+                    out error))
+            {
+                return false;
+            }
+
+            if (!string.Equals(
+                    assets.Profile.name,
+                    "FirstArtTerrainProfile3D",
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    assets.Material.name,
+                    "MAT_Terrain_FirstPass",
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    assets.Shader.name,
+                    FirstArtTerrainProfile3D.RequiredShaderName,
+                    StringComparison.Ordinal))
+            {
+                error = "Terrain Profile, Material, or Shader identity " +
+                        "name is invalid.";
+                return false;
+            }
+            if (!assets.Profile.TryValidate(out error))
+                return false;
+            if (assets.Profile.Material != assets.Material ||
+                assets.Profile.BaseColorArray != assets.BaseColor ||
+                assets.Profile.NormalArray != assets.Normal ||
+                assets.Profile.MaskArray != assets.Mask ||
+                assets.Profile.HeightArray != assets.Height)
+            {
+                error = "Terrain Profile references do not match the " +
+                        "approved asset identities.";
+                return false;
+            }
+            if (assets.Material.shader != assets.Shader ||
+                assets.Material.GetTexture("_BaseColorArray") !=
+                    assets.BaseColor ||
+                assets.Material.GetTexture("_NormalArray") !=
+                    assets.Normal ||
+                assets.Material.GetTexture("_MaskArray") != assets.Mask ||
+                assets.Material.GetTexture("_HeightArray") != assets.Height)
+            {
+                error = "Terrain Material references do not match the " +
+                        "approved Shader and texture-array identities.";
+                return false;
+            }
+
+            if (!ValidatePrimaryArray(
+                    assets.BaseColor,
+                    "TA_Terrain_BaseColor",
+                    FirstBaseColorSourcePath,
+                    out error) ||
+                !ValidatePrimaryArray(
+                    assets.Normal,
+                    "TA_Terrain_Normal",
+                    FirstNormalSourcePath,
+                    out error) ||
+                !ValidatePrimaryArray(
+                    assets.Mask,
+                    "TA_Terrain_Mask",
+                    FirstMaskSourcePath,
+                    out error) ||
+                !ValidateHeightArray(assets.Height, out error))
+            {
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool TryLoadExactAsset<T>(
+            string assetPath,
+            string expectedGuid,
+            out T asset,
+            out string error)
+            where T : UnityEngine.Object
+        {
+            asset = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+            string actualGuid = AssetDatabase.AssetPathToGUID(assetPath);
+            if (asset == null ||
+                !string.Equals(
+                    AssetDatabase.GetAssetPath(asset),
+                    assetPath,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    actualGuid,
+                    expectedGuid,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    AssetDatabase.GUIDToAssetPath(expectedGuid),
+                    assetPath,
+                    StringComparison.Ordinal))
+            {
+                error = $"Required {typeof(T).Name} at '{assetPath}' " +
+                        $"does not have approved GUID {expectedGuid}.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static bool ValidatePrimaryArray(
+            Texture2DArray array,
+            string expectedName,
+            string formatSourcePath,
+            out string error)
+        {
+            Texture2D source =
+                AssetDatabase.LoadAssetAtPath<Texture2D>(formatSourcePath);
+            if (!ValidateCommonArray(
+                    array,
+                    expectedName,
+                    FirstArtTerrainProfile3D.PrimaryArraySize,
+                    out error) ||
+                source == null ||
+                array.format != source.format ||
+                array.graphicsFormat != source.graphicsFormat ||
+                array.mipmapCount != source.mipmapCount)
+            {
+                if (string.IsNullOrEmpty(error))
+                {
+                    error = $"Terrain array '{expectedName}' does not " +
+                            $"match '{formatSourcePath}'.";
+                }
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool ValidateHeightArray(
+            Texture2DArray array,
+            out string error)
+        {
+            if (!ValidateCommonArray(
+                    array,
+                    "TA_Terrain_Height",
+                    FirstArtTerrainProfile3D.HeightArraySize,
+                    out error) ||
+                array.format != TextureFormat.R8 ||
+                array.graphicsFormat != GraphicsFormat.R8_UNorm ||
+                array.mipmapCount != MipCount(
+                    FirstArtTerrainProfile3D.HeightArraySize))
+            {
+                if (string.IsNullOrEmpty(error))
+                    error = "Terrain height array format is invalid.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool ValidateCommonArray(
+            Texture2DArray array,
+            string expectedName,
+            int expectedSize,
+            out string error)
+        {
+            if (array == null ||
+                !string.Equals(
+                    array.name,
+                    expectedName,
+                    StringComparison.Ordinal) ||
+                array.width != expectedSize ||
+                array.height != expectedSize ||
+                array.depth != FirstArtTerrainCatalog3D.LayerCount ||
+                array.wrapMode != TextureWrapMode.Repeat ||
+                array.filterMode != FilterMode.Bilinear ||
+                array.anisoLevel != 4 ||
+                array.mipmapCount <= 1 ||
+                !array.isReadable)
+            {
+                error = $"Terrain array '{expectedName}' has invalid " +
+                        "dimensions, sampling, or readability settings.";
+                return false;
+            }
+
+            error = null;
+            return true;
+        }
+
+        private static int MipCount(int size)
+        {
+            var count = 1;
+            while (size > 1)
+            {
+                size >>= 1;
+                count++;
+            }
+            return count;
         }
 
         private static GrayboxMobileCityController3D CreateMobileCity(
@@ -1069,6 +1421,18 @@ namespace WasteCity.Editor
             var result = new List<T>();
             foreach (GameObject root in scene.GetRootGameObjects())
                 result.AddRange(root.GetComponentsInChildren<T>(true));
+            return result;
+        }
+
+        private static List<GameObject> FindSceneGameObjects(Scene scene)
+        {
+            var result = new List<GameObject>();
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (Transform transform in
+                     root.GetComponentsInChildren<Transform>(true))
+            {
+                result.Add(transform.gameObject);
+            }
             return result;
         }
 
