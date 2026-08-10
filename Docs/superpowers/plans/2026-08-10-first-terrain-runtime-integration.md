@@ -1633,7 +1633,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
