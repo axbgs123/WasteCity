@@ -56,7 +56,7 @@ namespace WasteCity.ArtIntegration3D
 
         public void Configure(FirstArtTerrainProfile3D profile)
         {
-            if (this.profile == profile)
+            if (ReferenceEquals(this.profile, profile))
                 return;
 
             ClearPresentation();
@@ -130,8 +130,6 @@ namespace WasteCity.ArtIntegration3D
                 localControlMaps?.Dispose();
                 DestroyOwned(localMesh);
                 propertyBlock?.Clear();
-                if (worldView != null)
-                    worldView.SetSurfaceFallbackVisible(true);
                 LastPresentationError = exception.Message;
                 if (logFailure)
                 {
@@ -148,8 +146,15 @@ namespace WasteCity.ArtIntegration3D
         {
             if (retainedWorldView != null)
             {
-                retainedWorldView.DetachTerrainPresentation(this);
-                retainedWorldView.SetSurfaceFallbackVisible(true);
+                bool ownsFallback =
+                    retainedWorldView.IsTerrainPresentationActive(this);
+                bool hasCompetingPresentation =
+                    retainedWorldView.HasActiveTerrainPresentation &&
+                    !ownsFallback;
+                if (ownsFallback)
+                    retainedWorldView.DetachTerrainPresentation(this);
+                if (!hasCompetingPresentation)
+                    retainedWorldView.SetSurfaceFallbackVisible(true);
             }
 
             if (propertyBlock != null)

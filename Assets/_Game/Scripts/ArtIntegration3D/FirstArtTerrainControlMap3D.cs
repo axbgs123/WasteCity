@@ -32,8 +32,6 @@ namespace WasteCity.ArtIntegration3D
 
     public sealed class FirstArtTerrainControlMap3D : IDisposable
     {
-        internal static Action AfterControlAAllocatedForTests;
-
         private bool disposed;
 
         public int Width { get; }
@@ -48,6 +46,21 @@ namespace WasteCity.ArtIntegration3D
             int height,
             byte[] controlABytes,
             byte[] controlBBytes)
+            : this(
+                width,
+                height,
+                controlABytes,
+                controlBBytes,
+                null)
+        {
+        }
+
+        internal FirstArtTerrainControlMap3D(
+            int width,
+            int height,
+            byte[] controlABytes,
+            byte[] controlBBytes,
+            Action afterControlAAllocated)
         {
             if (width <= 0)
                 throw new ArgumentOutOfRangeException(nameof(width));
@@ -78,7 +91,7 @@ namespace WasteCity.ArtIntegration3D
                     height,
                     controlABytes,
                     "FirstArtTerrainControlA");
-                AfterControlAAllocatedForTests?.Invoke();
+                afterControlAAllocated?.Invoke();
                 localControlB = CreateTexture(
                     width,
                     height,

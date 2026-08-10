@@ -22,6 +22,10 @@ namespace WasteCity.Tests
         public bool CreatePartialOwnership { get; set; }
         public bool ParticipateInWorldLifecycle { get; set; }
         public bool HideFallbackBeforeFailure { get; set; }
+        public bool DetachOnClear { get; set; } = true;
+        public bool HideFallbackDuringClear { get; set; }
+        public bool ThrowBeforeReleaseOnClear { get; set; }
+        public int ThrowOnClearCall { get; set; }
         public int TryPresentCalls { get; private set; }
         public int ClearPresentationCalls { get; private set; }
         public bool SawModel { get; private set; }
@@ -58,15 +62,32 @@ namespace WasteCity.Tests
         public void ClearPresentation()
         {
             ClearPresentationCalls++;
+            bool shouldThrow = ThrowOnClear &&
+                (ThrowOnClearCall <= 0 ||
+                 ThrowOnClearCall == ClearPresentationCalls);
+            if (retainedWorldView != null && HideFallbackDuringClear)
+                retainedWorldView.SetSurfaceFallbackVisible(false);
+            if (shouldThrow && ThrowBeforeReleaseOnClear)
+            {
+                if (retainedWorldView != null && DetachOnClear)
+                {
+                    GrayboxWorldView3D viewToDetach = retainedWorldView;
+                    retainedWorldView = null;
+                    viewToDetach.DetachTerrainPresentation(this);
+                }
+                throw new InvalidOperationException(
+                    "Injected presenter cleanup failure.");
+            }
+
             ReleaseOwnedResources();
-            if (retainedWorldView != null)
+            if (retainedWorldView != null && DetachOnClear)
             {
                 GrayboxWorldView3D viewToDetach = retainedWorldView;
                 retainedWorldView = null;
                 viewToDetach.DetachTerrainPresentation(this);
                 viewToDetach.SetSurfaceFallbackVisible(true);
             }
-            if (ThrowOnClear)
+            if (shouldThrow)
             {
                 throw new InvalidOperationException(
                     "Injected presenter cleanup failure.");
@@ -352,6 +373,52 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Configure_WithSameLiveDependencies_RemainsIdempotent()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.ParticipateInWorldLifecycle = true;
+            presenter.CreatePartialOwnership = true;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+            WorldMapModel initializedWorld = bootstrap.World;
+
+            bootstrap.Configure(scope, view, presenter);
+
+            Assert.That(bootstrap.IsInitialized, Is.True);
+            Assert.That(bootstrap.World, Is.SameAs(initializedWorld));
+            Assert.That(presenter.ClearPresentationCalls, Is.Zero);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.True);
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+        }
+
+        [Test]
+        public void Configure_DestroyedDependenciesAndExplicitNull_ResetState()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+            UnityEngine.Object.DestroyImmediate(presenter.gameObject);
+            UnityEngine.Object.DestroyImmediate(view.gameObject);
+
+            bootstrap.Configure(scope, null, null);
+
+            Assert.That(presenter.ClearPresentationCalls, Is.EqualTo(1));
+            Assert.That(bootstrap.IsInitialized, Is.False);
+            Assert.That(bootstrap.World, Is.Null);
+            Assert.That(bootstrap.Initialize(), Is.False);
+        }
+
+        [Test]
         public void Configure_ReplacingRealPresenterPreventsOldSourceResurrection()
         {
             GrayboxUrpScope scope = NewScope(NewPipeline());
@@ -402,6 +469,67 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void ExternalGenerate_WhenPreRebuildCleanupThrows_RetainsHandleForRetry()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.ParticipateInWorldLifecycle = true;
+            presenter.CreatePartialOwnership = true;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+            WorldMapModel originalModel = view.Model;
+            int originalRendererCount = view.WorldRendererCount;
+            GameObject oldObject = presenter.OwnedObject;
+            Mesh oldMesh = presenter.OwnedMesh;
+            presenter.ThrowOnClear = true;
+            presenter.ThrowOnClearCall = 1;
+            presenter.ThrowBeforeReleaseOnClear = true;
+            presenter.HideFallbackDuringClear = true;
+            WorldMapModel replacement = new WorldMapModel(
+                4,
+                3,
+                new WorldSeed(104729));
+
+            Assert.That(
+                () => view.Generate(replacement),
+                Throws.TypeOf<InvalidOperationException>()
+                    .With.Message.EqualTo(
+                        "Injected presenter cleanup failure."));
+
+            Assert.That(view.Model, Is.SameAs(originalModel));
+            Assert.That(
+                view.WorldRendererCount,
+                Is.EqualTo(originalRendererCount));
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.True);
+            Assert.That(oldObject, Is.Not.Null);
+            Assert.That(oldMesh, Is.Not.Null);
+
+            presenter.ThrowOnClear = false;
+            presenter.HideFallbackDuringClear = false;
+            Assert.DoesNotThrow(() => view.Generate(replacement));
+
+            Assert.That(view.Model, Is.SameAs(replacement));
+            Assert.That(oldObject == null, Is.True);
+            Assert.That(oldMesh == null, Is.True);
+            Assert.That(presenter.TryPresentCalls, Is.EqualTo(2));
+            Assert.That(presenter.ClearPresentationCalls, Is.EqualTo(2));
+            Assert.That(
+                presenter.GetComponentsInChildren<MeshFilter>(true).Length,
+                Is.EqualTo(1));
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.True);
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
         public void ExternalGenerate_WhenRepresentationReturnsFalse_CleansAndRestoresFallback()
         {
             GrayboxUrpScope scope = NewScope(NewPipeline());
@@ -414,6 +542,7 @@ namespace WasteCity.Tests
             Assert.That(bootstrap.Initialize(), Is.True);
             presenter.Result = false;
             presenter.HideFallbackBeforeFailure = true;
+            presenter.DetachOnClear = false;
 
             Assert.DoesNotThrow(
                 () => view.Generate(new WorldMapModel(
@@ -424,6 +553,10 @@ namespace WasteCity.Tests
             Assert.That(presenter.TryPresentCalls, Is.EqualTo(2));
             Assert.That(presenter.ClearPresentationCalls, Is.EqualTo(2));
             Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.False);
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]
@@ -439,6 +572,7 @@ namespace WasteCity.Tests
             Assert.That(bootstrap.Initialize(), Is.True);
             presenter.ThrowOnPresent = true;
             presenter.HideFallbackBeforeFailure = true;
+            presenter.DetachOnClear = false;
 
             Assert.That(
                 () => view.Generate(new WorldMapModel(
@@ -451,6 +585,96 @@ namespace WasteCity.Tests
             Assert.That(presenter.TryPresentCalls, Is.EqualTo(2));
             Assert.That(presenter.ClearPresentationCalls, Is.EqualTo(2));
             Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.False);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void ExternalGenerate_WhenRepresentationReturnsFalseAndCleanupThrows_PreservesCleanupError()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.ParticipateInWorldLifecycle = true;
+            presenter.CreatePartialOwnership = true;
+            presenter.DetachOnClear = false;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+            presenter.Result = false;
+            presenter.HideFallbackBeforeFailure = true;
+            presenter.ThrowOnClear = true;
+            presenter.ThrowOnClearCall = 2;
+
+            InvalidOperationException exception =
+                Assert.Throws<InvalidOperationException>(
+                    () => view.Generate(new WorldMapModel(
+                        4,
+                        3,
+                        new WorldSeed(104729))));
+
+            Assert.That(
+                exception.Message,
+                Is.EqualTo(
+                    "Terrain presentation returned false and cleanup " +
+                    "failed."));
+            Assert.That(
+                exception.InnerException,
+                Is.TypeOf<InvalidOperationException>());
+            Assert.That(
+                exception.InnerException.Message,
+                Is.EqualTo("Injected presenter cleanup failure."));
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.False);
+            Assert.That(presenter.OwnedObject == null, Is.True);
+            Assert.That(presenter.OwnedMesh == null, Is.True);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
+        public void ExternalGenerate_WhenRepresentationAndCleanupThrow_AggregatesInAttemptFirstOrder()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.ParticipateInWorldLifecycle = true;
+            presenter.CreatePartialOwnership = true;
+            presenter.DetachOnClear = false;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+            presenter.ThrowOnPresent = true;
+            presenter.HideFallbackBeforeFailure = true;
+            presenter.ThrowOnClear = true;
+            presenter.ThrowOnClearCall = 2;
+
+            AggregateException exception =
+                Assert.Throws<AggregateException>(
+                    () => view.Generate(new WorldMapModel(
+                        4,
+                        3,
+                        new WorldSeed(104729))));
+
+            Assert.That(exception.InnerExceptions.Count, Is.EqualTo(2));
+            Assert.That(
+                exception.InnerExceptions[0].Message,
+                Is.EqualTo("Injected presenter failure."));
+            Assert.That(
+                exception.InnerExceptions[1].Message,
+                Is.EqualTo("Injected presenter cleanup failure."));
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.False);
+            Assert.That(presenter.OwnedObject == null, Is.True);
+            Assert.That(presenter.OwnedMesh == null, Is.True);
+            LogAssert.NoUnexpectedReceived();
         }
 
         [Test]

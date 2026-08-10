@@ -49,6 +49,15 @@ namespace WasteCity.Graybox3D
         public bool SurfaceFallbackVisible { get; private set; } = true;
         public int WorldRendererCount => generatedObjects.Count;
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
+        public bool HasActiveTerrainPresentation =>
+            IsPresentationAlive(activeTerrainPresentation);
+
+        public bool IsTerrainPresentationActive(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            return ReferenceEquals(activeTerrainPresentation, presentation) &&
+                IsPresentationAlive(presentation);
+        }
 
         public void Configure(
             Transform terrainRoot,
@@ -114,7 +123,7 @@ namespace WasteCity.Graybox3D
         {
             if (presentation == null)
                 throw new ArgumentNullException(nameof(presentation));
-            if (IsPresentationAlive(activeTerrainPresentation) &&
+            if (HasActiveTerrainPresentation &&
                 !ReferenceEquals(activeTerrainPresentation, presentation))
             {
                 throw new InvalidOperationException(
@@ -168,14 +177,38 @@ namespace WasteCity.Graybox3D
         {
             IGrayboxTerrainPresentation3D presentation =
                 activeTerrainPresentation;
-            activeTerrainPresentation = null;
             if (presentation == null)
                 return null;
 
-            SetSurfaceFallbackVisible(true);
-            if (IsPresentationAlive(presentation))
+            if (!IsPresentationAlive(presentation))
+            {
+                activeTerrainPresentation = null;
+                SetSurfaceFallbackVisible(true);
+                return null;
+            }
+
+            bool cleanupSucceeded = false;
+            try
+            {
                 presentation.ClearPresentation();
-            return presentation;
+                cleanupSucceeded = true;
+                return presentation;
+            }
+            finally
+            {
+                SetSurfaceFallbackVisible(true);
+                if (cleanupSucceeded)
+                {
+                    if (ReferenceEquals(
+                            activeTerrainPresentation,
+                            presentation))
+                        activeTerrainPresentation = null;
+                }
+                else
+                {
+                    activeTerrainPresentation = presentation;
+                }
+            }
         }
 
         private static bool IsPresentationAlive(

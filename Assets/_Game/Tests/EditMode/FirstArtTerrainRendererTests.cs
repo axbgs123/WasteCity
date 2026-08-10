@@ -121,6 +121,94 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Configure_WithSameLiveProfile_PreservesPresentation()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            FirstArtTerrainProfile3D profile = LoadApprovedProfile();
+            FirstArtTerrainRenderer3D presenter = CreatePresenter(profile);
+            Assert.That(presenter.TryPresent(view), Is.True);
+            MeshRenderer surface = presenter.SurfaceRenderer;
+            FirstArtTerrainControlMap3D maps = presenter.ControlMaps;
+
+            presenter.Configure(profile);
+
+            Assert.That(presenter.IsPresented, Is.True);
+            Assert.That(presenter.SurfaceRenderer, Is.SameAs(surface));
+            Assert.That(presenter.ControlMaps, Is.SameAs(maps));
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.True);
+            AssertFallbackState(view, false);
+        }
+
+        [Test]
+        public void Configure_DestroyedProfileAndExplicitNull_ClearsAndResets()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            FirstArtTerrainProfile3D profile =
+                CreateProfileClone(LoadApprovedProfile());
+            FirstArtTerrainRenderer3D presenter = CreatePresenter(profile);
+            Assert.That(presenter.TryPresent(view), Is.True);
+            Mesh oldMesh = presenter.SurfaceRenderer
+                .GetComponent<MeshFilter>().sharedMesh;
+            Texture2D oldControlA = presenter.ControlMaps.ControlA;
+            Texture2D oldControlB = presenter.ControlMaps.ControlB;
+            UnityEngine.Object.DestroyImmediate(profile);
+
+            presenter.Configure(null);
+
+            Assert.That(
+                ReferenceEquals(presenter.Profile, null),
+                Is.True);
+            Assert.That(presenter.IsPresented, Is.False);
+            Assert.That(oldMesh == null, Is.True);
+            Assert.That(oldControlA == null, Is.True);
+            Assert.That(oldControlB == null, Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(presenter),
+                Is.False);
+            AssertFallbackState(view, true);
+        }
+
+        [Test]
+        public void TryPresent_WhenAnotherPresenterIsActive_CleansRejectedOwnershipWithoutChangingFallback()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            FirstArtTerrainProfile3D profile = LoadApprovedProfile();
+            FirstArtTerrainRenderer3D active = CreatePresenter(profile);
+            FirstArtTerrainRenderer3D rejected = CreatePresenter(profile);
+            Assert.That(active.TryPresent(view), Is.True);
+            MeshRenderer activeSurface = active.SurfaceRenderer;
+            FirstArtTerrainControlMap3D activeMaps = active.ControlMaps;
+            int meshCount = RuntimeSurfaceMeshCount();
+            int controlTextureCount = RuntimeControlTextureCount();
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("A terrain presentation is already attached"));
+
+            Assert.That(rejected.TryPresent(view), Is.False);
+
+            Assert.That(active.IsPresented, Is.True);
+            Assert.That(active.SurfaceRenderer, Is.SameAs(activeSurface));
+            Assert.That(active.ControlMaps, Is.SameAs(activeMaps));
+            Assert.That(rejected.IsPresented, Is.False);
+            Assert.That(RuntimeSurfaceCount(active), Is.EqualTo(1));
+            Assert.That(RuntimeSurfaceCount(rejected), Is.Zero);
+            Assert.That(RuntimeSurfaceMeshCount(), Is.EqualTo(meshCount));
+            Assert.That(
+                RuntimeControlTextureCount(),
+                Is.EqualTo(controlTextureCount));
+            Assert.That(
+                view.IsTerrainPresentationActive(active),
+                Is.True);
+            Assert.That(
+                view.IsTerrainPresentationActive(rejected),
+                Is.False);
+            AssertFallbackState(view, false);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [Test]
         public void ExternalGenerate_AfterPresentationRebuildsExactlyOneFreshFormalSurface()
         {
             GrayboxWorldView3D view = CreateCatalogView();
@@ -447,6 +535,15 @@ namespace WasteCity.Tests
                 .Count(mesh =>
                     mesh != null &&
                     mesh.name == "first-art.terrain.surface");
+        }
+
+        private static int RuntimeControlTextureCount()
+        {
+            return Resources.FindObjectsOfTypeAll<Texture2D>()
+                .Count(texture =>
+                    texture != null &&
+                    (texture.name == "FirstArtTerrainControlA" ||
+                     texture.name == "FirstArtTerrainControlB"));
         }
 
         private static Transform NewChild(Transform parent, string name)

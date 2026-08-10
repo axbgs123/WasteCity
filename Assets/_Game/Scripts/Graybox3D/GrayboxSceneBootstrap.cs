@@ -29,10 +29,11 @@ namespace WasteCity.Graybox3D
             GrayboxWorldView3D worldView,
             MonoBehaviour terrainPresentationBehaviour)
         {
-            if (this.renderScope == renderScope &&
-                this.worldView == worldView &&
-                this.terrainPresentationBehaviour ==
-                    terrainPresentationBehaviour)
+            if (ReferenceEquals(this.renderScope, renderScope) &&
+                ReferenceEquals(this.worldView, worldView) &&
+                ReferenceEquals(
+                    this.terrainPresentationBehaviour,
+                    terrainPresentationBehaviour))
                 return;
 
             ClearConfiguredPresentation();

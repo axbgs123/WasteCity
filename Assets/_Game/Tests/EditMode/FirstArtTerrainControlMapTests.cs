@@ -169,32 +169,44 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Generate_WhenFaultInjectedAfterControlAAllocation_DestroysPartialTexture()
+        public void Constructor_WhenPerInstanceFaultOccursAfterControlAAllocation_DestroysPartialTexture()
         {
-            FieldInfo faultSeam = typeof(FirstArtTerrainControlMap3D).GetField(
-                "AfterControlAAllocatedForTests",
-                BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.That(faultSeam, Is.Not.Null);
+            ConstructorInfo faultConstructor =
+                typeof(FirstArtTerrainControlMap3D).GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[]
+                    {
+                        typeof(int),
+                        typeof(int),
+                        typeof(byte[]),
+                        typeof(byte[]),
+                        typeof(Action),
+                    },
+                    null);
+            Assert.That(faultConstructor, Is.Not.Null);
             int textureCountBefore = RuntimeControlTextureCount();
             var injectedFailure = new Action(
                 () => throw new InvalidOperationException(
                     "Injected after Control A allocation."));
-            faultSeam.SetValue(null, injectedFailure);
+            TargetInvocationException invocationException =
+                Assert.Throws<TargetInvocationException>(
+                    () => faultConstructor.Invoke(
+                        new object[]
+                        {
+                            1,
+                            1,
+                            new byte[4],
+                            new byte[4],
+                            injectedFailure,
+                        }));
 
-            try
-            {
-                Assert.That(
-                    () => FirstArtTerrainControlMapGenerator3D.Generate(
-                        CreateSevenStripeMap(),
-                        profile),
-                    Throws.TypeOf<InvalidOperationException>()
-                        .With.Message.EqualTo(
-                            "Injected after Control A allocation."));
-            }
-            finally
-            {
-                faultSeam.SetValue(null, null);
-            }
+            Assert.That(
+                invocationException.InnerException,
+                Is.TypeOf<InvalidOperationException>());
+            Assert.That(
+                invocationException.InnerException.Message,
+                Is.EqualTo("Injected after Control A allocation."));
 
             Assert.That(
                 RuntimeControlTextureCount(),
