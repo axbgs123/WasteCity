@@ -21,6 +21,37 @@ namespace WasteCity.Tests
             "Assets/_Game/Scenes/GrayboxPrototype3D.unity";
         private const string FormalScenePath =
             "Assets/_Game/Scenes/FormalPrototype.unity";
+        private const string TemporaryScenePath =
+            "Assets/_Game/Tests/EditMode/" +
+            "TempFirstArtTerrainSceneContract.unity";
+        private const string TemporaryProfilePath =
+            "Assets/_Game/Tests/EditMode/" +
+            "TempFirstArtTerrainProfile.asset";
+
+        public enum RepairableSceneMutation
+        {
+            OwnerMissingPresenter,
+            PresenterMissingProfile,
+            MissingBootstrapReference
+        }
+
+        public enum MalformedSceneMutation
+        {
+            DuplicateNamedOwner,
+            PresenterElsewhere,
+            WrongParent,
+            RenamedOwner,
+            RuntimeSurfaceChild,
+            RenamedChild,
+            MeshFilter,
+            MeshRendererAndMaterial,
+            Collider,
+            OtherOwnerComponent,
+            DuplicateBootstrap,
+            MissingScript,
+            AlternateBootstrapReference,
+            UnapprovedProfileReference
+        }
 
         private static readonly string[] TerrainNames =
         {
@@ -48,6 +79,8 @@ namespace WasteCity.Tests
             EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
+            AssetDatabase.DeleteAsset(TemporaryScenePath);
+            AssetDatabase.DeleteAsset(TemporaryProfilePath);
         }
 
         [Test]
@@ -156,6 +189,199 @@ namespace WasteCity.Tests
             Assert.That(scenes[0].path, Is.EqualTo(ScenePath));
             Assert.That(scenes[1].enabled, Is.True);
             Assert.That(scenes[1].path, Is.EqualTo(FormalScenePath));
+        }
+
+        [Test]
+        public void ConfigureAtPath_AuthorsThePreTask7FoundationIncrementally()
+        {
+            CreateTemporaryScene(scene =>
+            {
+                FirstArtTerrainRenderer3D presenter =
+                    FindSingle<FirstArtTerrainRenderer3D>(scene);
+                GrayboxSceneBootstrap bootstrap =
+                    FindSingle<GrayboxSceneBootstrap>(scene);
+                SetReference(
+                    bootstrap,
+                    "terrainPresentationBehaviour",
+                    null);
+                Object.DestroyImmediate(presenter.gameObject);
+            });
+            Scene beforeScene = EditorSceneManager.OpenScene(
+                TemporaryScenePath,
+                OpenSceneMode.Single);
+            Assert.That(
+                FindAll<FirstArtTerrainRenderer3D>(beforeScene),
+                Is.Empty);
+            Assert.That(
+                FindNamedObjects(
+                    beforeScene,
+                    "FirstArtTerrainPresentation"),
+                Is.Empty);
+            AssertReference(
+                FindSingle<GrayboxSceneBootstrap>(beforeScene),
+                "terrainPresentationBehaviour",
+                null);
+            Dictionary<string, ProtectedFileState> protectedBefore =
+                CaptureProtectedFileStates();
+            var builderCalled = false;
+            FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint =
+                ignored =>
+                {
+                    builderCalled = true;
+                    throw new InvalidOperationException(
+                        "Valid approved assets must bypass the terrain builder.");
+                };
+
+            InvokeConfigureAtPath();
+            string firstSceneHash = FileHash(TemporaryScenePath);
+            string firstSceneGuid =
+                AssetDatabase.AssetPathToGUID(TemporaryScenePath);
+            string[] firstGlobalIds =
+                CaptureSceneGlobalIds(TemporaryScenePath);
+            Dictionary<string, ProtectedFileState> protectedAfterFirst =
+                CaptureProtectedFileStates();
+            Scene authoredScene = EditorSceneManager.OpenScene(
+                TemporaryScenePath,
+                OpenSceneMode.Single);
+            AssertValidationAccepts(authoredScene);
+            FirstArtTerrainRenderer3D authoredPresenter =
+                FindSingle<FirstArtTerrainRenderer3D>(authoredScene);
+            Assert.That(
+                FindNamedObjects(
+                    authoredScene,
+                    "FirstArtTerrainPresentation").Count,
+                Is.EqualTo(1));
+            AssertReference(
+                FindSingle<GrayboxSceneBootstrap>(authoredScene),
+                "terrainPresentationBehaviour",
+                authoredPresenter);
+
+            InvokeConfigureAtPath();
+
+            Assert.That(builderCalled, Is.False);
+            Assert.That(
+                FileHash(TemporaryScenePath),
+                Is.EqualTo(firstSceneHash));
+            Assert.That(
+                AssetDatabase.AssetPathToGUID(TemporaryScenePath),
+                Is.EqualTo(firstSceneGuid));
+            Assert.That(
+                CaptureSceneGlobalIds(TemporaryScenePath),
+                Is.EqualTo(firstGlobalIds));
+            AssertProtectedStatesEqual(
+                protectedBefore,
+                protectedAfterFirst,
+                "incremental first pass");
+            AssertProtectedStatesEqual(
+                protectedBefore,
+                CaptureProtectedFileStates(),
+                "incremental second pass");
+        }
+
+        [TestCase(RepairableSceneMutation.OwnerMissingPresenter)]
+        [TestCase(RepairableSceneMutation.PresenterMissingProfile)]
+        [TestCase(RepairableSceneMutation.MissingBootstrapReference)]
+        public void ConfigureAtPath_RepairsOnlyOwnedAbsentState(
+            RepairableSceneMutation mutation)
+        {
+            CreateTemporaryScene(
+                scene => ApplyRepairableMutation(scene, mutation));
+            Dictionary<string, ProtectedFileState> protectedBefore =
+                CapturePreMutationProtectedFileStates();
+            var builderCalled = false;
+            FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint =
+                ignored =>
+                {
+                    builderCalled = true;
+                    throw new InvalidOperationException(
+                        "Valid approved assets must bypass the terrain builder.");
+                };
+
+            InvokeConfigureAtPath();
+
+            Scene repaired = EditorSceneManager.OpenScene(
+                TemporaryScenePath,
+                OpenSceneMode.Single);
+            AssertValidationAccepts(repaired);
+            FirstArtTerrainRenderer3D presenter =
+                FindSingle<FirstArtTerrainRenderer3D>(repaired);
+            Assert.That(
+                FindNamedObjects(
+                    repaired,
+                    "FirstArtTerrainPresentation").Count,
+                Is.EqualTo(1));
+            AssertReference(
+                FindSingle<GrayboxSceneBootstrap>(repaired),
+                "terrainPresentationBehaviour",
+                presenter);
+            Assert.That(builderCalled, Is.False, mutation.ToString());
+            AssertProtectedStatesEqual(
+                protectedBefore,
+                CapturePreMutationProtectedFileStates(),
+                mutation.ToString());
+        }
+
+        [TestCase(MalformedSceneMutation.DuplicateNamedOwner)]
+        [TestCase(MalformedSceneMutation.PresenterElsewhere)]
+        [TestCase(MalformedSceneMutation.WrongParent)]
+        [TestCase(MalformedSceneMutation.RenamedOwner)]
+        [TestCase(MalformedSceneMutation.RuntimeSurfaceChild)]
+        [TestCase(MalformedSceneMutation.RenamedChild)]
+        [TestCase(MalformedSceneMutation.MeshFilter)]
+        [TestCase(MalformedSceneMutation.MeshRendererAndMaterial)]
+        [TestCase(MalformedSceneMutation.Collider)]
+        [TestCase(MalformedSceneMutation.OtherOwnerComponent)]
+        [TestCase(MalformedSceneMutation.DuplicateBootstrap)]
+        [TestCase(MalformedSceneMutation.MissingScript)]
+        [TestCase(MalformedSceneMutation.AlternateBootstrapReference)]
+        [TestCase(MalformedSceneMutation.UnapprovedProfileReference)]
+        public void ConfigureAtPath_RejectsMalformedSceneBeforeMutation(
+            MalformedSceneMutation mutation)
+        {
+            CreateTemporaryScene(
+                scene => ApplyMalformedMutation(scene, mutation));
+            byte[] sceneBytesBefore =
+                File.ReadAllBytes(ProjectAbsolutePath(TemporaryScenePath));
+            byte[] sceneMetaBytesBefore = File.ReadAllBytes(
+                ProjectAbsolutePath(TemporaryScenePath + ".meta"));
+            string sceneGuidBefore =
+                AssetDatabase.AssetPathToGUID(TemporaryScenePath);
+            Dictionary<string, ProtectedFileState> protectedBefore =
+                CapturePreMutationProtectedFileStates();
+            var builderCalled = false;
+            FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint =
+                ignored =>
+                {
+                    builderCalled = true;
+                    throw new InvalidOperationException(
+                        "Malformed scenes must be rejected before asset repair.");
+                };
+
+            TargetInvocationException exception =
+                Assert.Throws<TargetInvocationException>(
+                    InvokeConfigureAtPath);
+
+            Assert.That(
+                exception.InnerException,
+                Is.TypeOf<InvalidOperationException>());
+            Assert.That(builderCalled, Is.False, mutation.ToString());
+            Assert.That(
+                File.ReadAllBytes(ProjectAbsolutePath(TemporaryScenePath)),
+                Is.EqualTo(sceneBytesBefore),
+                mutation.ToString());
+            Assert.That(
+                File.ReadAllBytes(
+                    ProjectAbsolutePath(TemporaryScenePath + ".meta")),
+                Is.EqualTo(sceneMetaBytesBefore),
+                mutation.ToString());
+            Assert.That(
+                AssetDatabase.AssetPathToGUID(TemporaryScenePath),
+                Is.EqualTo(sceneGuidBefore),
+                mutation.ToString());
+            AssertProtectedStatesEqual(
+                protectedBefore,
+                CapturePreMutationProtectedFileStates(),
+                mutation.ToString());
         }
 
         [Test]
@@ -335,6 +561,192 @@ namespace WasteCity.Tests
             Assert.That(idsAfterSecond, Is.EqualTo(idsBefore));
         }
 
+        private static void CreateTemporaryScene(Action<Scene> mutate)
+        {
+            AssetDatabase.DeleteAsset(TemporaryScenePath);
+            Scene source =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            mutate(source);
+            Assert.That(
+                EditorSceneManager.SaveScene(
+                    source,
+                    TemporaryScenePath,
+                    true),
+                Is.True);
+            AssetDatabase.ImportAsset(
+                TemporaryScenePath,
+                ImportAssetOptions.ForceSynchronousImport |
+                ImportAssetOptions.ForceUpdate);
+            EditorSceneManager.OpenScene(
+                TemporaryScenePath,
+                OpenSceneMode.Single);
+        }
+
+        private static void ApplyMalformedMutation(
+            Scene scene,
+            MalformedSceneMutation mutation)
+        {
+            FirstArtTerrainRenderer3D presenter =
+                FindSingle<FirstArtTerrainRenderer3D>(scene);
+            GameObject owner = presenter.gameObject;
+            GrayboxSceneBootstrap bootstrap =
+                FindSingle<GrayboxSceneBootstrap>(scene);
+            GameObject root = FindNamedObjects(
+                scene,
+                "GrayboxPrototype3D")[0];
+            switch (mutation)
+            {
+                case MalformedSceneMutation.DuplicateNamedOwner:
+                    MoveNewObjectToScene(
+                        "FirstArtTerrainPresentation",
+                        scene);
+                    break;
+                case MalformedSceneMutation.PresenterElsewhere:
+                {
+                    GameObject alternate =
+                        MoveNewObjectToScene("OtherPresentation", scene);
+                    alternate.AddComponent<FirstArtTerrainRenderer3D>()
+                        .Configure(presenter.Profile);
+                    break;
+                }
+                case MalformedSceneMutation.WrongParent:
+                    owner.transform.SetParent(root.transform, false);
+                    break;
+                case MalformedSceneMutation.RenamedOwner:
+                    owner.name = "RenamedTerrainPresentation";
+                    break;
+                case MalformedSceneMutation.RuntimeSurfaceChild:
+                    new GameObject("RuntimeSurface").transform.SetParent(
+                        owner.transform,
+                        false);
+                    break;
+                case MalformedSceneMutation.RenamedChild:
+                    new GameObject("UnexpectedSerializedChild")
+                        .transform.SetParent(owner.transform, false);
+                    break;
+                case MalformedSceneMutation.MeshFilter:
+                    owner.AddComponent<MeshFilter>();
+                    break;
+                case MalformedSceneMutation.MeshRendererAndMaterial:
+                {
+                    MeshRenderer renderer =
+                        owner.AddComponent<MeshRenderer>();
+                    renderer.sharedMaterial = LoadRequired<Material>(
+                        FirstArtTerrainAssetBuilder.MaterialPath);
+                    break;
+                }
+                case MalformedSceneMutation.Collider:
+                    owner.AddComponent<BoxCollider>();
+                    break;
+                case MalformedSceneMutation.OtherOwnerComponent:
+                    owner.AddComponent<Light>();
+                    break;
+                case MalformedSceneMutation.DuplicateBootstrap:
+                    MoveNewObjectToScene("DuplicateBootstrap", scene)
+                        .AddComponent<GrayboxSceneBootstrap>();
+                    break;
+                case MalformedSceneMutation.MissingScript:
+                {
+                    GameObject broken =
+                        MoveNewObjectToScene("BrokenScriptOwner", scene);
+                    GrayboxUrpScope component =
+                        broken.AddComponent<GrayboxUrpScope>();
+                    var serialized = new SerializedObject(component);
+                    serialized.FindProperty("m_Script")
+                        .objectReferenceValue = null;
+                    serialized.ApplyModifiedPropertiesWithoutUndo();
+                    Assert.That(
+                        GameObjectUtility
+                            .GetMonoBehavioursWithMissingScriptCount(broken),
+                        Is.EqualTo(1));
+                    break;
+                }
+                case MalformedSceneMutation.AlternateBootstrapReference:
+                {
+                    GrayboxUrpScope alternate = MoveNewObjectToScene(
+                            "AlternateTerrainPresentation",
+                            scene)
+                        .AddComponent<GrayboxUrpScope>();
+                    SetReference(
+                        bootstrap,
+                        "terrainPresentationBehaviour",
+                        alternate);
+                    break;
+                }
+                case MalformedSceneMutation.UnapprovedProfileReference:
+                {
+                    AssetDatabase.DeleteAsset(TemporaryProfilePath);
+                    FirstArtTerrainProfile3D alternate =
+                        ScriptableObject.CreateInstance<
+                            FirstArtTerrainProfile3D>();
+                    AssetDatabase.CreateAsset(
+                        alternate,
+                        TemporaryProfilePath);
+                    presenter.Configure(alternate);
+                    break;
+                }
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        null);
+            }
+        }
+
+        private static void ApplyRepairableMutation(
+            Scene scene,
+            RepairableSceneMutation mutation)
+        {
+            FirstArtTerrainRenderer3D presenter =
+                FindSingle<FirstArtTerrainRenderer3D>(scene);
+            GrayboxSceneBootstrap bootstrap =
+                FindSingle<GrayboxSceneBootstrap>(scene);
+            switch (mutation)
+            {
+                case RepairableSceneMutation.OwnerMissingPresenter:
+                    SetReference(
+                        bootstrap,
+                        "terrainPresentationBehaviour",
+                        null);
+                    Object.DestroyImmediate(presenter);
+                    break;
+                case RepairableSceneMutation.PresenterMissingProfile:
+                    presenter.Configure(null);
+                    break;
+                case RepairableSceneMutation.MissingBootstrapReference:
+                    SetReference(
+                        bootstrap,
+                        "terrainPresentationBehaviour",
+                        null);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        null);
+            }
+        }
+
+        private static GameObject MoveNewObjectToScene(
+            string name,
+            Scene scene)
+        {
+            var gameObject = new GameObject(name);
+            SceneManager.MoveGameObjectToScene(gameObject, scene);
+            return gameObject;
+        }
+
+        private static void InvokeConfigureAtPath()
+        {
+            MethodInfo method = typeof(GrayboxSceneAuthoring).GetMethod(
+                "ConfigureSceneAtPath",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(
+                null,
+                new object[] { TemporaryScenePath, false });
+        }
+
         private static SceneFixture CreateValidFixture()
         {
             Scene scene = EditorSceneManager.NewScene(
@@ -401,6 +813,43 @@ namespace WasteCity.Tests
             return asset;
         }
 
+        private static T FindSingle<T>(Scene scene)
+            where T : Component
+        {
+            List<T> values = FindAll<T>(scene);
+            Assert.That(values.Count, Is.EqualTo(1), typeof(T).Name);
+            return values[0];
+        }
+
+        private static List<T> FindAll<T>(Scene scene)
+            where T : Component
+        {
+            var values = new List<T>();
+            foreach (GameObject root in scene.GetRootGameObjects())
+                values.AddRange(root.GetComponentsInChildren<T>(true));
+            return values;
+        }
+
+        private static List<GameObject> FindNamedObjects(
+            Scene scene,
+            string name)
+        {
+            var values = new List<GameObject>();
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (Transform transform in
+                     root.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(
+                        transform.name,
+                        name,
+                        StringComparison.Ordinal))
+                {
+                    values.Add(transform.gameObject);
+                }
+            }
+            return values;
+        }
+
         private static void AssertReference(
             Object owner,
             string propertyName,
@@ -414,6 +863,19 @@ namespace WasteCity.Tests
                 property.objectReferenceValue,
                 Is.SameAs(expected),
                 propertyName);
+        }
+
+        private static void SetReference(
+            Object owner,
+            string propertyName,
+            Object value)
+        {
+            var serialized = new SerializedObject(owner);
+            SerializedProperty property =
+                serialized.FindProperty(propertyName);
+            Assert.That(property, Is.Not.Null, propertyName);
+            property.objectReferenceValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void AssertOwnerHasOnlyApprovedComponents(
@@ -442,8 +904,21 @@ namespace WasteCity.Tests
         private static Dictionary<string, ProtectedFileState>
             CaptureProtectedFileStates()
         {
+            return CaptureProtectedFileStates(ProtectedPaths());
+        }
+
+        private static Dictionary<string, ProtectedFileState>
+            CapturePreMutationProtectedFileStates()
+        {
+            return CaptureProtectedFileStates(
+                PreMutationProtectedPaths());
+        }
+
+        private static Dictionary<string, ProtectedFileState>
+            CaptureProtectedFileStates(IEnumerable<string> protectedPaths)
+        {
             var result = new Dictionary<string, ProtectedFileState>();
-            foreach (string protectedPath in ProtectedPaths())
+            foreach (string protectedPath in protectedPaths)
             {
                 string absolutePath = ProjectAbsolutePath(protectedPath);
                 Assert.That(File.Exists(absolutePath), Is.True, protectedPath);
@@ -494,8 +969,13 @@ namespace WasteCity.Tests
 
         private static string[] CaptureSceneGlobalIds()
         {
+            return CaptureSceneGlobalIds(ScenePath);
+        }
+
+        private static string[] CaptureSceneGlobalIds(string scenePath)
+        {
             Scene scene =
-                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
             var values = new List<string>();
             foreach (GameObject root in scene.GetRootGameObjects())
             foreach (Transform transform in
@@ -521,6 +1001,17 @@ namespace WasteCity.Tests
             }
             values.Sort(StringComparer.Ordinal);
             return values.ToArray();
+        }
+
+        private static string FileHash(string projectPath)
+        {
+            using (FileStream stream =
+                   File.OpenRead(ProjectAbsolutePath(projectPath)))
+            using (SHA256 sha = SHA256.Create())
+            {
+                return BitConverter.ToString(sha.ComputeHash(stream))
+                    .Replace("-", string.Empty);
+            }
         }
 
         private static string HierarchyPath(Transform transform)
@@ -568,6 +1059,46 @@ namespace WasteCity.Tests
                 yield return assetPath + ".meta";
             }
             yield return "ProjectSettings/EditorBuildSettings.asset";
+        }
+
+        private static IEnumerable<string> PreMutationProtectedPaths()
+        {
+            const string terrainRoot =
+                "Assets/_Game/Art/FirstPass/Environment/Terrain";
+            foreach (string terrainName in TerrainNames)
+            foreach (string channel in TerrainChannels)
+            {
+                yield return
+                    $"{terrainRoot}/{terrainName}/" +
+                    $"T_Terrain_{terrainName}_{channel}.png.meta";
+            }
+
+            string[] protectedAssetPaths =
+            {
+                FirstArtTerrainAssetBuilder.MaterialPath,
+                FirstArtTerrainAssetBuilder.MaterialPath + ".meta",
+                FirstArtTerrainAssetBuilder.ProfilePath,
+                FirstArtTerrainAssetBuilder.ProfilePath + ".meta",
+                FirstArtTerrainAssetBuilder.ShaderPath,
+                FirstArtTerrainAssetBuilder.ShaderPath + ".meta",
+                FirstArtTerrainAssetBuilder.BaseColorArrayPath + ".meta",
+                FirstArtTerrainAssetBuilder.NormalArrayPath + ".meta",
+                FirstArtTerrainAssetBuilder.MaskArrayPath + ".meta",
+                FirstArtTerrainAssetBuilder.HeightArrayPath + ".meta",
+                ScenePath,
+                ScenePath + ".meta",
+                "Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset",
+                "Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset.meta",
+                "Assets/_Game/Rendering/Graybox3D/" +
+                "GrayboxUniversalRenderer.asset",
+                "Assets/_Game/Rendering/Graybox3D/" +
+                "GrayboxUniversalRenderer.asset.meta",
+                "Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat",
+                "Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat.meta",
+                "ProjectSettings/EditorBuildSettings.asset"
+            };
+            foreach (string protectedPath in protectedAssetPaths)
+                yield return protectedPath;
         }
 
         private static string ProjectAbsolutePath(string projectPath)

@@ -86,24 +86,40 @@ namespace WasteCity.Editor
 
         public static void Configure()
         {
-            bool hasExistingScene =
-                TryOpenAndValidateFoundation(out Scene scene);
+            ConfigureSceneAtPath(ScenePath, true);
+        }
 
-            if (hasExistingScene)
+        private static void ConfigureSceneAtPath(
+            string targetScenePath,
+            bool updateBuildSettings)
+        {
+            if (string.IsNullOrEmpty(targetScenePath) ||
+                !targetScenePath.StartsWith(
+                    "Assets/",
+                    StringComparison.Ordinal) ||
+                !targetScenePath.EndsWith(
+                    ".unity",
+                    StringComparison.OrdinalIgnoreCase))
             {
-                ValidateFirstArtTerrainSceneStructure(
-                    scene,
-                    AssetDatabase.LoadAssetAtPath<
-                        FirstArtTerrainProfile3D>(
-                            FirstArtTerrainAssetBuilder.ProfilePath));
+                throw new ArgumentException(
+                    "Scene path must be a project-relative Assets path " +
+                    "ending in .unity.",
+                    nameof(targetScenePath));
             }
+
+            bool hasExistingScene =
+                TryOpenAndValidateFoundation(
+                    targetScenePath,
+                    out Scene scene);
 
             ApprovedTerrainAssets terrainAssets =
                 EnsureApprovedTerrainAssets();
             if (hasExistingScene)
-                ValidateFirstArtTerrainContractWithAssets(
+            {
+                EnsureFirstArtTerrainContract(
                     scene,
-                    terrainAssets);
+                    terrainAssets.Profile);
+            }
 
             Shader litShader = Shader.Find(LitShaderName);
             if (litShader == null)
@@ -122,19 +138,26 @@ namespace WasteCity.Editor
             if (!hasExistingScene)
                 scene = CreateFoundationScene(pipeline, material);
             EnsureBuildingContract(scene, material);
-            EnsureFirstArtTerrainContract(scene, terrainAssets.Profile);
+            if (!hasExistingScene)
+            {
+                EnsureFirstArtTerrainContract(
+                    scene,
+                    terrainAssets.Profile);
+            }
             ValidateFirstArtTerrainContract(scene);
 
-            if (!EditorSceneManager.SaveScene(scene, ScenePath))
+            if (!EditorSceneManager.SaveScene(scene, targetScenePath))
                 throw new InvalidOperationException(
-                    $"Failed to save graybox scene at '{ScenePath}'.");
-            if (scene.path != ScenePath)
+                    $"Failed to save graybox scene at " +
+                    $"'{targetScenePath}'.");
+            if (scene.path != targetScenePath)
                 throw new InvalidOperationException(
                     $"Graybox scene was saved to unexpected path " +
                     $"'{scene.path}'.");
-            scene = NormalizeSceneBytes();
+            scene = NormalizeSceneBytes(targetScenePath);
 
-            EnsureBuildSettings();
+            if (updateBuildSettings)
+                EnsureBuildSettings();
         }
 
         public static void CaptureFoundationIdentity()
@@ -296,12 +319,19 @@ namespace WasteCity.Editor
 
         private static bool TryOpenAndValidateFoundation(out Scene scene)
         {
+            return TryOpenAndValidateFoundation(ScenePath, out scene);
+        }
+
+        private static bool TryOpenAndValidateFoundation(
+            string scenePath,
+            out Scene scene)
+        {
             scene = default;
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null)
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
                 return false;
 
             scene = EditorSceneManager.OpenScene(
-                ScenePath,
+                scenePath,
                 OpenSceneMode.Single);
             ValidateFoundationContract(scene);
             return true;
@@ -409,6 +439,7 @@ namespace WasteCity.Editor
             if (!scene.IsValid() || !scene.isLoaded)
                 throw new InvalidOperationException(
                     "The graybox foundation scene must be loaded.");
+            ValidateSceneHasNoMissingScripts(scene);
 
             UniversalRenderPipelineAsset approvedPipeline =
                 AssetDatabase.LoadAssetAtPath<
@@ -534,6 +565,11 @@ namespace WasteCity.Editor
                 inputRouter,
                 "cameraController",
                 cameraController);
+            ValidateFirstArtTerrainSceneStructure(
+                scene,
+                AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
+                    FirstArtTerrainAssetBuilder.ProfilePath),
+                true);
         }
 
         private static void EnsureBuildingContract(
@@ -731,20 +767,23 @@ namespace WasteCity.Editor
             FirstArtTerrainRenderer3D presenter =
                 ValidateFirstArtTerrainSceneStructure(
                     scene,
-                    assets.Profile);
+                    assets.Profile,
+                    false);
             RequireReference(presenter, "profile", assets.Profile);
         }
 
         private static FirstArtTerrainRenderer3D
             ValidateFirstArtTerrainSceneStructure(
                 Scene scene,
-                FirstArtTerrainProfile3D approvedProfile)
+                FirstArtTerrainProfile3D approvedProfile,
+                bool allowRepairableAbsence)
         {
             if (!scene.IsValid() || !scene.isLoaded)
             {
                 throw new InvalidOperationException(
                     "The first-art terrain scene must be loaded.");
             }
+            ValidateSceneHasNoMissingScripts(scene);
 
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform world = RequireChild(root.transform, "GrayboxWorld");
@@ -752,15 +791,6 @@ namespace WasteCity.Editor
             var namedOwners = 0;
             foreach (GameObject gameObject in FindSceneGameObjects(scene))
             {
-                int missingScriptCount =
-                    GameObjectUtility
-                        .GetMonoBehavioursWithMissingScriptCount(gameObject);
-                if (missingScriptCount != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Scene object '{gameObject.name}' contains " +
-                        $"{missingScriptCount} missing script(s).");
-                }
                 if (string.Equals(
                         gameObject.name,
                         "RuntimeSurface",
@@ -781,12 +811,39 @@ namespace WasteCity.Editor
                 namedOwners++;
                 owner = gameObject.transform;
             }
-            if (namedOwners != 1)
+            if (namedOwners > 1 ||
+                (!allowRepairableAbsence && namedOwners != 1))
             {
                 throw new InvalidOperationException(
                     "The scene requires exactly one GameObject named " +
                     "FirstArtTerrainPresentation; found " +
                     $"{namedOwners}.");
+            }
+
+            List<FirstArtTerrainRenderer3D> presenters =
+                FindSceneComponents<FirstArtTerrainRenderer3D>(scene);
+            if (presenters.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    "The scene contains multiple " +
+                    "FirstArtTerrainRenderer3D components.");
+            }
+            GrayboxSceneBootstrap bootstrap =
+                RequireSingle<GrayboxSceneBootstrap>(scene);
+            UnityEngine.Object bootstrapReference = GetReference(
+                bootstrap,
+                "terrainPresentationBehaviour");
+
+            if (owner == null)
+            {
+                if (presenters.Count != 0 || bootstrapReference != null)
+                {
+                    throw new InvalidOperationException(
+                        "A missing FirstArtTerrainPresentation owner may " +
+                        "not leave a presenter or Bootstrap reference " +
+                        "elsewhere in the scene.");
+                }
+                return null;
             }
             if (owner.parent != world)
             {
@@ -794,19 +851,6 @@ namespace WasteCity.Editor
                     "FirstArtTerrainPresentation must be a direct child " +
                     "of GrayboxWorld.");
             }
-
-            FirstArtTerrainRenderer3D presenter =
-                RequireSingle<FirstArtTerrainRenderer3D>(scene);
-            GrayboxSceneBootstrap bootstrap =
-                RequireSingle<GrayboxSceneBootstrap>(scene);
-
-            RequireOwner(presenter, owner);
-            RequireReference(
-                bootstrap,
-                "terrainPresentationBehaviour",
-                presenter);
-            if (approvedProfile != null)
-                RequireReference(presenter, "profile", approvedProfile);
 
             if (owner.childCount != 0)
             {
@@ -817,14 +861,9 @@ namespace WasteCity.Editor
 
             Component[] components =
                 owner.GetComponents<Component>();
-            if (components.Length != 2)
-            {
-                throw new InvalidOperationException(
-                    "FirstArtTerrainPresentation may contain only its " +
-                    "Transform and FirstArtTerrainRenderer3D.");
-            }
             var transformCount = 0;
             var presenterCount = 0;
+            FirstArtTerrainRenderer3D presenter = null;
             foreach (Component component in components)
             {
                 if (component == null)
@@ -832,15 +871,72 @@ namespace WasteCity.Editor
                         "FirstArtTerrainPresentation contains a missing " +
                         "script component.");
                 if (component is Transform)
+                {
                     transformCount++;
-                if (ReferenceEquals(component, presenter))
+                    continue;
+                }
+                if (component is FirstArtTerrainRenderer3D candidate)
+                {
                     presenterCount++;
+                    presenter = candidate;
+                    continue;
+                }
+                throw new InvalidOperationException(
+                    "FirstArtTerrainPresentation may contain only its " +
+                    "Transform and FirstArtTerrainRenderer3D.");
             }
-            if (transformCount != 1 || presenterCount != 1)
+            if (transformCount != 1 ||
+                presenterCount > 1 ||
+                (!allowRepairableAbsence && presenterCount != 1))
             {
                 throw new InvalidOperationException(
                     "FirstArtTerrainPresentation component ownership is " +
                     "invalid.");
+            }
+
+            if (presenters.Count != presenterCount ||
+                (presenter != null && presenter.transform != owner))
+            {
+                throw new InvalidOperationException(
+                    "FirstArtTerrainRenderer3D must be attached only to " +
+                    "FirstArtTerrainPresentation.");
+            }
+            if (presenter == null)
+            {
+                if (bootstrapReference != null)
+                {
+                    throw new InvalidOperationException(
+                        "Bootstrap may not reference terrain presentation " +
+                        "behavior when the presenter is absent.");
+                }
+                return null;
+            }
+
+            UnityEngine.Object profileReference =
+                GetReference(presenter, "profile");
+            if (allowRepairableAbsence)
+            {
+                if ((profileReference != null &&
+                     profileReference != approvedProfile) ||
+                    (bootstrapReference != null &&
+                     bootstrapReference != presenter))
+                {
+                    throw new InvalidOperationException(
+                        "Existing terrain Profile and Bootstrap references " +
+                        "must be absent or already point to the approved " +
+                        "contract.");
+                }
+            }
+            else
+            {
+                if (approvedProfile == null ||
+                    profileReference != approvedProfile ||
+                    bootstrapReference != presenter)
+                {
+                    throw new InvalidOperationException(
+                        "The final terrain Profile or Bootstrap reference " +
+                        "is missing or invalid.");
+                }
             }
 
             return presenter;
@@ -1225,13 +1321,13 @@ namespace WasteCity.Editor
             return collider;
         }
 
-        private static Scene NormalizeSceneBytes()
+        private static Scene NormalizeSceneBytes(string scenePath)
         {
             string projectRoot = Path.GetDirectoryName(Application.dataPath);
             if (string.IsNullOrEmpty(projectRoot))
                 throw new InvalidOperationException(
                     "Unity project root could not be resolved.");
-            string absolutePath = Path.Combine(projectRoot, ScenePath);
+            string absolutePath = Path.Combine(projectRoot, scenePath);
             byte[] source = File.ReadAllBytes(absolutePath);
             var normalized = new byte[source.Length];
             int count = 0;
@@ -1260,11 +1356,11 @@ namespace WasteCity.Editor
             }
 
             AssetDatabase.ImportAsset(
-                ScenePath,
+                scenePath,
                 ImportAssetOptions.ForceSynchronousImport |
                 ImportAssetOptions.ForceUpdate);
             Scene scene = EditorSceneManager.OpenScene(
-                ScenePath,
+                scenePath,
                 OpenSceneMode.Single);
             ValidateFoundationContract(scene);
             ValidateFirstArtTerrainContract(scene);
@@ -1436,6 +1532,22 @@ namespace WasteCity.Editor
             return result;
         }
 
+        private static void ValidateSceneHasNoMissingScripts(Scene scene)
+        {
+            foreach (GameObject gameObject in FindSceneGameObjects(scene))
+            {
+                int missingScriptCount =
+                    GameObjectUtility
+                        .GetMonoBehavioursWithMissingScriptCount(gameObject);
+                if (missingScriptCount != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Scene object '{gameObject.name}' contains " +
+                        $"{missingScriptCount} missing script(s).");
+                }
+            }
+        }
+
         private static T RequireComponent<T>(GameObject owner)
             where T : Component
         {
@@ -1485,15 +1597,27 @@ namespace WasteCity.Editor
             string propertyName,
             UnityEngine.Object expected)
         {
-            var data = new SerializedObject(owner);
-            SerializedProperty property = data.FindProperty(propertyName);
-            if (property == null ||
-                property.objectReferenceValue != expected)
+            if (GetReference(owner, propertyName) != expected)
             {
                 throw new InvalidOperationException(
                     $"Foundation reference {owner.GetType().Name}." +
                     $"{propertyName} is missing or invalid.");
             }
+        }
+
+        private static UnityEngine.Object GetReference(
+            UnityEngine.Object owner,
+            string propertyName)
+        {
+            var data = new SerializedObject(owner);
+            SerializedProperty property = data.FindProperty(propertyName);
+            if (property == null)
+            {
+                throw new InvalidOperationException(
+                    $"Serialized property {owner.GetType().Name}." +
+                    $"{propertyName} is unavailable.");
+            }
+            return property.objectReferenceValue;
         }
 
         private static void SetReferences(
