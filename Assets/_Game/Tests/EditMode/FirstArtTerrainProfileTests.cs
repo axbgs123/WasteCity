@@ -130,6 +130,93 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Profile_AcceptsApprovedPrimaryAndHeightArrayDimensions()
+        {
+            using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+                       2048,
+                       2048,
+                       2048,
+                       1024))
+            {
+                Assert.That(scope.Profile.TryValidate(out string error), Is.True, error);
+            }
+        }
+
+        [Test]
+        public void Profile_RejectsWrongHeightArrayDimensionsWithDeterministicError()
+        {
+            using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+                       2048,
+                       2048,
+                       2048,
+                       2048))
+            {
+                Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+                Assert.That(error, Is.EqualTo("Height array must be 1024x1024."));
+            }
+        }
+
+        [Test]
+        public void Profile_RejectsMismatchedPrimaryArrayDimensionsWithDeterministicError()
+        {
+            using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+                       2048,
+                       1024,
+                       2048,
+                       1024))
+            {
+                Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+                Assert.That(
+                    error,
+                    Is.EqualTo(
+                        "BaseColor, Normal, and Mask arrays must each be 2048x2048."));
+            }
+        }
+
+        [TestCase(true, true, true)]
+        [TestCase(false, false, true)]
+        [TestCase(false, true, false)]
+        public void Profile_RejectsWrongPrimaryArrayColorSemanticsWithDeterministicError(
+            bool baseColorLinear,
+            bool normalLinear,
+            bool maskLinear)
+        {
+            using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+                       2048,
+                       2048,
+                       2048,
+                       1024,
+                       baseColorLinear,
+                       normalLinear,
+                       maskLinear))
+            {
+                Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+                Assert.That(
+                    error,
+                    Is.EqualTo(
+                        "BaseColor array must be sRGB, and Normal and Mask arrays must be linear."));
+            }
+        }
+
+        [Test]
+        public void Profile_RejectsWrongHeightArrayFormatWithDeterministicError()
+        {
+            using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+                       2048,
+                       2048,
+                       2048,
+                       1024,
+                       false,
+                       true,
+                       true,
+                       TextureFormat.RGBA32))
+            {
+                Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+                Assert.That(error, Is.EqualTo("Height array must use linear R8 format."));
+            }
+        }
+
+        [Test]
         public void Profile_AllowsSmallOrthogonalWaterVelocities()
         {
             FirstArtTerrainProfile3D profile =
@@ -215,6 +302,85 @@ namespace WasteCity.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null, fieldName);
             field.SetValue(profile, value);
+        }
+
+        private static ConfiguredProfileScope CreateConfiguredProfile(
+            int baseColorSize,
+            int normalSize,
+            int maskSize,
+            int heightSize,
+            bool baseColorLinear = false,
+            bool normalLinear = true,
+            bool maskLinear = true,
+            TextureFormat heightFormat = TextureFormat.R8)
+        {
+            Shader shader = Shader.Find(FirstArtTerrainProfile3D.RequiredShaderName);
+            Assert.That(shader, Is.Not.Null);
+            return new ConfiguredProfileScope(
+                shader,
+                baseColorSize,
+                normalSize,
+                maskSize,
+                heightSize,
+                baseColorLinear,
+                normalLinear,
+                maskLinear,
+                heightFormat);
+        }
+
+        private sealed class ConfiguredProfileScope : IDisposable
+        {
+            private readonly Material material;
+            private readonly Texture2DArray baseColor;
+            private readonly Texture2DArray normal;
+            private readonly Texture2DArray mask;
+            private readonly Texture2DArray height;
+
+            public ConfiguredProfileScope(
+                Shader shader,
+                int baseColorSize,
+                int normalSize,
+                int maskSize,
+                int heightSize,
+                bool baseColorLinear,
+                bool normalLinear,
+                bool maskLinear,
+                TextureFormat heightFormat)
+            {
+                Profile = ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>();
+                material = new Material(shader);
+                baseColor = CreateArray(baseColorSize, TextureFormat.RGBA32, baseColorLinear);
+                normal = CreateArray(normalSize, TextureFormat.RGBA32, normalLinear);
+                mask = CreateArray(maskSize, TextureFormat.RGBA32, maskLinear);
+                height = CreateArray(heightSize, heightFormat, true);
+                Profile.Configure(material, baseColor, normal, mask, height);
+            }
+
+            public FirstArtTerrainProfile3D Profile { get; }
+
+            public void Dispose()
+            {
+                UnityEngine.Object.DestroyImmediate(Profile);
+                UnityEngine.Object.DestroyImmediate(material);
+                UnityEngine.Object.DestroyImmediate(baseColor);
+                UnityEngine.Object.DestroyImmediate(normal);
+                UnityEngine.Object.DestroyImmediate(mask);
+                UnityEngine.Object.DestroyImmediate(height);
+            }
+
+            private static Texture2DArray CreateArray(
+                int size,
+                TextureFormat format,
+                bool linear)
+            {
+                return new Texture2DArray(
+                    size,
+                    size,
+                    FirstArtTerrainCatalog3D.LayerCount,
+                    format,
+                    false,
+                    linear);
+            }
         }
     }
 }

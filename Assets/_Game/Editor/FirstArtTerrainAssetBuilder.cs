@@ -22,15 +22,70 @@ namespace WasteCity.Editor
             "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset";
         public const string HeightArrayPath =
             "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset";
+        public const string MaterialPath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat";
+        public const string ProfilePath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset";
+        public const string ShaderPath =
+            "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader";
 
         private const string TerrainRoot =
             "Assets/_Game/Art/FirstPass/Environment/Terrain";
         private const string RuntimeFolder = TerrainRoot + "/Runtime";
         private const string GeneratedFolder = RuntimeFolder + "/Generated";
+        private const string MaterialsFolder = RuntimeFolder + "/Materials";
+        private const string ProfilesFolder = RuntimeFolder + "/Profiles";
+        private const string ShadersFolder = RuntimeFolder + "/Shaders";
         private const int SourceTextureSize = 2048;
         private const int HeightTextureSize = 1024;
 
         internal static Action<string> HeightSourceReadableCheckpoint;
+
+        [MenuItem("WasteCity/Art/Build First Terrain Runtime Assets")]
+        public static void BuildRuntimeAssets()
+        {
+            BuildTextureArrays();
+            EnsureRuntimeAssetFolders();
+
+            Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);
+            if (shader == null || !string.Equals(
+                    shader.name,
+                    FirstArtTerrainProfile3D.RequiredShaderName,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Required terrain Shader is missing or has the wrong name: {ShaderPath}");
+            }
+
+            Texture2DArray baseColor = LoadRequiredArray(BaseColorArrayPath);
+            Texture2DArray normal = LoadRequiredArray(NormalArrayPath);
+            Texture2DArray mask = LoadRequiredArray(MaskArrayPath);
+            Texture2DArray height = LoadRequiredArray(HeightArrayPath);
+            Material material = LoadOrCreateMaterial(shader);
+            material.SetTexture("_BaseColorArray", baseColor);
+            material.SetTexture("_NormalArray", normal);
+            material.SetTexture("_MaskArray", mask);
+            material.SetTexture("_HeightArray", height);
+            EditorUtility.SetDirty(material);
+
+            FirstArtTerrainProfile3D profile = LoadOrCreateProfile();
+            profile.Configure(material, baseColor, normal, mask, height);
+            if (!profile.TryValidate(out string validationError))
+                throw new InvalidOperationException(validationError);
+            EditorUtility.SetDirty(profile);
+
+            AssetDatabase.SaveAssets();
+            ReimportOutput(MaterialPath);
+            ReimportOutput(ProfilePath);
+
+            Material reloadedMaterial = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+            FirstArtTerrainProfile3D reloadedProfile =
+                AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(ProfilePath);
+            if (reloadedMaterial == null || reloadedProfile == null)
+                throw new InvalidOperationException("Generated terrain Material or Profile could not be reloaded.");
+            if (!reloadedProfile.TryValidate(out validationError))
+                throw new InvalidOperationException(validationError);
+        }
 
         [MenuItem("WasteCity/Art/Build First Terrain Texture Arrays")]
         public static void BuildTextureArrays()
@@ -447,6 +502,73 @@ namespace WasteCity.Editor
                 AssetDatabase.CreateFolder(TerrainRoot, "Runtime");
             if (!AssetDatabase.IsValidFolder(GeneratedFolder))
                 AssetDatabase.CreateFolder(RuntimeFolder, "Generated");
+        }
+
+        private static void EnsureRuntimeAssetFolders()
+        {
+            if (!AssetDatabase.IsValidFolder(RuntimeFolder))
+                AssetDatabase.CreateFolder(TerrainRoot, "Runtime");
+            if (!AssetDatabase.IsValidFolder(MaterialsFolder))
+                AssetDatabase.CreateFolder(RuntimeFolder, "Materials");
+            if (!AssetDatabase.IsValidFolder(ProfilesFolder))
+                AssetDatabase.CreateFolder(RuntimeFolder, "Profiles");
+            if (!AssetDatabase.IsValidFolder(ShadersFolder))
+                AssetDatabase.CreateFolder(RuntimeFolder, "Shaders");
+        }
+
+        private static Texture2DArray LoadRequiredArray(string assetPath)
+        {
+            Texture2DArray array = AssetDatabase.LoadAssetAtPath<Texture2DArray>(assetPath);
+            if (array == null)
+                throw new InvalidOperationException($"Required terrain Texture2DArray is missing: {assetPath}");
+            return array;
+        }
+
+        private static Material LoadOrCreateMaterial(Shader shader)
+        {
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+            if (material != null)
+            {
+                material.shader = shader;
+                return material;
+            }
+
+            var created = new Material(shader)
+            {
+                name = "MAT_Terrain_FirstPass",
+            };
+            try
+            {
+                AssetDatabase.CreateAsset(created, MaterialPath);
+                return created;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(created);
+                throw;
+            }
+        }
+
+        private static FirstArtTerrainProfile3D LoadOrCreateProfile()
+        {
+            FirstArtTerrainProfile3D profile =
+                AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(ProfilePath);
+            if (profile != null)
+                return profile;
+
+            FirstArtTerrainProfile3D created =
+                ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>();
+            created.name = "FirstArtTerrainProfile3D";
+            try
+            {
+                AssetDatabase.CreateAsset(created, ProfilePath);
+                return created;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(created);
+                throw;
+            }
         }
 
         private static void PersistArray(Texture2DArray temporary, string path)

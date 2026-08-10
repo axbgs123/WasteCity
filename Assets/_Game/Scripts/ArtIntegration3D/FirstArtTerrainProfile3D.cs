@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 
 namespace WasteCity.ArtIntegration3D
 {
@@ -10,6 +11,8 @@ namespace WasteCity.ArtIntegration3D
             "WasteCity/Terrain/FirstPassBlend";
         public const int DefaultControlPixelsPerCell = 4;
         public const float DefaultCellsPerTexture = 4f;
+        public const int PrimaryArraySize = 2048;
+        public const int HeightArraySize = 1024;
 
         [SerializeField] private Material material;
         [SerializeField] private Texture2DArray baseColorArray;
@@ -156,11 +159,26 @@ namespace WasteCity.ArtIntegration3D
                 error = "Each terrain channel array depth must be 7.";
                 return false;
             }
-            if (normalArray.width != baseColorArray.width || normalArray.height != baseColorArray.height ||
-                maskArray.width != baseColorArray.width || maskArray.height != baseColorArray.height ||
-                heightArray.width != baseColorArray.width || heightArray.height != baseColorArray.height)
+            if (baseColorArray.width != PrimaryArraySize || baseColorArray.height != PrimaryArraySize ||
+                normalArray.width != PrimaryArraySize || normalArray.height != PrimaryArraySize ||
+                maskArray.width != PrimaryArraySize || maskArray.height != PrimaryArraySize)
             {
-                error = "Terrain channel array dimensions must match.";
+                error = "BaseColor, Normal, and Mask arrays must each be 2048x2048.";
+                return false;
+            }
+            if (heightArray.width != HeightArraySize || heightArray.height != HeightArraySize)
+            {
+                error = "Height array must be 1024x1024.";
+                return false;
+            }
+            if (!baseColorArray.isDataSRGB || normalArray.isDataSRGB || maskArray.isDataSRGB)
+            {
+                error = "BaseColor array must be sRGB, and Normal and Mask arrays must be linear.";
+                return false;
+            }
+            if (heightArray.graphicsFormat != GraphicsFormat.R8_UNorm)
+            {
+                error = "Height array must use linear R8 format.";
                 return false;
             }
 

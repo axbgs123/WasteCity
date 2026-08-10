@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37019ede255543eea1811dbb9f34a301, type: 3}
+  m_Name: FirstArtTerrainProfile3D
+  m_EditorClassIdentifier:
+  material: {fileID: 2100000, guid: aea10c6322a834daf8dd881841c99f7a, type: 2}
+  baseColorArray: {fileID: 18700000, guid: b1f08156ff6c64dbca1d51a8132ccc2d, type: 2}
+  normalArray: {fileID: 18700000, guid: 11955d2e24e2d4226b06b086fe3b072a, type: 2}
+  maskArray: {fileID: 18700000, guid: 417640ccdd04a4121a7180da2ce71277, type: 2}
+  heightArray: {fileID: 18700000, guid: 9263e65e9f2694421b9fbdb96b3f49a3, type: 2}
+  controlPixelsPerCell: 4
+  cellsPerTexture: 4
+  heightBlendStrength: 0.5
+  waterNormalVelocityA: {x: 0.04, y: 0.02}
+  waterNormalVelocityB: {x: -0.025, y: 0.05}
