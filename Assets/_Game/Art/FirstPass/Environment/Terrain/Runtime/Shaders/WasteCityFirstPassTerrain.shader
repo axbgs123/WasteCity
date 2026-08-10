@@ -88,6 +88,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 half3 normalWS : TEXCOORD1;
                 half4 tangentWS : TEXCOORD2;
                 half fogFactor : TEXCOORD3;
+                half3 vertexLighting : TEXCOORD4;
             };
 
             struct LayerSample
@@ -111,7 +112,25 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                     normals.tangentWS,
                     input.tangentOS.w * GetOddNegativeScale());
                 output.fogFactor = ComputeFogFactor(positions.positionCS.z);
+                output.vertexLighting = VertexLighting(output.positionWS, output.normalWS);
                 return output;
+            }
+
+            half3 SafeNormalizeTangentNormal(float3 value)
+            {
+                float lengthSquared = dot(value, value);
+                if (!IsFinite(value.x) || !IsFinite(value.y) || !IsFinite(value.z) ||
+                    !IsFinite(lengthSquared) || lengthSquared <= 0.000001)
+                {
+                    return half3(0, 0, 1);
+                }
+
+                return (half3)(value * rsqrt(lengthSquared));
+            }
+
+            half3 ApplyDetailMaskToNormal(half3 decodedNormalTS, half detailMask)
+            {
+                return SafeNormalizeTangentNormal(lerp(half3(0, 0, 1), decodedNormalTS, saturate(detailMask)));
             }
 
             void InsertLayer(
@@ -175,7 +194,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                     sampler_NormalArray,
                     normalUV,
                     layerIndex));
-                sample.normalTS = normalA;
+                half3 combinedNormalTS = normalA;
 
                 if (layerIndex == 5u)
                 {
@@ -186,12 +205,13 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                         sampler_NormalArray,
                         normalUVB,
                         layerIndex));
-                    sample.normalTS = normalize(half3(
+                    combinedNormalTS = SafeNormalizeTangentNormal(half3(
                         normalA.xy + normalB.xy,
                         max(0.001h, normalA.z * normalB.z)));
                     sample.waterHighlight = saturate(dot(normalA, normalB) * 0.5h + 0.5h);
                 }
 
+                sample.normalTS = ApplyDetailMaskToNormal(combinedNormalTS, sample.mask.b);
                 return sample;
             }
 
@@ -272,7 +292,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                     sample0.mask * blendWeights.x +
                     sample1.mask * blendWeights.y +
                     sample2.mask * blendWeights.z;
-                half3 blendedNormalTS = normalize(
+                half3 blendedNormalTS = SafeNormalizeTangentNormal(
                     sample0.normalTS * blendWeights.x +
                     sample1.normalTS * blendWeights.y +
                     sample2.normalTS * blendWeights.z);
@@ -301,6 +321,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 inputData.bakedGI = SampleSH(inputData.normalWS);
                 inputData.fogCoord = input.fogFactor;
+                inputData.vertexLighting = input.vertexLighting;
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
@@ -313,7 +334,77 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 surfaceData.smoothness = saturate(
                     blendedMask.a +
                     waterHighlight * min(saturate(_WaterHighlightStrength), 0.12));
-                return UniversalFragmentPBR(inputData, surfaceData);
+                half4 litColor = UniversalFragmentPBR(inputData, surfaceData);
+                litColor.rgb = MixFog(litColor.rgb, inputData.fogCoord);
+                return litColor;
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+            Cull Back
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+
+            HLSLPROGRAM
+            #pragma target 3.5
+            #pragma vertex TerrainShadowVertex
+            #pragma fragment TerrainShadowFragment
+            #pragma multi_compile_instancing
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+
+            float3 _LightDirection;
+            float3 _LightPosition;
+
+            struct ShadowAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct ShadowVaryings
+            {
+                float4 positionCS : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            ShadowVaryings TerrainShadowVertex(ShadowAttributes input)
+            {
+                ShadowVaryings output;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                    float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+                #else
+                    float3 lightDirectionWS = _LightDirection;
+                #endif
+
+                output.positionCS = TransformWorldToHClip(
+                    ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+                #if UNITY_REVERSED_Z
+                    output.positionCS.z = min(output.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                    output.positionCS.z = max(output.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+                return output;
+            }
+
+            half4 TerrainShadowFragment(ShadowVaryings input) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                return 0;
             }
             ENDHLSL
         }

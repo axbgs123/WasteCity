@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using UnityEditor;
@@ -94,6 +95,108 @@ namespace WasteCity.Tests
                 ShaderUtil.GetShaderMessages(shader)
                     .Where(message => message.severity == ShaderCompilerMessageSeverity.Error),
                 Is.Empty);
+        }
+
+        [Test]
+        public void MasterShader_ShadowCasterPassAndVariantCompile()
+        {
+            Shader shader = Shader.Find(FirstArtTerrainProfile3D.RequiredShaderName);
+            Assert.That(shader, Is.Not.Null);
+            var material = new Material(shader);
+            try
+            {
+                Assert.That(material.FindPass("ShadowCaster"), Is.GreaterThanOrEqualTo(0));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(material);
+            }
+
+            var collection = new ShaderVariantCollection();
+            var variant = new ShaderVariantCollection.ShaderVariant(
+                shader,
+                PassType.ShadowCaster);
+            Assert.That(collection.Add(variant), Is.True);
+            collection.WarmUp();
+
+            Assert.That(collection.isWarmedUp, Is.True);
+            Assert.That(
+                ShaderUtil.GetShaderMessages(shader)
+                    .Where(message => message.severity == ShaderCompilerMessageSeverity.Error),
+                Is.Empty);
+        }
+
+        [Test]
+        public void MasterShader_FragmentOutputAppliesUrpFogAndPreservesAlpha()
+        {
+            string source = LoadShaderSource();
+
+            Assert.That(
+                source,
+                Does.Contain("half4 litColor = UniversalFragmentPBR(inputData, surfaceData);"));
+            Assert.That(
+                source,
+                Does.Contain("litColor.rgb = MixFog(litColor.rgb, inputData.fogCoord);"));
+            Assert.That(source, Does.Contain("return litColor;"));
+        }
+
+        [Test]
+        public void MasterShader_DetailMaskGatesOnlyPerLayerTangentNormal()
+        {
+            string source = LoadShaderSource();
+
+            Assert.That(
+                source,
+                Does.Contain(
+                    "return SafeNormalizeTangentNormal(lerp(half3(0, 0, 1), decodedNormalTS, saturate(detailMask)));"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "sample.normalTS = ApplyDetailMaskToNormal(combinedNormalTS, sample.mask.b);"));
+            Assert.That(CountOccurrences(source, "sample.mask.b"), Is.EqualTo(1));
+
+            Vector3 decoded = new Vector3(0.6f, 0f, 0.8f);
+            Assert.That(ApplyDetailMaskReference(decoded, 0f), Is.EqualTo(Vector3.forward));
+            AssertVectorWithin(ApplyDetailMaskReference(decoded, 1f), decoded, 0.000001f);
+            Vector3 intermediate = ApplyDetailMaskReference(decoded, 0.5f);
+            AssertVectorWithin(
+                intermediate,
+                new Vector3(0.31622777f, 0f, 0.9486833f),
+                0.000001f);
+            Assert.That(intermediate, Is.Not.EqualTo(Vector3.forward));
+            Assert.That(intermediate, Is.Not.EqualTo(decoded));
+        }
+
+        [Test]
+        public void MasterShader_VertexAdditionalLightsReachInputData()
+        {
+            string source = LoadShaderSource();
+
+            Assert.That(source, Does.Contain("half3 vertexLighting : TEXCOORD4;"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "output.vertexLighting = VertexLighting(output.positionWS, output.normalWS);"));
+            Assert.That(
+                source,
+                Does.Contain("inputData.vertexLighting = input.vertexLighting;"));
+        }
+
+        [Test]
+        public void MasterShader_FinalNormalUsesFiniteSafeFallback()
+        {
+            string source = LoadShaderSource();
+
+            Assert.That(source, Does.Contain("half3 SafeNormalizeTangentNormal(float3 value)"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "if (!IsFinite(value.x) || !IsFinite(value.y) || !IsFinite(value.z) ||"));
+            Assert.That(source, Does.Contain("lengthSquared <= 0.000001"));
+            Assert.That(source, Does.Contain("return half3(0, 0, 1);"));
+            Assert.That(
+                source,
+                Does.Contain("half3 blendedNormalTS = SafeNormalizeTangentNormal("));
         }
 
         [Test]
@@ -218,6 +321,46 @@ namespace WasteCity.Tests
             }
 
             return states;
+        }
+
+        private static string LoadShaderSource()
+        {
+            return File.ReadAllText(FirstArtTerrainAssetBuilder.ShaderPath);
+        }
+
+        private static int CountOccurrences(string source, string value)
+        {
+            int count = 0;
+            int offset = 0;
+            while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+            {
+                count++;
+                offset += value.Length;
+            }
+
+            return count;
+        }
+
+        private static Vector3 ApplyDetailMaskReference(Vector3 decodedNormal, float detailMask)
+        {
+            Vector3 gated = Vector3.Lerp(Vector3.forward, decodedNormal, Mathf.Clamp01(detailMask));
+            return gated.sqrMagnitude <= 0.000001f || !IsFinite(gated)
+                ? Vector3.forward
+                : gated.normalized;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+                   !float.IsNaN(value.y) && !float.IsInfinity(value.y) &&
+                   !float.IsNaN(value.z) && !float.IsInfinity(value.z);
+        }
+
+        private static void AssertVectorWithin(Vector3 actual, Vector3 expected, float tolerance)
+        {
+            Assert.That(actual.x, Is.EqualTo(expected.x).Within(tolerance));
+            Assert.That(actual.y, Is.EqualTo(expected.y).Within(tolerance));
+            Assert.That(actual.z, Is.EqualTo(expected.z).Within(tolerance));
         }
 
         private static T LoadRequired<T>(string assetPath)
