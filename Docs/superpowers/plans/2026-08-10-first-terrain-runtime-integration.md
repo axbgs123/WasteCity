@@ -1424,12 +1424,12 @@ git commit -m "test: verify first terrain runtime scene"
 - Modify: `Assets/_Game/Editor/GrayboxPerformanceProbe.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta`
+- Modify after the measured 96×64 probe exceeds 250 ms and profiling isolates control-map generation as the bottleneck: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`
+- Modify with that performance correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs`
 - Modify after rejected visual review only: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
-- Modify after rejected visual review only: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`
 - Modify after rejected visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader`
 - Modify after rejected visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset`
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
-- Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs`
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
 - Create after capture: `Docs/Art/FirstPass/Terrain/RuntimeIntegration/` approved PNG screenshots and one MP4 recording only after the user approves committing them
 
@@ -1512,6 +1512,66 @@ export WASTECITY_FIRST_TERRAIN_PERF_RESULT=/tmp/wastecity-first-terrain/task-09-
 ```
 
 Expected: focused tests pass, JSON contains five samples and median ≤250 ms.
+
+- [ ] **Step 4A: Correct the measured control-map allocation bottleneck if and only if the probe exceeds 250 ms**
+
+This boundary is active only after all of the following evidence exists:
+
+```text
+the 96×64 probe has five real samples and median >250 ms;
+world.Generate, presenter.TryPresent and presenter.ClearPresentation have been timed separately;
+direct mesh and control-map generation have been timed separately;
+control-map generation is the dominant measured cost;
+temporary diagnostic instrumentation has been removed before production edits.
+```
+
+The accepted evidence for this run is a `393.7867 ms` median, with world
+generation approximately `21–32 ms`, presentation approximately `371–415 ms`,
+clear approximately `0.02–0.12 ms`, direct mesh `0.0299 ms`, and direct
+control-map generation `422.5676 ms`. The generator currently creates a new
+`float[7]`, `int[3]`, and `int[7]` for each of `384×256` pixels.
+
+First add a mutation-sensitive allocation/parity test to
+`FirstArtTerrainControlMapTests.cs`. It must:
+
+```text
+generate the 96×64 seed-8128 map with the unmodified generator and record the
+SHA-256 of ControlABytes followed by ControlBBytes as a literal frozen baseline;
+require that literal digest plus byte-for-byte equality across repeated runs;
+verify the existing seven-layer, transition-byte, normalization, three-weight,
+border and deterministic contracts remain unchanged;
+warm the generator, then measure one complete 96×64 Generate call with both
+GC.GetAllocatedBytesForCurrentThread and a ProfilerRecorder;
+assert a fixed upper bound that includes the required layer grid, two encoded
+byte arrays, two Texture2D objects and result wrapper, but is far below the
+original roughly 98,304×3 temporary-array allocation count;
+assert the ProfilerRecorder allocation sample count is bounded by a small
+constant independent of pixel count, and prove the recorder with a separate
+positive-control allocation.
+```
+
+Choose the numeric byte/sample bounds from a recorded unoptimized 32×24 and
+96×64 diagnostic so the original 96×64 path fails and the bound still permits
+all required output allocations. Record those diagnostics and the frozen digest
+in the Task 9 report. Obtain RED by adding the bounds before the optimization;
+the unmodified generator must fail the allocation bound while its digest passes.
+The failure must not be a compile or fixture failure. Do not commit diagnostic
+instrumentation.
+
+Then change only `FirstArtTerrainControlMapGenerator3D.cs`: allocate fixed
+workspace buffers once per `Generate` call and clear/reuse them for each pixel.
+Preserve layer priority, blend math, noise, maximum-three-layer selection,
+rounding, fallback logging, exact byte encoding and public API. Do not cache
+across calls, introduce static mutable workspace, change Profile/Shader/assets,
+lower the 250 ms target, reduce dimensions, skip pixels, or move work outside
+the measured operation.
+
+Run the complete `FirstArtTerrainControlMapTests` and
+`FirstArtTerrainPerformanceTests`, then rerun the same five-run 96×64 probe.
+Expected: all focused tests pass, encoded bytes remain deterministic, and the
+probe median is ≤250 ms. If the same semantic-preserving workspace correction
+does not meet the threshold, stop and revise the plan again before touching any
+additional production path.
 
 - [ ] **Step 5: Run fresh full regression and headless compile**
 
