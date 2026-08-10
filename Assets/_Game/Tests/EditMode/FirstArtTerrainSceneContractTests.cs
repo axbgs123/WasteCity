@@ -72,15 +72,49 @@ namespace WasteCity.Tests
             "Height"
         };
 
+        private ProtectedFileSnapshot activeProtectedSnapshot;
+
         [TearDown]
         public void TearDown()
         {
+            if (activeProtectedSnapshot != null)
+            {
+                try
+                {
+                    activeProtectedSnapshot.RestoreAndDispose();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "Failed to restore the protected authoring snapshot " +
+                        $"during teardown: {exception}");
+                }
+                activeProtectedSnapshot = null;
+            }
             FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint = null;
-            EditorSceneManager.NewScene(
-                NewSceneSetup.EmptyScene,
-                NewSceneMode.Single);
-            AssetDatabase.DeleteAsset(TemporaryScenePath);
-            AssetDatabase.DeleteAsset(TemporaryProfilePath);
+            try
+            {
+                EditorSceneManager.NewScene(
+                    NewSceneSetup.EmptyScene,
+                    NewSceneMode.Single);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "Failed to close the temporary terrain test scene: " +
+                    exception);
+            }
+            try
+            {
+                AssetDatabase.DeleteAsset(TemporaryScenePath);
+                AssetDatabase.DeleteAsset(TemporaryProfilePath);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError(
+                    "Failed to delete temporary terrain test assets: " +
+                    exception);
+            }
         }
 
         [Test]
@@ -223,6 +257,7 @@ namespace WasteCity.Tests
                 null);
             Dictionary<string, ProtectedFileState> protectedBefore =
                 CaptureProtectedFileStates();
+            var firstHooks = new AuthoringHookProbe();
             var builderCalled = false;
             FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint =
                 ignored =>
@@ -232,7 +267,10 @@ namespace WasteCity.Tests
                         "Valid approved assets must bypass the terrain builder.");
                 };
 
-            InvokeConfigureAtPath();
+            InvokeConfigureAtPath(firstHooks);
+            Assert.That(firstHooks.RuntimeAssetBuilderEntries, Is.Zero);
+            Assert.That(firstHooks.SceneMutationEntries, Is.EqualTo(1));
+            Assert.That(firstHooks.SceneSaveEntries, Is.EqualTo(1));
             string firstSceneHash = FileHash(TemporaryScenePath);
             string firstSceneGuid =
                 AssetDatabase.AssetPathToGUID(TemporaryScenePath);
@@ -256,9 +294,13 @@ namespace WasteCity.Tests
                 "terrainPresentationBehaviour",
                 authoredPresenter);
 
-            InvokeConfigureAtPath();
+            var secondHooks = new AuthoringHookProbe();
+            InvokeConfigureAtPath(secondHooks);
 
             Assert.That(builderCalled, Is.False);
+            Assert.That(secondHooks.RuntimeAssetBuilderEntries, Is.Zero);
+            Assert.That(secondHooks.SceneMutationEntries, Is.EqualTo(1));
+            Assert.That(secondHooks.SceneSaveEntries, Is.EqualTo(1));
             Assert.That(
                 FileHash(TemporaryScenePath),
                 Is.EqualTo(firstSceneHash));
@@ -346,42 +388,72 @@ namespace WasteCity.Tests
                 ProjectAbsolutePath(TemporaryScenePath + ".meta"));
             string sceneGuidBefore =
                 AssetDatabase.AssetPathToGUID(TemporaryScenePath);
-            Dictionary<string, ProtectedFileState> protectedBefore =
-                CapturePreMutationProtectedFileStates();
-            var builderCalled = false;
-            FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint =
-                ignored =>
-                {
-                    builderCalled = true;
-                    throw new InvalidOperationException(
-                        "Malformed scenes must be rejected before asset repair.");
-                };
+            SceneStructuralSignature sceneBefore =
+                CaptureSceneStructuralSignature(
+                    SceneManager.GetSceneByPath(TemporaryScenePath));
+            var hooks = new AuthoringHookProbe();
+            ProtectedFileSnapshot protectedSnapshot =
+                ProtectedFileSnapshot.Capture();
+            activeProtectedSnapshot = protectedSnapshot;
+            Exception originalFailure = null;
+            try
+            {
+                TargetInvocationException exception =
+                    Assert.Throws<TargetInvocationException>(
+                        () => InvokeConfigureAtPath(hooks));
 
-            TargetInvocationException exception =
-                Assert.Throws<TargetInvocationException>(
-                    InvokeConfigureAtPath);
-
-            Assert.That(
-                exception.InnerException,
-                Is.TypeOf<InvalidOperationException>());
-            Assert.That(builderCalled, Is.False, mutation.ToString());
-            Assert.That(
-                File.ReadAllBytes(ProjectAbsolutePath(TemporaryScenePath)),
-                Is.EqualTo(sceneBytesBefore),
-                mutation.ToString());
-            Assert.That(
-                File.ReadAllBytes(
-                    ProjectAbsolutePath(TemporaryScenePath + ".meta")),
-                Is.EqualTo(sceneMetaBytesBefore),
-                mutation.ToString());
-            Assert.That(
-                AssetDatabase.AssetPathToGUID(TemporaryScenePath),
-                Is.EqualTo(sceneGuidBefore),
-                mutation.ToString());
-            AssertProtectedStatesEqual(
-                protectedBefore,
-                CapturePreMutationProtectedFileStates(),
-                mutation.ToString());
+                Assert.That(
+                    new[]
+                    {
+                        hooks.RuntimeAssetBuilderEntries,
+                        hooks.SceneMutationEntries,
+                        hooks.SceneSaveEntries
+                    },
+                    Is.EqualTo(new[] { 0, 0, 0 }),
+                    $"{mutation}: builder/mutation/save entry counts");
+                Assert.That(exception.InnerException, Is.Not.Null);
+                Assert.That(
+                    exception.InnerException.GetType().Name,
+                    Is.EqualTo("AuthoringPreflightException"),
+                    "Malformed scenes must fail the explicit authoring " +
+                    "preflight, not a later InvalidOperationException.");
+                Assert.That(
+                    exception.InnerException.Message,
+                    Does.Contain("preflight").IgnoreCase);
+                Assert.That(
+                    exception.InnerException.InnerException,
+                    Is.TypeOf<InvalidOperationException>());
+                Assert.That(
+                    File.ReadAllBytes(ProjectAbsolutePath(TemporaryScenePath)),
+                    Is.EqualTo(sceneBytesBefore),
+                    mutation.ToString());
+                Assert.That(
+                    File.ReadAllBytes(
+                        ProjectAbsolutePath(TemporaryScenePath + ".meta")),
+                    Is.EqualTo(sceneMetaBytesBefore),
+                    mutation.ToString());
+                Assert.That(
+                    AssetDatabase.AssetPathToGUID(TemporaryScenePath),
+                    Is.EqualTo(sceneGuidBefore),
+                    mutation.ToString());
+                AssertSceneSignaturesEqual(
+                    sceneBefore,
+                    CaptureSceneStructuralSignature(
+                        SceneManager.GetSceneByPath(TemporaryScenePath)),
+                    mutation.ToString());
+                protectedSnapshot.AssertUnchanged(mutation.ToString());
+            }
+            catch (Exception exception)
+            {
+                originalFailure = exception;
+                throw;
+            }
+            finally
+            {
+                RestoreProtectedSnapshot(
+                    protectedSnapshot,
+                    originalFailure);
+            }
         }
 
         [Test]
@@ -736,15 +808,68 @@ namespace WasteCity.Tests
             return gameObject;
         }
 
-        private static void InvokeConfigureAtPath()
+        private static void InvokeConfigureAtPath(
+            AuthoringHookProbe hooks = null)
         {
-            MethodInfo method = typeof(GrayboxSceneAuthoring).GetMethod(
-                "ConfigureSceneAtPath",
-                BindingFlags.NonPublic | BindingFlags.Static);
+            Type hooksType = typeof(GrayboxSceneAuthoring).GetNestedType(
+                "AuthoringHooks",
+                BindingFlags.NonPublic);
+            Assert.That(
+                hooksType,
+                Is.Not.Null,
+                "GrayboxSceneAuthoring must expose per-call nonpublic hooks.");
+            object hookOptions = Activator.CreateInstance(hooksType, true);
+            hooks = hooks ?? new AuthoringHookProbe();
+            SetHookMember(
+                hooksType,
+                hookOptions,
+                "BeforeRuntimeAssetBuilder",
+                new Action(() => hooks.RuntimeAssetBuilderEntries++));
+            SetHookMember(
+                hooksType,
+                hookOptions,
+                "BeforeSceneMutation",
+                new Action(() => hooks.SceneMutationEntries++));
+            SetHookMember(
+                hooksType,
+                hookOptions,
+                "BeforeSceneSave",
+                new Action(() => hooks.SceneSaveEntries++));
+            MethodInfo method = null;
+            foreach (MethodInfo candidate in
+                     typeof(GrayboxSceneAuthoring).GetMethods(
+                         BindingFlags.NonPublic | BindingFlags.Static))
+            {
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (candidate.Name == "ConfigureSceneAtPath" &&
+                    parameters.Length == 3 &&
+                    parameters[0].ParameterType == typeof(string) &&
+                    parameters[1].ParameterType == typeof(bool) &&
+                    parameters[2].ParameterType == hooksType)
+                {
+                    method = candidate;
+                    break;
+                }
+            }
             Assert.That(method, Is.Not.Null);
             method.Invoke(
                 null,
-                new object[] { TemporaryScenePath, false });
+                new[] { (object)TemporaryScenePath, false, hookOptions });
+        }
+
+        private static void SetHookMember(
+            Type hooksType,
+            object hooks,
+            string memberName,
+            object value)
+        {
+            FieldInfo field = hooksType.GetField(
+                memberName,
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, memberName);
+            field.SetValue(hooks, value);
         }
 
         private static SceneFixture CreateValidFixture()
@@ -901,6 +1026,199 @@ namespace WasteCity.Tests
             }
         }
 
+        private static SceneStructuralSignature
+            CaptureSceneStructuralSignature(Scene scene)
+        {
+            Assert.That(scene.IsValid(), Is.True);
+            Assert.That(scene.isLoaded, Is.True);
+            var rows = new List<string>();
+            var objectCount = 0;
+            var componentCount = 0;
+            var parentReferenceCount = 0;
+            var objectReferenceSlotCount = 0;
+            var objectReferenceCount = 0;
+            var missingScriptCount = 0;
+            foreach (GameObject root in scene.GetRootGameObjects())
+            foreach (Transform transform in
+                     root.GetComponentsInChildren<Transform>(true))
+            {
+                objectCount++;
+                string identity = HierarchyIdentity(transform);
+                string parentIdentity = transform.parent == null
+                    ? "<root>"
+                    : HierarchyIdentity(transform.parent);
+                if (transform.parent != null)
+                    parentReferenceCount++;
+                rows.Add(
+                    $"Object|{identity}|Parent={parentIdentity}|" +
+                    $"Active={transform.gameObject.activeSelf}");
+
+                Component[] components =
+                    transform.GetComponents<Component>();
+                componentCount += components.Length;
+                for (var componentIndex = 0;
+                     componentIndex < components.Length;
+                     componentIndex++)
+                {
+                    Component component = components[componentIndex];
+                    if (component == null)
+                    {
+                        missingScriptCount++;
+                        rows.Add(
+                            $"Component|{identity}|{componentIndex}|" +
+                            "MissingScript");
+                        continue;
+                    }
+
+                    string componentIdentity =
+                        $"{identity}|{componentIndex}|" +
+                        component.GetType().FullName;
+                    rows.Add("Component|" + componentIdentity);
+                    var serialized = new SerializedObject(component);
+                    SerializedProperty property = serialized.GetIterator();
+                    if (!property.Next(true))
+                        continue;
+                    do
+                    {
+                        if (property.propertyType !=
+                            SerializedPropertyType.ObjectReference)
+                        {
+                            continue;
+                        }
+
+                        objectReferenceSlotCount++;
+                        Object reference = property.objectReferenceValue;
+                        if (reference != null)
+                            objectReferenceCount++;
+                        rows.Add(
+                            $"Reference|{componentIdentity}|" +
+                            $"{property.propertyPath}|" +
+                            DescribeReference(reference, scene));
+                    } while (property.Next(false));
+                }
+            }
+            rows.Sort(StringComparer.Ordinal);
+            return new SceneStructuralSignature(
+                objectCount,
+                componentCount,
+                parentReferenceCount,
+                objectReferenceSlotCount,
+                objectReferenceCount,
+                missingScriptCount,
+                rows.ToArray());
+        }
+
+        private static string DescribeReference(Object reference, Scene scene)
+        {
+            if (reference == null)
+                return "<null>";
+            if (reference is GameObject gameObject &&
+                gameObject.scene == scene)
+            {
+                return "SceneGameObject:" +
+                       HierarchyIdentity(gameObject.transform);
+            }
+            if (reference is Component component &&
+                component.gameObject.scene == scene)
+            {
+                Component[] components =
+                    component.gameObject.GetComponents<Component>();
+                var componentIndex = Array.IndexOf(components, component);
+                return "SceneComponent:" +
+                       HierarchyIdentity(component.transform) + "|" +
+                       componentIndex + "|" +
+                       component.GetType().FullName;
+            }
+
+            string assetPath = AssetDatabase.GetAssetPath(reference);
+            if (!string.IsNullOrEmpty(assetPath) &&
+                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    reference,
+                    out string guid,
+                    out long localId))
+            {
+                return $"Asset:{assetPath}|{guid}|{localId}|" +
+                       reference.GetType().FullName;
+            }
+            return $"Other:{reference.GetType().FullName}|{reference.name}";
+        }
+
+        private static string HierarchyIdentity(Transform transform)
+        {
+            string result =
+                $"{transform.name}[{transform.GetSiblingIndex()}]";
+            for (Transform parent = transform.parent;
+                 parent != null;
+                 parent = parent.parent)
+            {
+                result = $"{parent.name}[{parent.GetSiblingIndex()}]/" + result;
+            }
+            return result;
+        }
+
+        private static void AssertSceneSignaturesEqual(
+            SceneStructuralSignature expected,
+            SceneStructuralSignature actual,
+            string context)
+        {
+            Assert.That(
+                actual.ObjectCount,
+                Is.EqualTo(expected.ObjectCount),
+                $"{context}: scene object count changed");
+            Assert.That(
+                actual.ComponentCount,
+                Is.EqualTo(expected.ComponentCount),
+                $"{context}: scene component count changed");
+            Assert.That(
+                actual.ParentReferenceCount,
+                Is.EqualTo(expected.ParentReferenceCount),
+                $"{context}: scene parent relationship count changed");
+            Assert.That(
+                actual.ObjectReferenceSlotCount,
+                Is.EqualTo(expected.ObjectReferenceSlotCount),
+                $"{context}: serialized reference slot count changed");
+            Assert.That(
+                actual.ObjectReferenceCount,
+                Is.EqualTo(expected.ObjectReferenceCount),
+                $"{context}: serialized non-null reference count changed");
+            Assert.That(
+                actual.MissingScriptCount,
+                Is.EqualTo(expected.MissingScriptCount),
+                $"{context}: missing script count changed");
+            Assert.That(
+                actual.Rows,
+                Is.EqualTo(expected.Rows),
+                $"{context}: in-memory scene structure changed");
+        }
+
+        private void RestoreProtectedSnapshot(
+            ProtectedFileSnapshot snapshot,
+            Exception originalFailure)
+        {
+            try
+            {
+                snapshot.RestoreAndDispose();
+            }
+            catch (Exception restorationFailure)
+            {
+                if (originalFailure == null)
+                    throw;
+                originalFailure.Data["ProtectedSnapshotRestoreFailure"] =
+                    restorationFailure.ToString();
+                Debug.LogError(
+                    "Protected snapshot restoration also failed; preserving " +
+                    $"the original assertion failure: {restorationFailure}");
+            }
+            finally
+            {
+                if (snapshot.IsDisposed &&
+                    ReferenceEquals(activeProtectedSnapshot, snapshot))
+                {
+                    activeProtectedSnapshot = null;
+                }
+            }
+        }
+
         private static Dictionary<string, ProtectedFileState>
             CaptureProtectedFileStates()
         {
@@ -941,6 +1259,45 @@ namespace WasteCity.Tests
                             guid,
                             BitConverter.ToString(
                                     sha.ComputeHash(stream))
+                                .Replace("-", string.Empty)));
+                }
+            }
+            return result;
+        }
+
+        private static Dictionary<string, ProtectedFileState>
+            CaptureProtectedFileStatesForRecovery(
+                IEnumerable<string> protectedPaths)
+        {
+            var result = new Dictionary<string, ProtectedFileState>();
+            foreach (string protectedPath in protectedPaths)
+            {
+                string absolutePath = ProjectAbsolutePath(protectedPath);
+                string assetPath = protectedPath.EndsWith(
+                    ".meta",
+                    StringComparison.Ordinal)
+                    ? protectedPath.Substring(0, protectedPath.Length - 5)
+                    : protectedPath;
+                string guid = assetPath.StartsWith(
+                    "Assets/",
+                    StringComparison.Ordinal)
+                    ? AssetDatabase.AssetPathToGUID(assetPath)
+                    : string.Empty;
+                if (!File.Exists(absolutePath))
+                {
+                    result.Add(
+                        protectedPath,
+                        new ProtectedFileState(guid, "<missing>"));
+                    continue;
+                }
+                using (FileStream stream = File.OpenRead(absolutePath))
+                using (SHA256 sha = SHA256.Create())
+                {
+                    result.Add(
+                        protectedPath,
+                        new ProtectedFileState(
+                            guid,
+                            BitConverter.ToString(sha.ComputeHash(stream))
                                 .Replace("-", string.Empty)));
                 }
             }
@@ -1144,6 +1501,190 @@ namespace WasteCity.Tests
 
             public string Guid { get; }
             public string Hash { get; }
+        }
+
+        private sealed class SceneStructuralSignature
+        {
+            public SceneStructuralSignature(
+                int objectCount,
+                int componentCount,
+                int parentReferenceCount,
+                int objectReferenceSlotCount,
+                int objectReferenceCount,
+                int missingScriptCount,
+                string[] rows)
+            {
+                ObjectCount = objectCount;
+                ComponentCount = componentCount;
+                ParentReferenceCount = parentReferenceCount;
+                ObjectReferenceSlotCount = objectReferenceSlotCount;
+                ObjectReferenceCount = objectReferenceCount;
+                MissingScriptCount = missingScriptCount;
+                Rows = rows;
+            }
+
+            public int ObjectCount { get; }
+            public int ComponentCount { get; }
+            public int ParentReferenceCount { get; }
+            public int ObjectReferenceSlotCount { get; }
+            public int ObjectReferenceCount { get; }
+            public int MissingScriptCount { get; }
+            public string[] Rows { get; }
+        }
+
+        private sealed class AuthoringHookProbe
+        {
+            public int RuntimeAssetBuilderEntries;
+            public int SceneMutationEntries;
+            public int SceneSaveEntries;
+        }
+
+        private sealed class ProtectedFileSnapshot
+        {
+            private readonly string backupDirectory;
+            private readonly Dictionary<string, string> backupPaths;
+            private readonly Dictionary<string, ProtectedFileState> expected;
+            private Dictionary<string, ProtectedFileState> lastObserved;
+            private bool disposed;
+
+            private ProtectedFileSnapshot(
+                string backupDirectory,
+                Dictionary<string, string> backupPaths,
+                Dictionary<string, ProtectedFileState> expected)
+            {
+                this.backupDirectory = backupDirectory;
+                this.backupPaths = backupPaths;
+                this.expected = expected;
+            }
+
+            public static ProtectedFileSnapshot Capture()
+            {
+                var paths = new List<string>(ProtectedPaths());
+                Assert.That(
+                    paths.Count,
+                    Is.EqualTo(51),
+                    "The complete protected set must contain 51 files.");
+                Dictionary<string, ProtectedFileState> expected =
+                    CaptureProtectedFileStates(paths);
+                string backupDirectory = Path.Combine(
+                    Path.GetTempPath(),
+                    "WasteCityTerrainProtected-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(backupDirectory);
+                var backups = new Dictionary<string, string>();
+                try
+                {
+                    for (var index = 0; index < paths.Count; index++)
+                    {
+                        string protectedPath = paths[index];
+                        string backupPath = Path.Combine(
+                            backupDirectory,
+                            index.ToString("D2") + ".bytes");
+                        File.Copy(
+                            ProjectAbsolutePath(protectedPath),
+                            backupPath,
+                            true);
+                        backups.Add(protectedPath, backupPath);
+                    }
+                    return new ProtectedFileSnapshot(
+                        backupDirectory,
+                        backups,
+                        expected);
+                }
+                catch
+                {
+                    Directory.Delete(backupDirectory, true);
+                    throw;
+                }
+            }
+
+            public void AssertUnchanged(string context)
+            {
+                lastObserved =
+                    CaptureProtectedFileStatesForRecovery(expected.Keys);
+                AssertProtectedStatesEqual(expected, lastObserved, context);
+            }
+
+            public bool IsDisposed => disposed;
+
+            public void RestoreAndDispose()
+            {
+                if (disposed)
+                    return;
+                Dictionary<string, ProtectedFileState> actual =
+                    lastObserved ??
+                    CaptureProtectedFileStatesForRecovery(expected.Keys);
+                var imports = new HashSet<string>();
+                foreach (KeyValuePair<string, ProtectedFileState> pair in
+                         expected)
+                {
+                    if (actual.TryGetValue(
+                            pair.Key,
+                            out ProtectedFileState observed) &&
+                        observed.Guid == pair.Value.Guid &&
+                        observed.Hash == pair.Value.Hash)
+                    {
+                        continue;
+                    }
+
+                    File.Copy(
+                        backupPaths[pair.Key],
+                        ProjectAbsolutePath(pair.Key),
+                        true);
+                    if (pair.Key.StartsWith(
+                            "Assets/",
+                            StringComparison.Ordinal))
+                    {
+                        imports.Add(
+                            pair.Key.EndsWith(
+                                ".meta",
+                                StringComparison.Ordinal)
+                                ? pair.Key.Substring(
+                                    0,
+                                    pair.Key.Length - 5)
+                                : pair.Key);
+                    }
+                }
+
+                if (imports.Count > 0)
+                {
+                    foreach (string assetPath in imports)
+                    {
+                        AssetDatabase.ImportAsset(
+                            assetPath,
+                            ImportAssetOptions.ForceSynchronousImport |
+                            ImportAssetOptions.ForceUpdate);
+                    }
+
+                    Dictionary<string, ProtectedFileState> afterImports =
+                        CaptureProtectedFileStatesForRecovery(expected.Keys);
+                    foreach (KeyValuePair<string, ProtectedFileState> pair in
+                             expected)
+                    {
+                        ProtectedFileState observed = afterImports[pair.Key];
+                        if (observed.Guid == pair.Value.Guid &&
+                            observed.Hash == pair.Value.Hash)
+                        {
+                            continue;
+                        }
+                        File.Copy(
+                            backupPaths[pair.Key],
+                            ProjectAbsolutePath(pair.Key),
+                            true);
+                    }
+                }
+
+                disposed = true;
+                try
+                {
+                    Directory.Delete(backupDirectory, true);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogError(
+                        "Protected bytes were restored, but the temporary " +
+                        $"snapshot directory could not be deleted: {exception}");
+                }
+            }
         }
     }
 }

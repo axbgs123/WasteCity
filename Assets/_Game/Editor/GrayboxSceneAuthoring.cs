@@ -84,14 +84,32 @@ namespace WasteCity.Editor
             public Texture2DArray Height;
         }
 
+        private sealed class AuthoringHooks
+        {
+            public Action BeforeRuntimeAssetBuilder;
+            public Action BeforeSceneMutation;
+            public Action BeforeSceneSave;
+        }
+
+        private sealed class AuthoringPreflightException : Exception
+        {
+            public AuthoringPreflightException(
+                string message,
+                Exception innerException)
+                : base(message, innerException)
+            {
+            }
+        }
+
         public static void Configure()
         {
-            ConfigureSceneAtPath(ScenePath, true);
+            ConfigureSceneAtPath(ScenePath, true, null);
         }
 
         private static void ConfigureSceneAtPath(
             string targetScenePath,
-            bool updateBuildSettings)
+            bool updateBuildSettings,
+            AuthoringHooks hooks)
         {
             if (string.IsNullOrEmpty(targetScenePath) ||
                 !targetScenePath.StartsWith(
@@ -110,12 +128,14 @@ namespace WasteCity.Editor
             bool hasExistingScene =
                 TryOpenAndValidateFoundation(
                     targetScenePath,
-                    out Scene scene);
+                    out Scene scene,
+                    hooks);
 
             ApprovedTerrainAssets terrainAssets =
-                EnsureApprovedTerrainAssets();
+                EnsureApprovedTerrainAssets(hooks);
             if (hasExistingScene)
             {
+                hooks?.BeforeSceneMutation?.Invoke();
                 EnsureFirstArtTerrainContract(
                     scene,
                     terrainAssets.Profile);
@@ -136,7 +156,10 @@ namespace WasteCity.Editor
             AssetDatabase.SaveAssets();
 
             if (!hasExistingScene)
+            {
+                hooks?.BeforeSceneMutation?.Invoke();
                 scene = CreateFoundationScene(pipeline, material);
+            }
             EnsureBuildingContract(scene, material);
             if (!hasExistingScene)
             {
@@ -146,6 +169,7 @@ namespace WasteCity.Editor
             }
             ValidateFirstArtTerrainContract(scene);
 
+            hooks?.BeforeSceneSave?.Invoke();
             if (!EditorSceneManager.SaveScene(scene, targetScenePath))
                 throw new InvalidOperationException(
                     $"Failed to save graybox scene at " +
@@ -319,12 +343,13 @@ namespace WasteCity.Editor
 
         private static bool TryOpenAndValidateFoundation(out Scene scene)
         {
-            return TryOpenAndValidateFoundation(ScenePath, out scene);
+            return TryOpenAndValidateFoundation(ScenePath, out scene, null);
         }
 
         private static bool TryOpenAndValidateFoundation(
             string scenePath,
-            out Scene scene)
+            out Scene scene,
+            AuthoringHooks hooks)
         {
             scene = default;
             if (AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
@@ -333,7 +358,17 @@ namespace WasteCity.Editor
             scene = EditorSceneManager.OpenScene(
                 scenePath,
                 OpenSceneMode.Single);
-            ValidateFoundationContract(scene);
+            try
+            {
+                ValidateFoundationContract(scene);
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new AuthoringPreflightException(
+                    "Graybox scene authoring preflight/foundation " +
+                    $"rejected '{scenePath}': {exception.Message}",
+                    exception);
+            }
             return true;
         }
 
@@ -942,7 +977,8 @@ namespace WasteCity.Editor
             return presenter;
         }
 
-        private static ApprovedTerrainAssets EnsureApprovedTerrainAssets()
+        private static ApprovedTerrainAssets EnsureApprovedTerrainAssets(
+            AuthoringHooks hooks)
         {
             if (TryLoadApprovedTerrainAssets(
                     out ApprovedTerrainAssets assets,
@@ -951,6 +987,7 @@ namespace WasteCity.Editor
                 return assets;
             }
 
+            hooks?.BeforeRuntimeAssetBuilder?.Invoke();
             FirstArtTerrainAssetBuilder.BuildRuntimeAssets();
             if (!TryLoadApprovedTerrainAssets(out assets, out string error))
             {
