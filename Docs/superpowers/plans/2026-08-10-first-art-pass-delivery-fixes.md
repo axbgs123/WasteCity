@@ -34,6 +34,7 @@
 - `Docs/06-User-Feedback-and-Change-Control-ZH.md` 中 `IDEA-0004` 段
 - `Docs/superpowers/specs/2026-08-08-first-art-pass-production-design.md`
 - `Docs/superpowers/specs/2026-08-08-first-terrain-materials-design.md`
+- `Docs/superpowers/plans/2026-08-05-3d-building-placement-and-developer-modifier.md` 中来源分支已经完成的 Task 13 机器/Windows 事实勾选（只原样保留，不再编辑其执行合同）
 - `Docs/superpowers/plans/2026-08-08-first-art-pass-production.md`
 - 本计划文件
 

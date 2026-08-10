@@ -26,7 +26,7 @@
 - 地形采用风格化 PBR，以暖黄干旱废土为母底色，贴图为主、少量模型装饰为辅；`Wasteland`、`Rocky`、`Wetland`、`Crystal` 使用柔和混合，`Ruins` 以柔化碎边自然衔接但不模糊规则范围，`DeepWater` 和 `Cliff` 必须维持清晰可读的玩法边界。
 - 每类正式地形的基础交付为 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask 和 16-bit Height；不得只完成 BaseColor 后把其余数据贴图登记为完成。
 - 资源不得持有成本、施工、生命、攻击、占地、解锁、城市状态或存档真值。
-- 所有 `.png`、`.fbx`、`.blend`、`.wav` 使用仓库现有 Git LFS 规则，不修改 `.gitattributes`。
+- 所有 `.png`、`.fbx`、`.blend`、`.kra`、`.ora`、`.psd`、`.wav` 必须使用 Git LFS。2026-08-10 的交付修复已补齐此前遗漏的 KRA/ORA/PSD 规则；后续新增二进制源文件必须先通过 `Tools/Art/validate_first_art_pass_delivery.py`，不得再次以普通 Git blob 提交。
 - 所有外部资源必须记录作者、来源、许可证、商业使用权和证据路径；许可证不明确的资源不得进入交接包。
 - Unity MCP/Package Manager 产生的 `Packages/manifest.json`、`Packages/packages-lock.json`、`ProjectSettings/PackageManagerSettings.asset`、`ProjectSettings/URPProjectSettings.asset` 始终视为受保护外部改动，除非另有独立批准。
 
@@ -69,11 +69,24 @@ Docs/Art/FirstPass/
 
 Assets/_Game/Editor/FirstArtPassAssetValidator.cs
 Assets/_Game/Editor/FirstArtPassAssetValidator.cs.meta
+Assets/_Game/Editor/FirstArtPassImportPolicy.cs
+Assets/_Game/Editor/FirstArtPassImportPolicy.cs.meta
 Assets/_Game/Tests/EditMode/FirstArtPassAssetValidationTests.cs
 Assets/_Game/Tests/EditMode/FirstArtPassAssetValidationTests.cs.meta
+Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs
+Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs.meta
+Tools/Art/validate_first_art_pass_delivery.py
 ```
 
 `FirstArtPassAssetValidator` 只验证导入资产，不修改场景或运行时。它产生可读验证结果，不负责正式表现绑定。
+
+### 2026-08-10 交付修复状态
+
+- 已把来源分支最终文件树压入不含大普通 blob 的新交付分支，旧分支保留但不作为后续合并源；
+- 已完成七类共 28 张地表 PNG、Ruins 八件与 Cliff 六件 FBX 的 LFS/数量/命名门；
+- 已提交限定 `Assets/_Game/Art/FirstPass/` 的 Unity 导入策略与 43 项真实 importer 测试，并冻结完整 Art/FirstPass 层级共 55 个资源/目录 `.meta`；
+- 本状态不替代本计划 Task 4 的完整尺寸、Bounds、Pivot、Renderer、音频和许可证验证器；该验证器仍未实现；
+- 未创建 Material、Shader、Prefab、Sprite、场景映射或运行时美术接入，Task 12 仍未完成。
 
 ---
 
