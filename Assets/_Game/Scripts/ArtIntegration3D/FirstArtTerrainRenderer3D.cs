@@ -6,7 +6,9 @@ using WasteCity.World;
 namespace WasteCity.ArtIntegration3D
 {
     public sealed class FirstArtTerrainRenderer3D : MonoBehaviour,
-        IGrayboxTerrainPresentation3D
+        IGrayboxTerrainPresentation3D,
+        IGrayboxTerrainPresentationAttempt3D,
+        IGrayboxTerrainPresentationSource3D
     {
         private static readonly int BaseColorArrayId =
             Shader.PropertyToID("_BaseColorArray");
@@ -50,14 +52,28 @@ namespace WasteCity.ArtIntegration3D
             controlMaps != null;
         public MeshRenderer SurfaceRenderer => surfaceRenderer;
         public FirstArtTerrainControlMap3D ControlMaps => controlMaps;
+        public string LastPresentationError { get; private set; }
 
         public void Configure(FirstArtTerrainProfile3D profile)
         {
+            if (this.profile == profile)
+                return;
+
+            ClearPresentation();
             this.profile = profile;
+            LastPresentationError = null;
         }
 
         public bool TryPresent(GrayboxWorldView3D worldView)
         {
+            return TryPresent(worldView, true);
+        }
+
+        public bool TryPresent(
+            GrayboxWorldView3D worldView,
+            bool logFailure)
+        {
+            LastPresentationError = null;
             ClearPresentation();
             retainedWorldView = worldView;
 
@@ -103,6 +119,7 @@ namespace WasteCity.ArtIntegration3D
                 localMesh = null;
                 localControlMaps = null;
 
+                worldView.AttachTerrainPresentation(this);
                 worldView.SetSurfaceFallbackVisible(false);
                 return true;
             }
@@ -115,10 +132,14 @@ namespace WasteCity.ArtIntegration3D
                 propertyBlock?.Clear();
                 if (worldView != null)
                     worldView.SetSurfaceFallbackVisible(true);
-                Debug.LogError(
-                    "First-art terrain presentation failed: " +
-                    exception.Message,
-                    this);
+                LastPresentationError = exception.Message;
+                if (logFailure)
+                {
+                    Debug.LogError(
+                        "First-art terrain presentation failed: " +
+                        exception.Message,
+                        this);
+                }
                 return false;
             }
         }
@@ -126,7 +147,10 @@ namespace WasteCity.ArtIntegration3D
         public void ClearPresentation()
         {
             if (retainedWorldView != null)
+            {
+                retainedWorldView.DetachTerrainPresentation(this);
                 retainedWorldView.SetSurfaceFallbackVisible(true);
+            }
 
             if (propertyBlock != null)
             {
@@ -146,6 +170,18 @@ namespace WasteCity.ArtIntegration3D
             DestroyOwned(surfaceToDestroy);
             mapsToDispose?.Dispose();
             DestroyOwned(meshToDestroy);
+        }
+
+        public void ReleasePresentationSource()
+        {
+            try
+            {
+                ClearPresentation();
+            }
+            finally
+            {
+                retainedWorldView = null;
+            }
         }
 
         private void ValidateSource(GrayboxWorldView3D worldView)

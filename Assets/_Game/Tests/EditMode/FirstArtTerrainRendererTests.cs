@@ -96,6 +96,57 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Configure_WhenProfileChanges_ClearsOwnedPresentationAndRestoresFallback()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            FirstArtTerrainProfile3D approved = LoadApprovedProfile();
+            FirstArtTerrainRenderer3D presenter = CreatePresenter(approved);
+            Assert.That(presenter.TryPresent(view), Is.True);
+            Mesh oldMesh = presenter.SurfaceRenderer
+                .GetComponent<MeshFilter>().sharedMesh;
+            Texture2D oldControlA = presenter.ControlMaps.ControlA;
+            Texture2D oldControlB = presenter.ControlMaps.ControlB;
+            FirstArtTerrainProfile3D replacement =
+                CreateProfileClone(approved);
+
+            presenter.Configure(replacement);
+
+            Assert.That(presenter.Profile, Is.SameAs(replacement));
+            Assert.That(presenter.IsPresented, Is.False);
+            Assert.That(RuntimeSurfaceCount(presenter), Is.Zero);
+            Assert.That(oldMesh == null, Is.True);
+            Assert.That(oldControlA == null, Is.True);
+            Assert.That(oldControlB == null, Is.True);
+            AssertFallbackState(view, true);
+        }
+
+        [Test]
+        public void ExternalGenerate_AfterPresentationRebuildsExactlyOneFreshFormalSurface()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            FirstArtTerrainRenderer3D presenter =
+                CreatePresenter(LoadApprovedProfile());
+            Assert.That(presenter.TryPresent(view), Is.True);
+            Mesh oldMesh = presenter.SurfaceRenderer
+                .GetComponent<MeshFilter>().sharedMesh;
+            FirstArtTerrainControlMap3D oldMaps = presenter.ControlMaps;
+            Texture2D oldControlA = oldMaps.ControlA;
+            Texture2D oldControlB = oldMaps.ControlB;
+            WorldMapModel replacement = CreateCatalogMap();
+
+            view.Generate(replacement);
+
+            Assert.That(view.Model, Is.SameAs(replacement));
+            Assert.That(oldMesh == null, Is.True);
+            Assert.That(oldControlA == null, Is.True);
+            Assert.That(oldControlB == null, Is.True);
+            Assert.That(presenter.IsPresented, Is.True);
+            Assert.That(presenter.ControlMaps, Is.Not.SameAs(oldMaps));
+            Assert.That(RuntimeSurfaceCount(presenter), Is.EqualTo(1));
+            AssertFallbackState(view, false);
+        }
+
+        [Test]
         public void DisableThenEnable_RestoresFallbackAndRecreatesExactlyOneSurface()
         {
             GrayboxWorldView3D view = CreateCatalogView();
@@ -242,6 +293,20 @@ namespace WasteCity.Tests
             presenter.runInEditMode = true;
             presenter.Configure(profile);
             return presenter;
+        }
+
+        private FirstArtTerrainProfile3D CreateProfileClone(
+            FirstArtTerrainProfile3D source)
+        {
+            FirstArtTerrainProfile3D clone = Track(
+                ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>());
+            clone.Configure(
+                source.Material,
+                source.BaseColorArray,
+                source.NormalArray,
+                source.MaskArray,
+                source.HeightArray);
+            return clone;
         }
 
         private GrayboxWorldView3D CreateCatalogView()

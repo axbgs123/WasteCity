@@ -29,10 +29,19 @@ namespace WasteCity.Graybox3D
             GrayboxWorldView3D worldView,
             MonoBehaviour terrainPresentationBehaviour)
         {
+            if (this.renderScope == renderScope &&
+                this.worldView == worldView &&
+                this.terrainPresentationBehaviour ==
+                    terrainPresentationBehaviour)
+                return;
+
+            ClearConfiguredPresentation();
             this.renderScope = renderScope;
             this.worldView = worldView;
             this.terrainPresentationBehaviour =
                 terrainPresentationBehaviour;
+            World = null;
+            IsInitialized = false;
         }
 
         public bool Initialize()
@@ -72,25 +81,101 @@ namespace WasteCity.Graybox3D
                 return;
             }
 
+            string presentationFailure;
             try
             {
-                if (presentation.TryPresent(worldView))
+                bool presented;
+                var diagnosticAttempt = presentation as
+                    IGrayboxTerrainPresentationAttempt3D;
+                if (diagnosticAttempt != null)
+                {
+                    presented = diagnosticAttempt.TryPresent(
+                        worldView,
+                        false);
+                }
+                else
+                {
+                    presented = presentation.TryPresent(worldView);
+                }
+
+                if (presented)
                     return;
 
-                worldView.SetSurfaceFallbackVisible(true);
-                Debug.LogError(
-                    "Graybox terrain presentation returned false; " +
-                    "surface fallback restored.",
-                    this);
+                presentationFailure =
+                    diagnosticAttempt != null &&
+                    !string.IsNullOrEmpty(
+                        diagnosticAttempt.LastPresentationError)
+                        ? "terrain presentation failed: " +
+                          diagnosticAttempt.LastPresentationError
+                        : "terrain presentation returned false";
             }
             catch (System.Exception exception)
             {
-                worldView.SetSurfaceFallbackVisible(true);
+                presentationFailure =
+                    "terrain presentation failed: " + exception.Message;
+            }
+
+            string cleanupFailure = ClearPresentationBestEffort(
+                presentation,
+                worldView);
+            string message = "Graybox " + presentationFailure;
+            if (!string.IsNullOrEmpty(cleanupFailure))
+                message += "; cleanup failed: " + cleanupFailure;
+            Debug.LogError(
+                message + "; surface fallback restored.",
+                this);
+        }
+
+        private void ClearConfiguredPresentation()
+        {
+            var presentation = terrainPresentationBehaviour as
+                IGrayboxTerrainPresentation3D;
+            if (presentation == null && worldView == null)
+                return;
+
+            string cleanupFailure = ClearPresentationBestEffort(
+                presentation,
+                worldView,
+                true);
+            if (!string.IsNullOrEmpty(cleanupFailure))
+            {
                 Debug.LogError(
-                    "Graybox terrain presentation failed: " +
-                    exception.Message + "; surface fallback restored.",
+                    "Graybox terrain presentation reconfiguration " +
+                    "cleanup failed: " + cleanupFailure +
+                    "; surface fallback restored.",
                     this);
             }
+        }
+
+        private static string ClearPresentationBestEffort(
+            IGrayboxTerrainPresentation3D presentation,
+            GrayboxWorldView3D configuredWorldView,
+            bool releaseSource = false)
+        {
+            string cleanupFailure = null;
+            if (presentation != null)
+            {
+                try
+                {
+                    var source = presentation as
+                        IGrayboxTerrainPresentationSource3D;
+                    if (releaseSource && source != null)
+                        source.ReleasePresentationSource();
+                    else
+                        presentation.ClearPresentation();
+                }
+                catch (System.Exception exception)
+                {
+                    cleanupFailure = exception.Message;
+                }
+            }
+
+            if (configuredWorldView != null)
+            {
+                configuredWorldView.DetachTerrainPresentation(presentation);
+                configuredWorldView.SetSurfaceFallbackVisible(true);
+            }
+            return cleanupFailure;
         }
 
         private void Start()

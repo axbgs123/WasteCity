@@ -32,6 +32,8 @@ namespace WasteCity.ArtIntegration3D
 
     public sealed class FirstArtTerrainControlMap3D : IDisposable
     {
+        internal static Action AfterControlAAllocatedForTests;
+
         private bool disposed;
 
         public int Width { get; }
@@ -66,8 +68,34 @@ namespace WasteCity.ArtIntegration3D
             Height = height;
             ControlABytes = controlABytes;
             ControlBBytes = controlBBytes;
-            ControlA = CreateTexture(width, height, controlABytes, "FirstArtTerrainControlA");
-            ControlB = CreateTexture(width, height, controlBBytes, "FirstArtTerrainControlB");
+
+            Texture2D localControlA = null;
+            Texture2D localControlB = null;
+            try
+            {
+                localControlA = CreateTexture(
+                    width,
+                    height,
+                    controlABytes,
+                    "FirstArtTerrainControlA");
+                AfterControlAAllocatedForTests?.Invoke();
+                localControlB = CreateTexture(
+                    width,
+                    height,
+                    controlBBytes,
+                    "FirstArtTerrainControlB");
+
+                ControlA = localControlA;
+                ControlB = localControlB;
+                localControlA = null;
+                localControlB = null;
+            }
+            catch
+            {
+                DestroyOwnedTexture(localControlB);
+                DestroyOwnedTexture(localControlA);
+                throw;
+            }
         }
 
         public TerrainControlWeights3D GetWeights(int x, int y)
@@ -108,15 +136,29 @@ namespace WasteCity.ArtIntegration3D
             byte[] bytes,
             string textureName)
         {
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false, true)
+            Texture2D texture = null;
+            try
             {
-                name = textureName,
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-            };
-            texture.LoadRawTextureData(bytes);
-            texture.Apply(false, true);
-            return texture;
+                texture = new Texture2D(
+                    width,
+                    height,
+                    TextureFormat.RGBA32,
+                    false,
+                    true)
+                {
+                    name = textureName,
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                texture.LoadRawTextureData(bytes);
+                texture.Apply(false, true);
+                return texture;
+            }
+            catch
+            {
+                DestroyOwnedTexture(texture);
+                throw;
+            }
         }
 
         private static void DestroyOwnedTexture(Texture2D texture)

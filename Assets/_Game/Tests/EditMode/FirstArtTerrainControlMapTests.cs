@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
@@ -18,7 +21,7 @@ namespace WasteCity.Tests
         [TearDown]
         public void TearDown()
         {
-            Object.DestroyImmediate(profile);
+            UnityEngine.Object.DestroyImmediate(profile);
         }
 
         [Test]
@@ -165,6 +168,39 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void Generate_WhenFaultInjectedAfterControlAAllocation_DestroysPartialTexture()
+        {
+            FieldInfo faultSeam = typeof(FirstArtTerrainControlMap3D).GetField(
+                "AfterControlAAllocatedForTests",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(faultSeam, Is.Not.Null);
+            int textureCountBefore = RuntimeControlTextureCount();
+            var injectedFailure = new Action(
+                () => throw new InvalidOperationException(
+                    "Injected after Control A allocation."));
+            faultSeam.SetValue(null, injectedFailure);
+
+            try
+            {
+                Assert.That(
+                    () => FirstArtTerrainControlMapGenerator3D.Generate(
+                        CreateSevenStripeMap(),
+                        profile),
+                    Throws.TypeOf<InvalidOperationException>()
+                        .With.Message.EqualTo(
+                            "Injected after Control A allocation."));
+            }
+            finally
+            {
+                faultSeam.SetValue(null, null);
+            }
+
+            Assert.That(
+                RuntimeControlTextureCount(),
+                Is.EqualTo(textureCountBefore));
+        }
+
         private FirstArtTerrainControlMap3D GenerateThreeWayJunction()
         {
             return FirstArtTerrainControlMapGenerator3D.Generate(
@@ -237,6 +273,15 @@ namespace WasteCity.Tests
             return layerIndex < 4
                 ? result.ControlABytes[offset + layerIndex]
                 : result.ControlBBytes[offset + layerIndex - 4];
+        }
+
+        private static int RuntimeControlTextureCount()
+        {
+            return Resources.FindObjectsOfTypeAll<Texture2D>()
+                .Count(texture =>
+                    texture != null &&
+                    (texture.name == "FirstArtTerrainControlA" ||
+                     texture.name == "FirstArtTerrainControlB"));
         }
 
     }

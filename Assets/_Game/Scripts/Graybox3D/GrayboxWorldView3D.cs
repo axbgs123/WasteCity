@@ -42,6 +42,7 @@ namespace WasteCity.Graybox3D
         private readonly List<Mesh> generatedMeshes = new List<Mesh>();
         private readonly List<GrayboxVisualSlot> surfaceSlots =
             new List<GrayboxVisualSlot>();
+        private IGrayboxTerrainPresentation3D activeTerrainPresentation;
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
@@ -82,7 +83,9 @@ namespace WasteCity.Graybox3D
                 throw new InvalidOperationException(
                     "Configure the graybox world view before generation.");
 
-            ClearGenerated();
+            IGrayboxTerrainPresentation3D presentationToRestore =
+                ReleaseActiveTerrainPresentation();
+            ClearGeneratedObjects();
             Model = model;
             Coordinates =
                 new PlanarCoordinateMapper3D(model.Width, model.Height);
@@ -101,6 +104,31 @@ namespace WasteCity.Graybox3D
             foreach (Group group in groups.Values)
                 BuildGroup(group);
             groups.Clear();
+
+            if (IsPresentationAlive(presentationToRestore))
+                RestoreTerrainPresentation(presentationToRestore);
+        }
+
+        public void AttachTerrainPresentation(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            if (presentation == null)
+                throw new ArgumentNullException(nameof(presentation));
+            if (IsPresentationAlive(activeTerrainPresentation) &&
+                !ReferenceEquals(activeTerrainPresentation, presentation))
+            {
+                throw new InvalidOperationException(
+                    "A terrain presentation is already attached.");
+            }
+
+            activeTerrainPresentation = presentation;
+        }
+
+        public void DetachTerrainPresentation(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            if (ReferenceEquals(activeTerrainPresentation, presentation))
+                activeTerrainPresentation = null;
         }
 
         public void SetSurfaceFallbackVisible(bool visible)
@@ -116,6 +144,12 @@ namespace WasteCity.Graybox3D
 
         public void ClearGenerated()
         {
+            ReleaseActiveTerrainPresentation();
+            ClearGeneratedObjects();
+        }
+
+        private void ClearGeneratedObjects()
+        {
             for (int index = generatedObjects.Count - 1; index >= 0; index--)
                 DestroyOwned(generatedObjects[index]);
             for (int index = generatedMeshes.Count - 1; index >= 0; index--)
@@ -127,6 +161,84 @@ namespace WasteCity.Graybox3D
             groups.Clear();
             Model = null;
             Coordinates = null;
+        }
+
+        private IGrayboxTerrainPresentation3D
+            ReleaseActiveTerrainPresentation()
+        {
+            IGrayboxTerrainPresentation3D presentation =
+                activeTerrainPresentation;
+            activeTerrainPresentation = null;
+            if (presentation == null)
+                return null;
+
+            SetSurfaceFallbackVisible(true);
+            if (IsPresentationAlive(presentation))
+                presentation.ClearPresentation();
+            return presentation;
+        }
+
+        private static bool IsPresentationAlive(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            if (presentation == null)
+                return false;
+            var unityObject = presentation as UnityEngine.Object;
+            return ReferenceEquals(unityObject, null) || unityObject != null;
+        }
+
+        private void RestoreTerrainPresentation(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            try
+            {
+                if (presentation.TryPresent(this))
+                    return;
+            }
+            catch (Exception presentationException)
+            {
+                Exception cleanupException =
+                    CleanupFailedTerrainPresentation(presentation);
+                if (cleanupException != null)
+                {
+                    throw new AggregateException(
+                        "Terrain presentation and cleanup failed.",
+                        presentationException,
+                        cleanupException);
+                }
+                throw;
+            }
+
+            Exception failedCleanup =
+                CleanupFailedTerrainPresentation(presentation);
+            if (failedCleanup != null)
+            {
+                throw new InvalidOperationException(
+                    "Terrain presentation returned false and cleanup " +
+                    "failed.",
+                    failedCleanup);
+            }
+        }
+
+        private Exception CleanupFailedTerrainPresentation(
+            IGrayboxTerrainPresentation3D presentation)
+        {
+            Exception cleanupException = null;
+            try
+            {
+                if (IsPresentationAlive(presentation))
+                    presentation.ClearPresentation();
+            }
+            catch (Exception exception)
+            {
+                cleanupException = exception;
+            }
+            finally
+            {
+                DetachTerrainPresentation(presentation);
+                SetSurfaceFallbackVisible(true);
+            }
+            return cleanupException;
         }
 
         public bool TryWorldToCell(
