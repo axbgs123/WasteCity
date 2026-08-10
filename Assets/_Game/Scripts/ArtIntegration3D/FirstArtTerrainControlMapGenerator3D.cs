@@ -96,7 +96,7 @@ namespace WasteCity.ArtIntegration3D
                     (FirstArtTerrainLayer3D)ownerLayer,
                     (FirstArtTerrainLayer3D)candidateLayer);
                 float distance = DistanceToCellRectangle(sampleX, sampleY, candidateX, candidateY);
-                float candidateWeight = 1f - Mathf.SmoothStep(
+                float candidateWeight = 1f - SmoothStep(
                     0f,
                     blendWidth,
                     distance + EdgeNoise(sampleX, sampleY, candidateLayer));
@@ -257,6 +257,11 @@ namespace WasteCity.ArtIntegration3D
         private static float Smooth01(float t)
         {
             return t * t * (3f - 2f * t);
+        }
+
+        private static float SmoothStep(float edge0, float edge1, float value)
+        {
+            return Smooth01(Mathf.Clamp01((value - edge0) / (edge1 - edge0)));
         }
     }
 }

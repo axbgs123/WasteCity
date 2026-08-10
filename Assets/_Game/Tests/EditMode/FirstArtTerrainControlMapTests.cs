@@ -96,15 +96,17 @@ namespace WasteCity.Tests
             }
         }
 
-        [TestCase(FirstArtTerrainLayer3D.Rocky, 1.25f)]
-        [TestCase(FirstArtTerrainLayer3D.Wetland, 1.15f)]
-        [TestCase(FirstArtTerrainLayer3D.Crystal, 1f)]
-        public void Generate_WastelandTransitionsUseApprovedRanges(
+        [TestCase(FirstArtTerrainLayer3D.Rocky, 13, 85)]
+        [TestCase(FirstArtTerrainLayer3D.Wetland, 13, 71)]
+        [TestCase(FirstArtTerrainLayer3D.Crystal, 12, 18)]
+        public void Generate_BaseTransitionsMatchConfiguredBoundaryBytes(
             FirstArtTerrainLayer3D neighbor,
-            float expectedWidth)
+            int insideBoundaryX,
+            byte expectedInsideByte)
         {
             TerrainKind terrain = TerrainFor(neighbor);
             WorldMapModel map = MapOf(
+                new WorldCell(TerrainKind.Wasteland, null, 0),
                 new WorldCell(TerrainKind.Wasteland, null, 0),
                 new WorldCell(TerrainKind.Wasteland, null, 0),
                 new WorldCell(TerrainKind.Wasteland, null, 0),
@@ -114,21 +116,26 @@ namespace WasteCity.Tests
                    FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
             {
                 Assert.That(
-                    profile.BlendWidth(FirstArtTerrainLayer3D.Wasteland, neighbor),
-                    Is.EqualTo(expectedWidth));
-                Assert.That(WeightOf(result.GetWeights(0, 1), neighbor), Is.EqualTo(0f));
+                    EncodedWeightOf(result, insideBoundaryX, 1, neighbor),
+                    Is.EqualTo(expectedInsideByte));
+                Assert.That(EncodedWeightOf(result, 10, 1, neighbor), Is.Zero);
             }
         }
 
-        [TestCase(WorldTraversalKind.Ruins, FirstArtTerrainLayer3D.Ruins, 0.75f)]
-        [TestCase(WorldTraversalKind.DeepWater, FirstArtTerrainLayer3D.DeepWater, 0.425f)]
-        [TestCase(WorldTraversalKind.Cliff, FirstArtTerrainLayer3D.Cliff, 0.35f)]
-        public void Generate_SpecialTransitionsUseNarrowApprovedRanges(
+        [TestCase(WorldTraversalKind.Ruins, FirstArtTerrainLayer3D.Ruins, 13, 35, 12)]
+        [TestCase(WorldTraversalKind.DeepWater, FirstArtTerrainLayer3D.DeepWater, 15, 102, 13)]
+        [TestCase(WorldTraversalKind.Cliff, FirstArtTerrainLayer3D.Cliff, 15, 114, 13)]
+        public void Generate_SpecialTransitionsMatchConfiguredBoundaryBytes(
             WorldTraversalKind traversal,
             FirstArtTerrainLayer3D special,
-            float expectedWidth)
+            int insideBoundaryX,
+            byte expectedInsideByte,
+            int beyondBoundaryX)
         {
             WorldMapModel map = MapOf(
+                new WorldCell(TerrainKind.Wasteland, null, 0),
+                new WorldCell(TerrainKind.Wasteland, null, 0),
+                new WorldCell(TerrainKind.Wasteland, null, 0),
                 new WorldCell(TerrainKind.Wasteland, null, 0),
                 new WorldCell(TerrainKind.Crystal, null, 0, traversal));
 
@@ -136,9 +143,9 @@ namespace WasteCity.Tests
                    FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
             {
                 Assert.That(
-                    profile.BlendWidth(FirstArtTerrainLayer3D.Wasteland, special),
-                    Is.EqualTo(expectedWidth));
-                Assert.That(WeightOf(result.GetWeights(result.Width - 1, 1), special), Is.GreaterThan(0.5f));
+                    EncodedWeightOf(result, insideBoundaryX, 1, special),
+                    Is.EqualTo(expectedInsideByte));
+                Assert.That(EncodedWeightOf(result, beyondBoundaryX, 1, special), Is.Zero);
             }
         }
 
@@ -218,5 +225,19 @@ namespace WasteCity.Tests
             int index = (int)layer;
             return index < 4 ? weights.Base[index] : weights.Special[index - 4];
         }
+
+        private static byte EncodedWeightOf(
+            FirstArtTerrainControlMap3D result,
+            int x,
+            int y,
+            FirstArtTerrainLayer3D layer)
+        {
+            int offset = (y * result.Width + x) * 4;
+            int layerIndex = (int)layer;
+            return layerIndex < 4
+                ? result.ControlABytes[offset + layerIndex]
+                : result.ControlBBytes[offset + layerIndex - 4];
+        }
+
     }
 }
