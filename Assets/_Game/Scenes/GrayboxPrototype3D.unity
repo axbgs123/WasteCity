@@ -1258,7 +1258,53 @@ Transform:
   - {fileID: 113905061}
   - {fileID: 1497081789}
   - {fileID: 842902525}
+  - {fileID: 1129381984}
   m_Father: {fileID: 1557591921}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1129381982
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1129381984}
+  - component: {fileID: 1129381983}
+  m_Layer: 0
+  m_Name: FirstArtTerrainPresentation
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1129381983
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129381982}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1203905569d647de88492a04032e59d3, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  profile: {fileID: 11400000, guid: c2c0273740a844e7bbbee5d059d8af8e, type: 2}
+--- !u!4 &1129381984
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1129381982}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 962754567}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1137942432
 GameObject:
@@ -1832,6 +1878,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   renderScope: {fileID: 2120797886}
   worldView: {fileID: 962754566}
+  terrainPresentationBehaviour: {fileID: 1129381983}
 --- !u!1 &1711310366
 GameObject:
   m_ObjectHideFlags: 0
