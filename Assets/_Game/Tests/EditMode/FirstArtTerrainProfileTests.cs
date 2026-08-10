@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
@@ -126,6 +127,94 @@ namespace WasteCity.Tests
             {
                 UnityEngine.Object.DestroyImmediate(profile);
             }
+        }
+
+        [Test]
+        public void Profile_AllowsSmallOrthogonalWaterVelocities()
+        {
+            FirstArtTerrainProfile3D profile =
+                ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>();
+
+            try
+            {
+                SetWaterNormalVelocities(
+                    profile,
+                    new Vector2(0.00001f, 0f),
+                    new Vector2(0f, 0.00001f));
+
+                Assert.That(profile.TryValidateControlSettings(out string error), Is.True, error);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void Profile_RejectsAntiparallelWaterVelocities()
+        {
+            FirstArtTerrainProfile3D profile =
+                ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>();
+
+            try
+            {
+                SetWaterNormalVelocities(profile, Vector2.right, Vector2.left);
+
+                Assert.That(profile.TryValidateControlSettings(out string error), Is.False);
+                Assert.That(error, Does.Contain("non-parallel"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void Profile_RejectsNonFiniteWaterVelocities()
+        {
+            FirstArtTerrainProfile3D profile =
+                ScriptableObject.CreateInstance<FirstArtTerrainProfile3D>();
+
+            try
+            {
+                SetWaterNormalVelocities(profile, new Vector2(float.NaN, 1f), Vector2.up);
+
+                Assert.That(profile.TryValidateControlSettings(out string error), Is.False);
+                Assert.That(error, Does.Contain("non-zero and non-parallel"));
+
+                SetWaterNormalVelocities(
+                    profile,
+                    new Vector2(float.PositiveInfinity, 1f),
+                    Vector2.up);
+
+                Assert.That(profile.TryValidateControlSettings(out error), Is.False);
+                Assert.That(error, Does.Contain("non-zero and non-parallel"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        private static void SetWaterNormalVelocities(
+            FirstArtTerrainProfile3D profile,
+            Vector2 velocityA,
+            Vector2 velocityB)
+        {
+            SetPrivateField(profile, "waterNormalVelocityA", velocityA);
+            SetPrivateField(profile, "waterNormalVelocityB", velocityB);
+        }
+
+        private static void SetPrivateField(
+            FirstArtTerrainProfile3D profile,
+            string fieldName,
+            Vector2 value)
+        {
+            FieldInfo field = typeof(FirstArtTerrainProfile3D).GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(profile, value);
         }
     }
 }

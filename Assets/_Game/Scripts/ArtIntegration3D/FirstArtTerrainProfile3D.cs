@@ -100,11 +100,11 @@ namespace WasteCity.ArtIntegration3D
                 return false;
             }
 
-            if (waterNormalVelocityA.sqrMagnitude <= 0f ||
-                waterNormalVelocityB.sqrMagnitude <= 0f ||
-                Mathf.Abs(
-                    waterNormalVelocityA.x * waterNormalVelocityB.y -
-                    waterNormalVelocityA.y * waterNormalVelocityB.x) <= 0.000001f)
+            if (!HasFiniteComponents(waterNormalVelocityA) ||
+                !HasFiniteComponents(waterNormalVelocityB) ||
+                IsZero(waterNormalVelocityA) ||
+                IsZero(waterNormalVelocityB) ||
+                IsParallel(waterNormalVelocityA, waterNormalVelocityB))
             {
                 error = "Water normal velocities must be non-zero and non-parallel.";
                 return false;
@@ -203,6 +203,31 @@ namespace WasteCity.ArtIntegration3D
                 default:
                     throw new ArgumentOutOfRangeException(nameof(layer), layer, "Unknown first-art terrain layer.");
             }
+        }
+
+        private static bool HasFiniteComponents(Vector2 value)
+        {
+            return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
+                   !float.IsNaN(value.y) && !float.IsInfinity(value.y);
+        }
+
+        private static bool IsParallel(Vector2 left, Vector2 right)
+        {
+            Vector2 leftDirection = NormalizeForAngle(left);
+            Vector2 rightDirection = NormalizeForAngle(right);
+            return Mathf.Abs(Vector2.Dot(leftDirection, rightDirection)) >= 0.9999f;
+        }
+
+        private static bool IsZero(Vector2 value)
+        {
+            return value.x == 0f && value.y == 0f;
+        }
+
+        private static Vector2 NormalizeForAngle(Vector2 value)
+        {
+            float scale = Mathf.Max(Mathf.Abs(value.x), Mathf.Abs(value.y));
+            Vector2 scaled = value / scale;
+            return scaled / Mathf.Sqrt(scaled.sqrMagnitude);
         }
 
         private static void ValidateLayer(FirstArtTerrainLayer3D layer, string parameterName)
