@@ -744,6 +744,8 @@ git commit -m "build: generate first terrain texture arrays"
 - Create: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader`
 - Create: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader.meta`
 - Modify: `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
+- Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs.meta`
 
@@ -785,13 +787,58 @@ public void BuildRuntimeAssets_CreatesValidMaterialAndProfileInPlace()
 
 Run builder twice and assert material/profile/Shader GUIDs and dependency hashes are stable. Add a negative test that a material using `Universal Render Pipeline/Lit` fails Profile validation with a precise Shader-name error.
 
+Extend `FirstArtTerrainProfileTests` with three dimension-contract cases. Create all arrays with depth `FirstArtTerrainCatalog3D.LayerCount`, configure a Material using `FirstArtTerrainProfile3D.RequiredShaderName`, and assert these exact outcomes after all earlier validation gates pass:
+
+```csharp
+[Test]
+public void Profile_AcceptsApprovedPrimaryAndHeightArrayDimensions()
+{
+    using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+        primarySize: 2048,
+        heightSize: 1024))
+    {
+        Assert.That(scope.Profile.TryValidate(out string error), Is.True, error);
+    }
+}
+
+[Test]
+public void Profile_RejectsWrongHeightArrayDimensionsWithDeterministicError()
+{
+    using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+        primarySize: 2048,
+        heightSize: 2048))
+    {
+        Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+        Assert.That(error, Is.EqualTo("Height array must be 1024x1024."));
+    }
+}
+
+[Test]
+public void Profile_RejectsMismatchedPrimaryArrayDimensionsWithDeterministicError()
+{
+    using (ConfiguredProfileScope scope = CreateConfiguredProfile(
+        baseColorSize: 2048,
+        normalSize: 1024,
+        maskSize: 2048,
+        heightSize: 1024))
+    {
+        Assert.That(scope.Profile.TryValidate(out string error), Is.False);
+        Assert.That(
+            error,
+            Is.EqualTo("BaseColor, Normal, and Mask arrays must each be 2048x2048."));
+    }
+}
+```
+
+The test scope owns and destroys the transient Profile, Material, and four Texture2DArrays. It must exercise the public `Configure`/`TryValidate` contract with real Unity objects, not a mock or source-text assertion.
+
 - [ ] **Step 2: Run RED**
 
 ```bash
 "$UNITY_BIN" -batchmode -projectPath "$PROJECT_PATH" -runTests -testPlatform EditMode -testFilter WasteCity.Tests.FirstArtTerrainShaderTests -testResults /tmp/wastecity-first-terrain/task-05-red.xml -logFile /tmp/wastecity-first-terrain/task-05-red.log
 ```
 
-Expected: missing Shader and `BuildRuntimeAssets`/path constants; no unrelated import errors.
+Expected: missing Shader and `BuildRuntimeAssets`/path constants; once those compile blockers are minimally resolved, the approved `2048/2048/2048 + 1024` Profile case still fails on the old all-dimensions-match rule. Record both RED causes before changing Profile validation. There must be no unrelated import errors.
 
 - [ ] **Step 3: Implement the exact Shader property surface**
 
@@ -821,6 +868,15 @@ Shader "WasteCity/Terrain/FirstPassBlend"
 ```
 
 Use `Core.hlsl` and `Lighting.hlsl`, a URP forward pass with `UniversalFragmentPBR`, opaque surface, ZWrite On, back-face culling, no transparency/refraction and no vertex displacement.
+
+Update `FirstArtTerrainProfile3D.TryValidate` without changing its existing gate order: control settings, Material presence, exact Shader name, each array's presence, then the shared depth check. After those gates, require BaseColor, Normal, and Mask to each be exactly `2048x2048`; preserve the established Task 4 BaseColor sRGB and Normal/Mask linear format semantics. Validate Height independently as exactly `1024x1024`, linear `R8`, with depth `7` already covered by the shared depth gate. Return deterministic errors in this order:
+
+```text
+BaseColor, Normal, and Mask arrays must each be 2048x2048.
+Height array must be 1024x1024.
+```
+
+The approved runtime combination is therefore BaseColor/Normal/Mask `2048x2048`, Height `1024x1024`, and every array depth `7`; do not restore the superseded requirement that Height dimensions match the three primary arrays.
 
 - [ ] **Step 4: Implement bounded layer sampling and PBR blending**
 
@@ -879,7 +935,7 @@ Expected: focused tests pass; compile exits 0; logs contain no `Shader error`, `
 - [ ] **Step 7: Commit Task 5**
 
 ```bash
-git add Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader.meta Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs.meta
+git add Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader.meta Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs.meta
 git diff --cached --check
 git commit -m "feat: add first terrain URP master material"
 ```
