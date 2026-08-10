@@ -973,8 +973,10 @@ git commit -m "feat: add first terrain URP master material"
 - Modify: `Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs`
 - Create: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
 - Create: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta`
+- Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs`
 
@@ -983,6 +985,12 @@ git commit -m "feat: add first terrain URP master material"
 - Produces: optional `IGrayboxTerrainPresentation3D`, `GrayboxWorldView3D.SetSurfaceFallbackVisible(bool)`, overloaded Bootstrap configuration and `FirstArtTerrainRenderer3D` atomic lifecycle.
 
 - [ ] **Step 1: Write failing graybox visibility tests**
+
+First freeze the shared catalog boundary with TDD: the existing four-only
+`FirstArtTerrainCatalog3D.IsSurfaceStableId` behavior must RED for `Ruins`,
+`DeepWater`, and `Cliff`, then GREEN for the exact seven IDs returned by
+`StableIdOf` layers `0..6`. It must remain false for representative resource
+and unrelated IDs, plus null and empty IDs.
 
 Generate the 12-slot catalog map and assert:
 
@@ -1046,7 +1054,7 @@ public bool SurfaceFallbackVisible { get; }
 public void SetSurfaceFallbackVisible(bool visible);
 ```
 
-Do not make `GrayboxWorldView3D` reference `FirstArtTerrainCatalog3D`; duplicate only the frozen seven stable ID strings in a private `IsSurfaceSlot` switch to preserve assembly direction. Tests compare it against the Task 1 catalog.
+Do not make `GrayboxWorldView3D` reference `FirstArtTerrainCatalog3D`; duplicate only the frozen exact seven stable ID strings in a private `IsSurfaceSlot` switch that must match the catalog, preserving assembly direction. Tests compare it against the Task 1 catalog.
 
 Extend Bootstrap without breaking old callers:
 
@@ -1113,7 +1121,7 @@ Expected: all focused tests pass; disabling/re-enabling does not duplicate `Runt
 - [ ] **Step 7: Commit Task 6**
 
 ```bash
-git add Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs.meta Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs
+git add Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs.meta Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs
 git diff --cached --check
 git commit -m "feat: present formal terrain with graybox fallback"
 ```
