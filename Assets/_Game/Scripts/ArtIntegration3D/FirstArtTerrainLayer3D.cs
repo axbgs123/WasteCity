@@ -77,7 +77,10 @@ namespace WasteCity.ArtIntegration3D
             return stableId == "world.terrain.wasteland" ||
                    stableId == "world.terrain.rocky" ||
                    stableId == "world.terrain.wetland" ||
-                   stableId == "world.terrain.crystal";
+                   stableId == "world.terrain.crystal" ||
+                   stableId == "world.obstacle.ruins" ||
+                   stableId == "world.obstacle.deep-water" ||
+                   stableId == "world.obstacle.cliff";
         }
     }
 }

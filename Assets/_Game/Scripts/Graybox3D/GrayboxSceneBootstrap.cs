@@ -12,6 +12,7 @@ namespace WasteCity.Graybox3D
 
         [SerializeField] private GrayboxUrpScope renderScope;
         [SerializeField] private GrayboxWorldView3D worldView;
+        [SerializeField] private MonoBehaviour terrainPresentationBehaviour;
 
         public bool IsInitialized { get; private set; }
         public WorldMapModel World { get; private set; }
@@ -20,8 +21,18 @@ namespace WasteCity.Graybox3D
             GrayboxUrpScope renderScope,
             GrayboxWorldView3D worldView)
         {
+            Configure(renderScope, worldView, null);
+        }
+
+        public void Configure(
+            GrayboxUrpScope renderScope,
+            GrayboxWorldView3D worldView,
+            MonoBehaviour terrainPresentationBehaviour)
+        {
             this.renderScope = renderScope;
             this.worldView = worldView;
+            this.terrainPresentationBehaviour =
+                terrainPresentationBehaviour;
         }
 
         public bool Initialize()
@@ -38,8 +49,48 @@ namespace WasteCity.Graybox3D
                 WorldHeight,
                 new WorldSeed(WorldSeedValue));
             worldView.Generate(World);
+            TryPresentTerrain();
             IsInitialized = true;
             return true;
+        }
+
+        private void TryPresentTerrain()
+        {
+            if (terrainPresentationBehaviour == null)
+                return;
+
+            var presentation = terrainPresentationBehaviour as
+                IGrayboxTerrainPresentation3D;
+            if (presentation == null)
+            {
+                worldView.SetSurfaceFallbackVisible(true);
+                Debug.LogError(
+                    "Graybox terrain presentation behaviour does not " +
+                    "implement IGrayboxTerrainPresentation3D; surface " +
+                    "fallback restored.",
+                    this);
+                return;
+            }
+
+            try
+            {
+                if (presentation.TryPresent(worldView))
+                    return;
+
+                worldView.SetSurfaceFallbackVisible(true);
+                Debug.LogError(
+                    "Graybox terrain presentation returned false; " +
+                    "surface fallback restored.",
+                    this);
+            }
+            catch (System.Exception exception)
+            {
+                worldView.SetSurfaceFallbackVisible(true);
+                Debug.LogError(
+                    "Graybox terrain presentation failed: " +
+                    exception.Message + "; surface fallback restored.",
+                    this);
+            }
         }
 
         private void Start()

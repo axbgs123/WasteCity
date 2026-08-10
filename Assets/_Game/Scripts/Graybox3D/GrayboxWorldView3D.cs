@@ -40,9 +40,12 @@ namespace WasteCity.Graybox3D
         private readonly List<GameObject> generatedObjects =
             new List<GameObject>();
         private readonly List<Mesh> generatedMeshes = new List<Mesh>();
+        private readonly List<GrayboxVisualSlot> surfaceSlots =
+            new List<GrayboxVisualSlot>();
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
+        public bool SurfaceFallbackVisible { get; private set; } = true;
         public int WorldRendererCount => generatedObjects.Count;
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
 
@@ -100,6 +103,17 @@ namespace WasteCity.Graybox3D
             groups.Clear();
         }
 
+        public void SetSurfaceFallbackVisible(bool visible)
+        {
+            SurfaceFallbackVisible = visible;
+            for (int index = 0; index < surfaceSlots.Count; index++)
+            {
+                GrayboxVisualSlot slot = surfaceSlots[index];
+                if (slot != null && slot.Renderer != null)
+                    slot.Renderer.enabled = visible;
+            }
+        }
+
         public void ClearGenerated()
         {
             for (int index = generatedObjects.Count - 1; index >= 0; index--)
@@ -109,6 +123,7 @@ namespace WasteCity.Graybox3D
 
             generatedObjects.Clear();
             generatedMeshes.Clear();
+            surfaceSlots.Clear();
             groups.Clear();
             Model = null;
             Coordinates = null;
@@ -319,8 +334,30 @@ namespace WasteCity.Graybox3D
             var slot = go.AddComponent<GrayboxVisualSlot>();
             slot.Configure(group.StableId, renderer, group.Color);
             slot.ApplyFallback(sharedMaterial);
+            if (IsSurfaceSlot(group.StableId))
+            {
+                surfaceSlots.Add(slot);
+                renderer.enabled = SurfaceFallbackVisible;
+            }
             generatedMeshes.Add(filter.sharedMesh);
             generatedObjects.Add(go);
+        }
+
+        private static bool IsSurfaceSlot(string stableId)
+        {
+            switch (stableId)
+            {
+                case "world.terrain.wasteland":
+                case "world.terrain.rocky":
+                case "world.terrain.wetland":
+                case "world.terrain.crystal":
+                case "world.obstacle.ruins":
+                case "world.obstacle.deep-water":
+                case "world.obstacle.cliff":
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static void DestroyOwned(UnityEngine.Object value)

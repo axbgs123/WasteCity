@@ -3,6 +3,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
+using WasteCity.Economy;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -40,6 +41,33 @@ namespace WasteCity.Tests
                 Is.True);
             Assert.That(
                 FirstArtTerrainCatalog3D.IsSurfaceStableId("world.obstacle.cliff"),
+                Is.True);
+        }
+
+        [Test]
+        public void Catalog_TreatsEveryFrozenTerrainLayerIdAsSurfacePresentation()
+        {
+            for (int layer = 0;
+                 layer < FirstArtTerrainCatalog3D.LayerCount;
+                 layer++)
+            {
+                string stableId = FirstArtTerrainCatalog3D.StableIdOf(
+                    (FirstArtTerrainLayer3D)layer);
+                Assert.That(
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(stableId),
+                    Is.True,
+                    stableId);
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase(ResourceIds.Iron)]
+        [TestCase("core.building.housing")]
+        public void Catalog_RejectsNonSurfaceStableIds(string stableId)
+        {
+            Assert.That(
+                FirstArtTerrainCatalog3D.IsSurfaceStableId(stableId),
                 Is.False);
         }
 

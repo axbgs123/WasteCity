@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.ArtIntegration3D;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.World;
@@ -181,6 +183,80 @@ namespace WasteCity.Tests
 
             Assert.That(view.WorldRendererCount, Is.Zero);
             Assert.That(view.PersistentGeneratedObjectCount, Is.Zero);
+            Assert.That(
+                view.GetComponentsInChildren<GrayboxVisualSlot>(true),
+                Is.Empty);
+        }
+
+        [Test]
+        public void SetSurfaceFallbackVisible_OnlyChangesSevenSurfaceRenderers()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+
+            view.SetSurfaceFallbackVisible(false);
+
+            GrayboxVisualSlot[] slots =
+                view.GetComponentsInChildren<GrayboxVisualSlot>(true);
+            Assert.That(
+                slots.Count(slot =>
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(slot.StableId)),
+                Is.EqualTo(7));
+            foreach (GrayboxVisualSlot slot in slots)
+            {
+                bool isSurface =
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(slot.StableId);
+                Assert.That(
+                    slot.Renderer.enabled,
+                    Is.EqualTo(!isSurface),
+                    slot.StableId);
+            }
+
+            view.SetSurfaceFallbackVisible(true);
+
+            Assert.That(slots.All(slot => slot.Renderer.enabled), Is.True);
+        }
+
+        [Test]
+        public void SetSurfaceFallbackVisible_BeforeGenerateIsSafeAndRetained()
+        {
+            GrayboxWorldView3D view = CreateView();
+
+            Assert.DoesNotThrow(
+                () => view.SetSurfaceFallbackVisible(false));
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+
+            view.Generate(CreateCatalogMap());
+
+            foreach (GrayboxVisualSlot slot in
+                     view.GetComponentsInChildren<GrayboxVisualSlot>(true))
+            {
+                bool isSurface =
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(slot.StableId);
+                Assert.That(
+                    slot.Renderer.enabled,
+                    Is.EqualTo(!isSurface),
+                    slot.StableId);
+            }
+        }
+
+        [Test]
+        public void ClearGenerated_DiscardsSurfaceTrackingWithoutTouchingUnrelatedRenderer()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+            var unrelatedObject = new GameObject("UnrelatedRenderer");
+            unrelatedObject.transform.SetParent(view.transform, false);
+            MeshRenderer unrelated =
+                unrelatedObject.AddComponent<MeshRenderer>();
+            unrelated.enabled = false;
+
+            view.ClearGenerated();
+            view.SetSurfaceFallbackVisible(true);
+            view.SetSurfaceFallbackVisible(false);
+
+            Assert.That(unrelated, Is.Not.Null);
+            Assert.That(unrelated.enabled, Is.False);
             Assert.That(
                 view.GetComponentsInChildren<GrayboxVisualSlot>(true),
                 Is.Empty);

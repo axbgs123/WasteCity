@@ -1,13 +1,44 @@
+using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.TestTools;
 using WasteCity.Graybox3D;
 using WasteCity.World;
 
 namespace WasteCity.Tests
 {
+    public sealed class RecordingTerrainPresentation3D : MonoBehaviour,
+        IGrayboxTerrainPresentation3D
+    {
+        public bool Result { get; set; } = true;
+        public bool ThrowOnPresent { get; set; }
+        public int TryPresentCalls { get; private set; }
+        public int ClearPresentationCalls { get; private set; }
+        public bool SawModel { get; private set; }
+        public bool SawCoordinates { get; private set; }
+
+        public bool TryPresent(GrayboxWorldView3D worldView)
+        {
+            TryPresentCalls++;
+            SawModel = worldView != null && worldView.Model != null;
+            SawCoordinates =
+                worldView != null && worldView.Coordinates != null;
+            if (ThrowOnPresent)
+                throw new InvalidOperationException(
+                    "Injected presenter failure.");
+            return Result;
+        }
+
+        public void ClearPresentation()
+        {
+            ClearPresentationCalls++;
+        }
+    }
+
     public sealed class GrayboxSceneBootstrapTests
     {
         private readonly List<UnityEngine.Object> cleanup =
@@ -95,6 +126,76 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Initialize_WithPresenter_CallsItOnceAfterWorldGeneration()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+
+            Assert.That(bootstrap.Initialize(), Is.True);
+            Assert.That(bootstrap.Initialize(), Is.True);
+
+            Assert.That(presenter.TryPresentCalls, Is.EqualTo(1));
+            Assert.That(presenter.SawModel, Is.True);
+            Assert.That(presenter.SawCoordinates, Is.True);
+            Assert.That(bootstrap.World, Is.SameAs(view.Model));
+        }
+
+        [Test]
+        public void Initialize_WhenPresenterReturnsFalse_RestoresFallbackAndInitializes()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            view.SetSurfaceFallbackVisible(false);
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.Result = false;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("Graybox terrain presentation returned false"));
+
+            Assert.That(bootstrap.Initialize(), Is.True);
+
+            Assert.That(bootstrap.IsInitialized, Is.True);
+            Assert.That(presenter.TryPresentCalls, Is.EqualTo(1));
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                AllGeneratedRenderersEnabled(view),
+                Is.True);
+        }
+
+        [Test]
+        public void Initialize_WhenPresenterThrows_RestoresFallbackAndInitializes()
+        {
+            GrayboxUrpScope scope = NewScope(NewPipeline());
+            GrayboxWorldView3D view = NewWorldView();
+            view.SetSurfaceFallbackVisible(false);
+            RecordingTerrainPresentation3D presenter = NewPresenter();
+            presenter.ThrowOnPresent = true;
+            GrayboxSceneBootstrap bootstrap =
+                NewBootstrap(scope, view, presenter);
+            Assert.That(scope.Enter(), Is.True);
+            LogAssert.Expect(
+                LogType.Error,
+                new Regex("Graybox terrain presentation failed: " +
+                          "Injected presenter failure"));
+
+            Assert.That(bootstrap.Initialize(), Is.True);
+
+            Assert.That(bootstrap.IsInitialized, Is.True);
+            Assert.That(presenter.TryPresentCalls, Is.EqualTo(1));
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                AllGeneratedRenderersEnabled(view),
+                Is.True);
+        }
+
+        [Test]
         public void Initialize_WithMissingAssetOrView_DoesNotGenerateWorld()
         {
             GrayboxUrpScope missingAssetScope = NewScope(null);
@@ -160,6 +261,25 @@ namespace WasteCity.Tests
             return bootstrap;
         }
 
+        private GrayboxSceneBootstrap NewBootstrap(
+            GrayboxUrpScope scope,
+            GrayboxWorldView3D view,
+            MonoBehaviour presenter)
+        {
+            var owner = Track(new GameObject("GrayboxSceneBootstrap"));
+            owner.SetActive(false);
+            GrayboxSceneBootstrap bootstrap =
+                owner.AddComponent<GrayboxSceneBootstrap>();
+            bootstrap.Configure(scope, view, presenter);
+            return bootstrap;
+        }
+
+        private RecordingTerrainPresentation3D NewPresenter()
+        {
+            var owner = Track(new GameObject("TerrainPresenter"));
+            return owner.AddComponent<RecordingTerrainPresentation3D>();
+        }
+
         private static Transform NewChild(Transform parent, string name)
         {
             var child = new GameObject(name);
@@ -189,6 +309,18 @@ namespace WasteCity.Tests
                     actualCell.Traversal,
                     Is.EqualTo(expectedCell.Traversal));
             }
+        }
+
+        private static bool AllGeneratedRenderersEnabled(
+            GrayboxWorldView3D view)
+        {
+            foreach (GrayboxVisualSlot slot in
+                     view.GetComponentsInChildren<GrayboxVisualSlot>(true))
+            {
+                if (!slot.Renderer.enabled)
+                    return false;
+            }
+            return true;
         }
 
         private T Track<T>(T value) where T : UnityEngine.Object
