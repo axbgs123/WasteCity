@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
@@ -28,6 +29,8 @@ namespace WasteCity.Editor
         private const string GeneratedFolder = RuntimeFolder + "/Generated";
         private const int SourceTextureSize = 2048;
         private const int HeightTextureSize = 1024;
+
+        internal static Action<string> HeightSourceReadableCheckpoint;
 
         [MenuItem("WasteCity/Art/Build First Terrain Texture Arrays")]
         public static void BuildTextureArrays()
@@ -263,6 +266,7 @@ namespace WasteCity.Editor
         {
             IDisposable readabilityScope = null;
             Texture2D slice = null;
+            Exception operationFailure = null;
             try
             {
                 readabilityScope = FirstArtPassImportPolicy.AllowTemporaryReadability(path);
@@ -278,6 +282,7 @@ namespace WasteCity.Editor
                         $"Height source '{path}' must import as R16, not {source.format}.");
                 }
 
+                HeightSourceReadableCheckpoint?.Invoke(path);
                 NativeArray<ushort> pixels = source.GetPixelData<ushort>(0);
                 if (pixels.Length != SourceTextureSize * SourceTextureSize)
                     throw new InvalidOperationException($"Height source has unexpected pixel data length: {path}");
@@ -313,22 +318,105 @@ namespace WasteCity.Editor
                 };
                 slice.SetPixelData(output, 0);
                 slice.Apply(true, false);
-                return slice;
             }
-            catch
+            catch (Exception exception)
+            {
+                operationFailure = exception;
+            }
+
+            List<Exception> cleanupFailures = RestoreHeightSource(path, readabilityScope);
+            if (operationFailure != null || cleanupFailures.Count > 0)
             {
                 if (slice != null)
+                {
                     UnityEngine.Object.DestroyImmediate(slice);
-                throw;
+                    slice = null;
+                }
+
+                ThrowOperationAndCleanupFailures(operationFailure, cleanupFailures, path);
             }
-            finally
+
+            return slice;
+        }
+
+        private static List<Exception> RestoreHeightSource(
+            string path,
+            IDisposable readabilityScope)
+        {
+            var failures = new List<Exception>(3);
+            try
             {
-                readabilityScope?.Dispose();
-                ReimportSource(path);
-                var restoredImporter = AssetImporter.GetAtPath(path) as TextureImporter;
-                if (restoredImporter == null || restoredImporter.isReadable)
-                    throw new InvalidOperationException($"Height source readability was not restored: {path}");
+                try
+                {
+                    readabilityScope?.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+                finally
+                {
+                    try
+                    {
+                        ReimportSource(path);
+                    }
+                    catch (Exception exception)
+                    {
+                        failures.Add(exception);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            var restoredImporter = AssetImporter.GetAtPath(path) as TextureImporter;
+                            if (restoredImporter == null || restoredImporter.isReadable)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Height source readability was not restored: {path}");
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            failures.Add(exception);
+                        }
+                    }
+                }
             }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            return failures;
+        }
+
+        private static void ThrowOperationAndCleanupFailures(
+            Exception operationFailure,
+            List<Exception> cleanupFailures,
+            string path)
+        {
+            if (operationFailure == null && cleanupFailures.Count == 0)
+                return;
+
+            if (operationFailure != null && cleanupFailures.Count == 0)
+            {
+                ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                return;
+            }
+
+            if (operationFailure == null && cleanupFailures.Count == 1)
+            {
+                ExceptionDispatchInfo.Capture(cleanupFailures[0]).Throw();
+                return;
+            }
+
+            var failures = new List<Exception>(cleanupFailures.Count + 1);
+            if (operationFailure != null)
+                failures.Add(operationFailure);
+            failures.AddRange(cleanupFailures);
+            throw new AggregateException(
+                $"Height array generation and cleanup failed for '{path}'.",
+                failures);
         }
 
         private static void ValidateRestoredSources(SourceAsset[,] sources)

@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Unity.Collections;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using WasteCity.Editor;
 
 namespace WasteCity.Tests
@@ -55,11 +56,12 @@ namespace WasteCity.Tests
             Texture2DArray height = LoadArray(
                 FirstArtTerrainAssetBuilder.HeightArrayPath);
 
-            AssertArrayContract(baseColor, 2048, TexturePath("Wasteland", "BaseColor"));
-            AssertArrayContract(normal, 2048, TexturePath("Wasteland", "Normal"));
-            AssertArrayContract(mask, 2048, TexturePath("Wasteland", "Mask"));
-            AssertArrayContract(height, 1024, null);
+            AssertArrayContract(baseColor, 2048, TexturePath("Wasteland", "BaseColor"), true);
+            AssertArrayContract(normal, 2048, TexturePath("Wasteland", "Normal"), false);
+            AssertArrayContract(mask, 2048, TexturePath("Wasteland", "Mask"), false);
+            AssertArrayContract(height, 1024, null, false);
             Assert.That(height.format, Is.EqualTo(TextureFormat.R8));
+            Assert.That(height.graphicsFormat, Is.EqualTo(GraphicsFormat.R8_UNorm));
 
             for (int slice = 0; slice < TerrainNames.Length; slice++)
             {
@@ -71,6 +73,9 @@ namespace WasteCity.Tests
                 Color32 actual = ReadCenterPixel(baseColor, slice);
                 AssertColorWithinOneByte(actual, expected, sourcePath);
             }
+
+            AssertSlicePixelsMatch(normal, "Normal", 731, 913, true);
+            AssertSlicePixelsMatch(mask, "Mask", 1169, 421, true);
 
             AssertHeightBlockMatchesSource(height, 0, "Wasteland", 317, 743);
 
@@ -124,6 +129,77 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void BuildTextureArrays_HeightOperationAndCleanupFailuresStillRestoreSource()
+        {
+            string path = TexturePath("Wasteland", "Height");
+            string guidBefore = AssetDatabase.AssetPathToGUID(path);
+            Hash128 dependencyHashBefore = AssetDatabase.GetAssetDependencyHash(path);
+            byte[] metaBefore = File.ReadAllBytes(path + ".meta");
+            TextureImporter importerBefore = RequireTextureImporter(path);
+            string platformName = BuildPipeline
+                .GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget)
+                .ToString();
+            TextureImporterPlatformSettings platformBefore =
+                importerBefore.GetPlatformTextureSettings(platformName);
+            var operationFailure = new InvalidOperationException("injected Height operation failure");
+            var cleanupFailure = new InvalidOperationException("injected Height cleanup failure");
+            bool operationCheckpointReached = false;
+            bool cleanupCheckpointReached = false;
+
+            FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint = observedPath =>
+            {
+                if (!string.Equals(observedPath, path, StringComparison.Ordinal))
+                    return;
+
+                operationCheckpointReached = true;
+                TextureImporter readableImporter = RequireTextureImporter(path);
+                Texture2D readableSource = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                Assert.That(readableImporter.isReadable, Is.True, path);
+                Assert.That(readableSource, Is.Not.Null, path);
+                Assert.That(readableSource.format, Is.EqualTo(TextureFormat.R16), path);
+                throw operationFailure;
+            };
+            FirstArtPassImportPolicy.TemporaryPlatformRestoreCheckpoint = observedPath =>
+            {
+                if (!string.Equals(observedPath, path, StringComparison.Ordinal))
+                    return;
+
+                cleanupCheckpointReached = true;
+                throw cleanupFailure;
+            };
+
+            try
+            {
+                AggregateException thrown = Assert.Throws<AggregateException>(
+                    () => FirstArtTerrainAssetBuilder.BuildTextureArrays());
+                CollectionAssert.Contains(thrown.Flatten().InnerExceptions, operationFailure);
+                CollectionAssert.Contains(thrown.Flatten().InnerExceptions, cleanupFailure);
+            }
+            finally
+            {
+                FirstArtTerrainAssetBuilder.HeightSourceReadableCheckpoint = null;
+                FirstArtPassImportPolicy.TemporaryPlatformRestoreCheckpoint = null;
+            }
+
+            Assert.That(operationCheckpointReached, Is.True);
+            Assert.That(cleanupCheckpointReached, Is.True);
+            TextureImporter importerAfter = RequireTextureImporter(path);
+            TextureImporterPlatformSettings platformAfter =
+                importerAfter.GetPlatformTextureSettings(platformName);
+            Assert.That(importerAfter.isReadable, Is.False, path);
+            AssertPlatformSettingsEqual(platformAfter, platformBefore, path);
+            Assert.That(AssetDatabase.AssetPathToGUID(path), Is.EqualTo(guidBefore), path);
+            Assert.That(AssetDatabase.GetAssetDependencyHash(path), Is.EqualTo(dependencyHashBefore), path);
+            Assert.That(File.ReadAllBytes(path + ".meta"), Is.EqualTo(metaBefore), path);
+
+            using (FirstArtPassImportPolicy.AllowTemporaryReadability(path))
+            {
+            }
+
+            Assert.That(File.ReadAllBytes(path + ".meta"), Is.EqualTo(metaBefore), path);
+        }
+
         [TestCase(0, 0, 0, 0, 0)]
         [TestCase(65535, 65535, 65535, 65535, 255)]
         [TestCase(0, 256, 514, 65535, 64)]
@@ -147,21 +223,54 @@ namespace WasteCity.Tests
         private static void AssertArrayContract(
             Texture2DArray array,
             int expectedSize,
-            string formatSourcePath)
+            string formatSourcePath,
+            bool expectedSourceSrgb)
         {
             Assert.That(array.depth, Is.EqualTo(7));
             Assert.That(array.width, Is.EqualTo(expectedSize));
             Assert.That(array.height, Is.EqualTo(expectedSize));
             Assert.That(array.wrapMode, Is.EqualTo(TextureWrapMode.Repeat));
+            Assert.That(array.filterMode, Is.EqualTo(FilterMode.Bilinear));
+            Assert.That(array.anisoLevel, Is.EqualTo(4));
             Assert.That(array.mipmapCount, Is.GreaterThan(1));
+            Assert.That(array.isReadable, Is.True);
 
             if (formatSourcePath == null)
+            {
+                Assert.That(GraphicsFormatUtility.IsSRGBFormat(array.graphicsFormat), Is.False);
                 return;
+            }
 
             Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(formatSourcePath);
             Assert.That(source, Is.Not.Null, formatSourcePath);
+            TextureImporter importer = RequireTextureImporter(formatSourcePath);
+            Assert.That(importer.sRGBTexture, Is.EqualTo(expectedSourceSrgb), formatSourcePath);
             Assert.That(array.format, Is.EqualTo(source.format), formatSourcePath);
+            Assert.That(array.graphicsFormat, Is.EqualTo(source.graphicsFormat), formatSourcePath);
+            Assert.That(
+                GraphicsFormatUtility.IsSRGBFormat(array.graphicsFormat),
+                Is.EqualTo(GraphicsFormatUtility.IsSRGBFormat(source.graphicsFormat)),
+                formatSourcePath);
             Assert.That(array.mipmapCount, Is.EqualTo(source.mipmapCount), formatSourcePath);
+        }
+
+        private static void AssertSlicePixelsMatch(
+            Texture2DArray array,
+            string channel,
+            int x,
+            int y,
+            bool linear)
+        {
+            for (int slice = 0; slice < TerrainNames.Length; slice++)
+            {
+                string sourcePath = TexturePath(TerrainNames[slice], channel);
+                Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourcePath);
+                Assert.That(source, Is.Not.Null, sourcePath);
+
+                Color32 expected = ReadPixel(source, x, y);
+                Color32 actual = ReadPixel(array, slice, x, y, linear);
+                AssertColorWithinOneByte(actual, expected, sourcePath);
+            }
         }
 
         private static Texture2DArray LoadArray(string path)
@@ -241,6 +350,11 @@ namespace WasteCity.Tests
 
         private static Color32 ReadCenterPixel(Texture2D source)
         {
+            return ReadPixel(source, source.width / 2, source.height / 2);
+        }
+
+        private static Color32 ReadPixel(Texture2D source, int x, int y)
+        {
             RenderTexture renderTexture = RenderTexture.GetTemporary(
                 source.width,
                 source.height,
@@ -254,7 +368,7 @@ namespace WasteCity.Tests
                 Graphics.Blit(source, renderTexture);
                 RenderTexture.active = renderTexture;
                 pixel.ReadPixels(
-                    new Rect(source.width / 2, source.height / 2, 1, 1),
+                    new Rect(x, y, 1, 1),
                     0,
                     0,
                     false);
@@ -271,16 +385,26 @@ namespace WasteCity.Tests
 
         private static Color32 ReadCenterPixel(Texture2DArray array, int slice)
         {
+            return ReadPixel(array, slice, array.width / 2, array.height / 2, false);
+        }
+
+        private static Color32 ReadPixel(
+            Texture2DArray array,
+            int slice,
+            int x,
+            int y,
+            bool linear)
+        {
             var texture = new Texture2D(
                 array.width,
                 array.height,
                 array.format,
                 false,
-                false);
+                linear);
             try
             {
                 Graphics.CopyTexture(array, slice, 0, texture, 0, 0);
-                return ReadCenterPixel(texture);
+                return ReadPixel(texture, x, y);
             }
             finally
             {
@@ -348,6 +472,36 @@ namespace WasteCity.Tests
                 Assert.That(importer.isReadable, Is.False, path);
                 Assert.That(File.ReadAllBytes(path + ".meta"), Is.EqualTo(metaBefore), path);
             }
+        }
+
+        private static TextureImporter RequireTextureImporter(string path)
+        {
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            Assert.That(importer, Is.Not.Null, path);
+            return importer;
+        }
+
+        private static void AssertPlatformSettingsEqual(
+            TextureImporterPlatformSettings actual,
+            TextureImporterPlatformSettings expected,
+            string context)
+        {
+            Assert.That(actual.name, Is.EqualTo(expected.name), context + " platform name");
+            Assert.That(actual.overridden, Is.EqualTo(expected.overridden), context + " overridden");
+            Assert.That(actual.maxTextureSize, Is.EqualTo(expected.maxTextureSize), context + " max size");
+            Assert.That(actual.format, Is.EqualTo(expected.format), context + " format");
+            Assert.That(
+                actual.textureCompression,
+                Is.EqualTo(expected.textureCompression),
+                context + " compression");
+            Assert.That(
+                actual.compressionQuality,
+                Is.EqualTo(expected.compressionQuality),
+                context + " quality");
+            Assert.That(
+                actual.crunchedCompression,
+                Is.EqualTo(expected.crunchedCompression),
+                context + " crunch");
         }
 
         private sealed class AssetState

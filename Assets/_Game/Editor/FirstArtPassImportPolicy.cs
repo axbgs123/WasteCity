@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using UnityEditor;
 using UnityEngine;
 
@@ -17,6 +18,8 @@ namespace WasteCity.Editor
 
         private static readonly HashSet<string> TemporaryReadablePaths =
             new HashSet<string>(StringComparer.Ordinal);
+
+        internal static Action<string> TemporaryPlatformRestoreCheckpoint;
 
         private static readonly string[] ApprovedHeightPaths =
         {
@@ -221,22 +224,67 @@ namespace WasteCity.Editor
                 if (disposed)
                     return;
 
-                TemporaryReadablePaths.Remove(exactAssetPath);
-                var importer = AssetImporter.GetAtPath(exactAssetPath) as TextureImporter;
-                if (importer == null)
+                var failures = new List<Exception>(3);
+                try
                 {
-                    throw new InvalidOperationException(
-                        $"Cannot restore Height importer platform settings: '{exactAssetPath}'.");
+                    try
+                    {
+                        TemporaryPlatformRestoreCheckpoint?.Invoke(exactAssetPath);
+                    }
+                    catch (Exception exception)
+                    {
+                        failures.Add(exception);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            var importer = AssetImporter.GetAtPath(exactAssetPath) as TextureImporter;
+                            if (importer == null)
+                            {
+                                throw new InvalidOperationException(
+                                    $"Cannot restore Height importer platform settings: '{exactAssetPath}'.");
+                            }
+
+                            if (!string.Equals(
+                                    originalPlatform.name,
+                                    platformName,
+                                    StringComparison.Ordinal))
+                            {
+                                failures.Add(new InvalidOperationException(
+                                    $"Captured Height platform settings do not match '{platformName}'."));
+                            }
+
+                            importer.SetPlatformTextureSettings(originalPlatform);
+                        }
+                        catch (Exception exception)
+                        {
+                            failures.Add(exception);
+                        }
+                    }
+                }
+                finally
+                {
+                    TemporaryReadablePaths.Remove(exactAssetPath);
+                    disposed = true;
                 }
 
-                if (!string.Equals(originalPlatform.name, platformName, StringComparison.Ordinal))
+                ThrowFailures(failures);
+            }
+
+            private static void ThrowFailures(List<Exception> failures)
+            {
+                if (failures.Count == 0)
+                    return;
+                if (failures.Count == 1)
                 {
-                    throw new InvalidOperationException(
-                        $"Captured Height platform settings do not match '{platformName}'.");
+                    ExceptionDispatchInfo.Capture(failures[0]).Throw();
+                    return;
                 }
 
-                importer.SetPlatformTextureSettings(originalPlatform);
-                disposed = true;
+                throw new AggregateException(
+                    "Temporary Height importer platform restoration failed.",
+                    failures);
             }
         }
     }
