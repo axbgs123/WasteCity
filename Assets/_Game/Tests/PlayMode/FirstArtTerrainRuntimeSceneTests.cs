@@ -73,19 +73,66 @@ namespace WasteCity.Tests
             }
             finally
             {
-                if (keyboard != null && keyboard.added)
-                    InputSystem.RemoveDevice(keyboard);
-                if (mouse != null && mouse.added)
-                    InputSystem.RemoveDevice(mouse);
-
-                InputSystem.settings.updateMode = previousInputUpdateMode;
-                InputSystem.settings.editorInputBehaviorInPlayMode =
-                    previousEditorInputBehavior;
-                InputSystem.settings.backgroundBehavior =
-                    previousBackgroundBehavior;
-                GraphicsSettings.defaultRenderPipeline = previousGraphics;
-                QualitySettings.renderPipeline = previousQuality;
-                Time.timeScale = previousTimeScale;
+                try
+                {
+                    if (keyboard != null && keyboard.added)
+                        InputSystem.RemoveDevice(keyboard);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (mouse != null && mouse.added)
+                            InputSystem.RemoveDevice(mouse);
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            InputSystem.settings.updateMode =
+                                previousInputUpdateMode;
+                        }
+                        finally
+                        {
+                            try
+                            {
+                                InputSystem.settings
+                                    .editorInputBehaviorInPlayMode =
+                                    previousEditorInputBehavior;
+                            }
+                            finally
+                            {
+                                try
+                                {
+                                    InputSystem.settings.backgroundBehavior =
+                                        previousBackgroundBehavior;
+                                }
+                                finally
+                                {
+                                    try
+                                    {
+                                        GraphicsSettings
+                                            .defaultRenderPipeline =
+                                            previousGraphics;
+                                    }
+                                    finally
+                                    {
+                                        try
+                                        {
+                                            QualitySettings.renderPipeline =
+                                                previousQuality;
+                                        }
+                                        finally
+                                        {
+                                            Time.timeScale =
+                                                previousTimeScale;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Assert.That(keyboard == null || !keyboard.added, Is.True);
                 Assert.That(mouse == null || !mouse.added, Is.True);
@@ -209,18 +256,43 @@ namespace WasteCity.Tests
         public IEnumerator ControlMaps_DeclareTheLayerOfEverySeed8128Cell()
         {
             FirstArtTerrainControlMap3D maps = Presenter().ControlMaps;
-            WorldMapModel model = World().Model;
+            WorldMapModel sceneModel = World().Model;
+            var seed8128Model = new WorldMapModel(
+                32,
+                24,
+                new WorldSeed(8128));
 
+            Assert.That(sceneModel.Width, Is.EqualTo(32));
+            Assert.That(sceneModel.Height, Is.EqualTo(24));
             Assert.That(
                 maps.Width,
-                Is.EqualTo(model.Width * ControlPixelsPerCell));
+                Is.EqualTo(seed8128Model.Width * ControlPixelsPerCell));
             Assert.That(
                 maps.Height,
-                Is.EqualTo(model.Height * ControlPixelsPerCell));
+                Is.EqualTo(seed8128Model.Height * ControlPixelsPerCell));
             int checkedCells = 0;
-            for (int cellY = 0; cellY < model.Height; cellY++)
-            for (int cellX = 0; cellX < model.Width; cellX++)
+            for (int cellY = 0; cellY < seed8128Model.Height; cellY++)
+            for (int cellX = 0; cellX < seed8128Model.Width; cellX++)
             {
+                WorldCell expectedCell = seed8128Model.Get(cellX, cellY);
+                WorldCell sceneCell = sceneModel.Get(cellX, cellY);
+                Assert.That(
+                    sceneCell.Terrain,
+                    Is.EqualTo(expectedCell.Terrain),
+                    $"Seed 8128 terrain mismatch at {cellX},{cellY}.");
+                Assert.That(
+                    sceneCell.Traversal,
+                    Is.EqualTo(expectedCell.Traversal),
+                    $"Seed 8128 traversal mismatch at {cellX},{cellY}.");
+                Assert.That(
+                    sceneCell.ResourceId,
+                    Is.EqualTo(expectedCell.ResourceId),
+                    $"Seed 8128 resource mismatch at {cellX},{cellY}.");
+                Assert.That(
+                    sceneCell.ResourceAmount,
+                    Is.EqualTo(expectedCell.ResourceAmount),
+                    $"Seed 8128 amount mismatch at {cellX},{cellY}.");
+
                 var totals = new int[FirstArtTerrainCatalog3D.LayerCount];
                 for (int pixelY = 0;
                      pixelY < ControlPixelsPerCell;
@@ -244,17 +316,34 @@ namespace WasteCity.Tests
                 }
 
                 FirstArtTerrainLayer3D expected =
-                    ExpectedLayer(model.Get(cellX, cellY));
-                int maximum = totals.Max();
+                    ExpectedLayer(expectedCell);
+                int declaredTotal = totals[(int)expected];
                 Assert.That(
-                    totals[(int)expected],
-                    Is.EqualTo(maximum).And.GreaterThan(0),
+                    declaredTotal,
+                    Is.GreaterThan(0),
                     $"Seed 8128 cell {cellX},{cellY} must declare " +
                     $"{expected}; totals={string.Join(",", totals)}.");
+                for (int layer = 0;
+                     layer < FirstArtTerrainCatalog3D.LayerCount;
+                     layer++)
+                {
+                    if (layer == (int)expected)
+                        continue;
+                    Assert.That(
+                        declaredTotal,
+                        Is.GreaterThan(totals[layer]),
+                        $"Seed 8128 cell {cellX},{cellY} must declare " +
+                        $"{expected} strictly above " +
+                        $"{(FirstArtTerrainLayer3D)layer}; totals=" +
+                        string.Join(",", totals) + ".");
+                }
                 checkedCells++;
             }
 
             Assert.That(checkedCells, Is.EqualTo(32 * 24));
+            Assert.That(
+                sceneModel.ResourceNodeCount,
+                Is.EqualTo(seed8128Model.ResourceNodeCount));
             yield return null;
         }
 
@@ -460,16 +549,28 @@ namespace WasteCity.Tests
                 presenter.GetComponentsInChildren<Collider>(),
                 Is.Empty);
 
+            var deepWaterTarget = new TraversalTarget();
             yield return MoveToTraversal(
                 world,
                 placement,
-                WorldTraversalKind.DeepWater);
-            AssertInvalidTerrain(placement, WorldTraversalKind.DeepWater);
+                WorldTraversalKind.DeepWater,
+                deepWaterTarget);
+            AssertInvalidTerrain(
+                world,
+                placement,
+                WorldTraversalKind.DeepWater,
+                deepWaterTarget);
+            var cliffTarget = new TraversalTarget();
             yield return MoveToTraversal(
                 world,
                 placement,
-                WorldTraversalKind.Cliff);
-            AssertInvalidTerrain(placement, WorldTraversalKind.Cliff);
+                WorldTraversalKind.Cliff,
+                cliffTarget);
+            AssertInvalidTerrain(
+                world,
+                placement,
+                WorldTraversalKind.Cliff,
+                cliffTarget);
             Assert.That(presenter.IsPresented, Is.True);
             Assert.That(world.SurfaceFallbackVisible, Is.False);
         }
@@ -554,6 +655,14 @@ namespace WasteCity.Tests
             {
                 Assert.That(surfaces[index].Renderer, Is.Not.Null);
                 Assert.That(
+                    surfaces[index].gameObject.activeInHierarchy,
+                    Is.True,
+                    surfaces[index].StableId);
+                Assert.That(
+                    surfaces[index].Renderer.gameObject.activeInHierarchy,
+                    Is.True,
+                    surfaces[index].StableId);
+                Assert.That(
                     surfaces[index].Renderer.enabled,
                     Is.EqualTo(fallbackVisible),
                     surfaces[index].StableId);
@@ -563,6 +672,14 @@ namespace WasteCity.Tests
             for (int index = 0; index < placeholders.Length; index++)
             {
                 Assert.That(placeholders[index].Renderer, Is.Not.Null);
+                Assert.That(
+                    placeholders[index].gameObject.activeInHierarchy,
+                    Is.True,
+                    placeholders[index].StableId);
+                Assert.That(
+                    placeholders[index].Renderer.gameObject.activeInHierarchy,
+                    Is.True,
+                    placeholders[index].StableId);
                 Assert.That(
                     placeholders[index].Renderer.enabled,
                     Is.True,
@@ -744,8 +861,10 @@ namespace WasteCity.Tests
         private IEnumerator MoveToTraversal(
             GrayboxWorldView3D world,
             GrayboxBuildingPlacementController3D placement,
-            WorldTraversalKind traversal)
+            WorldTraversalKind traversal,
+            TraversalTarget target)
         {
+            Assert.That(target, Is.Not.Null);
             for (int x = 0; x < world.Model.Width; x++)
             for (int y = 0; y < world.Model.Height; y++)
             {
@@ -760,8 +879,14 @@ namespace WasteCity.Tests
                     Is.True);
                 yield return MoveMouse(Camera.main.WorldToScreenPoint(
                     corner + new Vector3(.5f, 0f, .5f)));
-                if (placement.CurrentHit.Site == BuildingSite.Ground)
-                    yield break;
+                BuildingSurfaceHit hit = placement.CurrentHit;
+                if (!hit.IsValid ||
+                    hit.Site != BuildingSite.Ground ||
+                    hit.X != x ||
+                    hit.Y != y)
+                    continue;
+                target.Set(x, y);
+                yield break;
             }
 
             Assert.Fail("Seed 8128 lacks ground projection for " +
@@ -769,12 +894,32 @@ namespace WasteCity.Tests
         }
 
         private static void AssertInvalidTerrain(
+            GrayboxWorldView3D world,
             GrayboxBuildingPlacementController3D placement,
-            WorldTraversalKind traversal)
+            WorldTraversalKind traversal,
+            TraversalTarget target)
         {
+            Assert.That(target, Is.Not.Null);
+            Assert.That(target.IsAssigned, Is.True, traversal.ToString());
+            Assert.That(
+                placement.CurrentHit.IsValid,
+                Is.True,
+                traversal.ToString());
             Assert.That(
                 placement.CurrentHit.Site,
                 Is.EqualTo(BuildingSite.Ground),
+                traversal.ToString());
+            Assert.That(
+                placement.CurrentHit.X,
+                Is.EqualTo(target.X),
+                traversal.ToString());
+            Assert.That(
+                placement.CurrentHit.Y,
+                Is.EqualTo(target.Y),
+                traversal.ToString());
+            Assert.That(
+                world.Model.Get(target.X, target.Y).Traversal,
+                Is.EqualTo(traversal),
                 traversal.ToString());
             Assert.That(
                 placement.CurrentEvaluation.IsValid,
@@ -898,6 +1043,20 @@ namespace WasteCity.Tests
             SceneManager.SetActiveScene(empty);
             yield return SceneManager.UnloadSceneAsync(graybox);
             yield return null;
+        }
+
+        private sealed class TraversalTarget
+        {
+            public bool IsAssigned { get; private set; }
+            public int X { get; private set; } = -1;
+            public int Y { get; private set; } = -1;
+
+            public void Set(int x, int y)
+            {
+                X = x;
+                Y = y;
+                IsAssigned = true;
+            }
         }
     }
 }
