@@ -1750,11 +1750,17 @@ distinct and the final PNG exactly 1920×1080.
 
 For DeepWater, lock the same camera on the recorded shore, set
 `Time.captureFramerate = 30`, and capture one new lossless 1920×1080 camera frame
-on each of 300 distinct increasing `Time.frameCount` values. Encode those exact
-300 PNG frames with ffmpeg to H.264, 30 fps, exactly 10 seconds. Verify the
-camera/rig matrices are identical for all frames, frame hashes are not all
-identical, the shoreline occupies a readable portion of the image, and no frame
-contains Editor UI. Do not synthesize repeats from sparse screenshots.
+on each of 300 strictly consecutive `Time.frameCount` values. After the first
+captured frame, every next frame must equal the previous frame number plus one;
+the final frame number minus the first must equal `299`. Record the full ordered
+frame-number list and first/last range in the manifest. A duplicate, skipped or
+out-of-order frame aborts the capture, deletes the incomplete frame set and
+requires a fresh retry. Add a focused sequence-validator test whose gapped input
+`100, 102, 103` fails before GUI capture. Encode those exact 300 consecutive PNG
+frames with ffmpeg to H.264, 30 fps, exactly 10 seconds. Verify the camera/rig
+matrices are identical for all frames, frame hashes are not all identical, the
+shoreline occupies a readable portion of the image, and no frame contains
+Editor UI. Do not synthesize repeats from sparse screenshots.
 
 Extend `GrayboxPerformanceProbe` and its focused tests so the real GUI evidence
 also writes a terrain-runtime JSON containing: active scene/worktree, Game View
