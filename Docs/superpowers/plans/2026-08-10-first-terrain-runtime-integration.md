@@ -974,9 +974,11 @@ git commit -m "feat: add first terrain URP master material"
 - Create: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
 - Create: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta`
 - Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs`
+- Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMap3D.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta`
 - Modify: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs`
 
@@ -1027,6 +1029,28 @@ Use a fake `MonoBehaviour, IGrayboxTerrainPresentation3D` to prove:
 - disabled/destroyed real `FirstArtTerrainRenderer3D` restores all seven graybox renderers;
 - missing profile, wrong Shader, wrong array depth and control generation exception create no persistent formal object.
 
+Also freeze the review-fix contracts with focused failing tests:
+
+- a false or throwing presenter that owns a partial GameObject/resource is
+  best-effort cleared by Bootstrap before fallback restoration and completed
+  initialization; cleanup failure is combined with the presentation failure in
+  one contextual error and fallback is still restored;
+- a real presenter failure routed through Bootstrap emits exactly one
+  contextual error per attempt, with one explicit logging owner and no Update
+  logging;
+- changing a presenter's Profile clears its old owned presentation and restores
+  fallback; replacing Bootstrap's world/presenter clears and detaches the old
+  lifecycle owner, resets stale initialization state, and allows the new
+  configuration to initialize;
+- after a successful formal presentation, an external `worldView.Generate`
+  clears the old Mesh/control maps before replacing graybox slots, keeps
+  fallback visible during the rebuild, and re-presents exactly one formal
+  surface only after successful generation; Bootstrap's initial Generate must
+  not duplicate presentation;
+- inject a constructor fault immediately after Control A texture allocation and
+  assert the partial texture is destroyed, texture counts return to baseline,
+  and normal generation remains unchanged.
+
 - [ ] **Step 3: Run RED**
 
 ```bash
@@ -1056,6 +1080,14 @@ public void SetSurfaceFallbackVisible(bool visible);
 
 Do not make `GrayboxWorldView3D` reference `FirstArtTerrainCatalog3D`; duplicate only the frozen exact seven stable ID strings in a private `IsSurfaceSlot` switch that must match the catalog, preserving assembly direction. Tests compare it against the Task 1 catalog.
 
+Add an assembly-safe explicit presentation lifecycle/transaction registration
+owned by `GrayboxWorldView3D`. A successfully attached presentation is cleared
+before `Generate` replaces slots, retained locally only for the rebuild
+transaction, and re-presented after generation succeeds. Initial Bootstrap
+generation has no attached presenter, so Bootstrap performs the one initial
+presentation attempt without duplication. Detach on explicit clear,
+reconfiguration, disable, and destroy.
+
 Extend Bootstrap without breaking old callers:
 
 ```csharp
@@ -1072,6 +1104,16 @@ public void Configure(
 ```
 
 After `worldView.Generate(World)`, cast the optional behavior to the interface. On false or exception, force `SetSurfaceFallbackVisible(true)`, log once with component context, then still set `IsInitialized = true`.
+
+On false or exception, Bootstrap first best-effort calls
+`ClearPresentation`, then restores fallback and completes initialization. If
+cleanup also throws, preserve both the attempt and cleanup information in one
+contextual error. Bootstrap is the single logging owner for Bootstrap-routed
+attempts; the real presenter exposes a narrow assembly-safe suppressed-log
+attempt path and last error, while direct/runtime lifecycle attempts retain one
+presenter-owned error. Replacing configured dependencies performs the same
+best-effort detach/clear, resets `World` and `IsInitialized`, then permits the
+new configuration to initialize.
 
 - [ ] **Step 5: Implement the formal renderer with atomic ownership**
 
@@ -1108,6 +1150,19 @@ On any failure destroy locals, leave no child, restore graybox and return false 
 
 Retain the most recently supplied `GrayboxWorldView3D` across `OnDisable`. `OnEnable` re-runs `TryPresent` only when that retained view still has non-null Model and Coordinates. `OnDestroy` restores graybox and clears the retained source so a destroyed component cannot resurrect. The first scene enable before Bootstrap has supplied a view is a no-op.
 
+`Configure` changing the Profile must call `ClearPresentation` before storing
+the replacement so stale Mesh/control-map ownership cannot survive dependency
+changes. Successful presentation attaches to the Graybox lifecycle transaction;
+every clear path detaches while retaining only the source needed for legal
+disable/re-enable behavior.
+
+Strengthen `FirstArtTerrainControlMap3D` construction with local texture
+ownership and catch cleanup: if any exception occurs after Control A allocation
+but before both texture references transfer to the completed wrapper, destroy
+every local texture and rethrow. Provide one test-only static fault seam
+immediately after Control A allocation; it is null in normal runtime, changes no
+public runtime behavior, and introduces no per-frame work or allocation.
+
 - [ ] **Step 6: Run GREEN and allocation/lifecycle checks**
 
 ```bash
@@ -1116,12 +1171,17 @@ for test_class in FirstArtTerrainRendererTests GrayboxSceneBootstrapTests Graybo
 done
 ```
 
-Expected: all focused tests pass; disabling/re-enabling does not duplicate `RuntimeSurface`; resource renderers never disable; `Renderer.sharedMaterial` remains the profile asset.
+Expected: all focused tests pass; disabling/re-enabling and external world
+rebuild do not duplicate `RuntimeSurface`; stale Mesh/control textures are
+destroyed; reconfiguration restores fallback and resets Bootstrap state;
+partial Control A construction leaks zero textures; real Bootstrap-routed
+failure logs exactly once; resource renderers never disable; and
+`Renderer.sharedMaterial` remains the profile asset.
 
 - [ ] **Step 7: Commit Task 6**
 
 ```bash
-git add Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs.meta Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs
+git add Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs.meta Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMap3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs
 git diff --cached --check
 git commit -m "feat: present formal terrain with graybox fallback"
 ```
