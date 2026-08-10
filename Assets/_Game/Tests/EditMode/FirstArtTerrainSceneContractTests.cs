@@ -27,6 +27,12 @@ namespace WasteCity.Tests
         private const string TemporaryProfilePath =
             "Assets/_Game/Tests/EditMode/" +
             "TempFirstArtTerrainProfile.asset";
+        private const string TemporarySnapshotBeforePath =
+            "Assets/_Game/Tests/EditMode/" +
+            "TempFirstArtTerrainSnapshotBefore.unity";
+        private const string TemporarySnapshotAfterPath =
+            "Assets/_Game/Tests/EditMode/" +
+            "TempFirstArtTerrainSnapshotAfter.unity";
 
         public enum RepairableSceneMutation
         {
@@ -51,6 +57,16 @@ namespace WasteCity.Tests
             MissingScript,
             AlternateBootstrapReference,
             UnapprovedProfileReference
+        }
+
+        public enum InMemorySceneMutation
+        {
+            Transform,
+            Scalar,
+            Enabled,
+            Layer,
+            NestedReference,
+            SameShapeObjectReplacement
         }
 
         private static readonly string[] TerrainNames =
@@ -108,6 +124,8 @@ namespace WasteCity.Tests
             {
                 AssetDatabase.DeleteAsset(TemporaryScenePath);
                 AssetDatabase.DeleteAsset(TemporaryProfilePath);
+                AssetDatabase.DeleteAsset(TemporarySnapshotBeforePath);
+                AssetDatabase.DeleteAsset(TemporarySnapshotAfterPath);
             }
             catch (Exception exception)
             {
@@ -255,6 +273,8 @@ namespace WasteCity.Tests
                 FindSingle<GrayboxSceneBootstrap>(beforeScene),
                 "terrainPresentationBehaviour",
                 null);
+            string[] foundationGlobalIdsBefore =
+                CaptureSceneGlobalIds(TemporaryScenePath);
             Dictionary<string, ProtectedFileState> protectedBefore =
                 CaptureProtectedFileStates();
             var firstHooks = new AuthoringHookProbe();
@@ -276,6 +296,11 @@ namespace WasteCity.Tests
                 AssetDatabase.AssetPathToGUID(TemporaryScenePath);
             string[] firstGlobalIds =
                 CaptureSceneGlobalIds(TemporaryScenePath);
+            Assert.That(
+                firstGlobalIds,
+                Is.SupersetOf(foundationGlobalIdsBefore),
+                "pass 1 must preserve every pre-existing foundation " +
+                "GameObject and Component GlobalObjectId");
             Dictionary<string, ProtectedFileState> protectedAfterFirst =
                 CaptureProtectedFileStates();
             Scene authoredScene = EditorSceneManager.OpenScene(
@@ -310,6 +335,11 @@ namespace WasteCity.Tests
             Assert.That(
                 CaptureSceneGlobalIds(TemporaryScenePath),
                 Is.EqualTo(firstGlobalIds));
+            Assert.That(
+                CaptureSceneGlobalIds(TemporaryScenePath),
+                Is.SupersetOf(foundationGlobalIdsBefore),
+                "pass 2 must preserve every pre-existing foundation " +
+                "GameObject and Component GlobalObjectId");
             AssertProtectedStatesEqual(
                 protectedBefore,
                 protectedAfterFirst,
@@ -388,9 +418,10 @@ namespace WasteCity.Tests
                 ProjectAbsolutePath(TemporaryScenePath + ".meta"));
             string sceneGuidBefore =
                 AssetDatabase.AssetPathToGUID(TemporaryScenePath);
-            SceneStructuralSignature sceneBefore =
-                CaptureSceneStructuralSignature(
-                    SceneManager.GetSceneByPath(TemporaryScenePath));
+            InMemorySceneSnapshot sceneBefore =
+                CaptureInMemorySceneSnapshot(
+                    SceneManager.GetSceneByPath(TemporaryScenePath),
+                    TemporarySnapshotBeforePath);
             var hooks = new AuthoringHookProbe();
             ProtectedFileSnapshot protectedSnapshot =
                 ProtectedFileSnapshot.Capture();
@@ -436,10 +467,11 @@ namespace WasteCity.Tests
                     AssetDatabase.AssetPathToGUID(TemporaryScenePath),
                     Is.EqualTo(sceneGuidBefore),
                     mutation.ToString());
-                AssertSceneSignaturesEqual(
+                AssertInMemorySceneSnapshotsEqual(
                     sceneBefore,
-                    CaptureSceneStructuralSignature(
-                        SceneManager.GetSceneByPath(TemporaryScenePath)),
+                    CaptureInMemorySceneSnapshot(
+                        SceneManager.GetSceneByPath(TemporaryScenePath),
+                        TemporarySnapshotAfterPath),
                     mutation.ToString());
                 protectedSnapshot.AssertUnchanged(mutation.ToString());
             }
@@ -454,6 +486,94 @@ namespace WasteCity.Tests
                     protectedSnapshot,
                     originalFailure);
             }
+        }
+
+        [TestCase(InMemorySceneMutation.Transform)]
+        [TestCase(InMemorySceneMutation.Scalar)]
+        [TestCase(InMemorySceneMutation.Enabled)]
+        [TestCase(InMemorySceneMutation.Layer)]
+        [TestCase(InMemorySceneMutation.NestedReference)]
+        [TestCase(InMemorySceneMutation.SameShapeObjectReplacement)]
+        public void InMemorySnapshot_DetectsCompleteSerializedMutationWithZeroHooks(
+            InMemorySceneMutation mutation)
+        {
+            CreateTemporaryScene(scene => { });
+            Scene scene = SceneManager.GetSceneByPath(TemporaryScenePath);
+            var hooks = new AuthoringHookProbe();
+            InMemorySceneSnapshot before =
+                CaptureInMemorySceneSnapshot(
+                    scene,
+                    TemporarySnapshotBeforePath);
+
+            ApplyInMemorySceneMutation(scene, mutation);
+
+            InMemorySceneSnapshot after =
+                CaptureInMemorySceneSnapshot(
+                    scene,
+                    TemporarySnapshotAfterPath);
+            Assert.That(
+                new[]
+                {
+                    hooks.RuntimeAssetBuilderEntries,
+                    hooks.SceneMutationEntries,
+                    hooks.SceneSaveEntries
+                },
+                Is.EqualTo(new[] { 0, 0, 0 }));
+            Assert.That(
+                () => AssertInMemorySceneSnapshotsEqual(
+                    before,
+                    after,
+                    mutation.ToString()),
+                Throws.TypeOf<AssertionException>(),
+                $"{mutation}: the full snapshot comparison must reject " +
+                "the mutation");
+            if (mutation ==
+                InMemorySceneMutation.SameShapeObjectReplacement)
+            {
+                Assert.That(
+                    after.GlobalObjectIds,
+                    Is.Not.EqualTo(before.GlobalObjectIds),
+                    $"{mutation}: replacement GlobalObjectId evidence");
+            }
+            else
+            {
+                Assert.That(
+                    after.CanonicalSceneBytes,
+                    Is.Not.EqualTo(before.CanonicalSceneBytes),
+                    $"{mutation}: the complete serialized snapshot must " +
+                    "change");
+                Assert.That(
+                    after.GlobalObjectIds,
+                    Is.EqualTo(before.GlobalObjectIds),
+                    $"{mutation}: stable GlobalObjectId evidence");
+            }
+        }
+
+        [Test]
+        public void FoundationIdentityProof_DetectsSameShapeObjectReplacement()
+        {
+            CreateTemporaryScene(RemoveFirstArtTerrainPresentation);
+            string[] foundationBefore =
+                CaptureSceneGlobalIds(TemporaryScenePath);
+            string[] identityKeysBefore =
+                CaptureSceneGlobalIdentityKeys(foundationBefore);
+            Scene scene = SceneManager.GetSceneByPath(TemporaryScenePath);
+
+            ReplaceFoundationObjectWithSameSerializedShape(scene);
+            Assert.That(
+                EditorSceneManager.SaveScene(scene, TemporaryScenePath),
+                Is.True);
+            string[] foundationAfter =
+                CaptureSceneGlobalIds(TemporaryScenePath);
+
+            Assert.That(
+                CaptureSceneGlobalIdentityKeys(foundationAfter),
+                Is.EqualTo(identityKeysBefore),
+                "the mutation fixture must preserve hierarchy/type shape");
+            Assert.That(
+                foundationAfter,
+                Is.Not.SupersetOf(foundationBefore),
+                "the pre-existing identity proof must detect replacement");
         }
 
         [Test]
@@ -799,6 +919,103 @@ namespace WasteCity.Tests
             }
         }
 
+        private static void ApplyInMemorySceneMutation(
+            Scene scene,
+            InMemorySceneMutation mutation)
+        {
+            switch (mutation)
+            {
+                case InMemorySceneMutation.Transform:
+                    FindSingle<Camera>(scene).transform.localPosition +=
+                        Vector3.right;
+                    break;
+                case InMemorySceneMutation.Scalar:
+                    FindSingle<Camera>(scene).orthographicSize += 1f;
+                    break;
+                case InMemorySceneMutation.Enabled:
+                {
+                    Camera camera = FindSingle<Camera>(scene);
+                    camera.enabled = !camera.enabled;
+                    break;
+                }
+                case InMemorySceneMutation.Layer:
+                {
+                    GameObject camera = FindSingle<Camera>(scene).gameObject;
+                    camera.layer = (camera.layer + 1) % 32;
+                    break;
+                }
+                case InMemorySceneMutation.NestedReference:
+                {
+                    MeshRenderer renderer = FindAll<MeshRenderer>(scene)[0];
+                    Material replacement = LoadRequired<Material>(
+                        FirstArtTerrainAssetBuilder.MaterialPath);
+                    Assert.That(
+                        renderer.sharedMaterial,
+                        Is.Not.SameAs(replacement));
+                    renderer.sharedMaterial = replacement;
+                    break;
+                }
+                case InMemorySceneMutation.SameShapeObjectReplacement:
+                    ReplaceFoundationObjectWithSameSerializedShape(scene);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        null);
+            }
+        }
+
+        private static void RemoveFirstArtTerrainPresentation(Scene scene)
+        {
+            FirstArtTerrainRenderer3D presenter =
+                FindSingle<FirstArtTerrainRenderer3D>(scene);
+            SetReference(
+                FindSingle<GrayboxSceneBootstrap>(scene),
+                "terrainPresentationBehaviour",
+                null);
+            Object.DestroyImmediate(presenter.gameObject);
+        }
+
+        private static void ReplaceFoundationObjectWithSameSerializedShape(
+            Scene scene)
+        {
+            GameObject original =
+                FindNamedObjects(scene, "ObstacleRoot")[0];
+            Assert.That(original.transform.childCount, Is.Zero);
+            Transform parent = original.transform.parent;
+            int siblingIndex = original.transform.GetSiblingIndex();
+            Vector3 localPosition = original.transform.localPosition;
+            Quaternion localRotation = original.transform.localRotation;
+            Vector3 localScale = original.transform.localScale;
+            bool active = original.activeSelf;
+            int layer = original.layer;
+            string tag = original.tag;
+            HideFlags hideFlags = original.hideFlags;
+            StaticEditorFlags staticFlags =
+                GameObjectUtility.GetStaticEditorFlags(original);
+            Object.DestroyImmediate(original);
+
+            var replacement = new GameObject("ObstacleRoot");
+            replacement.transform.SetParent(parent, false);
+            replacement.transform.SetSiblingIndex(siblingIndex);
+            replacement.transform.localPosition = localPosition;
+            replacement.transform.localRotation = localRotation;
+            replacement.transform.localScale = localScale;
+            replacement.SetActive(active);
+            replacement.layer = layer;
+            replacement.tag = tag;
+            replacement.hideFlags = hideFlags;
+            GameObjectUtility.SetStaticEditorFlags(replacement, staticFlags);
+            SetReference(
+                FindSingle<GrayboxWorldView3D>(scene),
+                "obstacleRoot",
+                replacement.transform);
+            Assert.That(
+                FindNamedObjects(scene, "ObstacleRoot")[0],
+                Is.SameAs(replacement));
+        }
+
         private static GameObject MoveNewObjectToScene(
             string name,
             Scene scene)
@@ -1026,169 +1243,79 @@ namespace WasteCity.Tests
             }
         }
 
-        private static SceneStructuralSignature
-            CaptureSceneStructuralSignature(Scene scene)
+        private static InMemorySceneSnapshot CaptureInMemorySceneSnapshot(
+            Scene scene,
+            string snapshotPath)
         {
             Assert.That(scene.IsValid(), Is.True);
             Assert.That(scene.isLoaded, Is.True);
-            var rows = new List<string>();
-            var objectCount = 0;
-            var componentCount = 0;
-            var parentReferenceCount = 0;
-            var objectReferenceSlotCount = 0;
-            var objectReferenceCount = 0;
-            var missingScriptCount = 0;
-            foreach (GameObject root in scene.GetRootGameObjects())
-            foreach (Transform transform in
-                     root.GetComponentsInChildren<Transform>(true))
+            Assert.That(snapshotPath, Is.Not.EqualTo(scene.path));
+            AssetDatabase.DeleteAsset(snapshotPath);
+            try
             {
-                objectCount++;
-                string identity = HierarchyIdentity(transform);
-                string parentIdentity = transform.parent == null
-                    ? "<root>"
-                    : HierarchyIdentity(transform.parent);
-                if (transform.parent != null)
-                    parentReferenceCount++;
-                rows.Add(
-                    $"Object|{identity}|Parent={parentIdentity}|" +
-                    $"Active={transform.gameObject.activeSelf}");
+                Assert.That(
+                    EditorSceneManager.SaveScene(
+                        scene,
+                        snapshotPath,
+                        true),
+                    Is.True,
+                    snapshotPath);
+                byte[] canonicalSceneBytes =
+                    CanonicalizeKnownYamlWhitespace(
+                        File.ReadAllBytes(ProjectAbsolutePath(snapshotPath)));
+                return new InMemorySceneSnapshot(
+                    canonicalSceneBytes,
+                    CaptureSceneGlobalIds(scene));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(snapshotPath);
+            }
+        }
 
-                Component[] components =
-                    transform.GetComponents<Component>();
-                componentCount += components.Length;
-                for (var componentIndex = 0;
-                     componentIndex < components.Length;
-                     componentIndex++)
+        private static byte[] CanonicalizeKnownYamlWhitespace(byte[] source)
+        {
+            var canonical = new byte[source.Length];
+            var count = 0;
+            for (var index = 0; index < source.Length; index++)
+            {
+                byte value = source[index];
+                if (value == (byte)'\r' || value == (byte)'\n')
                 {
-                    Component component = components[componentIndex];
-                    if (component == null)
+                    while (count > 0 &&
+                           (canonical[count - 1] == (byte)' ' ||
+                            canonical[count - 1] == (byte)'\t'))
                     {
-                        missingScriptCount++;
-                        rows.Add(
-                            $"Component|{identity}|{componentIndex}|" +
-                            "MissingScript");
-                        continue;
+                        count--;
                     }
-
-                    string componentIdentity =
-                        $"{identity}|{componentIndex}|" +
-                        component.GetType().FullName;
-                    rows.Add("Component|" + componentIdentity);
-                    var serialized = new SerializedObject(component);
-                    SerializedProperty property = serialized.GetIterator();
-                    if (!property.Next(true))
-                        continue;
-                    do
-                    {
-                        if (property.propertyType !=
-                            SerializedPropertyType.ObjectReference)
-                        {
-                            continue;
-                        }
-
-                        objectReferenceSlotCount++;
-                        Object reference = property.objectReferenceValue;
-                        if (reference != null)
-                            objectReferenceCount++;
-                        rows.Add(
-                            $"Reference|{componentIdentity}|" +
-                            $"{property.propertyPath}|" +
-                            DescribeReference(reference, scene));
-                    } while (property.Next(false));
                 }
+                canonical[count++] = value;
             }
-            rows.Sort(StringComparer.Ordinal);
-            return new SceneStructuralSignature(
-                objectCount,
-                componentCount,
-                parentReferenceCount,
-                objectReferenceSlotCount,
-                objectReferenceCount,
-                missingScriptCount,
-                rows.ToArray());
-        }
-
-        private static string DescribeReference(Object reference, Scene scene)
-        {
-            if (reference == null)
-                return "<null>";
-            if (reference is GameObject gameObject &&
-                gameObject.scene == scene)
+            while (count > 0 &&
+                   (canonical[count - 1] == (byte)' ' ||
+                    canonical[count - 1] == (byte)'\t'))
             {
-                return "SceneGameObject:" +
-                       HierarchyIdentity(gameObject.transform);
-            }
-            if (reference is Component component &&
-                component.gameObject.scene == scene)
-            {
-                Component[] components =
-                    component.gameObject.GetComponents<Component>();
-                var componentIndex = Array.IndexOf(components, component);
-                return "SceneComponent:" +
-                       HierarchyIdentity(component.transform) + "|" +
-                       componentIndex + "|" +
-                       component.GetType().FullName;
+                count--;
             }
 
-            string assetPath = AssetDatabase.GetAssetPath(reference);
-            if (!string.IsNullOrEmpty(assetPath) &&
-                AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
-                    reference,
-                    out string guid,
-                    out long localId))
-            {
-                return $"Asset:{assetPath}|{guid}|{localId}|" +
-                       reference.GetType().FullName;
-            }
-            return $"Other:{reference.GetType().FullName}|{reference.name}";
-        }
-
-        private static string HierarchyIdentity(Transform transform)
-        {
-            string result =
-                $"{transform.name}[{transform.GetSiblingIndex()}]";
-            for (Transform parent = transform.parent;
-                 parent != null;
-                 parent = parent.parent)
-            {
-                result = $"{parent.name}[{parent.GetSiblingIndex()}]/" + result;
-            }
+            var result = new byte[count];
+            Buffer.BlockCopy(canonical, 0, result, 0, count);
             return result;
         }
 
-        private static void AssertSceneSignaturesEqual(
-            SceneStructuralSignature expected,
-            SceneStructuralSignature actual,
+        private static void AssertInMemorySceneSnapshotsEqual(
+            InMemorySceneSnapshot expected,
+            InMemorySceneSnapshot actual,
             string context)
         {
             Assert.That(
-                actual.ObjectCount,
-                Is.EqualTo(expected.ObjectCount),
-                $"{context}: scene object count changed");
+                actual.CanonicalSceneBytes,
+                Is.EqualTo(expected.CanonicalSceneBytes),
+                $"{context}: complete serialized in-memory scene changed");
             Assert.That(
-                actual.ComponentCount,
-                Is.EqualTo(expected.ComponentCount),
-                $"{context}: scene component count changed");
-            Assert.That(
-                actual.ParentReferenceCount,
-                Is.EqualTo(expected.ParentReferenceCount),
-                $"{context}: scene parent relationship count changed");
-            Assert.That(
-                actual.ObjectReferenceSlotCount,
-                Is.EqualTo(expected.ObjectReferenceSlotCount),
-                $"{context}: serialized reference slot count changed");
-            Assert.That(
-                actual.ObjectReferenceCount,
-                Is.EqualTo(expected.ObjectReferenceCount),
-                $"{context}: serialized non-null reference count changed");
-            Assert.That(
-                actual.MissingScriptCount,
-                Is.EqualTo(expected.MissingScriptCount),
-                $"{context}: missing script count changed");
-            Assert.That(
-                actual.Rows,
-                Is.EqualTo(expected.Rows),
-                $"{context}: in-memory scene structure changed");
+                actual.GlobalObjectIds,
+                Is.EqualTo(expected.GlobalObjectIds),
+                $"{context}: GameObject/Component GlobalObjectIds changed");
         }
 
         private void RestoreProtectedSnapshot(
@@ -1333,6 +1460,13 @@ namespace WasteCity.Tests
         {
             Scene scene =
                 EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            return CaptureSceneGlobalIds(scene);
+        }
+
+        private static string[] CaptureSceneGlobalIds(Scene scene)
+        {
+            Assert.That(scene.IsValid(), Is.True);
+            Assert.That(scene.isLoaded, Is.True);
             var values = new List<string>();
             foreach (GameObject root in scene.GetRootGameObjects())
             foreach (Transform transform in
@@ -1358,6 +1492,20 @@ namespace WasteCity.Tests
             }
             values.Sort(StringComparer.Ordinal);
             return values.ToArray();
+        }
+
+        private static string[] CaptureSceneGlobalIdentityKeys(
+            IEnumerable<string> globalIds)
+        {
+            var keys = new List<string>();
+            foreach (string globalId in globalIds)
+            {
+                int separator = globalId.LastIndexOf('|');
+                Assert.That(separator, Is.GreaterThan(0), globalId);
+                keys.Add(globalId.Substring(0, separator));
+            }
+            keys.Sort(StringComparer.Ordinal);
+            return keys.ToArray();
         }
 
         private static string FileHash(string projectPath)
@@ -1503,33 +1651,18 @@ namespace WasteCity.Tests
             public string Hash { get; }
         }
 
-        private sealed class SceneStructuralSignature
+        private sealed class InMemorySceneSnapshot
         {
-            public SceneStructuralSignature(
-                int objectCount,
-                int componentCount,
-                int parentReferenceCount,
-                int objectReferenceSlotCount,
-                int objectReferenceCount,
-                int missingScriptCount,
-                string[] rows)
+            public InMemorySceneSnapshot(
+                byte[] canonicalSceneBytes,
+                string[] globalObjectIds)
             {
-                ObjectCount = objectCount;
-                ComponentCount = componentCount;
-                ParentReferenceCount = parentReferenceCount;
-                ObjectReferenceSlotCount = objectReferenceSlotCount;
-                ObjectReferenceCount = objectReferenceCount;
-                MissingScriptCount = missingScriptCount;
-                Rows = rows;
+                CanonicalSceneBytes = canonicalSceneBytes;
+                GlobalObjectIds = globalObjectIds;
             }
 
-            public int ObjectCount { get; }
-            public int ComponentCount { get; }
-            public int ParentReferenceCount { get; }
-            public int ObjectReferenceSlotCount { get; }
-            public int ObjectReferenceCount { get; }
-            public int MissingScriptCount { get; }
-            public string[] Rows { get; }
+            public byte[] CanonicalSceneBytes { get; }
+            public string[] GlobalObjectIds { get; }
         }
 
         private sealed class AuthoringHookProbe
