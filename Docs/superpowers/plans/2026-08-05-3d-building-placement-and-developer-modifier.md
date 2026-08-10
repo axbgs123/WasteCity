@@ -2752,7 +2752,7 @@ Windows 继续执行使用 `$Task13Evidence = Join-Path $EvidenceRoot 'task-13'`
 
 - [ ] Before touching Docs/06, extract the entire `BUG-0001` section from the frozen plan base and current HEAD using the same deterministic section-boundary script already used in prior milestones. Save both files under `/tmp/wastecity-3d-building/task-13/` and record SHA-256.
 
-- [ ] 本批已获得受控状态授权：只有 Task 11、Task 12、独立复审和全部证据均通过后，才可将 `IDEA-0003` 从 `未实现` 改为 `已实现待验证`。不得标记为 `已验证`，因为真实 Windows 10/11 独立程序冒烟仍待补。Docs/06 只允许修改总表中的 `IDEA-0003` 行和 `### IDEA-0003` 详细段；`BUG-0001` 必须字节不变，`IDEA-0001`、`IDEA-0002`、`IDEA-0004` 也必须分别字节不变。
+- [x] 本批已按受控状态授权完成：Task 11、Task 12、独立复审和全部机器证据均已通过，`IDEA-0003` 已从 `未实现` 更新为 `已实现待验证`。真实 Windows 10/11 机器验证已经完成，但用户实际试玩仍待完成，因此不得标记为 `已验证`。Docs/06 的受控变更仅包含总表中的 `IDEA-0003` 行和 `### IDEA-0003` 详细段；`BUG-0001`、`IDEA-0001`、`IDEA-0002`、`IDEA-0004` 已保持逐字节不变。
 
 - [ ] Update Docs/05 only with verified facts:
 
@@ -2765,7 +2765,7 @@ actual 128-instance structure, five generation samples/median, 300-tick allocati
 default 3D entry remains
 formal save/schema 30 unchanged
 production/logistics/combat/outpost/formal evacuation/formal save remain excluded
-real Windows 10/11 standalone smoke remains pending
+real Windows 10/11 standalone smoke completed for Release 3D, Development 3D, and legacy 2D; user hands-on play validation remains pending
 retain links to the approved IDEA-0004 art sample specification/production plan, but state that art production has not started and do not execute either document
 ```
 
@@ -2849,7 +2849,7 @@ The executor must stop after Task 13 and report:
 6. Complete EditMode/PlayMode totals, compile result, and all `/tmp` result/log paths.
 7. Default Release 3D, Development 3D and legacy 2D build commands, paths and `file` output.
 8. 128-instance renderer/object counts, 300-tick allocation delta, five raw generation values/median, and real 300-frame Profiler/FPS evidence.
-9. Release modifier absence proof and explicit note that real Windows 10/11 smoke remains pending.
+9. Release modifier absence proof, completed real Windows 10/11 smoke evidence, and explicit note that user hands-on play validation remains pending.
 10. `FormalPrototype`, frozen 2D runtime, persistence/schema, Packages, Graphics/Quality/PackageManager settings and BUG-0001 zero-difference evidence.
 11. Controlled document exact changes and IDEA-0003 status authorization.
 12. Local/tracking/`ls-remote` equality and raw `git status --short`.

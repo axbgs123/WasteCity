@@ -6,7 +6,7 @@
 
 **Architecture:** 本计划只负责美术前期、源资源、导入资源、登记表和离线/Unity 导入前验证，不修改玩法、场景、VisualSlot 或正式运行时。资源以 `ArtSource/FirstPass/` 保存源工程，以 `Assets/_Game/Art/FirstPass/` 保存 Unity 可导入文件；采矿站先走完整黄金样板流程，模板冻结后再并行生产城市/角色/建筑、UI、环境与反馈三条轨道。
 
-**Tech Stack:** Blender、FBX、PNG、SVG、WAV 48 kHz/24-bit、Unity 2022.3.62f1、URP 14.0.12、Git LFS、Unity Test Framework、macOS 开发机与 Windows x86-64 构建验收。
+**Tech Stack:** Blender 5.2.0 LTS、Blender MCP v1.2、FBX、PNG、SVG、WAV 48 kHz/24-bit、Unity 2022.3.62f1、URP 14.0.12、Git LFS、Unity Test Framework、macOS 开发机与 Windows x86-64 构建验收。
 
 ## Global Constraints
 
@@ -14,11 +14,17 @@
 - Task 13 未通过全部测试、构建、性能与文档门时，本计划不得开始。
 - 本计划不修改 `Assets/_Game/Scenes/`、`Assets/_Game/Scripts/`、`Assets/_Game/Editor/GrayboxSceneAuthoring.cs`、`Packages/`、`ProjectSettings/`、schema、存档或玩法定义。
 - 本计划结束时不把正式资源接入运行时；Unity 表现映射必须在 Task 13 最终接口上另写设计规格和实施计划。
-- 模型源文件使用 `.blend`，交换文件使用 `.fbx`，Unity 图片使用 PNG，矢量源使用 SVG，音频源使用 48 kHz、24-bit WAV。
+- 模型源文件使用 `.blend`；Unity 模型主交付与交换格式固定为 `.fbx`。glTF 2.0/GLB 只作为次要预览或跨工具交换格式，不得替代 FBX 正式交付；Unity 图片使用 PNG，矢量源使用 SVG，音频源使用 48 kHz、24-bit WAV。
+- 制作机基线为 Blender 5.2.0 LTS 与 Blender MCP v1.2，并启用 FBX、glTF 2.0、UV Layout、SVG、BVH、Cycles 和 Pose Library；MCP 与这些扩展只服务于制作流程，不作为 Unity 运行时依赖。
 - 外城模型尺寸读取 Task 13 最终 `BuildingDefinition`；内城平台固定 `8×6`、每格 `0.32`、完整表面 `2.56×1.92`。
 - 模型导入比例 `1.0`，`Y` 向上，`+Z` 为正面，静态建筑根位于占地中心且底面为 `Y=0`。
 - 五座样板建筑必须支持 `0°/90°/180°/270°`，第一版以一个主要 Renderer 为目标。
+- 所有建模类资产必须先生成一张可执行参考图或参考板并取得用户明确批准，之后才能开始 Blender 白模或正式建模；参考图需登记来源、生成方法、许可证与批准日期。
 - BaseColor 为 sRGB；Normal、Mask 和其他数据贴图为 Linear；URP Mask Map 为 R Metallic、G Occlusion、B Detail Mask、A Smoothness。
+- 第一版地形固定为七类：`Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff`；不得自行合并、改名或把资源节点类别混入地形类别。
+- `Crystal` 是能晶化地表材质，`ResourceNodes/EnergyCrystal` 是可采集能晶节点，两者必须是独立资产；地表只表达视觉材质，不得持有资源节点、产量、储量、可采集状态或任何玩法真值。
+- 地形采用风格化 PBR，以暖黄干旱废土为母底色，贴图为主、少量模型装饰为辅；`Wasteland`、`Rocky`、`Wetland`、`Crystal` 使用柔和混合，`Ruins` 以柔化碎边自然衔接但不模糊规则范围，`DeepWater` 和 `Cliff` 必须维持清晰可读的玩法边界。
+- 每类正式地形的基础交付为 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask 和 16-bit Height；不得只完成 BaseColor 后把其余数据贴图登记为完成。
 - 资源不得持有成本、施工、生命、攻击、占地、解锁、城市状态或存档真值。
 - 所有 `.png`、`.fbx`、`.blend`、`.wav` 使用仓库现有 Git LFS 规则，不修改 `.gitattributes`。
 - 所有外部资源必须记录作者、来源、许可证、商业使用权和证据路径；许可证不明确的资源不得进入交接包。
@@ -402,6 +408,8 @@ git commit -m "art: complete mining station golden sample"
 - [ ] 完成不超过两套 4096 的城市纹理集，并记录实际显存。
 - [ ] 创建 `PF_City_Mobile.prefab` 和 `PF_City_InnerPlatform.prefab`，不加入玩法脚本或玩法 Collider。
 - [ ] 运行验证器和默认相机临时场景人工检查，确认移动/展开轮廓、平台格线和领袖比例。
+- [x] 2026-08-09 已由用户批准移动形态、同城堡垒形态和 `8×6` 内城平台三张白底单物体概念参考；本项只代表造型参考完成，LOD、动画、FBX、Prefab 与 Unity 接入仍未开始。
+- [x] 2026-08-09 已由用户批准 `Mobile → Deploy 33% → Deploy 66% → Fortress` 四帧白底机械顺序参考；`Pack` 使用反向顺序作视觉参考。正式动画层级、Pivot、接触事件、动画曲线、FBX 与 Animator 仍未开始。
 - [ ] 更新登记与许可证并提交：`git commit -m "art: complete mobile city sample"`。
 
 ---
@@ -439,6 +447,7 @@ git commit -m "art: complete mining station golden sample"
 - Produces: 完整五建筑正式样板和第二种资源节点。
 
 - [ ] 每座先完成三视概念并用默认俯视缩略图复核轮廓。
+- [x] 2026-08-09 已由用户批准 `MiningStation`、`Housing`、`Warehouse`、`Wall`、`MachineGunTurret` 五张默认俯视白底单物体造型参考；正式三视图、模型、LOD、FBX、Prefab 与 Unity 接入仍未开始。批准的采矿站参考不包含资源节点。
 - [ ] Housing/Warehouse 按普通建筑预算完成 LOD；Wall 允许更低预算；MachineGunTurret 按 8k–15k/3k–7k/0.8k–2.5k 完成 LOD。
 - [ ] 机枪塔视觉炮头可以有动画层级，但不得包含瞄准、攻击或伤害脚本。
 - [ ] 城墙四方向旋转后必须无空隙且不得越过 1×1 底座。
@@ -448,7 +457,7 @@ git commit -m "art: complete mining station golden sample"
 
 ---
 
-## Task 9: 完成六种地形与十二种环境装饰
+## Task 9: 完成七种地形与十二种环境装饰
 
 **Files:**
 - Create: `ArtSource/FirstPass/Environment/Terrain/*`
@@ -457,12 +466,22 @@ git commit -m "art: complete mining station golden sample"
 - Create: `Assets/_Game/Art/FirstPass/Environment/Props/*`
 
 **Interfaces:**
-- Consumes: 色板、URP Mask 合同和现有六类地形语义。
+- Consumes: 色板、URP Mask 合同和现有七类地形语义。
 - Produces: 无缝地形材质与无玩法碰撞的装饰包。
 
-- [ ] 为普通、废墟、湿地、岩石、深水、悬崖制作 2048 BaseColor/Normal/Mask 和预览图。
-- [ ] 使用 4×4 平铺预览检查接缝；Normal 和 Mask 导入为 Linear。
-- [ ] 制作小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰。
+- [x] 按 `Wasteland`、`Rocky`、`Wetland`、`Crystal`、`Ruins`、`DeepWater`、`Cliff` 七类逐一制作 2048×2048 无缝 BaseColor、Tangent Space Normal、URP Mask、16-bit Height、分层源文件和固定预览图；先以独立子计划完成 `Wasteland` 黄金样板，未批准前不得批量制作其余六类。
+  - [x] `Wasteland`：黄金样板已完成并由用户验收通过。
+  - [x] `Rocky`：正式贴图、分层源和固定预览已完成，并由用户验收通过。
+  - [x] `Wetland`：首版正式预览被否决；重制后的正式贴图、分层源和固定预览已完成，并由用户验收通过。
+  - [x] `Crystal`：概念、正式贴图、分层源和固定预览均已完成，并由用户验收通过。
+  - [x] `Ruins`：正式地表贴图、分层源和固定预览已完成并由用户验收通过；八件低模模块按批准参考板完成重制，使用 `3–7` 个多材质分区，并通过默认倾斜正交、普通荒地组合、顶视和线框 QA。用户于 2026-08-09 明确批准当前模型；尚未接入 Unity。
+  - [x] `DeepWater`：批准概念、2048×2048 BaseColor/Normal/URP Mask/16-bit Height、五层 OpenRaster 源、Blender 检查源和三张固定 QA 已完成；首轮正式结果因不像水被否决，连续水体重制版于 2026-08-09 由用户验收通过；尚未接入 Unity，也未制作正式水面模型。
+  - [x] `Cliff`：批准参考板、2048×2048 BaseColor/Normal/URP Mask/16-bit Height、六层 OpenRaster 源、Blender 材质源、六件多材质模块、六个 FBX 和八张固定 QA 已完成；用户于 2026-08-09 验收通过。FBX 回读验证通过；尚未接入 Unity、Prefab、Collider 或玩法系统。
+- [x] 使用 4×4 平铺图检查接缝与重复，并以默认倾斜正交视角和 PBR 球体或平面检查材质；BaseColor 使用 sRGB，Normal、Mask、Height 使用 Linear。
+- [x] `Crystal` 地表只表现能晶污染或矿化痕迹，不生成可采集节点；可采集资产仍只属于 `Environment/ResourceNodes/EnergyCrystal`，任何地形文件不得保存资源或玩法真值。
+- [x] `Wasteland`、`Rocky`、`Wetland`、`Crystal` 之间的色相、粗糙度和高度变化应支持柔和混合；`Ruins` 使用积尘、碎屑等柔化边缘但保持规则范围，`DeepWater` 和 `Cliff` 的轮廓、明度与材质响应保持清晰玩法边界。
+- [x] 完成小石、大石、废钢板、管道、轮胎、路障、金属箱、路灯、混凝土碎块、机械残骸、干枯植物、能晶碎片十二种装饰的白底单物件参考图；十二张 `512×512` 独立 PNG 与总览板已于 2026-08-09 由用户批准。
+- [ ] 十二种装饰的模型、FBX、Prefab 与 Unity 接入暂不制作：用户已明确取消由当前开发者继续建模；批准参考图只作为未来美术人员接手依据，不代表本项 3D 交付完成。
 - [ ] 每种装饰 200–2,000 三角面，至少两种缩放或旋转变体，共享材质图集并允许 GPU Instancing。
 - [ ] Prefab 不包含玩法 Collider、Rigidbody 或 WasteCity MonoBehaviour。
 - [ ] 运行验证器与临时 32×24 展示场景人工检查，不修改正式场景。
@@ -484,11 +503,12 @@ git commit -m "art: complete mining station golden sample"
 - Consumes: 28 个 BuildMenu 稳定 ID、色板和固定图标相机规范。
 - Produces: 完整目录视觉和后续 UGUI 映射所需 Sprite 源。
 
-- [ ] 建立固定图标渲染场景规范：相机角度、正交尺寸、灯光、阴影、透明背景和占屏边距固定。
-- [ ] 为 28 个普通目录稳定 ID各输出 `1024×1024` 原图和 `256×256` Unity PNG；五正式模型用固定场景渲染，其余 23 项使用批准概念渲染。
-- [ ] 明确排除 `core.building.heavy-machine-gun-turret` 和 `cultivation.building.sword-riding-platform`。
-- [ ] 制作基础/生产/物流/防御/路线五分类图标，科技/修仙/生物/灵能四路线图标。
-- [ ] 制作放置、旋转、取消、删除、施工、暂停、完成、遗弃、完整拆除、快速拆除、内城、外城十二操作图标。
+- [x] 为概念参考固定三分之四俯视正交相机、暖色棚拍光、纯白背景、单主体和统一占屏边距；4 张路线源板与 28 张独立图已通过用户验收。
+- [x] 为 28 个普通目录稳定 ID 各输出一张已批准 `512×512` 白底概念参考，并生成按 `BuildingCatalog.BuildMenu` 顺序排列的 7×4 QA 板。
+- [ ] 正式 `1024×1024` 透明原图、`256×256` Unity PNG、Sprite 导入和运行时映射不在本轮白底参考范围内，尚未完成。
+- [x] 明确排除 `core.building.heavy-machine-gun-turret` 和 `cultivation.building.sword-riding-platform`。
+- [x] 完成基础/生产/物流/防御/路线五分类与科技/修仙/生物/灵能四路线的 9 张 `512×512` 白底单徽章参考图；用户于 2026-08-09 批准。正式透明 Sprite 与 Unity 映射仍未开始。
+- [x] 完成放置、旋转、取消、删除、施工、暂停、完成、遗弃、完整拆除、快速拆除、内城、外城十二张 `512×512` 白底单徽章参考图；用户于 2026-08-09 批准。透明 Sprite、UGUI 行为与 Unity 映射仍未开始。
 - [ ] 制作十格快捷栏、完整目录、分类/路线标签、搜索、建筑卡、详情、成本、锁定原因、施工进度、取消确认、撤离清单、错误提示和按钮五态九宫格切图。
 - [ ] 用脚本或清单验证 28 个稳定 ID 无缺失、无重复、两个升级目标不存在；人工检查 256 像素与默认游戏缩放下仍可读。
 - [ ] 更新登记与许可证并提交：`git commit -m "art: complete first building UI package"`。
@@ -555,7 +575,7 @@ Assets/_Game/ArtIntegration/VisualLibrary.asset
 
 - [ ] **Step 4: 归档离线验收图**
 
-`AcceptanceShots.md` 链接移动/展开城市、平台比例、领袖、五建筑四方向、两节点、六地形、十二装饰、28 图标总览、UI组件、施工、遗迹和八 VFX 的固定预览；不得把未接线预览描述成游戏运行截图。
+`AcceptanceShots.md` 链接移动/展开城市、平台比例、领袖、五建筑四方向、两节点、七地形、十二装饰、28 图标总览、UI组件、施工、遗迹和八 VFX 的固定预览；不得把未接线预览描述成游戏运行截图。
 
 - [ ] **Step 5: 最终登记状态**
 
