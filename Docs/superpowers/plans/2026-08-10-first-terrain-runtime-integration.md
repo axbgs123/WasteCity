@@ -1573,6 +1573,59 @@ probe median is ≤250 ms. If the same semantic-preserving workspace correction
 does not meet the threshold, stop and revise the plan again before touching any
 additional production path.
 
+- [ ] **Step 4B: Collapse repeated same-layer weight calculations after the workspace-only correction remains above 250 ms**
+
+This second correction is authorized by the recorded post-workspace result:
+
+```text
+literal ControlA+ControlB SHA-256 remained
+de9d52dcb0e37180b47bc3f55a79c1e47151699cd53ef2743a3c5d2314f90d47;
+Profiler allocation samples fell from 294,944 to 35;
+all control-map tests passed 20/20 and performance tests passed 6/6;
+the five-run 96×64 median remained 399.7145 ms.
+```
+
+The remaining hot loop evaluates `DistanceToCellRectangle`, `EdgeNoise`,
+`BlendWidth`, and `SmoothStep` separately for every candidate cell even when
+many candidates share one layer. For a fixed output pixel and candidate layer,
+`EdgeNoise(sampleX, sampleY, layer)` and
+`BlendWidth(ownerLayer, candidateLayer)` are constant. The candidate weight is
+monotonically non-increasing with nonnegative distance, so the maximum weight
+for that layer is exactly the weight of its nearest candidate cell.
+
+Before the production edit, add a focused frozen-reference test with multiple
+same-layer candidates at different distances and at equal distance around one
+owner cell. Record the original generator's exact ControlA/ControlB bytes as
+literal expected data, not by reimplementing the algorithm in the test. Keep
+the existing full 96×64 frozen SHA-256 test. Temporarily introduce a deliberate
+wrong nearest-candidate choice in the uncommitted implementation and prove that
+at least the focused literal bytes or the full digest fails; then restore it.
+
+Change only `FirstArtTerrainControlMapGenerator3D.cs` and its existing test:
+
+```text
+allocate per-Generate nearest-distance and nearest-cell workspaces for all seven layers;
+for each output pixel, clear those workspaces and scan the exact same bounded candidate rectangle;
+retain the nearest candidate cell independently for each non-owner layer;
+compare candidates using nonnegative squared rectangle distance, but call the existing
+DistanceToCellRectangle on the retained real candidate coordinates for the final weight;
+compute the existing EdgeNoise, ordered Profile.BlendWidth and SmoothStep exactly once
+for each retained layer, then feed the unchanged highest-three/quantization/encoding path.
+```
+
+Do not shrink `candidateRadius`, skip candidate cells, approximate distance or
+noise, reorder layer priority, parallelize, add static mutable caches, cache
+between calls, change Profile/Shader/assets, lower the threshold, or reduce map
+or control dimensions. Exact candidate bounds, border behavior, ordered layer
+iteration, fallback logs and public API remain frozen.
+
+Run the new literal test, complete `FirstArtTerrainControlMapTests`, complete
+`FirstArtTerrainPerformanceTests`, and the same five-run 96×64 probe. Require
+the full frozen digest and all existing transition bytes to remain identical,
+all tests to pass, and the median to be ≤250 ms. If this nearest-per-layer
+equivalent correction still misses the threshold, stop again; do not touch a
+third production path or relax the target without a new controlled decision.
+
 - [ ] **Step 5: Run fresh full regression and headless compile**
 
 ```bash
