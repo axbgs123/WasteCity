@@ -3,6 +3,7 @@
   "references": [
     "WasteCity.Game",
     "WasteCity.ArtIntegration3D",
+    "WasteCity.Editor",
     "WasteCity.Graybox3D",
     "WasteCity.Graybox3D.Building",
     "Unity.InputSystem",

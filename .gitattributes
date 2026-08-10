@@ -2,6 +2,11 @@
 *.unity merge=unityyamlmerge eol=lf
 *.prefab merge=unityyamlmerge eol=lf
 *.asset merge=unityyamlmerge eol=lf
+Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset filter=lfs diff=lfs merge=lfs -text
+Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset filter=lfs diff=lfs merge=lfs -text
+Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset filter=lfs diff=lfs merge=lfs -text
+Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset filter=lfs diff=lfs merge=lfs -text
+Docs/Art/FirstPass/Terrain/RuntimeIntegration/11-deep-water-motion.mp4 filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.fbx filter=lfs diff=lfs merge=lfs -text
 *.blend filter=lfs diff=lfs merge=lfs -text
