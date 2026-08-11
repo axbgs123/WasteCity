@@ -1926,7 +1926,7 @@ namespace WasteCity.Tests
             Assert.That(housing, Does.Contain("位置 两者皆可"));
             Assert.That(housing, Does.Contain("运行 移动可运行"));
             Assert.That(research, Does.Contain("位置 两者皆可"));
-            Assert.That(research, Does.Contain("运行 仅展开运行"));
+            Assert.That(research, Does.Contain("运行 移动可运行"));
         }
 
         [Test]

@@ -257,13 +257,11 @@ namespace WasteCity.Tests
         {
             FirstArtTerrainControlMap3D maps = Presenter().ControlMaps;
             WorldMapModel sceneModel = World().Model;
-            var seed8128Model = new WorldMapModel(
-                32,
-                24,
-                new WorldSeed(8128));
+            WorldMapModel seed8128Model =
+                GrayboxWorldLayout3D.CreateDefault();
 
-            Assert.That(sceneModel.Width, Is.EqualTo(32));
-            Assert.That(sceneModel.Height, Is.EqualTo(24));
+            Assert.That(sceneModel.Width, Is.EqualTo(64));
+            Assert.That(sceneModel.Height, Is.EqualTo(48));
             Assert.That(
                 maps.Width,
                 Is.EqualTo(seed8128Model.Width * ControlPixelsPerCell));
@@ -271,6 +269,7 @@ namespace WasteCity.Tests
                 maps.Height,
                 Is.EqualTo(seed8128Model.Height * ControlPixelsPerCell));
             int checkedCells = 0;
+            int sparseOuterCells = 0;
             for (int cellY = 0; cellY < seed8128Model.Height; cellY++)
             for (int cellX = 0; cellX < seed8128Model.Width; cellX++)
             {
@@ -292,6 +291,23 @@ namespace WasteCity.Tests
                     sceneCell.ResourceAmount,
                     Is.EqualTo(expectedCell.ResourceAmount),
                     $"Seed 8128 amount mismatch at {cellX},{cellY}.");
+                bool isOuter =
+                    cellX < GrayboxWorldLayout3D.LegacyOffsetX ||
+                    cellX >= GrayboxWorldLayout3D.LegacyOffsetX +
+                        GrayboxWorldLayout3D.LegacyWidth ||
+                    cellY < GrayboxWorldLayout3D.LegacyOffsetY ||
+                    cellY >= GrayboxWorldLayout3D.LegacyOffsetY +
+                        GrayboxWorldLayout3D.LegacyHeight;
+                if (isOuter)
+                {
+                    Assert.That(sceneCell.Terrain,
+                        Is.EqualTo(TerrainKind.Wasteland));
+                    Assert.That(sceneCell.Traversal,
+                        Is.EqualTo(WorldTraversalKind.Open));
+                    Assert.That(sceneCell.ResourceId, Is.Null);
+                    Assert.That(sceneCell.ResourceAmount, Is.Zero);
+                    sparseOuterCells++;
+                }
 
                 var totals = new int[FirstArtTerrainCatalog3D.LayerCount];
                 for (int pixelY = 0;
@@ -340,7 +356,8 @@ namespace WasteCity.Tests
                 checkedCells++;
             }
 
-            Assert.That(checkedCells, Is.EqualTo(32 * 24));
+            Assert.That(checkedCells, Is.EqualTo(64 * 48));
+            Assert.That(sparseOuterCells, Is.EqualTo(2304));
             Assert.That(
                 sceneModel.ResourceNodeCount,
                 Is.EqualTo(seed8128Model.ResourceNodeCount));
