@@ -31,6 +31,16 @@ namespace WasteCity.ArtIntegration3D
             int height = checked(model.Height * PixelsPerCell);
             var controlA = new byte[checked(width * height * 4)];
             var controlB = new byte[checked(width * height * 4)];
+            var weights = new float[FirstArtTerrainCatalog3D.LayerCount];
+            var keptLayers = new int[MaximumEncodedLayers];
+            var encodedWeights =
+                new int[FirstArtTerrainCatalog3D.LayerCount];
+            var nearestSquaredDistances =
+                new float[FirstArtTerrainCatalog3D.LayerCount];
+            var nearestCellX =
+                new int[FirstArtTerrainCatalog3D.LayerCount];
+            var nearestCellY =
+                new int[FirstArtTerrainCatalog3D.LayerCount];
             int candidateRadius = Mathf.CeilToInt(MaximumBlendWidth(profile)) + 1;
 
             for (int y = 0; y < height; y++)
@@ -42,7 +52,7 @@ namespace WasteCity.ArtIntegration3D
                     float sampleX = (x + 0.5f) / PixelsPerCell - 0.5f;
                     int ownerX = Mathf.Clamp(Mathf.FloorToInt(sampleX + 0.5f), 0, model.Width - 1);
                     int ownerLayer = layers[ownerX, ownerY];
-                    int[] encodedWeights = GenerateEncodedWeights(
+                    GenerateEncodedWeights(
                         model,
                         profile,
                         layers,
@@ -51,7 +61,13 @@ namespace WasteCity.ArtIntegration3D
                         ownerX,
                         ownerY,
                         ownerLayer,
-                        candidateRadius);
+                        candidateRadius,
+                        weights,
+                        keptLayers,
+                        encodedWeights,
+                        nearestSquaredDistances,
+                        nearestCellX,
+                        nearestCellY);
                     Encode(encodedWeights, controlA, controlB, (y * width + x) * 4);
                 }
             }
@@ -68,7 +84,7 @@ namespace WasteCity.ArtIntegration3D
             return layers;
         }
 
-        private static int[] GenerateEncodedWeights(
+        private static void GenerateEncodedWeights(
             WorldMapModel model,
             FirstArtTerrainProfile3D profile,
             int[,] layers,
@@ -77,9 +93,26 @@ namespace WasteCity.ArtIntegration3D
             int ownerX,
             int ownerY,
             int ownerLayer,
-            int candidateRadius)
+            int candidateRadius,
+            float[] weights,
+            int[] keptLayers,
+            int[] encodedWeights,
+            float[] nearestSquaredDistances,
+            int[] nearestCellX,
+            int[] nearestCellY)
         {
-            var weights = new float[FirstArtTerrainCatalog3D.LayerCount];
+            Array.Clear(weights, 0, weights.Length);
+            for (int index = 0; index < keptLayers.Length; index++)
+                keptLayers[index] = -1;
+            Array.Clear(encodedWeights, 0, encodedWeights.Length);
+            for (int layer = 0;
+                 layer < FirstArtTerrainCatalog3D.LayerCount;
+                 layer++)
+            {
+                nearestSquaredDistances[layer] = float.PositiveInfinity;
+                nearestCellX[layer] = -1;
+                nearestCellY[layer] = -1;
+            }
             weights[ownerLayer] = 1f;
             int minX = Mathf.Max(0, ownerX - candidateRadius);
             int maxX = Mathf.Min(model.Width - 1, ownerX + candidateRadius);
@@ -92,28 +125,57 @@ namespace WasteCity.ArtIntegration3D
                 if (candidateLayer == ownerLayer)
                     continue;
 
+                float squaredDistance =
+                    SquaredDistanceToCellRectangle(
+                        sampleX,
+                        sampleY,
+                        candidateX,
+                        candidateY);
+                if (squaredDistance <
+                    nearestSquaredDistances[candidateLayer])
+                {
+                    nearestSquaredDistances[candidateLayer] =
+                        squaredDistance;
+                    nearestCellX[candidateLayer] = candidateX;
+                    nearestCellY[candidateLayer] = candidateY;
+                }
+            }
+
+            for (int candidateLayer = 0;
+                 candidateLayer < FirstArtTerrainCatalog3D.LayerCount;
+                 candidateLayer++)
+            {
+                if (candidateLayer == ownerLayer ||
+                    nearestCellX[candidateLayer] < 0)
+                    continue;
+
                 float blendWidth = profile.BlendWidth(
                     (FirstArtTerrainLayer3D)ownerLayer,
                     (FirstArtTerrainLayer3D)candidateLayer);
-                float distance = DistanceToCellRectangle(sampleX, sampleY, candidateX, candidateY);
+                float distance = DistanceToCellRectangle(
+                    sampleX,
+                    sampleY,
+                    nearestCellX[candidateLayer],
+                    nearestCellY[candidateLayer]);
                 float candidateWeight = 1f - SmoothStep(
                     0f,
                     blendWidth,
-                    distance + EdgeNoise(sampleX, sampleY, candidateLayer));
+                    distance + EdgeNoise(
+                        sampleX,
+                        sampleY,
+                        candidateLayer));
                 if (candidateWeight > weights[candidateLayer])
                     weights[candidateLayer] = candidateWeight;
             }
 
-            int[] keptLayers = KeepHighestPositiveLayers(weights);
-            return Quantize(weights, keptLayers);
+            KeepHighestPositiveLayers(weights, keptLayers);
+            Quantize(weights, keptLayers, encodedWeights);
         }
 
-        private static int[] KeepHighestPositiveLayers(float[] weights)
+        private static void KeepHighestPositiveLayers(
+            float[] weights,
+            int[] keptLayers)
         {
-            var keptLayers = new int[MaximumEncodedLayers];
-            for (int keptIndex = 0; keptIndex < keptLayers.Length; keptIndex++)
-                keptLayers[keptIndex] = -1;
-
             for (int layer = 0; layer < weights.Length; layer++)
             {
                 if (weights[layer] <= 0f)
@@ -132,7 +194,6 @@ namespace WasteCity.ArtIntegration3D
                 }
             }
 
-            return keptLayers;
         }
 
         private static bool IsHigherPriority(float[] weights, int leftLayer, int rightLayer)
@@ -141,9 +202,11 @@ namespace WasteCity.ArtIntegration3D
                    (weights[leftLayer] == weights[rightLayer] && leftLayer < rightLayer);
         }
 
-        private static int[] Quantize(float[] weights, int[] keptLayers)
+        private static void Quantize(
+            float[] weights,
+            int[] keptLayers,
+            int[] encoded)
         {
-            var encoded = new int[FirstArtTerrainCatalog3D.LayerCount];
             float sum = 0f;
             for (int index = 0; index < keptLayers.Length; index++)
             {
@@ -156,7 +219,7 @@ namespace WasteCity.ArtIntegration3D
             {
                 Debug.LogError("Terrain control-map quantization had no positive weights; falling back to Wasteland.");
                 encoded[(int)FirstArtTerrainLayer3D.Wasteland] = 255;
-                return encoded;
+                return;
             }
 
             int encodedSum = 0;
@@ -175,11 +238,10 @@ namespace WasteCity.ArtIntegration3D
                 Debug.LogError("Terrain control-map quantization produced a zero byte sum; falling back to Wasteland.");
                 Array.Clear(encoded, 0, encoded.Length);
                 encoded[(int)FirstArtTerrainLayer3D.Wasteland] = 255;
-                return encoded;
+                return;
             }
 
             encoded[keptLayers[0]] += 255 - encodedSum;
-            return encoded;
         }
 
         private static void Encode(int[] encodedWeights, byte[] controlA, byte[] controlB, int offset)
@@ -211,13 +273,23 @@ namespace WasteCity.ArtIntegration3D
 
         private static float DistanceToCellRectangle(float x, float y, int cellX, int cellY)
         {
+            return Mathf.Sqrt(
+                SquaredDistanceToCellRectangle(x, y, cellX, cellY));
+        }
+
+        private static float SquaredDistanceToCellRectangle(
+            float x,
+            float y,
+            int cellX,
+            int cellY)
+        {
             float minX = cellX - 0.5f;
             float maxX = cellX + 0.5f;
             float minY = cellY - 0.5f;
             float maxY = cellY + 0.5f;
             float deltaX = x < minX ? minX - x : x > maxX ? x - maxX : 0f;
             float deltaY = y < minY ? minY - y : y > maxY ? y - maxY : 0f;
-            return Mathf.Sqrt(deltaX * deltaX + deltaY * deltaY);
+            return deltaX * deltaX + deltaY * deltaY;
         }
 
         private static uint Hash(int x, int y, int layer)

@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using NUnit.Framework;
+using Unity.Profiling;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
 using WasteCity.World;
@@ -213,6 +215,125 @@ namespace WasteCity.Tests
                 Is.EqualTo(textureCountBefore));
         }
 
+        [Test]
+        public void ExpandedSeed8128_PreservesFrozenBytesWithinAllocationBudget()
+        {
+            const string expectedDigest =
+                "de9d52dcb0e37180b47bc3f55a79c1e47151699cd53ef2743a3c5d2314f90d47";
+            var map = new WorldMapModel(96, 64, new WorldSeed(8128));
+            using (FirstArtTerrainControlMap3D first =
+                   FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
+            using (FirstArtTerrainControlMap3D second =
+                   FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
+            {
+                Assert.That(
+                    CombinedDigest(
+                        first.ControlABytes,
+                        first.ControlBBytes),
+                    Is.EqualTo(expectedDigest));
+                Assert.That(
+                    CombinedDigest(
+                        second.ControlABytes,
+                        second.ControlBBytes),
+                    Is.EqualTo(expectedDigest));
+                CollectionAssert.AreEqual(
+                    first.ControlABytes,
+                    second.ControlABytes);
+                CollectionAssert.AreEqual(
+                    first.ControlBBytes,
+                    second.ControlBBytes);
+            }
+
+            GenerationMeasurement expanded = MeasureGeneration(map);
+            TestContext.WriteLine(
+                "FirstTerrainControl96x64ThreadBytes=" +
+                expanded.CurrentThreadBytes);
+            TestContext.WriteLine(
+                "FirstTerrainControl96x64ProfileSamples=" +
+                expanded.ProfileSamples);
+            TestContext.WriteLine(
+                "FirstTerrainControl96x64ProfileBytes=" +
+                expanded.ProfileBytes);
+            TestContext.WriteLine(
+                "FirstTerrainControl96x64Digest=" + expanded.Digest);
+            Assert.That(expanded.Digest, Is.EqualTo(expectedDigest));
+            Assert.That(
+                expanded.CurrentThreadBytes,
+                Is.LessThanOrEqualTo(1200000));
+            Assert.That(
+                expanded.ProfileSamples,
+                Is.LessThanOrEqualTo(64));
+            Assert.That(
+                expanded.ProfileBytes,
+                Is.LessThanOrEqualTo(1200000));
+        }
+
+        [Test]
+        public void AllocationProfilerPositiveControlCapturesManagedObjects()
+        {
+            var retained = new object[64];
+            ProfilerRecorder recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                256,
+                ProfilerRecorderOptions.StartImmediately |
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            int checksum = AllocateAndRetain(retained);
+            GC.KeepAlive(retained);
+            recorder.Stop();
+            int samples = recorder.Count;
+            long bytes = 0;
+            for (int index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample = recorder.GetSample(index);
+                bytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+
+            TestContext.WriteLine(
+                "FirstTerrainControlPositiveSamples=" + samples);
+            TestContext.WriteLine(
+                "FirstTerrainControlPositiveBytes=" + bytes);
+            Assert.That(checksum, Is.EqualTo(69632));
+            Assert.That(samples, Is.GreaterThan(0));
+            Assert.That(bytes, Is.GreaterThan(0));
+        }
+
+        [Test]
+        public void SameLayerCandidates_PreserveFrozenControlBytes()
+        {
+            const string expectedControlA =
+                "827D0000906F0000906F0000827D0000" +
+                "827D0000906F0000916E0000827D0000" +
+                "827D0000916E0000916E0000827D0000" +
+                "827D0000916E0000916E0000827D0000";
+            const string expectedControlB =
+                "00000000000000000000000000000000" +
+                "00000000000000000000000000000000" +
+                "00000000000000000000000000000000" +
+                "00000000000000000000000000000000";
+            WorldMapModel map = CreateSameLayerCandidateMap();
+            using (FirstArtTerrainControlMap3D result =
+                   FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
+            {
+                Assert.That(
+                    CellBytesHex(
+                        result.ControlABytes,
+                        result.Width,
+                        2,
+                        2),
+                    Is.EqualTo(expectedControlA));
+                Assert.That(
+                    CellBytesHex(
+                        result.ControlBBytes,
+                        result.Width,
+                        2,
+                        2),
+                    Is.EqualTo(expectedControlB));
+            }
+        }
+
         private FirstArtTerrainControlMap3D GenerateThreeWayJunction()
         {
             return FirstArtTerrainControlMapGenerator3D.Generate(
@@ -241,6 +362,19 @@ namespace WasteCity.Tests
                 new WorldCell(TerrainKind.Crystal, null, 0, WorldTraversalKind.Ruins),
                 new WorldCell(TerrainKind.Rocky, null, 0, WorldTraversalKind.DeepWater),
                 new WorldCell(TerrainKind.Wetland, null, 0, WorldTraversalKind.Cliff));
+        }
+
+        private static WorldMapModel CreateSameLayerCandidateMap()
+        {
+            var cells = new WorldCell[5, 5];
+            for (int y = 0; y < 5; y++)
+            for (int x = 0; x < 5; x++)
+                cells[x, y] = new WorldCell(TerrainKind.Wasteland, null, 0);
+
+            cells[1, 2] = new WorldCell(TerrainKind.Rocky, null, 0);
+            cells[3, 2] = new WorldCell(TerrainKind.Rocky, null, 0);
+            cells[2, 4] = new WorldCell(TerrainKind.Rocky, null, 0);
+            return new WorldMapModel(cells);
         }
 
         private static WorldMapModel MapOf(params WorldCell[] cells)
@@ -294,6 +428,138 @@ namespace WasteCity.Tests
                     texture != null &&
                     (texture.name == "FirstArtTerrainControlA" ||
                      texture.name == "FirstArtTerrainControlB"));
+        }
+
+        private GenerationMeasurement MeasureGeneration(WorldMapModel map)
+        {
+            using (FirstArtTerrainControlMap3D warmup =
+                   FirstArtTerrainControlMapGenerator3D.Generate(map, profile))
+            {
+                Assert.That(warmup.Width, Is.EqualTo(map.Width * 4));
+            }
+
+            ProfilerRecorder recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                400000,
+                ProfilerRecorderOptions.StartImmediately |
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            FirstArtTerrainControlMap3D result = null;
+            long currentThreadBytes;
+            try
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                result = FirstArtTerrainControlMapGenerator3D.Generate(
+                    map,
+                    profile);
+                currentThreadBytes =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+                recorder.Stop();
+                int samples = recorder.Count;
+                long profiledBytes = 0;
+                for (int index = 0; index < recorder.Count; index++)
+                {
+                    ProfilerRecorderSample sample =
+                        recorder.GetSample(index);
+                    profiledBytes += sample.Value * sample.Count;
+                }
+                return new GenerationMeasurement(
+                    currentThreadBytes,
+                    samples,
+                    profiledBytes,
+                    CombinedDigest(
+                        result.ControlABytes,
+                        result.ControlBBytes));
+            }
+            finally
+            {
+                recorder.Dispose();
+                result?.Dispose();
+            }
+        }
+
+        private static string CombinedDigest(byte[] controlA, byte[] controlB)
+        {
+            var combined = new byte[controlA.Length + controlB.Length];
+            Buffer.BlockCopy(
+                controlA,
+                0,
+                combined,
+                0,
+                controlA.Length);
+            Buffer.BlockCopy(
+                controlB,
+                0,
+                combined,
+                controlA.Length,
+                controlB.Length);
+            using (SHA256 sha = SHA256.Create())
+            {
+                return BitConverter.ToString(sha.ComputeHash(combined))
+                    .Replace("-", string.Empty)
+                    .ToLowerInvariant();
+            }
+        }
+
+        private static string CellBytesHex(
+            byte[] source,
+            int controlWidth,
+            int cellX,
+            int cellY)
+        {
+            var bytes = new byte[4 * 4 * 4];
+            int destination = 0;
+            for (int localY = 0; localY < 4; localY++)
+            for (int localX = 0; localX < 4; localX++)
+            {
+                int sourceOffset =
+                    (((cellY * 4 + localY) * controlWidth) +
+                     cellX * 4 + localX) * 4;
+                Buffer.BlockCopy(
+                    source,
+                    sourceOffset,
+                    bytes,
+                    destination,
+                    4);
+                destination += 4;
+            }
+            return BitConverter.ToString(bytes).Replace("-", string.Empty);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int AllocateAndRetain(object[] retained)
+        {
+            int checksum = 0;
+            for (int index = 0; index < retained.Length; index++)
+            {
+                var allocation = new byte[1024 + index];
+                allocation[0] = (byte)(index + 1);
+                retained[index] = allocation;
+                checksum += allocation.Length + allocation[0];
+            }
+            return checksum;
+        }
+
+        private readonly struct GenerationMeasurement
+        {
+            public GenerationMeasurement(
+                long currentThreadBytes,
+                int profileSamples,
+                long profileBytes,
+                string digest)
+            {
+                CurrentThreadBytes = currentThreadBytes;
+                ProfileSamples = profileSamples;
+                ProfileBytes = profileBytes;
+                Digest = digest;
+            }
+
+            public long CurrentThreadBytes { get; }
+            public int ProfileSamples { get; }
+            public long ProfileBytes { get; }
+            public string Digest { get; }
         }
 
     }

@@ -2,9 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
+using UnityEditor;
 using UnityEditor.Profiling;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.Profiling;
+using UnityEngine.Rendering;
+using UnityEngine.SceneManagement;
+using WasteCity.ArtIntegration3D;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -21,6 +27,10 @@ namespace WasteCity.Editor
             "WASTECITY_GRAYBOX_PERF_RESULT";
         private const string BuildingResultEnvironmentVariable =
             "WASTECITY_BUILDING_PERF_RESULT";
+        private const string FirstTerrainResultEnvironmentVariable =
+            "WASTECITY_FIRST_TERRAIN_PERF_RESULT";
+        private const string FirstTerrainRuntimeResultEnvironmentVariable =
+            "WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT";
         private const string GuiProfilerInputEnvironmentVariable =
             "WASTECITY_GUI_PROFILER_INPUT";
         private const string GuiProfilerResultEnvironmentVariable =
@@ -29,6 +39,10 @@ namespace WasteCity.Editor
         private const int BuildingInstanceCount = 128;
         private const int CompletedBuildingCount = 43;
         private const int ConstructionBuildingCount = 43;
+        private const int FirstTerrainWidth = 96;
+        private const int FirstTerrainHeight = 64;
+        private const int FirstTerrainSeed = 8128;
+        private const double FirstTerrainMaximumMedianMilliseconds = 250d;
 
         [Serializable]
         private sealed class Result
@@ -57,6 +71,63 @@ namespace WasteCity.Editor
             public int instanceRendererCount;
             public int infrastructureRendererCount;
             public int persistentBuildingObjectCount;
+        }
+
+        [Serializable]
+        private sealed class FirstTerrainResult
+        {
+            public int seed;
+            public int width;
+            public int height;
+            public double[] generationMilliseconds;
+            public double medianMilliseconds;
+            public int formalRendererCount;
+            public int formalPersistentObjectCount;
+            public int controlWidth;
+            public int controlHeight;
+            public long managedAllocationBytesAfterWarmup;
+        }
+
+        [Serializable]
+        private sealed class FirstTerrainRuntimeArrayResult
+        {
+            public string label;
+            public string assetPath;
+            public string assetGuid;
+            public int width;
+            public int height;
+            public int depth;
+            public int mipCount;
+            public string format;
+            public bool isReadable;
+            public long compressedPayloadBytes;
+            public long editorNativeMemoryBytes;
+        }
+
+        [Serializable]
+        private sealed class FirstTerrainRuntimeEvidenceResult
+        {
+            public string activeScene;
+            public string worktreePath;
+            public int gameViewTargetWidth;
+            public int gameViewTargetHeight;
+            public int formalRendererCount;
+            public string profileAssetPath;
+            public string profileGuid;
+            public string materialAssetPath;
+            public string materialGuid;
+            public string pipelineAssetPath;
+            public string pipelineGuid;
+            public FirstTerrainRuntimeArrayResult[] arrays;
+            public long compressedPayloadBytes;
+            public long editorNativeMemoryBytes;
+            public double editorNativeToPayloadRatio;
+            public long editorObservedDuplicateDifferenceBytes;
+            public bool editorNativeIsEditorObserved;
+            public bool editorNativeIsGpuMemory;
+            public bool presenterDeclaresUpdate;
+            public bool presenterDeclaresLateUpdate;
+            public bool windowsDevelopmentPlayerMemoryResolved;
         }
 
         [Serializable]
@@ -238,6 +309,257 @@ namespace WasteCity.Editor
                 resultPath);
         }
 
+        public static void MeasureFirstArtTerrainPerformance()
+        {
+            string resultPath = ResolveExternalPath(
+                FirstTerrainResultEnvironmentVariable,
+                true);
+            FirstArtTerrainProfile3D profile =
+                AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
+                    FirstArtTerrainAssetBuilder.ProfilePath);
+            if (profile == null)
+            {
+                throw new InvalidOperationException(
+                    "Approved first-art terrain profile is unavailable.");
+            }
+            if (!profile.TryValidate(out string profileError))
+            {
+                throw new InvalidOperationException(
+                    "Approved first-art terrain profile is invalid: " +
+                    profileError);
+            }
+
+            Shader fallbackShader = Shader.Find("Hidden/InternalErrorShader");
+            if (fallbackShader == null)
+            {
+                throw new InvalidOperationException(
+                    "Hidden/InternalErrorShader is unavailable.");
+            }
+
+            var root = new GameObject("FirstArtTerrainPerformanceProbe");
+            var fallbackMaterial = new Material(fallbackShader);
+            var presenterObject = new GameObject("FirstArtTerrainRenderer");
+            GrayboxWorldView3D world = null;
+            FirstArtTerrainRenderer3D presenter = null;
+            try
+            {
+                Transform terrain = NewChild(root.transform, "TerrainRoot");
+                Transform resources = NewChild(root.transform, "ResourceRoot");
+                Transform obstacles = NewChild(root.transform, "ObstacleRoot");
+                world = root.AddComponent<GrayboxWorldView3D>();
+                world.Configure(
+                    terrain,
+                    resources,
+                    obstacles,
+                    fallbackMaterial);
+                presenter = presenterObject.AddComponent<
+                    FirstArtTerrainRenderer3D>();
+                presenter.runInEditMode = true;
+                presenter.Configure(profile);
+                var model = new WorldMapModel(
+                    FirstTerrainWidth,
+                    FirstTerrainHeight,
+                    new WorldSeed(FirstTerrainSeed));
+                var samples = new double[RunCount];
+                int rendererCount = 0;
+                int persistentObjectCount = 0;
+                int controlWidth = 0;
+                int controlHeight = 0;
+
+                for (int run = 0; run < RunCount; run++)
+                {
+                    long before = Stopwatch.GetTimestamp();
+                    try
+                    {
+                        world.Generate(model);
+                        if (!presenter.TryPresent(world, false))
+                        {
+                            throw new InvalidOperationException(
+                                "First-art terrain presentation failed: " +
+                                presenter.LastPresentationError);
+                        }
+
+                        rendererCount = presenter
+                            .GetComponentsInChildren<MeshRenderer>(true)
+                            .Length;
+                        persistentObjectCount = presenter
+                            .GetComponentsInChildren<Transform>(true)
+                            .Length - 1;
+                        controlWidth = presenter.ControlMaps.Width;
+                        controlHeight = presenter.ControlMaps.Height;
+                    }
+                    finally
+                    {
+                        presenter.ClearPresentation();
+                    }
+                    long after = Stopwatch.GetTimestamp();
+                    samples[run] =
+                        (after - before) * 1000d / Stopwatch.Frequency;
+                }
+
+                long stableAllocation = MeasureStableTerrainAllocation(
+                    world,
+                    presenter,
+                    model);
+                var sorted = (double[])samples.Clone();
+                Array.Sort(sorted);
+                var result = new FirstTerrainResult
+                {
+                    seed = FirstTerrainSeed,
+                    width = FirstTerrainWidth,
+                    height = FirstTerrainHeight,
+                    generationMilliseconds = samples,
+                    medianMilliseconds = sorted[RunCount / 2],
+                    formalRendererCount = rendererCount,
+                    formalPersistentObjectCount = persistentObjectCount,
+                    controlWidth = controlWidth,
+                    controlHeight = controlHeight,
+                    managedAllocationBytesAfterWarmup = stableAllocation
+                };
+                File.WriteAllText(
+                    resultPath,
+                    JsonUtility.ToJson(result, true));
+                ValidateFirstTerrainResult(result);
+                Debug.Log(
+                    "First-art terrain performance result: " +
+                    resultPath);
+            }
+            finally
+            {
+                if (presenter != null)
+                    presenter.ReleasePresentationSource();
+                if (world != null)
+                    world.ClearGenerated();
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(fallbackMaterial);
+            }
+        }
+
+        [MenuItem("WasteCity/Performance/Record First Terrain Runtime Evidence")]
+        public static void RecordFirstArtTerrainRuntimeEvidence()
+        {
+            if (!EditorApplication.isPlaying)
+            {
+                throw new InvalidOperationException(
+                    "First terrain runtime evidence requires Play Mode.");
+            }
+
+            string resultPath = ResolveExternalPath(
+                FirstTerrainRuntimeResultEnvironmentVariable,
+                true);
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid() || !scene.isLoaded ||
+                !string.Equals(
+                    scene.path,
+                    "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "First terrain runtime evidence requires GrayboxPrototype3D.");
+            }
+
+            FirstArtTerrainRenderer3D[] presenters =
+                UnityEngine.Object.FindObjectsOfType<FirstArtTerrainRenderer3D>(true);
+            if (presenters.Length != 1 || !presenters[0].IsPresented)
+            {
+                throw new InvalidOperationException(
+                    "First terrain runtime evidence requires one live formal presenter.");
+            }
+
+            FirstArtTerrainRenderer3D presenter = presenters[0];
+            FirstArtTerrainProfile3D profile = presenter.Profile;
+            string profileError = null;
+            if (profile == null || !profile.TryValidate(out profileError))
+            {
+                throw new InvalidOperationException(
+                    "First terrain runtime profile is invalid: " + profileError);
+            }
+
+            Texture2DArray[] arrays =
+            {
+                profile.BaseColorArray,
+                profile.NormalArray,
+                profile.MaskArray,
+                profile.HeightArray,
+            };
+            string[] labels = { "BaseColor", "Normal", "Mask", "Height" };
+            var arrayResults = new FirstTerrainRuntimeArrayResult[arrays.Length];
+            long compressedPayload = 0L;
+            long editorNativeMemory = 0L;
+            for (int index = 0; index < arrays.Length; index++)
+            {
+                Texture2DArray array = arrays[index];
+                string arrayPath = AssetDatabase.GetAssetPath(array);
+                long payload =
+                    FirstArtTerrainEvidenceCapture.CalculateCompressedPayloadBytes(array);
+                long native = Profiler.GetRuntimeMemorySizeLong(array);
+                compressedPayload += payload;
+                editorNativeMemory += native;
+                arrayResults[index] = new FirstTerrainRuntimeArrayResult
+                {
+                    label = labels[index],
+                    assetPath = arrayPath,
+                    assetGuid = AssetDatabase.AssetPathToGUID(arrayPath),
+                    width = array.width,
+                    height = array.height,
+                    depth = array.depth,
+                    mipCount = array.mipmapCount,
+                    format = array.format.ToString(),
+                    isReadable = array.isReadable,
+                    compressedPayloadBytes = payload,
+                    editorNativeMemoryBytes = native,
+                };
+            }
+
+            string profilePath = AssetDatabase.GetAssetPath(profile);
+            string materialPath = AssetDatabase.GetAssetPath(profile.Material);
+            RenderPipelineAsset pipeline = GraphicsSettings.renderPipelineAsset;
+            string pipelinePath = AssetDatabase.GetAssetPath(pipeline);
+            const BindingFlags declaredInstance =
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.NonPublic |
+                BindingFlags.DeclaredOnly;
+            bool declaresUpdate =
+                typeof(FirstArtTerrainRenderer3D).GetMethod("Update", declaredInstance) != null;
+            bool declaresLateUpdate =
+                typeof(FirstArtTerrainRenderer3D).GetMethod("LateUpdate", declaredInstance) != null;
+            long duplicateDifference = Math.Abs(
+                editorNativeMemory - compressedPayload * 2L);
+            var result = new FirstTerrainRuntimeEvidenceResult
+            {
+                activeScene = scene.path,
+                worktreePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..")),
+                gameViewTargetWidth = 1920,
+                gameViewTargetHeight = 1080,
+                formalRendererCount = presenter
+                    .GetComponentsInChildren<MeshRenderer>(true).Length,
+                profileAssetPath = profilePath,
+                profileGuid = AssetDatabase.AssetPathToGUID(profilePath),
+                materialAssetPath = materialPath,
+                materialGuid = AssetDatabase.AssetPathToGUID(materialPath),
+                pipelineAssetPath = pipelinePath,
+                pipelineGuid = AssetDatabase.AssetPathToGUID(pipelinePath),
+                arrays = arrayResults,
+                compressedPayloadBytes = compressedPayload,
+                editorNativeMemoryBytes = editorNativeMemory,
+                editorNativeToPayloadRatio =
+                    compressedPayload == 0L
+                        ? 0d
+                        : editorNativeMemory / (double)compressedPayload,
+                editorObservedDuplicateDifferenceBytes = duplicateDifference,
+                editorNativeIsEditorObserved = true,
+                editorNativeIsGpuMemory = false,
+                presenterDeclaresUpdate = declaresUpdate,
+                presenterDeclaresLateUpdate = declaresLateUpdate,
+                windowsDevelopmentPlayerMemoryResolved = false,
+            };
+            ValidateFirstTerrainRuntimeEvidence(result);
+            File.WriteAllText(resultPath, JsonUtility.ToJson(result, true));
+            Debug.Log("First terrain runtime evidence result: " + resultPath);
+        }
+
         public static void SummarizeGuiProfilerCapture()
         {
             string inputPath = ResolveExternalPath(
@@ -279,7 +601,11 @@ namespace WasteCity.Editor
                     "WasteCity.Graybox3D.Building.dll!" +
                     "WasteCity.Graybox3D.Building::" +
                     "GrayboxEvacuationController3D.Update() [Invoke]",
-                    "GrayboxEvacuationController3D.Update() [Invoke]")
+                    "GrayboxEvacuationController3D.Update() [Invoke]"),
+                NewMarkerResult(
+                    "first-art-terrain-presenter",
+                    "FirstArtTerrainRenderer3D.Update() [Invoke]",
+                    "FirstArtTerrainRenderer3D.LateUpdate() [Invoke]")
             };
 
             double totalFrameMilliseconds = 0d;
@@ -648,6 +974,146 @@ namespace WasteCity.Editor
                     "Building probe placement failed: " +
                     evaluation.PrimaryFailure);
             return instance;
+        }
+
+        private static long MeasureStableTerrainAllocation(
+            GrayboxWorldView3D world,
+            FirstArtTerrainRenderer3D presenter,
+            WorldMapModel model)
+        {
+            try
+            {
+                world.Generate(model);
+                if (!presenter.TryPresent(world, false))
+                {
+                    throw new InvalidOperationException(
+                        "First-art terrain allocation setup failed: " +
+                        presenter.LastPresentationError);
+                }
+
+                int observable = ObserveFirstTerrain(presenter);
+                observable += ObserveFirstTerrain(presenter);
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int frame = 0; frame < 300; frame++)
+                    observable += ObserveFirstTerrain(presenter);
+                long allocation =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+                if (observable != 212306)
+                {
+                    throw new InvalidOperationException(
+                        "First-art terrain allocation observation was " +
+                        "not executed completely.");
+                }
+                return allocation;
+            }
+            finally
+            {
+                presenter.ClearPresentation();
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int ObserveFirstTerrain(
+            FirstArtTerrainRenderer3D presenter)
+        {
+            int value = presenter.IsPresented ? 1 : 0;
+            value += presenter.SurfaceRenderer != null ? 2 : 0;
+            value += presenter.SurfaceRenderer.enabled ? 4 : 0;
+            value += presenter.ControlMaps != null ? 8 : 0;
+            value += presenter.ControlMaps.Width;
+            value += presenter.ControlMaps.Height;
+            value += presenter.Profile != null ? 16 : 0;
+            value += string.IsNullOrEmpty(presenter.LastPresentationError)
+                ? 32
+                : 0;
+            return value;
+        }
+
+        private static void ValidateFirstTerrainResult(
+            FirstTerrainResult result)
+        {
+            if (result.generationMilliseconds == null ||
+                result.generationMilliseconds.Length != RunCount)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain probe must contain exactly five runs.");
+            }
+            if (result.medianMilliseconds >
+                FirstTerrainMaximumMedianMilliseconds)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain generation median exceeded 250 ms: " +
+                    result.medianMilliseconds);
+            }
+            if (result.formalRendererCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain must use exactly one formal Renderer.");
+            }
+            if (result.formalPersistentObjectCount > 1)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain created too many persistent objects.");
+            }
+            if (result.controlWidth != FirstTerrainWidth * 4 ||
+                result.controlHeight != FirstTerrainHeight * 4)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain control dimensions are incorrect.");
+            }
+            if (result.managedAllocationBytesAfterWarmup != 0)
+            {
+                throw new InvalidOperationException(
+                    "Stable first-art terrain observation allocated " +
+                    result.managedAllocationBytesAfterWarmup +
+                    " managed bytes.");
+            }
+        }
+
+        private static void ValidateFirstTerrainRuntimeEvidence(
+            FirstTerrainRuntimeEvidenceResult result)
+        {
+            if (result.arrays == null || result.arrays.Length != 4)
+                throw new InvalidOperationException("Runtime evidence must contain four arrays.");
+            if (result.formalRendererCount != 1)
+                throw new InvalidOperationException("Runtime evidence requires one formal Renderer.");
+            if (result.compressedPayloadBytes != 127227779L ||
+                result.compressedPayloadBytes > 128L * 1024L * 1024L)
+            {
+                throw new InvalidOperationException(
+                    "First terrain compressed payload exceeded its approved contract: " +
+                    result.compressedPayloadBytes);
+            }
+            if (result.editorNativeMemoryBytes > 256L * 1024L * 1024L ||
+                result.editorObservedDuplicateDifferenceBytes > 64L * 1024L)
+            {
+                throw new InvalidOperationException(
+                    "Editor-observed terrain native memory is outside its explained 2x envelope: " +
+                    result.editorNativeMemoryBytes + ", difference " +
+                    result.editorObservedDuplicateDifferenceBytes);
+            }
+            for (int index = 0; index < result.arrays.Length; index++)
+            {
+                if (result.arrays[index].isReadable)
+                {
+                    throw new InvalidOperationException(
+                        "Persistent terrain runtime arrays must be non-readable: " +
+                        result.arrays[index].label);
+                }
+            }
+            if (result.presenterDeclaresUpdate || result.presenterDeclaresLateUpdate)
+            {
+                throw new InvalidOperationException(
+                    "First-art terrain water must not declare a CPU Update loop.");
+            }
+            if (!result.editorNativeIsEditorObserved ||
+                result.editorNativeIsGpuMemory ||
+                result.windowsDevelopmentPlayerMemoryResolved)
+            {
+                throw new InvalidOperationException(
+                    "Runtime memory evidence labels are not conservative.");
+            }
         }
 
         private static string ResolveBuildingResultPath()

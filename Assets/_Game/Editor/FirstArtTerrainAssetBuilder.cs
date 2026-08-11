@@ -40,6 +40,9 @@ namespace WasteCity.Editor
         private const int HeightTextureSize = 1024;
 
         internal static Action<string> HeightSourceReadableCheckpoint;
+        internal static Action<string> MaskCompressionCheckpoint;
+        internal static Action<int, string> DestinationPersistCheckpoint;
+        internal static Action<string> DestinationRollbackCheckpoint;
 
         [MenuItem("WasteCity/Art/Build First Terrain Runtime Assets")]
         public static void BuildRuntimeAssets()
@@ -92,28 +95,25 @@ namespace WasteCity.Editor
         {
             SourceAsset[,] sources = ResolveAndValidateSources();
             var temporaryArrays = new List<Texture2DArray>(4);
+            ArrayDestinationTransaction destinationTransaction = null;
 
             try
             {
-                Texture2DArray baseColor = CreateCopiedArray(
+                Texture2DArray baseColor = CreateCpuPopulatedSourceArray(
                     sources,
                     SourceChannel.BaseColor,
                     false,
                     "TA_Terrain_BaseColor");
                 temporaryArrays.Add(baseColor);
 
-                Texture2DArray normal = CreateCopiedArray(
+                Texture2DArray normal = CreateCpuPopulatedSourceArray(
                     sources,
                     SourceChannel.Normal,
                     true,
                     "TA_Terrain_Normal");
                 temporaryArrays.Add(normal);
 
-                Texture2DArray mask = CreateCopiedArray(
-                    sources,
-                    SourceChannel.Mask,
-                    true,
-                    "TA_Terrain_Mask");
+                Texture2DArray mask = CreateCompressedMaskArray(sources);
                 temporaryArrays.Add(mask);
 
                 Texture2DArray height = CreateHeightArray(sources);
@@ -121,26 +121,72 @@ namespace WasteCity.Editor
 
                 ValidateRestoredSources(sources);
                 EnsureOutputFolders();
-                PersistArray(baseColor, BaseColorArrayPath);
-                PersistArray(normal, NormalArrayPath);
-                PersistArray(mask, MaskArrayPath);
-                PersistArray(height, HeightArrayPath);
-                AssetDatabase.SaveAssets();
+                destinationTransaction = new ArrayDestinationTransaction(
+                    BaseColorArrayPath,
+                    NormalArrayPath,
+                    MaskArrayPath,
+                    HeightArrayPath);
+                try
+                {
+                    PersistDestination(baseColor, BaseColorArrayPath, 1);
+                    PersistDestination(normal, NormalArrayPath, 2);
+                    PersistDestination(mask, MaskArrayPath, 3);
+                    PersistDestination(height, HeightArrayPath, 4);
+                    AssetDatabase.SaveAssets();
 
-                ReimportOutput(BaseColorArrayPath);
-                ReimportOutput(NormalArrayPath);
-                ReimportOutput(MaskArrayPath);
-                ReimportOutput(HeightArrayPath);
-                ValidatePersistentArrays(sources);
+                    ReimportOutput(BaseColorArrayPath);
+                    ReimportOutput(NormalArrayPath);
+                    ReimportOutput(MaskArrayPath);
+                    ReimportOutput(HeightArrayPath);
+                    ValidatePersistentArrays(sources);
+                    destinationTransaction.Complete();
+                }
+                catch (Exception operationFailure)
+                {
+                    List<Exception> rollbackFailures = destinationTransaction.Rollback();
+                    if (rollbackFailures.Count == 0)
+                    {
+                        ExceptionDispatchInfo.Capture(operationFailure).Throw();
+                        throw;
+                    }
+
+                    var failures = new List<Exception>(rollbackFailures.Count + 1)
+                    {
+                        operationFailure,
+                    };
+                    failures.AddRange(rollbackFailures);
+                    throw new AggregateException(
+                        "Terrain array persistence and rollback both failed.",
+                        failures);
+                }
             }
             finally
             {
-                foreach (Texture2DArray array in temporaryArrays)
+                try
                 {
-                    if (array != null)
-                        UnityEngine.Object.DestroyImmediate(array);
+                    destinationTransaction?.Dispose();
+                }
+                finally
+                {
+                    DestinationPersistCheckpoint = null;
+                    DestinationRollbackCheckpoint = null;
+                    foreach (Texture2DArray array in temporaryArrays)
+                    {
+                        if (array != null)
+                            UnityEngine.Object.DestroyImmediate(array);
+                    }
                 }
             }
+        }
+
+        private static void PersistDestination(
+            Texture2DArray temporary,
+            string path,
+            int destinationIndex)
+        {
+            PersistArray(temporary, path);
+            AssetDatabase.SaveAssets();
+            DestinationPersistCheckpoint?.Invoke(destinationIndex, path);
         }
 
         internal static byte QuantizeHeightBlock(ushort a, ushort b, ushort c, ushort d)
@@ -236,42 +282,177 @@ namespace WasteCity.Editor
             }
         }
 
-        private static Texture2DArray CreateCopiedArray(
+        private static Texture2DArray CreateCpuPopulatedSourceArray(
             SourceAsset[,] sources,
             SourceChannel channel,
             bool linear,
             string name)
         {
-            Texture2D first = sources[0, (int)channel].Texture;
+            SourceAsset first = sources[0, (int)channel];
             var array = new Texture2DArray(
-                first.width,
-                first.height,
+                first.Width,
+                first.Height,
                 FirstArtTerrainCatalog3D.LayerCount,
-                first.format,
-                first.mipmapCount > 1,
+                first.Format,
+                first.MipmapCount > 1,
                 linear)
             {
                 name = name,
                 wrapMode = TextureWrapMode.Repeat,
-                filterMode = first.filterMode,
-                anisoLevel = first.anisoLevel,
+                filterMode = first.FilterMode,
+                anisoLevel = first.AnisoLevel,
             };
 
             try
             {
                 for (int layer = 0; layer < FirstArtTerrainCatalog3D.LayerCount; layer++)
                 {
-                    Texture2D source = sources[layer, (int)channel].Texture;
-                    for (int mip = 0; mip < source.mipmapCount; mip++)
-                        Graphics.CopyTexture(source, 0, mip, array, layer, mip);
+                    SourceAsset sourceAsset = sources[layer, (int)channel];
+                    using (FirstArtPassImportPolicy.AllowTemporaryReadability(sourceAsset.Path))
+                    {
+                        ReimportSource(sourceAsset.Path);
+                        Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourceAsset.Path);
+                        if (source == null || !source.isReadable)
+                        {
+                            throw new InvalidOperationException(
+                                $"{channel} source did not become readable: {sourceAsset.Path}");
+                        }
+                        if (source.width != first.Width ||
+                            source.height != first.Height ||
+                            source.format != first.Format ||
+                            source.mipmapCount != first.MipmapCount)
+                        {
+                            throw new InvalidOperationException(
+                                $"{channel} source import contract changed while staging: {sourceAsset.Path}");
+                        }
+
+                        for (int mip = 0; mip < source.mipmapCount; mip++)
+                        {
+                            array.SetPixelData(
+                                source.GetPixelData<byte>(mip),
+                                mip,
+                                layer);
+                        }
+                    }
                 }
 
+                array.Apply(false, true);
                 return array;
             }
             catch
             {
                 UnityEngine.Object.DestroyImmediate(array);
                 throw;
+            }
+        }
+
+        private static Texture2DArray CreateCompressedMaskArray(SourceAsset[,] sources)
+        {
+            var array = new Texture2DArray(
+                SourceTextureSize,
+                SourceTextureSize,
+                FirstArtTerrainCatalog3D.LayerCount,
+                TextureFormat.BC7,
+                true,
+                true)
+            {
+                name = "TA_Terrain_Mask",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                anisoLevel = 4,
+            };
+
+            try
+            {
+                for (int layer = 0; layer < FirstArtTerrainCatalog3D.LayerCount; layer++)
+                {
+                    SourceAsset source = sources[layer, (int)SourceChannel.Mask];
+                    Texture2D staging = CreateCompressedMaskSlice(source);
+                    try
+                    {
+                        MaskCompressionCheckpoint?.Invoke(source.Path);
+                        for (int mip = 0; mip < staging.mipmapCount; mip++)
+                        {
+                            array.SetPixelData(
+                                staging.GetPixelData<byte>(mip),
+                                mip,
+                                layer);
+                        }
+                    }
+                    finally
+                    {
+                        UnityEngine.Object.DestroyImmediate(staging);
+                    }
+                }
+
+                array.Apply(false, true);
+                return array;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(array);
+                throw;
+            }
+        }
+
+        private static Texture2D CreateCompressedMaskSlice(SourceAsset sourceAsset)
+        {
+            Texture2D source = AssetDatabase.LoadAssetAtPath<Texture2D>(sourceAsset.Path);
+            if (source == null || source.width != SourceTextureSize || source.height != SourceTextureSize)
+                throw new InvalidOperationException($"Mask source failed staging validation: {sourceAsset.Path}");
+
+            RenderTexture renderTexture = RenderTexture.GetTemporary(
+                SourceTextureSize,
+                SourceTextureSize,
+                0,
+                RenderTextureFormat.ARGB32,
+                RenderTextureReadWrite.Linear);
+            var staging = new Texture2D(
+                SourceTextureSize,
+                SourceTextureSize,
+                TextureFormat.RGBA32,
+                true,
+                true)
+            {
+                name = $"{Path.GetFileNameWithoutExtension(sourceAsset.Path)}_BC7Staging",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Bilinear,
+                anisoLevel = 4,
+            };
+            RenderTexture previous = RenderTexture.active;
+            try
+            {
+                Graphics.Blit(source, renderTexture);
+                RenderTexture.active = renderTexture;
+                staging.ReadPixels(
+                    new Rect(0f, 0f, SourceTextureSize, SourceTextureSize),
+                    0,
+                    0,
+                    false);
+                staging.Apply(true, false);
+                EditorUtility.CompressTexture(
+                    staging,
+                    TextureFormat.BC7,
+                    TextureCompressionQuality.Best);
+                if (staging.format != TextureFormat.BC7 ||
+                    staging.mipmapCount != MipCount(SourceTextureSize) ||
+                    !staging.isReadable)
+                {
+                    throw new InvalidOperationException(
+                        $"Mask source did not produce a readable BC7 mip chain: {sourceAsset.Path}");
+                }
+
+                return staging;
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(staging);
+                throw;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(renderTexture);
             }
         }
 
@@ -300,7 +481,12 @@ namespace WasteCity.Editor
                     try
                     {
                         for (int mip = 0; mip < heightSlice.mipmapCount; mip++)
-                            Graphics.CopyTexture(heightSlice, 0, mip, array, layer, mip);
+                        {
+                            array.SetPixelData(
+                                heightSlice.GetPixelData<byte>(mip),
+                                mip,
+                                layer);
+                        }
                     }
                     finally
                     {
@@ -308,6 +494,7 @@ namespace WasteCity.Editor
                     }
                 }
 
+                array.Apply(false, true);
                 return array;
             }
             catch
@@ -589,18 +776,18 @@ namespace WasteCity.Editor
             ValidatePersistentArray(
                 BaseColorArrayPath,
                 SourceTextureSize,
-                sources[0, (int)SourceChannel.BaseColor].Texture.format,
-                sources[0, (int)SourceChannel.BaseColor].Texture.mipmapCount);
+                sources[0, (int)SourceChannel.BaseColor].Format,
+                sources[0, (int)SourceChannel.BaseColor].MipmapCount);
             ValidatePersistentArray(
                 NormalArrayPath,
                 SourceTextureSize,
-                sources[0, (int)SourceChannel.Normal].Texture.format,
-                sources[0, (int)SourceChannel.Normal].Texture.mipmapCount);
+                sources[0, (int)SourceChannel.Normal].Format,
+                sources[0, (int)SourceChannel.Normal].MipmapCount);
             ValidatePersistentArray(
                 MaskArrayPath,
                 SourceTextureSize,
-                sources[0, (int)SourceChannel.Mask].Texture.format,
-                sources[0, (int)SourceChannel.Mask].Texture.mipmapCount);
+                TextureFormat.BC7,
+                MipCount(SourceTextureSize));
             ValidatePersistentArray(
                 HeightArrayPath,
                 HeightTextureSize,
@@ -621,7 +808,8 @@ namespace WasteCity.Editor
                 array.depth != FirstArtTerrainCatalog3D.LayerCount ||
                 array.format != expectedFormat ||
                 array.mipmapCount != expectedMipCount ||
-                array.wrapMode != TextureWrapMode.Repeat)
+                array.wrapMode != TextureWrapMode.Repeat ||
+                array.isReadable)
             {
                 throw new InvalidOperationException($"Generated terrain array failed validation: {path}");
             }
@@ -694,6 +882,221 @@ namespace WasteCity.Editor
             Height = 3,
         }
 
+        private sealed class ArrayDestinationTransaction : IDisposable
+        {
+            private readonly string backupRoot;
+            private readonly DestinationBackup[] backups;
+            private bool completed;
+            private bool cleaned;
+
+            public ArrayDestinationTransaction(params string[] paths)
+            {
+                backupRoot = Path.Combine(
+                    Path.GetTempPath(),
+                    "wastecity-first-terrain-destination-" + Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(backupRoot);
+                backups = new DestinationBackup[paths.Length];
+                try
+                {
+                    for (int index = 0; index < paths.Length; index++)
+                    {
+                        string path = paths[index];
+                        string absolutePath = AbsoluteProjectPath(path);
+                        string absoluteMetaPath = absolutePath + ".meta";
+                        bool existed = File.Exists(absolutePath);
+                        string assetBackupPath = Path.Combine(backupRoot, index + ".asset");
+                        string metaBackupPath = Path.Combine(backupRoot, index + ".meta");
+                        if (existed)
+                        {
+                            File.Copy(absolutePath, assetBackupPath, true);
+                            File.Copy(absoluteMetaPath, metaBackupPath, true);
+                        }
+
+                        backups[index] = new DestinationBackup(
+                            path,
+                            absolutePath,
+                            absoluteMetaPath,
+                            existed,
+                            existed ? AssetDatabase.AssetPathToGUID(path) : string.Empty,
+                            assetBackupPath,
+                            metaBackupPath);
+                    }
+                }
+                catch
+                {
+                    CleanupBackupDirectory();
+                    throw;
+                }
+            }
+
+            public void Complete()
+            {
+                completed = true;
+            }
+
+            public List<Exception> Rollback()
+            {
+                var failures = new List<Exception>();
+                try
+                {
+                    AssetDatabase.StartAssetEditing();
+                    try
+                    {
+                        foreach (DestinationBackup backup in backups)
+                        {
+                            try
+                            {
+                                DestinationRollbackCheckpoint?.Invoke(backup.Path);
+                            }
+                            catch (Exception exception)
+                            {
+                                failures.Add(exception);
+                            }
+
+                            try
+                            {
+                                if (backup.Existed)
+                                {
+                                    File.Copy(
+                                        backup.AssetBackupPath,
+                                        backup.AbsolutePath,
+                                        true);
+                                    File.Copy(
+                                        backup.MetaBackupPath,
+                                        backup.AbsoluteMetaPath,
+                                        true);
+                                }
+                                else
+                                {
+                                    if (File.Exists(backup.AbsolutePath))
+                                        File.Delete(backup.AbsolutePath);
+                                    if (File.Exists(backup.AbsoluteMetaPath))
+                                        File.Delete(backup.AbsoluteMetaPath);
+                                }
+                            }
+                            catch (Exception exception)
+                            {
+                                failures.Add(exception);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            AssetDatabase.StopAssetEditing();
+                        }
+                        catch (Exception exception)
+                        {
+                            failures.Add(exception);
+                        }
+                    }
+
+                    try
+                    {
+                        AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                    }
+                    catch (Exception exception)
+                    {
+                        failures.Add(exception);
+                    }
+
+                    foreach (DestinationBackup backup in backups)
+                    {
+                        try
+                        {
+                            if (backup.Existed)
+                            {
+                                AssetDatabase.ImportAsset(
+                                    backup.Path,
+                                    ImportAssetOptions.ForceUpdate |
+                                    ImportAssetOptions.ForceSynchronousImport);
+                                string restoredGuid = AssetDatabase.AssetPathToGUID(backup.Path);
+                                if (!string.Equals(
+                                        restoredGuid,
+                                        backup.Guid,
+                                        StringComparison.Ordinal))
+                                {
+                                    throw new InvalidOperationException(
+                                        $"Terrain destination GUID rollback failed: {backup.Path}");
+                                }
+                            }
+                            else if (File.Exists(backup.AbsolutePath) ||
+                                     File.Exists(backup.AbsoluteMetaPath) ||
+                                     AssetDatabase.LoadMainAssetAtPath(backup.Path) != null)
+                            {
+                                throw new InvalidOperationException(
+                                    $"New terrain destination survived rollback: {backup.Path}");
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            failures.Add(exception);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+
+                try
+                {
+                    CleanupBackupDirectory();
+                }
+                catch (Exception exception)
+                {
+                    failures.Add(exception);
+                }
+                return failures;
+            }
+
+            public void Dispose()
+            {
+                if (!completed && !cleaned)
+                    return;
+                CleanupBackupDirectory();
+            }
+
+            private void CleanupBackupDirectory()
+            {
+                if (cleaned)
+                    return;
+                if (Directory.Exists(backupRoot))
+                    Directory.Delete(backupRoot, true);
+                cleaned = true;
+            }
+
+            private sealed class DestinationBackup
+            {
+                public DestinationBackup(
+                    string path,
+                    string absolutePath,
+                    string absoluteMetaPath,
+                    bool existed,
+                    string guid,
+                    string assetBackupPath,
+                    string metaBackupPath)
+                {
+                    Path = path;
+                    AbsolutePath = absolutePath;
+                    AbsoluteMetaPath = absoluteMetaPath;
+                    Existed = existed;
+                    Guid = guid;
+                    AssetBackupPath = assetBackupPath;
+                    MetaBackupPath = metaBackupPath;
+                }
+
+                public string Path { get; }
+                public string AbsolutePath { get; }
+                public string AbsoluteMetaPath { get; }
+                public bool Existed { get; }
+                public string Guid { get; }
+                public string AssetBackupPath { get; }
+                public string MetaBackupPath { get; }
+            }
+        }
+
         private sealed class SourceAsset
         {
             public SourceAsset(
@@ -708,6 +1111,12 @@ namespace WasteCity.Editor
                 DependencyHash = dependencyHash;
                 WasReadable = wasReadable;
                 Texture = texture;
+                Width = texture.width;
+                Height = texture.height;
+                Format = texture.format;
+                MipmapCount = texture.mipmapCount;
+                FilterMode = texture.filterMode;
+                AnisoLevel = texture.anisoLevel;
             }
 
             public string Path { get; }
@@ -719,6 +1128,18 @@ namespace WasteCity.Editor
             public bool WasReadable { get; }
 
             public Texture2D Texture { get; }
+
+            public int Width { get; }
+
+            public int Height { get; }
+
+            public TextureFormat Format { get; }
+
+            public int MipmapCount { get; }
+
+            public FilterMode FilterMode { get; }
+
+            public int AnisoLevel { get; }
         }
     }
 }

@@ -60,6 +60,7 @@ namespace WasteCity.Graybox3D.Building
         private readonly List<Visual> infrastructure =
             new List<Visual>();
         private Visual preview;
+        private Visual groundGrid;
         private Visual innerGrid;
         private int previewWidth;
         private int previewHeight;
@@ -68,12 +69,20 @@ namespace WasteCity.Graybox3D.Building
         private BuildingDefinition previewDefinition;
         private string previewStableId;
         private bool runtimeInitialized;
+        private bool buildGridVisible;
 
         public int InfrastructureRendererCount =>
             infrastructure.Count +
             nodeHighlights.Count +
             (preview == null ? 0 : 1);
         public int InstanceRendererCount => instances.Count;
+        public bool IsBuildGridVisible => buildGridVisible;
+
+        public void SetBuildGridVisible(bool visible)
+        {
+            buildGridVisible = visible;
+            ApplyBuildGridVisibility();
+        }
 
         public void Configure(
             Transform instanceRoot,
@@ -315,13 +324,13 @@ namespace WasteCity.Graybox3D.Building
 
         private void CreateGridVisuals()
         {
-            Visual ground = CreateVisual(
+            groundGrid = CreateVisual(
                 "building.grid.ground",
                 infrastructureRoot,
                 CreateGroundGridMesh(),
                 GridColor,
                 false);
-            infrastructure.Add(ground);
+            infrastructure.Add(groundGrid);
             innerGrid = CreateVisual(
                 "building.grid.inner-city",
                 infrastructureRoot,
@@ -329,6 +338,23 @@ namespace WasteCity.Graybox3D.Building
                 InnerGridColor,
                 false);
             infrastructure.Add(innerGrid);
+            ApplyBuildGridVisibility();
+        }
+
+        private void ApplyBuildGridVisibility()
+        {
+            SetVisualActive(groundGrid, buildGridVisible);
+            SetVisualActive(innerGrid, buildGridVisible);
+        }
+
+        private static void SetVisualActive(
+            Visual visual,
+            bool active)
+        {
+            if (visual == null || visual.Root == null ||
+                visual.Root.activeSelf == active)
+                return;
+            visual.Root.SetActive(active);
         }
 
         private Visual CreateVisual(
@@ -803,6 +829,7 @@ namespace WasteCity.Graybox3D.Building
             hasPreviewGeometry = false;
             previewDefinition = null;
             previewStableId = null;
+            groundGrid = null;
             innerGrid = null;
             runtimeInitialized = false;
         }

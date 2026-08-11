@@ -32,6 +32,32 @@ namespace WasteCity.Editor
             "Assets/_Game/Art/FirstPass/Environment/Terrain/Cliff/T_Terrain_Cliff_Height.png",
         };
 
+        private static readonly HashSet<string> ApprovedReadablePaths =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wasteland/T_Terrain_Wasteland_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wasteland/T_Terrain_Wasteland_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wasteland/T_Terrain_Wasteland_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Rocky/T_Terrain_Rocky_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Rocky/T_Terrain_Rocky_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Rocky/T_Terrain_Rocky_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wetland/T_Terrain_Wetland_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wetland/T_Terrain_Wetland_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Wetland/T_Terrain_Wetland_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Crystal/T_Terrain_Crystal_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Crystal/T_Terrain_Crystal_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Crystal/T_Terrain_Crystal_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/T_Terrain_Ruins_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/T_Terrain_Ruins_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/T_Terrain_Ruins_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/DeepWater/T_Terrain_DeepWater_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/DeepWater/T_Terrain_DeepWater_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/DeepWater/T_Terrain_DeepWater_Height.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Cliff/T_Terrain_Cliff_BaseColor.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Cliff/T_Terrain_Cliff_Normal.png",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Cliff/T_Terrain_Cliff_Height.png",
+            };
+
         private void OnPreprocessTexture()
         {
             if (!IsFirstPassAsset(assetPath))
@@ -125,10 +151,10 @@ namespace WasteCity.Editor
 
         internal static IDisposable AllowTemporaryReadability(string exactAssetPath)
         {
-            if (!IsApprovedHeightPath(exactAssetPath))
+            if (!ApprovedReadablePaths.Contains(exactAssetPath))
             {
                 throw new ArgumentException(
-                    "Temporary readability is limited to the seven approved first-art Height textures.",
+                    "Temporary readability is limited to the exact 21 approved first-art BaseColor, Normal and Height textures.",
                     nameof(exactAssetPath));
             }
 
@@ -152,7 +178,10 @@ namespace WasteCity.Editor
             return new TemporaryReadabilityScope(
                 exactAssetPath,
                 platformName,
-                originalPlatform);
+                originalPlatform,
+                File.ReadAllBytes(exactAssetPath + ".meta"),
+                AssetDatabase.AssetPathToGUID(exactAssetPath),
+                AssetDatabase.GetAssetDependencyHash(exactAssetPath));
         }
 
         private static bool IsFirstPassAsset(string path)
@@ -207,16 +236,25 @@ namespace WasteCity.Editor
             private readonly string exactAssetPath;
             private readonly string platformName;
             private readonly TextureImporterPlatformSettings originalPlatform;
+            private readonly byte[] originalMetaBytes;
+            private readonly string originalGuid;
+            private readonly Hash128 originalDependencyHash;
             private bool disposed;
 
             public TemporaryReadabilityScope(
                 string exactAssetPath,
                 string platformName,
-                TextureImporterPlatformSettings originalPlatform)
+                TextureImporterPlatformSettings originalPlatform,
+                byte[] originalMetaBytes,
+                string originalGuid,
+                Hash128 originalDependencyHash)
             {
                 this.exactAssetPath = exactAssetPath;
                 this.platformName = platformName;
                 this.originalPlatform = originalPlatform;
+                this.originalMetaBytes = originalMetaBytes;
+                this.originalGuid = originalGuid;
+                this.originalDependencyHash = originalDependencyHash;
             }
 
             public void Dispose()
@@ -267,9 +305,68 @@ namespace WasteCity.Editor
                 {
                     TemporaryReadablePaths.Remove(exactAssetPath);
                     disposed = true;
+                    try
+                    {
+                        RestoreExactMetaAndReimport();
+                    }
+                    catch (Exception exception)
+                    {
+                        failures.Add(exception);
+                    }
                 }
 
                 ThrowFailures(failures);
+            }
+
+            private void RestoreExactMetaAndReimport()
+            {
+                Reimport(exactAssetPath);
+                string metaPath = exactAssetPath + ".meta";
+                if (!BytesEqual(File.ReadAllBytes(metaPath), originalMetaBytes))
+                {
+                    File.WriteAllBytes(metaPath, originalMetaBytes);
+                    Reimport(exactAssetPath);
+                }
+
+                var importer = AssetImporter.GetAtPath(exactAssetPath) as TextureImporter;
+                if (importer == null || importer.isReadable)
+                {
+                    throw new InvalidOperationException(
+                        $"Terrain source readability was not restored: '{exactAssetPath}'.");
+                }
+                if (!string.Equals(
+                        AssetDatabase.AssetPathToGUID(exactAssetPath),
+                        originalGuid,
+                        StringComparison.Ordinal) ||
+                    AssetDatabase.GetAssetDependencyHash(exactAssetPath) != originalDependencyHash ||
+                    !BytesEqual(File.ReadAllBytes(metaPath), originalMetaBytes))
+                {
+                    throw new InvalidOperationException(
+                        $"Terrain source identity or exact meta bytes were not restored: '{exactAssetPath}'.");
+                }
+            }
+
+            private static void Reimport(string path)
+            {
+                AssetDatabase.ImportAsset(
+                    path,
+                    ImportAssetOptions.ForceUpdate |
+                    ImportAssetOptions.ForceSynchronousImport);
+            }
+
+            private static bool BytesEqual(byte[] left, byte[] right)
+            {
+                if (ReferenceEquals(left, right))
+                    return true;
+                if (left == null || right == null || left.Length != right.Length)
+                    return false;
+                for (int index = 0; index < left.Length; index++)
+                {
+                    if (left[index] != right[index])
+                        return false;
+                }
+
+                return true;
             }
 
             private static void ThrowFailures(List<Exception> failures)
@@ -283,7 +380,7 @@ namespace WasteCity.Editor
                 }
 
                 throw new AggregateException(
-                    "Temporary Height importer platform restoration failed.",
+                    "Temporary terrain importer restoration failed.",
                     failures);
             }
         }

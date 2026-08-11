@@ -501,6 +501,131 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void WorldView_BuildGridDefaultsHiddenAndTogglesOnlyStableGridRoots()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            GrayboxVisualSlot ground = Slot(
+                fixture.Presentation,
+                "building.grid.ground");
+            GrayboxVisualSlot inner = Slot(
+                fixture.Presentation,
+                "building.grid.inner-city");
+            Mesh groundMesh =
+                ground.GetComponent<MeshFilter>().sharedMesh;
+            Mesh innerMesh =
+                inner.GetComponent<MeshFilter>().sharedMesh;
+
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+            Assert.That(ground.gameObject.activeSelf, Is.False);
+            Assert.That(inner.gameObject.activeSelf, Is.False);
+
+            fixture.Presentation.ShowCompatibleResourceNode(
+                "world.resource-node.20.15",
+                20,
+                15,
+                true);
+            GrayboxVisualSlot node = Slot(
+                fixture.Presentation,
+                "building.node-highlight.world.resource-node.20.15");
+            fixture.Presentation.SetBuildGridVisible(true);
+
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+            Assert.That(ground.gameObject.activeSelf, Is.True);
+            Assert.That(inner.gameObject.activeSelf, Is.True);
+            Assert.That(node.gameObject.activeSelf, Is.True);
+
+            fixture.Presentation.SetBuildGridVisible(false);
+
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+            Assert.That(ground.gameObject.activeSelf, Is.False);
+            Assert.That(inner.gameObject.activeSelf, Is.False);
+            Assert.That(node.gameObject.activeSelf, Is.True);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.ground"),
+                Is.SameAs(ground));
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.inner-city"),
+                Is.SameAs(inner));
+            Assert.That(
+                ground.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(groundMesh));
+            Assert.That(
+                inner.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(innerMesh));
+        }
+
+        [Test]
+        public void WorldView_RequestedBuildGridStateSurvivesRehydrateAtZeroAllocation()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            Transform infrastructure =
+                fixture.Presentation.transform.Find("infrastructure");
+            fixture.Presentation.SetBuildGridVisible(true);
+
+            fixture.Presentation.Configure(
+                fixture.InstanceRoot,
+                infrastructure,
+                fixture.Material,
+                fixture.City);
+
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.ground")
+                    .gameObject.activeSelf,
+                Is.True);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.inner-city")
+                    .gameObject.activeSelf,
+                Is.True);
+
+            Action warmedSet = () =>
+                fixture.Presentation.SetBuildGridVisible(true);
+            warmedSet();
+            warmedSet();
+            AllocationMeasurement measurement =
+                Profile300Calls(warmedSet);
+
+            TestContext.WriteLine(
+                "BuildGridVisibilityProfilerSamples=" +
+                measurement.Samples);
+            TestContext.WriteLine(
+                "BuildGridVisibilityProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "BuildGridVisibilityCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+
+            fixture.Placement.SetBuildGridVisible(false);
+            fixture.Presentation.Configure(
+                fixture.InstanceRoot,
+                infrastructure,
+                fixture.Material,
+                fixture.City);
+
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.ground")
+                    .gameObject.activeSelf,
+                Is.False);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.inner-city")
+                    .gameObject.activeSelf,
+                Is.False);
+        }
+
+        [Test]
         public void WorldView_UsesStableGridPreviewAndNodeIdsWithSharedMaterial()
         {
             WorldFixture fixture = CreateWorldFixture();

@@ -475,23 +475,30 @@ namespace WasteCity.Tests
             for (var index = 0; index < ResourceIds.All.Length; index++)
                 modifier.AddResource(ResourceIds.All[index], 1000);
 
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
             yield return TapKey(Key.B);
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             Assert.That(interaction.CatalogReturnState, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
             yield return TapKey(Key.B);
             Assert.That(interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
 
             yield return TapKey(Key.B);
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return TapKey(Key.Digit2);
             Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.Housing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return TapKey(Key.B);
             Assert.That(interaction.CatalogReturnState, Is.EqualTo(
                 GrayboxBuildingInteractionState.Previewing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return TapKey(Key.B);
             Assert.That(interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Previewing));
             Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.Housing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
 
             interaction.Select(BuildingCatalog.BehemothPen);
             yield return TapKey(Key.R);
@@ -551,6 +558,7 @@ namespace WasteCity.Tests
             Assert.That(interaction.Selected, Is.SameAs(BuildingCatalog.Wall));
             Assert.That(interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Previewing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return MoveToGroundPreviewContaining(
                 city,
                 world,
@@ -563,6 +571,13 @@ namespace WasteCity.Tests
                 FindSlot("building.preview." + BuildingCatalog.Wall.Id.Value)
                     .FallbackColor,
                 Is.EqualTo(new Color(.9f, .16f, .12f, .55f)));
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(session.Instances, Has.Count.EqualTo(1));
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
 
             modifier.SetResource(ResourceIds.Stone, 1000);
             yield return MoveToValidGroundPreview(city, world, placement);
@@ -604,11 +619,16 @@ namespace WasteCity.Tests
                     GrayboxBuildingPlacementController3D>();
             GrayboxMobileCityController3D city =
                 Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
             GrayboxCameraController3D cameraController =
                 Object.FindObjectOfType<GrayboxCameraController3D>();
 
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
             yield return TapKey(Key.B);
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return TapKey(Key.Digit2);
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
             yield return MoveToInnerPreview(city);
             Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
             Button quickbar = FindButton("QuickbarSlot.1");
@@ -631,6 +651,7 @@ namespace WasteCity.Tests
             yield return ClickMouse(MouseButton.Right, worldPoint);
             Assert.That(interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
             Assert.That(city.AutopilotActive, Is.False);
 
             Vector2 dragEnd = worldPoint + new Vector2(100f, 40f);
@@ -639,6 +660,85 @@ namespace WasteCity.Tests
             yield return TapKey(Key.Home);
             Assert.That(cameraController.Mode, Is.EqualTo(
                 CameraFollowMode.Following));
+        }
+
+        [UnityTest]
+        public IEnumerator VirtualCancelUi_ReturnStateControlsBuildGridVisibility()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInteractionModel3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxConstructionController3D construction =
+                Object.FindObjectOfType<
+                    GrayboxConstructionController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            modifier.AddResource(ResourceIds.Stone, 1000);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+
+            interaction.Select(BuildingCatalog.Wall);
+            yield return MoveToValidGroundPreview(city, world, placement);
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(session.Instances, Has.Count.EqualTo(1));
+            GrayboxBuildingInstance3D instance = session.Instances[0];
+            yield return null;
+            Assert.That(instance.Progress.Normalized, Is.GreaterThan(0f));
+            Assert.That(
+                construction.SelectInstance(instance.StableInstanceId),
+                Is.True);
+
+            yield return ClickButton("Construction.Cancel");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+            yield return ClickButton("Construction.Confirm.No");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+
+            yield return ClickMouse(
+                MouseButton.Right,
+                new Vector2(Screen.width * .5f, Screen.height * .5f));
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
+
+            yield return ClickButton("Construction.Cancel");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+            yield return ClickButton("Construction.Confirm.No");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(presentation.IsBuildGridVisible, Is.False);
+
+            interaction.Select(BuildingCatalog.Wall);
+            yield return null;
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+            yield return ClickButton("Construction.Cancel");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+            yield return ClickButton("Construction.Confirm.Yes");
+            Assert.That(interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Previewing));
+            Assert.That(presentation.IsBuildGridVisible, Is.True);
+            Assert.That(session.Instances, Is.Empty);
         }
 
         [UnityTest]

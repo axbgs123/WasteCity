@@ -48,6 +48,15 @@ namespace WasteCity.Editor
             "417640ccdd04a4121a7180da2ce71277";
         private const string TerrainHeightGuid =
             "9263e65e9f2694421b9fbdb96b3f49a3";
+        private const string TerrainLightName =
+            "FirstArtTerrainDirectionalLight";
+        private const float TerrainLightIntensity = 1.25f;
+        private const float TerrainLightAngleTolerance = .01f;
+
+        private static readonly Color TerrainLightColor =
+            new Color(1f, .956f, .85f, 1f);
+        private static readonly Vector3 TerrainLightEuler =
+            new Vector3(50f, -30f, 0f);
 
         private const string FirstBaseColorSourcePath =
             "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
@@ -55,10 +64,6 @@ namespace WasteCity.Editor
         private const string FirstNormalSourcePath =
             "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
             "Wasteland/T_Terrain_Wasteland_Normal.png";
-        private const string FirstMaskSourcePath =
-            "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
-            "Wasteland/T_Terrain_Wasteland_Mask.png";
-
         [Serializable]
         private sealed class FoundationIdentity
         {
@@ -139,6 +144,7 @@ namespace WasteCity.Editor
                 EnsureFirstArtTerrainContract(
                     scene,
                     terrainAssets.Profile);
+                EnsureFirstArtTerrainLighting(scene);
             }
 
             Shader litShader = Shader.Find(LitShaderName);
@@ -166,6 +172,7 @@ namespace WasteCity.Editor
                 EnsureFirstArtTerrainContract(
                     scene,
                     terrainAssets.Profile);
+                EnsureFirstArtTerrainLighting(scene);
             }
             ValidateFirstArtTerrainContract(scene);
 
@@ -605,6 +612,7 @@ namespace WasteCity.Editor
                 AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
                     FirstArtTerrainAssetBuilder.ProfilePath),
                 true);
+            ValidateFirstArtTerrainLightStructure(scene, true);
         }
 
         private static void EnsureBuildingContract(
@@ -788,6 +796,23 @@ namespace WasteCity.Editor
             EditorSceneManager.MarkSceneDirty(scene);
         }
 
+        private static void EnsureFirstArtTerrainLighting(Scene scene)
+        {
+            GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
+            Transform owner = EnsureChild(root.transform, TerrainLightName);
+            Light light = EnsureComponent<Light>(owner);
+
+            owner.gameObject.SetActive(true);
+            owner.localRotation = Quaternion.Euler(TerrainLightEuler);
+            light.enabled = true;
+            light.type = LightType.Directional;
+            light.color = TerrainLightColor;
+            light.intensity = TerrainLightIntensity;
+            light.shadows = LightShadows.Soft;
+            light.cullingMask = ~0;
+            EditorSceneManager.MarkSceneDirty(scene);
+        }
+
         private static void ValidateFirstArtTerrainContract(Scene scene)
         {
             ValidateFirstArtTerrainContractWithAssets(
@@ -805,6 +830,135 @@ namespace WasteCity.Editor
                     assets.Profile,
                     false);
             RequireReference(presenter, "profile", assets.Profile);
+            ValidateFirstArtTerrainLightStructure(scene, false);
+        }
+
+        private static Light ValidateFirstArtTerrainLightStructure(
+            Scene scene,
+            bool allowRepairableAbsence)
+        {
+            GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
+            Transform owner = null;
+            var namedOwnerCount = 0;
+            foreach (GameObject gameObject in FindSceneGameObjects(scene))
+            {
+                if (!string.Equals(
+                        gameObject.name,
+                        TerrainLightName,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                namedOwnerCount++;
+                owner = gameObject.transform;
+            }
+
+            List<Light> lights = FindSceneComponents<Light>(scene);
+            if (namedOwnerCount > 1 || lights.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    "The first-art terrain scene requires exactly one " +
+                    $"{TerrainLightName} Light.");
+            }
+            if (owner == null)
+            {
+                if (lights.Count != 0 || !allowRepairableAbsence)
+                {
+                    throw new InvalidOperationException(
+                        $"The first-art terrain scene is missing its " +
+                        $"{TerrainLightName} Light.");
+                }
+                return null;
+            }
+            if (owner.parent != root.transform)
+            {
+                throw new InvalidOperationException(
+                    $"{TerrainLightName} must be a direct child of " +
+                    "GrayboxPrototype3D.");
+            }
+            if (owner.childCount != 0)
+            {
+                throw new InvalidOperationException(
+                    $"{TerrainLightName} must not contain children.");
+            }
+
+            Component[] components = owner.GetComponents<Component>();
+            Light terrainLight = null;
+            var transformCount = 0;
+            var lightCount = 0;
+            foreach (Component component in components)
+            {
+                if (component == null)
+                {
+                    throw new InvalidOperationException(
+                        $"{TerrainLightName} contains a missing script.");
+                }
+                if (component is Transform)
+                {
+                    transformCount++;
+                    continue;
+                }
+                if (component is Light candidate)
+                {
+                    lightCount++;
+                    terrainLight = candidate;
+                    continue;
+                }
+                throw new InvalidOperationException(
+                    $"{TerrainLightName} may contain only Transform and " +
+                    "Light components.");
+            }
+            if (transformCount != 1 || lightCount > 1 ||
+                (!allowRepairableAbsence && lightCount != 1) ||
+                lights.Count != lightCount)
+            {
+                throw new InvalidOperationException(
+                    $"{TerrainLightName} component ownership is invalid.");
+            }
+            if (terrainLight == null)
+                return null;
+
+            if (!owner.gameObject.activeSelf || !terrainLight.enabled ||
+                terrainLight.type != LightType.Directional ||
+                !Approximately(terrainLight.color, TerrainLightColor) ||
+                !Mathf.Approximately(
+                    terrainLight.intensity,
+                    TerrainLightIntensity) ||
+                terrainLight.shadows != LightShadows.Soft ||
+                terrainLight.cullingMask != ~0 ||
+                !ApproximatelyEuler(
+                    owner.localEulerAngles,
+                    TerrainLightEuler,
+                    TerrainLightAngleTolerance))
+            {
+                if (!allowRepairableAbsence)
+                {
+                    throw new InvalidOperationException(
+                        $"{TerrainLightName} settings do not match the " +
+                        "approved first-art lighting contract.");
+                }
+            }
+
+            return terrainLight;
+        }
+
+        private static bool Approximately(Color left, Color right)
+        {
+            return Mathf.Abs(left.r - right.r) <= .0001f &&
+                   Mathf.Abs(left.g - right.g) <= .0001f &&
+                   Mathf.Abs(left.b - right.b) <= .0001f &&
+                   Mathf.Abs(left.a - right.a) <= .0001f;
+        }
+
+        private static bool ApproximatelyEuler(
+            Vector3 left,
+            Vector3 right,
+            float tolerance)
+        {
+            return Mathf.Abs(Mathf.DeltaAngle(left.x, right.x)) <= tolerance &&
+                   Mathf.Abs(Mathf.DeltaAngle(left.y, right.y)) <= tolerance &&
+                   Mathf.Abs(Mathf.DeltaAngle(left.z, right.z)) <= tolerance;
         }
 
         private static FirstArtTerrainRenderer3D
@@ -1107,11 +1261,7 @@ namespace WasteCity.Editor
                     "TA_Terrain_Normal",
                     FirstNormalSourcePath,
                     out error) ||
-                !ValidatePrimaryArray(
-                    assets.Mask,
-                    "TA_Terrain_Mask",
-                    FirstMaskSourcePath,
-                    out error) ||
+                !ValidateMaskArray(assets.Mask, out error) ||
                 !ValidateHeightArray(assets.Height, out error))
             {
                 return false;
@@ -1182,6 +1332,27 @@ namespace WasteCity.Editor
             return true;
         }
 
+        private static bool ValidateMaskArray(
+            Texture2DArray array,
+            out string error)
+        {
+            if (!ValidateCommonArray(
+                    array,
+                    "TA_Terrain_Mask",
+                    FirstArtTerrainProfile3D.PrimaryArraySize,
+                    out error) ||
+                array.format != TextureFormat.BC7 ||
+                array.mipmapCount != MipCount(
+                    FirstArtTerrainProfile3D.PrimaryArraySize))
+            {
+                if (string.IsNullOrEmpty(error))
+                    error = "Terrain mask array format is invalid.";
+                return false;
+            }
+
+            return true;
+        }
+
         private static bool ValidateHeightArray(
             Texture2DArray array,
             out string error)
@@ -1222,7 +1393,7 @@ namespace WasteCity.Editor
                 array.filterMode != FilterMode.Bilinear ||
                 array.anisoLevel != 4 ||
                 array.mipmapCount <= 1 ||
-                !array.isReadable)
+                array.isReadable)
             {
                 error = $"Terrain array '{expectedName}' has invalid " +
                         "dimensions, sampling, or readability settings.";

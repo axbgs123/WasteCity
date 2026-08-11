@@ -15,8 +15,16 @@ Shader "WasteCity/Terrain/FirstPassBlend"
         _MacroVariation("Macro Variation", Float) = 0.05
         _WaterVelocityA("Water Velocity A", Vector) = (0.006,0.002,0,0)
         _WaterVelocityB("Water Velocity B", Vector) = (-0.003,0.005,0,0)
-        _WaterNormalScaleB("Water Normal Scale B", Float) = 1.17
-        _WaterHighlightStrength("Water Highlight Strength", Float) = 0.12
+        _WaterNormalScaleB("Water Normal Scale B", Float) = 1.35
+        _WaterHighlightStrength("Water Highlight Strength", Float) = 0.21
+        _WastelandTint("Wasteland Tint", Color) = (0.52,0.38,0.22,0.00)
+        _RockyTint("Rocky Tint", Color) = (0.42,0.39,0.34,0.35)
+        _WetlandTint("Wetland Tint", Color) = (0.28,0.40,0.22,0.42)
+        _CrystalTint("Crystal Tint", Color) = (0.30,0.52,0.56,0.46)
+        _RuinsTint("Ruins Tint", Color) = (0.38,0.36,0.34,0.42)
+        _DeepWaterTint("Deep Water Tint", Color) = (0.06,0.18,0.28,0.82)
+        _CliffTint("Cliff Tint", Color) = (0.30,0.28,0.26,0.50)
+        _DeepWaterNormalStrength("Deep Water Normal Strength", Float) = 1.45
     }
 
     SubShader
@@ -72,6 +80,14 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 float4 _WaterVelocityB;
                 float _WaterNormalScaleB;
                 float _WaterHighlightStrength;
+                float4 _WastelandTint;
+                float4 _RockyTint;
+                float4 _WetlandTint;
+                float4 _CrystalTint;
+                float4 _RuinsTint;
+                float4 _DeepWaterTint;
+                float4 _CliffTint;
+                float _DeepWaterNormalStrength;
             CBUFFER_END
 
             struct Attributes
@@ -133,6 +149,30 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 return SafeNormalizeTangentNormal(lerp(half3(0, 0, 1), decodedNormalTS, saturate(detailMask)));
             }
 
+            float4 LayerTint(uint layerIndex)
+            {
+                if (layerIndex == 1u)
+                    return _RockyTint;
+                if (layerIndex == 2u)
+                    return _WetlandTint;
+                if (layerIndex == 3u)
+                    return _CrystalTint;
+                if (layerIndex == 4u)
+                    return _RuinsTint;
+                if (layerIndex == 5u)
+                    return _DeepWaterTint;
+                if (layerIndex == 6u)
+                    return _CliffTint;
+                return _WastelandTint;
+            }
+
+            float3 GradeLayerBaseColor(float3 sourceColor, float4 tint)
+            {
+                float luminance = dot(sourceColor, float3(0.2126, 0.7152, 0.0722));
+                float3 graded = tint.rgb * lerp(0.65, 1.35, saturate(luminance));
+                return lerp(sourceColor, graded, saturate(tint.a));
+            }
+
             void InsertLayer(
                 uint candidateIndex,
                 float candidateWeight,
@@ -174,6 +214,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                     sampler_BaseColorArray,
                     worldUV,
                     layerIndex);
+                sample.baseColor.rgb = GradeLayerBaseColor(sample.baseColor.rgb, LayerTint(layerIndex));
                 sample.mask = SAMPLE_TEXTURE2D_ARRAY(
                     _MaskArray,
                     sampler_MaskArray,
@@ -205,8 +246,10 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                         sampler_NormalArray,
                         normalUVB,
                         layerIndex));
+                    float waterNormalStrength =
+                        clamp(_DeepWaterNormalStrength, 1.0, 1.6);
                     combinedNormalTS = SafeNormalizeTangentNormal(half3(
-                        normalA.xy + normalB.xy,
+                        (normalA.xy + normalB.xy) * waterNormalStrength,
                         max(0.001h, normalA.z * normalB.z)));
                     sample.waterHighlight = saturate(dot(normalA, normalB) * 0.5h + 0.5h);
                 }
@@ -333,7 +376,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                 surfaceData.occlusion = blendedMask.g;
                 surfaceData.smoothness = saturate(
                     blendedMask.a +
-                    waterHighlight * min(saturate(_WaterHighlightStrength), 0.12));
+                    waterHighlight * min(saturate(_WaterHighlightStrength), 0.22));
                 half4 litColor = UniversalFragmentPBR(inputData, surfaceData);
                 litColor.rgb = MixFog(litColor.rgb, inputData.fogCoord);
                 return litColor;

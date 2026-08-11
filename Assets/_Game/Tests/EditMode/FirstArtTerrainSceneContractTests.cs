@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using NUnit.Framework;
@@ -67,6 +68,22 @@ namespace WasteCity.Tests
             Layer,
             NestedReference,
             SameShapeObjectReplacement
+        }
+
+        public enum TerrainLightMutation
+        {
+            Missing,
+            Duplicate,
+            WrongName,
+            WrongParent,
+            InactiveOwner,
+            Disabled,
+            PointType,
+            WrongColor,
+            WrongIntensity,
+            HardShadows,
+            WrongCullingMask,
+            WrongRotation
         }
 
         private static readonly string[] TerrainNames =
@@ -157,6 +174,19 @@ namespace WasteCity.Tests
                     AssetDatabase.LoadAssetAtPath<
                         FirstArtTerrainProfile3D>(
                             FirstArtTerrainAssetBuilder.ProfilePath)));
+        }
+
+        [Test]
+        public void Scene_HasOneApprovedFirstArtTerrainDirectionalLight()
+        {
+            Scene scene =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = scene.GetRootGameObjects()
+                .Single(value => value.name == "GrayboxPrototype3D");
+            Light[] lights = Object.FindObjectsOfType<Light>(true);
+
+            Assert.That(lights.Length, Is.EqualTo(1));
+            AssertApprovedTerrainLight(lights[0], root.transform);
         }
 
         [Test]
@@ -722,6 +752,71 @@ namespace WasteCity.Tests
             AssertValidationRejects(fixture.Scene);
         }
 
+        [TestCase(TerrainLightMutation.Missing)]
+        [TestCase(TerrainLightMutation.Duplicate)]
+        [TestCase(TerrainLightMutation.WrongName)]
+        [TestCase(TerrainLightMutation.WrongParent)]
+        [TestCase(TerrainLightMutation.InactiveOwner)]
+        [TestCase(TerrainLightMutation.Disabled)]
+        [TestCase(TerrainLightMutation.PointType)]
+        [TestCase(TerrainLightMutation.WrongColor)]
+        [TestCase(TerrainLightMutation.WrongIntensity)]
+        [TestCase(TerrainLightMutation.HardShadows)]
+        [TestCase(TerrainLightMutation.WrongCullingMask)]
+        [TestCase(TerrainLightMutation.WrongRotation)]
+        public void AuthoringValidation_RejectsInvalidTerrainLight(
+            TerrainLightMutation mutation)
+        {
+            SceneFixture fixture = CreateValidFixture();
+            Light light = fixture.TerrainLight;
+            switch (mutation)
+            {
+                case TerrainLightMutation.Missing:
+                    Object.DestroyImmediate(light.gameObject);
+                    break;
+                case TerrainLightMutation.Duplicate:
+                    CreateApprovedTerrainLight(fixture.Root.transform);
+                    break;
+                case TerrainLightMutation.WrongName:
+                    light.gameObject.name = "RenamedTerrainLight";
+                    break;
+                case TerrainLightMutation.WrongParent:
+                    light.transform.SetParent(fixture.Owner.transform, false);
+                    break;
+                case TerrainLightMutation.InactiveOwner:
+                    light.gameObject.SetActive(false);
+                    break;
+                case TerrainLightMutation.Disabled:
+                    light.enabled = false;
+                    break;
+                case TerrainLightMutation.PointType:
+                    light.type = LightType.Point;
+                    break;
+                case TerrainLightMutation.WrongColor:
+                    light.color = Color.white;
+                    break;
+                case TerrainLightMutation.WrongIntensity:
+                    light.intensity = 0.5f;
+                    break;
+                case TerrainLightMutation.HardShadows:
+                    light.shadows = LightShadows.Hard;
+                    break;
+                case TerrainLightMutation.WrongCullingMask:
+                    light.cullingMask = 1;
+                    break;
+                case TerrainLightMutation.WrongRotation:
+                    light.transform.localRotation = Quaternion.identity;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mutation),
+                        mutation,
+                        null);
+            }
+
+            AssertValidationRejects(fixture.Scene);
+        }
+
         [Test]
         public void ConfigureTwice_SkipsTerrainBuilderAndPreservesProtectedState()
         {
@@ -741,16 +836,24 @@ namespace WasteCity.Tests
             Dictionary<string, ProtectedFileState> afterFirst =
                 CaptureProtectedFileStates();
             string[] idsAfterFirst = CaptureSceneGlobalIds();
+            string lightIdAfterFirst = CaptureTerrainLightGlobalId(ScenePath);
             GrayboxSceneAuthoring.Configure();
             Dictionary<string, ProtectedFileState> afterSecond =
                 CaptureProtectedFileStates();
             string[] idsAfterSecond = CaptureSceneGlobalIds();
+            string lightIdAfterSecond = CaptureTerrainLightGlobalId(ScenePath);
 
             Assert.That(builderCalled, Is.False);
             AssertProtectedStatesEqual(before, afterFirst, "first run");
             AssertProtectedStatesEqual(before, afterSecond, "second run");
-            Assert.That(idsAfterFirst, Is.EqualTo(idsBefore));
-            Assert.That(idsAfterSecond, Is.EqualTo(idsBefore));
+            Assert.That(
+                idsAfterFirst,
+                Is.SupersetOf(idsBefore),
+                "the first pass may add only the approved terrain light " +
+                "while preserving every existing GlobalObjectId");
+            Assert.That(idsAfterSecond, Is.EqualTo(idsAfterFirst));
+            Assert.That(lightIdAfterFirst, Is.Not.Empty);
+            Assert.That(lightIdAfterSecond, Is.EqualTo(lightIdAfterFirst));
         }
 
         private static void CreateTemporaryScene(Action<Scene> mutate)
@@ -1110,13 +1213,53 @@ namespace WasteCity.Tests
             GrayboxSceneBootstrap bootstrap =
                 bootstrapObject.AddComponent<GrayboxSceneBootstrap>();
             bootstrap.Configure(null, null, presenter);
+            Light terrainLight = CreateApprovedTerrainLight(root.transform);
             return new SceneFixture(
                 scene,
                 root,
                 owner,
                 presenter,
                 bootstrap,
+                terrainLight,
                 profile);
+        }
+
+        private static Light CreateApprovedTerrainLight(Transform root)
+        {
+            var owner = new GameObject("FirstArtTerrainDirectionalLight");
+            owner.transform.SetParent(root, false);
+            owner.transform.localRotation = Quaternion.Euler(50f, -30f, 0f);
+            Light light = owner.AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.color = new Color(1f, 0.956f, 0.85f, 1f);
+            light.intensity = 1.25f;
+            light.shadows = LightShadows.Soft;
+            light.cullingMask = ~0;
+            return light;
+        }
+
+        private static void AssertApprovedTerrainLight(
+            Light light,
+            Transform root)
+        {
+            Assert.That(light, Is.Not.Null);
+            Assert.That(light.gameObject.name,
+                Is.EqualTo("FirstArtTerrainDirectionalLight"));
+            Assert.That(light.transform.parent, Is.SameAs(root));
+            Assert.That(light.gameObject.activeSelf, Is.True);
+            Assert.That(light.enabled, Is.True);
+            Assert.That(light.type, Is.EqualTo(LightType.Directional));
+            Assert.That(light.color.r, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(light.color.g, Is.EqualTo(0.956f).Within(0.0001f));
+            Assert.That(light.color.b, Is.EqualTo(0.85f).Within(0.0001f));
+            Assert.That(light.color.a, Is.EqualTo(1f).Within(0.0001f));
+            Assert.That(light.intensity, Is.EqualTo(1.25f).Within(0.0001f));
+            Assert.That(light.shadows, Is.EqualTo(LightShadows.Soft));
+            Assert.That(light.cullingMask, Is.EqualTo(~0));
+            Vector3 euler = light.transform.localEulerAngles;
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(euler.x, 50f)), Is.LessThanOrEqualTo(0.01f));
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(euler.y, -30f)), Is.LessThanOrEqualTo(0.01f));
+            Assert.That(Mathf.Abs(Mathf.DeltaAngle(euler.z, 0f)), Is.LessThanOrEqualTo(0.01f));
         }
 
         private static void AssertValidationAccepts(Scene scene)
@@ -1494,6 +1637,20 @@ namespace WasteCity.Tests
             return values.ToArray();
         }
 
+        private static string CaptureTerrainLightGlobalId(string scenePath)
+        {
+            Scene scene = EditorSceneManager.OpenScene(
+                scenePath,
+                OpenSceneMode.Single);
+            List<GameObject> owners = FindNamedObjects(
+                scene,
+                "FirstArtTerrainDirectionalLight");
+            Assert.That(owners.Count, Is.EqualTo(1));
+            Light light = owners[0].GetComponent<Light>();
+            Assert.That(light, Is.Not.Null);
+            return GlobalObjectId.GetGlobalObjectIdSlow(light).ToString();
+        }
+
         private static string[] CaptureSceneGlobalIdentityKeys(
             IEnumerable<string> globalIds)
         {
@@ -1621,6 +1778,7 @@ namespace WasteCity.Tests
                 GameObject owner,
                 FirstArtTerrainRenderer3D presenter,
                 GrayboxSceneBootstrap bootstrap,
+                Light terrainLight,
                 FirstArtTerrainProfile3D profile)
             {
                 Scene = scene;
@@ -1628,6 +1786,7 @@ namespace WasteCity.Tests
                 Owner = owner;
                 Presenter = presenter;
                 Bootstrap = bootstrap;
+                TerrainLight = terrainLight;
                 Profile = profile;
             }
 
@@ -1636,6 +1795,7 @@ namespace WasteCity.Tests
             public GameObject Owner { get; }
             public FirstArtTerrainRenderer3D Presenter { get; }
             public GrayboxSceneBootstrap Bootstrap { get; }
+            public Light TerrainLight { get; }
             public FirstArtTerrainProfile3D Profile { get; }
         }
 

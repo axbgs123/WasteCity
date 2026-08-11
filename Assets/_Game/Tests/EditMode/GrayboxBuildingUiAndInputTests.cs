@@ -128,6 +128,89 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void InputRouter_SynchronizesBuildGridAcrossEveryInteractionState()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+
+            PressKey(fixture.Router, Key.B);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.CatalogOpen));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+
+            PressKey(fixture.Router, Key.B);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Inactive));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+
+            PressKey(fixture.Router, Key.B);
+            PressKey(fixture.Router, Key.Digit4);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Previewing));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D progressed =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    20,
+                    15,
+                    fixture.Presentation);
+            fixture.Construction.TickConstruction(.5f);
+            Assert.That(
+                fixture.Construction.SelectInstance(
+                    progressed.StableInstanceId),
+                Is.True);
+
+            PressKey(fixture.Router, Key.Delete);
+
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.CancelConfirmation));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+
+            PressKey(fixture.Router, Key.Escape);
+
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Previewing));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
+
+            PressMouse(fixture.Router, MouseButton.Right);
+
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(
+                    GrayboxBuildingInteractionState.Inactive));
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
+        }
+
+        [Test]
         public void InputRouter_BQuickbarRotateAndCancelFollowBuildState()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -137,6 +220,9 @@ namespace WasteCity.Tests
             Assert.That(fixture.Interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.CatalogOpen));
             Assert.That(catalog.Move, Is.False);
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.True);
 
             PressKey(fixture.Router, Key.Digit4);
             Assert.That(fixture.Interaction.State, Is.EqualTo(
@@ -154,6 +240,9 @@ namespace WasteCity.Tests
                 GrayboxBuildingInteractionState.Inactive));
             Assert.That(fixture.Interaction.Selected, Is.Null);
             Assert.That(cancelled.Destination, Is.True);
+            Assert.That(
+                fixture.Presentation.IsBuildGridVisible,
+                Is.False);
         }
 
         [Test]

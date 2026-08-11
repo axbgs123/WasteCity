@@ -117,6 +117,11 @@ namespace WasteCity.Graybox3D.Building
             CurrentHit = BuildingSurfaceHit.Invalid;
         }
 
+        public void SetBuildGridVisible(bool visible)
+        {
+            presentation?.SetBuildGridVisible(visible);
+        }
+
         private bool EvaluatePointer(Vector2 screenPosition)
         {
             if (evaluationWorkspace == null)

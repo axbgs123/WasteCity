@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.Rendering;
@@ -31,6 +32,14 @@ namespace WasteCity.Tests
             "_WaterVelocityB",
             "_WaterNormalScaleB",
             "_WaterHighlightStrength",
+            "_WastelandTint",
+            "_RockyTint",
+            "_WetlandTint",
+            "_CrystalTint",
+            "_RuinsTint",
+            "_DeepWaterTint",
+            "_CliffTint",
+            "_DeepWaterNormalStrength",
         };
 
         [Test]
@@ -73,8 +82,96 @@ namespace WasteCity.Tests
             AssertFloatProperty(shader, "_MacroVariation", 0.05f);
             AssertVectorProperty(shader, "_WaterVelocityA", new Vector4(0.006f, 0.002f, 0f, 0f));
             AssertVectorProperty(shader, "_WaterVelocityB", new Vector4(-0.003f, 0.005f, 0f, 0f));
-            AssertFloatProperty(shader, "_WaterNormalScaleB", 1.17f);
-            AssertFloatProperty(shader, "_WaterHighlightStrength", 0.12f);
+            AssertFloatProperty(shader, "_WaterNormalScaleB", 1.35f);
+            AssertFloatProperty(shader, "_WaterHighlightStrength", 0.21f);
+            AssertColorProperty(shader, "_WastelandTint", new Color(.52f, .38f, .22f, 0f));
+            AssertColorProperty(shader, "_RockyTint", new Color(.42f, .39f, .34f, .35f));
+            AssertColorProperty(shader, "_WetlandTint", new Color(.28f, .40f, .22f, .42f));
+            AssertColorProperty(shader, "_CrystalTint", new Color(.30f, .52f, .56f, .46f));
+            AssertColorProperty(shader, "_RuinsTint", new Color(.38f, .36f, .34f, .42f));
+            AssertColorProperty(shader, "_DeepWaterTint", new Color(.06f, .18f, .28f, .82f));
+            AssertColorProperty(shader, "_CliffTint", new Color(.30f, .28f, .26f, .50f));
+            AssertFloatProperty(shader, "_DeepWaterNormalStrength", 1.45f);
+        }
+
+        [Test]
+        public void MasterShader_LayerColorGradingUsesExactUniqueMaterialValues()
+        {
+            Material material = LoadRequired<Material>(
+                FirstArtTerrainAssetBuilder.MaterialPath);
+            var expected = new Dictionary<string, Color>
+            {
+                { "_WastelandTint", new Color(.52f, .38f, .22f, 0f) },
+                { "_RockyTint", new Color(.42f, .39f, .34f, .35f) },
+                { "_WetlandTint", new Color(.28f, .40f, .22f, .42f) },
+                { "_CrystalTint", new Color(.30f, .52f, .56f, .46f) },
+                { "_RuinsTint", new Color(.38f, .36f, .34f, .42f) },
+                { "_DeepWaterTint", new Color(.06f, .18f, .28f, .82f) },
+                { "_CliffTint", new Color(.30f, .28f, .26f, .50f) },
+            };
+
+            foreach (KeyValuePair<string, Color> pair in expected)
+            {
+                Assert.That(material.HasColor(pair.Key), Is.True, pair.Key);
+                Assert.That(material.GetColor(pair.Key), Is.EqualTo(pair.Value), pair.Key);
+            }
+            Assert.That(expected.Values, Is.Unique);
+            Assert.That(material.GetColor("_WastelandTint").a, Is.Zero);
+            Assert.That(
+                material.GetFloat("_DeepWaterNormalStrength"),
+                Is.EqualTo(1.45f).Within(.000001f));
+        }
+
+        [Test]
+        public void MasterShader_GradesEachFullLayerBeforeTopThreeBlend()
+        {
+            string source = LoadShaderSource();
+            const string gradeCall =
+                "sample.baseColor.rgb = GradeLayerBaseColor(sample.baseColor.rgb, LayerTint(layerIndex));";
+            int sampleFunction = source.IndexOf(
+                "LayerSample SampleLayer(uint layerIndex, float2 worldUV)",
+                StringComparison.Ordinal);
+            int gradeIndex = source.IndexOf(gradeCall, StringComparison.Ordinal);
+            int blendIndex = source.IndexOf(
+                "half4 blendedBaseColor =",
+                StringComparison.Ordinal);
+
+            Assert.That(sampleFunction, Is.GreaterThanOrEqualTo(0));
+            Assert.That(gradeIndex, Is.GreaterThan(sampleFunction));
+            Assert.That(blendIndex, Is.GreaterThan(gradeIndex));
+            Assert.That(CountOccurrences(source, gradeCall), Is.EqualTo(1));
+            Assert.That(
+                CountOccurrences(source, "LayerSample sample0 = SampleLayer("),
+                Is.EqualTo(1));
+            Assert.That(
+                CountOccurrences(source, "LayerSample sample1 = SampleLayer("),
+                Is.EqualTo(1));
+            Assert.That(
+                CountOccurrences(source, "LayerSample sample2 = SampleLayer("),
+                Is.EqualTo(1));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "float luminance = dot(sourceColor, float3(0.2126, 0.7152, 0.0722));"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "float3 graded = tint.rgb * lerp(0.65, 1.35, saturate(luminance));"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "return lerp(sourceColor, graded, saturate(tint.a));"));
+
+            Color sourceColor = new Color(.4f, .3f, .2f, .73f);
+            Color neutral = GradeLayerReference(
+                sourceColor,
+                new Color(.52f, .38f, .22f, 0f));
+            Assert.That(neutral, Is.EqualTo(sourceColor));
+            Color intermediate = GradeLayerReference(
+                sourceColor,
+                new Color(.28f, .40f, .22f, .42f));
+            Assert.That(intermediate, Is.Not.EqualTo(sourceColor));
+            Assert.That(intermediate.a, Is.EqualTo(sourceColor.a));
         }
 
         [Test]
@@ -197,6 +294,68 @@ namespace WasteCity.Tests
             Assert.That(
                 source,
                 Does.Contain("half3 blendedNormalTS = SafeNormalizeTangentNormal("));
+        }
+
+        [Test]
+        public void MasterShader_DeepWaterUsesTwoDirectionsAndBoundedHighlight()
+        {
+            string source = LoadShaderSource();
+            Material material = LoadRequired<Material>(
+                FirstArtTerrainAssetBuilder.MaterialPath);
+
+            Assert.That(
+                material.GetFloat("_WaterNormalScaleB"),
+                Is.EqualTo(1.35f).Within(.000001f));
+            Assert.That(
+                material.GetFloat("_WaterHighlightStrength"),
+                Is.EqualTo(.21f).Within(.000001f));
+            Assert.That(
+                material.GetFloat("_DeepWaterNormalStrength"),
+                Is.EqualTo(1.45f).Within(.000001f));
+            Assert.That(
+                material.GetVector("_WaterVelocityA"),
+                Is.EqualTo(new Vector4(.006f, .002f, 0f, 0f)));
+            Assert.That(
+                material.GetVector("_WaterVelocityB"),
+                Is.EqualTo(new Vector4(-.003f, .005f, 0f, 0f)));
+            Assert.That(
+                Vector2.Dot(
+                    new Vector2(.006f, .002f).normalized,
+                    new Vector2(-.003f, .005f).normalized),
+                Is.Not.EqualTo(1f).Within(.0001f));
+            Assert.That(
+                Regex.Matches(
+                    source,
+                    @"SAMPLE_TEXTURE2D_ARRAY\(\s*_NormalArray,"),
+                Has.Count.EqualTo(2));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "min(saturate(_WaterHighlightStrength), 0.22)"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "clamp(_DeepWaterNormalStrength, 1.0, 1.6)"));
+            int deepWaterBranch = source.IndexOf(
+                "if (layerIndex == 5u)",
+                source.IndexOf("half3 combinedNormalTS", StringComparison.Ordinal),
+                StringComparison.Ordinal);
+            int strengthUse = source.IndexOf(
+                "clamp(_DeepWaterNormalStrength, 1.0, 1.6)",
+                StringComparison.Ordinal);
+            int branchClose = source.IndexOf(
+                "sample.normalTS = ApplyDetailMaskToNormal",
+                deepWaterBranch,
+                StringComparison.Ordinal);
+            Assert.That(strengthUse, Is.GreaterThan(deepWaterBranch));
+            Assert.That(strengthUse, Is.LessThan(branchClose));
+            Assert.That(
+                CountOccurrences(source, "_DeepWaterNormalStrength"),
+                Is.EqualTo(3),
+                "property, CBUFFER and the DeepWater clamp are the only allowed uses");
+            Assert.That(source, Does.Not.Contain("surfaceData.emission ="));
+            Assert.That(source, Does.Not.Contain("\"Queue\" = \"Transparent\""));
+            Assert.That(source, Does.Not.Contain("new MeshRenderer"));
         }
 
         [Test]
@@ -349,6 +508,21 @@ namespace WasteCity.Tests
                 : gated.normalized;
         }
 
+        private static Color GradeLayerReference(Color source, Color tint)
+        {
+            float luminance =
+                source.r * .2126f + source.g * .7152f + source.b * .0722f;
+            float scale = Mathf.Lerp(.65f, 1.35f, Mathf.Clamp01(luminance));
+            var graded = new Color(
+                tint.r * scale,
+                tint.g * scale,
+                tint.b * scale,
+                source.a);
+            Color result = Color.Lerp(source, graded, Mathf.Clamp01(tint.a));
+            result.a = source.a;
+            return result;
+        }
+
         private static bool IsFinite(Vector3 value)
         {
             return !float.IsNaN(value.x) && !float.IsInfinity(value.x) &&
@@ -405,6 +579,24 @@ namespace WasteCity.Tests
             Assert.That(index, Is.GreaterThanOrEqualTo(0), propertyName);
             Assert.That(shader.GetPropertyType(index), Is.EqualTo(ShaderPropertyType.Float), propertyName);
             Assert.That(shader.GetPropertyDefaultFloatValue(index), Is.EqualTo(expectedDefault), propertyName);
+        }
+
+        private static void AssertColorProperty(
+            Shader shader,
+            string propertyName,
+            Color expectedDefault)
+        {
+            int index = shader.FindPropertyIndex(propertyName);
+            Assert.That(index, Is.GreaterThanOrEqualTo(0), propertyName);
+            Assert.That(shader.GetPropertyType(index), Is.EqualTo(ShaderPropertyType.Color), propertyName);
+            Assert.That(
+                shader.GetPropertyDefaultVectorValue(index),
+                Is.EqualTo(new Vector4(
+                    expectedDefault.r,
+                    expectedDefault.g,
+                    expectedDefault.b,
+                    expectedDefault.a)),
+                propertyName);
         }
 
         private readonly struct AssetState : IEquatable<AssetState>

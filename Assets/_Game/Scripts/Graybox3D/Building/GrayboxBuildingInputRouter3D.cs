@@ -37,6 +37,21 @@ namespace WasteCity.Graybox3D.Building
 
         public GrayboxInputSuppression ProcessCurrentInput()
         {
+            try
+            {
+                return ProcessCurrentInputCore();
+            }
+            finally
+            {
+                placement?.SetBuildGridVisible(
+                    interaction != null &&
+                    interaction.State !=
+                    GrayboxBuildingInteractionState.Inactive);
+            }
+        }
+
+        private GrayboxInputSuppression ProcessCurrentInputCore()
+        {
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
             Vector2 pointerPosition =
