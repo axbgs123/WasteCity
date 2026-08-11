@@ -1433,7 +1433,10 @@ git commit -m "test: verify first terrain runtime scene"
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
 - Modify after the real GUI memory capture exceeds the approved budget: `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
+- Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset`
+- Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset`
 - Regenerate in place with the same GUID: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset`
+- Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset`
 - Create for deterministic native-resolution evidence: `Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs`
 - Create: `Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta`
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs`
@@ -1676,18 +1679,27 @@ Add a failing builder test before changing production. It must require the real
 Mask to be `TextureFormat.BC7` and the four loaded arrays to remain within a
 `128 MiB` hard ceiling when measured with
 `Profiler.GetRuntimeMemorySizeLong`; RED must show that the current Mask is
-RGBA32 and the current sum exceeds the ceiling. Preserve the existing exact 2048 size,
+RGBA32 and the current readable CPU+GPU sum is `489,337,982 B`, above the
+ceiling. The GREEN contract also requires `isReadable == false` for all four
+generated runtime arrays; this releases their Editor/player CPU copies after
+generation rather than counting both CPU and GPU storage. Preserve the existing exact 2048 size,
 seven-slice order, 12 mip levels, linear color space, Repeat wrap, source GUID,
 source PNG bytes, source `.meta` bytes, importer readability/platform settings,
 generated Mask GUID and two-build deterministic identity contracts.
 
 Change only `FirstArtTerrainAssetBuilder.cs` to build the runtime Mask as 2048
-linear BC7 at `TextureCompressionQuality.Best`. Keep the seven source Mask PNGs
-and their import policy uncompressed and untouched. Use per-slice temporary
-readable linear RGBA32 staging textures, render/read mip 0 without color-space
-conversion, generate the mip chain, call `EditorUtility.CompressTexture`, copy
-all compressed mips into one BC7 `Texture2DArray`, and destroy every temporary
-Texture/RenderTexture in `finally`. The existing all-arrays preflight and
+linear BC7 at `TextureCompressionQuality.Best` and to finalize BaseColor,
+Normal, Mask and Height runtime arrays as non-readable after their complete mip
+data is populated. Use Unity's supported `Apply(...,
+makeNoLongerReadable: true)`/native texture path in an order that preserves the
+copied GPU content; the focused pixel tests must run against the reloaded
+persistent non-readable assets, not a readable staging object. Keep the seven
+source Mask PNGs and their import policy uncompressed and untouched. Use
+per-slice temporary readable linear RGBA32 staging textures, render/read mip 0
+without color-space conversion, generate the mip chain, call
+`EditorUtility.CompressTexture`, copy all compressed mips into one BC7
+`Texture2DArray`, and destroy every temporary Texture/RenderTexture in
+`finally`. The existing all-arrays preflight and
 persist-after-success transaction remains in force; a compression/readback/copy
 failure must leave all four persistent arrays and all source assets byte- and
 GUID-identical to their pre-call state.
@@ -1697,15 +1709,19 @@ The GREEN test must require:
 ```text
 Mask: 2048×2048×7, 12 mips, linear BC7, Repeat;
 BaseColor/Normal/Height formats and dimensions unchanged;
+BaseColor/Normal/Mask/Height persistent arrays all report isReadable=false;
 sum of Profiler.GetRuntimeMemorySizeLong for the four loaded arrays ≤128 MiB;
-expected sum reported near the approved approximately-120-MB target;
+expected loaded sum reported near `127,227,775 B` (`121.33 MiB`) and the
+approved approximately-120-MB target;
 64 deterministic mip-0 sample coordinates per slice against the source Mask,
 with each channel absolute error ≤16 and mean absolute channel error ≤4;
 two builds preserve all source states, all four array GUIDs and identical second-build contents;
 the Mask `.meta` GUID is unchanged and the regenerated `.asset` remains Git LFS-backed.
 ```
 
-Regenerate `TA_Terrain_Mask.asset` in place only after the focused tests pass.
+Regenerate all four array assets in place only after the focused tests pass;
+BaseColor/Normal/Height pixel content, formats, dimensions, mip counts and GUIDs
+must remain unchanged apart from the serialized non-readable storage flag.
 Then rerun asset-builder, profile, shader, scene-contract, performance and real
 runtime scene focused suites. Any source asset/meta change, unsupported BC7
 result, missing Mask channel, >128 MiB loaded sum or visual shader failure is a
@@ -1814,7 +1830,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
