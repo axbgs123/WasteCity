@@ -1902,6 +1902,88 @@ the real input path and verify the default camera returns to grid-hidden before
 recording the ten acceptance stills. The capture tool must restore interaction,
 grid and camera state in `finally`.
 
+- [ ] **Step 7A.3: Add bounded per-layer color grading after the grid-free recapture still fails**
+
+This correction is active because the grid-hidden recapture still failed the
+written technical visual gate: Rocky, Wetland, Crystal and Ruins remain too
+close to Wasteland, DeepWater is a black-gray crater/stain instead of blue-black
+water, and the existing normal-scale/highlight adjustment produces only
+`0.02–0.64/255` full-frame mean change across `t0/t5/t10`. The source textures,
+control-map ownership and seamless transitions are correct and remain frozen;
+the correction is bounded material color grading that preserves their detail.
+
+Add mutation-sensitive Shader tests first for exactly these new Color
+properties, whose alpha is the grading strength:
+
+```text
+_WastelandTint = (0.52, 0.38, 0.22, 0.00)
+_RockyTint     = (0.42, 0.39, 0.34, 0.35)
+_WetlandTint   = (0.28, 0.40, 0.22, 0.42)
+_CrystalTint   = (0.30, 0.52, 0.56, 0.46)
+_RuinsTint     = (0.38, 0.36, 0.34, 0.42)
+_DeepWaterTint = (0.06, 0.18, 0.28, 0.82)
+_CliffTint     = (0.30, 0.28, 0.26, 0.50)
+_DeepWaterNormalStrength = 1.45
+```
+
+For each sampled layer, compute source luminance with Rec.709 weights, derive
+`graded = tint.rgb * lerp(0.65, 1.35, saturate(luminance))`, and lerp only the
+sample's BaseColor RGB toward `graded` by `saturate(tint.a)` before the existing
+top-three layer blend. Wasteland alpha `0` must be byte-for-byte behaviorally
+neutral. The grading must not affect alpha, Normal, Metallic, AO, Smoothness,
+Height, control weights, blend widths or candidate selection. Crystal remains
+opaque/non-emissive. Every tint alpha is clamped by `saturate` in Shader code;
+the independent DeepWater normal strength uses the explicit clamp below.
+
+Inside the existing DeepWater-only two-normal branch, multiply the combined
+tangent-space normal XY by `clamp(_DeepWaterNormalStrength, 1.0, 1.6)` and safely
+renormalize before the existing Mask-B normal-detail gate. This property must
+not affect any other layer or any non-normal channel. Keep the existing two
+non-parallel Profile velocities and the approved `1.35/.21/.22` scale,
+highlight and cap values. Update `MAT_Terrain_FirstPass.mat` in place with the
+exact values above; do not modify the Profile, renderer, asset builder, source
+arrays or add a new texture/property owner.
+
+Shader tests must prove all exact defaults/material values, Wasteland neutral
+endpoint, a nontrivial intermediate tint, each category's unique tint, bounded
+DeepWater normal strength, exactly three full layer samples plus the one
+DeepWater Normal-only sample, and absence of emission, transparency, extra
+Renderer or CPU water loop. A temporary mutation removing tint application,
+applying tint after layer blending, changing Wasteland alpha, or letting the
+normal strength touch another layer/channel must produce RED before GREEN.
+
+Extend `FirstArtTerrainEvidenceCapture` and its tests with one exact DeepWater
+cell ROI derived from the recorded logical cell and frozen camera projection.
+Project the four ground-plane cell corners into the native 1920x1080 image,
+compute their screen-space centroid `C`, and define each inset vertex exactly as
+`C + 0.65 * (corner - C)` so the inset retains 65% of each projected dimension;
+pixel centers inside or on the boundary of that resulting convex quadrilateral
+are the ROI. All four inset vertices must be finite and inside the image and the
+ROI must contain at least 64 pixels; clipping, an empty/smaller ROI or an invalid
+projection is a hard capture failure rather than a skipped gate.
+
+Decode the captured PNGs as unsigned 8-bit sRGB and use RGB only, ignoring
+alpha. `mean R/G/B` is the arithmetic mean of the corresponding byte divided by
+255. Per-pixel luminance is `(0.2126*R + 0.7152*G + 0.0722*B)/255`, and reported
+luminance is its ROI arithmetic mean. Per-pixel motion delta for a frame pair is
+`(abs(Ra-Rb) + abs(Ga-Gb) + abs(Ba-Bb)) / (3*255)` at the same pixel; sort those
+scalar deltas and take the nearest-rank 95th percentile. Evaluate exactly the
+three pairs `t0-t5`, `t5-t10` and `t0-t10`. Nearest-rank P95 means the
+`ceil(0.95*N)`-th element of the ascending sorted values using one-based rank.
+
+Across each real `t0/t5/t10` ROI, require blue-black water: `mean B >= mean R *
+1.25`, `mean B >= mean G * 1.10`, and mean luminance between `15/255` and
+`90/255`, inclusive. For motion, at least one of the three exact pairs must have
+both arithmetic mean delta `>=1.0/255` and nearest-rank P95 delta `>=3/255`.
+Add mutation-sensitive fixtures for projection/inset, out-of-frame and
+under-64-pixel rejection, sRGB channel/luminance arithmetic, all three pair
+enumeration, per-pixel delta, nearest-rank P95 and every threshold boundary.
+These numeric gates supplement rather than replace the independent visual
+review. Regenerate the full ten stills, diagnostic grid still, strict 300-frame
+MP4 and clean Profiler package. If the seven categories still cannot be
+identified or DeepWater still reads as a pit/stain, stop for user direction; do
+not add stronger hidden constants, edit source art or alter terrain rules.
+
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
 Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
