@@ -28,10 +28,14 @@
 - `Assets/_Game/Scenes/GrayboxPrototype3D.unity`：由批准 authoring 重建的正式默认 3D 场景；禁止手工编辑 YAML。
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`：共享 UGUI 中的部署失败提示与建筑位置/运行限制说明。
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`：现有 `F` 仲裁者；只转发部署调用真实返回的失败文本，不复制失败判断。
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`：开发夹具人口真值与目录 revision；正常游戏人口规则不在本任务修改。
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`：Editor/Development 人口修改命令的薄适配。
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`：F10 面板的人口输入和可点击命令；Release 继续惰性无 UI。
 - `Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs`：默认出生格、世界坐标和基础场景引用合同。
 - `Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs`：方向光的 authoring、验证和幂等合同。
 - `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs`：部署失败文本从真实请求结果到菜单的转发合同。
 - `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`：共享状态提示可见性和建筑详情“位置/运行”信息合同。
+- `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs`：人口命令 API、revision、F10 UGUI 可达性和 Release 投影合同。
 - `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`：真实虚拟键盘 `F`、部署完成、内城九建筑矩阵和限制对照。
 - `Docs/06-User-Feedback-and-Change-Control-ZH.md`：最终提交、RED/GREEN、矩阵结论与人工复验状态回写。
 
@@ -188,35 +192,60 @@ git commit -m "fix: reduce first art terrain lighting"
 ### Task 4: Close The Mobile Inner-City Building Report
 
 **Files:**
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
+- Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - Modify: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
+- Test: `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs`
 - Test: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Test: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`
 
 **Interfaces:**
 - Consumes: `BuildingCatalog.BuildMenu`, `BuildingMobilityRules.SupportsSite`, `BuildingMobilityRules.CanConstruct`, `GrayboxDeveloperModifier3D`, and `GrayboxBuildingPlacementController3D.CurrentEvaluation`.
-- Produces: an executable nine-building evidence matrix and visible `运行 <OperationName>` card detail.
+- Produces: `GrayboxBuildingSession3D.SetPopulationForDevelopment(int value)`, `GrayboxDeveloperModifier3D.SetPopulation(int value)`, an executable nine-building evidence matrix, and visible `运行 <OperationName>` card detail.
 
 - [ ] **Step 1: Evaluate the Task 1 matrix result before production changes**
 
-If all nine definitions produce valid inner previews and both counterexamples produce their exact expected failure, record that the placement engine is correct and proceed with the label-only clarity fix. If a listed success definition fails for a reason other than a test fixture's missing prerequisite, stop, preserve the failing XML, and add the exact owning production path to this plan before editing it.
+The first formal-scene diagnostic produced a real RED: `ConsciousnessNetwork` failed only with `PopulationRequired` because the development session is fixed at population `200`, the definition requires `1000`, and the existing F10 modifier has no population command. Preserve `/tmp/wastecity-playtest-fixes/diagnostic/mobile-inner.xml` as evidence. Do not lower the definition requirement or raise default population globally.
 
-- [ ] **Step 2: Add operation information to every catalog detail card**
+- [ ] **Step 2: Write population modifier RED tests**
+
+In `GrayboxDeveloperModifierTests`, require exact public signature `System.Boolean SetPopulation(Int32)` on `GrayboxDeveloperModifier3D`; assert `-1` is rejected without mutation, `2000` updates `session.Population` and advances `CatalogRevision` exactly once, and setting `2000` again is accepted without another revision. In the runtime development-surface fixture, enter `2000` into `Population Amount`, submit `Set Population` through the real UGUI `Button`, and assert population changes. Keep the existing Release projection test green: no development panel or Missing Script in non-development builds.
+
+- [ ] **Step 3: Run population modifier RED**
+
+```bash
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_PATH" -runTests -testPlatform EditMode -testFilter WasteCity.Tests.GrayboxDeveloperModifierTests -testResults /tmp/wastecity-playtest-fixes/red/modifier-population.xml -logFile /tmp/wastecity-playtest-fixes/red/modifier-population.log
+```
+
+Expected: only the missing `SetPopulation`/population UI contract fails; existing modifier behaviors remain green.
+
+- [ ] **Step 4: Implement a development-only population command**
+
+Add `GrayboxBuildingSession3D.SetPopulationForDevelopment(int value)` that clamps to nonnegative values, changes `Population` only when the value differs, and advances `CatalogRevision` exactly once on change. Add `GrayboxDeveloperModifier3D.SetPopulation(int value)` returning `false` for negative input and otherwise delegating to the session. Add `Population Amount` (initial `200`) plus `Set Population` button to the existing shared F10 panel; parsing failure performs no mutation. Do not add a gameplay population setter, default-population increase, per-frame polling, or Release-only serialized type.
+
+- [ ] **Step 5: Add operation information to every catalog detail card**
 
 In `BuildDetails`, insert `"运行 " + BuildingMobilityRules.OperationName(definition.Operation)` immediately after the existing `位置` line. Do not change definition placement/operation values, research IDs, costs, prerequisites, population, or category visibility.
 
-- [ ] **Step 3: Run matrix and UI GREEN suites**
+- [ ] **Step 6: Re-run the matrix using the real modifier population command**
+
+Before previewing the nine definitions, assert `modifier.SetPopulation(2000)` succeeds and `session.Population == 2000`. Keep the literal nine-definition set, prerequisite construction sequence, ResearchStation `InvalidCityMode` counterexample and Housing `InsufficientMaterials` counterexample unchanged.
+
+- [ ] **Step 7: Run matrix, modifier, and UI GREEN suites**
 
 ```bash
 "$UNITY_BIN" -batchmode -projectPath "$PROJECT_PATH" -runTests -testPlatform EditMode -testFilter WasteCity.Tests.GrayboxBuildingUiAndInputTests -testResults /tmp/wastecity-playtest-fixes/green/ui.xml -logFile /tmp/wastecity-playtest-fixes/green/ui.log
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_PATH" -runTests -testPlatform EditMode -testFilter WasteCity.Tests.GrayboxDeveloperModifierTests -testResults /tmp/wastecity-playtest-fixes/green/modifier-population.xml -logFile /tmp/wastecity-playtest-fixes/green/modifier-population.log
 "$UNITY_BIN" -batchmode -projectPath "$PROJECT_PATH" -runTests -testPlatform PlayMode -testFilter WasteCity.Tests.GrayboxBuildingRuntimeSceneTests -testResults /tmp/wastecity-playtest-fixes/green/runtime.xml -logFile /tmp/wastecity-playtest-fixes/green/runtime.log
 ```
 
 Expected: nine literal mobile-inner definitions are valid after prerequisites, ResearchStation is rejected in Mobile with `InvalidCityMode`, insufficient materials remain `InsufficientMaterials`, and UI details expose both location and operation.
 
-- [ ] **Step 4: Commit the matrix evidence and clarity fix**
+- [ ] **Step 8: Commit the matrix evidence and clarity fix**
 
 ```bash
-git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs
+git add Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs
 git diff --cached --check
 git commit -m "fix: clarify mobile inner city building limits"
 ```
