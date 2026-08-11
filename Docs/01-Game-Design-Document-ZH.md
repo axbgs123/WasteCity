@@ -292,7 +292,7 @@
 
 ### A4.2 移动与展开
 
-> 已批准需求：`IDEA-0001`，详见 `Docs/06-User-Feedback-and-Change-Control-ZH.md`。
+> 已批准需求：`IDEA-0001`、`IDEA-0005`，详见 `Docs/06-User-Feedback-and-Change-Control-ZH.md`。
 
 ```text
 移动中 → 展开中 → 已展开 → 收起中 → 移动中
