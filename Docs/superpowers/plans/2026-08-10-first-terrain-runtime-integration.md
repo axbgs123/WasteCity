@@ -1426,11 +1426,18 @@ git commit -m "test: verify first terrain runtime scene"
 - Create: `Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta`
 - Modify after the measured 96×64 probe exceeds 250 ms and profiling isolates control-map generation as the bottleneck: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`
 - Modify with that performance correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs`
-- Modify after rejected visual review only: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
-- Modify after rejected visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader`
-- Modify after rejected visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset`
-- Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
-- Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtTerrainProfile3D.asset`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`
+- Modify after rejected technical or user visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
+- Modify after technical visual review identifies the always-on building grid: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
+- Modify with that grid-visibility correction: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`
+- Modify with that grid-visibility correction: `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
+- Modify with that grid-visibility correction: `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`
+- Modify with that grid-visibility correction: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
+- Modify with that grid-visibility correction: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`
 - Modify after the real GUI memory capture exceeds the approved budget: `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`
@@ -1822,6 +1829,68 @@ fallback terrain, unchanged 300-frame DeepWater hash set, unexpected scene
 identity change, second-pass byte difference or change outside these approved
 paths remains a stop gate.
 
+- [ ] **Step 7A.2: Remove the normal-play grid overlay and strengthen existing DeepWater motion**
+
+This correction is active because the post-lighting technical visual review is
+`NOT READY` with `0 Critical / 3 Important / 0 Minor`: the always-on
+`building.grid.ground`/`building.grid.inner-city` hard lines obscure terrain
+seams; DeepWater reads as a black-gray stain rather than moving blue-black
+water; and the seven classes cannot be judged reliably until the overlay is
+removed. Do not broaden this first correction into a new terrain-color system.
+
+Add failing view/input tests before production. `GrayboxBuildingWorldView3D`
+must expose allocation-free, idempotent `SetBuildGridVisible(bool)` and a
+read-only `IsBuildGridVisible` diagnostic. The untouched default state is
+hidden. Every rehydrate applies the current requested state: an untouched view
+stays hidden, while a view explicitly set visible before reconfigure/rehydrate
+restores the regenerated grid roots as visible. Hidden means only the two existing grid roots/renderers are inactive;
+their stable IDs, Meshes, Renderers and owned roots remain alive. Preview,
+resource-node highlight, building instances and colliders are unchanged.
+Calling `SetBuildGridVisible(true)` before a view reconfigure/rehydrate must
+reapply visible state to the regenerated grid roots; calling it with the same
+value for 300 warmed calls allocates 0 B.
+
+Add a narrow `GrayboxBuildingPlacementController3D.SetBuildGridVisible(bool)`
+delegate to its already-serialized presentation reference. The building input
+router remains the single state-to-grid owner and must synchronize the grid in
+the same `ProcessCurrentInput` call on every return path: `Inactive` hides;
+`CatalogOpen`, `Previewing` and `CancelConfirmation` show. Use the existing
+interaction state only—do not cache a second build-mode state, use
+`FindObjectOfType`, alter placement legality or add scene references. Real
+virtual-keyboard PlayMode must prove default hidden, `B` shows, second `B`
+hides, selecting/previewing remains shown, right-click/Escape cancel hides, and
+cancel-confirmation remains shown. UI-focus, pause and evacuation early returns
+must leave visibility synchronized with the current interaction state.
+
+In the existing terrain Shader/property surface only, change
+`_WaterNormalScaleB` from `1.17` to `1.35` and
+`_WaterHighlightStrength` from `0.12` to `0.21`; raise the existing bounded
+smoothness-highlight cap from `0.12` to `0.22`. Update the existing Material in
+place and update mutation-sensitive Shader tests for the exact defaults, cap,
+two non-parallel low-speed normal directions, exactly one additional water
+normal sample, and no emission/transparent/new Renderer/property. Do not change
+source PNGs, texture arrays, Profile, control maps, blend widths, gameplay
+terrain, collision or build placement.
+
+Run the grid focused suites, building runtime scene suite, Shader suite and all
+affected terrain/runtime suites. Then regenerate the same-camera ten stills,
+DeepWater `t0/t5/t10`, strict 300-frame MP4 and clean Profiler window. Technical
+review must first confirm the normal/default still contains no visible grid,
+the grid is visible in a separate build-mode diagnostic capture, DeepWater
+motion/highlight is perceptible and water-like, and all seven classes are more
+readable without the overlay. If DeepWater still is not recognizably blue-black
+water or the seven classes remain too similar, stop and authorize the separately
+listed bounded Profile/renderer tint correction; do not keep tuning hidden
+constants or alter all terrain hues in this step.
+
+The build-mode diagnostic is a separate raw 1920×1080 file at
+`/tmp/wastecity-first-terrain/visual-review/12-build-mode-grid-diagnostic.png`;
+it is not one of the ten user acceptance stills. Produce it only after a real
+virtual `B` input opens the catalog/build state, then close that state through
+the real input path and verify the default camera returns to grid-hidden before
+recording the ten acceptance stills. The capture tool must restore interaction,
+grid and camera state in `finally`.
+
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
 Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
@@ -1932,7 +2001,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/GrayboxSceneAuthoring.cs Assets/_Game/Editor/FirstArtPassImportPolicy.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scenes/GrayboxPrototype3D.unity Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/GrayboxSceneAuthoring.cs Assets/_Game/Editor/FirstArtPassImportPolicy.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scenes/GrayboxPrototype3D.unity Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/MAT_Terrain_FirstPass.mat Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Shaders/WasteCityFirstPassTerrain.shader Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
