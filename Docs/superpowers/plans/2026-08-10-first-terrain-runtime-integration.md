@@ -1690,10 +1690,16 @@ generated Mask GUID and two-build deterministic identity contracts.
 Change only `FirstArtTerrainAssetBuilder.cs` to build the runtime Mask as 2048
 linear BC7 at `TextureCompressionQuality.Best` and to finalize BaseColor,
 Normal, Mask and Height runtime arrays as non-readable after their complete mip
-data is populated. Use Unity's supported `Apply(...,
-makeNoLongerReadable: true)`/native texture path in an order that preserves the
-copied GPU content; the focused pixel tests must run against the reloaded
-persistent non-readable assets, not a readable staging object. Keep the seven
+data is populated. For each final `Texture2DArray`, write every slice and every
+mip into its CPU backing with `SetPixelData`; only after the array is complete,
+call `Apply(updateMipmaps: false, makeNoLongerReadable: true)` exactly once.
+After that call, do not call `SetPixelData` or `Apply` again: persist, save,
+reimport and reload the asset directly. It is explicitly forbidden to populate
+a final array with GPU `Graphics.CopyTexture` and then call `Apply`, because the
+CPU upload may overwrite the already-copied GPU content. GPU copy/readback is
+allowed only for temporary staging before bytes are written to the final array.
+The focused pixel tests must run against the reloaded persistent non-readable
+assets, not a readable staging object. Keep the seven
 source Mask PNGs and their import policy uncompressed and untouched. Use
 per-slice temporary readable linear RGBA32 staging textures, render/read mip 0
 without color-space conversion, generate the mip chain, call
@@ -1718,6 +1724,15 @@ with each channel absolute error ≤16 and mean absolute channel error ≤4;
 two builds preserve all source states, all four array GUIDs and identical second-build contents;
 the Mask `.meta` GUID is unchanged and the regenerated `.asset` remains Git LFS-backed.
 ```
+
+Replace the old readable-array test assumptions as part of the same approved
+test-file change. `AssertArrayContract` must require `isReadable == false` after
+`SaveAssets`/reimport/reload. Every BaseColor, Normal, Mask and Height generated
+array pixel assertion must use GPU readback (`RenderTexture` + `ReadPixels` or
+`AsyncGPUReadback`) and must not call `GetPixelData`, `GetPixels` or another CPU
+read API on a reloaded generated array. The existing temporary-readable source
+Height `GetPixelData<ushort>` path remains allowed because it reads the source
+inside the protected importer scope, not a persistent runtime array.
 
 Regenerate all four array assets in place only after the focused tests pass;
 BaseColor/Normal/Height pixel content, formats, dimensions, mip counts and GUIDs
