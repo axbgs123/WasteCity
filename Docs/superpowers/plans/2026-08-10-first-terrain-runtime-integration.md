@@ -1435,6 +1435,9 @@ git commit -m "test: verify first terrain runtime scene"
 - Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs`
+- Modify after the real capture proves the approved Lit materials have no scene lighting: `Assets/_Game/Editor/GrayboxSceneAuthoring.cs`
+- Regenerate in place through that authoring path: `Assets/_Game/Scenes/GrayboxPrototype3D.unity`
+- Modify with that lighting correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs`
 - Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset`
 - Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset`
 - Regenerate in place with the same GUID: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset`
@@ -1780,6 +1783,45 @@ Player memory capture on Windows 10/11 remains the authoritative check for
 whether the Editor-only duplicate is absent there; it is still unresolved and
 must not be marked passed from the macOS Editor result.
 
+- [ ] **Step 7A.1: Add one production directional light after the real capture proves the Lit scene is black**
+
+This correction is active because two independent real-URP capture attempts
+produced the same result: ten native 1920×1080 stills showed the formal terrain
+and graybox fallback as black rectangles, all 300 strictly consecutive
+DeepWater frames had an identical hash, and the serialized
+`GrayboxPrototype3D` scene contained no `Light` component. The formal terrain
+Shader and graybox material are both Lit, so an evidence-only light or a switch
+to Unlit would hide a production scene defect and is forbidden.
+
+Add failing scene-contract tests first. They must require exactly one enabled
+production `Light` owned by a direct child of `GrayboxPrototype3D` named
+`FirstArtTerrainDirectionalLight`, with `LightType.Directional`, neutral-warm
+color `(1.0, 0.956, 0.85, 1.0)`, intensity `1.25`, soft shadows, culling mask
+`Everything`, and deterministic local rotation `(50, -30, 0)` degrees within
+`0.01` tolerance. Missing, duplicate, wrong owner/name/type/color/intensity,
+disabled, wrong shadow mode, wrong culling mask or wrong rotation must fail.
+The pre-correction scene test is RED only because the light is absent.
+
+Extend `GrayboxSceneAuthoring` incrementally: after the already-approved
+foundation and first-art terrain preflight, ensure that exact direct-child
+GameObject and `Light` component, configure only the frozen fields above, then
+run the same final scene validation/save/normalization path. Do not create a
+Light in the evidence tool, do not change Project/Quality/URP settings, and do
+not add a second ambient/gameplay lighting truth. Preserve all existing scene
+object GlobalObjectIds and the new light's GlobalObjectId on the second authoring
+pass; the second pass must produce an identical scene byte hash. A malformed
+existing same-name owner or duplicate production Light must be rejected rather
+than silently deleted/replaced.
+
+Run the approved authoring command to regenerate `GrayboxPrototype3D.unity` in
+place, then rerun the focused scene contracts and the existing authoring
+identity/rollback suites. Extend the evidence-capture tests so every accepted
+formal/fallback still has non-black terrain coverage above a fixed luminance
+threshold while preserving the real-render requirement. A black formal or
+fallback terrain, unchanged 300-frame DeepWater hash set, unexpected scene
+identity change, second-pass byte difference or change outside these approved
+paths remains a stop gate.
+
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
 Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
@@ -1890,7 +1932,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtPassImportPolicy.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/GrayboxSceneAuthoring.cs Assets/_Game/Editor/FirstArtPassImportPolicy.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scenes/GrayboxPrototype3D.unity Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
