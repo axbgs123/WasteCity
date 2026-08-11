@@ -1911,6 +1911,47 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Menu_DetailsDistinguishMobileAndFortressInnerBuildings()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+
+            string housing = BuildDetails(presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Housing));
+            string research = BuildDetails(presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.ResearchStation));
+
+            Assert.That(housing, Does.Contain("位置 两者皆可"));
+            Assert.That(housing, Does.Contain("运行 移动可运行"));
+            Assert.That(research, Does.Contain("位置 两者皆可"));
+            Assert.That(research, Does.Contain("运行 仅展开运行"));
+        }
+
+        [Test]
+        public void Menu_DeploymentFailureIsVisibleOutsideBuildMode()
+        {
+            UiFixture fixture = CreateMenuFixture();
+
+            fixture.Menu.ShowDeploymentFailure(
+                "展开失败：地面不稳定或有大型废墟");
+
+            Transform status = FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            Text text = FindComponent<Text>(
+                status,
+                "Placement.Status.Text");
+            Assert.That(fixture.Interaction.State, Is.EqualTo(
+                GrayboxBuildingInteractionState.Inactive));
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            Assert.That(
+                text.text,
+                Is.EqualTo("展开失败：地面不稳定或有大型废墟"));
+        }
+
+        [Test]
         public void UiGuard_RealSelectableFocusOwnsKeyboardUntilFollowingFrame()
         {
             UiFixture fixture = CreateMenuFixture();

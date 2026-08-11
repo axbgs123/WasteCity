@@ -640,6 +640,15 @@ namespace WasteCity.Graybox3D.Building
                     ResearchCatalog.All[index].Id.Value);
         }
 
+        public void SetPopulationForDevelopment(int value)
+        {
+            EnsureConfigured();
+            int population = Math.Max(0, value);
+            if (Population == population) return;
+            Population = population;
+            AdvanceCatalogRevision();
+        }
+
         public void SetConstructionMultiplierForDevelopment(float value)
         {
             EnsureConfigured();

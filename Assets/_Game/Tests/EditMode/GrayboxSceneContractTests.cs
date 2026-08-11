@@ -251,8 +251,27 @@ namespace WasteCity.Tests
             Assert.That(fixture, Is.Not.Null);
             Assert.That(fixture.boolValue, Is.True);
 
-            Assert.That(city.transform.position.x, Is.EqualTo(-8f));
-            Assert.That(city.transform.position.z, Is.EqualTo(-5f));
+            Assert.That(city.transform.position.x, Is.EqualTo(-9f));
+            Assert.That(city.transform.position.y, Is.EqualTo(.5f));
+            Assert.That(city.transform.position.z, Is.EqualTo(-4f));
+            var coordinates = new PlanarCoordinateMapper3D(
+                GrayboxSceneBootstrap.WorldWidth,
+                GrayboxSceneBootstrap.WorldHeight);
+            Assert.That(
+                coordinates.TryWorldToCell(
+                    city.transform.position,
+                    out int cityX,
+                    out int cityY),
+                Is.True);
+            Assert.That(cityX, Is.EqualTo(7));
+            Assert.That(cityY, Is.EqualTo(8));
+            var world = new WorldMapModel(
+                GrayboxSceneBootstrap.WorldWidth,
+                GrayboxSceneBootstrap.WorldHeight,
+                new WorldSeed(GrayboxSceneBootstrap.WorldSeedValue));
+            Assert.That(
+                CityDeploymentRules.Validate(world, cityX, cityY),
+                Is.EqualTo(CityDeploymentFailure.None));
             BoxCollider cityCollider = city.GetComponent<BoxCollider>();
             Assert.That(cityCollider, Is.Not.Null);
             Assert.That(

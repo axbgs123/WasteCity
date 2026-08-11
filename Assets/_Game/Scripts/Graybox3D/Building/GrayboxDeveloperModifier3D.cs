@@ -86,6 +86,14 @@ namespace WasteCity.Graybox3D.Building
             return city.CompleteDeploymentTransitionForDevelopment();
         }
 
+        public bool SetPopulation(int value)
+        {
+            if (value < 0)
+                return false;
+            session.SetPopulationForDevelopment(value);
+            return true;
+        }
+
         public bool SetConstructionSpeed(DevelopmentConstructionSpeed speed)
         {
             if (speed != DevelopmentConstructionSpeed.Normal &&

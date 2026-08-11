@@ -119,7 +119,7 @@ namespace WasteCity.Graybox3D.Building
             if (IsManifestOpen || IsProcessing) return true;
             if (!session.HasPlayerOwnedGroundInstances)
             {
-                deploymentRequest.TryToggleDeployment(out _);
+                ToggleDeploymentWithFeedback();
                 return true;
             }
             if (deploymentRequest.Mode != WasteCity.City.CityMode.Fortress)
@@ -296,11 +296,21 @@ namespace WasteCity.Graybox3D.Building
         private bool FinishIfResolved()
         {
             if (session.HasPlayerOwnedGroundInstances) return true;
-            deploymentRequest.TryToggleDeployment(out _);
+            ToggleDeploymentWithFeedback();
             ResetLocalState();
             menu.HideEvacuation();
             menu.SetConstructionCancellationBlocked(false);
             return true;
+        }
+
+        private void ToggleDeploymentWithFeedback()
+        {
+            bool toggled = deploymentRequest.TryToggleDeployment(
+                out string failureReason);
+            if (toggled)
+                menu.ClearDeploymentFailure();
+            else
+                menu.ShowDeploymentFailure(failureReason);
         }
 
         private void FailProcessing()

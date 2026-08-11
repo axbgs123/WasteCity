@@ -265,6 +265,144 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator VirtualF_FromDefaultSpawn_DeploysCityAndCompletesTransition()
+        {
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+
+            Assert.That(city, Is.Not.Null);
+            Assert.That(city.Mode, Is.EqualTo(CityMode.Mobile));
+            yield return TapKey(Key.F);
+            Assert.That(city.Mode, Is.EqualTo(CityMode.Deploying));
+
+            float deadline = Time.realtimeSinceStartup + 4f;
+            while (city.Mode == CityMode.Deploying &&
+                   Time.realtimeSinceStartup < deadline)
+                yield return null;
+
+            Assert.That(city.Mode, Is.EqualTo(CityMode.Fortress));
+        }
+
+        [UnityTest]
+        public IEnumerator AllDeclaredMobileInnerBuildings_ProjectAsValidInFormalScene()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInteractionModel3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            var expectedMobileInner = new[]
+            {
+                BuildingCatalog.Housing,
+                BuildingCatalog.Warehouse,
+                BuildingCatalog.Assembler,
+                BuildingCatalog.PsionicWorkshop,
+                BuildingCatalog.ConsciousnessNetwork,
+                BuildingCatalog.ShieldGenerator,
+                BuildingCatalog.AutomatedRepairBay,
+                BuildingCatalog.AlchemyChamber,
+                BuildingCatalog.PuppetWorkshop
+            };
+            BuildingDefinition[] declaredMobileInner =
+                BuildingCatalog.BuildMenu.Where(definition =>
+                    BuildingMobilityRules.CanConstruct(
+                        definition,
+                        BuildingSite.InnerCity,
+                        CityMode.Mobile)).ToArray();
+
+            CollectionAssert.AreEquivalent(
+                expectedMobileInner,
+                declaredMobileInner);
+            modifier.UnlockAllResearch();
+            Assert.That(modifier.SetPopulation(2000), Is.True);
+            Assert.That(session.Population, Is.EqualTo(2000));
+            for (var index = 0; index < ResourceIds.All.Length; index++)
+                Assert.That(
+                    modifier.AddResource(ResourceIds.All[index], 1000),
+                    Is.True,
+                    ResourceIds.All[index]);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            yield return null;
+
+            var prerequisiteOrder = new[]
+            {
+                BuildingCatalog.Smelter,
+                BuildingCatalog.ResonanceFurnace,
+                BuildingCatalog.SpiritFireFurnace,
+                BuildingCatalog.ArtifactWorkshop,
+                BuildingCatalog.Assembler,
+                BuildingCatalog.PsionicWorkshop
+            };
+            for (var index = 0; index < prerequisiteOrder.Length; index++)
+            {
+                BuildingDefinition prerequisite = prerequisiteOrder[index];
+                interaction.Select(prerequisite);
+                yield return MoveToValidGroundPreview(
+                    city,
+                    world,
+                    placement);
+                Assert.That(
+                    placement.CurrentEvaluation.IsValid,
+                    Is.True,
+                    prerequisite.Id.Value + ": " +
+                    placement.CurrentEvaluation.PrimaryFailure);
+                yield return ClickMouse(
+                    MouseButton.Left,
+                    mouse.position.ReadValue());
+                modifier.CompleteAllConstruction();
+                Assert.That(
+                    session.CompletedBuildingCount(
+                        prerequisite.Id.Value),
+                    Is.EqualTo(1),
+                    prerequisite.Id.Value);
+            }
+
+            Assert.That(modifier.SetCityMode(CityMode.Mobile), Is.True);
+            yield return null;
+            for (var index = 0; index < expectedMobileInner.Length; index++)
+            {
+                BuildingDefinition definition = expectedMobileInner[index];
+                interaction.Select(definition);
+                yield return MoveToInnerPreview(city);
+                Assert.That(
+                    placement.CurrentHit.Site,
+                    Is.EqualTo(BuildingSite.InnerCity),
+                    definition.Id.Value);
+                Assert.That(
+                    placement.CurrentEvaluation.IsValid,
+                    Is.True,
+                    definition.Id.Value + ": " +
+                    placement.CurrentEvaluation.PrimaryFailure);
+            }
+
+            interaction.Select(BuildingCatalog.ResearchStation);
+            yield return MoveToInnerPreview(city);
+            Assert.That(
+                placement.CurrentEvaluation.PrimaryFailure,
+                Is.EqualTo(BuildingPlacementFailure.InvalidCityMode));
+
+            modifier.SetResource(ResourceIds.Alloy, 0);
+            interaction.Select(BuildingCatalog.Housing);
+            yield return MoveToInnerPreview(city);
+            Assert.That(
+                placement.CurrentEvaluation.PrimaryFailure,
+                Is.EqualTo(BuildingPlacementFailure.InsufficientMaterials));
+        }
+
+        [UnityTest]
         public IEnumerator DeveloperInjectedCatalog_MapsAllTwentyEightRuntimeCards()
         {
             GrayboxBuildingSession3D session =

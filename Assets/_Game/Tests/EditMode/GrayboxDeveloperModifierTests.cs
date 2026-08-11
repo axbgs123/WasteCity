@@ -170,6 +170,7 @@ namespace WasteCity.Tests
                     "System.Void UnlockAllResearch()",
                     "System.Boolean SetCityMode(WasteCity.City.CityMode)",
                     "System.Boolean CompleteCityTransition()",
+                    "System.Boolean SetPopulation(System.Int32)",
                     "System.Boolean SetConstructionSpeed(WasteCity.Graybox3D.Building.DevelopmentConstructionSpeed)",
                     "System.Void CompleteAllConstruction()"
                 }));
@@ -438,6 +439,7 @@ namespace WasteCity.Tests
                     "Resource +1000",
                     "Clear Resource",
                     "Set Resource",
+                    "Set Population",
                     "Unlock Research",
                     "Unlock Technology",
                     "Unlock Cultivation",
@@ -463,6 +465,19 @@ namespace WasteCity.Tests
                 Assert.That(
                     fixture.Session.Inventory.Get(ResourceIds.Iron),
                     Is.EqualTo(130));
+                InputField population = panel.transform
+                    .Find("Population Amount")
+                    .GetComponent<InputField>();
+                Assert.That(population, Is.Not.Null);
+                population.text = "2000";
+                ExecuteEvents.Execute(
+                    ButtonNamed(panel, "Set Population").gameObject,
+                    new PointerEventData(fixture.EventSystem)
+                    {
+                        button = PointerEventData.InputButton.Left
+                    },
+                    ExecuteEvents.pointerClickHandler);
+                Assert.That(fixture.Session.Population, Is.EqualTo(2000));
 
                 fixture.Bootstrap.Configure(
                     fixture.Session,
@@ -732,6 +747,26 @@ namespace WasteCity.Tests
             fixture.City.Deployment.Restore(CityMode.Packing, 1f);
             Assert.That(fixture.Modifier.CompleteCityTransition(), Is.True);
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Mobile));
+        }
+
+        [Test]
+        public void Commands_SetPopulationAndAdvanceCatalogOnlyOnChange()
+        {
+            ModifierFixture fixture = CreateFixture();
+            uint revision = fixture.Session.CatalogRevision;
+
+            Assert.That(fixture.Modifier.SetPopulation(-1), Is.False);
+            Assert.That(fixture.Session.Population, Is.EqualTo(200));
+            Assert.That(fixture.Session.CatalogRevision, Is.EqualTo(revision));
+            Assert.That(fixture.Modifier.SetPopulation(2000), Is.True);
+            Assert.That(fixture.Session.Population, Is.EqualTo(2000));
+            Assert.That(
+                fixture.Session.CatalogRevision,
+                Is.EqualTo(revision + 1));
+            Assert.That(fixture.Modifier.SetPopulation(2000), Is.True);
+            Assert.That(
+                fixture.Session.CatalogRevision,
+                Is.EqualTo(revision + 1));
         }
 
         [Test]

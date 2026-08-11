@@ -1232,7 +1232,7 @@ namespace WasteCity.Tests
             Light light = owner.AddComponent<Light>();
             light.type = LightType.Directional;
             light.color = new Color(1f, 0.956f, 0.85f, 1f);
-            light.intensity = 1.25f;
+            light.intensity = .90f;
             light.shadows = LightShadows.Soft;
             light.cullingMask = ~0;
             return light;
@@ -1253,7 +1253,7 @@ namespace WasteCity.Tests
             Assert.That(light.color.g, Is.EqualTo(0.956f).Within(0.0001f));
             Assert.That(light.color.b, Is.EqualTo(0.85f).Within(0.0001f));
             Assert.That(light.color.a, Is.EqualTo(1f).Within(0.0001f));
-            Assert.That(light.intensity, Is.EqualTo(1.25f).Within(0.0001f));
+            Assert.That(light.intensity, Is.EqualTo(.90f).Within(0.0001f));
             Assert.That(light.shadows, Is.EqualTo(LightShadows.Soft));
             Assert.That(light.cullingMask, Is.EqualTo(~0));
             Vector3 euler = light.transform.localEulerAngles;

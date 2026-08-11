@@ -71,6 +71,7 @@ namespace WasteCity.Graybox3D.Building
         public bool ConstructionCancellationBlocked =>
             constructionCancellationBlocked;
         public string SearchText => searchText;
+        public string DeploymentFailureMessage { get; private set; }
 
         public event Action CancelSelectedConstructionRequested;
         public event Action<bool>
@@ -179,6 +180,22 @@ namespace WasteCity.Graybox3D.Building
             if (placement == null)
                 throw new ArgumentNullException(nameof(placement));
             this.placement = placement;
+            hasPlacementStatusCache = false;
+            RefreshPlacementStatus();
+        }
+
+        public void ShowDeploymentFailure(string message)
+        {
+            DeploymentFailureMessage = string.IsNullOrEmpty(message)
+                ? string.Empty
+                : message;
+            hasPlacementStatusCache = false;
+            RefreshPlacementStatus();
+        }
+
+        public void ClearDeploymentFailure()
+        {
+            DeploymentFailureMessage = string.Empty;
             hasPlacementStatusCache = false;
             RefreshPlacementStatus();
         }
@@ -919,6 +936,8 @@ namespace WasteCity.Graybox3D.Building
                 "占地 " + definition.Width + "×" + definition.Height,
                 "位置 " + BuildingMobilityRules.PlacementName(
                     definition.Placement),
+                "运行 " + BuildingMobilityRules.OperationName(
+                    definition.Operation),
                 "施工 " + definition.BuildSeconds + " 秒",
                 "完整成本 " + definition.Cost + " " + definition.CostId
             };
@@ -1037,15 +1056,23 @@ namespace WasteCity.Graybox3D.Building
             lastPlacementState = state;
             lastPlacementFailure = failure;
             lastPlacementValid = evaluation.IsValid;
-            bool visible =
+            bool placementFailureVisible =
                 placement != null &&
                 state == GrayboxBuildingInteractionState.Previewing &&
                 !evaluation.IsValid &&
                 failure != BuildingPlacementFailure.None;
+            bool deploymentFailureVisible =
+                !placementFailureVisible &&
+                state == GrayboxBuildingInteractionState.Inactive &&
+                !string.IsNullOrEmpty(DeploymentFailureMessage);
+            bool visible =
+                placementFailureVisible || deploymentFailureVisible;
             placementStatusRoot.gameObject.SetActive(visible);
-            if (visible)
+            if (placementFailureVisible)
                 placementStatusText.text =
                     PlacementFailureMessage(failure);
+            else if (deploymentFailureVisible)
+                placementStatusText.text = DeploymentFailureMessage;
             else if (!string.IsNullOrEmpty(placementStatusText.text))
                 placementStatusText.text = string.Empty;
         }
