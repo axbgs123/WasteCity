@@ -2088,6 +2088,86 @@ Unity run introduced in the already-approved modified
 files are zero-diff, `git diff --check` passes, then rerun the asset-builder
 class, complete EditMode, PlayMode and compile gates before opening the GUI.
 
+- [ ] **Step 7A.5: Preserve the user's explicit first-version visual waiver without falsifying the gate**
+
+The real Metal capture after Step 7A.3 stopped at the DeepWater ROI gate with
+`R=0.137634`, `G=0.168758`, `B=0.163840`, luminance `0.161786`. Luminance passed,
+but `B/R=1.19 < 1.25` and `B/G=0.971 < 1.10`; independent inspection also found
+that DeepWater still reads as a gray-black pit and several terrain classes are
+weakly differentiated. The capture correctly deleted its incomplete 300-frame
+set and did not emit an approval manifest, MP4 or Profiler package.
+
+After being shown the actual overview and DeepWater still, the user explicitly
+selected option `C`: accept the current first-version appearance and proceed to
+final delivery. This is a product waiver of the first-version visual target,
+not a technical GREEN. Keep the strict default capture entry point and every
+threshold test unchanged. Add the Editor-only core entry
+`CaptureAllAcceptedDeviation(string decision)` to
+`FirstArtTerrainEvidenceCapture`; it may run only when `decision` is exactly
+`user-accepted-known-visual-deviation`. Add one public parameterless automation
+entry `CaptureAllAcceptedDeviationFromEnvironment()` for Unity
+`-executeMethod`; it reads only the dedicated environment variable
+`WASTECITY_FIRST_ART_VISUAL_DECISION`. From Edit Mode it must reuse the existing
+`StartAutomatedCapture()` state machine: save an accepted-mode discriminator and
+exact token in dedicated `SessionState` keys, open the same scene, register the
+same callbacks, enter Play Mode, survive the domain reload, and call
+`CaptureAllAcceptedDeviation(token)` only from the same runtime-ready callback
+that normally calls strict `CaptureAll()`. Strict and accepted automation state
+must be mutually exclusive, and every success, failure, cancellation and timeout
+must clear both mode and token in `finally`. The strict
+`CaptureAll()`/`StartAutomatedCapture()` path must never read the environment
+variable or accepted SessionState keys and must never auto-downgrade after
+failure. The accepted entry executes the same camera,
+rendering, ROI, sequence, cleanup and Profiler path, but preserve the finished
+evidence when the visual metrics fail.
+
+The waiver is narrow: it may continue only after the ROI blue-black color ratios
+report the already-disclosed failure, while preserving the already-disclosed
+subjective DeepWater pit/readability and weak category-separation findings. It
+does **not** waive the water-motion mean/P95 gate because no completed MP4 was
+available when the user chose `C`. If motion also fails after 300 frames, delete
+the incomplete accepted package, show the resulting diagnostic/video if one can
+be preserved outside the delivery directory, and stop for a new explicit user
+decision with a different token before proceeding. Wrong scene, seed,
+Profile, pipeline, Material, camera or renderer; invalid/out-of-frame ROI;
+missing/gapped/duplicate frames; changed camera; PNG/MP4/manifest integrity;
+cleanup leaks; Profiler/performance/memory failures remain hard errors that
+delete incomplete evidence and throw exactly as the strict path does.
+
+Build and full regression are external delivery gates that run after capture,
+not checks falsely attributed to `FirstArtTerrainEvidenceCapture`. If any later
+build or regression fails, orchestration must move the accepted package out of
+the primary delivery directory into a clearly named rejected directory and
+must not hand it to Task 10 until those external gates pass and evidence is
+regenerated or revalidated.
+
+The accepted-deviation manifest and summary must set
+`technicalVisualGatePassed=false`, `userVisualDecision="accepted-current-first-version"`,
+record every failed threshold with its exact measured values, name DeepWater
+color/readability and weak terrain-class separation as unresolved first-art-pass
+limitations, and state that no source PNG, gameplay, collision or hidden tuning
+was changed to obtain approval. It must never print `passed`, `GREEN` or
+`thresholds satisfied` for the visual gate. Add focused tests proving the strict
+entry still deletes/throws on the same fixture, a missing/wrong decision string
+cannot preserve evidence, and the exact accepted decision preserves evidence
+while serializing the failed metrics and waiver fields. Add mutation-sensitive
+tests proving an exact token still cannot preserve gapped frames, a wrong scene,
+failed motion mean/P95, missing Profiler output or any evidence-integrity
+failure, and that the strict
+entry continues to fail even when the environment variable contains the exact
+token. No Development/Release
+runtime menu, key, saved scene field or gameplay API may expose this Editor
+evidence-only entry.
+
+Regenerate all ten native stills, the build-grid diagnostic still, strict
+300-consecutive-frame MP4, manifest, terrain-runtime JSON and clean Profiler
+package through this explicit path. The independent technical review must
+report the visual findings as `accepted known deviation`, not READY on visual
+quality, while still reviewing evidence integrity, performance, regression and
+scope normally. Task 10 must write the same known limitation and exact user
+decision into Docs/05 and Docs/06; it may not mark the visual quality target as
+automatically achieved.
+
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
 Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
@@ -2189,11 +2269,39 @@ With seed 8128, the default 52° orthographic camera, the same URP pipeline, 192
 
 The MP4 is about 10 seconds and must show subtle two-direction normal motion without camera motion. Keep initial captures in `/tmp/wastecity-first-terrain/visual-review/`; do not commit them before user approval.
 
+There are two explicit evidence paths. The strict path emits this complete set
+only after all automated visual metrics pass. For the current user-approved
+first-version deviation, invoke only
+`CaptureAllAcceptedDeviationFromEnvironment()` with
+`WASTECITY_FIRST_ART_VISUAL_DECISION=user-accepted-known-visual-deviation`; it
+must emit the same ten stills, diagnostic build-grid still, 300-frame MP4,
+manifest, runtime JSON and Profiler package, but mark the visual gate failed and
+record the exact waiver. Either path must satisfy every non-visual integrity,
+performance, cleanup and regression requirement.
+
 - [ ] **Step 9: Stop for user visual approval**
 
-Present all ten stills and the DeepWater recording. Approval requires the seven classes to be readable, basic boundaries seamless, special boundaries clear, DeepWater recognizably water-like, no Crystal emission, no resource-node coverage and no visual/collider offset. If rejected, use `superpowers:receiving-code-review`; change only the Profile, Shader or control-generator paths listed in this task, add the matching focused regression test, commit the visual correction separately, regenerate all affected evidence and repeat this gate. Feedback requiring source PNG, models, Collider, gameplay or a different scene path is a plan stop gate.
+Present all ten stills and the DeepWater recording. The strict path may set
+`technicalVisualGatePassed=true` only when the seven classes are readable, basic
+boundaries seamless, special boundaries clear, DeepWater recognizably
+water-like, no Crystal emission, no resource-node coverage and no
+visual/collider offset. If rejected, use `superpowers:receiving-code-review`;
+change only the Profile, Shader or control-generator paths listed in this task,
+add the matching focused regression test, regenerate all affected evidence and
+repeat this gate. Feedback requiring source PNG, models, Collider, gameplay or
+a different scene path is a plan stop gate.
 
-- [ ] **Step 10: Commit Task 9 after approval**
+The only alternate delivery path is the exact Step 7A.5 waiver manifest. When
+and only when the complete accepted-deviation evidence exists with
+`technicalVisualGatePassed=false` and
+`userVisualDecision="accepted-current-first-version"`, Task 9 may continue to
+commit and Task 10. The handoff must enumerate every unmet strict requirement:
+DeepWater blue-black color/readability and weak category separation in the
+current evidence. It must label the result `accepted known deviation`, never a
+technical visual PASS, and Task 10 must leave the visual-quality target
+incomplete while recording the user's explicit product acceptance.
+
+- [ ] **Step 10: Commit Task 9 after strict approval or the exact accepted-deviation waiver**
 
 Always commit the performance code/tests:
 
