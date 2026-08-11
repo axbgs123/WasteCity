@@ -1711,17 +1711,14 @@ non-readable. RED must show that the current policy rejects BaseColor and Normal
 Change only `FirstArtTerrainAssetBuilder.cs` to build the runtime Mask as 2048
 linear BC7 at `TextureCompressionQuality.Best` and to finalize BaseColor,
 Normal, Mask and Height runtime arrays as non-readable after their complete mip
-data is populated. For each staging `Texture2DArray`, write every slice and every
-mip into its CPU backing with `SetPixelData` and upload while keeping the staging
-array readable. Copy that complete readable backing into the persistent
-destination, then call
-`destination.Apply(updateMipmaps: false, makeNoLongerReadable: true)` exactly
-once on the destination. After destination finalization, do not call
-`SetPixelData` or `Apply` again: save, reimport and reload the asset directly.
-It is explicitly forbidden to populate a destination with GPU
-`Graphics.CopyTexture` and then call `Apply`, because the CPU upload may
-overwrite the already-copied GPU content. GPU copy/readback is allowed only for
-temporary staging before bytes are written to the staging array.
+data is populated. For each final `Texture2DArray`, write every slice and every
+mip into its CPU backing with `SetPixelData`; only after the array is complete,
+call `Apply(updateMipmaps: false, makeNoLongerReadable: true)` exactly once.
+After that call, do not call `SetPixelData` or `Apply` again: persist, save,
+reimport and reload the asset directly. It is explicitly forbidden to populate
+a final array with GPU `Graphics.CopyTexture` and then call `Apply`, because the
+CPU upload may overwrite the already-copied GPU content. GPU copy/readback is
+allowed only for temporary staging before bytes are written to the final array.
 The focused pixel tests must run against the reloaded persistent non-readable
 assets, not a readable staging object. Keep the seven
 source Mask PNGs and their import policy uncompressed and untouched. Use
@@ -1760,9 +1757,9 @@ BaseColor/Normal/Height formats and dimensions unchanged;
 BaseColor/Normal/Mask/Height persistent arrays all report isReadable=false;
 format-derived compressed payload sum near `127,227,779 B` (`121.33 MiB`) and
 ≤128 MiB;
-Unity Editor sum of Profiler.GetRuntimeMemorySizeLong no lower than the
-calculated compressed payload (apart from at most 64 KiB reporting tolerance),
-no greater than twice that payload plus 64 KiB, and always ≤256 MiB;
+Unity Editor sum of Profiler.GetRuntimeMemorySizeLong near `254,457,350 B`
+(`242.67 MiB`), ≤256 MiB, and within 64 KiB of exactly twice the calculated
+compressed payload;
 64 deterministic mip-0 sample coordinates per slice against the source Mask,
 with each channel absolute error ≤16 and mean absolute channel error ≤4;
 two builds preserve all source states, all four array GUIDs and identical second-build contents;
@@ -1784,17 +1781,15 @@ must remain unchanged apart from the serialized non-readable storage flag.
 Then rerun asset-builder, profile, shader, scene-contract, performance and real
 runtime scene focused suites. Any source asset/meta change, unsupported BC7
 result, missing Mask channel, >128 MiB compressed payload, >256 MiB Editor
-native-memory sum, an Editor native sum below payload minus 64 KiB or above
-twice payload plus 64 KiB, or visual shader failure is a stop gate; do not reduce source
+native-memory sum, unexplained deviation from the measured approximately-2x
+Editor ratio, or visual shader failure is a stop gate; do not reduce source
 resolution or alter the Shader/Profile to hide it.
 
 This split does not relax the asset budget. Unity's 2022.3 Memory Profiler
-manual documents that the Editor can keep an extra CPU copy for readable
-textures. A fresh earlier run measured an approximately-2x Editor native total
-(`254,457,350 B`) over the `127,227,779 B` compressed payload, while correctly
-finalized non-readable persistent arrays may release that copy and report near
-1x. Record payload, native total and their ratio instead of requiring either
-residency state or mislabeling the Editor value as GPU payload.
+manual documents that the Editor keeps an extra CPU copy for textures; the
+fresh non-readable arrays likewise measured an exact approximately-2x Editor
+native total (`254,457,350 B`) over their `127,227,779 B` compressed payload.
+Record both numbers instead of mislabeling the Editor duplicate as GPU payload.
 The compressed/GPU payload hard ceiling remains 128 MiB. A real Development
 Player memory capture on Windows 10/11 remains the authoritative check for
 whether the Editor-only duplicate is absent there; it is still unresolved and
@@ -1994,16 +1989,30 @@ MP4 and clean Profiler package. If the seven categories still cannot be
 identified or DeepWater still reads as a pit/stain, stop for user direction; do
 not add stronger hidden constants, edit source art or alter terrain rules.
 
-- [ ] **Step 7A.4: Make repeated persistent-array rebuilds content-stable before visual recapture**
+- [ ] **Step 7A.4: Reject NullGfx evidence and close the real array-transaction gap**
 
-This correction is active because the first full EditMode run after Step 7A.3
-failed `1084/1086`, and an isolated asset-builder class run reproduced the same
-two failures at `8/10`. A further single-test run reproduced Wasteland Height
-source byte `129` versus persistent-array readback `205`. The format-derived
-payload remains exactly `127,227,779 B`, but the Editor native sum changed from
-the earlier approximately-2x observation to near 1x. The most recent known
-GREEN was `1076/1076` before repeated rebuilds. This is a real idempotent
-persistence defect, not a Shader/ROI failure or permission to change art data.
+This correction is active because the first Step 7A.3 full EditMode command was
+run with unapproved `-nographics`, contrary to the graphics-enabled test command
+already frozen in this plan. Its NullGfx backend produced `1084/1086`: GPU
+readback reported Wasteland Height source byte `129` versus array byte `205`,
+and `Profiler.GetRuntimeMemorySizeLong` reported near 1x payload instead of the
+known Metal approximately-2x result. The same invalid backend reproduced `8/10`
+and `0/1`. These results are invalid for pixel or native-texture-memory
+acceptance and must never be cited as a production persistence failure.
+
+A graphics-enabled Metal fixture then wrote real same-GUID R8 Height and BC7
+Mask sentinels, proved both differed through GPU readback, ran the unchanged
+public builder, and recovered both golden digests at `1/1`. This disproves the
+proposed `CopySerialized` stale-content root cause. Therefore retain the
+approved Step 7A temporary-array finalization/persist ordering and revert every
+production or source-inspection test change introduced only by the rejected
+NullGfx diagnosis. GPU-readback and runtime-memory tests must assert a non-Null
+graphics device and be run with `-batchmode` **without** `-nographics`.
+
+The plan review did expose one separate real gap already promised by Step 7A:
+the current four sequential destination writes do not yet implement atomic
+rollback if destination persistence itself fails. Only that transaction gap,
+not the disproved Apply-order hypothesis, proceeds to TDD below.
 
 The only additional production/test work for this correction is already in the
 Task 9 Files list:
@@ -2013,8 +2022,9 @@ Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs
 Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs
 ```
 
-Write a failing consecutive-rebuild test before changing production. First run
-the public builder and capture the approved golden contracts/digests. Then,
+Keep the graphics-enabled consecutive-rebuild regression as evidence that the
+existing persistence representation is sound. First run the public builder and
+capture the approved golden contracts/digests. Then,
 inside a `try/finally` fixture that restores exact pre-test files, overwrite the
 existing Height destination in place with valid same-shape sentinel content
 while preserving its asset path, `.meta` and GUID. In the same fixture, overwrite
@@ -2041,35 +2051,33 @@ second write retains stale destination pixels; an identity-only or metadata-only
 test is insufficient. Source PNG bytes, source `.meta` bytes and import state
 must be snapshotted and proven unchanged around both calls.
 
-The minimal implementation keeps each temporary `Texture2DArray` readable
-through data population and `PersistArray`; it must not call
-`Apply(false, true)` before copying into the persistent destination. For a new
-asset, create and own a destination copy, commit its uploaded data, then call
-`Apply(false, true)` on that destination before saving. For an existing asset,
-copy the still-readable temporary serialization into the same destination
-object, then call `destination.Apply(false, true)`, mark dirty and save. Preserve
-the destination object/GUID. Before the first destination mutation, back up all
-four existing `.asset` bytes/identities outside `Assets` and record absent
-outputs. Add one internal Editor-only, reset-in-`finally` checkpoint after each
-destination persist so tests can inject failure after destination 1, 2, 3 or 4.
+Write transaction tests that RED on the current sequential writes before
+changing production. Before the first destination mutation, back up all four
+existing `.asset` bytes/identities outside `Assets` and record absent outputs.
+Retain the Step 7A staging/finalization and `PersistArray` content-copy behavior;
+do not add another `Apply`, change readable residency or replace a successful
+existing destination. Add one internal Editor-only, reset-in-`finally`
+checkpoint after each destination persist so tests can inject failure after
+destination 1, 2, 3 or 4.
 Each injected failure must restore all pre-existing `.asset` bytes and GUIDs,
 delete every output created by the failed call (including its `.meta`), force
 reimport and leave no backup/temp file beneath `Assets`. Cover both an all-four
 existing case and a controlled originally-missing destination case; the test
 fixture itself must restore the repository's real generated assets in its outer
-`finally`, even if rollback assertions fail. Every temporary remains destroyed
-in `finally`. Do not replace assets by deleting or
+`finally`, even if rollback assertions fail. If rollback itself fails, preserve
+both the original persistence exception and the rollback exception rather than
+silently replacing either. Every temporary remains destroyed in `finally`. Do
+not replace assets by deleting or
 renaming them, and do not touch source art, Profile, Shader, renderer, control
 map, scene or gameplay to compensate.
 
-Revise the memory assertion only to reflect the now-observed valid
-non-readable residency range: payload remains exactly `127,227,779 B` and
-`<=128 MiB`; Editor native sum must be between payload minus 64 KiB and twice
-payload plus 64 KiB, and must remain `<=256 MiB`. Record the exact ratio on each
-run and require the two consecutive rebuilds to agree within 64 KiB. This does
-not relax either memory ceiling. A mutation that finalizes the temporary before
-copy, skips destination finalization, replaces the destination asset, or omits
-the sentinel-to-golden second-run content comparison must produce RED.
+On graphics-enabled Metal, payload remains exactly `127,227,779 B` and
+`<=128 MiB`; Editor native sum must remain within 64 KiB of twice payload and
+`<=256 MiB`. Record the exact ratio on each run and require the two consecutive
+rebuilds to agree within 64 KiB. A mutation that removes rollback, fails to
+delete a newly created output, changes an existing GUID, accepts NullGfx for
+pixel/memory evidence, or omits the R8/BC7 sentinel-to-golden comparison must
+produce RED.
 
 After GREEN, confirm the 28 source `.meta` files are already byte-identical to
 HEAD and do not rewrite them. Normalize only the trailing whitespace that the
@@ -2139,8 +2147,8 @@ array's dimensions/depth/format and
 `FirstArtTerrainRenderer3D` declares no `Update`/`LateUpdate` CPU water loop.
 The JSON must also record the independently calculated compressed payload for
 each array and its sum, the Editor native-memory sum, the ratio/difference from
-one payload and from twice the payload, and label any extra copy as
-Editor-observed rather than GPU memory.
+twice the payload, and label the extra copy as Editor-observed rather than GPU
+memory.
 The 300-frame Profiler summary must include an explicit terrain-presenter marker
 entry; zero occurrences/zero GC is accepted only together with the structural
 no-Update proof and the live one-renderer runtime JSON. Continue to record Draw
@@ -2151,7 +2159,7 @@ On this macOS Metal Editor, a displayed GPU value of `-- ms` may be recorded as
 numerical GPU-time gate to the already-unresolved real Windows 10/11 GPU smoke;
 CPU frame time, ≥60 FPS, exact 300-frame range, one formal Renderer, ≤128 MiB
 four-array compressed payload, ≤256 MiB explicitly labeled Editor native sum,
-the bounded 1x-to-2x residency proof and terrain-adapter 0 B remain mandatory
+the approximately-2x consistency proof and terrain-adapter 0 B remain mandatory
 now. The real Windows Development Player memory/GPU gate remains mandatory
 before final platform acceptance but is not claimed by this macOS evidence.
 
