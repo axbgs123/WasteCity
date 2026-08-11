@@ -1862,6 +1862,17 @@ hides, selecting/previewing remains shown, right-click/Escape cancel hides, and
 cancel-confirmation remains shown. UI-focus, pause and evacuation early returns
 must leave visibility synchronized with the current interaction state.
 
+The PlayMode contract must also use a virtual Mouse through the real serialized
+`GrayboxBuildingInputRouter3D.Update` loop to complete one legal left-click
+placement; it must not call the router, placement tick or confirmation method
+directly. Assert that the construction/instance is actually created, the
+interaction remains `Previewing` for continuous placement, and the grid remains
+visible in that same input frame. A second illegal left-click target must create
+nothing, preserve `Previewing`, and keep the grid visible. For construction
+cancel confirmation, drive the real UI yes/no path and assert the resolved
+return state controls visibility: return to `Inactive` hides, return to
+`Previewing` shows.
+
 In the existing terrain Shader/property surface only, change
 `_WaterNormalScaleB` from `1.17` to `1.35` and
 `_WaterHighlightStrength` from `0.12` to `0.21`; raise the existing bounded
