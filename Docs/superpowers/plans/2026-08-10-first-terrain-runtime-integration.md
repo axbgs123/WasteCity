@@ -1667,7 +1667,7 @@ Open this exact worktree in Unity 2022.3.62f1, load `GrayboxPrototype3D`, set Ga
 /tmp/wastecity-first-terrain/task-09-first-terrain-300-frames.data
 ```
 
-Record CPU/GPU frame time, FPS, Draw Calls, SetPass, Renderer count, total texture memory, four array memory, and GC allocation for `FirstArtTerrainRenderer3D`/terrain adapters. Target is ≥60 FPS, one formal terrain Renderer, approximately ≤120 MB terrain runtime texture memory, and 0 B per-frame managed allocation after warm-up. Do not use batchmode or NUnit data as a substitute.
+Record CPU/GPU frame time, FPS, Draw Calls, SetPass, Renderer count, total texture memory, four-array compressed GPU/serialized payload, Editor-reported four-array native memory, and GC allocation for `FirstArtTerrainRenderer3D`/terrain adapters. Target is ≥60 FPS, one formal terrain Renderer, approximately ≤120 MiB compressed terrain payload, an explicitly explained Editor-only duplicate copy no greater than 256 MiB, and 0 B per-frame managed allocation after warm-up. Do not use batchmode or NUnit data as a substitute.
 
 - [ ] **Step 7A: Correct the measured Mask-array memory overrun without changing source art**
 
@@ -1678,13 +1678,13 @@ design explicitly requires adjusting runtime-array format/resolution before
 visual approval when the array budget is materially exceeded.
 
 Add a failing builder test before changing production. It must require the real
-Mask to be `TextureFormat.BC7` and the four loaded arrays to remain within a
-`128 MiB` hard ceiling when measured with
-`Profiler.GetRuntimeMemorySizeLong`; RED must show that the current Mask is
+Mask to be `TextureFormat.BC7` and the four arrays' format-derived compressed
+payload to remain within a `128 MiB` hard ceiling. Calculate that payload from
+the exact dimensions, depth, mip chain and block format rather than from file
+size or `Profiler.GetRuntimeMemorySizeLong`. RED must show that the current Mask is
 RGBA32 and the current readable CPU+GPU sum is `489,337,982 B`, above the
-ceiling. The GREEN contract also requires `isReadable == false` for all four
-generated runtime arrays; this releases their Editor/player CPU copies after
-generation rather than counting both CPU and GPU storage. Preserve the existing exact 2048 size,
+old budget. The GREEN contract also requires `isReadable == false` for all four
+generated runtime arrays. Preserve the existing exact 2048 size,
 seven-slice order, 12 mip levels, linear color space, Repeat wrap, source GUID,
 source PNG bytes, source `.meta` bytes, importer readability/platform settings,
 generated Mask GUID and two-build deterministic identity contracts.
@@ -1740,9 +1740,11 @@ The GREEN test must require:
 Mask: 2048×2048×7, 12 mips, linear BC7, Repeat;
 BaseColor/Normal/Height formats and dimensions unchanged;
 BaseColor/Normal/Mask/Height persistent arrays all report isReadable=false;
-sum of Profiler.GetRuntimeMemorySizeLong for the four loaded arrays ≤128 MiB;
-expected loaded sum reported near `127,227,775 B` (`121.33 MiB`) and the
-approved approximately-120-MB target;
+format-derived compressed payload sum near `127,227,779 B` (`121.33 MiB`) and
+≤128 MiB;
+Unity Editor sum of Profiler.GetRuntimeMemorySizeLong near `254,457,350 B`
+(`242.67 MiB`), ≤256 MiB, and within 64 KiB of exactly twice the calculated
+compressed payload;
 64 deterministic mip-0 sample coordinates per slice against the source Mask,
 with each channel absolute error ≤16 and mean absolute channel error ≤4;
 two builds preserve all source states, all four array GUIDs and identical second-build contents;
@@ -1763,8 +1765,20 @@ BaseColor/Normal/Height pixel content, formats, dimensions, mip counts and GUIDs
 must remain unchanged apart from the serialized non-readable storage flag.
 Then rerun asset-builder, profile, shader, scene-contract, performance and real
 runtime scene focused suites. Any source asset/meta change, unsupported BC7
-result, missing Mask channel, >128 MiB loaded sum or visual shader failure is a
-stop gate; do not reduce source resolution or alter the Shader/Profile to hide it.
+result, missing Mask channel, >128 MiB compressed payload, >256 MiB Editor
+native-memory sum, unexplained deviation from the measured approximately-2x
+Editor ratio, or visual shader failure is a stop gate; do not reduce source
+resolution or alter the Shader/Profile to hide it.
+
+This split does not relax the asset budget. Unity's 2022.3 Memory Profiler
+manual documents that the Editor keeps an extra CPU copy for textures; the
+fresh non-readable arrays likewise measured an exact approximately-2x Editor
+native total (`254,457,350 B`) over their `127,227,779 B` compressed payload.
+Record both numbers instead of mislabeling the Editor duplicate as GPU payload.
+The compressed/GPU payload hard ceiling remains 128 MiB. A real Development
+Player memory capture on Windows 10/11 remains the authoritative check for
+whether the Editor-only duplicate is absent there; it is still unresolved and
+must not be marked passed from the macOS Editor result.
 
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
@@ -1823,6 +1837,10 @@ target `1920×1080`, formal Renderer count, Profile/Material identity, each load
 array's dimensions/depth/format and
 `Profiler.GetRuntimeMemorySizeLong`, summed array memory, and the fact that
 `FirstArtTerrainRenderer3D` declares no `Update`/`LateUpdate` CPU water loop.
+The JSON must also record the independently calculated compressed payload for
+each array and its sum, the Editor native-memory sum, the ratio/difference from
+twice the payload, and label the extra copy as Editor-observed rather than GPU
+memory.
 The 300-frame Profiler summary must include an explicit terrain-presenter marker
 entry; zero occurrences/zero GC is accepted only together with the structural
 no-Update proof and the live one-renderer runtime JSON. Continue to record Draw
@@ -1832,7 +1850,10 @@ On this macOS Metal Editor, a displayed GPU value of `-- ms` may be recorded as
 **unavailable**, not zero and not passed. Preserve the screenshot and defer a
 numerical GPU-time gate to the already-unresolved real Windows 10/11 GPU smoke;
 CPU frame time, ≥60 FPS, exact 300-frame range, one formal Renderer, ≤128 MiB
-four-array loaded sum and terrain-adapter 0 B remain mandatory now.
+four-array compressed payload, ≤256 MiB explicitly labeled Editor native sum,
+the approximately-2x consistency proof and terrain-adapter 0 B remain mandatory
+now. The real Windows Development Player memory/GPU gate remains mandatory
+before final platform acceptance but is not claimed by this macOS evidence.
 
 After this correction, regenerate the Profiler `.data`, terrain-runtime JSON,
 summary, Stats/Profiler screenshots, all ten stills, manifest and continuous
