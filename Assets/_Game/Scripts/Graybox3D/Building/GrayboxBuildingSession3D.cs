@@ -83,8 +83,6 @@ namespace WasteCity.Graybox3D.Building
     {
         public const int ResourceCapacity = 5000;
         private const int DevelopmentPopulation = 200;
-        private const int GroundGridWidth = 32;
-        private const int GroundGridHeight = 24;
         private const int InnerGridWidth = 8;
         private const int InnerGridHeight = 6;
         private const int DevelopmentGroundBuildRadius = 8;
@@ -137,7 +135,9 @@ namespace WasteCity.Graybox3D.Building
             Inventory.Set(ResourceIds.Water, 20);
             Inventory.Set(ResourceIds.Alloy, 30);
             Research = new ResearchModel();
-            GroundGrid = new BuildingGrid(GroundGridWidth, GroundGridHeight);
+            GroundGrid = new BuildingGrid(
+                GrayboxWorldLayout3D.WorldWidth,
+                GrayboxWorldLayout3D.WorldHeight);
             InnerGrid = new BuildingGrid(InnerGridWidth, InnerGridHeight);
             Population = DevelopmentPopulation;
             GroundBuildRadius = DevelopmentGroundBuildRadius;

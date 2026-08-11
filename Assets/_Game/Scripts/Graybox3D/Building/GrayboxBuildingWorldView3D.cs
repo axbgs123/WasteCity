@@ -9,8 +9,8 @@ namespace WasteCity.Graybox3D.Building
         MonoBehaviour,
         IGrayboxBuildingPresentation3D
     {
-        private const int GroundWidth = 32;
-        private const int GroundHeight = 24;
+        private const int GroundWidth = GrayboxWorldLayout3D.WorldWidth;
+        private const int GroundHeight = GrayboxWorldLayout3D.WorldHeight;
         private const float InnerAnchorX = -1.28f;
         private const float InnerAnchorZ = -.96f;
         private const float InnerCellSize = .32f;

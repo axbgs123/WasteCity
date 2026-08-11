@@ -32,8 +32,8 @@ namespace WasteCity.Tests
             Assert.That(session.DevelopmentFixtureEnabled, Is.True);
             Assert.That(session.Inventory.CapacityPerResource, Is.EqualTo(5000));
             Assert.That(session.Population, Is.EqualTo(200));
-            Assert.That(session.GroundGrid.Width, Is.EqualTo(32));
-            Assert.That(session.GroundGrid.Height, Is.EqualTo(24));
+            Assert.That(session.GroundGrid.Width, Is.EqualTo(64));
+            Assert.That(session.GroundGrid.Height, Is.EqualTo(48));
             Assert.That(session.InnerGrid.Width, Is.EqualTo(8));
             Assert.That(session.InnerGrid.Height, Is.EqualTo(6));
             Assert.That(session.GroundBuildRadius, Is.EqualTo(8));
