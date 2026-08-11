@@ -6,9 +6,9 @@ namespace WasteCity.Graybox3D
     [DefaultExecutionOrder(-9000)]
     public sealed class GrayboxSceneBootstrap : MonoBehaviour
     {
-        public const int WorldSeedValue = 8128;
-        public const int WorldWidth = 32;
-        public const int WorldHeight = 24;
+        public const int WorldSeedValue = GrayboxWorldLayout3D.DefaultSeed;
+        public const int WorldWidth = GrayboxWorldLayout3D.WorldWidth;
+        public const int WorldHeight = GrayboxWorldLayout3D.WorldHeight;
 
         [SerializeField] private GrayboxUrpScope renderScope;
         [SerializeField] private GrayboxWorldView3D worldView;
@@ -54,10 +54,7 @@ namespace WasteCity.Graybox3D
                 !renderScope.IsApplied)
                 return false;
 
-            World = new WorldMapModel(
-                WorldWidth,
-                WorldHeight,
-                new WorldSeed(WorldSeedValue));
+            World = GrayboxWorldLayout3D.CreateDefault();
             worldView.Generate(World);
             TryPresentTerrain();
             IsInitialized = true;

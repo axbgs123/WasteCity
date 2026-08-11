@@ -1429,8 +1429,8 @@ namespace WasteCity.Editor
                 GrayboxSceneBootstrap.WorldWidth,
                 GrayboxSceneBootstrap.WorldHeight);
             coordinates.TryCellToWorld(
-                7,
-                8,
+                GrayboxWorldLayout3D.ToExpandedX(7),
+                GrayboxWorldLayout3D.ToExpandedY(8),
                 .5f,
                 out Vector3 cityPosition);
             cityTransform.position = cityPosition;
@@ -1472,10 +1472,7 @@ namespace WasteCity.Editor
             var coordinates = new PlanarCoordinateMapper3D(
                 GrayboxSceneBootstrap.WorldWidth,
                 GrayboxSceneBootstrap.WorldHeight);
-            var world = new WorldMapModel(
-                GrayboxSceneBootstrap.WorldWidth,
-                GrayboxSceneBootstrap.WorldHeight,
-                new WorldSeed(GrayboxSceneBootstrap.WorldSeedValue));
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
             if (coordinates.TryWorldToCell(
                     city.transform.position,
                     out int currentX,
@@ -1488,8 +1485,12 @@ namespace WasteCity.Editor
                 return;
             }
 
-            const int approvedX = 7;
-            const int approvedY = 8;
+            const int approvedLegacyX = 7;
+            const int approvedLegacyY = 8;
+            int approvedX =
+                GrayboxWorldLayout3D.ToExpandedX(approvedLegacyX);
+            int approvedY =
+                GrayboxWorldLayout3D.ToExpandedY(approvedLegacyY);
             if (CityDeploymentRules.Validate(
                     world,
                     approvedX,

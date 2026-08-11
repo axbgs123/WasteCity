@@ -263,12 +263,8 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
-            Assert.That(cityX, Is.EqualTo(7));
-            Assert.That(cityY, Is.EqualTo(8));
-            var world = new WorldMapModel(
-                GrayboxSceneBootstrap.WorldWidth,
-                GrayboxSceneBootstrap.WorldHeight,
-                new WorldSeed(GrayboxSceneBootstrap.WorldSeedValue));
+            Assert.That((cityX, cityY), Is.EqualTo((23, 20)));
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
             Assert.That(
                 CityDeploymentRules.Validate(world, cityX, cityY),
                 Is.EqualTo(CityDeploymentFailure.None));
@@ -305,6 +301,30 @@ namespace WasteCity.Tests
                 scenes[1].path,
                 Is.EqualTo(
                     "Assets/_Game/Scenes/FormalPrototype.unity"));
+        }
+
+        [Test]
+        public void SceneAuthoring_UsesApprovedSparseLayoutFactory()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxSceneAuthoring.cs"));
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.CreateDefault()",
+                source);
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.ToExpandedX(7)",
+                source);
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.ToExpandedY(8)",
+                source);
+            string compact = source.Replace("\r", string.Empty)
+                .Replace("\n", string.Empty)
+                .Replace(" ", string.Empty);
+            StringAssert.DoesNotContain(
+                "newWorldMapModel(GrayboxSceneBootstrap.WorldWidth",
+                compact);
         }
 
         [TestCase("GrayboxSceneAuthoring.cs")]
