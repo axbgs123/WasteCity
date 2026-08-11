@@ -2168,6 +2168,49 @@ scope normally. Task 10 must write the same known limitation and exact user
 decision into Docs/05 and Docs/06; it may not mark the visual quality target as
 automatically achieved.
 
+- [ ] **Step 7A.6: Record the user's separate acceptance of insufficient DeepWater motion**
+
+The first accepted-color capture completed the strict 300 consecutive frames
+but failed the independent motion gate:
+`DeepWater ROI motion did not meet the mean and nearest-rank P95 thresholds in one exact pair.`
+The accepted-color token correctly deleted the primary package and stopped
+before Profiler, full regression, builds, commit or Task 10. After this separate
+failure was disclosed, the user explicitly selected option `B`: accept the
+first-version water-motion deficiency and record it as a known problem.
+
+Do not broaden or reinterpret the existing color-only token. Add one distinct
+exact token:
+
+```text
+user-accepted-known-visual-and-motion-deviation
+```
+
+Only this second token may preserve a finished package when both the previously
+disclosed color/readability/category findings and the motion mean/P95 gate fail.
+The old `user-accepted-known-visual-deviation` token must continue to delete and
+throw on motion failure. The new token uses the same Editor-only automation,
+SessionState isolation, strict evidence pipeline and cleanup contracts; no
+runtime API, menu, key or serialized field is added.
+
+Before accepting the motion deviation, calculate and serialize the exact mean
+and nearest-rank P95 values for each of `t0-t5`, `t5-t10` and `t0-t10`, including
+which threshold each pair missed. The manifest/summary must retain
+`technicalVisualGatePassed=false`, set
+`userVisualDecision="accepted-current-first-version-including-motion"`, list
+`DeepWater motion below perceptibility target` as an unresolved issue, and keep
+the color/pit/category limitations from Step 7A.5. It must not call the motion
+gate passed or omit its metrics merely because the user accepted delivery.
+
+Add mutation-sensitive tests proving the new token preserves the completed
+package for the exact combined color+motion fixture, the old token still rejects
+that fixture, and neither token waives scene/seed/camera/ROI validity, frame
+continuity, evidence integrity, cleanup, Profiler, performance or external
+regression/build delivery gates. Task 10 must record the motion issue and the
+user's separate `B` decision in both Docs/05 and IDEA-0004 in Docs/06, leave
+first-pass visual polish incomplete, and describe the later fix as a
+Material/Shader-only follow-up unless future requirements introduce true water
+geometry, reflection, transparency or gameplay.
+
 - [ ] **Step 7B: Replace the incomplete GUI and visual evidence with deterministic native captures**
 
 Create the Editor-only `FirstArtTerrainEvidenceCapture` tool and focused tests.
@@ -2273,7 +2316,8 @@ There are two explicit evidence paths. The strict path emits this complete set
 only after all automated visual metrics pass. For the current user-approved
 first-version deviation, invoke only
 `CaptureAllAcceptedDeviationFromEnvironment()` with
-`WASTECITY_FIRST_ART_VISUAL_DECISION=user-accepted-known-visual-deviation`; it
+`WASTECITY_FIRST_ART_VISUAL_DECISION=user-accepted-known-visual-and-motion-deviation`;
+it
 must emit the same ten stills, diagnostic build-grid still, 300-frame MP4,
 manifest, runtime JSON and Profiler package, but mark the visual gate failed and
 record the exact waiver. Either path must satisfy every non-visual integrity,
@@ -2291,13 +2335,15 @@ add the matching focused regression test, regenerate all affected evidence and
 repeat this gate. Feedback requiring source PNG, models, Collider, gameplay or
 a different scene path is a plan stop gate.
 
-The only alternate delivery path is the exact Step 7A.5 waiver manifest. When
+The only current alternate delivery path is the exact Step 7A.6 combined waiver
+manifest. When
 and only when the complete accepted-deviation evidence exists with
 `technicalVisualGatePassed=false` and
-`userVisualDecision="accepted-current-first-version"`, Task 9 may continue to
+`userVisualDecision="accepted-current-first-version-including-motion"`, Task 9 may continue to
 commit and Task 10. The handoff must enumerate every unmet strict requirement:
-DeepWater blue-black color/readability and weak category separation in the
-current evidence. It must label the result `accepted known deviation`, never a
+DeepWater blue-black color/readability, weak category separation and DeepWater
+motion below the perceptibility target in the current evidence. It must label
+the result `accepted known deviation`, never a
 technical visual PASS, and Task 10 must leave the visual-quality target
 incomplete while recording the user's explicit product acceptance.
 
