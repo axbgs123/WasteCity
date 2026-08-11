@@ -469,11 +469,19 @@ git commit -m "feat: expand graybox ground building grid"
 - Modify: `Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`
 - Modify: `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs`
+- Modify after the full-regression stale-copy assertion is observed: `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`
 - Modify: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`
 
 **Interfaces:**
 - Consumes: existing `BuildingMobilityRules.CanConstruct/CanOperate`, `GrayboxBuildingSession3D.TryBeginConstruction`, real virtual keyboard/mouse PlayMode fixture.
 - Produces: ResearchStation tagged `Either + MobileAllowed`; real Mobile inner-city construction without any research progression runtime.
+
+The first fresh full EditMode run after the focused GREEN exposed one
+additional copied catalog expectation in
+`GrayboxBuildingUiAndInputTests.Menu_DetailsDistinguishMobileAndFortressInnerBuildings`:
+it still expected ResearchStation details to say `仅展开运行`. This test file
+is an approved minimal Task 4 boundary; change only that ResearchStation
+detail expectation to `移动可运行`.
 
 - [ ] **Step 1: Write catalog and rule RED tests**
 
