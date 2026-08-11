@@ -308,6 +308,7 @@ namespace WasteCity.Tests
             {
                 BuildingCatalog.Housing,
                 BuildingCatalog.Warehouse,
+                BuildingCatalog.ResearchStation,
                 BuildingCatalog.Assembler,
                 BuildingCatalog.PsionicWorkshop,
                 BuildingCatalog.ConsciousnessNetwork,
@@ -391,12 +392,33 @@ namespace WasteCity.Tests
             interaction.Select(BuildingCatalog.ResearchStation);
             yield return MoveToInnerPreview(city);
             Assert.That(
-                placement.CurrentEvaluation.PrimaryFailure,
-                Is.EqualTo(BuildingPlacementFailure.InvalidCityMode));
+                placement.CurrentHit.Site,
+                Is.EqualTo(BuildingSite.InnerCity));
+            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            int countBefore = session.Instances.Count;
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(
+                session.Instances,
+                Has.Count.EqualTo(countBefore + 1));
+            GrayboxBuildingInstance3D placed =
+                session.Instances[countBefore];
+            Assert.That(
+                placed.Placement.Definition,
+                Is.SameAs(BuildingCatalog.ResearchStation));
+            Assert.That(
+                placed.Placement.Site,
+                Is.EqualTo(BuildingSite.InnerCity));
+            Assert.That(
+                placed.State,
+                Is.EqualTo(
+                    GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(city.Mode, Is.EqualTo(CityMode.Mobile));
 
             modifier.SetResource(ResourceIds.Alloy, 0);
             interaction.Select(BuildingCatalog.Housing);
-            yield return MoveToInnerPreview(city);
+            yield return MoveToInnerCell(city, 0, 0);
             Assert.That(
                 placement.CurrentEvaluation.PrimaryFailure,
                 Is.EqualTo(BuildingPlacementFailure.InsufficientMaterials));

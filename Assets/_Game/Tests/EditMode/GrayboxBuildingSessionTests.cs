@@ -588,6 +588,46 @@ namespace WasteCity.Tests
             Assert.That(ground.Progress.Remaining, Is.EqualTo(1f));
         }
 
+        [Test]
+        public void ResearchStation_ConstructsAndCompletesInMobileInnerCity()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            int ironBefore = session.Inventory.Get(ResourceIds.Iron);
+
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.ResearchStation,
+                BuildingSite.InnerCity,
+                CityMode.Mobile,
+                0,
+                0,
+                presentation);
+            string stableId = instance.StableInstanceId;
+
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(ironBefore - BuildingCatalog.ResearchStation.Cost));
+            Assert.That(instance.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
+            Assert.That(instance.Placement.Site,
+                Is.EqualTo(BuildingSite.InnerCity));
+            Assert.That(session.InnerGrid.IsOccupied(0, 0), Is.True);
+
+            session.TickConstruction(
+                BuildingCatalog.ResearchStation.BuildSeconds,
+                CityMode.Mobile,
+                false,
+                presentation);
+
+            Assert.That(instance.StableInstanceId, Is.EqualTo(stableId));
+            Assert.That(instance.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(session.Instances, Has.Count.EqualTo(1));
+            Assert.That(session.Instances[0], Is.SameAs(instance));
+            Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
+        }
+
         [TestCase(1f, 9.95f)]
         [TestCase(10f, 9.5f)]
         [TestCase(100f, 5f)]
