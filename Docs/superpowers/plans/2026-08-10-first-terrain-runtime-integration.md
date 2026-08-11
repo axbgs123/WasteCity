@@ -1433,6 +1433,8 @@ git commit -m "test: verify first terrain runtime scene"
 - Modify after rejected visual review only: `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`
 - Modify after the real GUI memory capture exceeds the approved budget: `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
 - Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
+- Modify with that runtime-array correction: `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`
+- Modify with that runtime-array correction: `Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs`
 - Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset`
 - Regenerate in place with the same GUID and non-readable runtime storage: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset`
 - Regenerate in place with the same GUID: `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset`
@@ -1687,6 +1689,15 @@ seven-slice order, 12 mip levels, linear color space, Repeat wrap, source GUID,
 source PNG bytes, source `.meta` bytes, importer readability/platform settings,
 generated Mask GUID and two-build deterministic identity contracts.
 
+Add failing import-policy tests before changing production. They must prove
+that `AllowTemporaryReadability` accepts exactly the approved seven BaseColor
+and seven Normal source paths in addition to the existing seven Height paths,
+still rejects Mask and every path outside this exact 21-file set, rejects a
+duplicate active scope, and restores importer readability, platform settings,
+GUID, dependency hash and exact `.meta` bytes after normal exit and injected
+operation/cleanup failure. The default import contract for every source remains
+non-readable. RED must show that the current policy rejects BaseColor and Normal.
+
 Change only `FirstArtTerrainAssetBuilder.cs` to build the runtime Mask as 2048
 linear BC7 at `TextureCompressionQuality.Best` and to finalize BaseColor,
 Normal, Mask and Height runtime arrays as non-readable after their complete mip
@@ -1709,6 +1720,19 @@ without color-space conversion, generate the mip chain, call
 persist-after-success transaction remains in force; a compression/readback/copy
 failure must leave all four persistent arrays and all source assets byte- and
 GUID-identical to their pre-call state.
+
+Change `FirstArtPassImportPolicy.cs` only to generalize its existing protected
+temporary-readability scope from the seven Height sources to the exact 21
+BaseColor, Normal and Height source paths. BaseColor and Normal retain their
+existing CompressedHQ/BC7, color-space, normal-map, mip and platform contracts;
+the temporary scope changes only readability, and the builder reads their
+existing compressed mip bytes with `GetPixelData<byte>` into the final arrays
+without decoding or recompressing them. Height keeps its existing temporary R16
+platform override. Mask is not added to this temporary-readability allowlist
+and continues through the dedicated RGBA32 staging-to-BC7 path. Scope cleanup
+must be nested/exception-safe and restore the captured platform settings before
+removing the readability token and force-reimporting the source. No source
+asset or `.meta` file may remain changed after the scope closes.
 
 The GREEN test must require:
 
@@ -1845,7 +1869,7 @@ Present all ten stills and the DeepWater recording. Approval requires the seven 
 Always commit the performance code/tests:
 
 ```bash
-git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
+git add Assets/_Game/Editor/GrayboxPerformanceProbe.cs Assets/_Game/Editor/FirstArtPassImportPolicy.cs Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs.meta Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs.meta Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs.meta Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset
 git diff --cached --check
 git commit -m "test: verify first terrain performance and builds"
 ```
