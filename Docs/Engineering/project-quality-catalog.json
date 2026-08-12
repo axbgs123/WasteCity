@@ -1172,6 +1172,20 @@
   ],
   "DocumentationRules": [
     {
+      "Id": "plain-chinese-project-guides",
+      "ChangedPathGlobs": [
+        "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+        "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+        "Docs/09-Reusable-Project-Catalog-ZH.md"
+      ],
+      "ReviewDocumentPaths": [
+        "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+        "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+        "Docs/09-Reusable-Project-Catalog-ZH.md"
+      ],
+      "PlainChineseReason": "普通中文指南变化后，需要检查链接、复用边界和面向试玩者的说明。"
+    },
+    {
       "Id": "quality-catalog",
       "ChangedPathGlobs": [
         "Assets/_Game/Scripts/**",

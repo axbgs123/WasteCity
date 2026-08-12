@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Editor.ProjectQuality;
@@ -262,11 +263,63 @@ namespace WasteCity.Tests
             CollectionAssert.IsEmpty(ChangedPaths(beforeValidation, HashFiles(ProjectRoot(), true)));
         }
 
+        [TestCase("Docs/07-Project-Use-and-Development-Guide-ZH.md", "Docs/Generated/Project-Inventory-ZH.md")]
+        [TestCase("Docs/08-Testing-and-Bug-Location-Guide-ZH.md", "Docs/Generated/Test-Inventory-ZH.md")]
+        [TestCase("Docs/09-Reusable-Project-Catalog-ZH.md", "Docs/Generated/Project-Inventory-ZH.md")]
+        public void PlainChineseHumanGuides_ExplainTermsLinkToCurrentInventoriesAndAvoidFixedCounts(
+            string relativePath, string generatedAppendix)
+        {
+            string path = Path.Combine(ProjectRoot(), relativePath);
+            Assert.That(File.Exists(path), Is.True, relativePath + " must exist");
+
+            string content = File.ReadAllText(path);
+            StringAssert.IsMatch(@"^# [\u4e00-\u9fff]", content);
+            StringAssert.Contains("适合谁看", content);
+            StringAssert.Contains("06-User-Feedback-and-Change-Control-ZH.md", content);
+            StringAssert.Contains(generatedAppendix.Substring("Docs/".Length), content);
+            Assert.That(Regex.IsMatch(content, @"\b\d+/\d+\b"), Is.False,
+                "human guides must link to changing reports instead of copying an overall test count");
+
+            AssertFirstUseExplained(content, "EditMode", "不启动游戏");
+            AssertFirstUseExplained(content, "PlayMode", "启动游戏");
+            AssertFirstUseExplained(content, "组件", "挂在");
+            AssertFirstUseExplained(content, "程序集", "一起编译");
+            AssertFirstUseExplained(content, "稳定 ID", "不随改名");
+
+            StringAssert.DoesNotContain("一定是", content);
+            StringAssert.DoesNotContain("根因就是", content);
+            if (relativePath.EndsWith("09-Reusable-Project-Catalog-ZH.md", StringComparison.Ordinal))
+            {
+                foreach (string level in new[] { "推荐复用", "复用前审查", "仅限场景", "冻结回归", "禁止用于新功能" })
+                    StringAssert.Contains(level, content);
+            }
+            else if (relativePath.EndsWith("08-Testing-and-Bug-Location-Guide-ZH.md", StringComparison.Ordinal))
+            {
+                StringAssert.Contains("复现失败 → 失败测试 → 最小修复 → 单功能检查 → 相关检查 → 完整回归 → 人工确认", content);
+                StringAssert.Contains("自动报告只是排查起点", content);
+            }
+            else
+            {
+                StringAssert.Contains("默认 3D", content);
+                StringAssert.Contains("冻结 2D", content);
+                StringAssert.Contains("不是新功能模板", content);
+            }
+        }
+
         private string Write(string name, string content)
         {
             string path = Path.Combine(fixtureDirectory, name);
             File.WriteAllText(path, content, new UTF8Encoding(false));
             return path;
+        }
+
+        private static void AssertFirstUseExplained(string content, string term, string explanation)
+        {
+            int firstUse = content.IndexOf(term, StringComparison.Ordinal);
+            Assert.That(firstUse, Is.GreaterThanOrEqualTo(0), term + " must be introduced in every human guide");
+            int nearbyEnd = Math.Min(content.Length, firstUse + term.Length + 80);
+            StringAssert.Contains(explanation, content.Substring(firstUse, nearbyEnd - firstUse),
+                term + " needs a nearby plain-Chinese explanation on first use");
         }
 
         private void ConfigureValidRecordEvidence(string editXml, string buildStatus = "NotRequired")
