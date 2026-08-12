@@ -1155,6 +1155,40 @@ EditMode writes complete XML; and protected original-worktree hashes plus clone
 post-run cleanliness prove no asset/meta mutation.  Do not continue Task 9
 verification until this boundary test passes.
 
+#### Approved finite-workload correction after the sentinel fix
+
+The sentinel correction removed the repeated empty-main-object warning, but the
+complete fixture still did not write XML before the earlier 30-minute watchdog.
+Method-level diagnosis in a fresh detached `35c6375` clone proved this is now a
+**finite, unusually expensive test workload**, not a second import loop:
+
+- the file expands to 24 calls to the real 2048×2048, seven-layer
+  `BuildTextureArrays()` pipeline once the four parameterized persistence cases are
+  counted;
+- `BuildTextureArrays_TwoBuildsPreserveSourceAndGeneratedIdentity` completed and
+  wrote passing `1/1` XML after `253.453915` seconds with exactly 178 terrain import
+  starts;
+- projecting that measured two-build cost across 24 calls gives about 50.7 minutes
+  and 2,136 terrain import starts; the prior 30-minute fixture run reached 1,285
+  starts, which is consistent with monotonic finite progress rather than a loop;
+- no empty-main-object warning occurred after `35c6375`, and generated arrays had
+  zero post-run diff in the interrupted clean clone.
+
+Do not change production code, reduce coverage, mark tests ignored/explicit, or add
+test-result exceptions for this Task 9 correction.  Also do not repeat the complete
+`FirstArtTerrainAssetBuilderTests` fixture as a separate acceptance command: the
+required full EditMode run executes the same fixture and is the non-duplicated
+acceptance gate.  Use a 75-minute watchdog for that one full EditMode process; while
+it runs, require terrain-import counts to remain monotonic, no empty-main-object
+warning, and no repeated identical import/error cycle.  Terminate only the exact
+Unity PID if it exceeds 75 minutes or violates those conditions.  The full run must
+still write complete NUnit XML with zero failed and zero skipped tests.
+
+Before the full run, preserve the already-passing exact sentinel `1/1` evidence and
+the exact two-build `1/1` evidence above.  They are focused diagnosis/control
+evidence, not substitutes for full EditMode.  This correction changes verification
+scheduling only; it does not authorize another test or implementation change.
+
 **Files:**
 - Modify: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Regenerate: `Docs/Generated/Latest-Verification-ZH.md`
