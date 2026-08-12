@@ -82,6 +82,26 @@ git status
 - [项目自动清单](Docs/Generated/Project-Inventory-ZH.md)、[测试自动清单](Docs/Generated/Test-Inventory-ZH.md)：当前文件、场景、组件与测试入口；
 - [最新验证快照](Docs/Generated/Latest-Verification-ZH.md)、[文档关注提醒](Docs/Generated/Documentation-Attention-ZH.md)：最近证据和需要人工检查的文档提醒。
 
+## 受控文档更新流程
+
+完成一次有仓库改动的审查时，先在交付说明写明已经确认的比较基线和审查范围。不要直接把用户工作区里所有未提交内容当成本次改动。下面清单只收集明确基线到当前提交之间的项目相对路径，并把它交给生成器：
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+REVIEW_BASE=<已明确的基线提交>
+CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
+mkdir -p /tmp/wastecity-project-quality
+git diff --name-only "$REVIEW_BASE"...HEAD > "$CHANGED_PATHS"
+WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
+  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.GenerateDocumentation
+WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
+  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation
+```
+
+其中 `UNITY_BIN` 使用本机 Unity `2022.3.62f1` 的可执行文件。交付说明必须记录 `REVIEW_BASE` 和 `CHANGED_PATHS` 所用清单，方便之后复查。只有用户明确确认“本次没有仓库变更”时，才可先创建空的 UTF-8 文件再运行上述命令；缺少 `WASTECITY_QUALITY_CHANGED_PATHS` 不是普通完成路径。生成和验证只更新或检查受控技术附录，不会替代人工试玩、审批或验收。
+
 ## 美术替换约定
 
 当前大部分表现是占位符。正式资源通过稳定 ID、`VisualSlot`、`VisualDefinition` 和 `VisualLibrary` 替换，不应把碰撞、生命、攻击或存档状态放入纯美术 Prefab。详细要求见 `Docs/05-Formal-Development-Roadmap-ZH.md` 与 `ArtDesign/README.md`。

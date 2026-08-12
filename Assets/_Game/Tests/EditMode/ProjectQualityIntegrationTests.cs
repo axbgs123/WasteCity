@@ -24,6 +24,14 @@ namespace WasteCity.Tests
             "WASTECITY_QUALITY_HUMAN_PLAYTEST", "WASTECITY_QUALITY_CHANGED_PATHS",
         };
 
+        private static readonly string[] GeneratedDocumentPaths =
+        {
+            ProjectDocumentationGenerator.ProjectInventoryPath,
+            ProjectDocumentationGenerator.TestInventoryPath,
+            ProjectDocumentationGenerator.VerificationPath,
+            ProjectDocumentationGenerator.AttentionPath,
+        };
+
         private readonly Dictionary<string, string> savedEnvironment = new Dictionary<string, string>();
         private string fixtureDirectory;
 
@@ -249,36 +257,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void GenerateThenValidate_ChangesOnlyGeneratedFilesAndUsesNoImplicitChangedPaths()
+        public void GenerateThenValidate_ChangesOnlyGeneratedFilesAndUsesExplicitChangedPaths()
         {
-            Dictionary<string, string> before = HashFiles(ProjectRoot(), false);
-            ProjectQualityTools.GenerateDocumentation();
-            Dictionary<string, string> afterGeneration = HashFiles(ProjectRoot(), false);
-            Assert.That(ChangedPaths(before, afterGeneration).All(path => path.StartsWith("Docs/Generated/", StringComparison.Ordinal)), Is.True);
-            StringAssert.Contains("当前没有待处理的路径提醒", File.ReadAllText(Path.Combine(ProjectRoot(),
-                ProjectDocumentationGenerator.AttentionPath)));
+            string changedPaths = Write("changed-paths.txt",
+                "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs\n");
+            var originalGeneratedFiles = new Dictionary<string, byte[]>();
+            foreach (string relativePath in GeneratedDocumentPaths)
+                originalGeneratedFiles[relativePath] = File.ReadAllBytes(Path.Combine(ProjectRoot(), relativePath));
+            var originalEnvironment = new Dictionary<string, string>();
+            foreach (string name in EnvironmentNames)
+                originalEnvironment[name] = Environment.GetEnvironmentVariable(name);
 
-            Dictionary<string, string> beforeValidation = HashFiles(ProjectRoot(), true);
-            ProjectQualityTools.ValidateDocumentation();
-            CollectionAssert.IsEmpty(ChangedPaths(beforeValidation, HashFiles(ProjectRoot(), true)));
+            try
+            {
+                Environment.SetEnvironmentVariable("WASTECITY_QUALITY_CHANGED_PATHS", changedPaths);
+                Dictionary<string, string> before = HashFiles(ProjectRoot(), false);
+                ProjectQualityTools.GenerateDocumentation();
+                Dictionary<string, string> afterGeneration = HashFiles(ProjectRoot(), false);
+                Assert.That(ChangedPaths(before, afterGeneration).All(path => path.StartsWith("Docs/Generated/", StringComparison.Ordinal)), Is.True);
+                StringAssert.Contains("Docs/Generated/Project-Inventory-ZH.md", File.ReadAllText(Path.Combine(ProjectRoot(),
+                    ProjectDocumentationGenerator.AttentionPath)));
+
+                Dictionary<string, string> beforeValidation = HashFiles(ProjectRoot(), true);
+                ProjectQualityTools.ValidateDocumentation();
+                CollectionAssert.IsEmpty(ChangedPaths(beforeValidation, HashFiles(ProjectRoot(), true)));
+            }
+            finally
+            {
+                foreach (KeyValuePair<string, byte[]> file in originalGeneratedFiles)
+                    File.WriteAllBytes(Path.Combine(ProjectRoot(), file.Key), file.Value);
+                foreach (KeyValuePair<string, string> value in originalEnvironment)
+                    Environment.SetEnvironmentVariable(value.Key, value.Value);
+            }
         }
 
         [Test]
         public void PermanentCompletionGate_RequiresQualityContractsAndDiscoverabilityLinks()
         {
             string agents = ReadGuide("AGENTS.md");
-            foreach (string requirement in new[]
-            {
-                "新增或修改的生产文件必须归入功能组",
-                "新增公共能力必须更新推荐复用目录或说明为何不适合复用",
-                "功能修改必须补充对应测试",
-                "完成前运行 ProjectQualityTools.GenerateDocumentation",
-                "完成前运行 ProjectQualityTools.ValidateDocumentation",
-                "自动工具不得改变玩法审批或人工验收结论",
-            }) StringAssert.Contains(requirement, agents);
-            StringAssert.Contains("Docs/06", agents);
-            StringAssert.Contains("生成的技术文档", agents);
-            StringAssert.Contains("不是", agents);
+            string completionGate = MarkdownSectionBody(agents, "## 开发完成门", "## 用户反馈处理");
+            AssertCompletionGateStep(completionGate, 1, "审查范围", "稳定需求 ID");
+            AssertCompletionGateStep(completionGate, 2, "生产文件必须归入功能组", "推荐复用目录", "对应测试");
+            AssertCompletionGateStep(completionGate, 3, "WASTECITY_QUALITY_CHANGED_PATHS", "UTF-8", "文档关注提醒");
+            AssertCompletionGateStep(completionGate, 4, "ProjectQualityTools.GenerateDocumentation");
+            AssertCompletionGateStep(completionGate, 5, "ProjectQualityTools.ValidateDocumentation", "只读");
+            AssertCompletionGateStep(completionGate, 6, "按改动风险", "完整测试", "无界面编译", "Windows 构建", "独立运行");
+            AssertCompletionGateStep(completionGate, 7, "ProjectQualityTools.AnalyzeTestResults", "ProjectQualityTools.RecordVerification");
+            AssertCompletionGateStep(completionGate, 8, "Docs/06-User-Feedback-and-Change-Control-ZH.md", "人工试玩", "审批");
+            AssertCompletionGateStep(completionGate, 9, "精确文件列表", "受保护文件");
+            StringAssert.Contains("自动工具不得改变玩法审批或人工验收结论", completionGate);
+            StringAssert.Contains("生成的技术文档不是", agents);
+
+            string feedback = MarkdownSectionBody(agents, "## 用户反馈处理", "## 仓库安全");
+            AssertOrderedText(feedback, "先在对话中澄清", "向用户展示摘要", "用户明确确认", "更新 `Docs/06");
+            foreach (string requirement in new[] { "修改位置", "目标规则", "边界", "验收", "原文差异", "稳定编号", "审批状态" })
+                StringAssert.Contains(requirement, feedback);
+            StringAssert.DoesNotContain("先更新 `Docs/06-User-Feedback-and-Change-Control-ZH.md`", feedback);
 
             string readme = ReadGuide("README.md");
             string docsIndex = ReadGuide("Docs/README.md");
@@ -310,6 +344,10 @@ namespace WasteCity.Tests
             }) AssertMarkdownLinkExists(docsIndex, "Docs/README.md", document);
             AssertAllMarkdownLinksResolve(readme, "README.md");
             AssertAllMarkdownLinksResolve(docsIndex, "Docs/README.md");
+            StringAssert.Contains("WASTECITY_QUALITY_CHANGED_PATHS", readme);
+            StringAssert.Contains("git diff --name-only \"$REVIEW_BASE\"...HEAD", readme);
+            StringAssert.Contains("ProjectQualityTools.GenerateDocumentation", readme);
+            StringAssert.Contains("本次没有仓库变更", readme);
 
             string roadmap = ReadGuide("Docs/05-Formal-Development-Roadmap-ZH.md");
             StringAssert.Contains("DOC-0001", roadmap);
@@ -317,6 +355,38 @@ namespace WasteCity.Tests
             StringAssert.Contains("不计入玩法完成度", roadmap);
             StringAssert.Contains("主 GDD 正式版整体：约 **50%**", roadmap);
             StringAssert.Contains("正式美术、动画与音频：约 **8%**", roadmap);
+        }
+
+        [Test]
+        public void GenerateDocumentation_UsesExplicitChangedPathListAndRestoresGeneratedEvidence()
+        {
+            string changedPaths = Write("explicit-changed-paths.txt",
+                "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs\n");
+            string attentionPath = Path.Combine(ProjectRoot(), ProjectDocumentationGenerator.AttentionPath);
+            var originalGeneratedFiles = new Dictionary<string, byte[]>();
+            foreach (string relativePath in GeneratedDocumentPaths)
+                originalGeneratedFiles[relativePath] = File.ReadAllBytes(Path.Combine(ProjectRoot(), relativePath));
+            var originalEnvironment = new Dictionary<string, string>();
+            foreach (string name in EnvironmentNames)
+                originalEnvironment[name] = Environment.GetEnvironmentVariable(name);
+
+            try
+            {
+                Environment.SetEnvironmentVariable("WASTECITY_QUALITY_CHANGED_PATHS", changedPaths);
+                ProjectQualityTools.GenerateDocumentation();
+
+                string attention = File.ReadAllText(attentionPath);
+                StringAssert.Contains("Docs/Generated/Project-Inventory-ZH.md", attention);
+                StringAssert.Contains("Docs/Generated/Test-Inventory-ZH.md", attention);
+                StringAssert.Contains("项目质量目录或测试映射变化后", attention);
+            }
+            finally
+            {
+                foreach (KeyValuePair<string, byte[]> file in originalGeneratedFiles)
+                    File.WriteAllBytes(Path.Combine(ProjectRoot(), file.Key), file.Value);
+                foreach (KeyValuePair<string, string> value in originalEnvironment)
+                    Environment.SetEnvironmentVariable(value.Key, value.Value);
+            }
         }
 
         [Test]
@@ -499,6 +569,28 @@ namespace WasteCity.Tests
             int end = content.IndexOf(nextHeading, bodyStart, StringComparison.Ordinal);
             Assert.That(end, Is.GreaterThan(bodyStart), "missing next Markdown section " + nextHeading);
             return content.Substring(bodyStart, end - bodyStart);
+        }
+
+        private static void AssertCompletionGateStep(string content, int number, params string[] requiredTerms)
+        {
+            string heading = number + ". ";
+            int start = content.IndexOf(heading, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), "missing completion-gate step " + number);
+            int next = content.IndexOf((number + 1) + ". ", start + heading.Length, StringComparison.Ordinal);
+            if (number < 9) Assert.That(next, Is.GreaterThan(start), "completion-gate steps are reordered after " + number);
+            string step = next < 0 ? content.Substring(start) : content.Substring(start, next - start);
+            foreach (string term in requiredTerms) StringAssert.Contains(term, step, "step " + number + " is incomplete");
+        }
+
+        private static void AssertOrderedText(string content, params string[] values)
+        {
+            int previous = -1;
+            foreach (string value in values)
+            {
+                int index = content.IndexOf(value, StringComparison.Ordinal);
+                Assert.That(index, Is.GreaterThan(previous), "missing or reordered text: " + value);
+                previous = index;
+            }
         }
 
         private static string ReuseEntryBody(string content, ProjectReuseEntry entry)

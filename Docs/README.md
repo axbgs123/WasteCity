@@ -20,6 +20,8 @@
 - [最新验证快照](Generated/Latest-Verification-ZH.md)：最近一次受控测试、编译、构建和人工试玩证据；
 - [文档关注提醒](Generated/Documentation-Attention-ZH.md)：依据改动路径给出的人工文档检查提醒，不代表已经批准。
 
+有代码或文档改动时，按仓库根目录 [README 的受控文档更新流程](../README.md#受控文档更新流程) 先提供明确范围的路径清单；不要把用户的无关脏改自动加入提醒。
+
 当前固定 Unity 版本：`2022.3.62f1`。
 
 对外发布状态：未公开；GitHub 仓库必须保持 Private。

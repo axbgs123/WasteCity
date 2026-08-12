@@ -19,13 +19,13 @@
 
 完成任何新增或修改前，必须按以下顺序检查：
 
-1. 在计划、测试和交付中保留相关稳定需求 ID；
-2. 新增或修改的生产文件必须归入功能组；
-3. 新增公共能力必须更新推荐复用目录或说明为何不适合复用；
-4. 功能修改必须补充对应测试，并先运行最小的针对性测试；
-5. 完成前运行 ProjectQualityTools.GenerateDocumentation，更新受控的技术附录；
-6. 完成前运行 ProjectQualityTools.ValidateDocumentation，只读检查目录映射、生成文件和文档提醒；
-7. 按改动风险补跑完整测试、无界面编译、Windows 构建和独立运行；
+1. 先明确本次审查范围，并在计划、测试和交付中保留相关稳定需求 ID；
+2. 新增或修改的生产文件必须归入功能组和质量目录映射；新增公共能力必须更新推荐复用目录或说明为何不适合复用；功能修改必须补充对应测试，并先运行最小的针对性测试；
+3. 从已明确的审查范围导出 UTF-8、项目相对路径清单，设置 `WASTECITY_QUALITY_CHANGED_PATHS` 后生成文档关注提醒；普通完成路径不得省略该清单，只有用户明确确认“本次没有仓库变更”时才可使用空文件；
+4. 完成前运行 ProjectQualityTools.GenerateDocumentation，更新受控的技术附录；
+5. 完成前运行 ProjectQualityTools.ValidateDocumentation，只读检查目录映射、生成文件和文档提醒；
+6. 按改动风险补跑完整测试、无界面编译、Windows 构建和独立运行；
+7. 用 ProjectQualityTools.AnalyzeTestResults 保存失败定位报告；证据完整且符合人工结论后，才用 ProjectQualityTools.RecordVerification 记录验证；
 8. 人工试玩、玩法含义、审批和验收结论仍由人确认并更新 `Docs/06-User-Feedback-and-Change-Control-ZH.md`；自动工具不得改变玩法审批或人工验收结论；
 9. 暂存前核对精确文件列表，并复查受保护文件没有被意外改动。
 
@@ -35,12 +35,12 @@
 
 用户反馈测试 Bug、提出新构思或要求改变原文档时：
 
-1. 先更新 `Docs/06-User-Feedback-and-Change-Control-ZH.md`；
-2. 分配 `BUG-`、`IDEA-` 或 `DOC-` 稳定编号；
-3. 新记录默认标记为 `待确认 + 未实现`；
-4. 只有用户明确批准后才能进入设计和开发；
-5. 每次新增记录或改变状态都应形成独立 Git 提交并推送当前开发分支；
-6. GitHub 暂时不可用时先保留本地提交，连接恢复后按顺序推送，不改写历史。
+1. 先在对话中澄清修改位置、目标规则、影响边界和验收方式，不直接写入 `Docs/06-User-Feedback-and-Change-Control-ZH.md`；
+2. 向用户展示摘要和原文差异；
+3. 取得用户明确确认；
+4. 确认后才更新 `Docs/06-User-Feedback-and-Change-Control-ZH.md`；
+5. 分配 `BUG-`、`IDEA-` 或 `DOC-` 稳定编号，并保持真实审批状态；新记录默认标记为 `待确认 + 未实现`；
+6. 只有用户明确批准后才能进入设计和开发；每次新增记录或改变状态都应形成独立 Git 提交并推送当前开发分支；GitHub 暂时不可用时先保留本地提交，连接恢复后按顺序推送，不改写历史。
 
 ## 仓库安全
 
