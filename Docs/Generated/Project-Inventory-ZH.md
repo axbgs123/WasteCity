@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`bed197901c2b249ca56f245b89b23ff35fc2f824ed88876931b444b5c38efac6`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`64f4ea305e1ea2086c1c171f5fad958a8d33236ee4779d651800fa6fbecca003`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -200,6 +200,7 @@
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs`
+- `Assets/_Game/Editor/ProjectQuality/ProjectQualityTools.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectTestResultAnalyzer.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs`
@@ -324,6 +325,10 @@
 - `WasteCity.Editor.GrayboxPerformanceProbe.SummarizeGuiProfilerCapture`
 - `WasteCity.Editor.GrayboxSceneAuthoring.CaptureFoundationIdentity`
 - `WasteCity.Editor.GrayboxSceneAuthoring.Configure`
+- `WasteCity.Editor.ProjectQuality.ProjectQualityTools.AnalyzeTestResults`
+- `WasteCity.Editor.ProjectQuality.ProjectQualityTools.GenerateDocumentation`
+- `WasteCity.Editor.ProjectQuality.ProjectQualityTools.RecordVerification`
+- `WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation`
 ## 9. 美术接入与稳定展示路径
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMap3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`

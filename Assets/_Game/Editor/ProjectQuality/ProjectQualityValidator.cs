@@ -12,6 +12,13 @@ namespace WasteCity.Editor.ProjectQuality
         public static IReadOnlyList<ProjectQualityIssue> Validate(
             ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot, string projectRoot)
         {
+            return Validate(catalog, snapshot, projectRoot, true);
+        }
+
+        public static IReadOnlyList<ProjectQualityIssue> Validate(
+            ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot, string projectRoot,
+            bool validateGeneratedDocumentation)
+        {
             var issues = new List<ProjectQualityIssue>();
             if (catalog == null || snapshot == null || string.IsNullOrWhiteSpace(projectRoot))
             {
@@ -25,7 +32,7 @@ namespace WasteCity.Editor.ProjectQuality
             ValidateScenes(catalog, snapshot, issues);
             ValidateUi(catalog, snapshot, issues);
             ValidateDocumentation(catalog, projectRoot, issues);
-            if (issues.Count == 0)
+            if (validateGeneratedDocumentation && issues.Count == 0)
                 ValidateGeneratedDocumentation(catalog, snapshot, projectRoot, issues);
             return Sort(issues);
         }

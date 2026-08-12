@@ -156,6 +156,14 @@ namespace WasteCity.Editor.ProjectQuality
             }
         }
 
+        public static void WriteVerificationFile(string projectRoot, string content)
+        {
+            if (string.IsNullOrWhiteSpace(projectRoot))
+                throw new InvalidOperationException("项目根目录无效");
+            string fullRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            WriteApprovedFile(ResolveApprovedTarget(fullRoot, VerificationPath), Utf8Bytes(content));
+        }
+
         public static ProjectVerificationSnapshot CreateRecordedPriorVerificationSnapshot()
         {
             return new ProjectVerificationSnapshot
@@ -383,6 +391,32 @@ namespace WasteCity.Editor.ProjectQuality
             if (!target.StartsWith(generatedDirectory + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                 throw new InvalidOperationException("生成文件路径超出 Docs/Generated");
             return target;
+        }
+
+        private static void WriteApprovedFile(string target, byte[] bytes)
+        {
+            string temporaryPath = target + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                using (var stream = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+                if (File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(bytes))
+                {
+                    File.Delete(temporaryPath);
+                    return;
+                }
+                if (File.Exists(target)) File.Replace(temporaryPath, target, null);
+                else File.Move(temporaryPath, target);
+            }
+            catch
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+                throw;
+            }
         }
 
         private static void RequireCatalog(ProjectQualityCatalog catalog)
