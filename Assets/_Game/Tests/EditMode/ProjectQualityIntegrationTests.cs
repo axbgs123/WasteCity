@@ -351,6 +351,11 @@ namespace WasteCity.Tests
             StringAssert.Contains("本次没有仓库变更", readme);
 
             string roadmap = ReadGuide("Docs/05-Formal-Development-Roadmap-ZH.md");
+            string changeControl = ReadGuide("Docs/06-User-Feedback-and-Change-Control-ZH.md");
+            StringAssert.Contains("| `DOC-0001` | 文档变更 | 项目测试、可复用目录与自动文档维护规范 | `P1` | `已明确` | `已批准` | `已实现待验证`", changeControl);
+            StringAssert.Contains("普通中文指南、测试定位、复用目录、自动清单与完成门已实现并通过机器验证；等待用户复验", changeControl);
+            StringAssert.Contains("DOC-0001`：项目测试、可复用目录与自动文档维护规范；工具、主文档和机器验证已完成，等待用户验证。", roadmap);
+            StringAssert.DoesNotContain("DOC-0001`：项目测试、可复用目录与自动文档维护规范；工具和主文档仍在实施中，未验证。", roadmap);
             StringAssert.Contains("DOC-0001", roadmap);
             StringAssert.Contains("质量", roadmap);
             StringAssert.Contains("不计入玩法完成度", roadmap);
