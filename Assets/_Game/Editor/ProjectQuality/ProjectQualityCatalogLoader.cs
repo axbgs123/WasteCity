@@ -35,6 +35,7 @@ namespace WasteCity.Editor.ProjectQuality
                 Fail(source, "invalid catalog JSON");
             if (dto.SchemaVersion != 1)
                 Fail(source, "schema version must be 1");
+            ValidateRequiredSceneFields(json, source);
 
             RequireArray(dto.FeatureGroups, source, "feature groups");
             RequireArray(dto.ReuseEntries, source, "reuse entries");
@@ -62,7 +63,26 @@ namespace WasteCity.Editor.ProjectQuality
                 ExplicitTestExclusions = NormalizePaths(dto.ExplicitTestExclusions, source, "explicit test exclusion"),
             };
 
+            ValidateRelationships(catalog, source);
+
             return catalog;
+        }
+
+        private static void ValidateRelationships(ProjectQualityCatalog catalog, string source)
+        {
+            var featureIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ProjectFeatureGroup feature in catalog.FeatureGroups)
+                featureIds.Add(feature.Id);
+            foreach (ProjectReuseEntry reuse in catalog.ReuseEntries)
+                if (!featureIds.Contains(reuse.FeatureGroupId))
+                    Fail(source, "dangling feature group: " + reuse.FeatureGroupId);
+
+            var sceneIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ProjectSceneEntry scene in catalog.Scenes)
+                sceneIds.Add(scene.Id);
+            foreach (ProjectUiEntry ui in catalog.UiEntries)
+                if (!sceneIds.Contains(ui.SceneId))
+                    Fail(source, "dangling scene: " + ui.SceneId);
         }
 
         private static ProjectFeatureGroup[] ConvertFeatureGroups(FeatureGroupDto[] entries, string source, HashSet<string> ids)
@@ -78,7 +98,7 @@ namespace WasteCity.Editor.ProjectQuality
                     SourceGlobs = NormalizePaths(RequireArray(entry.SourceGlobs, source, "feature source globs"), source, "source glob"),
                     TestFileGlobs = NormalizePaths(RequireArray(entry.TestFileGlobs, source, "feature test file globs"), source, "test file glob"),
                     ScenePaths = NormalizePaths(RequireArray(entry.ScenePaths, source, "feature scene paths"), source, "scene path"),
-                    RequirementIds = NormalizeTextArray(RequireArray(entry.RequirementIds, source, "feature requirement IDs"), source, "requirement ID"),
+                    RequirementIds = NormalizeRequirementIds(RequireArray(entry.RequirementIds, source, "feature requirement IDs"), source),
                     HumanDocumentPaths = NormalizePaths(RequireArray(entry.HumanDocumentPaths, source, "feature human document paths"), source, "human document path"),
                     MinimumVerification = ParseVerification(entry.MinimumVerification, source),
                 };
@@ -103,7 +123,7 @@ namespace WasteCity.Editor.ProjectQuality
                     UseSummary = HumanText(entry.UseSummary, source, "use summary"),
                     BoundarySummary = HumanText(entry.BoundarySummary, source, "boundary summary"),
                     RequiredTestFiles = NormalizePaths(RequireArray(entry.RequiredTestFiles, source, "required test files"), source, "required test file"),
-                    RequirementIds = NormalizeTextArray(RequireArray(entry.RequirementIds, source, "reuse requirement IDs"), source, "requirement ID"),
+                    RequirementIds = NormalizeRequirementIds(RequireArray(entry.RequirementIds, source, "reuse requirement IDs"), source),
                 };
             }
             return result;
@@ -203,6 +223,24 @@ namespace WasteCity.Editor.ProjectQuality
             return result;
         }
 
+        private static string[] NormalizeRequirementIds(string[] values, string source)
+        {
+            var result = new string[values.Length];
+            for (int index = 0; index < values.Length; index++)
+            {
+                string value = RequiredText(values[index], source, "requirement ID");
+                if (value.Length != 8 ||
+                    !(value.StartsWith("BUG-", StringComparison.Ordinal) ||
+                      value.StartsWith("IDEA-", StringComparison.Ordinal) ||
+                      value.StartsWith("DOC-", StringComparison.Ordinal)) ||
+                    !char.IsDigit(value[value.Length - 1]) || !char.IsDigit(value[value.Length - 2]) ||
+                    !char.IsDigit(value[value.Length - 3]) || !char.IsDigit(value[value.Length - 4]))
+                    Fail(source, "malformed requirement id: " + value);
+                result[index] = value;
+            }
+            return result;
+        }
+
         private static string NormalizePath(string value, string source, string label)
         {
             string path = RequiredText(value, source, label).Replace('\\', '/');
@@ -256,6 +294,116 @@ namespace WasteCity.Editor.ProjectQuality
         private static void Fail(string source, string message)
         {
             throw new InvalidDataException(source + ": " + message);
+        }
+
+        private static void ValidateRequiredSceneFields(string json, string source)
+        {
+            int valueStart;
+            int valueEnd;
+            if (!TryFindRootProperty(json, "Scenes", out valueStart, out valueEnd) || json[valueStart] != '[')
+                Fail(source, "scenes array is required");
+
+            int position = valueStart + 1;
+            while (true)
+            {
+                SkipWhitespace(json, ref position);
+                if (position >= valueEnd || json[position] == ']') return;
+                int sceneStart = position;
+                int sceneEnd = SkipValue(json, ref position);
+                if (sceneStart >= sceneEnd || json[sceneStart] != '{')
+                    Fail(source, "scene is invalid");
+                if (!ObjectHasProperty(json, sceneStart, sceneEnd, "EnabledInBuildSettings"))
+                    Fail(source, "missing scene enabled");
+                if (!ObjectHasProperty(json, sceneStart, sceneEnd, "ExpectedBuildIndex"))
+                    Fail(source, "missing scene build index");
+                SkipWhitespace(json, ref position);
+                if (position < valueEnd && json[position] == ',') { position++; continue; }
+                if (position < valueEnd && json[position] == ']') return;
+                Fail(source, "scene array is invalid");
+            }
+        }
+
+        private static bool TryFindRootProperty(string json, string property, out int valueStart, out int valueEnd)
+        {
+            valueStart = valueEnd = 0;
+            int position = 0;
+            SkipWhitespace(json, ref position);
+            if (position >= json.Length || json[position++] != '{') return false;
+            while (true)
+            {
+                SkipWhitespace(json, ref position);
+                if (position >= json.Length || json[position] == '}') return false;
+                string name = ReadString(json, ref position);
+                SkipWhitespace(json, ref position);
+                if (position >= json.Length || json[position++] != ':') return false;
+                SkipWhitespace(json, ref position);
+                int start = position;
+                int end = SkipValue(json, ref position);
+                if (name == property) { valueStart = start; valueEnd = end; return true; }
+                SkipWhitespace(json, ref position);
+                if (position >= json.Length || json[position++] != ',') return false;
+            }
+        }
+
+        private static bool ObjectHasProperty(string json, int start, int end, string property)
+        {
+            int position = start + 1;
+            while (position < end)
+            {
+                SkipWhitespace(json, ref position);
+                if (position >= end || json[position] == '}') return false;
+                string name = ReadString(json, ref position);
+                SkipWhitespace(json, ref position);
+                if (position >= end || json[position++] != ':') return false;
+                SkipWhitespace(json, ref position);
+                SkipValue(json, ref position);
+                if (name == property) return true;
+                SkipWhitespace(json, ref position);
+                if (position < end && json[position] == ',') { position++; continue; }
+                return false;
+            }
+            return false;
+        }
+
+        private static void SkipWhitespace(string json, ref int position)
+        {
+            while (position < json.Length && char.IsWhiteSpace(json[position])) position++;
+        }
+
+        private static string ReadString(string json, ref int position)
+        {
+            if (position >= json.Length || json[position++] != '"') return null;
+            int start = position;
+            var value = new System.Text.StringBuilder();
+            while (position < json.Length)
+            {
+                char current = json[position++];
+                if (current == '"') return value.Length == 0 ? json.Substring(start, position - start - 1) : value.ToString();
+                if (current == '\\' && position < json.Length) { value.Append(json[position++]); continue; }
+                value.Append(current);
+            }
+            return null;
+        }
+
+        private static int SkipValue(string json, ref int position)
+        {
+            SkipWhitespace(json, ref position);
+            if (position >= json.Length) return position;
+            char opening = json[position];
+            if (opening == '"') { ReadString(json, ref position); return position; }
+            if (opening != '{' && opening != '[') { while (position < json.Length && ",]} \t\r\n".IndexOf(json[position]) < 0) position++; return position; }
+            char closing = opening == '{' ? '}' : ']';
+            position++;
+            while (position < json.Length)
+            {
+                SkipWhitespace(json, ref position);
+                if (position < json.Length && json[position] == closing) { position++; return position; }
+                if (opening == '{') { ReadString(json, ref position); SkipWhitespace(json, ref position); if (position < json.Length && json[position] == ':') position++; }
+                SkipValue(json, ref position);
+                SkipWhitespace(json, ref position);
+                if (position < json.Length && json[position] == ',') position++;
+            }
+            return position;
         }
 
         [Serializable]
