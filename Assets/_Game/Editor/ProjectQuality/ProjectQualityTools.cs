@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
+using System.Xml.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -75,8 +77,16 @@ namespace WasteCity.Editor.ProjectQuality
             ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(root);
             ProjectTestAnalysisReport edit = ProjectTestResultAnalyzer.Analyze(values[2], catalog, snapshot);
             ProjectTestAnalysisReport play = ProjectTestResultAnalyzer.Analyze(values[3], catalog, snapshot);
+            ValidateRecordTestEvidence(edit);
+            ValidateRecordTestEvidence(play);
+            if (edit.Failed > 0 || play.Failed > 0)
+                throw new InvalidOperationException("测试 XML 包含失败用例，不能记录验证");
             if (edit.IsIncomplete || play.IsIncomplete)
                 throw new InvalidOperationException("测试 XML 结果不完整，不能记录验证");
+            ProjectCommandResult compile = ReadCompileResult(values[4]);
+            ProjectCommandResult[] builds = ReadBuildSummary(values[5]);
+            if (builds.Any(build => !build.Passed))
+                throw new InvalidOperationException("构建证据包含失败构建，不能记录验证");
 
             var verification = new ProjectVerificationSnapshot
             {
@@ -84,8 +94,8 @@ namespace WasteCity.Editor.ProjectQuality
                 VerifiedAtIso8601 = values[1],
                 EditMode = TestSummary(edit),
                 PlayMode = TestSummary(play),
-                Compile = ReadCompileResult(values[4]),
-                Builds = ReadBuildSummary(values[5]),
+                Compile = compile,
+                Builds = builds,
                 HumanPlaytestStatus = values[6],
             };
             ProjectDocumentationGenerator.WriteVerificationFile(root,
@@ -160,13 +170,42 @@ namespace WasteCity.Editor.ProjectQuality
                 Uri.IsWellFormedUriString(value, UriKind.Absolute))
                 throw new InvalidOperationException(AnalysisOutputEnvironment + " must be a local absolute output path");
             string output = Path.GetFullPath(value);
-            foreach (string protectedDirectory in new[] { "Assets", "Packages", "ProjectSettings" })
-            {
-                string protectedRoot = Path.GetFullPath(Path.Combine(root, protectedDirectory));
-                if (output == protectedRoot || output.StartsWith(protectedRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-                    throw new InvalidOperationException(AnalysisOutputEnvironment + " must not write under " + protectedDirectory);
-            }
+            if (IsWithin(output, root))
+                throw new InvalidOperationException(AnalysisOutputEnvironment + " must be outside the project root");
+            string approvedRoot = Path.GetFullPath(Path.GetTempPath()).TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!IsWithin(output, approvedRoot))
+                throw new InvalidOperationException(AnalysisOutputEnvironment + " must be under the approved temporary output root");
+            RejectReparsePoint(output, approvedRoot);
             return output;
+        }
+
+        private static bool IsWithin(string path, string root)
+        {
+            string fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return string.Equals(path, fullRoot, StringComparison.Ordinal) ||
+                path.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+        }
+
+        private static void RejectReparsePoint(string output, string approvedRoot)
+        {
+            if (File.Exists(output) && IsReparsePoint(output))
+                throw new InvalidOperationException(AnalysisOutputEnvironment + " must not be a symbolic link");
+            string directory = Path.GetDirectoryName(output);
+            while (!string.IsNullOrWhiteSpace(directory))
+            {
+                if (Directory.Exists(directory) && IsReparsePoint(directory))
+                    throw new InvalidOperationException(AnalysisOutputEnvironment + " must not have a symbolic-link ancestor");
+                if (string.Equals(directory, approvedRoot, StringComparison.Ordinal)) break;
+                DirectoryInfo parent = Directory.GetParent(directory);
+                if (parent == null || string.Equals(parent.FullName, directory, StringComparison.Ordinal)) break;
+                directory = parent.FullName;
+            }
+        }
+
+        private static bool IsReparsePoint(string path)
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
         }
 
         private static string RequireLocalExistingFile(string value, string environment)
@@ -197,6 +236,52 @@ namespace WasteCity.Editor.ProjectQuality
                 Skipped = report.Skipped,
                 XmlPath = report.XmlPath,
             };
+        }
+
+        private static void ValidateRecordTestEvidence(ProjectTestAnalysisReport report)
+        {
+            XDocument document;
+            try
+            {
+                var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null };
+                using (var stream = new FileStream(report.XmlPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (XmlReader reader = XmlReader.Create(stream, settings))
+                    document = XDocument.Load(reader, LoadOptions.PreserveWhitespace);
+            }
+            catch (Exception exception) when (exception is XmlException || exception is IOException ||
+                exception is UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException("无法验证 NUnit XML 证据：" + report.XmlPath, exception);
+            }
+            XElement root = document.Root;
+            if (root == null || root.Name.LocalName != "test-run")
+                throw new InvalidOperationException("NUnit XML 没有 test-run 根元素：" + report.XmlPath);
+            XElement[] cases = document.Descendants().Where(value => value.Name.LocalName == "test-case").ToArray();
+            if (cases.Length == 0)
+                throw new InvalidOperationException("NUnit XML 没有实际 test-case：" + report.XmlPath);
+            int passed = cases.Count(value => ResultIs(value, "Passed"));
+            int failed = cases.Count(value => ResultIs(value, "Failed"));
+            int skipped = cases.Count(value => ResultIs(value, "Skipped"));
+            if (passed + failed + skipped != cases.Length || ReadRequiredCount(root, "total", report.XmlPath) != cases.Length ||
+                ReadRequiredCount(root, "passed", report.XmlPath) != passed ||
+                ReadRequiredCount(root, "failed", report.XmlPath) != failed ||
+                ReadRequiredCount(root, "skipped", report.XmlPath) != skipped)
+                throw new InvalidOperationException("NUnit XML 汇总与实际 test-case 不一致：" + report.XmlPath);
+        }
+
+        private static bool ResultIs(XElement value, string result)
+        {
+            XAttribute attribute = value.Attribute("result");
+            return attribute != null && string.Equals(attribute.Value, result, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int ReadRequiredCount(XElement root, string name, string path)
+        {
+            XAttribute attribute = root.Attribute(name);
+            int value;
+            if (attribute == null || !int.TryParse(attribute.Value, out value) || value < 0)
+                throw new InvalidOperationException("NUnit XML 缺少有效 " + name + " 计数：" + path);
+            return value;
         }
 
         private static ProjectCommandResult ReadCompileResult(string value)
