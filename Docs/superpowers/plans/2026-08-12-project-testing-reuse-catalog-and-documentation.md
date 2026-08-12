@@ -476,10 +476,12 @@ The scanner must:
 - use `EditorBuildSettings.scenes` for enabled scene order;
 - identify Editor public static parameterless methods on `FormalBuildTools`, `GrayboxSceneAuthoring`, `FirstArtTerrainAssetBuilder`, `FirstArtTerrainEvidenceCapture`, `GrayboxPerformanceProbe`, and later `ProjectQualityTools`;
 - find test classes from loaded types with NUnit `[Test]`, `[TestCase]`, `[TestCaseSource]`, or Unity `[UnityTest]` methods;
-- map each test class to its declaring source file by class name plus source scan, failing on ambiguity rather than guessing;
+- build one ordinal deterministic index from `MonoScript.GetClass()` exact `Type` identity to repository-relative `AssetDatabase` paths under the approved source/test roots; map each discovered type and test class through that index, failing on missing or duplicate paths rather than guessing. Do not implement a handwritten C# lexer or preprocessor for source mapping;
 - keep all arrays sorted ordinally.
 
 Do not load or save scenes during a general scan. Scene object-tree inspection belongs to existing scene contract tests, not this inventory.
+
+**Source-mapping rationale:** Repeated valid-C# edge cases around comments, conditional branches, interpolated strings, and raw strings show that a handwritten declaration parser cannot be the authoritative mapping boundary. Unity's importer already exposes the compiled `MonoScript.GetClass()` identity and `AssetDatabase` path needed by this Editor-only inventory, including plain NUnit classes. Use that importer-owned identity as the authoritative source mapping.
 
 - [ ] **Step 4: Run Task 2 GREEN**
 
