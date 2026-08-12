@@ -269,7 +269,7 @@ namespace WasteCity.Editor.ProjectQuality
             builder.AppendLine("## 5. 可复制的测试筛选命令");
             string filter = string.Join("|", Values(snapshot.TestClasses).Select(value => value.FullName)
                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray());
-            builder.AppendLine("- '" + "-testFilter " + filter + "'");
+            builder.AppendLine("- -testFilter '" + filter + "'");
             builder.AppendLine("## 6. 失败定位用的源码路径与受控需求编号");
             foreach (ProjectFeatureGroup feature in Values(catalog.FeatureGroups).OrderBy(value => value.Id, StringComparer.Ordinal))
                 builder.AppendLine("- " + Text(feature.ChineseName) + "：源码 " + JoinCode(Values(feature.SourceGlobs)) + "；需求 " + JoinCode(Values(feature.RequirementIds)));

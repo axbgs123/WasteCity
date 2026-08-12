@@ -51,7 +51,7 @@ namespace WasteCity.Tests
                 StringAssert.Contains("## " + section + ".", files["Docs/Generated/Test-Inventory-ZH.md"]);
             StringAssert.Contains("自动生成", files["Docs/Generated/Project-Inventory-ZH.md"]);
             StringAssert.Contains("普通中文", files["Docs/Generated/Test-Inventory-ZH.md"]);
-            StringAssert.Contains("'-testFilter WasteCity.Tests.FeatureTests|WasteCity.Tests.RuntimeTests'",
+            StringAssert.Contains("-testFilter 'WasteCity.Tests.FeatureTests|WasteCity.Tests.RuntimeTests'",
                 files["Docs/Generated/Test-Inventory-ZH.md"]);
         }
 
