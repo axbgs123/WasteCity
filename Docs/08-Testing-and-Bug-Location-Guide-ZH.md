@@ -18,7 +18,7 @@
 
 ## 按功能选择测试
 
-先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景，再在[测试自动清单](Generated/Test-Inventory-ZH.md)寻找该功能组的最低检查门和可复制筛选命令。建造、城市、UI、地形、美术、存档和冻结 2D 的最低检查并不相同；不确定时，宁可从单功能检查开始，再扩大范围。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
+先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景。单功能检查优先看失败报告中的“只重跑这个失败”：报告实际会在“建议复跑”下给出一个可直接复制的单类筛选。若还没有失败报告，或要补跑相关类，就在[测试自动清单](Generated/Test-Inventory-ZH.md)的“精确测试文件与测试类”表找到对应类名，手动把一到数个类名用 `|` 连起来。该附录的“可复制的测试筛选命令”目前只有全部测试类的聚合筛选，不能当作单功能命令。建造、城市、UI、地形、美术、存档和冻结 2D 的最低检查并不相同；先跑单功能，再跑相关检查，最后才完整回归。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
 
 ## 怎样读失败定位报告
 
@@ -55,7 +55,19 @@
 <details>
 <summary>展开技术附录：测试命令如何查找</summary>
 
-请从[测试自动清单](Generated/Test-Inventory-ZH.md)复制对应的 `-testFilter`，使用项目固定 Unity 版本运行。先执行目标功能的筛选，再扩大到相关功能和完整回归；不要把本文当作会自动更新的命令清单。
+先复制失败报告“建议复跑”中的单类筛选；它就是失败报告中的“只重跑这个失败”。若要把相关检查放进同一次运行，从[测试自动清单](Generated/Test-Inventory-ZH.md)“精确测试文件与测试类”表复制真实类名，用 `|` 连接，并用单引号包住整个筛选值。以下是可直接运行的真实格式示例；把两个类名替换成表中与你的问题对应的类名即可。
+
+```sh
+PROJECT_ROOT=/Users/baiyan1/Documents/WasteCity-first-art-pass-fixes
+UNITY_BIN=/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests' \
+  -testResults /tmp/wastecity-project-quality/focused.xml \
+  -logFile /tmp/wastecity-project-quality/focused.log
+```
+
+不要把测试清单末尾的聚合筛选误当成单功能入口；它会运行全部已列出的测试类。流程始终是单功能检查，再相关检查，最后完整回归。
 
 </details>
 

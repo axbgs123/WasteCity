@@ -28,7 +28,7 @@
 
 ### 三维世界布局（复用前审查）
 
-能解决什么：安排三维灰盒世界的位置。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`。怎么复用：在修改布局前先复核现有场景。不能负责什么：不能替你判断新玩法规则。改后跑哪组测试：`GrayboxWorldLayout3DTests`。代码名：`GrayboxWorldLayout3D`。
+能解决什么：安排三维灰盒世界的位置。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`。怎么复用：调整布局前需要场景复核。不能负责什么：不能替你判断新玩法规则。改后跑哪组测试：`GrayboxWorldLayout3DTests`。代码名：`GrayboxWorldLayout3D`。
 
 ### 平面坐标映射（推荐复用）
 
@@ -86,7 +86,7 @@
 
 ### 三维建筑世界视图（仅限场景）
 
-能解决什么：在当前场景显示建筑。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`。怎么复用：只在现有三维场景中绑定。不能负责什么：不能当作纯规则模型复用。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
+能解决什么：在当前场景显示建筑。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`。怎么复用：只在现有三维场景中绑定。不能负责什么：不作为纯领域模型复用。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
 
 ## UI 与输入
 
@@ -114,7 +114,7 @@
 
 ### 正式存档数据（复用前审查）
 
-能解决什么：保存正式存档字段。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：变更前先做兼容性审查。不能负责什么：不替代存档迁移方案。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
+能解决什么：保存正式存档字段。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：变更需要兼容性评审。不能负责什么：不替代存档迁移方案。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
 
 ## 3D 表现与美术
 
@@ -124,11 +124,11 @@
 
 ### 三维灰盒视觉槽位（仅限场景）
 
-能解决什么：把灰盒视觉绑定到当前场景。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`。怎么复用：只在该三维场景内使用。不能负责什么：不替代二维槽位。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxVisualSlot`。
+能解决什么：把灰盒视觉绑定到当前场景。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`。怎么复用：只在该三维场景内使用。不能负责什么：不作为二维槽位替代。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxVisualSlot`。
 
 ### 首版三维地形配置（复用前审查）
 
-能解决什么：定义首版地形参数。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`。怎么复用：先复核导入策略和性能边界。不能负责什么：不直接决定资源导入。改后跑哪组测试：`FirstArtTerrainProfileTests`。代码名：`FirstArtTerrainProfile3D`。
+能解决什么：定义首版地形参数。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`。怎么复用：修改前需要导入策略复核。不能负责什么：不直接决定资源导入。改后跑哪组测试：`FirstArtTerrainProfileTests`。代码名：`FirstArtTerrainProfile3D`。
 
 ### 首版三维地形渲染（仅限场景）
 
@@ -146,14 +146,14 @@
 
 ### 灰盒性能探针（仅限场景）
 
-能解决什么：采集灰盒性能数据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：只在已定义的性能场景采样。不能负责什么：不作为发布版逻辑。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxPerformanceProbe`。
+能解决什么：采集灰盒性能数据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：只在已定义的性能场景采样。不能负责什么：不作为发布版本逻辑。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxPerformanceProbe`。
 
 ## 冻结或禁止用于新功能的旧内容
 
 ### 正式原型冻结场景（冻结回归）
 
-能解决什么：保留二维旧功能的回归基线。在哪里：`Assets/_Game/Scenes/FormalPrototype.unity` 和 `Assets/_Game/Scripts/Core/FormalGameBootstrap.cs`。怎么复用：只用于确认旧行为未倒退。不能负责什么：不是新功能模板。改后跑哪组测试：`SceneContractTests`。代码名：`FormalGameBootstrap`。
+能解决什么：保留二维旧功能的回归基线。在哪里：`Assets/_Game/Scenes/FormalPrototype.unity` 和 `Assets/_Game/Scripts/Core/FormalGameBootstrap.cs`。怎么复用：只用于确认旧行为未倒退。不能负责什么：不得作为新功能起点。改后跑哪组测试：`SceneContractTests`。代码名：`FormalGameBootstrap`。
 
 ### 占位建筑控制器（禁止用于新功能）
 
-能解决什么：维持旧回归兼容。在哪里：`Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs`。怎么复用：不复用到新功能，只在修复旧回归时谨慎维护。不能负责什么：不能作为新的建筑实现。改后跑哪组测试：`TurretAndBuildingTests`。代码名：`PlaceholderBuildingController`。
+能解决什么：维持旧回归兼容。在哪里：`Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs`。怎么复用：禁止新功能复用。不能负责什么：不能作为新的建筑实现。改后跑哪组测试：`TurretAndBuildingTests`。代码名：`PlaceholderBuildingController`。

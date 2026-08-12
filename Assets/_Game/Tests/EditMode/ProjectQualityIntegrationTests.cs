@@ -263,46 +263,65 @@ namespace WasteCity.Tests
             CollectionAssert.IsEmpty(ChangedPaths(beforeValidation, HashFiles(ProjectRoot(), true)));
         }
 
-        [TestCase("Docs/07-Project-Use-and-Development-Guide-ZH.md", "Docs/Generated/Project-Inventory-ZH.md")]
-        [TestCase("Docs/08-Testing-and-Bug-Location-Guide-ZH.md", "Docs/Generated/Test-Inventory-ZH.md")]
-        [TestCase("Docs/09-Reusable-Project-Catalog-ZH.md", "Docs/Generated/Project-Inventory-ZH.md")]
-        public void PlainChineseHumanGuides_ExplainTermsLinkToCurrentInventoriesAndAvoidFixedCounts(
-            string relativePath, string generatedAppendix)
+        [Test]
+        public void PlainChineseHumanGuides_HaveOrderedSectionsResolvedLinksAndPlainLanguage()
         {
-            string path = Path.Combine(ProjectRoot(), relativePath);
-            Assert.That(File.Exists(path), Is.True, relativePath + " must exist");
+            string userGuide = ReadGuide("Docs/07-Project-Use-and-Development-Guide-ZH.md");
+            string bugGuide = ReadGuide("Docs/08-Testing-and-Bug-Location-Guide-ZH.md");
+            string reuseGuide = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
 
-            string content = File.ReadAllText(path);
-            StringAssert.IsMatch(@"^# [\u4e00-\u9fff]", content);
-            StringAssert.Contains("适合谁看", content);
-            StringAssert.Contains("06-User-Feedback-and-Change-Control-ZH.md", content);
-            StringAssert.Contains(generatedAppendix.Substring("Docs/".Length), content);
-            Assert.That(Regex.IsMatch(content, @"\b\d+/\d+\b"), Is.False,
-                "human guides must link to changing reports instead of copying an overall test count");
+            AssertGuideContract(userGuide, "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+                "# 废土移动城市使用与开发入门", "## 这份说明适合谁看", new[]
+                {
+                    "这份说明适合谁看", "游戏目前能做什么", "明确尚未完成的内容", "怎样打开默认 3D 游戏",
+                    "两个场景的区别", "主要按键和界面", "开发修改器只在开发版本出现", "想修改某个功能先看哪里",
+                    "新电脑交接最短路径", "出问题时先做什么", "技术清单链接",
+                }, "06-User-Feedback-and-Change-Control-ZH.md", "Generated/Project-Inventory-ZH.md");
+            StringAssert.Contains("默认 3D", userGuide);
+            StringAssert.Contains("冻结 2D", userGuide);
+            StringAssert.Contains("不是新功能模板", userGuide);
 
-            AssertFirstUseExplained(content, "EditMode", "不启动游戏");
-            AssertFirstUseExplained(content, "PlayMode", "启动游戏");
-            AssertFirstUseExplained(content, "组件", "挂在");
-            AssertFirstUseExplained(content, "程序集", "一起编译");
-            AssertFirstUseExplained(content, "稳定 ID", "不随改名");
+            AssertGuideContract(bugGuide, "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+                "# 废土移动城市测试与 Bug 定位指南", "## 适合谁看", new[]
+                {
+                    "适合谁看", "测试是什么，不是什么", "五层检查", "按功能选择测试", "怎样读失败定位报告",
+                    "明天试玩记录模板", "Bug 修复流程", "偶发失败不能直接忽略", "什么情况下要构建 Windows", "给开发者/AI 的命令入口",
+                }, "06-User-Feedback-and-Change-Control-ZH.md", "Generated/Test-Inventory-ZH.md");
+            StringAssert.Contains("复现失败 → 失败测试 → 最小修复 → 单功能检查 → 相关检查 → 完整回归 → 人工确认", bugGuide);
+            StringAssert.Contains("自动报告只是排查起点", bugGuide);
+            StringAssert.Contains("失败报告中的“只重跑这个失败”", bugGuide);
+            StringAssert.Contains("精确测试文件与测试类", bugGuide);
+            StringAssert.Contains("-testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests'", bugGuide);
+            StringAssert.DoesNotContain("复制对应的 `-testFilter`", bugGuide);
 
-            StringAssert.DoesNotContain("一定是", content);
-            StringAssert.DoesNotContain("根因就是", content);
-            if (relativePath.EndsWith("09-Reusable-Project-Catalog-ZH.md", StringComparison.Ordinal))
+            AssertGuideContract(reuseGuide, "Docs/09-Reusable-Project-Catalog-ZH.md",
+                "# 废土移动城市可复用项目目录", "## 适合谁看", new[]
+                {
+                    "适合谁看", "五级复用说明", "内容与稳定编号", "世界、城市和坐标", "建造与撤离", "UI 与输入",
+                    "资源、研究、人口、战斗和存档", "3D 表现与美术", "场景、构建与检查工具", "冻结或禁止用于新功能的旧内容",
+                }, "06-User-Feedback-and-Change-Control-ZH.md", "Generated/Project-Inventory-ZH.md");
+        }
+
+        [Test]
+        public void ReuseGuide_RendersEveryCommittedCatalogEntryWithExactFields()
+        {
+            string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
+            ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
+                "Docs/Engineering/project-quality-catalog.json"));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(32));
+
+            foreach (ProjectReuseEntry entry in catalog.ReuseEntries)
             {
-                foreach (string level in new[] { "推荐复用", "复用前审查", "仅限场景", "冻结回归", "禁止用于新功能" })
-                    StringAssert.Contains(level, content);
-            }
-            else if (relativePath.EndsWith("08-Testing-and-Bug-Location-Guide-ZH.md", StringComparison.Ordinal))
-            {
-                StringAssert.Contains("复现失败 → 失败测试 → 最小修复 → 单功能检查 → 相关检查 → 完整回归 → 人工确认", content);
-                StringAssert.Contains("自动报告只是排查起点", content);
-            }
-            else
-            {
-                StringAssert.Contains("默认 3D", content);
-                StringAssert.Contains("冻结 2D", content);
-                StringAssert.Contains("不是新功能模板", content);
+                string body = ReuseEntryBody(content, entry);
+                StringAssert.Contains("能解决什么：", body);
+                StringAssert.Contains("在哪里：", body);
+                StringAssert.Contains("怎么复用：", body);
+                StringAssert.Contains("不能负责什么：", body);
+                StringAssert.Contains("改后跑哪组测试：", body);
+                foreach (string assetPath in entry.AssetPaths) StringAssert.Contains(assetPath, body);
+                foreach (string testPath in entry.RequiredTestFiles)
+                    StringAssert.Contains(Path.GetFileNameWithoutExtension(testPath), body);
+                StringAssert.Contains(entry.BoundarySummary, body);
             }
         }
 
@@ -313,6 +332,53 @@ namespace WasteCity.Tests
             return path;
         }
 
+        private static string ReadGuide(string relativePath)
+        {
+            string path = Path.Combine(ProjectRoot(), relativePath);
+            Assert.That(File.Exists(path), Is.True, relativePath + " must exist");
+            return File.ReadAllText(path);
+        }
+
+        private static void AssertGuideContract(string content, string relativePath, string title, string firstHeading,
+            string[] orderedSections, params string[] requiredLinks)
+        {
+            StringAssert.StartsWith(title + "\n", content);
+            string[] lines = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int titleLine = Array.IndexOf(lines, title);
+            int firstContentLine = titleLine + 1;
+            while (firstContentLine < lines.Length && string.IsNullOrWhiteSpace(lines[firstContentLine])) firstContentLine++;
+            Assert.That(firstContentLine, Is.LessThan(lines.Length));
+            Assert.That(lines[firstContentLine], Is.EqualTo(firstHeading));
+            int firstParagraphLine = firstContentLine + 1;
+            while (firstParagraphLine < lines.Length && string.IsNullOrWhiteSpace(lines[firstParagraphLine])) firstParagraphLine++;
+            Assert.That(firstParagraphLine, Is.LessThan(lines.Length));
+            Assert.That(lines[firstParagraphLine].StartsWith("#", StringComparison.Ordinal), Is.False,
+                relativePath + " must explain who it is for immediately after its title");
+
+            int previous = -1;
+            foreach (string section in orderedSections)
+            {
+                int index = content.IndexOf("## " + section + "\n", StringComparison.Ordinal);
+                Assert.That(index, Is.GreaterThan(previous), relativePath + " is missing or reorders section " + section);
+                previous = index;
+            }
+            foreach (string link in requiredLinks) AssertMarkdownLinkExists(content, relativePath, link);
+            AssertAllMarkdownLinksResolve(content, relativePath);
+            AssertPlainTermsAndCautiousLanguage(content);
+        }
+
+        private static void AssertPlainTermsAndCautiousLanguage(string content)
+        {
+            AssertFirstUseExplained(content, "EditMode", "不启动游戏");
+            AssertFirstUseExplained(content, "PlayMode", "启动游戏");
+            AssertFirstUseExplained(content, "组件", "挂在");
+            AssertFirstUseExplained(content, "程序集", "一起编译");
+            AssertFirstUseExplained(content, "稳定 ID", "不随改名");
+            Assert.That(Regex.IsMatch(content, @"\b\d+/\d+\b"), Is.False);
+            StringAssert.DoesNotContain("一定是", content);
+            StringAssert.DoesNotContain("根因就是", content);
+        }
+
         private static void AssertFirstUseExplained(string content, string term, string explanation)
         {
             int firstUse = content.IndexOf(term, StringComparison.Ordinal);
@@ -320,6 +386,57 @@ namespace WasteCity.Tests
             int nearbyEnd = Math.Min(content.Length, firstUse + term.Length + 80);
             StringAssert.Contains(explanation, content.Substring(firstUse, nearbyEnd - firstUse),
                 term + " needs a nearby plain-Chinese explanation on first use");
+        }
+
+        private static void AssertMarkdownLinkExists(string content, string sourcePath, string expectedTarget)
+        {
+            Match match = MarkdownLinks(content).FirstOrDefault(value => value.Groups["target"].Value == expectedTarget);
+            Assert.That(match, Is.Not.Null, sourcePath + " must use a real Markdown link to " + expectedTarget);
+        }
+
+        private static void AssertAllMarkdownLinksResolve(string content, string sourcePath)
+        {
+            string root = ProjectRoot();
+            string sourceDirectory = Path.GetDirectoryName(sourcePath) ?? string.Empty;
+            foreach (Match match in MarkdownLinks(content))
+            {
+                string target = match.Groups["target"].Value;
+                if (target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                    target.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || target.StartsWith("#", StringComparison.Ordinal)) continue;
+                string relativeTarget = target.Split('#')[0].Replace('/', Path.DirectorySeparatorChar);
+                string resolved = Path.GetFullPath(Path.Combine(root, sourceDirectory, relativeTarget));
+                Assert.That(resolved.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal), Is.True,
+                    sourcePath + " link escapes the project: " + target);
+                Assert.That(File.Exists(resolved), Is.True, sourcePath + " link target does not exist: " + target);
+            }
+        }
+
+        private static MatchCollection MarkdownLinks(string content)
+        {
+            return Regex.Matches(content, @"(?<!!)\[[^\]]+\]\((?<target>[^\s)]+)\)");
+        }
+
+        private static string ReuseEntryBody(string content, ProjectReuseEntry entry)
+        {
+            string heading = "### " + entry.ChineseName + "（" + ReuseLevelName(entry.ReuseLevel) + "）";
+            int start = content.IndexOf(heading + "\n", StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), "reuse guide is missing heading " + heading);
+            int bodyStart = start + heading.Length;
+            int next = content.IndexOf("\n### ", bodyStart, StringComparison.Ordinal);
+            return next < 0 ? content.Substring(bodyStart) : content.Substring(bodyStart, next - bodyStart);
+        }
+
+        private static string ReuseLevelName(ProjectReuseLevel level)
+        {
+            switch (level)
+            {
+                case ProjectReuseLevel.Recommended: return "推荐复用";
+                case ProjectReuseLevel.ReviewBeforeReuse: return "复用前审查";
+                case ProjectReuseLevel.SceneOnly: return "仅限场景";
+                case ProjectReuseLevel.FrozenRegression: return "冻结回归";
+                case ProjectReuseLevel.ProhibitedForNewWork: return "禁止用于新功能";
+                default: throw new ArgumentOutOfRangeException(nameof(level), level, null);
+            }
         }
 
         private void ConfigureValidRecordEvidence(string editXml, string buildStatus = "NotRequired")
