@@ -661,7 +661,7 @@ public void WriteGeneratedFiles_RejectsOutsideGeneratedDirectory(string path)
 }
 ```
 
-Also test LF line endings, UTF-8 without BOM, final newline, ordinal sections, plain-Chinese headings, and two-run file hashes.
+Also test LF line endings, UTF-8 without BOM, final newline, ordinal sections, plain-Chinese headings, and two-run hashes for the exact four-file approved batch. The write API rejects an empty set, a subset, a fifth key, casing variants, backslashes, prefixes, absolute paths, and traversal; it accepts only the four exact ordinal keys together.
 
 - [ ] **Step 2: Run Task 4 RED**
 
@@ -712,11 +712,11 @@ Reject non-40-character lowercase SHA, invalid ISO-8601 with offset, missing XML
 
 - [ ] **Step 4: Implement atomic writes**
 
-For each approved path, write UTF-8/LF content to `<target>.tmp`, flush and close, compare with existing target, then replace only when content differs. On any render failure, delete only the task-owned `.tmp` file and leave the old document intact. Do not use a directory-wide delete.
+Treat the exact four approved paths as one required input batch. For each approved path, write UTF-8/LF content to `<target>.tmp`, flush and close, compare with existing target, then replace only when content differs. Reject an invalid batch before writing any target. On any render failure, delete only the task-owned `.tmp` file and leave the old document intact. Do not use a directory-wide delete.
 
 - [ ] **Step 5: Enable stale-output validation and create first generated files**
 
-Validator issue `PQ011` reports a missing or byte-different generated document. The test must prove `Validate` detects stale output but leaves it unchanged. Generate the current structural files twice and require identical SHA-256 values.
+Validator issue `PQ011` reports a missing or byte-different structural document only: `Project-Inventory-ZH.md` and `Test-Inventory-ZH.md`, the two files uniquely rebuildable from `catalog + snapshot`. It must not compare caller-supplied attention or verification content. The test must prove `Validate` detects stale structural output but leaves it unchanged, while a legal non-empty attention document and a newer legal verification snapshot do not cause `PQ011`. Generate all four approved documents twice and require identical SHA-256 values.
 
 Create the initial verification snapshot using the already verified parent baseline facts, not guessed fresh results:
 
