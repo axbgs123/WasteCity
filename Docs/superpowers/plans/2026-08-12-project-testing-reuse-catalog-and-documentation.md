@@ -1096,6 +1096,34 @@ git commit -m "docs: require project quality completion gates"
 
 ### Task 9: Fresh end-to-end verification and controlled status write-back
 
+#### Approved verification-isolation and build-scope correction
+
+The normal Task 9 checkout is a linked worktree that deliberately retains user-owned
+terrain import changes.  It is not a safe place for a fresh whole-project Unity run:
+an import loop can mutate those files before NUnit writes XML.  Before any re-run,
+recover only the three files proved to have been changed by the aborted Task 9
+attempt: use `apply_patch` to restore the `Wasteland` Normal texture meta
+`isReadable` value from `1` to `0`, then compare it to Task 1's original SHA-256;
+restore only the two clean LFS terrain arrays from `HEAD` with Git LFS's exact-path
+restore mechanism and prove they have zero diff.  Never reset, clean, stage, or
+otherwise touch the other 27 terrain meta files or either protected ProjectSettings
+file.
+
+For the fresh evidence, do not nest another worktree.  Create an independent local
+clone with `git clone --local --no-hardlinks`, detach it at the exact pre-writeback
+commit, and require a clean status and matching SHA before launching Unity.  Keep the
+clone and its `/tmp/wastecity-project-quality/final-clean/` evidence through review;
+only the original worktree may receive the final documentation write-back.
+
+The committed package diff is approved Task 2 dependency
+`com.unity.nuget.mono-cecil` version `1.11.4`, not an unknown runtime change.  It is
+still a build input, so do not record the players as `NotRequired`.  Run exactly the
+default release 3D `FormalBuildTools.BuildWindows`,
+`BuildWindowsGraybox3DDevelopment`, and `BuildWindowsLegacy2D` entry points.  Do not
+repeat a separate Graybox 3D build when the default release entry point already has
+the same scene/configuration target.  Each build needs a successful Unity log and a
+PE32+ x86-64 output check; macOS must not claim a Windows launch smoke test.
+
 **Files:**
 - Modify: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Regenerate: `Docs/Generated/Latest-Verification-ZH.md`
@@ -1159,7 +1187,11 @@ Run:
 git diff --name-only b83fda9..HEAD -- Assets Packages ProjectSettings
 ```
 
-If the committed diff is limited to Editor quality tools and EditMode tests, and all runtime scripts, scenes, rendering assets, Packages, and ProjectSettings are zero-diff, do not rebuild the three Windows players and record “not required: runtime/build inputs unchanged.” If any runtime/build input changed unexpectedly, stop; do not silently expand Task 9.
+The committed `Packages` delta is the approved Task 2 Editor-only
+`com.unity.nuget.mono-cecil` `1.11.4` dependency.  It is nevertheless a build input,
+so run the three approved Windows entry points described above.  Stop if any other
+runtime script, scene, rendering asset, Package, or ProjectSettings path differs from
+`b83fda9`; do not silently expand the scope further.
 
 - [ ] **Step 6: Generate final verification snapshot from actual results**
 
@@ -1171,7 +1203,7 @@ Recompute both protected SHA lists and compare to Task 1 originals. Require:
 
 - exact match for all protected files;
 - `git diff --check` passes for task-owned files;
-- runtime scripts, scenes, Persistence, Packages, and ProjectSettings have no committed diff from `b83fda9`;
+- runtime scripts, scenes, Persistence, rendering assets, and ProjectSettings have no committed diff from `b83fda9`; Packages may differ only by the approved Task 2 `com.unity.nuget.mono-cecil` `1.11.4` manifest/lock entries;
 - staging area contains only final generated verification and Docs/06 before commit.
 
 The pre-existing dirty paths may remain in `git status`; they are not an error if hashes match.
