@@ -750,6 +750,8 @@ git commit -m "feat: generate project quality documentation"
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`
 - Modify: `Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs`
 - Modify: `Docs/Engineering/project-quality-catalog.json`
+- Modify when stale: `Docs/Generated/Project-Inventory-ZH.md`
+- Modify when stale: `Docs/Generated/Test-Inventory-ZH.md`
 
 **Interfaces:**
 - Produces: `ProjectTestResultAnalyzer.Analyze(string xmlPath, ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot) : ProjectTestAnalysisReport`
@@ -759,6 +761,9 @@ git commit -m "feat: generate project quality documentation"
   `FailureLocationSummary` and `PrimarySourceGlobs` for this report.
 - `ProjectQualityCatalogTests` updates complete schema fixtures and freezes the
   new feature-field validation contract.
+- Task 5 catalog, analyzer, and test changes may make the two structural
+  inventories stale; regenerate through the existing exact-four write API and
+  retain the verification and attention files byte-for-byte when unchanged.
 
 - [ ] **Step 1: Write focused XML fixtures and RED tests**
 
@@ -829,7 +834,12 @@ The Chinese rendering order is:
 
 For each of the 13 feature groups, add a short plain-Chinese `FailureLocationSummary` and ordered `PrimarySourceGlobs` to the catalog. For example, building failures say “先检查建筑定义、建造限制、放置会话和场景接线”; UI failures say “先检查焦点、输入优先级、界面组件和真实场景引用”. Keep each sentence below 45 Chinese characters.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [ ] **Step 5: Regenerate stale structural inventories, run GREEN and commit**
+
+If the catalog/analyzer/test additions produce `PQ011` for either structural
+inventory, regenerate through the existing exact-four write API before GREEN.
+The verification and attention inputs remain the current caller-provided
+contents; only changed structural files belong to this task.
 
 Run the Task 1 command template with `-testFilter 'WasteCity.Tests.ProjectTestResultAnalyzerTests|WasteCity.Tests.ProjectQualityCatalogTests|WasteCity.Tests.ProjectQualityValidatorTests'` and `task-05/green.xml` / `task-05/green.log`. Commit exact paths:
 
