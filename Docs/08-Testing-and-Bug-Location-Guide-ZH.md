@@ -55,7 +55,11 @@
 <details>
 <summary>展开技术附录：测试命令如何查找</summary>
 
-先复制失败报告“建议复跑”中的单类筛选；它就是失败报告中的“只重跑这个失败”。若要把相关检查放进同一次运行，从[测试自动清单](Generated/Test-Inventory-ZH.md)“精确测试文件与测试类”表复制真实类名，用 `|` 连接，并用单引号包住整个筛选值。以下 `sh` 代码块只适用于 macOS/Linux，需从仓库根目录执行，不可直接用于 Windows；把两个类名替换成表中与你的问题对应的类名即可。
+先复制失败报告“建议复跑”中的单类筛选；它就是失败报告中的“只重跑这个失败”。若要把相关检查放进同一次运行，从[测试自动清单](Generated/Test-Inventory-ZH.md)“精确测试文件与测试类”表复制真实类名，用 `|` 连接，并用单引号包住整个筛选值。下面按平台给出入口；把两个类名替换成表中与你的问题对应的类名即可。
+
+### macOS
+
+下面 macOS 命令块只适用于 macOS，需从仓库根目录执行。若 Unity 安装在其他位置，把 `UNITY_BIN` 改成该机器上 Unity 2022.3.62f1 的实际可执行文件路径。
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
@@ -68,9 +72,26 @@ mkdir -p /tmp/wastecity-project-quality
   -logFile /tmp/wastecity-project-quality/focused.log
 ```
 
+### Linux
+
+下面 Linux 命令块只适用于 Linux。Unity Hub 的常见安装位置是 `$HOME/Unity/Hub/Editor/2022.3.62f1/Editor/Unity`；如果你的安装位置不同，先运行 `find "$HOME/Unity/Hub/Editor" -type f -path '*/Editor/Unity' -print` 查找，再按实际安装路径替换 `UNITY_BIN`。
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+UNITY_BIN="$HOME/Unity/Hub/Editor/2022.3.62f1/Editor/Unity"
+mkdir -p /tmp/wastecity-project-quality
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests' \
+  -testResults /tmp/wastecity-project-quality/focused.xml \
+  -logFile /tmp/wastecity-project-quality/focused.log
+```
+
 不要把测试清单末尾的聚合筛选误当成单功能入口；它会运行全部已列出的测试类。流程始终是单功能检查，再相关检查，最后完整回归。
 
-Windows 用户可在 Unity Test Runner 中按“精确测试文件与测试类”表搜索并选择失败测试类和相关测试类，再运行所选测试；同样先单功能、再相关、最后完整回归。
+### Windows
+
+Windows 用户不直接运行上面的 `sh` 命令块。请在 Unity Test Runner 中按“精确测试文件与测试类”表搜索并选择失败测试类和相关测试类，再运行所选测试；同样先单功能、再相关、最后完整回归。
 
 </details>
 

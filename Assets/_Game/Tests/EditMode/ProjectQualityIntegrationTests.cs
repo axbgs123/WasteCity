@@ -294,9 +294,18 @@ namespace WasteCity.Tests
             StringAssert.Contains("-testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests'", bugGuide);
             StringAssert.Contains("PROJECT_ROOT=\"$(git rev-parse --show-toplevel)\"", bugGuide);
             StringAssert.Contains("mkdir -p /tmp/wastecity-project-quality", bugGuide);
-            StringAssert.Contains("只适用于 macOS/Linux", bugGuide);
-            StringAssert.Contains("不可直接用于 Windows", bugGuide);
-            StringAssert.Contains("Windows 用户", bugGuide);
+            StringAssert.DoesNotContain("只适用于 macOS/Linux", bugGuide);
+            string macOsCommands = MarkdownSectionBody(bugGuide, "### macOS", "### Linux");
+            StringAssert.Contains("只适用于 macOS", macOsCommands);
+            StringAssert.Contains(".app/Contents/MacOS/Unity", macOsCommands);
+            string linuxCommands = MarkdownSectionBody(bugGuide, "### Linux", "### Windows");
+            StringAssert.Contains("只适用于 Linux", linuxCommands);
+            StringAssert.Contains("UNITY_BIN=\"$HOME/Unity/Hub/Editor/2022.3.62f1/Editor/Unity\"", linuxCommands);
+            StringAssert.Contains("按实际安装路径替换", linuxCommands);
+            StringAssert.Contains("find \"$HOME/Unity/Hub/Editor\"", linuxCommands);
+            StringAssert.DoesNotContain(".app/Contents/MacOS/Unity", linuxCommands);
+            string windowsCommands = MarkdownSectionBody(bugGuide, "### Windows", "</details>");
+            StringAssert.Contains("Unity Test Runner", windowsCommands);
             StringAssert.DoesNotContain("/Users/baiyan1", bugGuide);
             StringAssert.DoesNotContain("复制对应的 `-testFilter`", bugGuide);
 
@@ -424,6 +433,16 @@ namespace WasteCity.Tests
         private static MatchCollection MarkdownLinks(string content)
         {
             return Regex.Matches(content, @"(?<!!)\[[^\]]+\]\((?<target>[^\s)]+)\)");
+        }
+
+        private static string MarkdownSectionBody(string content, string heading, string nextHeading)
+        {
+            int start = content.IndexOf(heading + "\n", StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), "missing Markdown section " + heading);
+            int bodyStart = start + heading.Length;
+            int end = content.IndexOf(nextHeading, bodyStart, StringComparison.Ordinal);
+            Assert.That(end, Is.GreaterThan(bodyStart), "missing next Markdown section " + nextHeading);
+            return content.Substring(bodyStart, end - bodyStart);
         }
 
         private static string ReuseEntryBody(string content, ProjectReuseEntry entry)
