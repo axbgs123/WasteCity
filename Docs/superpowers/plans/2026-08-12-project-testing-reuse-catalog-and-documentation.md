@@ -916,7 +916,7 @@ git commit -m "feat: expose project quality automation"
 
 The tests read the three files and require:
 
-- each starts with a Chinese title and a one-paragraph “适合谁看”; 
+- each starts with a Chinese title and a one-paragraph “适合谁看”;
 - all first uses of `EditMode`, `PlayMode`, `组件`, `程序集`, and `稳定 ID` have plain-Chinese explanations nearby;
 - no hard-coded overall test count matching `\d+/\d+` appears;
 - each guide links `Docs/06` and the relevant generated appendix;
