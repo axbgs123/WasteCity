@@ -748,6 +748,7 @@ git commit -m "feat: generate project quality documentation"
 - Create: `Assets/_Game/Tests/EditMode/ProjectTestResultAnalyzerTests.cs.meta`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`
+- Modify: `Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs`
 - Modify: `Docs/Engineering/project-quality-catalog.json`
 
 **Interfaces:**
@@ -756,6 +757,8 @@ git commit -m "feat: generate project quality documentation"
 - Report contains summaries plus `ProjectFailedTestLocation[]`.
 - `ProjectQualityCatalogLoader` strictly loads and validates feature-group
   `FailureLocationSummary` and `PrimarySourceGlobs` for this report.
+- `ProjectQualityCatalogTests` updates complete schema fixtures and freezes the
+  new feature-field validation contract.
 
 - [ ] **Step 1: Write focused XML fixtures and RED tests**
 
