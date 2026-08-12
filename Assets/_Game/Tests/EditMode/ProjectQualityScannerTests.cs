@@ -74,6 +74,23 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Scan_MapsEachProductionTypeInBuildingRuntimeSourceFile()
+        {
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+            const string source = "Assets/_Game/Scripts/Building/BuildingRuntime.cs";
+            Assert.That(snapshot.TypeRecords.Single(x => x.FullName == "WasteCity.Building.BuildingRuntime").SourcePath, Is.EqualTo(source));
+            Assert.That(snapshot.TypeRecords.Single(x => x.FullName == "WasteCity.Building.PlaceholderShieldGenerator").SourcePath, Is.EqualTo(source));
+        }
+
+        [Test]
+        public void Scan_MapsCompiledPreprocessorProbeTestClass()
+        {
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+            Assert.That(snapshot.TestClasses.Single(x => x.FullName == "WasteCity.Tests.ProjectQualityPdbSourceMappingProbeTests").SourcePath,
+                Is.EqualTo("Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs"));
+        }
+
+        [Test]
         public void Scan_RepeatedRunProducesEqualOrderedSnapshot()
         {
             ProjectInventorySnapshot first = ProjectQualityScanner.Scan(ProjectRoot());
@@ -117,88 +134,6 @@ namespace WasteCity.Tests
             InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
                 ProjectQualityScanner.Scan(fixtureRoot));
             StringAssert.Contains("Broken.asmdef", error.Message);
-        }
-
-        [Test]
-        public void SourceMapping_IgnoresCommentsStringsCharsAndInactivePreprocessorBranches()
-        {
-            ProjectFileRecord declaration = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Fixture.cs", "public sealed class Fixture { }");
-            ProjectFileRecord decoys = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Decoys.cs",
-                "// class Fixture { }\n" +
-                "/* class Fixture { } */\n" +
-                "var quoted = \"class Fixture { }\";\n" +
-                "var verbatim = @\"class Fixture { }\";\n" +
-                "var interpolated = $\"class Fixture { }\";\n" +
-                "var character = '\\\\';\n" +
-                "#if false\npublic sealed class Fixture { }\n#endif\n" +
-                "#if NEVER_DEFINED\npublic sealed class Fixture { }\n#endif\n");
-
-            Assert.That(FindSourcePath("Fixture", declaration, decoys), Is.EqualTo(declaration.Path));
-        }
-
-        [Test]
-        public void SourceMapping_DoesNotInterpretPreprocessorTextInsideBlockComments()
-        {
-            ProjectFileRecord declaration = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/CommentDirective.cs",
-                "/*\n#if false\n*/\npublic sealed class CommentDirectiveFixture { }\n");
-
-            Assert.That(FindSourcePath("CommentDirectiveFixture", declaration), Is.EqualTo(declaration.Path));
-        }
-
-        [Test]
-        public void SourceMapping_IgnoresNestedTextInsideInterpolatedStringForms()
-        {
-            ProjectFileRecord declaration = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Target.cs", "public sealed class Target { }");
-            ProjectFileRecord decoys = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/InterpolatedDecoys.cs",
-                "var normal = $\"{Format(\"class Target\", @\"class Target\", $\"\"\"class Target\"\"\")}\";\n" +
-                "var verbatim = $@\"{Format(\"class Target\", @\"class Target\")}\";\n" +
-                "var alternateVerbatim = @$\"{Format(\"class Target\")}\";\n" +
-                "var raw = $\"\"\"\"\"\" { Format(\"class Target\", @\"class Target\", $\"\"\"class Target\"\"\") } \"\"\"\"\"\";\n" +
-                "var multipleDollarRaw = $$\"\"\" {{ Format(\"class Target\", $\"\"\"class Target\"\"\") }} \"\"\";\n");
-
-            Assert.That(FindSourcePath("Target", declaration, decoys), Is.EqualTo(declaration.Path));
-        }
-
-        [Test]
-        public void SourceMapping_RecoversActivePreprocessorBranchesAfterInactiveLexicalGarbage()
-        {
-            ProjectFileRecord declaration = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Recovered.cs",
-                "#if false\n" +
-                "/* unclosed comment\n" +
-                "var verbatim = @\"unclosed\n" +
-                "var raw = \"\"\"unclosed\n" +
-                "var character = '\\n" +
-                "#if false\npublic sealed class InactiveBranch { }\n#elif true\npublic sealed class InactiveBranch { }\n#else\npublic sealed class InactiveBranch { }\n#endif\n" +
-                "#else\n" +
-                "#if false\npublic sealed class InactiveBranch { }\n#elif false\npublic sealed class InactiveBranch { }\n#else\npublic sealed class Target { }\n#endif\n" +
-                "#endif\n");
-
-            Assert.That(FindSourcePath("Target", declaration), Is.EqualTo(declaration.Path));
-        }
-
-        [Test]
-        public void SourceMapping_MapsGenericReflectionNames()
-        {
-            ProjectFileRecord generic = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Generic.cs", "public sealed class Fixture<T> { }");
-
-            Assert.That(FindSourcePath("Fixture`1", generic), Is.EqualTo(generic.Path));
-        }
-
-        [Test]
-        public void SourceMapping_RejectsNestedSimpleNameConflicts()
-        {
-            ProjectFileRecord conflict = WriteLexicalFixtureFile(
-                "Assets/_Game/Tests/EditMode/Conflict.cs",
-                "public sealed class Conflict { } public sealed class Outer { public sealed class Conflict { } }");
-
-            Assert.That(() => FindSourcePath("Conflict", conflict), Throws.TypeOf<InvalidDataException>());
         }
 
         [Test]
@@ -293,31 +228,6 @@ namespace WasteCity.Tests
                     StringComparer.Ordinal);
         }
 
-        private ProjectFileRecord WriteLexicalFixtureFile(string path, string content)
-        {
-            WriteFixtureFile(path, content);
-            string absolutePath = Path.Combine(fixtureRoot, path.Replace('/', Path.DirectorySeparatorChar));
-            return new ProjectFileRecord
-            {
-                Path = MakePathRelativeToCurrentProject(absolutePath),
-                Kind = ProjectFileKind.EditModeTest,
-            };
-        }
-
-        private static string FindSourcePath(string className, params ProjectFileRecord[] files)
-        {
-            MethodInfo method = typeof(ProjectQualityScanner).GetMethod("FindUniqueSourcePath",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            try
-            {
-                return (string)method.Invoke(null, new object[] { className, files.ToList() });
-            }
-            catch (TargetInvocationException exception)
-            {
-                throw exception.InnerException;
-            }
-        }
-
         private static bool ContainsTestMethod(Type type)
         {
             MethodInfo method = typeof(ProjectQualityScanner).GetMethod("ContainsTestMethod",
@@ -338,12 +248,6 @@ namespace WasteCity.Tests
                 AssemblyNames = new string[0],
                 ScenePaths = new string[0],
             };
-        }
-
-        private static string MakePathRelativeToCurrentProject(string absolutePath)
-        {
-            Uri root = new Uri(ProjectRoot().TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar);
-            return Uri.UnescapeDataString(root.MakeRelativeUri(new Uri(absolutePath)).ToString());
         }
 
         private static void RecordCounts(ProjectInventorySnapshot snapshot)
@@ -396,4 +300,18 @@ namespace WasteCity.Tests
         private static void FixturePrivateStaticParameterless() { }
         public static void FixtureParameterized(int value) { }
     }
+
+#if true
+    internal static class ProjectQualityScannerPreprocessorProbe
+    {
+        internal static readonly string Content = $@"{string.Concat("x")}
+#if false
+";
+    }
+
+    public sealed class ProjectQualityPdbSourceMappingProbeTests
+    {
+        [Test] public void CompiledProbeExists() { Assert.That(true, Is.True); }
+    }
+#endif
 }
