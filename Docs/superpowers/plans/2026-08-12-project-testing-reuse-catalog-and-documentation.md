@@ -513,6 +513,7 @@ git commit -m "feat: scan project quality inventory"
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs.meta`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
+- Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs` (required compilation dependency: parse explicit exclusions as `Path` + non-empty `Reason` records)
 - Modify: `Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs`
 - Modify: `Docs/Engineering/project-quality-catalog.json`
 
@@ -520,6 +521,7 @@ git commit -m "feat: scan project quality inventory"
 - Produces: `ProjectQualityValidator.Validate(ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot, string projectRoot) : IReadOnlyList<ProjectQualityIssue>`
 - Produces: `ProjectQualityIssue` with `Code`, `Severity`, `PlainChineseMessage`, and `Path`
 - Consumes no mutable Unity scene state and writes no files.
+- The loader change is limited to the explicit-exclusion record DTO/model conversion required by Step 3; it must not alter unrelated loader behavior.
 
 - [ ] **Step 1: Write mutation-sensitive RED tests**
 
