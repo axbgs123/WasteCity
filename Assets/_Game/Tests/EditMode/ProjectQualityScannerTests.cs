@@ -149,6 +149,40 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SourceMapping_IgnoresNestedTextInsideInterpolatedStringForms()
+        {
+            ProjectFileRecord declaration = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Target.cs", "public sealed class Target { }");
+            ProjectFileRecord decoys = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/InterpolatedDecoys.cs",
+                "var normal = $\"{Format(\"class Target\", @\"class Target\", $\"\"\"class Target\"\"\")}\";\n" +
+                "var verbatim = $@\"{Format(\"class Target\", @\"class Target\")}\";\n" +
+                "var alternateVerbatim = @$\"{Format(\"class Target\")}\";\n" +
+                "var raw = $\"\"\"\"\"\" { Format(\"class Target\", @\"class Target\", $\"\"\"class Target\"\"\") } \"\"\"\"\"\";\n" +
+                "var multipleDollarRaw = $$\"\"\" {{ Format(\"class Target\", $\"\"\"class Target\"\"\") }} \"\"\";\n");
+
+            Assert.That(FindSourcePath("Target", declaration, decoys), Is.EqualTo(declaration.Path));
+        }
+
+        [Test]
+        public void SourceMapping_RecoversActivePreprocessorBranchesAfterInactiveLexicalGarbage()
+        {
+            ProjectFileRecord declaration = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Recovered.cs",
+                "#if false\n" +
+                "/* unclosed comment\n" +
+                "var verbatim = @\"unclosed\n" +
+                "var raw = \"\"\"unclosed\n" +
+                "var character = '\\n" +
+                "#if false\npublic sealed class InactiveBranch { }\n#elif true\npublic sealed class InactiveBranch { }\n#else\npublic sealed class InactiveBranch { }\n#endif\n" +
+                "#else\n" +
+                "#if false\npublic sealed class InactiveBranch { }\n#elif false\npublic sealed class InactiveBranch { }\n#else\npublic sealed class Target { }\n#endif\n" +
+                "#endif\n");
+
+            Assert.That(FindSourcePath("Target", declaration), Is.EqualTo(declaration.Path));
+        }
+
+        [Test]
         public void SourceMapping_MapsGenericReflectionNames()
         {
             ProjectFileRecord generic = WriteLexicalFixtureFile(

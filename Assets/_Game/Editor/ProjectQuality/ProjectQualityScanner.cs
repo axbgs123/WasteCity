@@ -306,8 +306,9 @@ namespace WasteCity.Editor.ProjectQuality
                 if (lineEnd < 0) lineEnd = source.Length;
                 string line = source.Substring(position, lineEnd - position);
                 string trimmed = line.TrimStart();
-                if (!insideBlockComment && !insideVerbatimString && rawStringQuoteCount == 0 &&
-                    trimmed.StartsWith("#", StringComparison.Ordinal))
+                bool isDirective = trimmed.StartsWith("#", StringComparison.Ordinal) &&
+                    (!active || (!insideBlockComment && !insideVerbatimString && rawStringQuoteCount == 0));
+                if (isDirective)
                 {
                     ProcessDirective(trimmed.Substring(1).TrimStart(), branches, ref active);
                     output.Append(' ', line.Length);
@@ -317,8 +318,9 @@ namespace WasteCity.Editor.ProjectQuality
                 else
                     output.Append(' ', line.Length);
 
-                AdvancePreprocessorLexicalState(line, ref insideBlockComment,
-                    ref insideVerbatimString, ref rawStringQuoteCount);
+                if (active && !isDirective)
+                    AdvancePreprocessorLexicalState(line, ref insideBlockComment,
+                        ref insideVerbatimString, ref rawStringQuoteCount);
 
                 if (lineEnd < source.Length) output.Append('\n');
                 position = lineEnd + 1;
@@ -367,28 +369,30 @@ namespace WasteCity.Editor.ProjectQuality
                 if (line[index] == '\'') { index = SkipQuotedCharacter(line, index + 1, '\''); continue; }
                 if (IsStringStart(line, index))
                 {
-                    int quote = FindStringQuote(line, index);
+                    int quote;
+                    bool verbatim;
+                    int dollarCount;
+                    TryGetStringStart(line, index, out quote, out verbatim, out dollarCount);
                     int quoteCount = CountQuotes(line, quote);
                     if (quoteCount >= 3)
                     {
-                        rawStringQuoteCount = quoteCount;
-                        index = quote + quoteCount;
+                        bool closed;
+                        index = SkipRawString(line, quote + quoteCount, quoteCount, out closed);
+                        rawStringQuoteCount = closed ? 0 : quoteCount;
                         continue;
                     }
-                    bool verbatim = line.Substring(index, quote - index).IndexOf('@') >= 0;
-                    int end = SkipQuotedCharacter(line, quote + 1, '"', verbatim);
-                    if (verbatim && end >= line.Length) insideVerbatimString = true;
-                    index = end;
+                    if (verbatim)
+                    {
+                        bool closed;
+                        index = SkipVerbatimString(line, quote + 1, out closed);
+                        insideVerbatimString = !closed;
+                    }
+                    else
+                        index = SkipString(line, index);
                     continue;
                 }
                 index++;
             }
-        }
-
-        private static int FindStringQuote(string source, int index)
-        {
-            while (index < source.Length && source[index] != '"') index++;
-            return index;
         }
 
         private static int CountQuotes(string source, int index)
@@ -457,38 +461,177 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static bool IsStringStart(string source, int index)
         {
-            char character = source[index];
-            if (character == '"') return true;
-            if (character != '@' && character != '$') return false;
-            int next = index + 1;
-            return next < source.Length && (source[next] == '"' ||
-                ((source[next] == '@' || source[next] == '$') && next + 1 < source.Length && source[next + 1] == '"'));
+            int quote;
+            bool verbatim;
+            int dollarCount;
+            return TryGetStringStart(source, index, out quote, out verbatim, out dollarCount);
         }
 
         private static int SkipString(string source, int index)
         {
-            bool verbatim = false;
-            while (index < source.Length && (source[index] == '@' || source[index] == '$'))
-            {
-                verbatim |= source[index] == '@';
-                index++;
-            }
-            if (index >= source.Length || source[index] != '"') return index;
-            int quoteCount = 1;
-            while (index + quoteCount < source.Length && source[index + quoteCount] == '"') quoteCount++;
+            int quote;
+            bool verbatim;
+            int dollarCount;
+            if (!TryGetStringStart(source, index, out quote, out verbatim, out dollarCount)) return index;
+            int quoteCount = CountQuotes(source, quote);
             if (quoteCount >= 3)
             {
-                index += quoteCount;
-                while (index < source.Length)
-                {
-                    int run = 0;
-                    while (index + run < source.Length && source[index + run] == '"') run++;
-                    if (run >= quoteCount) return index + quoteCount;
-                    index += Math.Max(run, 1);
-                }
-                return source.Length;
+                bool closed;
+                if (dollarCount > 0)
+                    return SkipRawInterpolatedString(source, quote + quoteCount,
+                        quoteCount, dollarCount, out closed);
+                return SkipRawString(source, quote + quoteCount, quoteCount, out closed);
             }
-            return SkipQuotedCharacter(source, index + 1, '"', verbatim);
+            if (dollarCount > 0)
+                return SkipInterpolatedString(source, quote + 1, verbatim);
+            if (verbatim)
+            {
+                bool closed;
+                return SkipVerbatimString(source, quote + 1, out closed);
+            }
+            return SkipQuotedCharacter(source, quote + 1, '"');
+        }
+
+        private static bool TryGetStringStart(string source, int index, out int quote,
+            out bool verbatim, out int dollarCount)
+        {
+            quote = index;
+            verbatim = false;
+            dollarCount = 0;
+            while (quote < source.Length && (source[quote] == '@' || source[quote] == '$'))
+            {
+                if (source[quote] == '@')
+                {
+                    if (verbatim) return false;
+                    verbatim = true;
+                }
+                else
+                    dollarCount++;
+                quote++;
+            }
+            if (quote >= source.Length || source[quote] != '"') return false;
+            return quote == index || verbatim || dollarCount > 0;
+        }
+
+        private static int SkipInterpolatedString(string source, int index, bool verbatim)
+        {
+            int braceDepth = 0;
+            while (index < source.Length)
+            {
+                char character = source[index];
+                if (braceDepth == 0)
+                {
+                    if (character == '"')
+                    {
+                        if (verbatim && index + 1 < source.Length && source[index + 1] == '"') { index += 2; continue; }
+                        return index + 1;
+                    }
+                    if (character == '{')
+                    {
+                        if (index + 1 < source.Length && source[index + 1] == '{') { index += 2; continue; }
+                        braceDepth = 1;
+                        index++;
+                        continue;
+                    }
+                    if (!verbatim && character == '\\' && index + 1 < source.Length) { index += 2; continue; }
+                    index++;
+                    continue;
+                }
+
+                if (character == '/' && index + 1 < source.Length)
+                {
+                    if (source[index + 1] == '/') { index = SkipLineComment(source, index + 2); continue; }
+                    if (source[index + 1] == '*') { index = SkipBlockComment(source, index + 2); continue; }
+                }
+                if (IsStringStart(source, index)) { index = SkipString(source, index); continue; }
+                if (character == '\'') { index = SkipQuotedCharacter(source, index + 1, '\''); continue; }
+                if (character == '{') { braceDepth++; index++; continue; }
+                if (character == '}') { braceDepth--; index++; continue; }
+                index++;
+            }
+            return source.Length;
+        }
+
+        private static int SkipVerbatimString(string source, int index, out bool closed)
+        {
+            closed = false;
+            while (index < source.Length)
+            {
+                if (source[index] != '"') { index++; continue; }
+                if (index + 1 < source.Length && source[index + 1] == '"') { index += 2; continue; }
+                closed = true;
+                return index + 1;
+            }
+            return source.Length;
+        }
+
+        private static int SkipRawString(string source, int index, int quoteCount, out bool closed)
+        {
+            closed = false;
+            while (index < source.Length)
+            {
+                int run = CountQuotes(source, index);
+                if (run >= quoteCount)
+                {
+                    closed = true;
+                    return index + run;
+                }
+                index += Math.Max(run, 1);
+            }
+            return source.Length;
+        }
+
+        private static int SkipRawInterpolatedString(string source, int index,
+            int quoteCount, int interpolationBraceCount, out bool closed)
+        {
+            closed = false;
+            int braceDepth = 0;
+            while (index < source.Length)
+            {
+                if (braceDepth == 0)
+                {
+                    int quoteRun = CountQuotes(source, index);
+                    if (quoteRun >= quoteCount)
+                    {
+                        closed = true;
+                        return index + quoteRun;
+                    }
+                    int braceRun = CountRepeatedCharacter(source, index, '{');
+                    if (braceRun == interpolationBraceCount)
+                    {
+                        braceDepth = 1;
+                        index += braceRun;
+                        continue;
+                    }
+                    if (braceRun >= interpolationBraceCount * 2)
+                    {
+                        index += braceRun;
+                        continue;
+                    }
+                    index += Math.Max(Math.Max(quoteRun, braceRun), 1);
+                    continue;
+                }
+
+                char character = source[index];
+                if (character == '/' && index + 1 < source.Length)
+                {
+                    if (source[index + 1] == '/') { index = SkipLineComment(source, index + 2); continue; }
+                    if (source[index + 1] == '*') { index = SkipBlockComment(source, index + 2); continue; }
+                }
+                if (IsStringStart(source, index)) { index = SkipString(source, index); continue; }
+                if (character == '\'') { index = SkipQuotedCharacter(source, index + 1, '\''); continue; }
+                if (character == '{') { braceDepth++; index++; continue; }
+                if (character == '}') { braceDepth--; index++; continue; }
+                index++;
+            }
+            return source.Length;
+        }
+
+        private static int CountRepeatedCharacter(string source, int index, char character)
+        {
+            int count = 0;
+            while (index + count < source.Length && source[index + count] == character) count++;
+            return count;
         }
 
         private static int SkipQuotedCharacter(string source, int index, char quote, bool verbatim = false)
