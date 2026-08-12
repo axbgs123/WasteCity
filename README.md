@@ -39,8 +39,7 @@ git status
 
 当前自动化与构建基线（`8ce573a`）：
 
-- EditMode：`492/492`；
-- PlayMode：`58/58`；
+- 最新的 EditMode、PlayMode、编译、构建和人工试玩状态见[最新验证快照](Docs/Generated/Latest-Verification-ZH.md)；这里不手工维护会过期的测试数量。
 - Unity 无界面编译：0 错误；
 - 默认 3D Windows 构建和显式 2D 回归构建均成功，两个产物均为 `PE32+ executable (GUI) x86-64`；
 - 存档 schema：`30`；首个 3D 基础阶段仍不读写正式存档；
@@ -73,6 +72,15 @@ git status
 4. `Docs/04-Minimum-Releasable-Version-Plan-ZH.md`：历史 MRV；
 5. `Docs/02-Demo-Implementation-Plan-ZH.md`：历史 Demo 实施计划；
 6. `Docs/03-Legacy-Progress-Notes-ZH.md`：早期记录。
+
+## 项目质量与复用入口
+
+- [用户反馈与变更控制](Docs/06-User-Feedback-and-Change-Control-ZH.md)：确认批准状态和人工验收结论；
+- [项目使用与开发入门](Docs/07-Project-Use-and-Development-Guide-ZH.md)：从默认场景和基本操作开始；
+- [测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)：按功能选择测试，阅读失败定位；
+- [可复用项目目录](Docs/09-Reusable-Project-Catalog-ZH.md)：选择已有能力时先看用途和边界；
+- [项目自动清单](Docs/Generated/Project-Inventory-ZH.md)、[测试自动清单](Docs/Generated/Test-Inventory-ZH.md)：当前文件、场景、组件与测试入口；
+- [最新验证快照](Docs/Generated/Latest-Verification-ZH.md)、[文档关注提醒](Docs/Generated/Documentation-Attention-ZH.md)：最近证据和需要人工检查的文档提醒。
 
 ## 美术替换约定
 

@@ -264,6 +264,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PermanentCompletionGate_RequiresQualityContractsAndDiscoverabilityLinks()
+        {
+            string agents = ReadGuide("AGENTS.md");
+            foreach (string requirement in new[]
+            {
+                "新增或修改的生产文件必须归入功能组",
+                "新增公共能力必须更新推荐复用目录或说明为何不适合复用",
+                "功能修改必须补充对应测试",
+                "完成前运行 ProjectQualityTools.GenerateDocumentation",
+                "完成前运行 ProjectQualityTools.ValidateDocumentation",
+                "自动工具不得改变玩法审批或人工验收结论",
+            }) StringAssert.Contains(requirement, agents);
+            StringAssert.Contains("Docs/06", agents);
+            StringAssert.Contains("生成的技术文档", agents);
+            StringAssert.Contains("不是", agents);
+
+            string readme = ReadGuide("README.md");
+            string docsIndex = ReadGuide("Docs/README.md");
+            foreach (string document in new[]
+            {
+                "Docs/06-User-Feedback-and-Change-Control-ZH.md",
+                "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+                "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+                "Docs/09-Reusable-Project-Catalog-ZH.md",
+            }) AssertMarkdownLinkExists(readme, "README.md", document);
+            foreach (string appendix in new[]
+            {
+                "Docs/Generated/Project-Inventory-ZH.md",
+                "Docs/Generated/Test-Inventory-ZH.md",
+                "Docs/Generated/Latest-Verification-ZH.md",
+                "Docs/Generated/Documentation-Attention-ZH.md",
+            }) AssertMarkdownLinkExists(readme, "README.md", appendix);
+
+            foreach (string document in new[]
+            {
+                "06-User-Feedback-and-Change-Control-ZH.md",
+                "07-Project-Use-and-Development-Guide-ZH.md",
+                "08-Testing-and-Bug-Location-Guide-ZH.md",
+                "09-Reusable-Project-Catalog-ZH.md",
+                "Generated/Project-Inventory-ZH.md",
+                "Generated/Test-Inventory-ZH.md",
+                "Generated/Latest-Verification-ZH.md",
+                "Generated/Documentation-Attention-ZH.md",
+            }) AssertMarkdownLinkExists(docsIndex, "Docs/README.md", document);
+            AssertAllMarkdownLinksResolve(readme, "README.md");
+            AssertAllMarkdownLinksResolve(docsIndex, "Docs/README.md");
+
+            string roadmap = ReadGuide("Docs/05-Formal-Development-Roadmap-ZH.md");
+            StringAssert.Contains("DOC-0001", roadmap);
+            StringAssert.Contains("质量", roadmap);
+            StringAssert.Contains("不计入玩法完成度", roadmap);
+            StringAssert.Contains("主 GDD 正式版整体：约 **50%**", roadmap);
+            StringAssert.Contains("正式美术、动画与音频：约 **8%**", roadmap);
+        }
+
+        [Test]
         public void PlainChineseHumanGuides_HaveOrderedSectionsResolvedLinksAndPlainLanguage()
         {
             string userGuide = ReadGuide("Docs/07-Project-Use-and-Development-Guide-ZH.md");
