@@ -1124,6 +1124,37 @@ repeat a separate Graybox 3D build when the default release entry point already 
 the same scene/configuration target.  Each build needs a successful Unity log and a
 PE32+ x86-64 output check; macOS must not claim a Windows launch smoke test.
 
+#### Approved EditMode import-loop blocking fix path
+
+**Only allowed production/test file for this correction:**
+`Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`.
+
+Phase-1 evidence establishes that the existing sentinel test helper copies a
+`Texture2DArray` sentinel whose main-object name is empty into the persistent Height
+and Mask arrays.  The helper then saves and synchronously reimports them.  Unity logs
+`Main Object Name '' does not match filename` and repeatedly requeues terrain
+imports, preventing NUnit from producing XML.  The normal production builder is a
+passing control, so this correction must not modify `FirstArtTerrainAssetBuilder`,
+`FirstArtPassImportPolicy`, any other production code, importer policy, LFS asset, or
+terrain source/meta content.
+
+The test-helper fix must preserve the destination's original name, or set the
+sentinel name to `Path.GetFileNameWithoutExtension(path)`, before any
+`SaveAssets`/`ImportAsset` operation.  The helper must assert immediately before
+each save/reimport that the destination name equals that filename-derived expected
+name.  Add a lightweight mutation-sensitive helper/name contract in the same test
+file when practical; it must fail if the helper again permits an empty or mismatched
+sentinel name.
+
+The currently hanging
+`BuildTextureArrays_ExistingR8AndBc7SentinelsReturnToStableGoldenContent` invocation
+is the RED evidence.  After the test-only correction, use a fresh clean detached
+clone at the new HEAD to require: the exact sentinel filter writes passed `1/1` XML;
+the complete `FirstArtTerrainAssetBuilderTests` class writes complete XML; full
+EditMode writes complete XML; and protected original-worktree hashes plus clone
+post-run cleanliness prove no asset/meta mutation.  Do not continue Task 9
+verification until this boundary test passes.
+
 **Files:**
 - Modify: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Regenerate: `Docs/Generated/Latest-Verification-ZH.md`
