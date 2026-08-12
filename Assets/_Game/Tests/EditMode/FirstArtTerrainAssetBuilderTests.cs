@@ -1199,7 +1199,10 @@ namespace WasteCity.Tests
             try
             {
                 Texture2DArray destination = LoadArray(path);
+                string expectedName = Path.GetFileNameWithoutExtension(path);
                 EditorUtility.CopySerialized(sentinel, destination);
+                destination.name = expectedName;
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 destination.Apply(false, true);
                 EditorUtility.SetDirty(destination);
                 AssetDatabase.SaveAssets();
