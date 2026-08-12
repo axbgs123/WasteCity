@@ -55,11 +55,12 @@
 <details>
 <summary>展开技术附录：测试命令如何查找</summary>
 
-先复制失败报告“建议复跑”中的单类筛选；它就是失败报告中的“只重跑这个失败”。若要把相关检查放进同一次运行，从[测试自动清单](Generated/Test-Inventory-ZH.md)“精确测试文件与测试类”表复制真实类名，用 `|` 连接，并用单引号包住整个筛选值。以下是可直接运行的真实格式示例；把两个类名替换成表中与你的问题对应的类名即可。
+先复制失败报告“建议复跑”中的单类筛选；它就是失败报告中的“只重跑这个失败”。若要把相关检查放进同一次运行，从[测试自动清单](Generated/Test-Inventory-ZH.md)“精确测试文件与测试类”表复制真实类名，用 `|` 连接，并用单引号包住整个筛选值。以下 `sh` 代码块只适用于 macOS/Linux，需从仓库根目录执行，不可直接用于 Windows；把两个类名替换成表中与你的问题对应的类名即可。
 
 ```sh
-PROJECT_ROOT=/Users/baiyan1/Documents/WasteCity-first-art-pass-fixes
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 UNITY_BIN=/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Unity
+mkdir -p /tmp/wastecity-project-quality
 "$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
   -runTests -testPlatform EditMode \
   -testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests' \
@@ -68,6 +69,8 @@ UNITY_BIN=/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents/MacOS/Un
 ```
 
 不要把测试清单末尾的聚合筛选误当成单功能入口；它会运行全部已列出的测试类。流程始终是单功能检查，再相关检查，最后完整回归。
+
+Windows 用户可在 Unity Test Runner 中按“精确测试文件与测试类”表搜索并选择失败测试类和相关测试类，再运行所选测试；同样先单功能、再相关、最后完整回归。
 
 </details>
 

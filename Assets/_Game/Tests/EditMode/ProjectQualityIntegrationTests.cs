@@ -292,6 +292,12 @@ namespace WasteCity.Tests
             StringAssert.Contains("失败报告中的“只重跑这个失败”", bugGuide);
             StringAssert.Contains("精确测试文件与测试类", bugGuide);
             StringAssert.Contains("-testFilter 'WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests'", bugGuide);
+            StringAssert.Contains("PROJECT_ROOT=\"$(git rev-parse --show-toplevel)\"", bugGuide);
+            StringAssert.Contains("mkdir -p /tmp/wastecity-project-quality", bugGuide);
+            StringAssert.Contains("只适用于 macOS/Linux", bugGuide);
+            StringAssert.Contains("不可直接用于 Windows", bugGuide);
+            StringAssert.Contains("Windows 用户", bugGuide);
+            StringAssert.DoesNotContain("/Users/baiyan1", bugGuide);
             StringAssert.DoesNotContain("复制对应的 `-testFilter`", bugGuide);
 
             AssertGuideContract(reuseGuide, "Docs/09-Reusable-Project-Catalog-ZH.md",
@@ -313,6 +319,8 @@ namespace WasteCity.Tests
             foreach (ProjectReuseEntry entry in catalog.ReuseEntries)
             {
                 string body = ReuseEntryBody(content, entry);
+                Assert.That(entry.TypeNames, Is.Not.Empty, entry.Id + " needs catalog code names");
+                Assert.That(string.IsNullOrWhiteSpace(entry.UseSummary), Is.False, entry.Id + " needs catalog reuse guidance");
                 StringAssert.Contains("能解决什么：", body);
                 StringAssert.Contains("在哪里：", body);
                 StringAssert.Contains("怎么复用：", body);
@@ -321,6 +329,8 @@ namespace WasteCity.Tests
                 foreach (string assetPath in entry.AssetPaths) StringAssert.Contains(assetPath, body);
                 foreach (string testPath in entry.RequiredTestFiles)
                     StringAssert.Contains(Path.GetFileNameWithoutExtension(testPath), body);
+                foreach (string typeName in entry.TypeNames) StringAssert.Contains(typeName, body);
+                StringAssert.Contains("怎么复用：" + entry.UseSummary, body);
                 StringAssert.Contains(entry.BoundarySummary, body);
             }
         }
