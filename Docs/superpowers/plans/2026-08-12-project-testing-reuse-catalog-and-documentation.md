@@ -472,16 +472,16 @@ The scanner must:
 - enumerate repository-relative production `.cs` under `Assets/_Game/Scripts` and `Assets/_Game/Editor`;
 - enumerate EditMode and PlayMode `.cs` test files;
 - parse `.asmdef` names using `JsonUtility` DTOs;
-- use `TypeCache.GetTypesDerivedFrom<MonoBehaviour>()` and `TypeCache.GetTypesDerivedFrom<ScriptableObject>()`, filtering to assemblies whose names start with `WasteCity`;
+- use `TypeCache.GetTypesDerivedFrom<MonoBehaviour>()` and `TypeCache.GetTypesDerivedFrom<ScriptableObject>()` only for production/editor `WasteCity*` assemblies; exclude the frozen test assembly names `WasteCity.EditModeTests` and `WasteCity.PlayModeTests` so test-only helper components do not enter `ProjectTypeRecords`;
 - use `EditorBuildSettings.scenes` for enabled scene order;
 - identify Editor public static parameterless methods on `FormalBuildTools`, `GrayboxSceneAuthoring`, `FirstArtTerrainAssetBuilder`, `FirstArtTerrainEvidenceCapture`, `GrayboxPerformanceProbe`, and later `ProjectQualityTools`;
 - find test classes from loaded types with NUnit `[Test]`, `[TestCase]`, `[TestCaseSource]`, or Unity `[UnityTest]` methods;
-- build one ordinal deterministic index from `MonoScript.GetClass()` exact `Type` identity to repository-relative `AssetDatabase` paths under the approved source/test roots; map each discovered type and test class through that index, failing on missing or duplicate paths rather than guessing. Do not implement a handwritten C# lexer or preprocessor for source mapping;
+- build one ordinal deterministic index from `MonoScript.GetClass()` exact `Type` identity to repository-relative `AssetDatabase` paths under the approved source/test roots; map every production/editor discovered type and each discovered test class through that index, failing on missing or duplicate paths rather than guessing. Test-only `MonoBehaviour` and `ScriptableObject` helpers are deliberately absent from `ProjectTypeRecords`; their test source file and owning test class remain in the test inventory. Do not implement a handwritten C# lexer or preprocessor for source mapping;
 - keep all arrays sorted ordinally.
 
 Do not load or save scenes during a general scan. Scene object-tree inspection belongs to existing scene contract tests, not this inventory.
 
-**Source-mapping rationale:** Repeated valid-C# edge cases around comments, conditional branches, interpolated strings, and raw strings show that a handwritten declaration parser cannot be the authoritative mapping boundary. Unity's importer already exposes the compiled `MonoScript.GetClass()` identity and `AssetDatabase` path needed by this Editor-only inventory, including plain NUnit classes. Use that importer-owned identity as the authoritative source mapping.
+**Source-mapping rationale:** Repeated valid-C# edge cases around comments, conditional branches, interpolated strings, and raw strings show that a handwritten declaration parser cannot be the authoritative mapping boundary. Unity's importer already exposes the compiled `MonoScript.GetClass()` identity and `AssetDatabase` path needed by this Editor-only inventory, including plain NUnit classes. A single C# file can contain test-only component helpers that do not receive a distinct `MonoScript` identity, so component discovery is intentionally restricted to production/editor assemblies; test classes remain separately inventoried by their exact importer-owned identity. Use that boundary rather than parsing source text.
 
 - [ ] **Step 4: Run Task 2 GREEN**
 
