@@ -421,6 +421,7 @@ git commit -m "feat: define project quality catalog"
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs.meta`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
+- Modify: `Assets/_Game/Editor/WasteCity.Editor.asmdef`
 
 **Interfaces:**
 - Consumes: normalized `ProjectQualityCatalog`
@@ -476,12 +477,15 @@ The scanner must:
 - use `EditorBuildSettings.scenes` for enabled scene order;
 - identify Editor public static parameterless methods on `FormalBuildTools`, `GrayboxSceneAuthoring`, `FirstArtTerrainAssetBuilder`, `FirstArtTerrainEvidenceCapture`, `GrayboxPerformanceProbe`, and later `ProjectQualityTools`;
 - find test classes from loaded types with NUnit `[Test]`, `[TestCase]`, `[TestCaseSource]`, or Unity `[UnityTest]` methods;
-- build one ordinal deterministic index from `MonoScript.GetClass()` exact `Type` identity to repository-relative `AssetDatabase` paths under the approved source/test roots; map every production/editor discovered type and each discovered test class through that index, failing on missing or duplicate paths rather than guessing. Test-only `MonoBehaviour` and `ScriptableObject` helpers are deliberately absent from `ProjectTypeRecords`; their test source file and owning test class remain in the test inventory. Do not implement a handwritten C# lexer or preprocessor for source mapping;
+- keep `Mono.Cecil` and `Mono.Cecil.Pdb` private to `WasteCity.Editor`: set `overrideReferences` and add only Unity-owned `Mono.Cecil.dll` and `Mono.Cecil.Pdb.dll` as `precompiledReferences` in `WasteCity.Editor.asmdef`. Do not vendor DLLs, use machine-specific paths, expose Cecil types from public scanner models, modify `WasteCity.EditModeTests.asmdef`, or add Cecil `using` directives to tests;
+- build one ordinal deterministic type-to-source index from the loaded `WasteCity*` assembly DLLs and their Unity-generated portable PDB sequence-point documents. Normalize each document path to one repository-relative path under the approved source/test roots, recurse nested Cecil type definitions, and match the exact runtime `Type.FullName`; use `MonoScript.GetClass()` exact identity only as a zero-sequence-point fallback. Multiple top-level types in one file must map independently (including `WasteCity.Building.BuildingRuntime` and `WasteCity.Building.PlaceholderShieldGenerator`). Fail on absent DLL/PDB, missing source, outside-root source, or multiple distinct paths rather than guessing;
+- map every production/editor discovered type and each discovered test class through that private index. Test-only `MonoBehaviour` and `ScriptableObject` helpers are deliberately absent from `ProjectTypeRecords`; their owning test class remains in the test inventory. Tests verify only public `ProjectInventorySnapshot` results and never directly construct or inspect Cecil objects;
+- delete the handwritten C# declaration lexer/preprocessor and its reflection-based lexical tests after the new current-project RED proves the missing multi-type mapping. Do not retain source-text parsing as a fallback;
 - keep all arrays sorted ordinally.
 
 Do not load or save scenes during a general scan. Scene object-tree inspection belongs to existing scene contract tests, not this inventory.
 
-**Source-mapping rationale:** Repeated valid-C# edge cases around comments, conditional branches, interpolated strings, and raw strings show that a handwritten declaration parser cannot be the authoritative mapping boundary. Unity's importer already exposes the compiled `MonoScript.GetClass()` identity and `AssetDatabase` path needed by this Editor-only inventory, including plain NUnit classes. A single C# file can contain test-only component helpers that do not receive a distinct `MonoScript` identity, so component discovery is intentionally restricted to production/editor assemblies; test classes remain separately inventoried by their exact importer-owned identity. Use that boundary rather than parsing source text.
+**Source-mapping rationale:** Repeated valid-C# edge cases around comments, conditional branches, interpolated strings, and raw strings show that a handwritten declaration parser cannot be the authoritative mapping boundary. `MonoScript.GetClass()` also represents only one primary class per imported file, while current production file `BuildingRuntime.cs` contains several top-level `MonoBehaviour` types. Unity already produces portable PDB files next to the loaded Editor assemblies, and their compiled sequence-point documents provide a syntax-independent type-to-source boundary. Keep that implementation private to the Editor scanner, retain `MonoScript` only for a compiled type without usable sequence points, and test the scanner's public inventory rather than spreading Cecil into the test assembly.
 
 - [ ] **Step 4: Run Task 2 GREEN**
 
@@ -489,7 +493,7 @@ Run the same Task 2 filter with `task-02/green.xml` and `task-02/green.log`; exp
 
 - [ ] **Step 5: Commit Task 2**
 
-Stage only the five listed task paths and commit:
+Stage only the six listed task paths and commit:
 
 ```bash
 git commit -m "feat: scan project quality inventory"
