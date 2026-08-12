@@ -52,6 +52,15 @@ namespace WasteCity.Editor.ProjectQuality
                 if (ui == null || string.IsNullOrWhiteSpace(ui.SceneId) || !sceneIds.Contains(ui.SceneId))
                     Add(issues, "PQ005", "界面条目引用了未知场景", ui == null ? string.Empty : ui.Id);
             }
+            foreach (ProjectFeatureGroup feature in catalog.FeatureGroups)
+            {
+                if (feature == null) continue;
+                foreach (string scenePath in Values(feature.ScenePaths))
+                    if (!Values(catalog.Scenes).Any(scene => scene != null && scene.Path == scenePath))
+                        Add(issues, "PQ005", "功能分组引用了未登记场景", scenePath);
+            }
+            ValidateExclusions(catalog.ExplicitSourceExclusions, "生产文件排除项", issues);
+            ValidateExclusions(catalog.ExplicitTestExclusions, "测试文件排除项", issues);
         }
 
         private static void ValidateFileCoverage(ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot,
@@ -97,19 +106,18 @@ namespace WasteCity.Editor.ProjectQuality
                     if (!files.Contains(path) && !Values(snapshot.ScenePaths).Contains(path))
                         Add(issues, "PQ003", "复用资源路径不存在于项目快照", path);
                 foreach (string typeName in Values(reuse.TypeNames))
-                    if (typeName.IndexOf('.') >= 0 && !Values(snapshot.TypeRecords).Any(type => TypeMatches(type, typeName)))
+                    if (!Values(snapshot.TypeRecords).Any(type => TypeMatches(type, typeName)))
                         Add(issues, "PQ003", "复用类型不存在于项目快照", typeName);
                 foreach (string testPath in Values(reuse.RequiredTestFiles))
                     if (!testFiles.Contains(testPath)) Add(issues, "PQ004", "复用条目缺少必需测试", testPath);
 
-                ProjectFeatureGroup feature = Values(catalog.FeatureGroups)
-                    .FirstOrDefault(value => value.Id == reuse.FeatureGroupId);
-                if (feature != null && reuse.ReuseLevel == ProjectReuseLevel.FrozenRegression &&
-                    feature.MinimumVerification != ProjectVerificationLevel.FullRegression)
-                    Add(issues, "PQ007", "冻结回归条目不能标记为普通推荐功能", reuse.Id);
-                if (reuse.ReuseLevel == ProjectReuseLevel.Recommended &&
-                    Values(reuse.AssetPaths).Any(path => path.IndexOf("Placeholder", StringComparison.OrdinalIgnoreCase) >= 0))
-                    Add(issues, "PQ008", "占位实现不能标记为推荐复用", reuse.Id);
+                if (reuse.ReuseLevel == ProjectReuseLevel.Recommended && IsFrozenFeature(reuse.FeatureGroupId))
+                {
+                    if (Values(reuse.AssetPaths).Any(path => IsFrozenScenePath(catalog, path)))
+                        Add(issues, "PQ007", "冻结二维场景条目不能标记为推荐复用", reuse.Id);
+                    else
+                        Add(issues, "PQ008", "禁止新工作的冻结二维条目不能标记为推荐复用", reuse.Id);
+                }
             }
         }
 
@@ -128,7 +136,12 @@ namespace WasteCity.Editor.ProjectQuality
                 }
                 else if (actual != null)
                     Add(issues, "PQ006", "目录要求禁用的场景仍出现在构建设置中", scene.Path);
+                if (scene.ReuseLevel == ProjectReuseLevel.Recommended && IsFrozenScenePath(catalog, scene.Path))
+                    Add(issues, "PQ007", "冻结二维场景不能标记为推荐复用", scene.Path);
             }
+            foreach (ProjectSceneRecord actual in Values(snapshot.SceneRecords))
+                if (actual != null && !Values(catalog.Scenes).Any(scene => scene != null && scene.Path == actual.Path))
+                    Add(issues, "PQ006", "构建设置包含未登记场景", actual.Path);
         }
 
         private static void ValidateUi(ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot,
@@ -241,7 +254,34 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static bool IsExplicitlyExcluded(string path, IEnumerable<ProjectPathExclusion> exclusions)
         {
-            return Values(exclusions).Any(exclusion => exclusion != null && exclusion.Path == path);
+            return Values(exclusions).Any(exclusion => IsValidExclusion(exclusion) && exclusion.Path == path);
+        }
+
+        private static void ValidateExclusions(IEnumerable<ProjectPathExclusion> exclusions, string label,
+            List<ProjectQualityIssue> issues)
+        {
+            foreach (ProjectPathExclusion exclusion in Values(exclusions))
+                if (!IsValidExclusion(exclusion))
+                    Add(issues, "PQ005", label + "必须使用精确路径和非空理由",
+                        exclusion == null || string.IsNullOrWhiteSpace(exclusion.Path) ? label : exclusion.Path);
+        }
+
+        private static bool IsValidExclusion(ProjectPathExclusion exclusion)
+        {
+            return exclusion != null && !string.IsNullOrWhiteSpace(exclusion.Path) &&
+                exclusion.Path.IndexOf('*') < 0 && exclusion.Path.IndexOf('?') < 0 &&
+                !string.IsNullOrWhiteSpace(exclusion.Reason);
+        }
+
+        private static bool IsFrozenFeature(string featureGroupId)
+        {
+            return string.Equals(featureGroupId, "frozen-2d-regression", StringComparison.Ordinal);
+        }
+
+        private static bool IsFrozenScenePath(ProjectQualityCatalog catalog, string path)
+        {
+            return Values(catalog.FeatureGroups).Any(feature => feature != null &&
+                IsFrozenFeature(feature.Id) && Values(feature.ScenePaths).Contains(path));
         }
 
         private static bool TypeMatches(ProjectTypeRecord type, string typeName)

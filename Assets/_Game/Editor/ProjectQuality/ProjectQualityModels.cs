@@ -34,6 +34,7 @@ namespace WasteCity.Editor.ProjectQuality
     {
         MonoBehaviour,
         ScriptableObject,
+        PlainCSharp,
     }
 
     public enum ProjectTestPlatform

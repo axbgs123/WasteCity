@@ -31,8 +31,7 @@ namespace WasteCity.Tests
                 ProjectQualityValidator.Validate(
                     fixture.Catalog, fixture.Snapshot, fixture.Root);
 
-            Assert.That(issues.Any(x => x.Code == expectedCode), Is.True,
-                string.Join("\n", issues.Select(x => x.PlainChineseMessage)));
+            AssertIssuesExactly(issues, expectedCode);
         }
 
         [Test]
@@ -81,6 +80,119 @@ namespace WasteCity.Tests
                 issue.Code + " " + issue.Path + " " + issue.PlainChineseMessage)));
         }
 
+        [Test]
+        public void Validate_RealFrozenReuseBecomingRecommended_ReturnsOnlyPq007()
+        {
+            ProjectQualityCatalog catalog = CurrentCatalog();
+            ProjectReuseEntry reuse = catalog.ReuseEntries.Single(entry => entry.Id == "formal-prototype-frozen");
+            reuse.ReuseLevel = ProjectReuseLevel.Recommended;
+
+            AssertIssuesExactly(ValidateCurrent(catalog), "PQ007");
+        }
+
+        [Test]
+        public void Validate_RealFrozenSceneBecomingRecommended_ReturnsOnlyPq007()
+        {
+            ProjectQualityCatalog catalog = CurrentCatalog();
+            ProjectSceneEntry scene = catalog.Scenes.Single(entry => entry.Id == "formal-prototype");
+            scene.ReuseLevel = ProjectReuseLevel.Recommended;
+
+            AssertIssuesExactly(ValidateCurrent(catalog), "PQ007");
+        }
+
+        [Test]
+        public void Validate_RealProhibitedReuseBecomingRecommended_ReturnsOnlyPq008()
+        {
+            ProjectQualityCatalog catalog = CurrentCatalog();
+            ProjectReuseEntry reuse = catalog.ReuseEntries.Single(entry => entry.Id == "placeholder-building-controller-frozen");
+            reuse.ReuseLevel = ProjectReuseLevel.Recommended;
+
+            AssertIssuesExactly(ValidateCurrent(catalog), "PQ008");
+        }
+
+        [Test]
+        public void Validate_RejectsMissingSimpleCatalogTypeAgainstSnapshot()
+        {
+            ProjectQualityCatalog catalog = CurrentCatalog();
+            catalog.ReuseEntries.Single(entry => entry.Id == "stable-id").TypeNames[0] = "MissingStableId";
+
+            AssertIssuesExactly(ValidateCurrent(catalog), "PQ003");
+        }
+
+        [Test]
+        public void Validate_RejectsUnknownEditorPathAgainstCommittedCatalog()
+        {
+            ProjectInventorySnapshot snapshot = CurrentSnapshot();
+            snapshot.FileRecords = snapshot.FileRecords.Concat(new[]
+            {
+                new ProjectFileRecord
+                {
+                    Path = "Assets/_Game/Editor/FutureUnknownTool.cs",
+                    Kind = ProjectFileKind.Production,
+                },
+            }).ToArray();
+
+            AssertIssuesExactly(Validate(CurrentCatalog(), snapshot), "PQ001");
+        }
+
+        [Test]
+        public void Validate_RejectsUnregisteredEnabledSnapshotScene()
+        {
+            ProjectInventorySnapshot snapshot = CurrentSnapshot();
+            snapshot.SceneRecords = snapshot.SceneRecords.Concat(new[]
+            {
+                new ProjectSceneRecord { Path = "Assets/_Game/Scenes/Future.unity", BuildIndex = 2 },
+            }).ToArray();
+            snapshot.ScenePaths = snapshot.ScenePaths.Concat(new[] { "Assets/_Game/Scenes/Future.unity" }).ToArray();
+
+            AssertIssuesExactly(Validate(CurrentCatalog(), snapshot), "PQ006");
+        }
+
+        [Test]
+        public void Validate_RejectsFeatureScenePathOutsideCatalogSceneEntries()
+        {
+            ProjectQualityCatalog catalog = CurrentCatalog();
+            catalog.FeatureGroups[0].ScenePaths[0] = "Assets/_Game/Scenes/Missing.unity";
+
+            AssertIssuesExactly(ValidateCurrent(catalog), "PQ005");
+        }
+
+        [Test]
+        public void Validate_RejectsReasonlessExclusionAndDoesNotSuppressCoverage()
+        {
+            Fixture fixture = ValidFixture();
+            const string path = "Assets/_Game/Scripts/Unmapped.cs";
+            fixture.Snapshot.FileRecords = fixture.Snapshot.FileRecords.Concat(new[]
+            {
+                new ProjectFileRecord { Path = path, Kind = ProjectFileKind.Production },
+            }).ToArray();
+            fixture.Catalog.ExplicitSourceExclusions = new[]
+            {
+                new ProjectPathExclusion { Path = path, Reason = string.Empty },
+            };
+
+            AssertIssuesExactly(ProjectQualityValidator.Validate(fixture.Catalog, fixture.Snapshot, fixture.Root),
+                "PQ001", "PQ005");
+        }
+
+        [Test]
+        public void Validate_ReturnsDeterministicallySortedWellFormedIssues()
+        {
+            Fixture fixture = ValidFixture();
+            fixture.Snapshot.FileRecords = fixture.Snapshot.FileRecords.Concat(new[]
+            {
+                new ProjectFileRecord { Path = "Assets/_Game/Scripts/Z.cs", Kind = ProjectFileKind.Production },
+                new ProjectFileRecord { Path = "Assets/_Game/Scripts/A.cs", Kind = ProjectFileKind.Production },
+            }).ToArray();
+
+            IReadOnlyList<ProjectQualityIssue> issues =
+                ProjectQualityValidator.Validate(fixture.Catalog, fixture.Snapshot, fixture.Root);
+
+            AssertIssuesExactly(issues, "PQ001", "PQ001");
+            for (int index = 1; index < issues.Count; index++)
+                Assert.That(CompareIssues(issues[index - 1], issues[index]), Is.LessThanOrEqualTo(0));
+        }
+
         private static Fixture ValidFixture()
         {
             string root = Path.Combine(Path.GetTempPath(), "wastecity-project-quality-validator",
@@ -91,8 +203,10 @@ namespace WasteCity.Tests
             File.WriteAllText(Path.Combine(root, "Docs", "catalog.md"), "# 目录\n");
 
             const string sourcePath = "Assets/_Game/Scripts/Feature/FeatureComponent.cs";
+            const string prohibitedPath = "Assets/_Game/Scripts/Frozen/ProhibitedComponent.cs";
             const string testPath = "Assets/_Game/Tests/EditMode/FeatureComponentTests.cs";
             const string scenePath = "Assets/_Game/Scenes/FeatureScene.unity";
+            const string frozenScenePath = "Assets/_Game/Scenes/FrozenScene.unity";
             const string documentationPath = "Docs/guide.md";
 
             var feature = new ProjectFeatureGroup
@@ -119,6 +233,43 @@ namespace WasteCity.Tests
                 RequiredTestFiles = new[] { testPath },
                 RequirementIds = new[] { "DOC-0001" },
             };
+            var frozenFeature = new ProjectFeatureGroup
+            {
+                Id = "frozen-2d-regression",
+                ChineseName = "冻结二维",
+                SourceGlobs = new[] { "Assets/_Game/Scripts/Frozen/**" },
+                TestFileGlobs = new[] { testPath },
+                ScenePaths = new[] { frozenScenePath },
+                RequirementIds = new[] { "DOC-0001" },
+                HumanDocumentPaths = new[] { documentationPath },
+                MinimumVerification = ProjectVerificationLevel.FullRegression,
+            };
+            var frozenReuse = new ProjectReuseEntry
+            {
+                Id = "frozen-scene",
+                ChineseName = "冻结场景",
+                TypeNames = new[] { "WasteCity.Feature.FeatureComponent" },
+                AssetPaths = new[] { frozenScenePath },
+                FeatureGroupId = frozenFeature.Id,
+                ReuseLevel = ProjectReuseLevel.FrozenRegression,
+                UseSummary = "仅供冻结回归",
+                BoundarySummary = "不供新工作复用",
+                RequiredTestFiles = new[] { testPath },
+                RequirementIds = new[] { "DOC-0001" },
+            };
+            var prohibitedReuse = new ProjectReuseEntry
+            {
+                Id = "prohibited-entry",
+                ChineseName = "禁止条目",
+                TypeNames = new[] { "WasteCity.Frozen.ProhibitedComponent" },
+                AssetPaths = new[] { prohibitedPath },
+                FeatureGroupId = frozenFeature.Id,
+                ReuseLevel = ProjectReuseLevel.ProhibitedForNewWork,
+                UseSummary = "只供历史回归",
+                BoundarySummary = "禁止新工作引用",
+                RequiredTestFiles = new[] { testPath },
+                RequirementIds = new[] { "DOC-0001" },
+            };
             var scene = new ProjectSceneEntry
             {
                 Id = "feature-scene",
@@ -133,7 +284,7 @@ namespace WasteCity.Tests
             {
                 Id = "feature-ui",
                 ChineseName = "功能界面",
-                OwnerTypeName = "WasteCity.Feature.FeatureComponent",
+                OwnerTypeName = "WasteCity.Feature.FeatureUiOwner",
                 SceneId = scene.Id,
                 InputPrioritySummary = "优先处理功能输入",
                 RequiredTestFiles = new[] { testPath },
@@ -141,9 +292,18 @@ namespace WasteCity.Tests
             var catalog = new ProjectQualityCatalog
             {
                 SchemaVersion = 1,
-                FeatureGroups = new[] { feature },
-                ReuseEntries = new[] { reuse },
-                Scenes = new[] { scene },
+                FeatureGroups = new[] { feature, frozenFeature },
+                ReuseEntries = new[] { reuse, frozenReuse, prohibitedReuse },
+                Scenes = new[]
+                {
+                    scene,
+                    new ProjectSceneEntry
+                    {
+                        Id = "frozen-scene", ChineseName = "冻结场景", Path = frozenScenePath,
+                        Purpose = "冻结回归", EnabledInBuildSettings = true, ExpectedBuildIndex = 1,
+                        ReuseLevel = ProjectReuseLevel.FrozenRegression,
+                    },
+                },
                 UiEntries = new[] { ui },
                 DocumentationRules = new[]
                 {
@@ -163,6 +323,7 @@ namespace WasteCity.Tests
                 FileRecords = new[]
                 {
                     new ProjectFileRecord { Path = sourcePath, Kind = ProjectFileKind.Production },
+                    new ProjectFileRecord { Path = prohibitedPath, Kind = ProjectFileKind.Production },
                     new ProjectFileRecord { Path = testPath, Kind = ProjectFileKind.EditModeTest },
                 },
                 TypeRecords = new[]
@@ -174,9 +335,27 @@ namespace WasteCity.Tests
                         SourcePath = sourcePath,
                         Kind = ProjectTypeKind.MonoBehaviour,
                     },
+                    new ProjectTypeRecord
+                    {
+                        FullName = "WasteCity.Feature.FeatureUiOwner",
+                        AssemblyName = "WasteCity.Game",
+                        SourcePath = sourcePath,
+                        Kind = ProjectTypeKind.MonoBehaviour,
+                    },
+                    new ProjectTypeRecord
+                    {
+                        FullName = "WasteCity.Frozen.ProhibitedComponent",
+                        AssemblyName = "WasteCity.Game",
+                        SourcePath = prohibitedPath,
+                        Kind = ProjectTypeKind.PlainCSharp,
+                    },
                 },
                 AssemblyRecords = new ProjectAssemblyRecord[0],
-                SceneRecords = new[] { new ProjectSceneRecord { Path = scenePath, BuildIndex = 0 } },
+                SceneRecords = new[]
+                {
+                    new ProjectSceneRecord { Path = scenePath, BuildIndex = 0 },
+                    new ProjectSceneRecord { Path = frozenScenePath, BuildIndex = 1 },
+                },
                 TestClasses = new[]
                 {
                     new ProjectTestClassRecord
@@ -188,9 +367,53 @@ namespace WasteCity.Tests
                 },
                 EditorEntryPoints = new ProjectEditorEntryPointRecord[0],
                 AssemblyNames = new[] { "WasteCity.Game" },
-                ScenePaths = new[] { scenePath },
+                ScenePaths = new[] { scenePath, frozenScenePath },
             };
             return new Fixture(root, catalog, snapshot);
+        }
+
+        private static ProjectQualityCatalog CurrentCatalog()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            return ProjectQualityCatalogLoader.LoadFromFile(
+                Path.Combine(root, "Docs/Engineering/project-quality-catalog.json"));
+        }
+
+        private static ProjectInventorySnapshot CurrentSnapshot()
+        {
+            return ProjectQualityScanner.Scan(Path.GetFullPath(Path.Combine(Application.dataPath, "..")));
+        }
+
+        private static IReadOnlyList<ProjectQualityIssue> ValidateCurrent(ProjectQualityCatalog catalog)
+        {
+            return Validate(catalog, CurrentSnapshot());
+        }
+
+        private static IReadOnlyList<ProjectQualityIssue> Validate(ProjectQualityCatalog catalog,
+            ProjectInventorySnapshot snapshot)
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            return ProjectQualityValidator.Validate(catalog, snapshot, root);
+        }
+
+        private static void AssertIssuesExactly(IReadOnlyList<ProjectQualityIssue> issues, params string[] codes)
+        {
+            CollectionAssert.AreEqual(codes, issues.Select(issue => issue.Code).ToArray(),
+                string.Join("\n", issues.Select(issue => issue.Code + " " + issue.Path + " " + issue.PlainChineseMessage)));
+            foreach (ProjectQualityIssue issue in issues)
+            {
+                Assert.That(issue.Severity, Is.EqualTo(ProjectQualityIssueSeverity.Error));
+                Assert.That(issue.Path, Is.Not.Null.And.Not.Empty);
+                Assert.That(issue.PlainChineseMessage, Is.Not.Null.And.Not.Empty);
+            }
+        }
+
+        private static int CompareIssues(ProjectQualityIssue left, ProjectQualityIssue right)
+        {
+            int code = string.CompareOrdinal(left.Code, right.Code);
+            if (code != 0) return code;
+            int path = string.CompareOrdinal(left.Path, right.Path);
+            return path != 0 ? path : string.CompareOrdinal(left.PlainChineseMessage, right.PlainChineseMessage);
         }
 
         private static string[] HashFixtureFiles(string root)
@@ -257,13 +480,14 @@ namespace WasteCity.Tests
                         Snapshot.SceneRecords[0].BuildIndex = 1;
                         return;
                     case "frozen-recommended":
-                        Catalog.ReuseEntries[0].ReuseLevel = ProjectReuseLevel.FrozenRegression;
+                        Catalog.ReuseEntries[1].ReuseLevel = ProjectReuseLevel.Recommended;
                         return;
                     case "placeholder-recommended":
-                        Catalog.ReuseEntries[0].AssetPaths[0] = "Assets/_Game/Scripts/Feature/PlaceholderComponent.cs";
+                        Catalog.ReuseEntries[2].ReuseLevel = ProjectReuseLevel.Recommended;
                         return;
                     case "missing-ui-owner":
-                        Snapshot.TypeRecords = new ProjectTypeRecord[0];
+                        Snapshot.TypeRecords = Snapshot.TypeRecords.Where(record =>
+                            record.FullName != "WasteCity.Feature.FeatureUiOwner").ToArray();
                         return;
                     case "missing-human-link":
                         File.WriteAllText(Path.Combine(Root, "Docs", "guide.md"), "[缺失](missing.md)\n");

@@ -323,7 +323,17 @@
       "Id": "scene-editor-build-performance",
       "ChineseName": "场景编辑构建与性能",
       "SourceGlobs": [
-        "Assets/_Game/Editor/**",
+        "Assets/_Game/Editor/FirstArtPassImportPolicy.cs",
+        "Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs",
+        "Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs",
+        "Assets/_Game/Editor/FormalBuildTools.cs",
+        "Assets/_Game/Editor/FormalProjectSetup.cs",
+        "Assets/_Game/Editor/GrayboxPerformanceProbe.cs",
+        "Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs"
       ],

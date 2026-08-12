@@ -141,8 +141,33 @@ namespace WasteCity.Editor.ProjectQuality
             var records = new List<ProjectTypeRecord>();
             AddTypes(TypeCache.GetTypesDerivedFrom<MonoBehaviour>(), ProjectTypeKind.MonoBehaviour, pdb, records);
             AddTypes(TypeCache.GetTypesDerivedFrom<ScriptableObject>(), ProjectTypeKind.ScriptableObject, pdb, records);
+            AddPlainProductionTypes(pdb, records);
             return records.OrderBy(record => record.FullName, StringComparer.Ordinal)
                 .ThenBy(record => record.Kind.ToString(), StringComparer.Ordinal).ToList();
+        }
+
+        private static void AddPlainProductionTypes(Dictionary<string, List<string>> pdb, List<ProjectTypeRecord> records)
+        {
+            var recordedNames = new HashSet<string>(records.Select(record => record.FullName), StringComparer.Ordinal);
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                string assemblyName = assembly.GetName().Name;
+                if (assemblyName == null || !assemblyName.StartsWith("WasteCity", StringComparison.Ordinal) ||
+                    Array.IndexOf(TestAssemblyNames, assemblyName) >= 0) continue;
+                foreach (Type type in GetLoadableTypes(assembly))
+                {
+                    if (!IsCatalogProductionType(type) || !recordedNames.Add(type.FullName)) continue;
+                    string sourcePath;
+                    if (!TryResolvePdb(type.FullName, pdb, out sourcePath)) continue;
+                    records.Add(new ProjectTypeRecord
+                    {
+                        FullName = type.FullName,
+                        AssemblyName = assemblyName,
+                        SourcePath = sourcePath,
+                        Kind = ProjectTypeKind.PlainCSharp,
+                    });
+                }
+            }
         }
 
         private static void AddTypes(IEnumerable<Type> types, ProjectTypeKind kind, Dictionary<string, List<string>> pdb, List<ProjectTypeRecord> records)
@@ -328,9 +353,21 @@ namespace WasteCity.Editor.ProjectQuality
                 string assemblyName = assembly.GetName().Name;
                 if (assemblyName == null || !assemblyName.StartsWith("WasteCity", StringComparison.Ordinal)) continue;
                 foreach (Type type in GetLoadableTypes(assembly))
+                {
                     if (type != null && type.FullName != null && ContainsTestMethod(type)) names.Add(type.FullName);
+                    if (IsCatalogProductionType(type)) names.Add(type.FullName);
+                }
             }
             return names;
+        }
+
+        private static bool IsCatalogProductionType(Type type)
+        {
+            if (type == null || type.FullName == null || type.Assembly == null || type.IsNestedPrivate ||
+                type.IsDefined(typeof(CompilerGeneratedAttribute), false)) return false;
+            string assemblyName = type.Assembly.GetName().Name;
+            return assemblyName != null && assemblyName.StartsWith("WasteCity", StringComparison.Ordinal) &&
+                Array.IndexOf(TestAssemblyNames, assemblyName) < 0;
         }
 
         private static IEnumerable<TypeDefinition> AllTypeDefinitions(IEnumerable<TypeDefinition> types)
@@ -395,6 +432,18 @@ namespace WasteCity.Editor.ProjectQuality
             if (paths.Count != 1)
                 throw new InvalidDataException("ambiguous class source mapping for " + name + ": " + string.Join(", ", paths));
             return paths[0];
+        }
+
+        private static bool TryResolvePdb(string name, Dictionary<string, List<string>> map, out string sourcePath)
+        {
+            List<string> paths;
+            if (!map.TryGetValue(name, out paths) || paths.Count != 1)
+            {
+                sourcePath = null;
+                return false;
+            }
+            sourcePath = paths[0];
+            return true;
         }
 
         internal static string ResolveSourcePathForTests(string name, Dictionary<string, List<string>> map)

@@ -83,6 +83,20 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Scan_IncludesCompiledSourceMappedPlainProductionTypesAndStillExcludesTestHelpers()
+        {
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+
+            Assert.That(snapshot.TypeRecords.Any(record =>
+                record.FullName == "WasteCity.World.WorldMapModel" &&
+                record.SourcePath == "Assets/_Game/Scripts/World/WorldMapModel.cs"), Is.True);
+            Assert.That(snapshot.TypeRecords.Any(record =>
+                record.FullName == "WasteCity.Tests.ProjectQualityScannerPreprocessorProbe"), Is.False);
+            Assert.That(snapshot.TypeRecords.Any(record =>
+                record.FullName == "WasteCity.Tests.RecordingTerrainPresentation3D"), Is.False);
+        }
+
+        [Test]
         public void Scan_MapsCompiledPreprocessorProbeTestClass()
         {
             ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
