@@ -1206,7 +1206,9 @@ namespace WasteCity.Tests
                 Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 destination.Apply(false, true);
                 EditorUtility.SetDirty(destination);
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 AssetDatabase.SaveAssets();
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 AssetDatabase.ImportAsset(
                     path,
                     ImportAssetOptions.ForceUpdate |

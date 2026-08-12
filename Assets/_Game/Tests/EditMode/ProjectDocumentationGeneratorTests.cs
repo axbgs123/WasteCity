@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Editor.ProjectQuality;
@@ -21,15 +22,98 @@ namespace WasteCity.Tests
             string guide = File.ReadAllText(Path.Combine(root,
                 "Docs/08-Testing-and-Bug-Location-Guide-ZH.md"), Encoding.UTF8);
 
-            StringAssert.Contains("[Category(\"TerrainAssetDeep\")]", fixture);
-            StringAssert.Contains("-testCategory '!TerrainAssetDeep'", guide);
-            StringAssert.Contains("-testCategory 'TerrainAssetDeep'", guide);
-            StringAssert.Contains("地形源 PNG", guide);
-            StringAssert.Contains("导入策略", guide);
-            StringAssert.Contains("FirstArtTerrainAssetBuilder", guide);
-            StringAssert.Contains("生成的纹理数组", guide);
-            StringAssert.Contains("序列化格式", guide);
-            StringAssert.Contains("发布候选版本", guide);
+            string fixtureCode = RemoveCSharpComments(fixture);
+            StringAssert.IsMatch(
+                @"\[Category\(\""TerrainAssetDeep\""\)\]\s*" +
+                @"public\s+sealed\s+class\s+FirstArtTerrainAssetBuilderTests\b",
+                fixtureCode,
+                "TerrainAssetDeep must be attached to FirstArtTerrainAssetBuilderTests");
+
+            string sentinelOverwrite = CollapseWhitespace(ExtractMethodBody(
+                fixtureCode,
+                "private static void OverwriteDestinationWithSentinel"));
+            StringAssert.IsMatch(
+                @"Assert\.That\(destination\.name, Is\.EqualTo\(expectedName\), path\); " +
+                @"AssetDatabase\.SaveAssets\(\); " +
+                @"Assert\.That\(destination\.name, Is\.EqualTo\(expectedName\), path\); " +
+                @"AssetDatabase\.ImportAsset\(",
+                sentinelOverwrite,
+                "destination identity must be asserted immediately before save and forced import");
+            StringAssert.Contains(
+                "ImportAssetOptions.ForceUpdate | ImportAssetOptions.ForceSynchronousImport",
+                sentinelOverwrite);
+
+            string scheduleSection = MarkdownSection(
+                guide,
+                "日常 EditMode 与地形深度检查");
+            MatchCollection commands = Regex.Matches(
+                scheduleSection,
+                @"```sh\s*(?<command>[\s\S]*?)```",
+                RegexOptions.CultureInvariant);
+            Assert.That(commands.Count, Is.EqualTo(2),
+                "daily/deep schedule section must contain exactly two shell commands");
+            StringAssert.Contains(
+                "-testCategory '!TerrainAssetDeep'",
+                commands[0].Groups["command"].Value);
+            StringAssert.Contains(
+                "-testCategory 'TerrainAssetDeep'",
+                commands[1].Groups["command"].Value);
+
+            int dailyCommandEnd = commands[0].Index + commands[0].Length;
+            string deepTrigger = scheduleSection.Substring(
+                dailyCommandEnd,
+                commands[1].Index - dailyCommandEnd);
+            StringAssert.Contains("地形源 PNG", deepTrigger);
+            StringAssert.Contains("导入策略", deepTrigger);
+            StringAssert.Contains("FirstArtTerrainAssetBuilder", deepTrigger);
+            StringAssert.Contains("生成的纹理数组", deepTrigger);
+            StringAssert.Contains("序列化格式", deepTrigger);
+            StringAssert.Contains("发布候选版本", deepTrigger);
+            StringAssert.Contains("必须运行完整地形深度套件", deepTrigger);
+        }
+
+        private static string RemoveCSharpComments(string source)
+        {
+            return Regex.Replace(
+                source,
+                @"//[^\r\n]*|/\*[\s\S]*?\*/",
+                string.Empty,
+                RegexOptions.CultureInvariant);
+        }
+
+        private static string ExtractMethodBody(string source, string signature)
+        {
+            int signatureIndex = source.IndexOf(signature, StringComparison.Ordinal);
+            Assert.That(signatureIndex, Is.GreaterThanOrEqualTo(0), signature);
+            int openingBrace = source.IndexOf('{', signatureIndex + signature.Length);
+            Assert.That(openingBrace, Is.GreaterThanOrEqualTo(0), signature);
+            int depth = 0;
+            for (int index = openingBrace; index < source.Length; index++)
+            {
+                if (source[index] == '{') depth++;
+                else if (source[index] == '}' && --depth == 0)
+                    return source.Substring(openingBrace + 1, index - openingBrace - 1);
+            }
+
+            Assert.Fail("Unclosed method body: " + signature);
+            return string.Empty;
+        }
+
+        private static string CollapseWhitespace(string value)
+        {
+            return Regex.Replace(value, @"\s+", " ").Trim();
+        }
+
+        private static string MarkdownSection(string markdown, string heading)
+        {
+            string marker = "## " + heading;
+            int start = markdown.IndexOf(marker, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), marker);
+            int contentStart = start + marker.Length;
+            int next = markdown.IndexOf("\n## ", contentStart, StringComparison.Ordinal);
+            return markdown.Substring(
+                contentStart,
+                next < 0 ? markdown.Length - contentStart : next - contentStart);
         }
 
         [Test]
