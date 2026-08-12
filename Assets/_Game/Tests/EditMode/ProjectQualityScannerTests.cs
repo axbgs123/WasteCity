@@ -1,7 +1,10 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Editor.ProjectQuality;
@@ -38,9 +41,15 @@ namespace WasteCity.Tests
             Assert.That(snapshot.TypeRecords.Any(record =>
                 record.FullName == "WasteCity.Graybox3D.GrayboxMobileCityController3D" &&
                 record.Kind == ProjectTypeKind.MonoBehaviour), Is.True);
+            Assert.That(snapshot.TypeRecords.Any(record =>
+                record.FullName == "WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D" &&
+                record.Kind == ProjectTypeKind.ScriptableObject), Is.True);
             Assert.That(snapshot.TestClasses.Any(record =>
                 record.FullName == "WasteCity.Tests.GrayboxBuildingRuntimeSceneTests" &&
                 record.Platform == ProjectTestPlatform.PlayMode), Is.True);
+            Assert.That(snapshot.TestClasses.Single(record =>
+                record.FullName == "WasteCity.Tests.GrayboxBuildingRuntimeSceneTests").SourcePath,
+                Is.EqualTo("Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"));
             Assert.That(snapshot.EditorEntryPoints.Any(record =>
                 record.OwnerTypeFullName == "WasteCity.Editor.FormalBuildTools" &&
                 record.MethodName == "BuildWindows"), Is.True);
@@ -55,6 +64,13 @@ namespace WasteCity.Tests
             foreach (string owner in entryPointOwners)
                 Assert.That(snapshot.EditorEntryPoints.Any(record =>
                     record.OwnerTypeFullName.EndsWith("." + owner, StringComparison.Ordinal)), Is.True, owner);
+
+            CollectionAssert.AreEqual(snapshot.SceneRecords.Select(record => record.Path)
+                .OrderBy(path => path, StringComparer.Ordinal).ToArray(), snapshot.ScenePaths);
+            Assert.That(snapshot.SceneRecords.Single(record =>
+                record.Path == "Assets/_Game/Scenes/GrayboxPrototype3D.unity").BuildIndex, Is.EqualTo(0));
+            Assert.That(snapshot.SceneRecords.Single(record =>
+                record.Path == "Assets/_Game/Scenes/FormalPrototype.unity").BuildIndex, Is.EqualTo(1));
         }
 
         [Test]
@@ -104,21 +120,79 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Scan_RejectsAmbiguousCurrentProjectTestClassSourceMapping()
+        public void SourceMapping_IgnoresCommentsStringsCharsAndInactivePreprocessorBranches()
         {
-            string path = Path.Combine(ProjectRoot(), "Assets/_Game/Tests/EditMode/zz_ProjectQualityScannerAmbiguousFixture.cs");
-            try
+            ProjectFileRecord declaration = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Fixture.cs", "public sealed class Fixture { }");
+            ProjectFileRecord decoys = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Decoys.cs",
+                "// class Fixture { }\n" +
+                "/* class Fixture { } */\n" +
+                "var quoted = \"class Fixture { }\";\n" +
+                "var verbatim = @\"class Fixture { }\";\n" +
+                "var interpolated = $\"class Fixture { }\";\n" +
+                "var character = '\\\\';\n" +
+                "#if false\npublic sealed class Fixture { }\n#endif\n" +
+                "#if NEVER_DEFINED\npublic sealed class Fixture { }\n#endif\n");
+
+            Assert.That(FindSourcePath("Fixture", declaration, decoys), Is.EqualTo(declaration.Path));
+        }
+
+        [Test]
+        public void SourceMapping_DoesNotInterpretPreprocessorTextInsideBlockComments()
+        {
+            ProjectFileRecord declaration = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/CommentDirective.cs",
+                "/*\n#if false\n*/\npublic sealed class CommentDirectiveFixture { }\n");
+
+            Assert.That(FindSourcePath("CommentDirectiveFixture", declaration), Is.EqualTo(declaration.Path));
+        }
+
+        [Test]
+        public void SourceMapping_MapsGenericReflectionNames()
+        {
+            ProjectFileRecord generic = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Generic.cs", "public sealed class Fixture<T> { }");
+
+            Assert.That(FindSourcePath("Fixture`1", generic), Is.EqualTo(generic.Path));
+        }
+
+        [Test]
+        public void SourceMapping_RejectsNestedSimpleNameConflicts()
+        {
+            ProjectFileRecord conflict = WriteLexicalFixtureFile(
+                "Assets/_Game/Tests/EditMode/Conflict.cs",
+                "public sealed class Conflict { } public sealed class Outer { public sealed class Conflict { } }");
+
+            Assert.That(() => FindSourcePath("Conflict", conflict), Throws.TypeOf<InvalidDataException>());
+        }
+
+        [Test]
+        public void Scan_RestrictsEditorEntriesToApprovedOwnersAndPublicStaticParameterlessMethods()
+        {
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+
+            Assert.That(snapshot.EditorEntryPoints.Any(record =>
+                record.OwnerTypeFullName == "WasteCity.Tests.FormalBuildTools"), Is.False);
+            Assert.That(snapshot.EditorEntryPoints.Any(record =>
+                record.OwnerTypeFullName == "WasteCity.Tests.GrayboxPerformanceProbe"), Is.False);
+            foreach (ProjectEditorEntryPointRecord record in snapshot.EditorEntryPoints)
             {
-                File.WriteAllText(path, "// class ProjectQualityScannerTests\n");
-                InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
-                    ProjectQualityScanner.Scan(ProjectRoot()));
-                StringAssert.Contains("ProjectQualityScannerTests", error.Message);
+                Type owner = Type.GetType(record.OwnerTypeFullName + ", " + "WasteCity.Editor");
+                Assert.That(owner, Is.Not.Null, record.OwnerTypeFullName);
+                MethodInfo method = owner.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                    .Single(candidate => candidate.Name == record.MethodName && candidate.GetParameters().Length == 0);
+                Assert.That(method.IsPublic && method.IsStatic && method.GetParameters().Length == 0, Is.True);
             }
-            finally
-            {
-                if (File.Exists(path))
-                    File.Delete(path);
-            }
+        }
+
+        [Test]
+        public void TestDiscovery_RecognizesEachSupportedMethodAttribute()
+        {
+            Assert.That(ContainsTestMethod(typeof(TestAttributeFixture)), Is.True);
+            Assert.That(ContainsTestMethod(typeof(TestCaseAttributeFixture)), Is.True);
+            Assert.That(ContainsTestMethod(typeof(TestCaseSourceAttributeFixture)), Is.True);
+            Assert.That(ContainsTestMethod(typeof(UnityTestAttributeFixture)), Is.True);
         }
 
         [Test]
@@ -128,12 +202,45 @@ namespace WasteCity.Tests
             WriteFixtureFile("Assets/_Game/Scripts/Fixture.Runtime.asmdef", "{\"name\":\"Fixture.Runtime\"}");
             Dictionary<string, byte[]> before = ReadFixtureFiles();
 
-            ProjectQualityScanner.Scan(fixtureRoot);
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(fixtureRoot);
+            snapshot.ToDeterministicJson();
 
             Dictionary<string, byte[]> after = ReadFixtureFiles();
             CollectionAssert.AreEquivalent(before.Keys, after.Keys);
             foreach (string path in before.Keys)
                 CollectionAssert.AreEqual(before[path], after[path], path);
+        }
+
+        [Test]
+        public void ToDeterministicJson_EscapesControlCharactersAndIsCultureIndependent()
+        {
+            const string value = "a\"\\\n\r\t\u0001";
+            const string escapedValue = "a\\\"\\\\\\n\\r\\t\\u0001";
+            ProjectInventorySnapshot snapshot = EmptySnapshot();
+            snapshot.FileRecords = new[] { new ProjectFileRecord { Path = value, Kind = ProjectFileKind.Production } };
+
+            CultureInfo previousCulture = CultureInfo.CurrentCulture;
+            CultureInfo previousUiCulture = CultureInfo.CurrentUICulture;
+            try
+            {
+                CultureInfo.CurrentCulture = new CultureInfo("fr-FR");
+                CultureInfo.CurrentUICulture = CultureInfo.CurrentCulture;
+                Assert.That(snapshot.ToDeterministicJson(), Is.EqualTo(
+                    "{\"FileRecords\":[{\"Path\":\"" + escapedValue +
+                    "\",\"Kind\":\"Production\"}],\"TypeRecords\":[],\"AssemblyRecords\":[],\"SceneRecords\":[],\"TestClasses\":[],\"EditorEntryPoints\":[],\"AssemblyNames\":[],\"ScenePaths\":[]}"));
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = previousCulture;
+                CultureInfo.CurrentUICulture = previousUiCulture;
+            }
+        }
+
+        [Test]
+        public void ToDeterministicJson_RejectsIncompleteSnapshotState()
+        {
+            Assert.That(() => new ProjectInventorySnapshot().ToDeterministicJson(),
+                Throws.TypeOf<InvalidOperationException>());
         }
 
         private void WriteFixtureFile(string relativePath, string content)
@@ -152,6 +259,59 @@ namespace WasteCity.Tests
                     StringComparer.Ordinal);
         }
 
+        private ProjectFileRecord WriteLexicalFixtureFile(string path, string content)
+        {
+            WriteFixtureFile(path, content);
+            string absolutePath = Path.Combine(fixtureRoot, path.Replace('/', Path.DirectorySeparatorChar));
+            return new ProjectFileRecord
+            {
+                Path = MakePathRelativeToCurrentProject(absolutePath),
+                Kind = ProjectFileKind.EditModeTest,
+            };
+        }
+
+        private static string FindSourcePath(string className, params ProjectFileRecord[] files)
+        {
+            MethodInfo method = typeof(ProjectQualityScanner).GetMethod("FindUniqueSourcePath",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            try
+            {
+                return (string)method.Invoke(null, new object[] { className, files.ToList() });
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw exception.InnerException;
+            }
+        }
+
+        private static bool ContainsTestMethod(Type type)
+        {
+            MethodInfo method = typeof(ProjectQualityScanner).GetMethod("ContainsTestMethod",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            return (bool)method.Invoke(null, new object[] { type });
+        }
+
+        private static ProjectInventorySnapshot EmptySnapshot()
+        {
+            return new ProjectInventorySnapshot
+            {
+                FileRecords = new ProjectFileRecord[0],
+                TypeRecords = new ProjectTypeRecord[0],
+                AssemblyRecords = new ProjectAssemblyRecord[0],
+                SceneRecords = new ProjectSceneRecord[0],
+                TestClasses = new ProjectTestClassRecord[0],
+                EditorEntryPoints = new ProjectEditorEntryPointRecord[0],
+                AssemblyNames = new string[0],
+                ScenePaths = new string[0],
+            };
+        }
+
+        private static string MakePathRelativeToCurrentProject(string absolutePath)
+        {
+            Uri root = new Uri(ProjectRoot().TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar);
+            return Uri.UnescapeDataString(root.MakeRelativeUri(new Uri(absolutePath)).ToString());
+        }
+
         private static void RecordCounts(ProjectInventorySnapshot snapshot)
         {
             TestContext.CurrentContext.Test.Properties.Set("ProjectQualityFileRecords", snapshot.FileRecords.Length);
@@ -166,5 +326,40 @@ namespace WasteCity.Tests
         {
             return Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         }
+
+        private sealed class TestAttributeFixture
+        {
+            [Test] public void DiscoversTest() { }
+        }
+
+        private sealed class TestCaseAttributeFixture
+        {
+            [TestCase(1)] public void DiscoversTestCase(int value) { }
+        }
+
+        private sealed class TestCaseSourceAttributeFixture
+        {
+            private static IEnumerable Cases { get { return new[] { new TestCaseData(1) }; } }
+            [TestCaseSource("Cases")] public void DiscoversTestCaseSource(int value) { }
+        }
+
+        private sealed class UnityTestAttributeFixture
+        {
+            [UnityEngine.TestTools.UnityTest] public IEnumerator DiscoversUnityTest() { yield break; }
+        }
+    }
+
+    public static class FormalBuildTools
+    {
+        public static void FixturePublicStaticParameterless() { }
+        private static void FixturePrivateStaticParameterless() { }
+        public static void FixtureParameterized(int value) { }
+    }
+
+    public sealed class GrayboxPerformanceProbe
+    {
+        public void FixtureInstance() { }
+        private static void FixturePrivateStaticParameterless() { }
+        public static void FixtureParameterized(int value) { }
     }
 }

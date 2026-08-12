@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,14 +11,14 @@ namespace WasteCity.Editor.ProjectQuality
 {
     public static class ProjectQualityScanner
     {
-        private static readonly string[] EntryPointOwnerNames =
+        private static readonly string[] EntryPointOwnerTypeNames =
         {
-            "FirstArtTerrainAssetBuilder",
-            "FirstArtTerrainEvidenceCapture",
-            "FormalBuildTools",
-            "GrayboxPerformanceProbe",
-            "GrayboxSceneAuthoring",
-            "ProjectQualityTools",
+            "WasteCity.Editor.FirstArtTerrainAssetBuilder",
+            "WasteCity.Editor.FirstArtTerrainEvidenceCapture",
+            "WasteCity.Editor.FormalBuildTools",
+            "WasteCity.Editor.GrayboxPerformanceProbe",
+            "WasteCity.Editor.GrayboxSceneAuthoring",
+            "WasteCity.Editor.ProjectQuality.ProjectQualityTools",
         };
 
         public static ProjectInventorySnapshot Scan(string projectRoot)
@@ -225,7 +225,7 @@ namespace WasteCity.Editor.ProjectQuality
                 foreach (Type type in GetLoadableTypes(assembly))
                 {
                     if (type == null || type.FullName == null ||
-                        Array.IndexOf(EntryPointOwnerNames, type.Name) < 0) continue;
+                        Array.IndexOf(EntryPointOwnerTypeNames, type.FullName) < 0) continue;
                     foreach (MethodInfo method in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
                     {
                         if (method.GetParameters().Length != 0) continue;
@@ -244,16 +244,287 @@ namespace WasteCity.Editor.ProjectQuality
         private static string FindUniqueSourcePath(string className, List<ProjectFileRecord> files)
         {
             var matches = new List<string>();
-            Regex pattern = new Regex("\\bclass\\s+" + Regex.Escape(className) + "\\b");
+            string declarationName = RemoveGenericArity(className);
             foreach (ProjectFileRecord file in files)
             {
-                if (pattern.IsMatch(File.ReadAllText(ToAbsolutePath(file.Path))))
+                int declarationCount = CountClassDeclarations(
+                    File.ReadAllText(ToAbsolutePath(file.Path)), declarationName);
+                for (int index = 0; index < declarationCount; index++)
                     matches.Add(file.Path);
             }
 
             if (matches.Count > 1)
                 throw new InvalidDataException("ambiguous class source mapping for " + className + ": " + string.Join(", ", matches.OrderBy(path => path, StringComparer.Ordinal).ToArray()));
             return matches.Count == 0 ? string.Empty : matches[0];
+        }
+
+        private static string RemoveGenericArity(string className)
+        {
+            int marker = className.IndexOf('`');
+            return marker < 0 ? className : className.Substring(0, marker);
+        }
+
+        private static int CountClassDeclarations(string source, string declarationName)
+        {
+            string activeSource = RemoveInactivePreprocessorBranches(source);
+            int count = 0;
+            for (int index = 0; index < activeSource.Length;)
+            {
+                char character = activeSource[index];
+                if (char.IsWhiteSpace(character)) { index++; continue; }
+                if (character == '/' && index + 1 < activeSource.Length)
+                {
+                    if (activeSource[index + 1] == '/') { index = SkipLineComment(activeSource, index + 2); continue; }
+                    if (activeSource[index + 1] == '*') { index = SkipBlockComment(activeSource, index + 2); continue; }
+                }
+                if (IsStringStart(activeSource, index)) { index = SkipString(activeSource, index); continue; }
+                if (character == '\'') { index = SkipQuotedCharacter(activeSource, index + 1, '\''); continue; }
+                if (!IsIdentifierStart(character)) { index++; continue; }
+
+                string identifier = ReadIdentifier(activeSource, ref index);
+                if (identifier != "class") continue;
+                SkipWhitespace(activeSource, ref index);
+                if (index < activeSource.Length && activeSource[index] == '@') index++;
+                if (index >= activeSource.Length || !IsIdentifierStart(activeSource[index])) continue;
+                if (ReadIdentifier(activeSource, ref index) == declarationName) count++;
+            }
+            return count;
+        }
+
+        private static string RemoveInactivePreprocessorBranches(string source)
+        {
+            var output = new StringBuilder(source.Length);
+            var branches = new Stack<PreprocessorBranch>();
+            bool active = true;
+            bool insideBlockComment = false;
+            bool insideVerbatimString = false;
+            int rawStringQuoteCount = 0;
+            int position = 0;
+            while (position < source.Length)
+            {
+                int lineEnd = source.IndexOf('\n', position);
+                if (lineEnd < 0) lineEnd = source.Length;
+                string line = source.Substring(position, lineEnd - position);
+                string trimmed = line.TrimStart();
+                if (!insideBlockComment && !insideVerbatimString && rawStringQuoteCount == 0 &&
+                    trimmed.StartsWith("#", StringComparison.Ordinal))
+                {
+                    ProcessDirective(trimmed.Substring(1).TrimStart(), branches, ref active);
+                    output.Append(' ', line.Length);
+                }
+                else if (active)
+                    output.Append(line);
+                else
+                    output.Append(' ', line.Length);
+
+                AdvancePreprocessorLexicalState(line, ref insideBlockComment,
+                    ref insideVerbatimString, ref rawStringQuoteCount);
+
+                if (lineEnd < source.Length) output.Append('\n');
+                position = lineEnd + 1;
+            }
+            return output.ToString();
+        }
+
+        private static void AdvancePreprocessorLexicalState(string line, ref bool insideBlockComment,
+            ref bool insideVerbatimString, ref int rawStringQuoteCount)
+        {
+            for (int index = 0; index < line.Length;)
+            {
+                if (insideBlockComment)
+                {
+                    int end = line.IndexOf("*/", index, StringComparison.Ordinal);
+                    if (end < 0) return;
+                    insideBlockComment = false;
+                    index = end + 2;
+                    continue;
+                }
+                if (insideVerbatimString)
+                {
+                    if (line[index] != '"') { index++; continue; }
+                    if (index + 1 < line.Length && line[index + 1] == '"') { index += 2; continue; }
+                    insideVerbatimString = false;
+                    index++;
+                    continue;
+                }
+                if (rawStringQuoteCount > 0)
+                {
+                    int quoteCount = CountQuotes(line, index);
+                    if (quoteCount >= rawStringQuoteCount)
+                    {
+                        rawStringQuoteCount = 0;
+                        index += quoteCount;
+                    }
+                    else
+                        index += Math.Max(quoteCount, 1);
+                    continue;
+                }
+                if (line[index] == '/' && index + 1 < line.Length)
+                {
+                    if (line[index + 1] == '/') return;
+                    if (line[index + 1] == '*') { insideBlockComment = true; index += 2; continue; }
+                }
+                if (line[index] == '\'') { index = SkipQuotedCharacter(line, index + 1, '\''); continue; }
+                if (IsStringStart(line, index))
+                {
+                    int quote = FindStringQuote(line, index);
+                    int quoteCount = CountQuotes(line, quote);
+                    if (quoteCount >= 3)
+                    {
+                        rawStringQuoteCount = quoteCount;
+                        index = quote + quoteCount;
+                        continue;
+                    }
+                    bool verbatim = line.Substring(index, quote - index).IndexOf('@') >= 0;
+                    int end = SkipQuotedCharacter(line, quote + 1, '"', verbatim);
+                    if (verbatim && end >= line.Length) insideVerbatimString = true;
+                    index = end;
+                    continue;
+                }
+                index++;
+            }
+        }
+
+        private static int FindStringQuote(string source, int index)
+        {
+            while (index < source.Length && source[index] != '"') index++;
+            return index;
+        }
+
+        private static int CountQuotes(string source, int index)
+        {
+            int count = 0;
+            while (index + count < source.Length && source[index + count] == '"') count++;
+            return count;
+        }
+
+        private static void ProcessDirective(string directive, Stack<PreprocessorBranch> branches, ref bool active)
+        {
+            string name;
+            string condition;
+            int separator = directive.IndexOfAny(new[] { ' ', '\t' });
+            if (separator < 0) { name = directive; condition = string.Empty; }
+            else { name = directive.Substring(0, separator); condition = directive.Substring(separator).Trim(); }
+
+            if (name == "if")
+            {
+                bool branchActive = active && EvaluatePreprocessorCondition(condition);
+                branches.Push(new PreprocessorBranch(active, branchActive));
+                active = branchActive;
+            }
+            else if (name == "elif" && branches.Count > 0)
+            {
+                PreprocessorBranch branch = branches.Pop();
+                bool branchActive = branch.ParentActive && !branch.AnyBranchActive && EvaluatePreprocessorCondition(condition);
+                branches.Push(new PreprocessorBranch(branch.ParentActive, branch.AnyBranchActive || branchActive));
+                active = branchActive;
+            }
+            else if (name == "else" && branches.Count > 0)
+            {
+                PreprocessorBranch branch = branches.Pop();
+                bool branchActive = branch.ParentActive && !branch.AnyBranchActive;
+                branches.Push(new PreprocessorBranch(branch.ParentActive, true));
+                active = branchActive;
+            }
+            else if (name == "endif" && branches.Count > 0)
+            {
+                PreprocessorBranch branch = branches.Pop();
+                active = branch.ParentActive;
+            }
+        }
+
+        private static bool EvaluatePreprocessorCondition(string condition)
+        {
+            condition = condition.Trim();
+            if (condition == "true" || condition == "UNITY_EDITOR") return true;
+            if (condition == "false") return false;
+            if (condition.StartsWith("!", StringComparison.Ordinal))
+                return !EvaluatePreprocessorCondition(condition.Substring(1));
+            return false;
+        }
+
+        private static int SkipLineComment(string source, int index)
+        {
+            int lineEnd = source.IndexOf('\n', index);
+            return lineEnd < 0 ? source.Length : lineEnd;
+        }
+
+        private static int SkipBlockComment(string source, int index)
+        {
+            int end = source.IndexOf("*/", index, StringComparison.Ordinal);
+            return end < 0 ? source.Length : end + 2;
+        }
+
+        private static bool IsStringStart(string source, int index)
+        {
+            char character = source[index];
+            if (character == '"') return true;
+            if (character != '@' && character != '$') return false;
+            int next = index + 1;
+            return next < source.Length && (source[next] == '"' ||
+                ((source[next] == '@' || source[next] == '$') && next + 1 < source.Length && source[next + 1] == '"'));
+        }
+
+        private static int SkipString(string source, int index)
+        {
+            bool verbatim = false;
+            while (index < source.Length && (source[index] == '@' || source[index] == '$'))
+            {
+                verbatim |= source[index] == '@';
+                index++;
+            }
+            if (index >= source.Length || source[index] != '"') return index;
+            int quoteCount = 1;
+            while (index + quoteCount < source.Length && source[index + quoteCount] == '"') quoteCount++;
+            if (quoteCount >= 3)
+            {
+                index += quoteCount;
+                while (index < source.Length)
+                {
+                    int run = 0;
+                    while (index + run < source.Length && source[index + run] == '"') run++;
+                    if (run >= quoteCount) return index + quoteCount;
+                    index += Math.Max(run, 1);
+                }
+                return source.Length;
+            }
+            return SkipQuotedCharacter(source, index + 1, '"', verbatim);
+        }
+
+        private static int SkipQuotedCharacter(string source, int index, char quote, bool verbatim = false)
+        {
+            while (index < source.Length)
+            {
+                if (source[index] == quote)
+                {
+                    if (verbatim && index + 1 < source.Length && source[index + 1] == quote)
+                    {
+                        index += 2;
+                        continue;
+                    }
+                    return index + 1;
+                }
+                if (!verbatim && source[index] == '\\' && index + 1 < source.Length) index += 2;
+                else index++;
+            }
+            return source.Length;
+        }
+
+        private static void SkipWhitespace(string source, ref int index)
+        {
+            while (index < source.Length && char.IsWhiteSpace(source[index])) index++;
+        }
+
+        private static bool IsIdentifierStart(char character)
+        {
+            return character == '_' || char.IsLetter(character);
+        }
+
+        private static string ReadIdentifier(string source, ref int index)
+        {
+            int start = index++;
+            while (index < source.Length && (source[index] == '_' || char.IsLetterOrDigit(source[index]))) index++;
+            return source.Substring(start, index - start);
         }
 
         private static string ToAbsolutePath(string projectRelativePath)
@@ -277,6 +548,18 @@ namespace WasteCity.Editor.ProjectQuality
         private sealed class AsmdefDto
         {
             public string name;
+        }
+
+        private struct PreprocessorBranch
+        {
+            public readonly bool ParentActive;
+            public readonly bool AnyBranchActive;
+
+            public PreprocessorBranch(bool parentActive, bool anyBranchActive)
+            {
+                ParentActive = parentActive;
+                AnyBranchActive = anyBranchActive;
+            }
         }
     }
 }

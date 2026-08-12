@@ -101,6 +101,7 @@ namespace WasteCity.Editor.ProjectQuality
 
         public string ToDeterministicJson()
         {
+            ValidateCompleteState();
             var builder = new StringBuilder();
             builder.Append('{');
             AppendFiles(builder); builder.Append(',');
@@ -113,6 +114,36 @@ namespace WasteCity.Editor.ProjectQuality
             AppendStringArray(builder, "ScenePaths", ScenePaths);
             builder.Append('}');
             return builder.ToString();
+        }
+
+        private void ValidateCompleteState()
+        {
+            if (FileRecords == null || TypeRecords == null || AssemblyRecords == null ||
+                SceneRecords == null || TestClasses == null || EditorEntryPoints == null ||
+                AssemblyNames == null || ScenePaths == null)
+                throw new InvalidOperationException("inventory snapshot arrays must not be null");
+            ValidateRecords(FileRecords, "file");
+            ValidateRecords(TypeRecords, "type");
+            ValidateRecords(AssemblyRecords, "assembly");
+            ValidateRecords(SceneRecords, "scene");
+            ValidateRecords(TestClasses, "test");
+            ValidateRecords(EditorEntryPoints, "editor entry point");
+            ValidateStrings(AssemblyNames, "assembly name");
+            ValidateStrings(ScenePaths, "scene path");
+        }
+
+        private static void ValidateRecords<T>(T[] values, string name) where T : class
+        {
+            for (int index = 0; index < values.Length; index++)
+                if (values[index] == null)
+                    throw new InvalidOperationException("inventory " + name + " record must not be null");
+        }
+
+        private static void ValidateStrings(string[] values, string name)
+        {
+            for (int index = 0; index < values.Length; index++)
+                if (values[index] == null)
+                    throw new InvalidOperationException("inventory " + name + " must not be null");
         }
 
         private void AppendFiles(StringBuilder builder)
