@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Mono.Cecil;
 using Mono.Cecil.Pdb;
 using Mono.Cecil.Cil;
 using UnityEditor;
 using UnityEngine;
+
+[assembly: InternalsVisibleTo("WasteCity.EditModeTests")]
 
 namespace WasteCity.Editor.ProjectQuality
 {
@@ -258,7 +261,9 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static Dictionary<string, List<string>> BuildPdbIndex(string root)
         {
-            var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var documents = new List<SourceDocumentInput>();
+            var zeroSequenceTypeNames = new HashSet<string>(DiscoverSourceIdentityTypeNames(), StringComparer.Ordinal);
+            var sequencePointTypeNames = new HashSet<string>(StringComparer.Ordinal);
             string assemblies = Path.Combine(root, "Library", "ScriptAssemblies");
             foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -279,25 +284,53 @@ namespace WasteCity.Editor.ProjectQuality
                 {
                     foreach (TypeDefinition type in AllTypeDefinitions(definition.MainModule.Types))
                     {
-                        string[] paths = type.Methods.Where(method => method.DebugInformation.HasSequencePoints)
+                        string typeName = ToRuntimeFullName(type);
+                        if (!zeroSequenceTypeNames.Contains(typeName)) continue;
+                        string[] urls = type.Methods.Where(method => method.DebugInformation.HasSequencePoints)
                             .SelectMany(method => method.DebugInformation.SequencePoints)
                             .Where(point => point.Document != null)
-                            .Select(point => NormalizeSymbolPath(root, point.Document.Url))
-                            .Where(path => path != null)
-                            .Distinct(StringComparer.Ordinal).ToArray();
-                        if (paths.Length == 0 && type.DeclaringType != null)
-                        {
-                            List<string> declaringPaths;
-                            map.TryGetValue(ToRuntimeFullName(type.DeclaringType), out declaringPaths);
-                            paths = declaringPaths == null ? new string[0] : declaringPaths.ToArray();
-                        }
-                        foreach (string path in paths) AddSourcePath(map, ToRuntimeFullName(type), path);
+                            .Select(point => point.Document.Url).Distinct(StringComparer.Ordinal).ToArray();
+                        if (urls.Length == 0) continue;
+                        sequencePointTypeNames.Add(typeName);
+                        foreach (string url in urls)
+                            documents.Add(new SourceDocumentInput(typeName, url));
                     }
                 }
             }
-            foreach (List<string> paths in map.Values) paths.Sort(StringComparer.Ordinal);
-            AddMonoScriptFallback(map);
-            return map;
+            var fallbacks = new List<SourceFallbackInput>();
+            foreach (string path in AssetDatabase.FindAssets("t:MonoScript", SourceIdentityRoots
+                .Select(rootPath => rootPath.TrimEnd('/')).ToArray())
+                .Select(AssetDatabase.GUIDToAssetPath).OrderBy(path => path, StringComparer.Ordinal))
+            {
+                MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(path);
+                Type type = script == null ? null : script.GetClass();
+                if (type != null && zeroSequenceTypeNames.Contains(type.FullName) &&
+                    !sequencePointTypeNames.Contains(type.FullName))
+                    fallbacks.Add(new SourceFallbackInput(type.FullName, path));
+            }
+            return BuildSourceIndex(root, documents, fallbacks);
+        }
+
+        private static IEnumerable<string> DiscoverSourceIdentityTypeNames()
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Type type in TypeCache.GetTypesDerivedFrom<MonoBehaviour>()
+                .Concat(TypeCache.GetTypesDerivedFrom<ScriptableObject>()))
+            {
+                if (type == null || type.FullName == null || type.Assembly == null) continue;
+                string assemblyName = type.Assembly.GetName().Name;
+                if (assemblyName != null && assemblyName.StartsWith("WasteCity", StringComparison.Ordinal) &&
+                    Array.IndexOf(TestAssemblyNames, assemblyName) < 0)
+                    names.Add(type.FullName);
+            }
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                string assemblyName = assembly.GetName().Name;
+                if (assemblyName == null || !assemblyName.StartsWith("WasteCity", StringComparison.Ordinal)) continue;
+                foreach (Type type in GetLoadableTypes(assembly))
+                    if (type != null && type.FullName != null && ContainsTestMethod(type)) names.Add(type.FullName);
+            }
+            return names;
         }
 
         private static IEnumerable<TypeDefinition> AllTypeDefinitions(IEnumerable<TypeDefinition> types)
@@ -314,7 +347,25 @@ namespace WasteCity.Editor.ProjectQuality
             return type.FullName.Replace('/', '+');
         }
 
-        private static string NormalizeSymbolPath(string root, string documentUrl)
+        internal static Dictionary<string, List<string>> BuildSourceIndexForTests(string root,
+            IEnumerable<SourceDocumentInput> documents, IEnumerable<SourceFallbackInput> fallbacks)
+        {
+            return BuildSourceIndex(root, documents, fallbacks);
+        }
+
+        private static Dictionary<string, List<string>> BuildSourceIndex(string root,
+            IEnumerable<SourceDocumentInput> documents, IEnumerable<SourceFallbackInput> fallbacks)
+        {
+            var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (SourceDocumentInput document in documents)
+                AddSourcePath(map, document.TypeFullName, NormalizeSourcePath(root, document.DocumentPath));
+            foreach (SourceFallbackInput fallback in fallbacks)
+                AddSourcePath(map, fallback.TypeFullName, NormalizeSourcePath(root, fallback.SourcePath));
+            foreach (List<string> paths in map.Values) paths.Sort(StringComparer.Ordinal);
+            return map;
+        }
+
+        private static string NormalizeSourcePath(string root, string documentUrl)
         {
             string fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string fullPath = Path.GetFullPath(Path.IsPathRooted(documentUrl) ? documentUrl : Path.Combine(fullRoot, documentUrl));
@@ -323,7 +374,9 @@ namespace WasteCity.Editor.ProjectQuality
                 throw new InvalidDataException("symbol source is outside project: " + documentUrl);
             string path = fullPath.Substring(prefix.Length).Replace('\\', '/');
             if (!SourceIdentityRoots.Any(rootPath => path.StartsWith(rootPath, StringComparison.Ordinal)))
-                return null;
+                throw new InvalidDataException("symbol source is outside approved roots: " + path);
+            if (!File.Exists(fullPath))
+                throw new InvalidDataException("symbol source does not exist: " + path);
             return path;
         }
 
@@ -334,22 +387,6 @@ namespace WasteCity.Editor.ProjectQuality
             if (!paths.Contains(path)) paths.Add(path);
         }
 
-        private static void AddMonoScriptFallback(Dictionary<string, List<string>> map)
-        {
-            foreach (string root in SourceIdentityRoots)
-            {
-                foreach (string guid in AssetDatabase.FindAssets("t:MonoScript", new[] { root.TrimEnd('/') }))
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(path);
-                    Type type = script == null ? null : script.GetClass();
-                    if (type != null && !map.ContainsKey(type.FullName))
-                        AddSourcePath(map, type.FullName, path.Replace('\\', '/'));
-                }
-            }
-            foreach (List<string> paths in map.Values) paths.Sort(StringComparer.Ordinal);
-        }
-
         private static string ResolvePdb(string name, Dictionary<string, List<string>> map)
         {
             List<string> paths;
@@ -358,6 +395,33 @@ namespace WasteCity.Editor.ProjectQuality
             if (paths.Count != 1)
                 throw new InvalidDataException("ambiguous class source mapping for " + name + ": " + string.Join(", ", paths));
             return paths[0];
+        }
+
+        internal static string ResolveSourcePathForTests(string name, Dictionary<string, List<string>> map)
+        {
+            return ResolvePdb(name, map);
+        }
+
+        internal sealed class SourceDocumentInput
+        {
+            public readonly string TypeFullName;
+            public readonly string DocumentPath;
+            public SourceDocumentInput(string typeFullName, string documentPath)
+            {
+                TypeFullName = typeFullName;
+                DocumentPath = documentPath;
+            }
+        }
+
+        internal sealed class SourceFallbackInput
+        {
+            public readonly string TypeFullName;
+            public readonly string SourcePath;
+            public SourceFallbackInput(string typeFullName, string sourcePath)
+            {
+                TypeFullName = typeFullName;
+                SourcePath = sourcePath;
+            }
         }
 
         private static string ToRelativePath(string root, string path)

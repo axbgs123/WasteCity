@@ -91,6 +91,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Scan_ExcludesTestOnlyComponentHelperFromTypeRecords()
+        {
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+
+            Assert.That(snapshot.TypeRecords.Any(record =>
+                record.FullName == "WasteCity.Tests.RecordingTerrainPresentation3D"), Is.False);
+        }
+
+        [Test]
+        public void SourceIndex_RejectsMissingAndAmbiguousZeroSequenceFallbackCandidates()
+        {
+            WriteFixtureFile("Assets/_Game/Scripts/A.cs", "internal sealed class A { }");
+            WriteFixtureFile("Assets/_Game/Scripts/B.cs", "internal sealed class B { }");
+            const string typeName = "WasteCity.Tests.ZeroSequenceFixture";
+
+            Dictionary<string, List<string>> missing = ProjectQualityScanner.BuildSourceIndexForTests(
+                fixtureRoot, new ProjectQualityScanner.SourceDocumentInput[0],
+                new ProjectQualityScanner.SourceFallbackInput[0]);
+            Assert.That(() => ProjectQualityScanner.ResolveSourcePathForTests(typeName, missing),
+                Throws.TypeOf<InvalidDataException>());
+
+            Dictionary<string, List<string>> ambiguous = ProjectQualityScanner.BuildSourceIndexForTests(
+                fixtureRoot, new ProjectQualityScanner.SourceDocumentInput[0],
+                new[]
+                {
+                    new ProjectQualityScanner.SourceFallbackInput(typeName,
+                        Path.Combine(fixtureRoot, "Assets/_Game/Scripts/B.cs")),
+                    new ProjectQualityScanner.SourceFallbackInput(typeName,
+                        Path.Combine(fixtureRoot, "Assets/_Game/Scripts/A.cs")),
+                });
+            CollectionAssert.AreEqual(new[] { "Assets/_Game/Scripts/A.cs", "Assets/_Game/Scripts/B.cs" },
+                ambiguous[typeName]);
+            Assert.That(() => ProjectQualityScanner.ResolveSourcePathForTests(typeName, ambiguous),
+                Throws.TypeOf<InvalidDataException>());
+        }
+
+        [Test]
+        public void SourceIndex_RejectsOutsideUnapprovedAndMissingSequenceDocuments()
+        {
+            const string typeName = "WasteCity.Tests.SymbolFixture";
+            WriteFixtureFile("Assets/Unapproved/Source.cs", "internal sealed class Source { }");
+
+            Assert.That(() => ProjectQualityScanner.BuildSourceIndexForTests(fixtureRoot,
+                new[] { new ProjectQualityScanner.SourceDocumentInput(typeName, Path.GetTempFileName()) },
+                new ProjectQualityScanner.SourceFallbackInput[0]), Throws.TypeOf<InvalidDataException>());
+            Assert.That(() => ProjectQualityScanner.BuildSourceIndexForTests(fixtureRoot,
+                new[] { new ProjectQualityScanner.SourceDocumentInput(typeName,
+                    Path.Combine(fixtureRoot, "Assets/Unapproved/Source.cs")) },
+                new ProjectQualityScanner.SourceFallbackInput[0]), Throws.TypeOf<InvalidDataException>());
+            Assert.That(() => ProjectQualityScanner.BuildSourceIndexForTests(fixtureRoot,
+                new[] { new ProjectQualityScanner.SourceDocumentInput(typeName,
+                    Path.Combine(fixtureRoot, "Assets/_Game/Scripts/Missing.cs")) },
+                new ProjectQualityScanner.SourceFallbackInput[0]), Throws.TypeOf<InvalidDataException>());
+        }
+
+        [Test]
         public void Scan_RepeatedRunProducesEqualOrderedSnapshot()
         {
             ProjectInventorySnapshot first = ProjectQualityScanner.Scan(ProjectRoot());
@@ -158,10 +214,15 @@ namespace WasteCity.Tests
         [Test]
         public void TestDiscovery_RecognizesEachSupportedMethodAttribute()
         {
-            Assert.That(ContainsTestMethod(typeof(TestAttributeFixture)), Is.True);
-            Assert.That(ContainsTestMethod(typeof(TestCaseAttributeFixture)), Is.True);
-            Assert.That(ContainsTestMethod(typeof(TestCaseSourceAttributeFixture)), Is.True);
-            Assert.That(ContainsTestMethod(typeof(UnityTestAttributeFixture)), Is.True);
+            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
+            string[] expected =
+            {
+                typeof(TestAttributeFixture).FullName,
+                typeof(TestCaseAttributeFixture).FullName,
+                typeof(TestCaseSourceAttributeFixture).FullName,
+                typeof(UnityTestAttributeFixture).FullName,
+            };
+            CollectionAssert.IsSubsetOf(expected, snapshot.TestClasses.Select(record => record.FullName).ToArray());
         }
 
         [Test]
@@ -228,13 +289,6 @@ namespace WasteCity.Tests
                     StringComparer.Ordinal);
         }
 
-        private static bool ContainsTestMethod(Type type)
-        {
-            MethodInfo method = typeof(ProjectQualityScanner).GetMethod("ContainsTestMethod",
-                BindingFlags.NonPublic | BindingFlags.Static);
-            return (bool)method.Invoke(null, new object[] { type });
-        }
-
         private static ProjectInventorySnapshot EmptySnapshot()
         {
             return new ProjectInventorySnapshot
@@ -265,26 +319,19 @@ namespace WasteCity.Tests
             return Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         }
 
-        private sealed class TestAttributeFixture
-        {
-            [Test] public void DiscoversTest() { }
-        }
+    }
 
-        private sealed class TestCaseAttributeFixture
-        {
-            [TestCase(1)] public void DiscoversTestCase(int value) { }
-        }
-
-        private sealed class TestCaseSourceAttributeFixture
-        {
-            private static IEnumerable Cases { get { return new[] { new TestCaseData(1) }; } }
-            [TestCaseSource("Cases")] public void DiscoversTestCaseSource(int value) { }
-        }
-
-        private sealed class UnityTestAttributeFixture
-        {
-            [UnityEngine.TestTools.UnityTest] public IEnumerator DiscoversUnityTest() { yield break; }
-        }
+    public sealed class TestAttributeFixture { [Test] public void DiscoversTest() { } }
+    public sealed class TestCaseAttributeFixture { [TestCase(1)] public void DiscoversTestCase(int value) { } }
+    public sealed class TestCaseSourceAttributeFixture
+    {
+        private static IEnumerable Cases { get { return new[] { new TestCaseData(1) }; } }
+        [TestCaseSource("Cases")] public void DiscoversTestCaseSource(int value) { }
+    }
+    public sealed class UnityTestAttributeFixture
+    {
+        [UnityEngine.TestTools.UnityTest] public IEnumerator DiscoversUnityTest() { yield break; }
+        private static int SourceIdentityAnchor() { return 1; }
     }
 
     public static class FormalBuildTools
