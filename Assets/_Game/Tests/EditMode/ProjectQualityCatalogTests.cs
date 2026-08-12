@@ -46,6 +46,18 @@ namespace WasteCity.Tests
             StringAssert.Contains(ExpectedFragment(caseName), error.Message);
         }
 
+        [TestCase("missing failure summary", "    \"FailureLocationSummary\": \" 先检查建筑定义 \" ,\n", "")]
+        [TestCase("empty failure summary", "\"FailureLocationSummary\": \" 先检查建筑定义 \"", "\"FailureLocationSummary\": \"   \"")]
+        [TestCase("empty primary source globs", "\"PrimarySourceGlobs\": [\"Assets/_Game/Scripts/Building/**\"]", "\"PrimarySourceGlobs\": []")]
+        [TestCase("invalid primary source glob", "Assets/_Game/Scripts/Building/**\"],\n    \"FailureLocationSummary\"", "Assets/_Game/**/Building.cs\"],\n    \"FailureLocationSummary\"")]
+        public void LoadFromJson_RejectsInvalidFailureLocationFields(string caseName, string oldValue, string newValue)
+        {
+            InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+                ProjectQualityCatalogLoader.LoadFromJson(CatalogJson().Replace(oldValue, newValue), "failure-location.json"));
+            StringAssert.Contains("failure-location.json", error.Message);
+            StringAssert.Contains(caseName, error.Message);
+        }
+
         [TestCase("malformed requirement id", "RequirementIds\": [\"DOC-0001\"]", "RequirementIds\": [\"IDEA-01\"]")]
         [TestCase("dangling feature group", "FeatureGroupId\": \"building\"", "FeatureGroupId\": \"missing-feature\"")]
         [TestCase("dangling scene", "SceneId\": \"graybox\"", "SceneId\": \"missing-scene\"")]
@@ -285,6 +297,8 @@ namespace WasteCity.Tests
                    "    \"ScenePaths\": [\"Assets/_Game/Scenes/GrayboxPrototype3D.unity\"],\n" +
                    "    \"RequirementIds\": [\"" + requirementId + "\"],\n" +
                    "    \"HumanDocumentPaths\": [\"Docs/Engineering/project-quality-catalog.json\"],\n" +
+                   "    \"PrimarySourceGlobs\": [\"Assets/_Game/Scripts/Building/**\"],\n" +
+                   "    \"FailureLocationSummary\": \" 先检查建筑定义 \" ,\n" +
                    "    \"MinimumVerification\": \"" + verificationLevel + "\"\n" +
                    "  }],\n" +
                    "  \"ReuseEntries\": [{\n" +

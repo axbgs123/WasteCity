@@ -286,6 +286,8 @@ namespace WasteCity.Editor.ProjectQuality
         public string Id;
         public string ChineseName;
         public string[] SourceGlobs;
+        public string[] PrimarySourceGlobs;
+        public string FailureLocationSummary;
         public string[] TestFileGlobs;
         public string[] ScenePaths;
         public string[] RequirementIds;
@@ -354,6 +356,34 @@ namespace WasteCity.Editor.ProjectQuality
         public ProjectQualityIssueSeverity Severity;
         public string PlainChineseMessage;
         public string Path;
+    }
+
+    [Serializable]
+    public sealed class ProjectFailedTestLocation
+    {
+        public string FullName;
+        public string TestClassFullName;
+        public string FeatureGroupId;
+        public string FailureLocationSummary;
+        public string[] RelatedFiles;
+        public string[] ScenePaths;
+        public string[] RequirementIds;
+        public string RerunFilter;
+        public string OriginalMessage;
+        public string OriginalStack;
+    }
+
+    [Serializable]
+    public sealed class ProjectTestAnalysisReport
+    {
+        public string XmlPath;
+        public int Total;
+        public int Passed;
+        public int Failed;
+        public int Skipped;
+        public bool IsIncomplete;
+        public ProjectQualityIssue[] Issues;
+        public ProjectFailedTestLocation[] Failures;
     }
 
     [Serializable]

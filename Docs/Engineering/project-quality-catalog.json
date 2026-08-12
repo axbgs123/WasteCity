@@ -8,6 +8,11 @@
         "Assets/_Game/Scripts/Core/**",
         "Assets/_Game/Scripts/Content/StableId.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Core/**",
+        "Assets/_Game/Scripts/Content/StableId.cs"
+      ],
+      "FailureLocationSummary": "先检查时钟、会话、资源与稳定标识",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/FoundationTests.cs",
         "Assets/_Game/Tests/EditMode/GameClockAndForesightTests.cs",
@@ -33,6 +38,11 @@
         "Assets/_Game/Scripts/World/**",
         "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/World/**",
+        "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
+      ],
+      "FailureLocationSummary": "先检查地图模型、地形规则和世界投影",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/WorldMapTests.cs",
         "Assets/_Game/Tests/EditMode/CameraFollowModelTests.cs",
@@ -71,6 +81,11 @@
         "Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs",
         "Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/City/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs"
+      ],
+      "FailureLocationSummary": "先检查城市规则、寻路、部署状态和场景接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/CityDeploymentRulesTests.cs",
         "Assets/_Game/Tests/EditMode/CityOperationalTests.cs",
@@ -102,6 +117,11 @@
         "Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Leader/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs"
+      ],
+      "FailureLocationSummary": "先检查领袖状态、控制切换和场景输入接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/LeaderTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs"
@@ -124,6 +144,11 @@
         "Assets/_Game/Scripts/Building/**",
         "Assets/_Game/Scripts/Graybox3D/Building/*.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Building/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/*.cs"
+      ],
+      "FailureLocationSummary": "先检查建筑定义、建造限制、放置会话和场景接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/BuildingGridTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs",
@@ -145,7 +170,8 @@
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0005"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -163,6 +189,11 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/UI/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs"
+      ],
+      "FailureLocationSummary": "先检查焦点、输入优先级、界面组件和真实场景引用",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
@@ -188,6 +219,11 @@
         "Assets/_Game/Scripts/Economy/**",
         "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Economy/**",
+        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
+      ],
+      "FailureLocationSummary": "先检查库存、生产循环、物流网络和建筑接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
@@ -215,6 +251,11 @@
         "Assets/_Game/Scripts/Progression/**",
         "Assets/_Game/Scripts/Narrative/**"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Research/**",
+        "Assets/_Game/Scripts/Population/**"
+      ],
+      "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
@@ -239,6 +280,11 @@
         "Assets/_Game/Scripts/Combat/**",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Combat/**",
+        "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
+      ],
+      "FailureLocationSummary": "先检查战斗规则、路线内容、单位状态和事件接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/BehemothBreedingTests.cs",
         "Assets/_Game/Tests/EditMode/BossEncounterTests.cs",
@@ -276,6 +322,10 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Persistence/**"
+      ],
+      "FailureLocationSummary": "先检查存档格式、迁移步骤和读写边界",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
       ],
@@ -304,6 +354,11 @@
         "Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs",
         "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Presentation/**",
+        "Assets/_Game/Scripts/ArtIntegration3D/**"
+      ],
+      "FailureLocationSummary": "先检查视觉槽、材质接入、投影与相机场景引用",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
         "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
@@ -334,10 +389,17 @@
         "Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectTestResultAnalyzer.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Editor/ProjectQuality/**",
+        "Assets/_Game/Editor/FormalBuildTools.cs",
+        "Assets/_Game/Editor/GrayboxSceneAuthoring.cs"
+      ],
+      "FailureLocationSummary": "先检查编辑工具、场景生成、构建配置和性能边界",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs",
@@ -347,6 +409,7 @@
         "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectTestResultAnalyzerTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
       ],
       "ScenePaths": [
@@ -391,6 +454,12 @@
         "Assets/_Game/Scripts/World/PlaceholderWorldView.cs",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Legacy/**",
+        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "FailureLocationSummary": "先检查冻结二维基线、历史场景和回归约束",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs",
         "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",

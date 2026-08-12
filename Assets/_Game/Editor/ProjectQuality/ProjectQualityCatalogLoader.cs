@@ -96,6 +96,8 @@ namespace WasteCity.Editor.ProjectQuality
                     Id = UniqueId(entry.Id, ids, source, "feature"),
                     ChineseName = HumanText(entry.ChineseName, source, "Chinese name"),
                     SourceGlobs = NormalizeGlobs(RequireArray(entry.SourceGlobs, source, "feature source globs"), source, "source glob"),
+                    PrimarySourceGlobs = NormalizePrimarySourceGlobs(entry.PrimarySourceGlobs, source),
+                    FailureLocationSummary = FailureLocationSummary(entry.FailureLocationSummary, source),
                     TestFileGlobs = NormalizeGlobs(RequireArray(entry.TestFileGlobs, source, "feature test file globs"), source, "test file glob"),
                     ScenePaths = NormalizePaths(RequireArray(entry.ScenePaths, source, "feature scene paths"), source, "scene path"),
                     RequirementIds = NormalizeRequirementIds(RequireArray(entry.RequirementIds, source, "feature requirement IDs"), source),
@@ -235,6 +237,45 @@ namespace WasteCity.Editor.ProjectQuality
                 result[index] = path;
             }
             return result;
+        }
+
+        private static string[] NormalizePrimarySourceGlobs(string[] values, string source)
+        {
+            if (values == null || values.Length == 0)
+                Fail(source, "empty primary source globs");
+            var result = new string[values.Length];
+            for (int index = 0; index < values.Length; index++)
+            {
+                string path = NormalizePath(values[index], source, "invalid primary source glob");
+                int recursive = path.IndexOf("**", StringComparison.Ordinal);
+                if (recursive >= 0 && (recursive != path.Length - 2 || !path.EndsWith("/**", StringComparison.Ordinal)))
+                    Fail(source, "invalid primary source glob: " + path);
+                result[index] = path;
+            }
+            return result;
+        }
+
+        private static string FailureLocationSummary(string value, string source)
+        {
+            if (value == null)
+                Fail(source, "missing failure summary");
+            string summary = value.Trim();
+            if (summary.Length == 0 || CountCjk(summary) == 0)
+                Fail(source, "empty failure summary");
+            if (CountCjk(summary) >= 45)
+                Fail(source, "failure summary must be below 45 Chinese characters");
+            return summary;
+        }
+
+        private static int CountCjk(string value)
+        {
+            int count = 0;
+            for (int index = 0; index < value.Length; index++)
+            {
+                char character = value[index];
+                if (character >= '\u3400' && character <= '\u9fff') count++;
+            }
+            return count;
         }
 
         private static ProjectPathExclusion[] NormalizeExclusions(PathExclusionDto[] values, string source, string label)
@@ -503,6 +544,8 @@ namespace WasteCity.Editor.ProjectQuality
             public string Id;
             public string ChineseName;
             public string[] SourceGlobs;
+            public string[] PrimarySourceGlobs;
+            public string FailureLocationSummary;
             public string[] TestFileGlobs;
             public string[] ScenePaths;
             public string[] RequirementIds;
