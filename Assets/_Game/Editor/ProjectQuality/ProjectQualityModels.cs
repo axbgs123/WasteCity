@@ -363,7 +363,10 @@ namespace WasteCity.Editor.ProjectQuality
     {
         public string FullName;
         public string TestClassFullName;
+        public string TestMethodName;
+        public string TestSourcePath;
         public string FeatureGroupId;
+        public string FeatureGroupChineseName;
         public string FailureLocationSummary;
         public string[] RelatedFiles;
         public string[] ScenePaths;

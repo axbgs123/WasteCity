@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
@@ -198,6 +199,26 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs");
             CollectionAssert.DoesNotContain(FindFeature(catalog, "frozen-2d-regression").TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs");
+
+            string[] expectedFailureLocations =
+            {
+                "foundation-clock|先检查时钟、会话、资源与稳定标识|Assets/_Game/Scripts/Core/**|Assets/_Game/Scripts/Content/StableId.cs",
+                "world-terrain|先检查地图模型、地形规则和世界投影|Assets/_Game/Scripts/World/**|Assets/_Game/Art/FirstPass/Environment/Terrain/**",
+                "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
+                "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
+                "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
+                "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
+                "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
+                "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
+                "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**",
+                "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**",
+                "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
+                "frozen-2d-regression|先检查冻结二维基线、历史场景和回归约束|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs|Assets/_Game/Scenes/FormalPrototype.unity",
+            };
+            CollectionAssert.AreEqual(expectedFailureLocations, catalog.FeatureGroups.Select(feature =>
+                feature.Id + "|" + feature.FailureLocationSummary + "|" +
+                string.Join("|", feature.PrimarySourceGlobs)).ToArray());
         }
 
         private static ProjectFeatureGroup FindFeature(ProjectQualityCatalog catalog, string id)
@@ -217,6 +238,8 @@ namespace WasteCity.Tests
                 ProjectFeatureGroup a = expected.FeatureGroups[index]; ProjectFeatureGroup b = actual.FeatureGroups[index];
                 Assert.That(b.Id, Is.EqualTo(a.Id)); Assert.That(b.ChineseName, Is.EqualTo(a.ChineseName));
                 AssertArraysEqual(a.SourceGlobs, b.SourceGlobs); AssertArraysEqual(a.TestFileGlobs, b.TestFileGlobs);
+                AssertArraysEqual(a.PrimarySourceGlobs, b.PrimarySourceGlobs);
+                Assert.That(b.FailureLocationSummary, Is.EqualTo(a.FailureLocationSummary));
                 AssertArraysEqual(a.ScenePaths, b.ScenePaths); AssertArraysEqual(a.RequirementIds, b.RequirementIds);
                 AssertArraysEqual(a.HumanDocumentPaths, b.HumanDocumentPaths); Assert.That(b.MinimumVerification, Is.EqualTo(a.MinimumVerification));
             }
