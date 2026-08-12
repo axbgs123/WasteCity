@@ -50,6 +50,28 @@
 
 改到运行时、场景、输入、资源加载、渲染、平台设置或构建脚本时，除了编辑器内测试，还要构建 Windows 版本并做独立运行冒烟。只改纯文档或不影响运行时的质量映射时，通常不需要构建，但仍应完成相关自动检查和人工阅读确认。
 
+## 日常 EditMode 与地形深度检查
+
+日常开发完成相关单功能检查后，运行完整 EditMode 回归，但排除地形纹理数组的深度套件。着色器、材质、控制图和场景契约检查仍在日常套件中；只有会反复重建七层 2K 真实纹理数组的 `FirstArtTerrainAssetBuilderTests` 被排除。macOS 示例（先按下方技术附录设置 `UNITY_BIN` 和 `PROJECT_ROOT`）：
+
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testCategory '!TerrainAssetDeep' \
+  -testResults /tmp/wastecity-project-quality/editmode-daily.xml \
+  -logFile /tmp/wastecity-project-quality/editmode-daily.log
+```
+
+地形源 PNG、其导入策略、`FirstArtTerrainAssetBuilder`、生成的纹理数组或其序列化格式发生变化时，必须运行完整地形深度套件；发布候选版本前也必须运行。它不是每次日常修改都要跑的检查：
+
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testCategory 'TerrainAssetDeep' \
+  -testResults /tmp/wastecity-project-quality/terrain-asset-deep.xml \
+  -logFile /tmp/wastecity-project-quality/terrain-asset-deep.log
+```
+
 ## 给开发者/AI 的命令入口
 
 <details>

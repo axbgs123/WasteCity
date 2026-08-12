@@ -5,12 +5,33 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using NUnit.Framework;
+using UnityEngine;
 using WasteCity.Editor.ProjectQuality;
 
 namespace WasteCity.Tests
 {
     public sealed class ProjectDocumentationGeneratorTests
     {
+        [Test]
+        public void TerrainAssetDeepSuite_UsesExactCategoryAndDocumentsDailyAndDeepCommands()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+            string fixture = File.ReadAllText(Path.Combine(root,
+                "Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs"), Encoding.UTF8);
+            string guide = File.ReadAllText(Path.Combine(root,
+                "Docs/08-Testing-and-Bug-Location-Guide-ZH.md"), Encoding.UTF8);
+
+            StringAssert.Contains("[Category(\"TerrainAssetDeep\")]", fixture);
+            StringAssert.Contains("-testCategory '!TerrainAssetDeep'", guide);
+            StringAssert.Contains("-testCategory 'TerrainAssetDeep'", guide);
+            StringAssert.Contains("地形源 PNG", guide);
+            StringAssert.Contains("导入策略", guide);
+            StringAssert.Contains("FirstArtTerrainAssetBuilder", guide);
+            StringAssert.Contains("生成的纹理数组", guide);
+            StringAssert.Contains("序列化格式", guide);
+            StringAssert.Contains("发布候选版本", guide);
+        }
+
         [Test]
         public void RenderStructuralDocuments_SameInputIsByteForByteStable()
         {

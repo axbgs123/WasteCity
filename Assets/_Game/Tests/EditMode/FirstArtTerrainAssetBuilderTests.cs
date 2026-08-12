@@ -14,6 +14,7 @@ using WasteCity.Editor;
 
 namespace WasteCity.Tests
 {
+    [Category("TerrainAssetDeep")]
     public sealed class FirstArtTerrainAssetBuilderTests
     {
         private const string TerrainRoot =
