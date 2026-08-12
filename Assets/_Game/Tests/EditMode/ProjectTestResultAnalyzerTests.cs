@@ -73,6 +73,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Analyze_ExpandsExistingNonCSharpPrimaryFilesInOrdinalOrder()
+        {
+            ProjectQualityCatalog catalog = FixtureCatalog();
+            catalog.FeatureGroups[0].PrimarySourceGlobs = new[]
+            {
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/*.asset",
+            };
+            ProjectTestAnalysisReport report = ProjectTestResultAnalyzer.Analyze(WriteNUnitXml(
+                "WasteCity.Tests.AlphaTests.Fails", "消息", "stack", "WasteCity.Tests.AlphaTests"),
+                catalog, FixtureSnapshot());
+
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/AlphaTests.cs",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_BaseColor.asset",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Height.asset",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Mask.asset",
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Generated/TA_Terrain_Normal.asset",
+                "Assets/_Game/Scripts/Reusable.cs",
+                "Assets/_Game/Scenes/Feature.unity",
+            }, report.Failures.Single().RelatedFiles);
+        }
+
+        [Test]
+        public void Analyze_CommittedWorldTerrainIncludesEveryExistingNonMetaTerrainPrimaryFile()
+        {
+            ProjectInventorySnapshot snapshot = CurrentSnapshot();
+            ProjectTestAnalysisReport report = ProjectTestResultAnalyzer.Analyze(WriteNUnitXml(
+                "WasteCity.Tests.FirstArtTerrainProfileTests.Fails", "消息", "stack",
+                "WasteCity.Tests.FirstArtTerrainProfileTests"), CurrentCatalog(), snapshot);
+            ProjectFailedTestLocation failure = report.Failures.Single();
+            string root = Path.Combine(ProjectRoot(), "Assets/_Game/Art/FirstPass/Environment/Terrain");
+            string[] expectedTerrain = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                .Where(path => !path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+                .Select(path => RelativeProjectPath(path)).OrderBy(path => path, StringComparer.Ordinal).ToArray();
+            string[] actualTerrain = failure.RelatedFiles.Where(path => path.StartsWith(
+                "Assets/_Game/Art/FirstPass/Environment/Terrain/", StringComparison.Ordinal)).ToArray();
+
+            CollectionAssert.AreEqual(expectedTerrain, actualTerrain);
+            Assert.That(actualTerrain.All(path => File.Exists(Path.Combine(ProjectRoot(), path))), Is.True);
+            Assert.That(failure.RelatedFiles[0], Is.EqualTo(
+                "Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs"));
+        }
+
+        [Test]
+        public void Analyze_RejectsOutOfRepositoryPrimarySourceGlob()
+        {
+            ProjectQualityCatalog catalog = FixtureCatalog();
+            catalog.FeatureGroups[0].PrimarySourceGlobs = new[] { "../outside/**" };
+
+            Assert.That(() => ProjectTestResultAnalyzer.Analyze(WriteNUnitXml(
+                "WasteCity.Tests.AlphaTests.Fails", "消息", "stack", "WasteCity.Tests.AlphaTests"),
+                catalog, FixtureSnapshot()), Throws.TypeOf<InvalidDataException>());
+        }
+
+        [Test]
         public void Analyze_UnknownClassRetainsItsExactTestSourceAndDoesNotReturnGlobs()
         {
             ProjectInventorySnapshot snapshot = FixtureSnapshot();
@@ -258,6 +314,26 @@ namespace WasteCity.Tests
             Assert.That(Count(text, "原始堆栈"), Is.EqualTo(2));
         }
 
+        [Test]
+        public void RenderPlainChinese_RendersKnownAndUnknownMultilineBlocksExactly()
+        {
+            ProjectInventorySnapshot snapshot = FixtureSnapshotWithClass("WasteCity.Tests.UnknownTests");
+            string xml = "<test-run result=\"Failed\"><test-suite>" +
+                "<test-case fullname=\"WasteCity.Tests.AlphaTests.Alpha\" classname=\"WasteCity.Tests.AlphaTests\" methodname=\"Alpha\" result=\"Failed\">" +
+                "<failure><message>known &amp; entity\nknown message line</message><stack-trace>known stack one\nknown stack two</stack-trace></failure></test-case>" +
+                "<test-case fullname=\"WasteCity.Tests.UnknownTests.Zeta\" classname=\"WasteCity.Tests.UnknownTests\" methodname=\"Zeta\" result=\"Failed\">" +
+                "<failure><message>unknown &lt; entity\nunknown message line</message><stack-trace>unknown stack one\nunknown stack two</stack-trace></failure></test-case>" +
+                "</test-suite></test-run>";
+
+            string text = ProjectTestResultAnalyzer.RenderPlainChinese(ProjectTestResultAnalyzer.Analyze(
+                WriteXml(xml), FixtureCatalog(), snapshot));
+
+            Assert.That(text, Is.EqualTo(
+                "测试结果摘要\n- 总数：2；通过：0；失败：2；跳过：0。\n" +
+                "- PQTEST001：失败测试未归类：WasteCity.Tests.UnknownTests.Zeta\n" +
+                KnownRenderedBlock() + UnknownRenderedBlock()));
+        }
+
         private string WriteNUnitXml(string fullName, string message, string stack, string className = null)
         {
             return WriteXml("<test-run result=\"Failed\" total=\"1\" failed=\"1\">" +
@@ -293,6 +369,32 @@ namespace WasteCity.Tests
         private static string ProjectRoot()
         {
             return Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+        }
+
+        private static string RelativeProjectPath(string absolutePath)
+        {
+            return Path.GetFullPath(absolutePath).Substring(ProjectRoot().Length)
+                .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Replace('\\', '/');
+        }
+
+        private static string KnownRenderedBlock()
+        {
+            return "问题区域\n- 功能甲\n失败位置\n- Assets/_Game/Tests/EditMode/AlphaTests.cs：WasteCity.Tests.AlphaTests.Alpha\n" +
+                "失败测试\n- WasteCity.Tests.AlphaTests.Alpha\n优先检查\n- 先检查第一项；仅作为排查起点，尚待证据确认。\n" +
+                "相关文件\n- Assets/_Game/Tests/EditMode/AlphaTests.cs\n- Assets/_Game/Scripts/First/A.cs\n" +
+                "- Assets/_Game/Scripts/First/Z.cs\n- Assets/_Game/Scripts/Second/Only.cs\n- Assets/_Game/Scripts/Reusable.cs\n" +
+                "- Assets/_Game/Scenes/Feature.unity\n相关场景\n- Assets/_Game/Scenes/Feature.unity\n相关需求\n- DOC-0001\n" +
+                "建议复跑\n- -testFilter 'WasteCity.Tests.AlphaTests'\n原始错误\nknown & entity\nknown message line\n" +
+                "原始堆栈\nknown stack one\nknown stack two\n";
+        }
+
+        private static string UnknownRenderedBlock()
+        {
+            return "问题区域\n- 未归类\n失败位置\n- Assets/_Game/Tests/EditMode/UnknownTests.cs：WasteCity.Tests.UnknownTests.Zeta\n" +
+                "失败测试\n- WasteCity.Tests.UnknownTests.Zeta\n优先检查\n- 没有目录映射，先核对测试类和功能目录；仅作为排查起点，尚待证据确认。\n" +
+                "相关文件\n- Assets/_Game/Tests/EditMode/UnknownTests.cs\n相关场景\n- 无。\n相关需求\n- 无。\n" +
+                "建议复跑\n- -testFilter 'WasteCity.Tests.UnknownTests'\n原始错误\nunknown < entity\nunknown message line\n" +
+                "原始堆栈\nunknown stack one\nunknown stack two\n";
         }
 
         private static ProjectQualityCatalog FixtureCatalog()

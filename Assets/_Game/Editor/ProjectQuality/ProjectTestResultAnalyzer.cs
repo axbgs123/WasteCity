@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
+using UnityEngine;
 
 namespace WasteCity.Editor.ProjectQuality
 {
@@ -167,7 +168,8 @@ namespace WasteCity.Editor.ProjectQuality
                     !string.IsNullOrWhiteSpace(record.Path)).ToArray();
             foreach (string glob in Values(feature.PrimarySourceGlobs))
                 foreach (string path in sourceFiles.Where(record => PathMatchesGlob(record.Path, glob))
-                    .Select(record => record.Path).OrderBy(path => path, StringComparer.Ordinal))
+                    .Select(record => record.Path).Concat(ExistingProjectFiles(glob))
+                    .Distinct(StringComparer.Ordinal).OrderBy(path => path, StringComparer.Ordinal))
                     AddExact(files, seen, path);
 
             var exactPaths = new HashSet<string>(sourceFiles.Select(record => record.Path), StringComparer.Ordinal);
@@ -292,6 +294,46 @@ namespace WasteCity.Editor.ProjectQuality
                 .Replace("\\*\\*", ".*").Replace("\\*", "[^/]*") + "$";
             return System.Text.RegularExpressions.Regex.IsMatch(path.Replace('\\', '/'), pattern,
                 System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        }
+
+        private static IEnumerable<string> ExistingProjectFiles(string glob)
+        {
+            string normalizedGlob = ValidatePrimaryGlob(glob);
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, ".."))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string firstSegment = normalizedGlob.Substring(0, normalizedGlob.IndexOf('/'));
+            string searchRoot = Path.Combine(root, firstSegment);
+            if (!Directory.Exists(searchRoot)) return new string[0];
+
+            var matches = new List<string>();
+            foreach (string path in Directory.EnumerateFiles(searchRoot, "*", SearchOption.AllDirectories))
+            {
+                if (path.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) continue;
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0) continue;
+                string fullPath = Path.GetFullPath(path);
+                if (!fullPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+                string relative = fullPath.Substring(root.Length + 1).Replace('\\', '/');
+                if (PathMatchesGlob(relative, normalizedGlob)) matches.Add(relative);
+            }
+            return matches;
+        }
+
+        private static string ValidatePrimaryGlob(string glob)
+        {
+            if (string.IsNullOrWhiteSpace(glob))
+                throw new InvalidDataException("主源码 glob 无效");
+            string value = glob.Trim().Replace('\\', '/');
+            if (Path.IsPathRooted(value) || value.IndexOf("://", StringComparison.Ordinal) >= 0 ||
+                value.IndexOf("..", StringComparison.Ordinal) >= 0 || !value.Contains("/"))
+                throw new InvalidDataException("主源码 glob 必须是仓库内相对路径：" + glob);
+            int recursive = value.IndexOf("**", StringComparison.Ordinal);
+            if (recursive >= 0 && (recursive != value.Length - 2 || !value.EndsWith("/**", StringComparison.Ordinal)))
+                throw new InvalidDataException("主源码 glob 无效：" + glob);
+            string firstSegment = value.Substring(0, value.IndexOf('/'));
+            if (firstSegment.Length == 0 || firstSegment.IndexOf('*') >= 0 || firstSegment == ".")
+                throw new InvalidDataException("主源码 glob 根目录无效：" + glob);
+            return value;
         }
 
         private static bool TypeMatches(string fullName, string expected)
