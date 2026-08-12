@@ -126,12 +126,13 @@ namespace WasteCity.Tests
         [Test]
         public void AnalyzeTestResults_RejectsReparsePointAncestorsWithoutWritingProtectedRoots()
         {
+            RequireNativeSymlinkSupport();
             string results = Write("result.xml", StandardNUnitXml("Passed", 1, 1, 0, 0));
             Environment.SetEnvironmentVariable("WASTECITY_QUALITY_TEST_RESULTS", results);
             foreach (string protectedRoot in new[] { "Assets", "Packages", "ProjectSettings" })
             {
                 string link = Path.Combine(fixtureDirectory, "link-" + protectedRoot);
-                if (CreateSymbolicLink(Path.Combine(ProjectRoot(), protectedRoot), link) != 0)
+                if (CreateNativeSymbolicLink(Path.Combine(ProjectRoot(), protectedRoot), link) != 0)
                     Assert.Ignore("symbolic links are unavailable on this platform");
                 string target = Path.Combine(link, "quality-analysis-" + Guid.NewGuid().ToString("N") + ".txt");
                 Dictionary<string, string> before = HashRepositoryFiles(ProjectRoot());
@@ -148,6 +149,28 @@ namespace WasteCity.Tests
                 }
                 CollectionAssert.IsEmpty(ChangedPaths(before, HashRepositoryFiles(ProjectRoot())));
             }
+        }
+
+        [Test]
+        public void SymlinkFixture_HasWindowsGateBeforeNativeInterop()
+        {
+            string source = File.ReadAllText(Path.Combine(ProjectRoot(),
+                "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs"));
+            const string signature = "private static void RequireNativeSymlinkSupport()";
+            int stringLiteral = source.IndexOf(signature, StringComparison.Ordinal);
+            int declaration = source.IndexOf(signature, stringLiteral + signature.Length, StringComparison.Ordinal);
+            Assert.That(declaration, Is.GreaterThanOrEqualTo(0));
+            string body = source.Substring(declaration);
+            int windows = body.IndexOf("RuntimeInformation.IsOSPlatform(OSPlatform.Windows)", StringComparison.Ordinal);
+            int ignored = body.IndexOf("Assert.Ignore", StringComparison.Ordinal);
+            Assert.That(windows, Is.GreaterThanOrEqualTo(0));
+            Assert.That(ignored, Is.GreaterThan(windows));
+            int fixture = source.IndexOf("public void AnalyzeTestResults_RejectsReparsePointAncestorsWithoutWritingProtectedRoots()",
+                StringComparison.Ordinal);
+            int gate = source.IndexOf("RequireNativeSymlinkSupport();", fixture, StringComparison.Ordinal);
+            int native = source.IndexOf("CreateNativeSymbolicLink(", gate, StringComparison.Ordinal);
+            Assert.That(gate, Is.GreaterThan(fixture));
+            Assert.That(native, Is.GreaterThan(gate));
         }
 
         [Test]
@@ -359,6 +382,32 @@ namespace WasteCity.Tests
         private static string EscapeJson(string value)
         {
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        private static void RequireNativeSymlinkSupport()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                Assert.Ignore("libc.symlink is not available on Windows");
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && !RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                Assert.Ignore("no supported native symbolic-link API is available on this platform");
+        }
+
+        private static int CreateNativeSymbolicLink(string target, string linkPath)
+        {
+            try
+            {
+                return CreateSymbolicLink(target, linkPath);
+            }
+            catch (DllNotFoundException)
+            {
+                Assert.Ignore("libc symbolic-link API is unavailable on this platform");
+                return -1;
+            }
+            catch (EntryPointNotFoundException)
+            {
+                Assert.Ignore("libc symbolic-link entry point is unavailable on this platform");
+                return -1;
+            }
         }
 
         [DllImport("libc", EntryPoint = "symlink", SetLastError = true)]
