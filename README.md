@@ -39,8 +39,7 @@ git status
 
 当前自动化与构建基线（`8ce573a`）：
 
-- EditMode：`492/492`；
-- PlayMode：`58/58`；
+- 最新的 EditMode、PlayMode、编译、构建和人工试玩状态见[最新验证快照](Docs/Generated/Latest-Verification-ZH.md)；这里不手工维护会过期的测试数量。
 - Unity 无界面编译：0 错误；
 - 默认 3D Windows 构建和显式 2D 回归构建均成功，两个产物均为 `PE32+ executable (GUI) x86-64`；
 - 存档 schema：`30`；首个 3D 基础阶段仍不读写正式存档；
@@ -73,6 +72,65 @@ git status
 4. `Docs/04-Minimum-Releasable-Version-Plan-ZH.md`：历史 MRV；
 5. `Docs/02-Demo-Implementation-Plan-ZH.md`：历史 Demo 实施计划；
 6. `Docs/03-Legacy-Progress-Notes-ZH.md`：早期记录。
+
+## 项目质量与复用入口
+
+- [用户反馈与变更控制](Docs/06-User-Feedback-and-Change-Control-ZH.md)：确认批准状态和人工验收结论；
+- [项目使用与开发入门](Docs/07-Project-Use-and-Development-Guide-ZH.md)：从默认场景和基本操作开始；
+- [测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)：按功能选择测试，阅读失败定位；
+- [可复用项目目录](Docs/09-Reusable-Project-Catalog-ZH.md)：选择已有能力时先看用途和边界；
+- [项目自动清单](Docs/Generated/Project-Inventory-ZH.md)、[测试自动清单](Docs/Generated/Test-Inventory-ZH.md)：当前文件、场景、组件与测试入口；
+- [最新验证快照](Docs/Generated/Latest-Verification-ZH.md)、[文档关注提醒](Docs/Generated/Documentation-Attention-ZH.md)：最近证据和需要人工检查的文档提醒。
+
+## 受控文档更新流程
+
+完成一次有仓库改动的审查时，先在交付说明写明已经确认的比较基线和审查范围。`TASK_PATHS` 只写本任务已批准的精确路径；不要用全仓库 `git diff`，也不要把用户工作区里所有未提交内容当成本次改动。
+
+### A. 已提交审查
+
+当只审查已经提交的范围时，比较明确基线到 `HEAD`。这不会收集 index、工作区或未跟踪文件：
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+REVIEW_BASE=<已明确的基线提交>
+TASK_PATHS=("精确路径1" "精确路径2")
+CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
+mkdir -p /tmp/wastecity-project-quality
+git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}" > "$CHANGED_PATHS"
+```
+
+### B. 提交前正常开发
+
+完成门通常在提交前运行。对同一份 `TASK_PATHS`，必须合并四类来源：基线后的已提交改动、index、已跟踪工作区改动和未跟踪文件。这样能收集本任务尚未提交的内容，却不会无差别收集用户的无关脏改：
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+REVIEW_BASE=<已明确的基线提交>
+TASK_PATHS=("精确路径1" "精确路径2")
+CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
+mkdir -p /tmp/wastecity-project-quality
+{
+  git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}"
+  git diff --cached --name-only -- "${TASK_PATHS[@]}"
+  git diff --name-only -- "${TASK_PATHS[@]}"
+  git ls-files --others --exclude-standard -- "${TASK_PATHS[@]}"
+} | LC_ALL=C sort -u > "$CHANGED_PATHS"
+```
+
+确认 `CHANGED_PATHS` 只包含批准范围后，用它生成和验证：
+
+```sh
+WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
+  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.GenerateDocumentation
+WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
+  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation
+```
+
+其中 `UNITY_BIN` 使用本机 Unity `2022.3.62f1` 的可执行文件。生成前输入清单只用于本轮文档关注提醒，不等于生成后最终暂存清单；步骤 9 仍要单独核对最终精确暂存清单和受保护文件。交付说明必须记录 `REVIEW_BASE`、`TASK_PATHS` 和 `CHANGED_PATHS` 所用清单，方便之后复查。只有用户明确确认“本次没有仓库变更”时，才可先创建空的 UTF-8 文件再运行上述命令；缺少 `WASTECITY_QUALITY_CHANGED_PATHS` 不是普通完成路径。生成和验证只更新或检查受控技术附录，不会替代人工试玩、审批或验收。
+
+上面的命令块仅适用于 macOS/Linux shell。Windows 请在 PowerShell 中用同一份精确路径集合分别运行四类 Git 查询，并用 `Sort-Object -Unique | Set-Content -Encoding utf8` 合并为清单；随后按[测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)的 Windows 入口运行 Unity，不要把 Bash 命令直接当成 Windows 通用命令。
 
 ## 美术替换约定
 

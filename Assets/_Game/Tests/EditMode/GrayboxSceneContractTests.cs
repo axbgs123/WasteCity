@@ -251,8 +251,23 @@ namespace WasteCity.Tests
             Assert.That(fixture, Is.Not.Null);
             Assert.That(fixture.boolValue, Is.True);
 
-            Assert.That(city.transform.position.x, Is.EqualTo(-8f));
-            Assert.That(city.transform.position.z, Is.EqualTo(-5f));
+            Assert.That(city.transform.position.x, Is.EqualTo(-9f));
+            Assert.That(city.transform.position.y, Is.EqualTo(.5f));
+            Assert.That(city.transform.position.z, Is.EqualTo(-4f));
+            var coordinates = new PlanarCoordinateMapper3D(
+                GrayboxSceneBootstrap.WorldWidth,
+                GrayboxSceneBootstrap.WorldHeight);
+            Assert.That(
+                coordinates.TryWorldToCell(
+                    city.transform.position,
+                    out int cityX,
+                    out int cityY),
+                Is.True);
+            Assert.That((cityX, cityY), Is.EqualTo((23, 20)));
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
+            Assert.That(
+                CityDeploymentRules.Validate(world, cityX, cityY),
+                Is.EqualTo(CityDeploymentFailure.None));
             BoxCollider cityCollider = city.GetComponent<BoxCollider>();
             Assert.That(cityCollider, Is.Not.Null);
             Assert.That(
@@ -286,6 +301,30 @@ namespace WasteCity.Tests
                 scenes[1].path,
                 Is.EqualTo(
                     "Assets/_Game/Scenes/FormalPrototype.unity"));
+        }
+
+        [Test]
+        public void SceneAuthoring_UsesApprovedSparseLayoutFactory()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxSceneAuthoring.cs"));
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.CreateDefault()",
+                source);
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.ToExpandedX(7)",
+                source);
+            StringAssert.Contains(
+                "GrayboxWorldLayout3D.ToExpandedY(8)",
+                source);
+            string compact = source.Replace("\r", string.Empty)
+                .Replace("\n", string.Empty)
+                .Replace(" ", string.Empty);
+            StringAssert.DoesNotContain(
+                "newWorldMapModel(GrayboxSceneBootstrap.WorldWidth",
+                compact);
         }
 
         [TestCase("GrayboxSceneAuthoring.cs")]

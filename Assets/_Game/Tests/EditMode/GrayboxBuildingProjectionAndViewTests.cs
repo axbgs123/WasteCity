@@ -683,6 +683,65 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void WorldView_ExpandedGroundGridAlignsCornerCellCenters()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(
+                    GrayboxWorldLayout3D.WorldWidth,
+                    GrayboxWorldLayout3D.WorldHeight),
+                CityMode.Fortress);
+            GrayboxVisualSlot ground = Slot(
+                fixture.Presentation,
+                "building.grid.ground");
+            Mesh gridMesh = ground.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(gridMesh.bounds.size.x, Is.GreaterThan(64f));
+            Assert.That(gridMesh.bounds.size.z, Is.GreaterThan(48f));
+
+            var mapper = new PlanarCoordinateMapper3D(64, 48);
+            var corners = new[]
+            {
+                new Vector2Int(0, 0),
+                new Vector2Int(63, 47)
+            };
+            foreach (Vector2Int corner in corners)
+            {
+                Assert.That(
+                    mapper.TryCellToWorld(
+                        corner.x,
+                        corner.y,
+                        0f,
+                        out Vector3 expected),
+                    Is.True);
+                var hit = new BuildingSurfaceHit(
+                    true,
+                    BuildingSite.Ground,
+                    corner.x,
+                    corner.y,
+                    expected,
+                    "外城");
+                fixture.Presentation.ShowPreview(
+                    BuildingCatalog.Wall,
+                    hit,
+                    BuildingOrientation.North,
+                    default);
+                GrayboxVisualSlot preview = Slot(
+                    fixture.Presentation,
+                    "building.preview.core.building.wall");
+                Assert.That(
+                    preview.transform.position,
+                    Is.EqualTo(expected + Vector3.up * .06f));
+            }
+
+            Assert.That(
+                fixture.Presentation.InfrastructureRendererCount,
+                Is.LessThanOrEqualTo(8));
+            Assert.That(
+                fixture.Presentation.transform.Find("infrastructure")
+                    .GetComponentsInChildren<Transform>(true).Length,
+                Is.LessThan(20));
+        }
+
+        [Test]
         public void WorldView_ExplicitReconfigureReplacesOnlyOwnedVisuals()
         {
             WorldFixture fixture = CreateWorldFixture();
@@ -1207,16 +1266,16 @@ namespace WasteCity.Tests
 
         [TestCase(
             ResourceIds.Iron,
-            19,
-            15,
-            "world.resource-node.19.15",
+            35,
+            27,
+            "world.resource-node.35.27",
             3f,
             3f)]
         [TestCase(
             ResourceIds.EnergyCrystal,
-            18,
-            14,
-            "world.resource-node.18.14",
+            34,
+            26,
+            "world.resource-node.34.26",
             2f,
             2f)]
         public void
@@ -1228,14 +1287,19 @@ namespace WasteCity.Tests
                 float expectedHighlightX,
                 float expectedHighlightZ)
         {
-            WorldCell[,] cells = OpenCells();
+            WorldCell[,] cells = OpenCells(
+                GrayboxWorldLayout3D.WorldWidth,
+                GrayboxWorldLayout3D.WorldHeight);
             cells[nodeX, nodeY] = Cell(resourceId);
             WorldFixture fixture = CreateWorldFixture(
                 cells,
                 CityMode.Fortress,
                 true);
             fixture.Interaction.Select(BuildingCatalog.MiningStation);
-            PositionCameraAtCell(fixture, 18, 14);
+            PositionCameraAtCell(
+                fixture,
+                GrayboxWorldLayout3D.ToExpandedX(18),
+                GrayboxWorldLayout3D.ToExpandedY(14));
 
             fixture.Placement.UpdatePointer(ScreenCenter);
 
@@ -1847,7 +1911,12 @@ namespace WasteCity.Tests
 
         private static WorldCell[,] OpenCells()
         {
-            var result = new WorldCell[32, 24];
+            return OpenCells(32, 24);
+        }
+
+        private static WorldCell[,] OpenCells(int width, int height)
+        {
+            var result = new WorldCell[width, height];
             for (var x = 0; x < result.GetLength(0); x++)
             for (var y = 0; y < result.GetLength(1); y++)
                 result[x, y] = Cell();

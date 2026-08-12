@@ -12,8 +12,10 @@ using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using WasteCity.ArtIntegration3D;
+using WasteCity.City;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.World;
 
 namespace WasteCity.Editor
 {
@@ -50,7 +52,7 @@ namespace WasteCity.Editor
             "9263e65e9f2694421b9fbdb96b3f49a3";
         private const string TerrainLightName =
             "FirstArtTerrainDirectionalLight";
-        private const float TerrainLightIntensity = 1.25f;
+        private const float TerrainLightIntensity = .90f;
         private const float TerrainLightAngleTolerance = .01f;
 
         private static readonly Color TerrainLightColor =
@@ -167,6 +169,7 @@ namespace WasteCity.Editor
                 scene = CreateFoundationScene(pipeline, material);
             }
             EnsureBuildingContract(scene, material);
+            EnsurePlayableInitialDeployment(scene);
             if (!hasExistingScene)
             {
                 EnsureFirstArtTerrainContract(
@@ -1426,8 +1429,8 @@ namespace WasteCity.Editor
                 GrayboxSceneBootstrap.WorldWidth,
                 GrayboxSceneBootstrap.WorldHeight);
             coordinates.TryCellToWorld(
-                8,
-                7,
+                GrayboxWorldLayout3D.ToExpandedX(7),
+                GrayboxWorldLayout3D.ToExpandedY(8),
                 .5f,
                 out Vector3 cityPosition);
             cityTransform.position = cityPosition;
@@ -1460,6 +1463,59 @@ namespace WasteCity.Editor
                     GrayboxMobileCityController3D>();
             city.Configure(worldView, body, bodyCollider);
             return city;
+        }
+
+        private static void EnsurePlayableInitialDeployment(Scene scene)
+        {
+            GrayboxMobileCityController3D city =
+                RequireSingle<GrayboxMobileCityController3D>(scene);
+            var coordinates = new PlanarCoordinateMapper3D(
+                GrayboxSceneBootstrap.WorldWidth,
+                GrayboxSceneBootstrap.WorldHeight);
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
+            if (coordinates.TryWorldToCell(
+                    city.transform.position,
+                    out int currentX,
+                    out int currentY) &&
+                CityDeploymentRules.Validate(
+                    world,
+                    currentX,
+                    currentY) == CityDeploymentFailure.None)
+            {
+                return;
+            }
+
+            const int approvedLegacyX = 7;
+            const int approvedLegacyY = 8;
+            int approvedX =
+                GrayboxWorldLayout3D.ToExpandedX(approvedLegacyX);
+            int approvedY =
+                GrayboxWorldLayout3D.ToExpandedY(approvedLegacyY);
+            if (CityDeploymentRules.Validate(
+                    world,
+                    approvedX,
+                    approvedY) != CityDeploymentFailure.None ||
+                !coordinates.TryCellToWorld(
+                    approvedX,
+                    approvedY,
+                    city.transform.position.y,
+                    out Vector3 approvedPosition))
+            {
+                throw new InvalidOperationException(
+                    "The approved initial deployment cell is invalid for " +
+                    "the serialized graybox seed.");
+            }
+
+            Vector3 delta = approvedPosition - city.transform.position;
+            city.transform.position = approvedPosition;
+            GrayboxLeaderController3D leader =
+                RequireSingle<GrayboxLeaderController3D>(scene);
+            leader.transform.position += delta;
+            Transform cameraRig = RequireChild(
+                RequireRoot(scene, "GrayboxPrototype3D").transform,
+                "CameraRig");
+            cameraRig.position += new Vector3(delta.x, 0f, delta.z);
+            EditorSceneManager.MarkSceneDirty(scene);
         }
 
         private static GrayboxLeaderController3D CreateLeader(

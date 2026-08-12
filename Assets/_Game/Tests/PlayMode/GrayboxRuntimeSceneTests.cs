@@ -130,8 +130,8 @@ namespace WasteCity.Tests
 
             Assert.That(bootstrap, Is.Not.Null);
             Assert.That(bootstrap.IsInitialized, Is.True);
-            Assert.That(worldView.Model.Width, Is.EqualTo(32));
-            Assert.That(worldView.Model.Height, Is.EqualTo(24));
+            Assert.That(worldView.Model.Width, Is.EqualTo(64));
+            Assert.That(worldView.Model.Height, Is.EqualTo(48));
             Assert.That(
                 GraphicsSettings.currentRenderPipeline,
                 Is.TypeOf<UniversalRenderPipelineAsset>());

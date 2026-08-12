@@ -1,0 +1,1218 @@
+{
+  "SchemaVersion": 1,
+  "FeatureGroups": [
+    {
+      "Id": "foundation-clock",
+      "ChineseName": "基础时钟与会话",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Core/**",
+        "Assets/_Game/Scripts/Content/StableId.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Core/**",
+        "Assets/_Game/Scripts/Content/StableId.cs"
+      ],
+      "FailureLocationSummary": "先检查时钟、会话、资源与稳定标识",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/FoundationTests.cs",
+        "Assets/_Game/Tests/EditMode/GameClockAndForesightTests.cs",
+        "Assets/_Game/Tests/EditMode/GameSessionStateTests.cs",
+        "Assets/_Game/Tests/EditMode/GameSpeedTests.cs",
+        "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "world-terrain",
+      "ChineseName": "世界地图与地形",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/World/**",
+        "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/World/**",
+        "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
+      ],
+      "FailureLocationSummary": "先检查地图模型、地形规则和世界投影",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/WorldMapTests.cs",
+        "Assets/_Game/Tests/EditMode/CameraFollowModelTests.cs",
+        "Assets/_Game/Tests/EditMode/ConsciousnessNetworkTests.cs",
+        "Assets/_Game/Tests/EditMode/RescueSiteTests.cs",
+        "Assets/_Game/Tests/EditMode/ScoutDroneTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainMeshTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs",
+        "Assets/_Game/Tests/PlayMode/FirstArtTerrainRuntimeSceneTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "Performance"
+    },
+    {
+      "Id": "city-navigation-deployment",
+      "ChineseName": "城市导航与部署",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/City/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/City/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs"
+      ],
+      "FailureLocationSummary": "先检查城市规则、寻路、部署状态和场景接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/CityDeploymentRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/CityOperationalTests.cs",
+        "Assets/_Game/Tests/EditMode/CityPathfinderTests.cs",
+        "Assets/_Game/Tests/EditMode/CityTerrainRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/DeploymentAndHarvestTests.cs",
+        "Assets/_Game/Tests/EditMode/DirectControlRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxMobileCityController3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/PlanarCoordinateMapper3DTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "leader-direct-control",
+      "ChineseName": "领袖直接控制",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Leader/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Leader/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs"
+      ],
+      "FailureLocationSummary": "先检查领袖状态、控制切换和场景输入接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/LeaderTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "building-construction-evacuation",
+      "ChineseName": "建筑建造与疏散",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Building/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/*.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Building/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/*.cs"
+      ],
+      "FailureLocationSummary": "先检查建筑定义、建造限制、放置会话和场景接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/BuildingGridTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingOrientationAndRangeTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingRuntimeMobilityTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs",
+        "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
+        "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
+        "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001",
+        "IDEA-0005"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedPlayMode"
+    },
+    {
+      "Id": "ui-input",
+      "ChineseName": "界面与输入",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/UI/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/UI/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs"
+      ],
+      "FailureLocationSummary": "先检查焦点、输入优先级、界面组件和真实场景引用",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
+        "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
+        "Assets/_Game/Tests/EditMode/TitleMenuTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "economy-production-logistics",
+      "ChineseName": "经济生产与物流",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Economy/**",
+        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Economy/**",
+        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
+      ],
+      "FailureLocationSummary": "先检查库存、生产循环、物流网络和建筑接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
+        "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
+        "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/ProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "research-population",
+      "ChineseName": "研究与人口",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Research/**",
+        "Assets/_Game/Scripts/Population/**",
+        "Assets/_Game/Scripts/Progression/**",
+        "Assets/_Game/Scripts/Narrative/**"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Research/**",
+        "Assets/_Game/Scripts/Population/**"
+      ],
+      "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTests.cs",
+        "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "combat-routes",
+      "ChineseName": "战斗与路线",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Combat/**",
+        "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Combat/**",
+        "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
+      ],
+      "FailureLocationSummary": "先检查战斗规则、路线内容、单位状态和事件接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/BehemothBreedingTests.cs",
+        "Assets/_Game/Tests/EditMode/BossEncounterTests.cs",
+        "Assets/_Game/Tests/EditMode/EnemyCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/EnemyQualityTests.cs",
+        "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
+        "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/InfectionModelTests.cs",
+        "Assets/_Game/Tests/EditMode/InfectionSpreadRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/MindControlTests.cs",
+        "Assets/_Game/Tests/EditMode/PsionicResonanceTests.cs",
+        "Assets/_Game/Tests/EditMode/PuppetFabricationTests.cs",
+        "Assets/_Game/Tests/EditMode/PuppetMaintenanceTests.cs",
+        "Assets/_Game/Tests/EditMode/RouteCapstoneBuildingTests.cs",
+        "Assets/_Game/Tests/EditMode/RouteContentDisplayTests.cs",
+        "Assets/_Game/Tests/EditMode/RouteDefenseTowerTests.cs",
+        "Assets/_Game/Tests/EditMode/SwordIntentTests.cs",
+        "Assets/_Game/Tests/EditMode/TechnologyOverloadTests.cs",
+        "Assets/_Game/Tests/EditMode/WaveDirectorTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "persistence-migration",
+      "ChineseName": "持久化与迁移",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Persistence/**"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Persistence/**"
+      ],
+      "FailureLocationSummary": "先检查存档格式、迁移步骤和读写边界",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FullRegression"
+    },
+    {
+      "Id": "presentation-art-integration",
+      "ChineseName": "展示与美术整合",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Presentation/**",
+        "Assets/_Game/Scripts/ArtIntegration3D/**",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs",
+        "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Presentation/**",
+        "Assets/_Game/Scripts/ArtIntegration3D/**"
+      ],
+      "FailureLocationSummary": "先检查视觉槽、材质接入、投影与相机场景引用",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+        "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FocusedEditMode"
+    },
+    {
+      "Id": "scene-editor-build-performance",
+      "ChineseName": "场景编辑构建与性能",
+      "SourceGlobs": [
+        "Assets/_Game/Editor/FirstArtPassImportPolicy.cs",
+        "Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs",
+        "Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs",
+        "Assets/_Game/Editor/FormalBuildTools.cs",
+        "Assets/_Game/Editor/FormalProjectSetup.cs",
+        "Assets/_Game/Editor/GrayboxPerformanceProbe.cs",
+        "Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectTestResultAnalyzer.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityTools.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Editor/ProjectQuality/**",
+        "Assets/_Game/Editor/FormalBuildTools.cs",
+        "Assets/_Game/Editor/GrayboxSceneAuthoring.cs"
+      ],
+      "FailureLocationSummary": "先检查编辑工具、场景生成、构建配置和性能边界",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs",
+        "Assets/_Game/Tests/EditMode/SceneContractTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectTestResultAnalyzerTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "WindowsBuilds"
+    },
+    {
+      "Id": "frozen-2d-regression",
+      "ChineseName": "冻结二维回归",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/Legacy/**",
+        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
+        "Assets/_Game/Scripts/City/PlaceholderMobileCity.cs",
+        "Assets/_Game/Scripts/Combat/FormalCombatController.cs",
+        "Assets/_Game/Scripts/Combat/FormalFriendlyUnitController.cs",
+        "Assets/_Game/Scripts/Combat/FormalTechnologyRouteController.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderBehemoth.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderBossEncounter.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderEnemy.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderPuppet.cs",
+        "Assets/_Game/Scripts/Core/FormalGameClockController.cs",
+        "Assets/_Game/Scripts/Core/FormalSessionController.cs",
+        "Assets/_Game/Scripts/Core/FormalSessionStatisticsController.cs",
+        "Assets/_Game/Scripts/Economy/FormalEconomyController.cs",
+        "Assets/_Game/Scripts/Leader/FormalLeaderController.cs",
+        "Assets/_Game/Scripts/Narrative/FormalGuidanceController.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveController.cs",
+        "Assets/_Game/Scripts/Population/FormalPopulationController.cs",
+        "Assets/_Game/Scripts/Progression/FormalAdvancementController.cs",
+        "Assets/_Game/Scripts/Progression/FormalProgressionController.cs",
+        "Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs",
+        "Assets/_Game/Scripts/UI/FormalTitleMenuController.cs",
+        "Assets/_Game/Scripts/World/FormalCameraController.cs",
+        "Assets/_Game/Scripts/World/FormalDroneController.cs",
+        "Assets/_Game/Scripts/World/PlaceholderWorldView.cs",
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/Legacy/**",
+        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "FailureLocationSummary": "先检查冻结二维基线、历史场景和回归约束",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/LegacyEffectTests.cs",
+        "Assets/_Game/Tests/EditMode/LegacySelectionTests.cs",
+        "Assets/_Game/Tests/EditMode/LocalHasteTests.cs",
+        "Assets/_Game/Tests/EditMode/PlaceholderMobileCityTests.cs",
+        "Assets/_Game/Tests/EditMode/SpatialTemplateTests.cs",
+        "Assets/_Game/Tests/EditMode/TerritoryNetworkTests.cs",
+        "Assets/_Game/Tests/PlayMode/RuntimeSceneTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "MinimumVerification": "FullRegression"
+    }
+  ],
+  "ReuseEntries": [
+    {
+      "Id": "stable-id",
+      "ChineseName": "稳定标识",
+      "TypeNames": [
+        "StableId"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Content/StableId.cs"
+      ],
+      "FeatureGroupId": "foundation-clock",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于跨系统保存稳定标识。",
+      "BoundarySummary": "不生成业务实体。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FoundationTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "world-map-model",
+      "ChineseName": "世界地图模型",
+      "TypeNames": [
+        "WorldMapModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/World/WorldMapModel.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于保存世界地图状态。",
+      "BoundarySummary": "不处理场景渲染。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/WorldMapTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "world-layout-3d",
+      "ChineseName": "三维世界布局",
+      "TypeNames": [
+        "GrayboxWorldLayout3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于灰盒世界布局。",
+      "BoundarySummary": "调整布局前需要场景复核。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "planar-coordinate-mapper-3d",
+      "ChineseName": "平面坐标映射",
+      "TypeNames": [
+        "PlanarCoordinateMapper3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于世界与平面坐标转换。",
+      "BoundarySummary": "不决定城市规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/PlanarCoordinateMapper3DTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "city-pathfinder",
+      "ChineseName": "城市寻路",
+      "TypeNames": [
+        "CityPathfinder"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/City/CityPathfinder.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于城市路径搜索。",
+      "BoundarySummary": "不处理部署消耗。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CityPathfinderTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "city-terrain-rules",
+      "ChineseName": "城市地形规则",
+      "TypeNames": [
+        "CityTerrainRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/City/CityTerrainRules.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于校验城市地形条件。",
+      "BoundarySummary": "不负责路径计算。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CityTerrainRulesTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "city-deployment-rules",
+      "ChineseName": "城市部署规则",
+      "TypeNames": [
+        "CityDeploymentRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/City/CityDeploymentRules.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于判定城市部署合法性。",
+      "BoundarySummary": "不渲染部署预览。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CityDeploymentRulesTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "direct-control-rules",
+      "ChineseName": "直接控制规则",
+      "TypeNames": [
+        "DirectControlRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/City/DirectControlRules.cs"
+      ],
+      "FeatureGroupId": "leader-direct-control",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于直接控制状态规则。",
+      "BoundarySummary": "不处理领袖动画。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/DirectControlRulesTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-catalog",
+      "ChineseName": "建筑目录",
+      "TypeNames": [
+        "GrayboxBuildingCatalogPresenter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于展示建筑目录。",
+      "BoundarySummary": "不提交建筑放置。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-grid",
+      "ChineseName": "建筑网格",
+      "TypeNames": [
+        "BuildingGrid"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingGrid.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于建筑格位计算。",
+      "BoundarySummary": "不负责输入路由。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/BuildingGridTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-mobility-rules",
+      "ChineseName": "建筑移动规则",
+      "TypeNames": [
+        "BuildingMobilityRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingMobilityRules.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于约束建筑移动。",
+      "BoundarySummary": "不决定建筑解锁。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-placement-rules",
+      "ChineseName": "建筑放置规则",
+      "TypeNames": [
+        "BuildingPlacementEvaluation"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于评估建筑放置。",
+      "BoundarySummary": "不管理施工进度。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-unlock-model",
+      "ChineseName": "建筑解锁模型",
+      "TypeNames": [
+        "BuildingUnlockModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingUnlockModel.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于保存建筑解锁状态。",
+      "BoundarySummary": "不计算升级成本。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "construction-progress",
+      "ChineseName": "施工进度",
+      "TypeNames": [
+        "ConstructionProgress"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/ConstructionProgress.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于跟踪施工进度。",
+      "BoundarySummary": "不控制建筑视图。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "construction-refund-rules",
+      "ChineseName": "施工退款规则",
+      "TypeNames": [
+        "ConstructionRefundRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/ConstructionRefundRules.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于计算施工退款。",
+      "BoundarySummary": "不写入资源库存。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-session-3d",
+      "ChineseName": "三维建筑会话",
+      "TypeNames": [
+        "GrayboxBuildingSession3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于协调三维建筑会话。",
+      "BoundarySummary": "不替代领域建造规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-input-router-3d",
+      "ChineseName": "三维建筑输入路由",
+      "TypeNames": [
+        "GrayboxBuildingInputRouter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于路由建筑界面输入。",
+      "BoundarySummary": "不决定建筑放置规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-menu-view-3d",
+      "ChineseName": "三维建筑菜单视图",
+      "TypeNames": [
+        "GrayboxBuildingMenuView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于显示建筑菜单。",
+      "BoundarySummary": "不保存建筑数据。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "building-world-view-3d",
+      "ChineseName": "三维建筑世界视图",
+      "TypeNames": [
+        "GrayboxBuildingWorldView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于场景内显示建筑。",
+      "BoundarySummary": "不作为纯领域模型复用。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "resource-inventory",
+      "ChineseName": "资源库存",
+      "TypeNames": [
+        "ResourceInventory"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceInventory.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于管理资源数量。",
+      "BoundarySummary": "不驱动生产周期。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FoundationTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "research-model",
+      "ChineseName": "研究模型",
+      "TypeNames": [
+        "ResearchModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Research/ResearchModel.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于管理研究状态。",
+      "BoundarySummary": "不展示研究界面。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResearchTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "population-model",
+      "ChineseName": "人口模型",
+      "TypeNames": [
+        "PopulationModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Population/PopulationModel.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于管理人口容量。",
+      "BoundarySummary": "不控制人口表现。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "visual-slot-2d",
+      "ChineseName": "二维视觉槽位",
+      "TypeNames": [
+        "VisualSlot"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Presentation/VisualSlot.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于挂接二维视觉定义。",
+      "BoundarySummary": "不适配三维地形。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "graybox-visual-slot-3d",
+      "ChineseName": "三维灰盒视觉槽位",
+      "TypeNames": [
+        "GrayboxVisualSlot"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于场景内灰盒视觉绑定。",
+      "BoundarySummary": "不作为二维槽位替代。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "first-art-terrain-profile-3d",
+      "ChineseName": "首版三维地形配置",
+      "TypeNames": [
+        "FirstArtTerrainProfile3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于定义首版地形参数。",
+      "BoundarySummary": "修改前需要导入策略复核。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "first-art-terrain-renderer-3d",
+      "ChineseName": "首版三维地形渲染",
+      "TypeNames": [
+        "FirstArtTerrainRenderer3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于在场景渲染首版地形。",
+      "BoundarySummary": "不管理地形资源导入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "graybox-scene-authoring",
+      "ChineseName": "灰盒场景编写",
+      "TypeNames": [
+        "GrayboxSceneAuthoring"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/GrayboxSceneAuthoring.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于编辑器生成灰盒场景。",
+      "BoundarySummary": "不在运行时调用。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "formal-build-tools",
+      "ChineseName": "正式构建工具",
+      "TypeNames": [
+        "FormalBuildTools"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/FormalBuildTools.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于执行正式构建检查。",
+      "BoundarySummary": "不修改游戏规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "graybox-performance-probe",
+      "ChineseName": "灰盒性能探针",
+      "TypeNames": [
+        "GrayboxPerformanceProbe"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/GrayboxPerformanceProbe.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于采集灰盒性能数据。",
+      "BoundarySummary": "不作为发布版本逻辑。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "formal-save-data",
+      "ChineseName": "正式存档数据",
+      "TypeNames": [
+        "FormalSaveData"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalSaveData.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于保存正式存档字段。",
+      "BoundarySummary": "变更需要兼容性评审。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "formal-prototype-frozen",
+      "ChineseName": "正式原型冻结场景",
+      "TypeNames": [
+        "FormalGameBootstrap"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scenes/FormalPrototype.unity",
+        "Assets/_Game/Scripts/Core/FormalGameBootstrap.cs"
+      ],
+      "FeatureGroupId": "frozen-2d-regression",
+      "ReuseLevel": "FrozenRegression",
+      "UseSummary": "用于保留二维回归基线。",
+      "BoundarySummary": "不得作为新功能起点。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/SceneContractTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "placeholder-building-controller-frozen",
+      "ChineseName": "占位建筑控制器",
+      "TypeNames": [
+        "PlaceholderBuildingController"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs"
+      ],
+      "FeatureGroupId": "frozen-2d-regression",
+      "ReuseLevel": "ProhibitedForNewWork",
+      "UseSummary": "用于旧回归兼容验证。",
+      "BoundarySummary": "禁止新功能复用。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    }
+  ],
+  "Scenes": [
+    {
+      "Id": "graybox-prototype-3d",
+      "ChineseName": "三维灰盒原型",
+      "Path": "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+      "Purpose": "用于三维运行和场景合同验证。",
+      "EnabledInBuildSettings": true,
+      "ExpectedBuildIndex": 0,
+      "ReuseLevel": "SceneOnly"
+    },
+    {
+      "Id": "formal-prototype",
+      "ChineseName": "正式二维原型",
+      "Path": "Assets/_Game/Scenes/FormalPrototype.unity",
+      "Purpose": "用于冻结二维回归。",
+      "EnabledInBuildSettings": true,
+      "ExpectedBuildIndex": 1,
+      "ReuseLevel": "FrozenRegression"
+    }
+  ],
+  "UiEntries": [
+    {
+      "Id": "graybox-building-menu",
+      "ChineseName": "灰盒建筑菜单",
+      "OwnerTypeName": "GrayboxBuildingMenuView3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "建筑菜单先于世界点击处理输入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs"
+      ]
+    },
+    {
+      "Id": "graybox-input-router",
+      "ChineseName": "灰盒输入路由",
+      "OwnerTypeName": "GrayboxInputRouter",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "路由器按界面保护规则分发输入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs"
+      ]
+    }
+  ],
+  "DocumentationRules": [
+    {
+      "Id": "plain-chinese-project-guides",
+      "ChangedPathGlobs": [
+        "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+        "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+        "Docs/09-Reusable-Project-Catalog-ZH.md"
+      ],
+      "ReviewDocumentPaths": [
+        "Docs/07-Project-Use-and-Development-Guide-ZH.md",
+        "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
+        "Docs/09-Reusable-Project-Catalog-ZH.md"
+      ],
+      "PlainChineseReason": "普通中文指南变化后，需要检查链接、复用边界和面向试玩者的说明。"
+    },
+    {
+      "Id": "quality-catalog",
+      "ChangedPathGlobs": [
+        "Assets/_Game/Scripts/**",
+        "Assets/_Game/Editor/**",
+        "Assets/_Game/Scenes/**"
+      ],
+      "ReviewDocumentPaths": [
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "PlainChineseReason": "功能归属变化时必须同步质量目录，保证后续任务只消费规范化模型。"
+    },
+    {
+      "Id": "generated-project-quality-appendices",
+      "ChangedPathGlobs": [
+        "Assets/_Game/Editor/ProjectQuality/**",
+        "Assets/_Game/Tests/EditMode/ProjectQuality*.cs",
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "ReviewDocumentPaths": [
+        "Docs/Generated/Project-Inventory-ZH.md",
+        "Docs/Generated/Test-Inventory-ZH.md",
+        "Docs/Generated/Latest-Verification-ZH.md",
+        "Docs/Generated/Documentation-Attention-ZH.md"
+      ],
+      "PlainChineseReason": "项目质量目录或测试映射变化后，需要重新生成技术附录。"
+    }
+  ],
+  "ExplicitSourceExclusions": [],
+  "ExplicitTestExclusions": []
+}

@@ -459,10 +459,11 @@ namespace WasteCity.Tests
         [Test]
         public void Controller_ConsumesFWhenSingleNoGroundDelegationFails()
         {
-            EvacuationFixture fixture = CreateFixture();
+            EvacuationFixture fixture = CreateFixture(configureMenu: true);
             var deployment = new DeploymentRequestSpy(
                 CityMode.Fortress,
-                toggleResult: false);
+                toggleResult: false,
+                "展开失败：地面不稳定或有大型废墟");
             fixture.Controller.Configure(
                 fixture.Session,
                 deployment,
@@ -473,6 +474,9 @@ namespace WasteCity.Tests
 
             Assert.That(consumed, Is.True);
             Assert.That(deployment.ToggleCalls, Is.EqualTo(1));
+            Assert.That(
+                fixture.Menu.DeploymentFailureMessage,
+                Is.EqualTo("展开失败：地面不稳定或有大型废墟"));
         }
 
         [Test]
@@ -1298,19 +1302,26 @@ namespace WasteCity.Tests
         {
             private readonly bool toggleResult;
 
-            public DeploymentRequestSpy(CityMode mode, bool toggleResult)
+            public DeploymentRequestSpy(
+                CityMode mode,
+                bool toggleResult,
+                string failureReason = "rejected")
             {
                 Mode = mode;
                 this.toggleResult = toggleResult;
+                this.failureReason = failureReason;
             }
 
+            private readonly string failureReason;
             public CityMode Mode { get; }
             public int ToggleCalls { get; private set; }
 
             public bool TryToggleDeployment(out string failureReason)
             {
                 ToggleCalls++;
-                failureReason = toggleResult ? string.Empty : "rejected";
+                failureReason = toggleResult
+                    ? string.Empty
+                    : this.failureReason;
                 return toggleResult;
             }
         }

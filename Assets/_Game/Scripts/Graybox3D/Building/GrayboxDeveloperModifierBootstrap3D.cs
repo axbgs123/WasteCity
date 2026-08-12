@@ -205,6 +205,13 @@ namespace WasteCity.Graybox3D.Building
                 if (int.TryParse(resourceAmount.text, out int amount))
                     modifier.SetResource(resourceId.text, amount);
             });
+            InputField populationAmount = CreateInput(
+                root, "Population Amount", "200");
+            CreateButton(root, "Set Population", "设置人口", () =>
+            {
+                if (int.TryParse(populationAmount.text, out int amount))
+                    modifier.SetPopulation(amount);
+            });
 
             InputField researchId = CreateInput(
                 root,

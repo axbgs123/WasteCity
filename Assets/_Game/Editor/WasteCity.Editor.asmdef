@@ -9,5 +9,7 @@
     "Unity.ugui",
     "Unity.RenderPipelines.Universal.Runtime"
   ],
-  "includePlatforms": ["Editor"]
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["Mono.Cecil.dll", "Mono.Cecil.Pdb.dll"]
 }

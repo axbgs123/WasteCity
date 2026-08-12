@@ -14,6 +14,7 @@ using WasteCity.Editor;
 
 namespace WasteCity.Tests
 {
+    [Category("TerrainAssetDeep")]
     public sealed class FirstArtTerrainAssetBuilderTests
     {
         private const string TerrainRoot =
@@ -1199,10 +1200,15 @@ namespace WasteCity.Tests
             try
             {
                 Texture2DArray destination = LoadArray(path);
+                string expectedName = Path.GetFileNameWithoutExtension(path);
                 EditorUtility.CopySerialized(sentinel, destination);
+                destination.name = expectedName;
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 destination.Apply(false, true);
                 EditorUtility.SetDirty(destination);
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 AssetDatabase.SaveAssets();
+                Assert.That(destination.name, Is.EqualTo(expectedName), path);
                 AssetDatabase.ImportAsset(
                     path,
                     ImportAssetOptions.ForceUpdate |

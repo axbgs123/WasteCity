@@ -17,7 +17,7 @@ namespace WasteCity.Tests
                 yield return Case(BuildingCatalog.Housing, BuildingPlacement.Either, BuildingOperation.MobileAllowed);
                 yield return Case(BuildingCatalog.Warehouse, BuildingPlacement.Either, BuildingOperation.MobileAllowed);
                 yield return Case(BuildingCatalog.Wall, BuildingPlacement.Ground, BuildingOperation.FortressOnly);
-                yield return Case(BuildingCatalog.ResearchStation, BuildingPlacement.Either, BuildingOperation.FortressOnly);
+                yield return Case(BuildingCatalog.ResearchStation, BuildingPlacement.Either, BuildingOperation.MobileAllowed);
                 yield return Case(BuildingCatalog.Smelter, BuildingPlacement.Ground, BuildingOperation.FortressOnly);
                 yield return Case(BuildingCatalog.Assembler, BuildingPlacement.Either, BuildingOperation.MobileAllowed);
                 yield return Case(BuildingCatalog.MachineGunTurret, BuildingPlacement.Ground, BuildingOperation.FortressOnly);
@@ -68,6 +68,25 @@ namespace WasteCity.Tests
                 BuildingMobilityRules.CanOperate(
                     BuildingCatalog.Housing,
                     BuildingSite.InnerCity,
+                    mode),
+                Is.EqualTo(expected));
+        }
+
+        [TestCase(CityMode.Mobile, BuildingSite.InnerCity, true)]
+        [TestCase(CityMode.Mobile, BuildingSite.Ground, false)]
+        [TestCase(CityMode.Deploying, BuildingSite.InnerCity, false)]
+        [TestCase(CityMode.Fortress, BuildingSite.InnerCity, true)]
+        [TestCase(CityMode.Fortress, BuildingSite.Ground, true)]
+        [TestCase(CityMode.Packing, BuildingSite.InnerCity, false)]
+        public void ResearchStation_UsesApprovedConstructionMatrix(
+            CityMode mode,
+            BuildingSite site,
+            bool expected)
+        {
+            Assert.That(
+                BuildingMobilityRules.CanConstruct(
+                    BuildingCatalog.ResearchStation,
+                    site,
                     mode),
                 Is.EqualTo(expected));
         }

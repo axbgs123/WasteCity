@@ -182,10 +182,10 @@ namespace WasteCity.Tests
 
             Assert.That(bootstrap.IsInitialized, Is.True);
             Assert.That(bootstrap.World, Is.SameAs(view.Model));
-            Assert.That(bootstrap.World.Width, Is.EqualTo(32));
-            Assert.That(bootstrap.World.Height, Is.EqualTo(24));
+            Assert.That(bootstrap.World.Width, Is.EqualTo(64));
+            Assert.That(bootstrap.World.Height, Is.EqualTo(48));
             AssertWorldEquals(
-                new WorldMapModel(32, 24, new WorldSeed(8128)),
+                GrayboxWorldLayout3D.CreateDefault(),
                 bootstrap.World);
         }
 
