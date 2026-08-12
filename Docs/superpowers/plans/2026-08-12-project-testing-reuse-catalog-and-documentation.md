@@ -514,7 +514,9 @@ git commit -m "feat: scan project quality inventory"
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs.meta`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs` (required compilation dependency: parse explicit exclusions as `Path` + non-empty `Reason` records)
+- Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs` (required validation dependency: include compiled, source-mapped production C# types that catalog reuse records can name)
 - Modify: `Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`
 - Modify: `Docs/Engineering/project-quality-catalog.json`
 
 **Interfaces:**
@@ -522,6 +524,7 @@ git commit -m "feat: scan project quality inventory"
 - Produces: `ProjectQualityIssue` with `Code`, `Severity`, `PlainChineseMessage`, and `Path`
 - Consumes no mutable Unity scene state and writes no files.
 - The loader change is limited to the explicit-exclusion record DTO/model conversion required by Step 3; it must not alter unrelated loader behavior.
+- The scanner change is limited to compiled production type inventory for reuse-type existence checks: retain the existing MonoBehaviour/ScriptableObject flags, exclude test assemblies and compiler-generated/private nested types, and do not change PDB/MonoScript candidate collection, source-path resolution, or assembly discovery.
 
 - [ ] **Step 1: Write mutation-sensitive RED tests**
 
