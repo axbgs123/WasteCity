@@ -331,6 +331,7 @@
         "Assets/_Game/Editor/GrayboxPerformanceProbe.cs",
         "Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs",
@@ -344,6 +345,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs",
         "Assets/_Game/Tests/EditMode/SceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
       ],
@@ -1109,6 +1111,21 @@
         "Docs/Engineering/project-quality-catalog.json"
       ],
       "PlainChineseReason": "功能归属变化时必须同步质量目录，保证后续任务只消费规范化模型。"
+    },
+    {
+      "Id": "generated-project-quality-appendices",
+      "ChangedPathGlobs": [
+        "Assets/_Game/Editor/ProjectQuality/**",
+        "Assets/_Game/Tests/EditMode/ProjectQuality*.cs",
+        "Docs/Engineering/project-quality-catalog.json"
+      ],
+      "ReviewDocumentPaths": [
+        "Docs/Generated/Project-Inventory-ZH.md",
+        "Docs/Generated/Test-Inventory-ZH.md",
+        "Docs/Generated/Latest-Verification-ZH.md",
+        "Docs/Generated/Documentation-Attention-ZH.md"
+      ],
+      "PlainChineseReason": "项目质量目录或测试映射变化后，需要重新生成技术附录。"
     }
   ],
   "ExplicitSourceExclusions": [],

@@ -1,0 +1,145 @@
+# 测试自动清单
+
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。工具架构版本：1，内容指纹：`ec891a3279f9cbfd66d900ddf41a9dceafe11b1dd4724a1e4d1b53e578df66e1`。
+
+## 1. 生成说明与内容指纹
+- 指纹只来自已提供的目录和项目快照，方便确认清单是否对应同一份事实。
+## 2. EditMode 与 PlayMode 的普通中文说明
+- EditMode 在不启动完整游戏画面的情况下检查规则和资料；PlayMode 会启动运行时流程，检查玩家实际会遇到的互动。
+## 3. 每个功能分组的最低验证门
+- 建筑建造与疏散：针对性 PlayMode 测试
+- 城市导航与部署：针对性 EditMode 测试
+- 战斗与路线：针对性 EditMode 测试
+- 经济生产与物流：针对性 EditMode 测试
+- 基础时钟与会话：针对性 EditMode 测试
+- 冻结二维回归：完整回归
+- 领袖直接控制：针对性 EditMode 测试
+- 持久化与迁移：完整回归
+- 展示与美术整合：针对性 EditMode 测试
+- 研究与人口：针对性 EditMode 测试
+- 场景编辑构建与性能：Windows 构建
+- 界面与输入：针对性 EditMode 测试
+- 世界地图与地形：性能检查
+## 4. 精确测试文件与测试类
+- `Assets/_Game/Tests/EditMode/AlchemyTests.cs`：`WasteCity.Tests.AlchemyTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BehemothBreedingTests.cs`：`WasteCity.Tests.BehemothBreedingTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BossEncounterTests.cs`：`WasteCity.Tests.BossEncounterTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingGridTests.cs`：`WasteCity.Tests.BuildingGridTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingMobilityRulesTests.cs`：`WasteCity.Tests.BuildingMobilityRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingOrientationAndRangeTests.cs`：`WasteCity.Tests.BuildingOrientationAndRangeTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs`：`WasteCity.Tests.BuildingPlacementEvaluationTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingRuntimeMobilityTests.cs`：`WasteCity.Tests.BuildingRuntimeMobilityTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs`：`WasteCity.Tests.BuildingUnlockTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs`：`WasteCity.Tests.BuildingUpgradeTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/CameraFollowModelTests.cs`：`WasteCity.Tests.CameraFollowModelTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/CityDeploymentRulesTests.cs`：`WasteCity.Tests.CityDeploymentRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/CityOperationalTests.cs`：`WasteCity.Tests.CityOperationalTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/CityPathfinderTests.cs`：`WasteCity.Tests.CityPathfinderTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/CityTerrainRulesTests.cs`：`WasteCity.Tests.CityTerrainRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ConsciousnessNetworkTests.cs`：`WasteCity.Tests.ConsciousnessNetworkTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs`：`WasteCity.Tests.ConstructionProgressTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/DeploymentAndHarvestTests.cs`：`WasteCity.Tests.DeploymentAndHarvestTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/DirectControlRulesTests.cs`：`WasteCity.Tests.DirectControlRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/EnemyCatalogTests.cs`：`WasteCity.Tests.EnemyCatalogTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/EnemyQualityTests.cs`：`WasteCity.Tests.EnemyQualityTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs`：`WasteCity.Tests.FirstArtPassImportPolicyTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`：`WasteCity.Tests.FirstArtTerrainAssetBuilderTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs`：`WasteCity.Tests.FirstArtTerrainControlMapTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs`：`WasteCity.Tests.FirstArtTerrainEvidenceCaptureTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainMeshTests.cs`：`WasteCity.Tests.FirstArtTerrainMeshTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainPerformanceTests.cs`：`WasteCity.Tests.FirstArtTerrainPerformanceTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs`：`WasteCity.Tests.FirstArtTerrainProfileTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs`：`WasteCity.Tests.FirstArtTerrainRendererTests`（EditMode）
+- `Assets/_Game/Tests/PlayMode/FirstArtTerrainRuntimeSceneTests.cs`：`WasteCity.Tests.FirstArtTerrainRuntimeSceneTests`（PlayMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs`：`WasteCity.Tests.FirstArtTerrainSceneContractTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs`：`WasteCity.Tests.FirstArtTerrainShaderTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs`：`WasteCity.Tests.FormalCameraControllerTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FormalCombatTests.cs`：`WasteCity.Tests.FormalCombatTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FormalProgressionTests.cs`：`WasteCity.Tests.FormalProgressionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FormalSaveTests.cs`：`WasteCity.Tests.FormalSaveTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FoundationTests.cs`：`WasteCity.Tests.FoundationTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs`：`WasteCity.Tests.FriendlyUnitCommandTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs`：`WasteCity.Tests.FriendlyUnitTacticalRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GameClockAndForesightTests.cs`：`WasteCity.Tests.GameClockAndForesightTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GameSessionStateTests.cs`：`WasteCity.Tests.GameSessionStateTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GameSpeedTests.cs`：`WasteCity.Tests.GameSpeedTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs`：`WasteCity.Tests.GrayboxBuildAndPerformanceTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs`：`WasteCity.Tests.GrayboxBuildingCatalogTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs`：`WasteCity.Tests.GrayboxBuildingProjectionAndViewTests`（EditMode）
+- `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`：`WasteCity.Tests.GrayboxBuildingRuntimeSceneTests`（PlayMode）
+- `Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs`：`WasteCity.Tests.GrayboxBuildingSessionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs`：`WasteCity.Tests.GrayboxBuildingUiAndInputTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs`：`WasteCity.Tests.GrayboxCameraAndInputTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs`：`WasteCity.Tests.GrayboxDeveloperModifierTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs`：`WasteCity.Tests.GrayboxEvacuationTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs`：`WasteCity.Tests.GrayboxLeaderControlTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxMobileCityController3DTests.cs`：`WasteCity.Tests.GrayboxMobileCityController3DTests`（EditMode）
+- `Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs`：`WasteCity.Tests.GrayboxRuntimeSceneTests`（PlayMode）
+- `Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs`：`WasteCity.Tests.GrayboxSceneBootstrapTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs`：`WasteCity.Tests.GrayboxSceneContractTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs`：`WasteCity.Tests.GrayboxUrpScopeTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs`：`WasteCity.Tests.GrayboxVisualAndWorldTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs`：`WasteCity.Tests.GrayboxWorldLayout3DTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs`：`WasteCity.Tests.GuidanceFlowTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/InfectionModelTests.cs`：`WasteCity.Tests.InfectionModelTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/InfectionSpreadRulesTests.cs`：`WasteCity.Tests.InfectionSpreadRulesTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/LeaderTests.cs`：`WasteCity.Tests.LeaderTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/LegacyEffectTests.cs`：`WasteCity.Tests.LegacyEffectTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/LegacySelectionTests.cs`：`WasteCity.Tests.LegacySelectionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/LocalHasteTests.cs`：`WasteCity.Tests.LocalHasteTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs`：`WasteCity.Tests.LogisticsNetworkTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/MindControlTests.cs`：`WasteCity.Tests.MindControlTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PassiveProductionTests.cs`：`WasteCity.Tests.PassiveProductionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PlaceholderMobileCityTests.cs`：`WasteCity.Tests.PlaceholderMobileCityTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PlanarCoordinateMapper3DTests.cs`：`WasteCity.Tests.PlanarCoordinateMapper3DTests`（EditMode）
+- `Assets/_Game/Tests/PlayMode/RuntimeSceneTests.cs`：`WasteCity.Tests.PlayMode.RuntimeSceneTests`（PlayMode）
+- `Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs`：`WasteCity.Tests.PopulationAndCapacityTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProductionTests.cs`：`WasteCity.Tests.ProductionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs`：`WasteCity.Tests.ProjectDocumentationGeneratorTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs`：`WasteCity.Tests.ProjectQualityCatalogTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.ProjectQualityPdbSourceMappingProbeTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.ProjectQualityScannerTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs`：`WasteCity.Tests.ProjectQualityValidatorTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PsionicResonanceTests.cs`：`WasteCity.Tests.PsionicResonanceTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PuppetFabricationTests.cs`：`WasteCity.Tests.PuppetFabricationTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/PuppetMaintenanceTests.cs`：`WasteCity.Tests.PuppetMaintenanceTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RepairProcessTests.cs`：`WasteCity.Tests.RepairProcessTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RescueSiteTests.cs`：`WasteCity.Tests.RescueSiteTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ResearchTests.cs`：`WasteCity.Tests.ResearchTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RouteCapstoneBuildingTests.cs`：`WasteCity.Tests.RouteCapstoneBuildingTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs`：`WasteCity.Tests.RouteCapstoneProductionTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RouteContentDisplayTests.cs`：`WasteCity.Tests.RouteContentDisplayTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RouteDefenseTowerTests.cs`：`WasteCity.Tests.RouteDefenseTowerTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs`：`WasteCity.Tests.RouteTechnologyEffectTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/SceneContractTests.cs`：`WasteCity.Tests.SceneContractTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ScoutDroneTests.cs`：`WasteCity.Tests.ScoutDroneTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs`：`WasteCity.Tests.SessionStatisticsTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/SpatialTemplateTests.cs`：`WasteCity.Tests.SpatialTemplateTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/SwordIntentTests.cs`：`WasteCity.Tests.SwordIntentTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/TechnologyOverloadTests.cs`：`WasteCity.Tests.TechnologyOverloadTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/TerritoryNetworkTests.cs`：`WasteCity.Tests.TerritoryNetworkTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.TestAttributeFixture`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.TestCaseAttributeFixture`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.TestCaseSourceAttributeFixture`（EditMode）
+- `Assets/_Game/Tests/EditMode/TitleMenuTests.cs`：`WasteCity.Tests.TitleMenuTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs`：`WasteCity.Tests.TurretAndBuildingTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs`：`WasteCity.Tests.UnityTestAttributeFixture`（EditMode）
+- `Assets/_Game/Tests/EditMode/VisualSlotTests.cs`：`WasteCity.Tests.VisualSlotTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/WaveDirectorTests.cs`：`WasteCity.Tests.WaveDirectorTests`（EditMode）
+- `Assets/_Game/Tests/EditMode/WorldMapTests.cs`：`WasteCity.Tests.WorldMapTests`（EditMode）
+## 5. 可复制的测试筛选命令
+- `-testFilter WasteCity.Tests.AlchemyTests|WasteCity.Tests.BehemothBreedingTests|WasteCity.Tests.BossEncounterTests|WasteCity.Tests.BuildingGridTests|WasteCity.Tests.BuildingMobilityRulesTests|WasteCity.Tests.BuildingOrientationAndRangeTests|WasteCity.Tests.BuildingPlacementEvaluationTests|WasteCity.Tests.BuildingRuntimeMobilityTests|WasteCity.Tests.BuildingUnlockTests|WasteCity.Tests.BuildingUpgradeTests|WasteCity.Tests.CameraFollowModelTests|WasteCity.Tests.CityDeploymentRulesTests|WasteCity.Tests.CityOperationalTests|WasteCity.Tests.CityPathfinderTests|WasteCity.Tests.CityTerrainRulesTests|WasteCity.Tests.ConsciousnessNetworkTests|WasteCity.Tests.ConstructionProgressTests|WasteCity.Tests.DeploymentAndHarvestTests|WasteCity.Tests.DirectControlRulesTests|WasteCity.Tests.EnemyCatalogTests|WasteCity.Tests.EnemyQualityTests|WasteCity.Tests.FirstArtPassImportPolicyTests|WasteCity.Tests.FirstArtTerrainAssetBuilderTests|WasteCity.Tests.FirstArtTerrainControlMapTests|WasteCity.Tests.FirstArtTerrainEvidenceCaptureTests|WasteCity.Tests.FirstArtTerrainMeshTests|WasteCity.Tests.FirstArtTerrainPerformanceTests|WasteCity.Tests.FirstArtTerrainProfileTests|WasteCity.Tests.FirstArtTerrainRendererTests|WasteCity.Tests.FirstArtTerrainRuntimeSceneTests|WasteCity.Tests.FirstArtTerrainSceneContractTests|WasteCity.Tests.FirstArtTerrainShaderTests|WasteCity.Tests.FormalCameraControllerTests|WasteCity.Tests.FormalCombatTests|WasteCity.Tests.FormalProgressionTests|WasteCity.Tests.FormalSaveTests|WasteCity.Tests.FoundationTests|WasteCity.Tests.FriendlyUnitCommandTests|WasteCity.Tests.FriendlyUnitTacticalRulesTests|WasteCity.Tests.GameClockAndForesightTests|WasteCity.Tests.GameSessionStateTests|WasteCity.Tests.GameSpeedTests|WasteCity.Tests.GrayboxBuildAndPerformanceTests|WasteCity.Tests.GrayboxBuildingCatalogTests|WasteCity.Tests.GrayboxBuildingProjectionAndViewTests|WasteCity.Tests.GrayboxBuildingRuntimeSceneTests|WasteCity.Tests.GrayboxBuildingSessionTests|WasteCity.Tests.GrayboxBuildingUiAndInputTests|WasteCity.Tests.GrayboxCameraAndInputTests|WasteCity.Tests.GrayboxDeveloperModifierTests|WasteCity.Tests.GrayboxEvacuationTests|WasteCity.Tests.GrayboxLeaderControlTests|WasteCity.Tests.GrayboxMobileCityController3DTests|WasteCity.Tests.GrayboxRuntimeSceneTests|WasteCity.Tests.GrayboxSceneBootstrapTests|WasteCity.Tests.GrayboxSceneContractTests|WasteCity.Tests.GrayboxUrpScopeTests|WasteCity.Tests.GrayboxVisualAndWorldTests|WasteCity.Tests.GrayboxWorldLayout3DTests|WasteCity.Tests.GuidanceFlowTests|WasteCity.Tests.InfectionModelTests|WasteCity.Tests.InfectionSpreadRulesTests|WasteCity.Tests.LeaderTests|WasteCity.Tests.LegacyEffectTests|WasteCity.Tests.LegacySelectionTests|WasteCity.Tests.LocalHasteTests|WasteCity.Tests.LogisticsNetworkTests|WasteCity.Tests.MindControlTests|WasteCity.Tests.PassiveProductionTests|WasteCity.Tests.PlaceholderMobileCityTests|WasteCity.Tests.PlanarCoordinateMapper3DTests|WasteCity.Tests.PlayMode.RuntimeSceneTests|WasteCity.Tests.PopulationAndCapacityTests|WasteCity.Tests.ProductionTests|WasteCity.Tests.ProjectDocumentationGeneratorTests|WasteCity.Tests.ProjectQualityCatalogTests|WasteCity.Tests.ProjectQualityPdbSourceMappingProbeTests|WasteCity.Tests.ProjectQualityScannerTests|WasteCity.Tests.ProjectQualityValidatorTests|WasteCity.Tests.PsionicResonanceTests|WasteCity.Tests.PuppetFabricationTests|WasteCity.Tests.PuppetMaintenanceTests|WasteCity.Tests.RepairProcessTests|WasteCity.Tests.RescueSiteTests|WasteCity.Tests.ResearchTests|WasteCity.Tests.RouteCapstoneBuildingTests|WasteCity.Tests.RouteCapstoneProductionTests|WasteCity.Tests.RouteContentDisplayTests|WasteCity.Tests.RouteDefenseTowerTests|WasteCity.Tests.RouteTechnologyEffectTests|WasteCity.Tests.SceneContractTests|WasteCity.Tests.ScoutDroneTests|WasteCity.Tests.SessionStatisticsTests|WasteCity.Tests.SpatialTemplateTests|WasteCity.Tests.SwordIntentTests|WasteCity.Tests.TechnologyOverloadTests|WasteCity.Tests.TerritoryNetworkTests|WasteCity.Tests.TestAttributeFixture|WasteCity.Tests.TestCaseAttributeFixture|WasteCity.Tests.TestCaseSourceAttributeFixture|WasteCity.Tests.TitleMenuTests|WasteCity.Tests.TurretAndBuildingTests|WasteCity.Tests.UnityTestAttributeFixture|WasteCity.Tests.VisualSlotTests|WasteCity.Tests.WaveDirectorTests|WasteCity.Tests.WorldMapTests`
+## 6. 失败定位用的源码路径与受控需求编号
+- 建筑建造与疏散：源码 `Assets/_Game/Scripts/Building/**`、`Assets/_Game/Scripts/Graybox3D/Building/*.cs`；需求 `DOC-0001`
+- 城市导航与部署：源码 `Assets/_Game/Scripts/City/**`、`Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`、`Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs`；需求 `DOC-0001`
+- 战斗与路线：源码 `Assets/_Game/Scripts/Combat/**`、`Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs`；需求 `DOC-0001`
+- 经济生产与物流：源码 `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`、`Assets/_Game/Scripts/Economy/**`；需求 `DOC-0001`
+- 基础时钟与会话：源码 `Assets/_Game/Scripts/Content/StableId.cs`、`Assets/_Game/Scripts/Core/**`；需求 `DOC-0001`
+- 冻结二维回归：源码 `Assets/_Game/Scenes/FormalPrototype.unity`、`Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs`、`Assets/_Game/Scripts/City/PlaceholderMobileCity.cs`、`Assets/_Game/Scripts/Combat/FormalCombatController.cs`、`Assets/_Game/Scripts/Combat/FormalFriendlyUnitController.cs`、`Assets/_Game/Scripts/Combat/FormalTechnologyRouteController.cs`、`Assets/_Game/Scripts/Combat/PlaceholderBehemoth.cs`、`Assets/_Game/Scripts/Combat/PlaceholderBossEncounter.cs`、`Assets/_Game/Scripts/Combat/PlaceholderEnemy.cs`、`Assets/_Game/Scripts/Combat/PlaceholderPuppet.cs`、`Assets/_Game/Scripts/Core/FormalGameClockController.cs`、`Assets/_Game/Scripts/Core/FormalSessionController.cs`、`Assets/_Game/Scripts/Core/FormalSessionStatisticsController.cs`、`Assets/_Game/Scripts/Economy/FormalEconomyController.cs`、`Assets/_Game/Scripts/Leader/FormalLeaderController.cs`、`Assets/_Game/Scripts/Legacy/**`、`Assets/_Game/Scripts/Narrative/FormalGuidanceController.cs`、`Assets/_Game/Scripts/Persistence/FormalSaveController.cs`、`Assets/_Game/Scripts/Population/FormalPopulationController.cs`、`Assets/_Game/Scripts/Progression/FormalAdvancementController.cs`、`Assets/_Game/Scripts/Progression/FormalProgressionController.cs`、`Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs`、`Assets/_Game/Scripts/UI/FormalTitleMenuController.cs`、`Assets/_Game/Scripts/World/FormalCameraController.cs`、`Assets/_Game/Scripts/World/FormalDroneController.cs`、`Assets/_Game/Scripts/World/PlaceholderWorldView.cs`；需求 `DOC-0001`
+- 领袖直接控制：源码 `Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs`、`Assets/_Game/Scripts/Leader/**`；需求 `DOC-0001`
+- 持久化与迁移：源码 `Assets/_Game/Scripts/Persistence/**`；需求 `DOC-0001`
+- 展示与美术整合：源码 `Assets/_Game/Scripts/ArtIntegration3D/**`、`Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`、`Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`、`Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`、`Assets/_Game/Scripts/Presentation/**`；需求 `DOC-0001`
+- 研究与人口：源码 `Assets/_Game/Scripts/Narrative/**`、`Assets/_Game/Scripts/Population/**`、`Assets/_Game/Scripts/Progression/**`、`Assets/_Game/Scripts/Research/**`；需求 `DOC-0001`
+- 场景编辑构建与性能：源码 `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`、`Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`、`Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs`、`Assets/_Game/Editor/FormalBuildTools.cs`、`Assets/_Game/Editor/FormalProjectSetup.cs`、`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`、`Assets/_Game/Editor/GrayboxSceneAuthoring.cs`、`Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs`、`Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`、`Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`、`Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs`、`Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs`；需求 `DOC-0001`
+- 界面与输入：源码 `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`、`Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`、`Assets/_Game/Scripts/UI/**`；需求 `DOC-0001`
+- 世界地图与地形：源码 `Assets/_Game/Art/FirstPass/Environment/Terrain/**`、`Assets/_Game/Scripts/World/**`；需求 `DOC-0001`

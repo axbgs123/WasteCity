@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace WasteCity.Editor.ProjectQuality
@@ -24,6 +25,8 @@ namespace WasteCity.Editor.ProjectQuality
             ValidateScenes(catalog, snapshot, issues);
             ValidateUi(catalog, snapshot, issues);
             ValidateDocumentation(catalog, projectRoot, issues);
+            if (issues.Count == 0)
+                ValidateGeneratedDocumentation(catalog, snapshot, projectRoot, issues);
             return Sort(issues);
         }
 
@@ -170,6 +173,7 @@ namespace WasteCity.Editor.ProjectQuality
                 .Distinct(StringComparer.Ordinal);
             foreach (string path in paths)
             {
+                if (IsGeneratedOutputPath(path)) continue;
                 string absolutePath = ToProjectPath(projectRoot, path);
                 if (absolutePath == null || !File.Exists(absolutePath))
                 {
@@ -183,6 +187,33 @@ namespace WasteCity.Editor.ProjectQuality
                     if (linkedPath == null || !File.Exists(linkedPath))
                         Add(issues, "PQ010", "Markdown 链接目标不存在", path + " -> " + target);
                 }
+            }
+        }
+
+        private static void ValidateGeneratedDocumentation(ProjectQualityCatalog catalog,
+            ProjectInventorySnapshot snapshot, string projectRoot, List<ProjectQualityIssue> issues)
+        {
+            if (!Values(catalog.DocumentationRules).Any(rule => rule != null &&
+                rule.Id == "generated-project-quality-appendices" &&
+                ApprovedGeneratedPaths.All(path => Values(rule.ReviewDocumentPaths).Contains(path)))) return;
+
+            IReadOnlyDictionary<string, string> structural =
+                ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot);
+            var expected = new Dictionary<string, string>(structural, StringComparer.Ordinal)
+            {
+                { ProjectDocumentationGenerator.AttentionPath,
+                    ProjectDocumentationGenerator.RenderDocumentationAttention(catalog, new string[0]) },
+                { ProjectDocumentationGenerator.VerificationPath,
+                    ProjectDocumentationGenerator.RenderVerification(
+                        ProjectDocumentationGenerator.CreateRecordedPriorVerificationSnapshot()) },
+            };
+            foreach (KeyValuePair<string, string> document in expected.OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                string absolutePath = ToProjectPath(projectRoot, document.Key);
+                byte[] expectedBytes = new UTF8Encoding(false).GetBytes(document.Value);
+                if (absolutePath == null || !File.Exists(absolutePath) ||
+                    !File.ReadAllBytes(absolutePath).SequenceEqual(expectedBytes))
+                    Add(issues, "PQ011", "自动生成文档缺失或内容已过期", document.Key);
             }
         }
 
@@ -212,6 +243,19 @@ namespace WasteCity.Editor.ProjectQuality
             string fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             string candidate = Path.GetFullPath(Path.Combine(fullRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
             return candidate.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal) ? candidate : null;
+        }
+
+        private static readonly string[] ApprovedGeneratedPaths =
+        {
+            ProjectDocumentationGenerator.ProjectInventoryPath,
+            ProjectDocumentationGenerator.TestInventoryPath,
+            ProjectDocumentationGenerator.VerificationPath,
+            ProjectDocumentationGenerator.AttentionPath,
+        };
+
+        private static bool IsGeneratedOutputPath(string path)
+        {
+            return ApprovedGeneratedPaths.Contains(path, StringComparer.Ordinal);
         }
 
         private static bool MatchesAny(string path, IEnumerable<string> globs)
