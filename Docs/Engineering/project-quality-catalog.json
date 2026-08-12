@@ -390,6 +390,7 @@
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityScanner.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectTestResultAnalyzer.cs",
+        "Assets/_Game/Editor/ProjectQuality/ProjectQualityTools.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityValidator.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs"
@@ -408,6 +409,7 @@
         "Assets/_Game/Tests/EditMode/SceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectTestResultAnalyzerTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
