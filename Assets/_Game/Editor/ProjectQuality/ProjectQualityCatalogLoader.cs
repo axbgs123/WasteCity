@@ -229,16 +229,27 @@ namespace WasteCity.Editor.ProjectQuality
             for (int index = 0; index < values.Length; index++)
             {
                 string value = RequiredText(values[index], source, "requirement ID");
-                if (value.Length != 8 ||
-                    !(value.StartsWith("BUG-", StringComparison.Ordinal) ||
-                      value.StartsWith("IDEA-", StringComparison.Ordinal) ||
-                      value.StartsWith("DOC-", StringComparison.Ordinal)) ||
-                    !char.IsDigit(value[value.Length - 1]) || !char.IsDigit(value[value.Length - 2]) ||
-                    !char.IsDigit(value[value.Length - 3]) || !char.IsDigit(value[value.Length - 4]))
+                if (!IsRequirementId(value))
                     Fail(source, "malformed requirement id: " + value);
                 result[index] = value;
             }
             return result;
+        }
+
+        private static bool IsRequirementId(string value)
+        {
+            int prefixLength;
+            if (value.StartsWith("BUG-", StringComparison.Ordinal) || value.StartsWith("DOC-", StringComparison.Ordinal))
+                prefixLength = 4;
+            else if (value.StartsWith("IDEA-", StringComparison.Ordinal))
+                prefixLength = 5;
+            else
+                return false;
+
+            if (value.Length != prefixLength + 4) return false;
+            for (int index = prefixLength; index < value.Length; index++)
+                if (value[index] < '0' || value[index] > '9') return false;
+            return true;
         }
 
         private static string NormalizePath(string value, string source, string label)
@@ -298,71 +309,86 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static void ValidateRequiredSceneFields(string json, string source)
         {
-            int valueStart;
-            int valueEnd;
-            if (!TryFindRootProperty(json, "Scenes", out valueStart, out valueEnd) || json[valueStart] != '[')
-                Fail(source, "scenes array is required");
+            int position = 0;
+            SkipWhitespace(json, ref position);
+            if (position >= json.Length || json[position++] != '{')
+                Fail(source, "catalog root is invalid");
 
-            int position = valueStart + 1;
+            int scenesStart = -1;
+            int scenesEnd = -1;
             while (true)
             {
                 SkipWhitespace(json, ref position);
-                if (position >= valueEnd || json[position] == ']') return;
+                if (position >= json.Length || json[position] == '}') break;
+                string name = ReadJsonString(json, ref position);
+                SkipWhitespace(json, ref position);
+                if (position >= json.Length || json[position++] != ':') Fail(source, "catalog root is invalid");
+                SkipWhitespace(json, ref position);
+                int valueStart = position;
+                int valueEnd = SkipValue(json, ref position);
+                if (name == "Scenes")
+                {
+                    if (scenesStart >= 0) Fail(source, "duplicate root Scenes");
+                    scenesStart = valueStart;
+                    scenesEnd = valueEnd;
+                }
+                SkipWhitespace(json, ref position);
+                if (position < json.Length && json[position] == ',') { position++; continue; }
+                if (position < json.Length && json[position] == '}') break;
+                Fail(source, "catalog root is invalid");
+            }
+
+            if (scenesStart < 0 || json[scenesStart] != '[')
+                Fail(source, "scenes array is required");
+
+            position = scenesStart + 1;
+            while (true)
+            {
+                SkipWhitespace(json, ref position);
+                if (position >= scenesEnd || json[position] == ']') return;
                 int sceneStart = position;
                 int sceneEnd = SkipValue(json, ref position);
                 if (sceneStart >= sceneEnd || json[sceneStart] != '{')
                     Fail(source, "scene is invalid");
-                if (!ObjectHasProperty(json, sceneStart, sceneEnd, "EnabledInBuildSettings"))
-                    Fail(source, "missing scene enabled");
-                if (!ObjectHasProperty(json, sceneStart, sceneEnd, "ExpectedBuildIndex"))
-                    Fail(source, "missing scene build index");
+                ValidateSceneObject(json, sceneStart, sceneEnd, source);
                 SkipWhitespace(json, ref position);
-                if (position < valueEnd && json[position] == ',') { position++; continue; }
-                if (position < valueEnd && json[position] == ']') return;
+                if (position < scenesEnd && json[position] == ',') { position++; continue; }
+                if (position < scenesEnd && json[position] == ']') return;
                 Fail(source, "scene array is invalid");
             }
         }
 
-        private static bool TryFindRootProperty(string json, string property, out int valueStart, out int valueEnd)
+        private static void ValidateSceneObject(string json, int start, int end, string source)
         {
-            valueStart = valueEnd = 0;
-            int position = 0;
-            SkipWhitespace(json, ref position);
-            if (position >= json.Length || json[position++] != '{') return false;
+            bool hasEnabled = false;
+            bool hasBuildIndex = false;
+            int position = start + 1;
             while (true)
             {
                 SkipWhitespace(json, ref position);
-                if (position >= json.Length || json[position] == '}') return false;
-                string name = ReadString(json, ref position);
+                if (position >= end || json[position] == '}') break;
+                string name = ReadJsonString(json, ref position);
                 SkipWhitespace(json, ref position);
-                if (position >= json.Length || json[position++] != ':') return false;
-                SkipWhitespace(json, ref position);
-                int start = position;
-                int end = SkipValue(json, ref position);
-                if (name == property) { valueStart = start; valueEnd = end; return true; }
-                SkipWhitespace(json, ref position);
-                if (position >= json.Length || json[position++] != ',') return false;
-            }
-        }
-
-        private static bool ObjectHasProperty(string json, int start, int end, string property)
-        {
-            int position = start + 1;
-            while (position < end)
-            {
-                SkipWhitespace(json, ref position);
-                if (position >= end || json[position] == '}') return false;
-                string name = ReadString(json, ref position);
-                SkipWhitespace(json, ref position);
-                if (position >= end || json[position++] != ':') return false;
+                if (position >= end || json[position++] != ':') Fail(source, "scene is invalid");
                 SkipWhitespace(json, ref position);
                 SkipValue(json, ref position);
-                if (name == property) return true;
+                if (name == "EnabledInBuildSettings")
+                {
+                    if (hasEnabled) Fail(source, "duplicate scene enabled");
+                    hasEnabled = true;
+                }
+                else if (name == "ExpectedBuildIndex")
+                {
+                    if (hasBuildIndex) Fail(source, "duplicate scene build index");
+                    hasBuildIndex = true;
+                }
                 SkipWhitespace(json, ref position);
                 if (position < end && json[position] == ',') { position++; continue; }
-                return false;
+                if (position < end && json[position] == '}') break;
+                Fail(source, "scene is invalid");
             }
-            return false;
+            if (!hasEnabled) Fail(source, "missing scene enabled");
+            if (!hasBuildIndex) Fail(source, "missing scene build index");
         }
 
         private static void SkipWhitespace(string json, ref int position)
@@ -370,16 +396,36 @@ namespace WasteCity.Editor.ProjectQuality
             while (position < json.Length && char.IsWhiteSpace(json[position])) position++;
         }
 
-        private static string ReadString(string json, ref int position)
+        private static string ReadJsonString(string json, ref int position)
         {
             if (position >= json.Length || json[position++] != '"') return null;
-            int start = position;
             var value = new System.Text.StringBuilder();
             while (position < json.Length)
             {
                 char current = json[position++];
-                if (current == '"') return value.Length == 0 ? json.Substring(start, position - start - 1) : value.ToString();
-                if (current == '\\' && position < json.Length) { value.Append(json[position++]); continue; }
+                if (current == '"') return value.ToString();
+                if (current == '\\' && position < json.Length)
+                {
+                    char escaped = json[position++];
+                    if (escaped == 'u' && position + 4 <= json.Length)
+                    {
+                        int codePoint;
+                        if (!int.TryParse(json.Substring(position, 4), System.Globalization.NumberStyles.AllowHexSpecifier,
+                            System.Globalization.CultureInfo.InvariantCulture, out codePoint)) return null;
+                        value.Append((char)codePoint);
+                        position += 4;
+                    }
+                    else
+                    {
+                        switch (escaped)
+                        {
+                            case '"': value.Append('"'); break; case '\\': value.Append('\\'); break; case '/': value.Append('/'); break;
+                            case 'b': value.Append('\b'); break; case 'f': value.Append('\f'); break; case 'n': value.Append('\n'); break;
+                            case 'r': value.Append('\r'); break; case 't': value.Append('\t'); break; default: return null;
+                        }
+                    }
+                    continue;
+                }
                 value.Append(current);
             }
             return null;
@@ -390,7 +436,7 @@ namespace WasteCity.Editor.ProjectQuality
             SkipWhitespace(json, ref position);
             if (position >= json.Length) return position;
             char opening = json[position];
-            if (opening == '"') { ReadString(json, ref position); return position; }
+            if (opening == '"') { ReadJsonString(json, ref position); return position; }
             if (opening != '{' && opening != '[') { while (position < json.Length && ",]} \t\r\n".IndexOf(json[position]) < 0) position++; return position; }
             char closing = opening == '{' ? '}' : ']';
             position++;
@@ -398,7 +444,7 @@ namespace WasteCity.Editor.ProjectQuality
             {
                 SkipWhitespace(json, ref position);
                 if (position < json.Length && json[position] == closing) { position++; return position; }
-                if (opening == '{') { ReadString(json, ref position); SkipWhitespace(json, ref position); if (position < json.Length && json[position] == ':') position++; }
+                if (opening == '{') { ReadJsonString(json, ref position); SkipWhitespace(json, ref position); if (position < json.Length && json[position] == ':') position++; }
                 SkipValue(json, ref position);
                 SkipWhitespace(json, ref position);
                 if (position < json.Length && json[position] == ',') position++;

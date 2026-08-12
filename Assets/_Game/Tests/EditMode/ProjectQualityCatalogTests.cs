@@ -59,6 +59,47 @@ namespace WasteCity.Tests
             StringAssert.Contains(caseName, error.Message);
         }
 
+        [TestCase("BUG-0001")]
+        [TestCase("DOC-0001")]
+        [TestCase("IDEA-0001")]
+        public void LoadFromJson_AcceptsEveryControlledRequirementPrefix(string requirementId)
+        {
+            ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromJson(
+                CatalogJson(requirementId: requirementId), "requirements.json");
+            Assert.That(catalog.FeatureGroups[0].RequirementIds[0], Is.EqualTo(requirementId));
+            Assert.That(catalog.ReuseEntries[0].RequirementIds[0], Is.EqualTo(requirementId));
+        }
+
+        [TestCase("TASK-0001")]
+        [TestCase("BUG-000")]
+        [TestCase("BUG-٠٠٠١")]
+        [TestCase("DOC-０００１")]
+        public void LoadFromJson_RejectsRequirementIdsOutsideExactAsciiGrammar(string requirementId)
+        {
+            InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+                ProjectQualityCatalogLoader.LoadFromJson(CatalogJson(requirementId: requirementId), "requirements.json"));
+            StringAssert.Contains("malformed requirement id", error.Message);
+        }
+
+        [TestCase("duplicate root Scenes", "duplicate root Scenes", "  \"ReuseEntries\"", "  \"Scenes\": [],\n  \"ReuseEntries\"")]
+        [TestCase("duplicate scene enabled", "duplicate scene enabled", "\"EnabledInBuildSettings\": true,", "\"EnabledInBuildSettings\": true, \"EnabledInBuildSettings\": false,")]
+        [TestCase("nested wrong scene field", "missing scene enabled", "\"EnabledInBuildSettings\": true,", "\"Metadata\": { \"EnabledInBuildSettings\": true },")]
+        public void LoadFromJson_RejectsAmbiguousOrNestedSceneFields(string caseName, string expectedFragment, string oldValue, string newValue)
+        {
+            InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+                ProjectQualityCatalogLoader.LoadFromJson(CatalogJson().Replace(oldValue, newValue), "scene-structure.json"));
+            StringAssert.Contains(expectedFragment, error.Message, caseName);
+        }
+
+        [Test]
+        public void LoadFromJson_DecodesEscapedSceneMemberNames()
+        {
+            ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromJson(
+                CatalogJson().Replace("\"EnabledInBuildSettings\"", "\"\\u0045nabledInBuildSettings\""),
+                "escaped-scene.json");
+            Assert.That(catalog.Scenes[0].EnabledInBuildSettings, Is.True);
+        }
+
         [Test]
         public void PublicApis_AreDeterministicAndDoNotWriteTheCatalog()
         {
@@ -74,6 +115,8 @@ namespace WasteCity.Tests
             AssertCatalogsEqual(fromFileA, fromFileB);
             AssertCatalogsEqual(fromFileA, fromJsonA);
             AssertCatalogsEqual(fromJsonA, fromJsonB);
+            fromJsonB.DocumentationRules[0].PlainChineseReason = "different";
+            Assert.That(() => AssertCatalogsEqual(fromJsonA, fromJsonB), Throws.TypeOf<AssertionException>());
             CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
         }
 
@@ -129,13 +172,53 @@ namespace WasteCity.Tests
         private static void AssertCatalogsEqual(ProjectQualityCatalog expected, ProjectQualityCatalog actual)
         {
             Assert.That(actual.SchemaVersion, Is.EqualTo(expected.SchemaVersion));
-            Assert.That(actual.FeatureGroups.Length, Is.EqualTo(expected.FeatureGroups.Length));
-            Assert.That(actual.ReuseEntries.Length, Is.EqualTo(expected.ReuseEntries.Length));
-            Assert.That(actual.Scenes.Length, Is.EqualTo(expected.Scenes.Length));
-            Assert.That(actual.UiEntries.Length, Is.EqualTo(expected.UiEntries.Length));
-            Assert.That(actual.DocumentationRules.Length, Is.EqualTo(expected.DocumentationRules.Length));
-            Assert.That(actual.FeatureGroups[0].Id, Is.EqualTo(expected.FeatureGroups[0].Id));
-            Assert.That(actual.ReuseEntries[0].Id, Is.EqualTo(expected.ReuseEntries[0].Id));
+            Assert.That(actual.FeatureGroups, Has.Length.EqualTo(expected.FeatureGroups.Length));
+            for (int index = 0; index < expected.FeatureGroups.Length; index++)
+            {
+                ProjectFeatureGroup a = expected.FeatureGroups[index]; ProjectFeatureGroup b = actual.FeatureGroups[index];
+                Assert.That(b.Id, Is.EqualTo(a.Id)); Assert.That(b.ChineseName, Is.EqualTo(a.ChineseName));
+                AssertArraysEqual(a.SourceGlobs, b.SourceGlobs); AssertArraysEqual(a.TestFileGlobs, b.TestFileGlobs);
+                AssertArraysEqual(a.ScenePaths, b.ScenePaths); AssertArraysEqual(a.RequirementIds, b.RequirementIds);
+                AssertArraysEqual(a.HumanDocumentPaths, b.HumanDocumentPaths); Assert.That(b.MinimumVerification, Is.EqualTo(a.MinimumVerification));
+            }
+            Assert.That(actual.ReuseEntries, Has.Length.EqualTo(expected.ReuseEntries.Length));
+            for (int index = 0; index < expected.ReuseEntries.Length; index++)
+            {
+                ProjectReuseEntry a = expected.ReuseEntries[index]; ProjectReuseEntry b = actual.ReuseEntries[index];
+                Assert.That(b.Id, Is.EqualTo(a.Id)); Assert.That(b.ChineseName, Is.EqualTo(a.ChineseName)); AssertArraysEqual(a.TypeNames, b.TypeNames);
+                AssertArraysEqual(a.AssetPaths, b.AssetPaths); Assert.That(b.FeatureGroupId, Is.EqualTo(a.FeatureGroupId));
+                Assert.That(b.ReuseLevel, Is.EqualTo(a.ReuseLevel)); Assert.That(b.UseSummary, Is.EqualTo(a.UseSummary));
+                Assert.That(b.BoundarySummary, Is.EqualTo(a.BoundarySummary)); AssertArraysEqual(a.RequiredTestFiles, b.RequiredTestFiles); AssertArraysEqual(a.RequirementIds, b.RequirementIds);
+            }
+            Assert.That(actual.Scenes, Has.Length.EqualTo(expected.Scenes.Length));
+            for (int index = 0; index < expected.Scenes.Length; index++)
+            {
+                ProjectSceneEntry a = expected.Scenes[index]; ProjectSceneEntry b = actual.Scenes[index];
+                Assert.That(b.Id, Is.EqualTo(a.Id)); Assert.That(b.ChineseName, Is.EqualTo(a.ChineseName)); Assert.That(b.Path, Is.EqualTo(a.Path));
+                Assert.That(b.Purpose, Is.EqualTo(a.Purpose)); Assert.That(b.EnabledInBuildSettings, Is.EqualTo(a.EnabledInBuildSettings));
+                Assert.That(b.ExpectedBuildIndex, Is.EqualTo(a.ExpectedBuildIndex)); Assert.That(b.ReuseLevel, Is.EqualTo(a.ReuseLevel));
+            }
+            Assert.That(actual.UiEntries, Has.Length.EqualTo(expected.UiEntries.Length));
+            for (int index = 0; index < expected.UiEntries.Length; index++)
+            {
+                ProjectUiEntry a = expected.UiEntries[index]; ProjectUiEntry b = actual.UiEntries[index];
+                Assert.That(b.Id, Is.EqualTo(a.Id)); Assert.That(b.ChineseName, Is.EqualTo(a.ChineseName)); Assert.That(b.OwnerTypeName, Is.EqualTo(a.OwnerTypeName));
+                Assert.That(b.SceneId, Is.EqualTo(a.SceneId)); Assert.That(b.InputPrioritySummary, Is.EqualTo(a.InputPrioritySummary)); AssertArraysEqual(a.RequiredTestFiles, b.RequiredTestFiles);
+            }
+            Assert.That(actual.DocumentationRules, Has.Length.EqualTo(expected.DocumentationRules.Length));
+            for (int index = 0; index < expected.DocumentationRules.Length; index++)
+            {
+                ProjectDocumentationRule a = expected.DocumentationRules[index]; ProjectDocumentationRule b = actual.DocumentationRules[index];
+                Assert.That(b.Id, Is.EqualTo(a.Id)); AssertArraysEqual(a.ChangedPathGlobs, b.ChangedPathGlobs); AssertArraysEqual(a.ReviewDocumentPaths, b.ReviewDocumentPaths); Assert.That(b.PlainChineseReason, Is.EqualTo(a.PlainChineseReason));
+            }
+            AssertArraysEqual(expected.ExplicitSourceExclusions, actual.ExplicitSourceExclusions);
+            AssertArraysEqual(expected.ExplicitTestExclusions, actual.ExplicitTestExclusions);
+        }
+
+        private static void AssertArraysEqual(string[] expected, string[] actual)
+        {
+            Assert.That(actual, Has.Length.EqualTo(expected.Length));
+            for (int index = 0; index < expected.Length; index++) Assert.That(actual[index], Is.EqualTo(expected[index]));
         }
 
         private static string ProjectRoot()
@@ -152,7 +235,8 @@ namespace WasteCity.Tests
             string featureId = "building",
             string sourceGlob = "Assets/_Game/Scripts/Building/**",
             string reuseLevel = "Recommended",
-            string verificationLevel = "FocusedEditMode")
+            string verificationLevel = "FocusedEditMode",
+            string requirementId = "DOC-0001")
         {
             return "{\n" +
                    "  \"SchemaVersion\": 1,\n" +
@@ -162,7 +246,7 @@ namespace WasteCity.Tests
                    "    \"SourceGlobs\": [\"" + sourceGlob.Replace("\\", "\\\\") + "\"],\n" +
                    "    \"TestFileGlobs\": [\"Assets/_Game/Tests/EditMode/BuildingGridTests.cs\"],\n" +
                    "    \"ScenePaths\": [\"Assets/_Game/Scenes/GrayboxPrototype3D.unity\"],\n" +
-                   "    \"RequirementIds\": [\"DOC-0001\"],\n" +
+                   "    \"RequirementIds\": [\"" + requirementId + "\"],\n" +
                    "    \"HumanDocumentPaths\": [\"Docs/Engineering/project-quality-catalog.json\"],\n" +
                    "    \"MinimumVerification\": \"" + verificationLevel + "\"\n" +
                    "  }],\n" +
@@ -176,7 +260,7 @@ namespace WasteCity.Tests
                    "    \"UseSummary\": \" 用于建筑格位计算 \",\n" +
                    "    \"BoundarySummary\": \" 不负责输入路由 \",\n" +
                    "    \"RequiredTestFiles\": [\"Assets/_Game/Tests/EditMode/BuildingGridTests.cs\"],\n" +
-                   "    \"RequirementIds\": [\"DOC-0001\"]\n" +
+                   "    \"RequirementIds\": [\"" + requirementId + "\"]\n" +
                    "  }],\n" +
                    "  \"Scenes\": [{\n" +
                    "    \"Id\": \"graybox\", \"ChineseName\": \" 灰盒场景 \",\n" +
