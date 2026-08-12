@@ -296,7 +296,13 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Presentation/**",
         "Assets/_Game/Scripts/ArtIntegration3D/**",
-        "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs"
+        "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs",
+        "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs"
       ],
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
@@ -327,7 +333,9 @@
         "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs",
         "Assets/_Game/Tests/EditMode/SceneContractTests.cs",
-        "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs"
+        "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
+        "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -345,8 +353,30 @@
       "ChineseName": "冻结二维回归",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Legacy/**",
-        "Assets/_Game/Scripts/**/*Placeholder*.cs",
-        "Assets/_Game/Scripts/**/*Formal*Controller.cs",
+        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
+        "Assets/_Game/Scripts/City/PlaceholderMobileCity.cs",
+        "Assets/_Game/Scripts/Combat/FormalCombatController.cs",
+        "Assets/_Game/Scripts/Combat/FormalFriendlyUnitController.cs",
+        "Assets/_Game/Scripts/Combat/FormalTechnologyRouteController.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderBehemoth.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderBossEncounter.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderEnemy.cs",
+        "Assets/_Game/Scripts/Combat/PlaceholderPuppet.cs",
+        "Assets/_Game/Scripts/Core/FormalGameClockController.cs",
+        "Assets/_Game/Scripts/Core/FormalSessionController.cs",
+        "Assets/_Game/Scripts/Core/FormalSessionStatisticsController.cs",
+        "Assets/_Game/Scripts/Economy/FormalEconomyController.cs",
+        "Assets/_Game/Scripts/Leader/FormalLeaderController.cs",
+        "Assets/_Game/Scripts/Narrative/FormalGuidanceController.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveController.cs",
+        "Assets/_Game/Scripts/Population/FormalPopulationController.cs",
+        "Assets/_Game/Scripts/Progression/FormalAdvancementController.cs",
+        "Assets/_Game/Scripts/Progression/FormalProgressionController.cs",
+        "Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs",
+        "Assets/_Game/Scripts/UI/FormalTitleMenuController.cs",
+        "Assets/_Game/Scripts/World/FormalCameraController.cs",
+        "Assets/_Game/Scripts/World/FormalDroneController.cs",
+        "Assets/_Game/Scripts/World/PlaceholderWorldView.cs",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "TestFileGlobs": [
@@ -1071,10 +1101,6 @@
       "PlainChineseReason": "功能归属变化时必须同步质量目录，保证后续任务只消费规范化模型。"
     }
   ],
-  "ExplicitSourceExclusions": [
-    "Assets/_Game/Tests/**"
-  ],
-  "ExplicitTestExclusions": [
-    "Assets/_Game/Tests/**/WasteCity.*.asmdef"
-  ]
+  "ExplicitSourceExclusions": [],
+  "ExplicitTestExclusions": []
 }

@@ -59,8 +59,8 @@ namespace WasteCity.Editor.ProjectQuality
                 Scenes = ConvertScenes(dto.Scenes, source, sceneIds),
                 UiEntries = ConvertUiEntries(dto.UiEntries, source, uiIds),
                 DocumentationRules = ConvertDocumentationRules(dto.DocumentationRules, source, documentationRuleIds),
-                ExplicitSourceExclusions = NormalizePaths(dto.ExplicitSourceExclusions, source, "explicit source exclusion"),
-                ExplicitTestExclusions = NormalizePaths(dto.ExplicitTestExclusions, source, "explicit test exclusion"),
+                ExplicitSourceExclusions = NormalizeExclusions(dto.ExplicitSourceExclusions, source, "explicit source exclusion"),
+                ExplicitTestExclusions = NormalizeExclusions(dto.ExplicitTestExclusions, source, "explicit test exclusion"),
             };
 
             ValidateRelationships(catalog, source);
@@ -95,8 +95,8 @@ namespace WasteCity.Editor.ProjectQuality
                 {
                     Id = UniqueId(entry.Id, ids, source, "feature"),
                     ChineseName = HumanText(entry.ChineseName, source, "Chinese name"),
-                    SourceGlobs = NormalizePaths(RequireArray(entry.SourceGlobs, source, "feature source globs"), source, "source glob"),
-                    TestFileGlobs = NormalizePaths(RequireArray(entry.TestFileGlobs, source, "feature test file globs"), source, "test file glob"),
+                    SourceGlobs = NormalizeGlobs(RequireArray(entry.SourceGlobs, source, "feature source globs"), source, "source glob"),
+                    TestFileGlobs = NormalizeGlobs(RequireArray(entry.TestFileGlobs, source, "feature test file globs"), source, "test file glob"),
                     ScenePaths = NormalizePaths(RequireArray(entry.ScenePaths, source, "feature scene paths"), source, "scene path"),
                     RequirementIds = NormalizeRequirementIds(RequireArray(entry.RequirementIds, source, "feature requirement IDs"), source),
                     HumanDocumentPaths = NormalizePaths(RequireArray(entry.HumanDocumentPaths, source, "feature human document paths"), source, "human document path"),
@@ -177,7 +177,7 @@ namespace WasteCity.Editor.ProjectQuality
                 result[index] = new ProjectDocumentationRule
                 {
                     Id = UniqueId(entry.Id, ids, source, "documentation rule"),
-                    ChangedPathGlobs = NormalizePaths(RequireArray(entry.ChangedPathGlobs, source, "changed path globs"), source, "changed path glob"),
+                    ChangedPathGlobs = NormalizeGlobs(RequireArray(entry.ChangedPathGlobs, source, "changed path globs"), source, "changed path glob"),
                     ReviewDocumentPaths = NormalizePaths(RequireArray(entry.ReviewDocumentPaths, source, "review document paths"), source, "review document path"),
                     PlainChineseReason = HumanText(entry.PlainChineseReason, source, "plain Chinese reason"),
                 };
@@ -220,6 +220,38 @@ namespace WasteCity.Editor.ProjectQuality
             var result = new string[values.Length];
             for (int index = 0; index < values.Length; index++)
                 result[index] = NormalizePath(values[index], source, label);
+            return result;
+        }
+
+        private static string[] NormalizeGlobs(string[] values, string source, string label)
+        {
+            var result = new string[values.Length];
+            for (int index = 0; index < values.Length; index++)
+            {
+                string path = NormalizePath(values[index], source, label);
+                int recursive = path.IndexOf("**", StringComparison.Ordinal);
+                if (recursive >= 0 && (recursive != path.Length - 2 || !path.EndsWith("/**", StringComparison.Ordinal)))
+                    Fail(source, "unsupported recursive glob: " + path);
+                result[index] = path;
+            }
+            return result;
+        }
+
+        private static ProjectPathExclusion[] NormalizeExclusions(PathExclusionDto[] values, string source, string label)
+        {
+            var result = new ProjectPathExclusion[values.Length];
+            for (int index = 0; index < values.Length; index++)
+            {
+                PathExclusionDto entry = RequireEntry(values[index], source, label);
+                string path = NormalizePath(entry.Path, source, label + " path");
+                if (path.IndexOf('*') >= 0 || path.IndexOf('?') >= 0)
+                    Fail(source, label + " must be an exact path: " + path);
+                result[index] = new ProjectPathExclusion
+                {
+                    Path = path,
+                    Reason = HumanText(entry.Reason, source, label + " reason"),
+                };
+            }
             return result;
         }
 
@@ -461,8 +493,8 @@ namespace WasteCity.Editor.ProjectQuality
             public SceneEntryDto[] Scenes;
             public UiEntryDto[] UiEntries;
             public DocumentationRuleDto[] DocumentationRules;
-            public string[] ExplicitSourceExclusions;
-            public string[] ExplicitTestExclusions;
+            public PathExclusionDto[] ExplicitSourceExclusions;
+            public PathExclusionDto[] ExplicitTestExclusions;
         }
 
         [Serializable]
@@ -523,6 +555,13 @@ namespace WasteCity.Editor.ProjectQuality
             public string[] ChangedPathGlobs;
             public string[] ReviewDocumentPaths;
             public string PlainChineseReason;
+        }
+
+        [Serializable]
+        private sealed class PathExclusionDto
+        {
+            public string Path;
+            public string Reason;
         }
     }
 }

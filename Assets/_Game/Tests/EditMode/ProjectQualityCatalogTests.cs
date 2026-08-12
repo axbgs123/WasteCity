@@ -36,6 +36,7 @@ namespace WasteCity.Tests
         [TestCase("empty Chinese name")]
         [TestCase("absolute repository path")]
         [TestCase("parent traversal")]
+        [TestCase("unsupported recursive glob")]
         public void LoadFromJson_RejectsInvalidCatalogWithSourceName(string caseName)
         {
             string json = InvalidCatalogJson(caseName);
@@ -130,6 +131,32 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void LoadFromJson_ConvertsExactExclusionsWithReasons()
+        {
+            string json = CatalogJson().Replace("\"ExplicitSourceExclusions\": []",
+                "\"ExplicitSourceExclusions\": [{\"Path\":\"Assets/_Game/Scripts/Feature/Generated.cs\",\"Reason\":\"生成文件由工具维护\"}]");
+
+            ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromJson(json, "exclusions.json");
+
+            Assert.That(catalog.ExplicitSourceExclusions[0].Path,
+                Is.EqualTo("Assets/_Game/Scripts/Feature/Generated.cs"));
+            Assert.That(catalog.ExplicitSourceExclusions[0].Reason, Is.EqualTo("生成文件由工具维护"));
+        }
+
+        [TestCase("Assets/_Game/Scripts/*.cs", "理由", "exact path")]
+        [TestCase("Assets/_Game/Scripts/Feature/Generated.cs", "   ", "reason")]
+        public void LoadFromJson_RejectsWildcardOrReasonlessExclusion(string path, string reason, string expected)
+        {
+            string json = CatalogJson().Replace("\"ExplicitSourceExclusions\": []",
+                "\"ExplicitSourceExclusions\": [{\"Path\":\"" + path + "\",\"Reason\":\"" + reason + "\"}]");
+
+            InvalidDataException error = Assert.Throws<InvalidDataException>(() =>
+                ProjectQualityCatalogLoader.LoadFromJson(json, "exclusions.json"));
+
+            StringAssert.Contains(expected, error.Message);
+        }
+
+        [Test]
         public void CommittedCatalog_UsesControlledRequirementsAndMapsCatalogOwnership()
         {
             string docs06 = File.ReadAllText(Path.Combine(ProjectRoot(), "Docs/06-User-Feedback-and-Change-Control-ZH.md"));
@@ -211,8 +238,18 @@ namespace WasteCity.Tests
                 ProjectDocumentationRule a = expected.DocumentationRules[index]; ProjectDocumentationRule b = actual.DocumentationRules[index];
                 Assert.That(b.Id, Is.EqualTo(a.Id)); AssertArraysEqual(a.ChangedPathGlobs, b.ChangedPathGlobs); AssertArraysEqual(a.ReviewDocumentPaths, b.ReviewDocumentPaths); Assert.That(b.PlainChineseReason, Is.EqualTo(a.PlainChineseReason));
             }
-            AssertArraysEqual(expected.ExplicitSourceExclusions, actual.ExplicitSourceExclusions);
-            AssertArraysEqual(expected.ExplicitTestExclusions, actual.ExplicitTestExclusions);
+            AssertExclusionsEqual(expected.ExplicitSourceExclusions, actual.ExplicitSourceExclusions);
+            AssertExclusionsEqual(expected.ExplicitTestExclusions, actual.ExplicitTestExclusions);
+        }
+
+        private static void AssertExclusionsEqual(ProjectPathExclusion[] expected, ProjectPathExclusion[] actual)
+        {
+            Assert.That(actual, Has.Length.EqualTo(expected.Length));
+            for (int index = 0; index < expected.Length; index++)
+            {
+                Assert.That(actual[index].Path, Is.EqualTo(expected[index].Path));
+                Assert.That(actual[index].Reason, Is.EqualTo(expected[index].Reason));
+            }
         }
 
         private static void AssertArraysEqual(string[] expected, string[] actual)
@@ -302,6 +339,8 @@ namespace WasteCity.Tests
                     return json.Replace("Assets/_Game/Scripts/Building/**", "/Users/example/Assets/_Game/Scripts/Building/**");
                 case "parent traversal":
                     return json.Replace("Assets/_Game/Scripts/Building/**", "Assets/_Game/../Secrets/**");
+                case "unsupported recursive glob":
+                    return json.Replace("Assets/_Game/Scripts/Building/**", "Assets/_Game/**/Building.cs");
                 default:
                     Assert.Fail("Unknown invalid catalog case: " + caseName);
                     return null;

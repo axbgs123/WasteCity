@@ -42,6 +42,12 @@ namespace WasteCity.Editor.ProjectQuality
         PlayMode,
     }
 
+    public enum ProjectQualityIssueSeverity
+    {
+        Error,
+        Warning,
+    }
+
     [Serializable]
     public sealed class ProjectFileRecord
     {
@@ -334,6 +340,22 @@ namespace WasteCity.Editor.ProjectQuality
     }
 
     [Serializable]
+    public sealed class ProjectPathExclusion
+    {
+        public string Path;
+        public string Reason;
+    }
+
+    [Serializable]
+    public sealed class ProjectQualityIssue
+    {
+        public string Code;
+        public ProjectQualityIssueSeverity Severity;
+        public string PlainChineseMessage;
+        public string Path;
+    }
+
+    [Serializable]
     public sealed class ProjectQualityCatalog
     {
         public int SchemaVersion;
@@ -342,7 +364,7 @@ namespace WasteCity.Editor.ProjectQuality
         public ProjectSceneEntry[] Scenes;
         public ProjectUiEntry[] UiEntries;
         public ProjectDocumentationRule[] DocumentationRules;
-        public string[] ExplicitSourceExclusions;
-        public string[] ExplicitTestExclusions;
+        public ProjectPathExclusion[] ExplicitSourceExclusions;
+        public ProjectPathExclusion[] ExplicitTestExclusions;
     }
 }
