@@ -84,14 +84,42 @@ git status
 
 ## 受控文档更新流程
 
-完成一次有仓库改动的审查时，先在交付说明写明已经确认的比较基线和审查范围。不要直接把用户工作区里所有未提交内容当成本次改动。下面清单只收集明确基线到当前提交之间的项目相对路径，并把它交给生成器：
+完成一次有仓库改动的审查时，先在交付说明写明已经确认的比较基线和审查范围。`TASK_PATHS` 只写本任务已批准的精确路径；不要用全仓库 `git diff`，也不要把用户工作区里所有未提交内容当成本次改动。
+
+### A. 已提交审查
+
+当只审查已经提交的范围时，比较明确基线到 `HEAD`。这不会收集 index、工作区或未跟踪文件：
 
 ```sh
 PROJECT_ROOT="$(git rev-parse --show-toplevel)"
 REVIEW_BASE=<已明确的基线提交>
+TASK_PATHS=("精确路径1" "精确路径2")
 CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
 mkdir -p /tmp/wastecity-project-quality
-git diff --name-only "$REVIEW_BASE"...HEAD > "$CHANGED_PATHS"
+git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}" > "$CHANGED_PATHS"
+```
+
+### B. 提交前正常开发
+
+完成门通常在提交前运行。对同一份 `TASK_PATHS`，必须合并四类来源：基线后的已提交改动、index、已跟踪工作区改动和未跟踪文件。这样能收集本任务尚未提交的内容，却不会无差别收集用户的无关脏改：
+
+```sh
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+REVIEW_BASE=<已明确的基线提交>
+TASK_PATHS=("精确路径1" "精确路径2")
+CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
+mkdir -p /tmp/wastecity-project-quality
+{
+  git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}"
+  git diff --cached --name-only -- "${TASK_PATHS[@]}"
+  git diff --name-only -- "${TASK_PATHS[@]}"
+  git ls-files --others --exclude-standard -- "${TASK_PATHS[@]}"
+} | LC_ALL=C sort -u > "$CHANGED_PATHS"
+```
+
+确认 `CHANGED_PATHS` 只包含批准范围后，用它生成和验证：
+
+```sh
 WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
   "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
   -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.GenerateDocumentation
@@ -100,7 +128,9 @@ WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
   -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation
 ```
 
-其中 `UNITY_BIN` 使用本机 Unity `2022.3.62f1` 的可执行文件。交付说明必须记录 `REVIEW_BASE` 和 `CHANGED_PATHS` 所用清单，方便之后复查。只有用户明确确认“本次没有仓库变更”时，才可先创建空的 UTF-8 文件再运行上述命令；缺少 `WASTECITY_QUALITY_CHANGED_PATHS` 不是普通完成路径。生成和验证只更新或检查受控技术附录，不会替代人工试玩、审批或验收。
+其中 `UNITY_BIN` 使用本机 Unity `2022.3.62f1` 的可执行文件。生成前输入清单只用于本轮文档关注提醒，不等于生成后最终暂存清单；步骤 9 仍要单独核对最终精确暂存清单和受保护文件。交付说明必须记录 `REVIEW_BASE`、`TASK_PATHS` 和 `CHANGED_PATHS` 所用清单，方便之后复查。只有用户明确确认“本次没有仓库变更”时，才可先创建空的 UTF-8 文件再运行上述命令；缺少 `WASTECITY_QUALITY_CHANGED_PATHS` 不是普通完成路径。生成和验证只更新或检查受控技术附录，不会替代人工试玩、审批或验收。
+
+上面的命令块仅适用于 macOS/Linux shell。Windows 请在 PowerShell 中用同一份精确路径集合分别运行四类 Git 查询，并用 `Sort-Object -Unique | Set-Content -Encoding utf8` 合并为清单；随后按[测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)的 Windows 入口运行 Unity，不要把 Bash 命令直接当成 Windows 通用命令。
 
 ## 美术替换约定
 

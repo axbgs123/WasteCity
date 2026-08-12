@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -390,6 +391,42 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void ScopedChangedPathCollection_IncludesOnlyTheApprovedUntrackedFixture()
+        {
+            string root = ProjectRoot();
+            string fixtureRelativePath = "task8-scoped-changed-path-" + Guid.NewGuid().ToString("N") + ".txt";
+            string fixturePath = Path.Combine(root, fixtureRelativePath);
+            try
+            {
+                File.WriteAllText(fixturePath, "scoped fixture\n", new UTF8Encoding(false));
+                string[] collected = CollectScopedGitPaths(root, fixtureRelativePath);
+
+                CollectionAssert.Contains(collected, fixtureRelativePath);
+                CollectionAssert.DoesNotContain(collected,
+                    "Assets/_Game/Art/FirstPass/Environment/Terrain/Cliff/T_Terrain_Cliff_BaseColor.png.meta");
+                CollectionAssert.DoesNotContain(collected, "ProjectSettings/PackageManagerSettings.asset");
+                CollectionAssert.DoesNotContain(collected, "ProjectSettings/URPProjectSettings.asset");
+
+                string readme = ReadGuide("README.md");
+                StringAssert.Contains("### A. 已提交审查", readme);
+                StringAssert.Contains("git diff --name-only \"$REVIEW_BASE\"...HEAD -- \"${TASK_PATHS[@]}\"", readme);
+                StringAssert.Contains("### B. 提交前正常开发", readme);
+                StringAssert.Contains("TASK_PATHS=(\"精确路径1\" \"精确路径2\")", readme);
+                StringAssert.Contains("git diff --cached --name-only -- \"${TASK_PATHS[@]}\"", readme);
+                StringAssert.Contains("git diff --name-only -- \"${TASK_PATHS[@]}\"", readme);
+                StringAssert.Contains("git ls-files --others --exclude-standard -- \"${TASK_PATHS[@]}\"", readme);
+                StringAssert.Contains("LC_ALL=C sort -u", readme);
+                StringAssert.Contains("生成前输入清单", readme);
+                StringAssert.Contains("最终暂存清单", readme);
+                StringAssert.Contains("PowerShell", readme);
+            }
+            finally
+            {
+                if (File.Exists(fixturePath)) File.Delete(fixturePath);
+            }
+        }
+
+        [Test]
         public void PlainChineseHumanGuides_HaveOrderedSectionsResolvedLinksAndPlainLanguage()
         {
             string userGuide = ReadGuide("Docs/07-Project-Use-and-Development-Guide-ZH.md");
@@ -591,6 +628,48 @@ namespace WasteCity.Tests
                 Assert.That(index, Is.GreaterThan(previous), "missing or reordered text: " + value);
                 previous = index;
             }
+        }
+
+        private static string[] CollectScopedGitPaths(string projectRoot, string approvedPath)
+        {
+            return new[]
+            {
+                RunGit(projectRoot, "diff", "--name-only", "HEAD", "--", approvedPath),
+                RunGit(projectRoot, "diff", "--cached", "--name-only", "--", approvedPath),
+                RunGit(projectRoot, "diff", "--name-only", "--", approvedPath),
+                RunGit(projectRoot, "ls-files", "--others", "--exclude-standard", "--", approvedPath),
+            }.SelectMany(output => output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+                .Select(path => path.Replace('\\', '/')).Distinct(StringComparer.Ordinal)
+                .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        }
+
+        private static string RunGit(string projectRoot, params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                WorkingDirectory = projectRoot,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                Arguments = string.Join(" ", arguments.Select(GitArgument).ToArray()),
+            };
+            using (Process process = Process.Start(startInfo))
+            {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                Assert.That(process.ExitCode, Is.EqualTo(0), "git command failed: " + error);
+                return output;
+            }
+        }
+
+        private static string GitArgument(string value)
+        {
+            Assert.That(Regex.IsMatch(value ?? string.Empty, "^[A-Za-z0-9_./-]+$"), Is.True,
+                "test git arguments must be fixed safe repository-relative tokens");
+            return value;
         }
 
         private static string ReuseEntryBody(string content, ProjectReuseEntry entry)
