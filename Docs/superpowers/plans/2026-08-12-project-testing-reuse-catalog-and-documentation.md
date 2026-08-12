@@ -422,6 +422,8 @@ git commit -m "feat: define project quality catalog"
 - Create: `Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs.meta`
 - Modify: `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
 - Modify: `Assets/_Game/Editor/WasteCity.Editor.asmdef`
+- Modify: `Packages/manifest.json`
+- Modify: `Packages/packages-lock.json`
 
 **Interfaces:**
 - Consumes: normalized `ProjectQualityCatalog`
@@ -477,7 +479,8 @@ The scanner must:
 - use `EditorBuildSettings.scenes` for enabled scene order;
 - identify Editor public static parameterless methods on `FormalBuildTools`, `GrayboxSceneAuthoring`, `FirstArtTerrainAssetBuilder`, `FirstArtTerrainEvidenceCapture`, `GrayboxPerformanceProbe`, and later `ProjectQualityTools`;
 - find test classes from loaded types with NUnit `[Test]`, `[TestCase]`, `[TestCaseSource]`, or Unity `[UnityTest]` methods;
-- keep the `Mono.Cecil` and `Mono.Cecil.Pdb` namespaces private to `WasteCity.Editor`: set `overrideReferences` and add only the Unity Editor managed assemblies `Unity.Cecil.dll` and `Unity.Cecil.Pdb.dll` as `precompiledReferences` in `WasteCity.Editor.asmdef`. Unity 2022.3 exposes these project-facing filenames even though the contained namespaces remain `Mono.Cecil*`; do not copy the Test Runner package's `Mono.Cecil*.dll` filenames. Do not vendor DLLs, use machine-specific paths, expose Cecil types from public scanner models, modify `WasteCity.EditModeTests.asmdef`, or add Cecil `using` directives to tests;
+- add Unity's bundled `com.unity.nuget.mono-cecil` package at exact version `1.11.4` to `Packages/manifest.json` and let Unity resolve the matching direct depth-0 lock entry. This is an Editor quality-tool dependency only; do not add a Git URL, local `file:` path, machine-specific path, or copied DLL;
+- keep the `Mono.Cecil` and `Mono.Cecil.Pdb` namespaces private to `WasteCity.Editor`: after the package is resolved, set `overrideReferences` and add only package-provided `Mono.Cecil.dll` and `Mono.Cecil.Pdb.dll` as `precompiledReferences` in `WasteCity.Editor.asmdef`. Do not expose Cecil types from public scanner models, modify `WasteCity.EditModeTests.asmdef`, or add Cecil `using` directives to tests;
 - build one ordinal deterministic type-to-source index from the loaded `WasteCity*` assembly DLLs and their Unity-generated portable PDB sequence-point documents. Normalize each document path to one repository-relative path under the approved source/test roots, recurse nested Cecil type definitions, and match the exact runtime `Type.FullName`; use `MonoScript.GetClass()` exact identity only as a zero-sequence-point fallback. Multiple top-level types in one file must map independently (including `WasteCity.Building.BuildingRuntime` and `WasteCity.Building.PlaceholderShieldGenerator`). Fail on absent DLL/PDB, missing source, outside-root source, or multiple distinct paths rather than guessing;
 - map every production/editor discovered type and each discovered test class through that private index. Test-only `MonoBehaviour` and `ScriptableObject` helpers are deliberately absent from `ProjectTypeRecords`; their owning test class remains in the test inventory. Tests verify only public `ProjectInventorySnapshot` results and never directly construct or inspect Cecil objects;
 - delete the handwritten C# declaration lexer/preprocessor and its reflection-based lexical tests after the new current-project RED proves the missing multi-type mapping. Do not retain source-text parsing as a fallback;
@@ -493,7 +496,7 @@ Run the same Task 2 filter with `task-02/green.xml` and `task-02/green.log`; exp
 
 - [ ] **Step 5: Commit Task 2**
 
-Stage only the six listed task paths and commit:
+Stage only the eight listed task paths and commit:
 
 ```bash
 git commit -m "feat: scan project quality inventory"
