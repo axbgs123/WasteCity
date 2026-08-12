@@ -1189,6 +1189,41 @@ the exact two-build `1/1` evidence above.  They are focused diagnosis/control
 evidence, not substitutes for full EditMode.  This correction changes verification
 scheduling only; it does not authorize another test or implementation change.
 
+#### User-approved fast/deep test split
+
+On 2026-08-12 the user explicitly approved simplifying checks that are unnecessary
+for every development cycle.  Apply that decision as **scheduling**, not deletion:
+
+- add NUnit fixture category `TerrainAssetDeep` to
+  `FirstArtTerrainAssetBuilderTests`; keep every existing test and assertion;
+- daily EditMode regression is the complete EditMode suite with
+  `-testCategory '!TerrainAssetDeep'`;
+- the full-size terrain-array suite remains available with
+  `-testCategory 'TerrainAssetDeep'` and is required when terrain source PNGs,
+  their import policy, `FirstArtTerrainAssetBuilder`, generated texture arrays, or
+  their serialization format change, and before a release candidate;
+- shader/material/control-map/scene-contract tests remain in the daily suite; only
+  the fixture that repeatedly rebuilds the real seven-layer 2K arrays is deep;
+- for this Task 9 acceptance, the already-completed current-HEAD sentinel `1/1`
+  and two-build `1/1` controls cover the changed sentinel helper.  Prove category
+  routing with the cheap quantization cases under `TerrainAssetDeep`, then run the
+  daily EditMode suite excluding the category.  Do not run all 24 full-size rebuilds
+  again in this cycle; record that the complete deep suite remains a release/terrain-
+  change gate and was not represented as passing in the final snapshot.
+
+Use TDD for the classification/documentation contract.  First extend
+`ProjectDocumentationGeneratorTests` so it fails unless the fixture has the exact
+`[Category("TerrainAssetDeep")]` marker and the plain-Chinese test guide documents
+both exact commands and their trigger boundaries.  Then make the minimal fixture and
+guide changes.  Do not modify production code, generated texture arrays, source
+textures/metas, importer policy, or any gameplay/runtime path.
+
+**Additional files approved for this correction:**
+
+- Modify: `Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs`
+- Modify: `Docs/08-Testing-and-Bug-Location-Guide-ZH.md`
+
 **Files:**
 - Modify: `Docs/06-User-Feedback-and-Change-Control-ZH.md`
 - Regenerate: `Docs/Generated/Latest-Verification-ZH.md`
