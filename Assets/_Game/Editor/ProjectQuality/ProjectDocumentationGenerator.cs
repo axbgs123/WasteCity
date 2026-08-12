@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using UnityEngine;
 
 namespace WasteCity.Editor.ProjectQuality
@@ -38,6 +39,7 @@ namespace WasteCity.Editor.ProjectQuality
 
     public static class ProjectDocumentationGenerator
     {
+        private const string GeneratorSchema = "project-quality-documentation/v2";
         public const string ProjectInventoryPath = "Docs/Generated/Project-Inventory-ZH.md";
         public const string TestInventoryPath = "Docs/Generated/Test-Inventory-ZH.md";
         public const string VerificationPath = "Docs/Generated/Latest-Verification-ZH.md";
@@ -53,11 +55,16 @@ namespace WasteCity.Editor.ProjectQuality
         {
             RequireCatalog(catalog);
             RequireSnapshot(snapshot);
-            string fingerprint = ContentFingerprint(catalog, snapshot);
+            string inventoryBody = RenderProjectInventoryBody(catalog, snapshot);
+            string testBody = RenderTestInventoryBody(catalog, snapshot);
+            string fingerprint = ContentFingerprint(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { ProjectInventoryPath, inventoryBody }, { TestInventoryPath, testBody },
+            });
             var files = new SortedDictionary<string, string>(StringComparer.Ordinal)
             {
-                { ProjectInventoryPath, RenderProjectInventory(catalog, snapshot, fingerprint) },
-                { TestInventoryPath, RenderTestInventory(catalog, snapshot, fingerprint) },
+                { ProjectInventoryPath, WithStructuralHeader("项目自动清单", fingerprint, inventoryBody) },
+                { TestInventoryPath, WithStructuralHeader("测试自动清单", fingerprint, testBody) },
             };
             return files;
         }
@@ -73,7 +80,7 @@ namespace WasteCity.Editor.ProjectQuality
                 {
                     if (!Values(rule.ChangedPathGlobs).Any(glob => PathMatchesGlob(changedPath, glob))) continue;
                     foreach (string documentPath in Values(rule.ReviewDocumentPaths).OrderBy(path => path, StringComparer.Ordinal))
-                        reminders.Add("- 检查 `" + documentPath + "`：" + (rule.PlainChineseReason ?? string.Empty));
+                        reminders.Add("- 检查 " + Code(documentPath) + "：" + Text(rule.PlainChineseReason));
                 }
             }
 
@@ -89,22 +96,22 @@ namespace WasteCity.Editor.ProjectQuality
         {
             ValidateVerificationSnapshot(snapshot);
             var builder = NewDocument("最近验证快照", "这是已记录的既有验证证据，不是本次运行自动推断的结果。");
-            builder.AppendLine("- 已验证提交：`" + snapshot.VerifiedCommitSha + "`");
-            builder.AppendLine("- 记录时间：`" + snapshot.VerifiedAtIso8601 + "`");
+            builder.AppendLine("- 已验证提交：" + Code(snapshot.VerifiedCommitSha));
+            builder.AppendLine("- 记录时间：" + Code(snapshot.VerifiedAtIso8601));
             builder.AppendLine();
             builder.AppendLine("## 1. 自动测试");
             AppendTestRun(builder, "EditMode", snapshot.EditMode);
             AppendTestRun(builder, "PlayMode", snapshot.PlayMode);
             builder.AppendLine();
             builder.AppendLine("## 2. 编译与 Windows 构建");
-            builder.AppendLine("- 无界面编译：" + (snapshot.Compile.Passed ? "通过" : "未通过") + "，证据：`" + snapshot.Compile.EvidencePath + "`");
+            builder.AppendLine("- 无界面编译：" + (snapshot.Compile.Passed ? "通过" : "未通过") + "，证据：" + Code(snapshot.Compile.EvidencePath));
             builder.AppendLine("- Windows 构建：" + snapshot.Builds.Length + " 项，" +
                 (snapshot.Builds.All(build => build.Passed) ? "均通过" : "存在未通过项") + "。");
             foreach (ProjectCommandResult build in snapshot.Builds)
-                builder.AppendLine("  - " + (build.Passed ? "通过" : "未通过") + "：`" + build.EvidencePath + "`");
+                builder.AppendLine("  - " + (build.Passed ? "通过" : "未通过") + "：" + Code(build.EvidencePath));
             builder.AppendLine();
             builder.AppendLine("## 3. 人工试玩");
-            builder.AppendLine("- 状态：" + snapshot.HumanPlaytestStatus);
+            builder.AppendLine("- 状态：" + Text(snapshot.HumanPlaytestStatus));
             return Finish(builder);
         }
 
@@ -112,6 +119,8 @@ namespace WasteCity.Editor.ProjectQuality
         {
             if (string.IsNullOrWhiteSpace(projectRoot) || files == null)
                 throw new InvalidOperationException("项目根目录或生成文件无效");
+            if (files.Count != ApprovedPaths.Length || !new HashSet<string>(files.Keys, StringComparer.Ordinal)
+                .SetEquals(ApprovedPaths)) throw new InvalidOperationException("必须同批写入四份批准的生成文件");
             string fullRoot = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             var prepared = new List<KeyValuePair<string, byte[]>>();
             foreach (KeyValuePair<string, string> pair in files.OrderBy(value => value.Key, StringComparer.Ordinal))
@@ -152,26 +161,26 @@ namespace WasteCity.Editor.ProjectQuality
             return new ProjectVerificationSnapshot
             {
                 VerifiedCommitSha = "81b2f47d1688a72a7ddba36a2ffa04b1025e40f9",
-                VerifiedAtIso8601 = "2026-08-12T12:00:00+08:00",
+                VerifiedAtIso8601 = "2026-08-12T00:26:11+08:00",
                 EditMode = new ProjectTestRunSummary
                 {
                     Total = 1121, Passed = 1121, Failed = 0, Skipped = 0,
-                    XmlPath = "已记录的父基线：EditMode 1121/1121",
+                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-editmode-v2.xml",
                 },
                 PlayMode = new ProjectTestRunSummary
                 {
                     Total = 82, Passed = 82, Failed = 0, Skipped = 0,
-                    XmlPath = "已记录的父基线：PlayMode 82/82",
+                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-playmode.xml",
                 },
                 Compile = new ProjectCommandResult
                 {
-                    Passed = true, EvidencePath = "已记录的父基线：无界面编译通过",
+                    Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-compile.log",
                 },
                 Builds = new[]
                 {
-                    new ProjectCommandResult { Passed = true, EvidencePath = "已记录的父基线：Windows 构建 1 通过" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "已记录的父基线：Windows 构建 2 通过" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "已记录的父基线：Windows 构建 3 通过" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-release-3d.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-development-3d.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-legacy-2d.log" },
                 },
                 HumanPlaytestStatus = "等待用户复验",
             };
@@ -192,22 +201,27 @@ namespace WasteCity.Editor.ProjectQuality
             WriteGeneratedFiles(root, files);
         }
 
-        private static string RenderProjectInventory(ProjectQualityCatalog catalog,
-            ProjectInventorySnapshot snapshot, string fingerprint)
+        private static string RenderProjectInventoryBody(ProjectQualityCatalog catalog,
+            ProjectInventorySnapshot snapshot)
         {
-            var builder = NewDocument("项目自动清单", "本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。工具架构版本：1，内容指纹：`" + fingerprint + "`。");
+            var builder = new StringBuilder();
             builder.AppendLine("## 1. 生成说明与内容指纹");
-            builder.AppendLine("- 指纹只来自已提供的目录和项目快照，不读取当前时间、Git 提交或机器路径。");
+            builder.AppendLine("- 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。");
             builder.AppendLine("## 2. 程序集");
             AppendList(builder, Values(snapshot.AssemblyRecords).OrderBy(value => value.Name, StringComparer.Ordinal)
-                .Select(value => "`" + value.Name + "`：`" + value.Path + "`"));
+                .Select(value => Code(value.Name) + "：" + Code(value.Path)));
             builder.AppendLine("## 3. 启用场景与顺序");
             AppendList(builder, Values(catalog.Scenes).Where(value => value.EnabledInBuildSettings)
                 .OrderBy(value => value.ExpectedBuildIndex).ThenBy(value => value.Path, StringComparer.Ordinal)
-                .Select(value => value.ExpectedBuildIndex + "：`" + value.Path + "`（" + value.ChineseName + "）"));
+                .Select(value => value.ExpectedBuildIndex + "：" + Code(value.Path) + "（" + Text(value.ChineseName) + "）"));
             builder.AppendLine("## 4. 按功能分组的生产文件");
             foreach (ProjectFeatureGroup feature in Values(catalog.FeatureGroups).OrderBy(value => value.Id, StringComparer.Ordinal))
-                builder.AppendLine("- " + feature.ChineseName + "（`" + feature.Id + "`）：" + JoinCode(Values(feature.SourceGlobs)));
+            {
+                builder.AppendLine("- " + Text(feature.ChineseName) + "（" + Code(feature.Id) + "）：");
+                AppendList(builder, Values(snapshot.FileRecords).Where(value => value.Kind == ProjectFileKind.Production &&
+                    Values(feature.SourceGlobs).Any(glob => PathMatchesGlob(value.Path, glob))).OrderBy(value => value.Path, StringComparer.Ordinal)
+                    .Select(value => Code(value.Path)));
+            }
             builder.AppendLine("## 5. MonoBehaviour 组件");
             AppendList(builder, Values(snapshot.TypeRecords).Where(value => value.Kind == ProjectTypeKind.MonoBehaviour)
                 .OrderBy(value => value.FullName, StringComparer.Ordinal).Select(TypeLine));
@@ -216,50 +230,56 @@ namespace WasteCity.Editor.ProjectQuality
                 .OrderBy(value => value.FullName, StringComparer.Ordinal).Select(TypeLine));
             builder.AppendLine("## 7. 界面所有者");
             AppendList(builder, Values(catalog.UiEntries).OrderBy(value => value.Id, StringComparer.Ordinal)
-                .Select(value => value.ChineseName + "：`" + value.OwnerTypeName + "`，场景 `" + value.SceneId + "`"));
+                .Select(value => Text(value.ChineseName) + "：" + Code(value.OwnerTypeName) + "，场景 " + Code(value.SceneId)));
             builder.AppendLine("## 8. 编辑器、构建与性能入口");
             AppendList(builder, Values(snapshot.EditorEntryPoints).OrderBy(value => value.OwnerTypeFullName, StringComparer.Ordinal)
                 .ThenBy(value => value.MethodName, StringComparer.Ordinal)
-                .Select(value => "`" + value.OwnerTypeFullName + "." + value.MethodName + "`"));
+                .Select(value => Code(value.OwnerTypeFullName + "." + value.MethodName)));
             builder.AppendLine("## 9. 美术接入与稳定展示路径");
-            AppendList(builder, Values(catalog.ReuseEntries).SelectMany(value => Values(value.AssetPaths))
-                .Where(path => path.IndexOf("Art", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    path.IndexOf("Presentation", StringComparison.OrdinalIgnoreCase) >= 0)
-                .OrderBy(path => path, StringComparer.Ordinal).Select(path => "`" + path + "`"));
+            ProjectFeatureGroup presentation = Values(catalog.FeatureGroups).FirstOrDefault(value =>
+                value.Id == "presentation-art-integration");
+            var presentationPaths = new SortedSet<string>(StringComparer.Ordinal);
+            if (presentation != null)
+                foreach (ProjectFileRecord file in Values(snapshot.FileRecords).Where(value => value.Kind == ProjectFileKind.Production &&
+                    Values(presentation.SourceGlobs).Any(glob => PathMatchesGlob(value.Path, glob)))) presentationPaths.Add(file.Path);
+            foreach (ProjectReuseEntry reuse in Values(catalog.ReuseEntries).Where(value =>
+                value.FeatureGroupId == "presentation-art-integration"))
+                foreach (string path in Values(reuse.AssetPaths)) presentationPaths.Add(path);
+            AppendList(builder, presentationPaths.Select(Code));
             builder.AppendLine("## 10. 明确排除项");
             AppendList(builder, Values(catalog.ExplicitSourceExclusions).Concat(Values(catalog.ExplicitTestExclusions))
-                .OrderBy(value => value.Path, StringComparer.Ordinal).Select(value => "`" + value.Path + "`：" + value.Reason));
+                .OrderBy(value => value.Path, StringComparer.Ordinal).Select(value => Code(value.Path) + "：" + Text(value.Reason)));
             return Finish(builder);
         }
 
-        private static string RenderTestInventory(ProjectQualityCatalog catalog,
-            ProjectInventorySnapshot snapshot, string fingerprint)
+        private static string RenderTestInventoryBody(ProjectQualityCatalog catalog,
+            ProjectInventorySnapshot snapshot)
         {
-            var builder = NewDocument("测试自动清单", "本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。工具架构版本：1，内容指纹：`" + fingerprint + "`。");
+            var builder = new StringBuilder();
             builder.AppendLine("## 1. 生成说明与内容指纹");
             builder.AppendLine("- 指纹只来自已提供的目录和项目快照，方便确认清单是否对应同一份事实。");
             builder.AppendLine("## 2. EditMode 与 PlayMode 的普通中文说明");
             builder.AppendLine("- EditMode 在不启动完整游戏画面的情况下检查规则和资料；PlayMode 会启动运行时流程，检查玩家实际会遇到的互动。");
             builder.AppendLine("## 3. 每个功能分组的最低验证门");
             foreach (ProjectFeatureGroup feature in Values(catalog.FeatureGroups).OrderBy(value => value.Id, StringComparer.Ordinal))
-                builder.AppendLine("- " + feature.ChineseName + "：" + VerificationName(feature.MinimumVerification));
+                builder.AppendLine("- " + Text(feature.ChineseName) + "：" + VerificationName(feature.MinimumVerification));
             builder.AppendLine("## 4. 精确测试文件与测试类");
             foreach (ProjectTestClassRecord test in Values(snapshot.TestClasses).OrderBy(value => value.FullName, StringComparer.Ordinal))
-                builder.AppendLine("- `" + test.SourcePath + "`：`" + test.FullName + "`（" + test.Platform + "）");
+                builder.AppendLine("- " + Code(test.SourcePath) + "：" + Code(test.FullName) + "（" + Text(test.Platform.ToString()) + "）");
             builder.AppendLine("## 5. 可复制的测试筛选命令");
             string filter = string.Join("|", Values(snapshot.TestClasses).Select(value => value.FullName)
                 .Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray());
-            builder.AppendLine("- `-testFilter " + filter + "`");
+            builder.AppendLine("- '" + "-testFilter " + filter + "'");
             builder.AppendLine("## 6. 失败定位用的源码路径与受控需求编号");
             foreach (ProjectFeatureGroup feature in Values(catalog.FeatureGroups).OrderBy(value => value.Id, StringComparer.Ordinal))
-                builder.AppendLine("- " + feature.ChineseName + "：源码 " + JoinCode(Values(feature.SourceGlobs)) + "；需求 " + JoinCode(Values(feature.RequirementIds)));
+                builder.AppendLine("- " + Text(feature.ChineseName) + "：源码 " + JoinCode(Values(feature.SourceGlobs)) + "；需求 " + JoinCode(Values(feature.RequirementIds)));
             return Finish(builder);
         }
 
         private static void AppendTestRun(StringBuilder builder, string name, ProjectTestRunSummary run)
         {
             builder.AppendLine("- " + name + "：" + run.Passed + "/" + run.Total + " 通过，失败 " + run.Failed +
-                "，跳过 " + run.Skipped + "，证据：`" + run.XmlPath + "`");
+                "，跳过 " + run.Skipped + "，证据：" + Code(run.XmlPath));
         }
 
         private static StringBuilder NewDocument(string title, string purpose)
@@ -287,7 +307,7 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static string TypeLine(ProjectTypeRecord type)
         {
-            return "`" + type.FullName + "`：`" + type.SourcePath + "`";
+            return Code(type.FullName) + "：" + Code(type.SourcePath);
         }
 
         private static string VerificationName(ProjectVerificationLevel level)
@@ -308,24 +328,45 @@ namespace WasteCity.Editor.ProjectQuality
         private static string JoinCode(IEnumerable<string> values)
         {
             string[] items = Values(values).OrderBy(value => value, StringComparer.Ordinal).ToArray();
-            return items.Length == 0 ? "无" : string.Join("、", items.Select(value => "`" + value + "`").ToArray());
+            return items.Length == 0 ? "无" : string.Join("、", items.Select(Code).ToArray());
         }
 
-        private static string ContentFingerprint(ProjectQualityCatalog catalog, ProjectInventorySnapshot snapshot)
+        private static string WithStructuralHeader(string title, string fingerprint, string body)
         {
-            string catalogContent = string.Join("\n", Values(catalog.FeatureGroups).OrderBy(value => value.Id, StringComparer.Ordinal)
-                .Select(value => value.Id + "|" + value.ChineseName + "|" + JoinRaw(value.SourceGlobs) + "|" +
-                    JoinRaw(value.TestFileGlobs) + "|" + JoinRaw(value.ScenePaths) + "|" + JoinRaw(value.RequirementIds))) +
-                "\n" + string.Join("\n", Values(catalog.Scenes).OrderBy(value => value.Id, StringComparer.Ordinal)
-                    .Select(value => value.Id + "|" + value.Path + "|" + value.ExpectedBuildIndex));
-            byte[] bytes = Encoding.UTF8.GetBytes(catalog.SchemaVersion + "\n" + catalogContent + "\n" + snapshot.ToDeterministicJson());
+            return Finish(NewDocument(title, "本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：" +
+                Code(GeneratorSchema) + "，内容指纹：" + Code(fingerprint) + "。").Append(body));
+        }
+
+        private static string ContentFingerprint(IReadOnlyDictionary<string, string> bodies)
+        {
+            var bytes = new List<byte>();
+            AppendFingerprintPart(bytes, GeneratorSchema);
+            foreach (KeyValuePair<string, string> pair in bodies.OrderBy(value => value.Key, StringComparer.Ordinal))
+            {
+                AppendFingerprintPart(bytes, pair.Key);
+                AppendFingerprintPart(bytes, pair.Value);
+            }
             using (SHA256 hash = SHA256.Create())
-                return BitConverter.ToString(hash.ComputeHash(bytes)).Replace("-", string.Empty).ToLowerInvariant();
+                return BitConverter.ToString(hash.ComputeHash(bytes.ToArray())).Replace("-", string.Empty).ToLowerInvariant();
         }
 
-        private static string JoinRaw(IEnumerable<string> values)
+        private static void AppendFingerprintPart(List<byte> bytes, string value)
         {
-            return string.Join("|", Values(values).OrderBy(value => value, StringComparer.Ordinal).ToArray());
+            byte[] valueBytes = Encoding.UTF8.GetBytes(value ?? string.Empty);
+            byte[] lengthBytes = Encoding.UTF8.GetBytes(valueBytes.Length.ToString(CultureInfo.InvariantCulture) + ":");
+            bytes.AddRange(lengthBytes);
+            bytes.AddRange(valueBytes);
+        }
+
+        private static string Text(string value)
+        {
+            return (value ?? string.Empty).Replace("\r\n", " ").Replace("\r", " ").Replace("\n", " ")
+                .Replace("\\", "\\\\").Replace("|", "\\|").Replace("`", "\\`");
+        }
+
+        private static string Code(string value)
+        {
+            return "`" + Text(value) + "`";
         }
 
         private static byte[] Utf8Bytes(string content)
@@ -375,19 +416,32 @@ namespace WasteCity.Editor.ProjectQuality
 
         private static bool IsValidTestRun(ProjectTestRunSummary value)
         {
-            return value != null && !string.IsNullOrWhiteSpace(value.XmlPath) && value.Total >= 0 && value.Passed >= 0 &&
-                value.Failed >= 0 && value.Skipped >= 0 && value.Passed + value.Failed + value.Skipped == value.Total;
+            if (value == null || string.IsNullOrWhiteSpace(value.XmlPath) || !value.XmlPath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(value.XmlPath) || value.Total < 0 || value.Passed < 0 || value.Failed < 0 || value.Skipped < 0) return false;
+            try
+            {
+                XDocument document = XDocument.Load(value.XmlPath);
+                if (document.Root == null || document.Root.Name.LocalName != "test-run") return false;
+                return checked((long)value.Passed + value.Failed + value.Skipped) == value.Total;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         private static bool IsValidCommand(ProjectCommandResult value)
         {
-            return value != null && !string.IsNullOrWhiteSpace(value.EvidencePath);
+            return value != null && !string.IsNullOrWhiteSpace(value.EvidencePath) && File.Exists(value.EvidencePath);
         }
 
         private static bool IsControlledHumanStatus(string value)
         {
-            return value == "未进行" || value == "等待用户复验" || Regex.IsMatch(value ?? string.Empty,
-                @"^(?:BUG|IDEA|DOC)-\d{4} 已由用户于 \d{4}-\d{2}-\d{2} 验证$");
+            if (value == "未进行" || value == "等待用户复验") return true;
+            Match match = Regex.Match(value ?? string.Empty,
+                @"^(?:BUG|IDEA|DOC)-\d{4} 已由用户于 (\d{4}-\d{2}-\d{2}) 验证$");
+            return match.Success && DateTime.TryParseExact(match.Groups[1].Value, "yyyy-MM-dd",
+                CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
         }
 
         private static bool PathMatchesGlob(string path, string glob)

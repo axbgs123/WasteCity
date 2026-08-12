@@ -51,7 +51,7 @@ namespace WasteCity.Tests
                 StringAssert.Contains("## " + section + ".", files["Docs/Generated/Test-Inventory-ZH.md"]);
             StringAssert.Contains("自动生成", files["Docs/Generated/Project-Inventory-ZH.md"]);
             StringAssert.Contains("普通中文", files["Docs/Generated/Test-Inventory-ZH.md"]);
-            StringAssert.Contains("WasteCity.Tests.FeatureTests|WasteCity.Tests.RuntimeTests",
+            StringAssert.Contains("'-testFilter WasteCity.Tests.FeatureTests|WasteCity.Tests.RuntimeTests'",
                 files["Docs/Generated/Test-Inventory-ZH.md"]);
         }
 
@@ -122,8 +122,7 @@ namespace WasteCity.Tests
         public void WriteGeneratedFiles_UsesUtf8LfFinalNewlineAndStableTwoRunHashes()
         {
             string root = FixtureRoot();
-            IReadOnlyDictionary<string, string> files = ProjectDocumentationGenerator.RenderStructuralDocuments(
-                CatalogFixture(), SnapshotFixture());
+            IReadOnlyDictionary<string, string> files = CompleteFileBatch(CatalogFixture(), SnapshotFixture());
             ProjectDocumentationGenerator.WriteGeneratedFiles(root, files);
             string[] firstHashes = HashFiles(root, files.Keys);
             ProjectDocumentationGenerator.WriteGeneratedFiles(root, files);
@@ -147,7 +146,7 @@ namespace WasteCity.Tests
             string root = FixtureRoot();
             ProjectQualityCatalog catalog = CatalogFixture();
             ProjectInventorySnapshot snapshot = SnapshotFixture();
-            IReadOnlyDictionary<string, string> files = ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot);
+            IReadOnlyDictionary<string, string> files = CompleteFileBatch(catalog, snapshot);
             Directory.CreateDirectory(Path.Combine(root, "Docs"));
             File.WriteAllText(Path.Combine(root, "Docs", "guide.md"), "# 指南\n", new UTF8Encoding(false));
             ProjectDocumentationGenerator.WriteGeneratedFiles(root, files);
@@ -161,6 +160,169 @@ namespace WasteCity.Tests
                 issue.Path == "Docs/Generated/Project-Inventory-ZH.md"), Is.True,
                 string.Join("\n", issues.Select(issue => issue.Code + " " + issue.Path)));
             CollectionAssert.AreEqual(before, File.ReadAllBytes(target));
+        }
+
+        [TestCase("")]
+        [TestCase("Docs/Generated/Project-Inventory-ZH.md")]
+        [TestCase("Docs/Generated/Project-Inventory-ZH.md,Docs/Generated/Unexpected.md")]
+        [TestCase("docs/Generated/Project-Inventory-ZH.md")]
+        [TestCase("Docs\\Generated\\Project-Inventory-ZH.md")]
+        [TestCase("Docs/Generated/Project-Inventory-ZH.md.bak")]
+        public void WriteGeneratedFiles_RequiresTheExactFourFileBatch(string mutation)
+        {
+            Dictionary<string, string> files = new Dictionary<string, string>(
+                CompleteFileBatch(CatalogFixture(), SnapshotFixture()), StringComparer.Ordinal);
+            if (mutation == "") files.Clear();
+            else if (mutation.IndexOf(',') < 0 && files.ContainsKey(mutation))
+                files = new Dictionary<string, string> { { mutation, files[mutation] } };
+            else if (mutation.IndexOf(',') >= 0)
+                files.Add("Docs/Generated/Unexpected.md", "x\n");
+            else
+                files.Add(mutation, "x\n");
+
+            Assert.Throws<InvalidOperationException>(() =>
+                ProjectDocumentationGenerator.WriteGeneratedFiles(FixtureRoot(), files));
+        }
+
+        [Test]
+        public void WriteGeneratedFiles_InvalidBatchPreservesOldFilesAndUnrelatedTemporaryFile()
+        {
+            string root = FixtureRoot();
+            var files = new Dictionary<string, string>(CompleteFileBatch(CatalogFixture(), SnapshotFixture()), StringComparer.Ordinal);
+            ProjectDocumentationGenerator.WriteGeneratedFiles(root, files);
+            string target = Path.Combine(root, ProjectDocumentationGenerator.ProjectInventoryPath);
+            byte[] before = File.ReadAllBytes(target);
+            string unrelatedTemporary = Path.Combine(root, "Docs/Generated/other-tool.tmp");
+            File.WriteAllText(unrelatedTemporary, "keep\n", new UTF8Encoding(false));
+            files.Add("Docs/Generated/Unexpected.md", "bad\n");
+
+            Assert.Throws<InvalidOperationException>(() => ProjectDocumentationGenerator.WriteGeneratedFiles(root, files));
+
+            CollectionAssert.AreEqual(before, File.ReadAllBytes(target));
+            Assert.That(File.Exists(unrelatedTemporary), Is.True);
+        }
+
+        [Test]
+        public void Validate_OnlyComparesStructuralDocuments_NotIndependentCallerInputs()
+        {
+            string root = FixtureRoot();
+            ProjectQualityCatalog catalog = CatalogFixture();
+            ProjectInventorySnapshot snapshot = SnapshotFixture();
+            Directory.CreateDirectory(Path.Combine(root, "Docs"));
+            File.WriteAllText(Path.Combine(root, "Docs", "guide.md"), "# 指南\n", new UTF8Encoding(false));
+            var files = new Dictionary<string, string>(ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot), StringComparer.Ordinal)
+            {
+                { ProjectDocumentationGenerator.AttentionPath,
+                    ProjectDocumentationGenerator.RenderDocumentationAttention(catalog, new[] { "Assets/_Game/Scripts/Feature/FeatureComponent.cs" }) },
+                { ProjectDocumentationGenerator.VerificationPath,
+                    ProjectDocumentationGenerator.RenderVerification(VerificationFixture()) },
+            };
+            ProjectDocumentationGenerator.WriteGeneratedFiles(root, files);
+
+            Assert.That(ProjectQualityValidator.Validate(catalog, snapshot, root).Any(issue => issue.Code == "PQ011"), Is.False);
+        }
+
+        [Test]
+        public void StructuralFingerprint_ChangesForEveryRenderedCatalogFieldAndEscapesMarkdown()
+        {
+            ProjectQualityCatalog firstCatalog = CatalogFixture();
+            ProjectQualityCatalog secondCatalog = CatalogFixture();
+            secondCatalog.Scenes[0].ChineseName = "场景\n## 注入|`";
+            secondCatalog.UiEntries[0].InputPrioritySummary = "输入|`\n## 伪标题";
+            secondCatalog.ExplicitSourceExclusions = new[]
+            {
+                new ProjectPathExclusion { Path = "Assets/_Game/Scripts/Bad`|\n## Nope.cs", Reason = "理由\n## Nope" },
+            };
+            string first = ProjectDocumentationGenerator.RenderStructuralDocuments(firstCatalog, SnapshotFixture())[
+                ProjectDocumentationGenerator.ProjectInventoryPath];
+            string second = ProjectDocumentationGenerator.RenderStructuralDocuments(secondCatalog, SnapshotFixture())[
+                ProjectDocumentationGenerator.ProjectInventoryPath];
+
+            Assert.That(Fingerprint(first), Is.Not.EqualTo(Fingerprint(second)));
+            StringAssert.DoesNotContain("\n## 注入", second);
+            StringAssert.DoesNotContain("\n## Nope", second);
+            StringAssert.DoesNotContain("`|", second);
+        }
+
+        [Test]
+        public void ProjectInventory_ListsMappedProductionFilesAndPresentationReusePath()
+        {
+            ProjectQualityCatalog catalog = CatalogFixture();
+            catalog.FeatureGroups = catalog.FeatureGroups.Concat(new[]
+            {
+                new ProjectFeatureGroup
+                {
+                    Id = "presentation-art-integration", ChineseName = "展示", SourceGlobs = new[] { "Assets/_Game/Scripts/Graybox3D/**" },
+                    TestFileGlobs = new string[0], ScenePaths = new string[0], RequirementIds = new[] { "DOC-0001" },
+                    HumanDocumentPaths = new[] { "Docs/guide.md" }, MinimumVerification = ProjectVerificationLevel.FocusedEditMode,
+                },
+            }).ToArray();
+            catalog.ReuseEntries = new[]
+            {
+                new ProjectReuseEntry
+                {
+                    Id = "graybox-visual-slot-3d", ChineseName = "稳定展示槽", TypeNames = new string[0],
+                    AssetPaths = new[] { "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs" },
+                    FeatureGroupId = "presentation-art-integration", ReuseLevel = ProjectReuseLevel.Recommended,
+                    UseSummary = "展示", BoundarySummary = "边界", RequiredTestFiles = new string[0], RequirementIds = new[] { "DOC-0001" },
+                },
+            };
+            ProjectInventorySnapshot snapshot = SnapshotFixture();
+            snapshot.FileRecords = snapshot.FileRecords.Concat(new[]
+            {
+                new ProjectFileRecord { Path = "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs", Kind = ProjectFileKind.Production },
+            }).ToArray();
+            string output = ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot)[
+                ProjectDocumentationGenerator.ProjectInventoryPath];
+
+            StringAssert.Contains("Assets/_Game/Scripts/Feature/FeatureComponent.cs", Section(output, 4));
+            StringAssert.Contains("Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs", Section(output, 9));
+        }
+
+        [Test]
+        public void RenderVerification_RejectsMissingOrNonXmlEvidenceOverflowAndInvalidControlledDate()
+        {
+            ProjectVerificationSnapshot snapshot = VerificationFixture();
+            snapshot.EditMode.XmlPath = Path.Combine(Path.GetTempPath(), "missing.txt");
+            Assert.Throws<InvalidOperationException>(() => ProjectDocumentationGenerator.RenderVerification(snapshot));
+            snapshot = VerificationFixture();
+            snapshot.EditMode.Passed = int.MaxValue;
+            snapshot.EditMode.Failed = int.MaxValue;
+            snapshot.EditMode.Skipped = 2;
+            snapshot.EditMode.Total = 0;
+            Assert.Throws<InvalidOperationException>(() => ProjectDocumentationGenerator.RenderVerification(snapshot));
+            snapshot = VerificationFixture();
+            snapshot.HumanPlaytestStatus = "BUG-0002 已由用户于 2026-99-99 验证";
+            Assert.Throws<InvalidOperationException>(() => ProjectDocumentationGenerator.RenderVerification(snapshot));
+        }
+
+        private static IReadOnlyDictionary<string, string> CompleteFileBatch(ProjectQualityCatalog catalog,
+            ProjectInventorySnapshot snapshot)
+        {
+            var files = new Dictionary<string, string>(ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot),
+                StringComparer.Ordinal)
+            {
+                { ProjectDocumentationGenerator.AttentionPath,
+                    ProjectDocumentationGenerator.RenderDocumentationAttention(catalog, new string[0]) },
+                { ProjectDocumentationGenerator.VerificationPath,
+                    ProjectDocumentationGenerator.RenderVerification(VerificationFixture()) },
+            };
+            return files;
+        }
+
+        private static string Fingerprint(string output)
+        {
+            const string prefix = "内容指纹：`";
+            int start = output.IndexOf(prefix, StringComparison.Ordinal) + prefix.Length;
+            return output.Substring(start, output.IndexOf('`', start) - start);
+        }
+
+        private static string Section(string output, int number)
+        {
+            string start = "## " + number + ".";
+            int index = output.IndexOf(start, StringComparison.Ordinal);
+            int next = output.IndexOf("\n## ", index + start.Length, StringComparison.Ordinal);
+            return output.Substring(index, next < 0 ? output.Length - index : next - index);
         }
 
         private static string[] HashFiles(string root, IEnumerable<string> paths)
@@ -182,21 +344,23 @@ namespace WasteCity.Tests
             return new ProjectVerificationSnapshot
             {
                 VerifiedCommitSha = "81b2f47d1688a72a7ddba36a2ffa04b1025e40f9",
-                VerifiedAtIso8601 = "2026-08-12T12:00:00+08:00",
+                VerifiedAtIso8601 = "2026-08-12T00:26:11+08:00",
                 EditMode = new ProjectTestRunSummary
                 {
-                    Total = 1121, Passed = 1121, Failed = 0, Skipped = 0, XmlPath = "task-03/editmode.xml",
+                    Total = 1121, Passed = 1121, Failed = 0, Skipped = 0,
+                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-editmode-v2.xml",
                 },
                 PlayMode = new ProjectTestRunSummary
                 {
-                    Total = 82, Passed = 82, Failed = 0, Skipped = 0, XmlPath = "task-03/playmode.xml",
+                    Total = 82, Passed = 82, Failed = 0, Skipped = 0,
+                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-playmode.xml",
                 },
-                Compile = new ProjectCommandResult { Passed = true, EvidencePath = "task-03/compile.log" },
+                Compile = new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-compile.log" },
                 Builds = new[]
                 {
-                    new ProjectCommandResult { Passed = true, EvidencePath = "task-03/windows-a.log" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "task-03/windows-b.log" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "task-03/windows-c.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-release-3d.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-development-3d.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-legacy-2d.log" },
                 },
                 HumanPlaytestStatus = "等待用户复验",
             };

@@ -197,16 +197,8 @@ namespace WasteCity.Editor.ProjectQuality
                 rule.Id == "generated-project-quality-appendices" &&
                 ApprovedGeneratedPaths.All(path => Values(rule.ReviewDocumentPaths).Contains(path)))) return;
 
-            IReadOnlyDictionary<string, string> structural =
+            IReadOnlyDictionary<string, string> expected =
                 ProjectDocumentationGenerator.RenderStructuralDocuments(catalog, snapshot);
-            var expected = new Dictionary<string, string>(structural, StringComparer.Ordinal)
-            {
-                { ProjectDocumentationGenerator.AttentionPath,
-                    ProjectDocumentationGenerator.RenderDocumentationAttention(catalog, new string[0]) },
-                { ProjectDocumentationGenerator.VerificationPath,
-                    ProjectDocumentationGenerator.RenderVerification(
-                        ProjectDocumentationGenerator.CreateRecordedPriorVerificationSnapshot()) },
-            };
             foreach (KeyValuePair<string, string> document in expected.OrderBy(value => value.Key, StringComparer.Ordinal))
             {
                 string absolutePath = ToProjectPath(projectRoot, document.Key);
