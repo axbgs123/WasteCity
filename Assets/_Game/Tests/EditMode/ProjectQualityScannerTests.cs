@@ -161,6 +161,27 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PlainProductionSourceIndex_RequiresItsOwnSequenceDocumentAndIgnoresMonoScriptFallback()
+        {
+            const string typeName = "WasteCity.Fixture.PlainProductionType";
+            string source = Path.Combine(fixtureRoot, "Assets/_Game/Scripts/PlainProductionType.cs");
+            WriteFixtureFile("Assets/_Game/Scripts/PlainProductionType.cs", "internal sealed class PlainProductionType { }");
+
+            Dictionary<string, List<string>> fallbackOnly =
+                ProjectQualityScanner.BuildPlainProductionSourceIndexForTests(fixtureRoot,
+                    new ProjectQualityScanner.SourceDocumentInput[0],
+                    new[] { new ProjectQualityScanner.SourceFallbackInput(typeName, source) });
+            Assert.That(fallbackOnly.ContainsKey(typeName), Is.False);
+
+            Dictionary<string, List<string>> sequenceMapped =
+                ProjectQualityScanner.BuildPlainProductionSourceIndexForTests(fixtureRoot,
+                    new[] { new ProjectQualityScanner.SourceDocumentInput(typeName, source) },
+                    new ProjectQualityScanner.SourceFallbackInput[0]);
+            CollectionAssert.AreEqual(new[] { "Assets/_Game/Scripts/PlainProductionType.cs" },
+                sequenceMapped[typeName]);
+        }
+
+        [Test]
         public void Scan_RepeatedRunProducesEqualOrderedSnapshot()
         {
             ProjectInventorySnapshot first = ProjectQualityScanner.Scan(ProjectRoot());

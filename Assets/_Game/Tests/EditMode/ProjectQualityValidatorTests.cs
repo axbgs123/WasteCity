@@ -11,18 +11,18 @@ namespace WasteCity.Tests
 {
     public sealed class ProjectQualityValidatorTests
     {
-        [TestCase("unmapped-source", "PQ001")]
-        [TestCase("unmapped-test", "PQ002")]
-        [TestCase("missing-reuse-path", "PQ003")]
-        [TestCase("missing-required-test", "PQ004")]
-        [TestCase("unknown-feature", "PQ005")]
-        [TestCase("wrong-scene-index", "PQ006")]
-        [TestCase("frozen-recommended", "PQ007")]
-        [TestCase("placeholder-recommended", "PQ008")]
-        [TestCase("missing-ui-owner", "PQ009")]
-        [TestCase("missing-human-link", "PQ010")]
+        [TestCase("unmapped-source", "PQ001", "Assets/_Game/Scripts/Other.cs")]
+        [TestCase("unmapped-test", "PQ002", "Assets/_Game/Tests/EditMode/OtherTests.cs")]
+        [TestCase("missing-reuse-path", "PQ003", "Assets/_Game/Scripts/Feature/MissingComponent.cs")]
+        [TestCase("missing-required-test", "PQ004", "Assets/_Game/Tests/EditMode/MissingTests.cs")]
+        [TestCase("unknown-feature", "PQ005", "feature-component")]
+        [TestCase("wrong-scene-index", "PQ006", "Assets/_Game/Scenes/FeatureScene.unity")]
+        [TestCase("frozen-recommended", "PQ007", "frozen-scene")]
+        [TestCase("placeholder-recommended", "PQ008", "prohibited-entry")]
+        [TestCase("missing-ui-owner", "PQ009", "feature-ui")]
+        [TestCase("missing-human-link", "PQ010", "Docs/guide.md -> missing.md")]
         public void Validate_ReturnsStableIssueForEachBrokenContract(
-            string mutation, string expectedCode)
+            string mutation, string expectedCode, string expectedPath)
         {
             Fixture fixture = ValidFixture();
             fixture.Apply(mutation);
@@ -32,6 +32,7 @@ namespace WasteCity.Tests
                     fixture.Catalog, fixture.Snapshot, fixture.Root);
 
             AssertIssuesExactly(issues, expectedCode);
+            Assert.That(issues[0].Path, Is.EqualTo(expectedPath));
         }
 
         [Test]
@@ -191,6 +192,27 @@ namespace WasteCity.Tests
             AssertIssuesExactly(issues, "PQ001", "PQ001");
             for (int index = 1; index < issues.Count; index++)
                 Assert.That(CompareIssues(issues[index - 1], issues[index]), Is.LessThanOrEqualTo(0));
+        }
+
+        [Test]
+        public void SortIssues_UsesMessageAsThirdOrdinalKeyForSameCodeAndPath()
+        {
+            IReadOnlyList<ProjectQualityIssue> issues = ProjectQualityValidator.SortIssuesForTests(new[]
+            {
+                new ProjectQualityIssue
+                {
+                    Code = "PQ001", Path = "Assets/_Game/Scripts/Same.cs", Severity = ProjectQualityIssueSeverity.Error,
+                    PlainChineseMessage = "中文乙",
+                },
+                new ProjectQualityIssue
+                {
+                    Code = "PQ001", Path = "Assets/_Game/Scripts/Same.cs", Severity = ProjectQualityIssueSeverity.Error,
+                    PlainChineseMessage = "中文甲",
+                },
+            });
+
+            CollectionAssert.AreEqual(new[] { "中文乙", "中文甲" },
+                issues.Select(issue => issue.PlainChineseMessage).ToArray());
         }
 
         private static Fixture ValidFixture()
@@ -405,7 +427,13 @@ namespace WasteCity.Tests
                 Assert.That(issue.Severity, Is.EqualTo(ProjectQualityIssueSeverity.Error));
                 Assert.That(issue.Path, Is.Not.Null.And.Not.Empty);
                 Assert.That(issue.PlainChineseMessage, Is.Not.Null.And.Not.Empty);
+                Assert.That(issue.PlainChineseMessage.Any(IsCjk), Is.True, issue.Code);
             }
+        }
+
+        private static bool IsCjk(char value)
+        {
+            return value >= '\u3400' && value <= '\u9fff';
         }
 
         private static int CompareIssues(ProjectQualityIssue left, ProjectQualityIssue right)

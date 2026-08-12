@@ -308,6 +308,11 @@ namespace WasteCity.Editor.ProjectQuality
                 .ThenBy(issue => issue.PlainChineseMessage, StringComparer.Ordinal).ToArray();
         }
 
+        internal static IReadOnlyList<ProjectQualityIssue> SortIssuesForTests(IEnumerable<ProjectQualityIssue> issues)
+        {
+            return Sort(issues);
+        }
+
         private static IEnumerable<T> Values<T>(IEnumerable<T> values)
         {
             return values ?? Enumerable.Empty<T>();

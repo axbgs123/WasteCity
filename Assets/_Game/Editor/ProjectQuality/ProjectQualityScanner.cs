@@ -61,7 +61,8 @@ namespace WasteCity.Editor.ProjectQuality
                 return snapshot;
 
             Dictionary<string, List<string>> pdb = BuildPdbIndex(root);
-            snapshot.TypeRecords = DiscoverTypes(pdb).ToArray();
+            Dictionary<string, List<string>> plainProductionPdb = BuildPlainProductionPdbIndex(root);
+            snapshot.TypeRecords = DiscoverTypes(pdb, plainProductionPdb).ToArray();
             snapshot.SceneRecords = DiscoverEnabledScenes().ToArray();
             snapshot.ScenePaths = snapshot.SceneRecords.Select(record => record.Path).ToArray();
             snapshot.TestClasses = DiscoverTestClasses(pdb).ToArray();
@@ -136,12 +137,13 @@ namespace WasteCity.Editor.ProjectQuality
                 .ThenBy(record => record.Path, StringComparer.Ordinal).ToList();
         }
 
-        private static List<ProjectTypeRecord> DiscoverTypes(Dictionary<string, List<string>> pdb)
+        private static List<ProjectTypeRecord> DiscoverTypes(Dictionary<string, List<string>> pdb,
+            Dictionary<string, List<string>> plainProductionPdb)
         {
             var records = new List<ProjectTypeRecord>();
             AddTypes(TypeCache.GetTypesDerivedFrom<MonoBehaviour>(), ProjectTypeKind.MonoBehaviour, pdb, records);
             AddTypes(TypeCache.GetTypesDerivedFrom<ScriptableObject>(), ProjectTypeKind.ScriptableObject, pdb, records);
-            AddPlainProductionTypes(pdb, records);
+            AddPlainProductionTypes(plainProductionPdb, records);
             return records.OrderBy(record => record.FullName, StringComparer.Ordinal)
                 .ThenBy(record => record.Kind.ToString(), StringComparer.Ordinal).ToList();
         }
@@ -336,6 +338,43 @@ namespace WasteCity.Editor.ProjectQuality
             return BuildSourceIndex(root, documents, fallbacks);
         }
 
+        private static Dictionary<string, List<string>> BuildPlainProductionPdbIndex(string root)
+        {
+            var documents = new List<SourceDocumentInput>();
+            var plainTypeNames = new HashSet<string>(DiscoverPlainProductionTypeNames(), StringComparer.Ordinal);
+            string assemblies = Path.Combine(root, "Library", "ScriptAssemblies");
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                string name = assembly.GetName().Name;
+                if (name == null || !name.StartsWith("WasteCity", StringComparison.Ordinal)) continue;
+                string dllPath = Path.Combine(assemblies, name + ".dll");
+                string pdbPath = Path.Combine(assemblies, name + ".pdb");
+                if (!File.Exists(dllPath) || !File.Exists(pdbPath))
+                    throw new InvalidDataException("compiled symbols missing for assembly " + name);
+                using (FileStream dll = File.OpenRead(dllPath))
+                using (FileStream pdb = File.OpenRead(pdbPath))
+                using (AssemblyDefinition definition = AssemblyDefinition.ReadAssembly(dll, new ReaderParameters
+                {
+                    ReadSymbols = true,
+                    SymbolStream = pdb,
+                    SymbolReaderProvider = new DefaultSymbolReaderProvider(false),
+                }))
+                {
+                    foreach (TypeDefinition type in AllTypeDefinitions(definition.MainModule.Types))
+                    {
+                        string typeName = ToRuntimeFullName(type);
+                        if (!plainTypeNames.Contains(typeName)) continue;
+                        foreach (string url in type.Methods.Where(method => method.DebugInformation.HasSequencePoints)
+                            .SelectMany(method => method.DebugInformation.SequencePoints)
+                            .Where(point => point.Document != null).Select(point => point.Document.Url)
+                            .Distinct(StringComparer.Ordinal))
+                            documents.Add(new SourceDocumentInput(typeName, url));
+                    }
+                }
+            }
+            return BuildPlainProductionSourceIndex(root, documents);
+        }
+
         private static IEnumerable<string> DiscoverSourceIdentityTypeNames()
         {
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -355,9 +394,17 @@ namespace WasteCity.Editor.ProjectQuality
                 foreach (Type type in GetLoadableTypes(assembly))
                 {
                     if (type != null && type.FullName != null && ContainsTestMethod(type)) names.Add(type.FullName);
-                    if (IsCatalogProductionType(type)) names.Add(type.FullName);
                 }
             }
+            return names;
+        }
+
+        private static IEnumerable<string> DiscoverPlainProductionTypeNames()
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+                foreach (Type type in GetLoadableTypes(assembly))
+                    if (IsCatalogProductionType(type)) names.Add(type.FullName);
             return names;
         }
 
@@ -388,6 +435,18 @@ namespace WasteCity.Editor.ProjectQuality
             IEnumerable<SourceDocumentInput> documents, IEnumerable<SourceFallbackInput> fallbacks)
         {
             return BuildSourceIndex(root, documents, fallbacks);
+        }
+
+        internal static Dictionary<string, List<string>> BuildPlainProductionSourceIndexForTests(string root,
+            IEnumerable<SourceDocumentInput> documents, IEnumerable<SourceFallbackInput> fallbacks)
+        {
+            return BuildPlainProductionSourceIndex(root, documents);
+        }
+
+        private static Dictionary<string, List<string>> BuildPlainProductionSourceIndex(string root,
+            IEnumerable<SourceDocumentInput> documents)
+        {
+            return BuildSourceIndex(root, documents, Enumerable.Empty<SourceFallbackInput>());
         }
 
         private static Dictionary<string, List<string>> BuildSourceIndex(string root,
