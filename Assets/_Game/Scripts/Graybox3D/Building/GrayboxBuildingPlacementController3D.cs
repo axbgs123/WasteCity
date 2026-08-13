@@ -2,7 +2,6 @@ using System;
 using UnityEngine;
 using WasteCity.Building;
 using WasteCity.Content;
-using WasteCity.Economy;
 using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
@@ -226,7 +225,10 @@ namespace WasteCity.Graybox3D.Building
                         Math.Abs(y - cityY) <= 1)
                         touchesCity = true;
                     if (!coversCompatibleNode &&
-                        IsCompatibleResourceNode(definition, cell))
+                        cell.HasResource &&
+                        BuildingResourceNodeCompatibilityRules.IsCompatible(
+                            definition,
+                            cell.ResourceId))
                     {
                         coversCompatibleNode = true;
                         compatibleNodeId =
@@ -332,22 +334,6 @@ namespace WasteCity.Graybox3D.Building
                 session.Inventory.CanSpend(
                     definition.CostId,
                     definition.Cost));
-        }
-
-        private static bool IsCompatibleResourceNode(
-            BuildingDefinition definition,
-            WorldCell cell)
-        {
-            return ReferenceEquals(definition, BuildingCatalog.MiningStation) &&
-                cell.HasResource &&
-                (string.Equals(
-                     cell.ResourceId,
-                     ResourceIds.Iron,
-                     StringComparison.Ordinal) ||
-                 string.Equals(
-                     cell.ResourceId,
-                     ResourceIds.EnergyCrystal,
-                     StringComparison.Ordinal));
         }
 
         private void UpdateNodeHighlight(
