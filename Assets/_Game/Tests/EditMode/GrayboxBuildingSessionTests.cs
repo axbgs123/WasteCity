@@ -214,6 +214,197 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0010_PlacementRevisionAdvancesOnlyAfterCommittedGridChanges()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            uint revision = PlacementRevision(session);
+            BuildingPlacementRequest request = ValidRequest(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10);
+            session.Inventory.Set(ResourceIds.Stone, 0);
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    request,
+                    presentation,
+                    out _,
+                    out _),
+                Is.False);
+            Assert.That(PlacementRevision(session), Is.EqualTo(revision));
+
+            session.Inventory.Set(ResourceIds.Stone, 30);
+            Assert.That(
+                session.TryBeginConstruction(
+                    request,
+                    presentation,
+                    out GrayboxBuildingInstance3D instance,
+                    out BuildingPlacementEvaluation evaluation),
+                Is.True,
+                evaluation.PrimaryFailure.ToString());
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+            revision = PlacementRevision(session);
+
+            Assert.That(
+                session.TryCancelConstruction(
+                    instance.StableInstanceId,
+                    0d,
+                    presentation,
+                    out _),
+                Is.True);
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+        }
+
+        [Test]
+        public void IDEA0010_PlacementRevisionTracksCompletionAndEvacuationOnce()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            uint revision = PlacementRevision(session);
+
+            session.TickConstruction(
+                100f,
+                CityMode.Fortress,
+                false,
+                presentation);
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+            revision = PlacementRevision(session);
+            var work = BuildingEvacuationRules.Create(
+                instance.StableInstanceId,
+                instance.Placement.Definition.Cost,
+                instance.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            Assert.That(
+                session.TryCaptureEvacuationWork(
+                    new[] { work },
+                    out string captureFailure),
+                Is.True,
+                captureFailure);
+            Assert.That(
+                session.TryCommitEvacuation(
+                    work,
+                    presentation,
+                    out _,
+                    out string commitFailure),
+                Is.True,
+                commitFailure);
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+        }
+
+        [Test]
+        public void IDEA0010_PlacementRevisionTracksLockAndRollbackOnce()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D instance = Begin(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            var work = BuildingEvacuationRules.Create(
+                instance.StableInstanceId,
+                instance.Placement.Definition.Cost,
+                instance.Progress.BaseDuration,
+                instance.Progress.Remaining /
+                instance.Progress.BaseDuration,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(
+                session.TryCaptureEvacuationWork(
+                    new[] { work },
+                    out string captureFailure),
+                Is.True,
+                captureFailure);
+            uint revision = PlacementRevision(session);
+
+            Assert.That(
+                session.TryLockEvacuationWork(
+                    new[] { work },
+                    out string lockFailure),
+                Is.True,
+                lockFailure);
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+            revision = PlacementRevision(session);
+
+            session.RollbackEvacuationLocksAfterFailure(
+                new[] { work });
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+        }
+
+        [Test]
+        public void IDEA0010_PlacementRevisionTracksFixtureUnlockAndPopulationInputs()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            uint revision = PlacementRevision(session);
+
+            session.ConfigureDevelopmentFixture();
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 1u)));
+            revision = PlacementRevision(session);
+            session.SetPopulationForDevelopment(session.Population + 1);
+            session.SetPopulationForDevelopment(session.Population);
+            session.SetRouteContact(ContentRoute.Technology, true);
+            session.SetRouteContact(ContentRoute.Technology, true);
+            session.UnlockResearchForDevelopment(
+                "core.research.automated-machinery");
+            session.UnlockResearchForDevelopment(
+                "core.research.automated-machinery");
+
+            Assert.That(
+                PlacementRevision(session),
+                Is.EqualTo(unchecked(revision + 3u)));
+        }
+
+        [Test]
+        public void IDEA0010_PlacementRevisionWrapsAndIsNotSerialized()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            FieldInfo field = typeof(GrayboxBuildingSession3D).GetField(
+                "placementRevision",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            Assert.That(
+                field.IsDefined(typeof(SerializeField), false),
+                Is.False);
+            field.SetValue(session, uint.MaxValue);
+
+            session.ConfigureDevelopmentFixture();
+
+            Assert.That(PlacementRevision(session), Is.Zero);
+            Assert.That(
+                JsonUtility.ToJson(session),
+                Does.Not.Contain("placementRevision"));
+        }
+
+        [Test]
         public void CatalogRevision_DoesNotAdvanceWhenPresentationCompletionRollsBack()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -1584,6 +1775,18 @@ namespace WasteCity.Tests
             var property = typeof(GrayboxBuildingSession3D).GetProperty(
                 "CatalogRevision");
             Assert.That(property, Is.Not.Null);
+            return (uint)property.GetValue(session);
+        }
+
+        private static uint PlacementRevision(
+            GrayboxBuildingSession3D session)
+        {
+            PropertyInfo property = typeof(GrayboxBuildingSession3D)
+                .GetProperty("PlacementRevision");
+            Assert.That(
+                property,
+                Is.Not.Null,
+                "IDEA-0010 requires a non-persisted placement revision.");
             return (uint)property.GetValue(session);
         }
 

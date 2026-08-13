@@ -43,6 +43,7 @@ namespace WasteCity.Graybox3D.Building
             }
             finally
             {
+                placement?.RefreshMiningGuidance();
                 placement?.SetBuildGridVisible(
                     interaction != null &&
                     interaction.State !=

@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using Unity.Profiling;
 using UnityEngine;
@@ -1149,6 +1150,122 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0010_RealInputFramesRefreshEveryGuidanceKeyMutation()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            SetWorldCell(
+                fixture.World.Model,
+                20,
+                15,
+                new WorldCell(
+                    TerrainKind.Rocky,
+                    WasteCity.Economy.ResourceIds.Iron,
+                    100,
+                    WorldTraversalKind.Open));
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+
+            fixture.Router.ProcessCurrentInput();
+            uint refresh = MiningGuidanceRefreshCount(fixture.Placement);
+            Assert.That(refresh, Is.GreaterThan(0u));
+            Assert.That(
+                ActiveMiningAnchorCount(fixture.Presentation),
+                Is.GreaterThan(0));
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(refresh),
+                "An unchanged real input frame reuses the scan.");
+
+            fixture.Session.Inventory.Set(
+                WasteCity.Economy.ResourceIds.Alloy,
+                0);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+            Assert.That(
+                ActiveMiningAnchorCount(fixture.Presentation),
+                Is.Zero);
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            fixture.Session.Inventory.Set(
+                WasteCity.Economy.ResourceIds.Alloy,
+                30);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            Assert.That(
+                fixture.Session.GroundGrid.TryRestore(
+                    BuildingCatalog.Wall,
+                    19,
+                    14,
+                    out _),
+                Is.True);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            fixture.Session.SetPopulationForDevelopment(
+                fixture.Session.Population + 1);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            fixture.Session.UnlockResearchForDevelopment(
+                "core.research.automated-machinery");
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)),
+                "A session unlock revision refreshes on the next input frame.");
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            fixture.City.Deployment.Restore(CityMode.Mobile, 0f);
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+            Assert.That(
+                ActiveMiningAnchorCount(fixture.Presentation),
+                Is.Zero);
+            refresh = MiningGuidanceRefreshCount(fixture.Placement);
+
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            Assert.That(
+                fixture.World.Coordinates.TryCellToWorld(
+                    15,
+                    12,
+                    .5f,
+                    out Vector3 movedCity),
+                Is.True);
+            fixture.City.transform.position = movedCity;
+            PressKey(fixture.Router, Key.R);
+            Assert.That(
+                MiningGuidanceRefreshCount(fixture.Placement),
+                Is.EqualTo(unchecked(refresh + 1u)));
+
+            PressKey(fixture.Router, Key.Digit4);
+            Assert.That(
+                fixture.Interaction.Selected,
+                Is.SameAs(BuildingCatalog.Wall));
+            Assert.That(
+                ActiveMiningNodeCount(fixture.Presentation),
+                Is.Zero);
+            Assert.That(
+                ActiveMiningAnchorCount(fixture.Presentation),
+                Is.Zero);
+        }
+
+        [Test]
         public void InputRouter_StablePreviewReevaluatesUnlockMutation()
         {
             InputRouterFixture fixture = CreateInputRouterFixture();
@@ -1806,6 +1923,38 @@ namespace WasteCity.Tests
             Assert.That(fixture.Interaction.Selected, Is.SameAs(
                 BuildingCatalog.Housing));
             Assert.That(fixture.Menu.CatalogVisible, Is.False);
+        }
+
+        [Test]
+        public void IDEA0010_MenuShowsExactMiningLegendOnlyForMiningPreview()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            Transform legend = FindTransform(
+                fixture.Canvas.transform,
+                "Mining.Guidance.Legend");
+            Assert.That(
+                legend,
+                Is.Not.Null,
+                "IDEA-0010 requires one stable legend root.");
+            Assert.That(legend.gameObject.activeSelf, Is.False);
+
+            Assert.That(fixture.Menu.TrySelectQuickbarSlot(0), Is.True);
+            InvokeLifecycle(fixture.Menu, "Update");
+
+            Assert.That(legend.gameObject.activeSelf, Is.True);
+            string text = AllText(legend);
+            Assert.That(text, Does.Contain("绿色：当前可建造位置"));
+            Assert.That(
+                text,
+                Does.Contain("暗黄色：资源兼容，但当前条件不满足"));
+
+            Assert.That(fixture.Menu.TrySelectQuickbarSlot(1), Is.True);
+            InvokeLifecycle(fixture.Menu, "Update");
+            Assert.That(legend.gameObject.activeSelf, Is.False);
+
+            fixture.Interaction.CancelPreview();
+            InvokeLifecycle(fixture.Menu, "Update");
+            Assert.That(legend.gameObject.activeSelf, Is.False);
         }
 
         [Test]
@@ -3965,6 +4114,42 @@ namespace WasteCity.Tests
                     System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic)
                 .Invoke(behaviour, null);
+        }
+
+        private static uint MiningGuidanceRefreshCount(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            PropertyInfo property =
+                typeof(GrayboxBuildingPlacementController3D).GetProperty(
+                    "MiningGuidanceRefreshCount");
+            Assert.That(property, Is.Not.Null);
+            return (uint)property.GetValue(placement);
+        }
+
+        private static int ActiveMiningNodeCount(
+            GrayboxBuildingWorldView3D presentation)
+        {
+            return GuidanceCount(
+                presentation,
+                "ActiveMiningNodeHighlightCount");
+        }
+
+        private static int ActiveMiningAnchorCount(
+            GrayboxBuildingWorldView3D presentation)
+        {
+            return GuidanceCount(
+                presentation,
+                "ActiveMiningAnchorHighlightCount");
+        }
+
+        private static int GuidanceCount(
+            GrayboxBuildingWorldView3D presentation,
+            string propertyName)
+        {
+            PropertyInfo property =
+                typeof(GrayboxBuildingWorldView3D).GetProperty(propertyName);
+            Assert.That(property, Is.Not.Null);
+            return (int)property.GetValue(presentation);
         }
 
         private static string BuildDetails(GrayboxBuildingCatalogItem3D item)

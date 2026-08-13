@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.World;
 
@@ -26,6 +28,47 @@ namespace WasteCity.Graybox3D.Building
         private string[] resourceNodeVisualIds;
         private int resourceNodeVisualWidth;
         private int resourceNodeVisualHeight;
+        private BuildingPlacementEvaluationWorkspace
+            miningGuidanceWorkspace;
+        private List<Vector2Int> miningCandidateWorkspace;
+        private List<MiningGuidanceNode> miningNodes;
+        private List<MiningGuidanceAnchor> miningAnchors;
+        private Dictionary<long, int> miningAnchorIndices;
+        private bool hasMiningGuidanceKey;
+        private BuildingOrientation miningGuidanceOrientation;
+        private int miningGuidanceCityX;
+        private int miningGuidanceCityY;
+        private int miningGuidanceRadius;
+        private int miningGuidanceWorldWidth;
+        private int miningGuidanceWorldHeight;
+        private CityMode miningGuidanceCityMode;
+        private uint miningGuidancePlacementRevision;
+        private uint miningGuidanceCatalogRevision;
+        private int miningGuidanceInventory;
+        private int miningGuidancePopulation;
+        private int miningGuidanceGridCount;
+
+        private struct MiningGuidanceNode
+        {
+            public string StableId;
+            public int X;
+            public int Y;
+            public bool HasLegalAnchor;
+        }
+
+        private readonly struct MiningGuidanceAnchor
+        {
+            public MiningGuidanceAnchor(int x, int y, bool isValid)
+            {
+                X = x;
+                Y = y;
+                IsValid = isValid;
+            }
+
+            public int X { get; }
+            public int Y { get; }
+            public bool IsValid { get; }
+        }
 
         public BuildingPlacementEvaluation CurrentEvaluation
         {
@@ -34,6 +77,7 @@ namespace WasteCity.Graybox3D.Building
         }
         public BuildingSurfaceHit CurrentHit { get; private set; } =
             BuildingSurfaceHit.Invalid;
+        public uint MiningGuidanceRefreshCount { get; private set; }
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -57,6 +101,12 @@ namespace WasteCity.Graybox3D.Building
         {
             evaluationWorkspace =
                 new BuildingPlacementEvaluationWorkspace();
+            miningGuidanceWorkspace =
+                new BuildingPlacementEvaluationWorkspace();
+            miningCandidateWorkspace = new List<Vector2Int>(9);
+            miningNodes = new List<MiningGuidanceNode>();
+            miningAnchors = new List<MiningGuidanceAnchor>();
+            miningAnchorIndices = new Dictionary<long, int>();
             researchCompleted =
                 session == null
                     ? null
@@ -112,6 +162,7 @@ namespace WasteCity.Graybox3D.Building
                     0,
                     false);
             highlightedNodeId = null;
+            presentation?.HideMiningGuidance();
             presentation?.HidePreview();
             CurrentHit = BuildingSurfaceHit.Invalid;
         }
@@ -145,6 +196,76 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             presentation.SetBuildGridVisible(visible);
+        }
+
+        public void RefreshMiningGuidance()
+        {
+            if (!ReferenceEquals(
+                    interaction?.Selected,
+                    BuildingCatalog.MiningStation) ||
+                session == null ||
+                city == null ||
+                world?.Model == null ||
+                world.Coordinates == null ||
+                presentation == null ||
+                miningGuidanceWorkspace == null ||
+                !world.Coordinates.TryWorldToCell(
+                    city.transform.position,
+                    out int cityX,
+                    out int cityY))
+            {
+                hasMiningGuidanceKey = false;
+                presentation?.HideMiningGuidance();
+                return;
+            }
+
+            BuildingOrientation orientation = interaction.Orientation;
+            int radius = session.GroundBuildRadius;
+            int worldWidth = world.Model.Width;
+            int worldHeight = world.Model.Height;
+            CityMode cityMode = city.Mode;
+            uint placementRevision = session.PlacementRevision;
+            uint catalogRevision = session.CatalogRevision;
+            int inventory = session.Inventory.Get(
+                BuildingCatalog.MiningStation.CostId);
+            int population = session.Population;
+            int gridCount = session.GroundGrid.Count;
+            if (hasMiningGuidanceKey &&
+                miningGuidanceOrientation == orientation &&
+                miningGuidanceCityX == cityX &&
+                miningGuidanceCityY == cityY &&
+                miningGuidanceRadius == radius &&
+                miningGuidanceWorldWidth == worldWidth &&
+                miningGuidanceWorldHeight == worldHeight &&
+                miningGuidanceCityMode == cityMode &&
+                miningGuidancePlacementRevision == placementRevision &&
+                miningGuidanceCatalogRevision == catalogRevision &&
+                miningGuidanceInventory == inventory &&
+                miningGuidancePopulation == population &&
+                miningGuidanceGridCount == gridCount)
+                return;
+
+            BuildMiningGuidance(
+                orientation,
+                cityX,
+                cityY,
+                radius,
+                worldWidth,
+                worldHeight);
+            miningGuidanceOrientation = orientation;
+            miningGuidanceCityX = cityX;
+            miningGuidanceCityY = cityY;
+            miningGuidanceRadius = radius;
+            miningGuidanceWorldWidth = worldWidth;
+            miningGuidanceWorldHeight = worldHeight;
+            miningGuidanceCityMode = cityMode;
+            miningGuidancePlacementRevision = placementRevision;
+            miningGuidanceCatalogRevision = catalogRevision;
+            miningGuidanceInventory = inventory;
+            miningGuidancePopulation = population;
+            miningGuidanceGridCount = gridCount;
+            hasMiningGuidanceKey = true;
+            unchecked { MiningGuidanceRefreshCount++; }
         }
 
         private bool EvaluatePointer(Vector2 screenPosition)
@@ -199,6 +320,17 @@ namespace WasteCity.Graybox3D.Building
             BuildingDefinition definition,
             in BuildingSurfaceHit hit)
         {
+            return CreateRequest(
+                definition,
+                hit,
+                interaction.Orientation);
+        }
+
+        private BuildingPlacementRequest CreateRequest(
+            BuildingDefinition definition,
+            in BuildingSurfaceHit hit,
+            BuildingOrientation orientation)
+        {
             BuildingGrid grid = hit.Site == BuildingSite.InnerCity
                 ? session.InnerGrid
                 : session.GroundGrid;
@@ -223,10 +355,10 @@ namespace WasteCity.Graybox3D.Building
                 EnsureResourceNodeIdentityWorkspace();
                 int width = BuildingOrientationRules.Width(
                     definition,
-                    interaction.Orientation);
+                    orientation);
                 int height = BuildingOrientationRules.Height(
                     definition,
-                    interaction.Orientation);
+                    orientation);
                 for (var dx = 0; dx < width; dx++)
                 for (var dy = 0; dy < height; dy++)
                 {
@@ -286,7 +418,7 @@ namespace WasteCity.Graybox3D.Building
                 definition,
                 grid,
                 hit.Site,
-                interaction.Orientation,
+                orientation,
                 hit.X,
                 hit.Y,
                 cityX,
@@ -302,6 +434,176 @@ namespace WasteCity.Graybox3D.Building
                 contentVisible,
                 unlock,
                 canAfford);
+        }
+
+        private BuildingPlacementRequest CreateGroundRequest(
+            BuildingDefinition definition,
+            BuildingOrientation orientation,
+            int anchorX,
+            int anchorY)
+        {
+            var hit = new BuildingSurfaceHit(
+                true,
+                BuildingSite.Ground,
+                anchorX,
+                anchorY,
+                default,
+                "外城");
+            return CreateRequest(definition, hit, orientation);
+        }
+
+        private void BuildMiningGuidance(
+            BuildingOrientation orientation,
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            miningNodes.Clear();
+            miningAnchors.Clear();
+            miningAnchorIndices.Clear();
+            presentation.HideMiningGuidance();
+            EnsureResourceNodeIdentityWorkspace();
+
+            for (var x = 0; x < worldWidth; x++)
+            for (var y = 0; y < worldHeight; y++)
+            {
+                WorldCell cell = world.Model.Get(x, y);
+                if (!cell.HasResource ||
+                    !BuildingResourceNodeCompatibilityRules.IsCompatible(
+                        BuildingCatalog.MiningStation,
+                        cell.ResourceId) ||
+                    !BuildingRangeRules.IsGroundCellInRange(
+                        cityX,
+                        cityY,
+                        x,
+                        y,
+                        radius))
+                    continue;
+
+                var node = new MiningGuidanceNode
+                {
+                    StableId = ResourceNodeVisualId(x, y),
+                    X = x,
+                    Y = y
+                };
+                CopyFootprintCoveringAnchors(
+                    BuildingCatalog.MiningStation,
+                    orientation,
+                    x,
+                    y,
+                    miningCandidateWorkspace);
+                for (var index = 0;
+                     index < miningCandidateWorkspace.Count;
+                     index++)
+                {
+                    Vector2Int candidate =
+                        miningCandidateWorkspace[index];
+                    long key = AnchorKey(candidate.x, candidate.y);
+                    bool isValid;
+                    if (miningAnchorIndices.TryGetValue(
+                            key,
+                            out int existingIndex))
+                    {
+                        isValid = miningAnchors[existingIndex].IsValid;
+                    }
+                    else
+                    {
+                        BuildingPlacementRequest request =
+                            CreateGroundRequest(
+                                BuildingCatalog.MiningStation,
+                                orientation,
+                                candidate.x,
+                                candidate.y);
+                        isValid = BuildingPlacementRules.Evaluate(
+                            request,
+                            miningGuidanceWorkspace).IsValid;
+                        miningAnchorIndices.Add(
+                            key,
+                            miningAnchors.Count);
+                        miningAnchors.Add(
+                            new MiningGuidanceAnchor(
+                                candidate.x,
+                                candidate.y,
+                                isValid));
+                    }
+                    if (isValid)
+                        node.HasLegalAnchor = true;
+                }
+                miningNodes.Add(node);
+            }
+
+            for (var index = 0; index < miningNodes.Count; index++)
+            {
+                MiningGuidanceNode node = miningNodes[index];
+                presentation.ShowMiningResourceNode(
+                    node.StableId,
+                    node.X,
+                    node.Y,
+                    worldWidth,
+                    worldHeight,
+                    node.HasLegalAnchor);
+            }
+
+            int width = BuildingOrientationRules.Width(
+                BuildingCatalog.MiningStation,
+                orientation);
+            int height = BuildingOrientationRules.Height(
+                BuildingCatalog.MiningStation,
+                orientation);
+            for (var index = 0; index < miningAnchors.Count; index++)
+            {
+                MiningGuidanceAnchor anchor = miningAnchors[index];
+                if (!anchor.IsValid)
+                    continue;
+                presentation.ShowMiningAnchor(
+                    MiningAnchorStableId(
+                        anchor.X,
+                        anchor.Y,
+                        orientation),
+                    anchor.X,
+                    anchor.Y,
+                    width,
+                    height,
+                    worldWidth,
+                    worldHeight);
+            }
+        }
+
+        private static void CopyFootprintCoveringAnchors(
+            BuildingDefinition definition,
+            BuildingOrientation orientation,
+            int nodeX,
+            int nodeY,
+            List<Vector2Int> destination)
+        {
+            if (destination == null)
+                throw new ArgumentNullException(nameof(destination));
+            destination.Clear();
+            int width = BuildingOrientationRules.Width(
+                definition,
+                orientation);
+            int height = BuildingOrientationRules.Height(
+                definition,
+                orientation);
+            for (var x = nodeX - width + 1; x <= nodeX; x++)
+            for (var y = nodeY - height + 1; y <= nodeY; y++)
+                destination.Add(new Vector2Int(x, y));
+        }
+
+        private static long AnchorKey(int x, int y)
+        {
+            return ((long)x << 32) ^ (uint)y;
+        }
+
+        private static string MiningAnchorStableId(
+            int x,
+            int y,
+            BuildingOrientation orientation)
+        {
+            return "building.anchor-highlight." + x + "." + y + "." +
+                   orientation.ToString().ToLowerInvariant();
         }
 
         private BuildingPlacementRequest MissingRequest(
@@ -365,6 +667,11 @@ namespace WasteCity.Graybox3D.Building
         private void UpdateNodeHighlight(
             in BuildingPlacementEvaluation evaluation)
         {
+            if (hasMiningGuidanceKey)
+            {
+                highlightedNodeId = null;
+                return;
+            }
             string next = evaluation.CompatibleResourceNodeId;
             if (string.Equals(
                     highlightedNodeId,
@@ -411,6 +718,11 @@ namespace WasteCity.Graybox3D.Building
 
         private void ClearNodeHighlight()
         {
+            if (hasMiningGuidanceKey)
+            {
+                highlightedNodeId = null;
+                return;
+            }
             if (string.IsNullOrEmpty(highlightedNodeId) ||
                 presentation == null)
                 return;
@@ -517,6 +829,12 @@ namespace WasteCity.Graybox3D.Building
             CurrentHit = BuildingSurfaceHit.Invalid;
             CurrentEvaluation = default;
             evaluationWorkspace = null;
+            miningGuidanceWorkspace = null;
+            miningCandidateWorkspace = null;
+            miningNodes = null;
+            miningAnchors = null;
+            miningAnchorIndices = null;
+            hasMiningGuidanceKey = false;
             researchCompleted = null;
             completedBuildings = null;
             resourceNodeVisualIds = null;

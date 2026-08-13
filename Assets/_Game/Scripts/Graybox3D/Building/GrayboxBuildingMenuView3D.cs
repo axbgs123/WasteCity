@@ -36,6 +36,7 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform evacuationRoot;
         private RectTransform placementStatusRoot;
         private Text placementStatusText;
+        private RectTransform miningGuidanceLegendRoot;
         private InputField searchField;
         private BuildingMenuCategory? category;
         private ContentRoute? route;
@@ -109,6 +110,7 @@ namespace WasteCity.Graybox3D.Building
                 RefreshCatalog();
             SyncCatalogVisibility();
             RefreshPlacementStatus();
+            SyncMiningGuidanceLegend();
         }
 
         private void OnDestroy()
@@ -127,6 +129,7 @@ namespace WasteCity.Graybox3D.Building
             evacuationRoot = null;
             placementStatusRoot = null;
             placementStatusText = null;
+            miningGuidanceLegendRoot = null;
             searchField = null;
             cancelConstructionButton = null;
             confirmCancellationButton = null;
@@ -462,6 +465,7 @@ namespace WasteCity.Graybox3D.Building
             evacuationRoot = null;
             placementStatusRoot = null;
             placementStatusText = null;
+            miningGuidanceLegendRoot = null;
             searchField = null;
             hasPlacementStatusCache = false;
             RetireSerializedUiRoots();
@@ -470,6 +474,7 @@ namespace WasteCity.Graybox3D.Building
             BindTextInput();
             RefreshCatalog();
             RefreshPlacementStatus();
+            SyncMiningGuidanceLegend();
         }
 
         private void BindTextInput()
@@ -683,6 +688,21 @@ namespace WasteCity.Graybox3D.Building
                 string.Empty);
             placementStatusText.fontSize = 15;
             placementStatusRoot.gameObject.SetActive(false);
+
+            miningGuidanceLegendRoot = CreatePanel(
+                uiRoot,
+                "Mining.Guidance.Legend",
+                new Vector2(.5f, 1f),
+                new Vector2(.5f, 1f),
+                new Vector2(0f, -52f),
+                new Vector2(480f, 58f));
+            Text miningLegend = CreateLabel(
+                miningGuidanceLegendRoot,
+                "Mining.Guidance.Legend.Text",
+                "绿色：当前可建造位置\n" +
+                "暗黄色：资源兼容，但当前条件不满足");
+            miningLegend.fontSize = 14;
+            miningGuidanceLegendRoot.gameObject.SetActive(false);
         }
 
         private void BuildCatalogChrome()
@@ -1034,6 +1054,20 @@ namespace WasteCity.Graybox3D.Building
             catalogRoot.gameObject.SetActive(visible);
             if (visible)
                 RebuildCatalogCards();
+        }
+
+        private void SyncMiningGuidanceLegend()
+        {
+            if (miningGuidanceLegendRoot == null || interaction == null)
+                return;
+            bool visible =
+                interaction.State ==
+                    GrayboxBuildingInteractionState.Previewing &&
+                ReferenceEquals(
+                    interaction.Selected,
+                    BuildingCatalog.MiningStation);
+            if (miningGuidanceLegendRoot.gameObject.activeSelf != visible)
+                miningGuidanceLegendRoot.gameObject.SetActive(visible);
         }
 
         private void RefreshPlacementStatus()

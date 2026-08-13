@@ -295,7 +295,10 @@ namespace WasteCity.Tests
 
             Assert.That(fixture.Placement.CurrentEvaluation.IsValid, Is.True);
             Assert.That(
-                NodeSlots(fixture.Presentation).Select(value => value.StableId),
+                ActiveGuidanceSlots(
+                        fixture.Presentation,
+                        "building.node-highlight.")
+                    .Select(value => value.StableId),
                 Is.EqualTo(new[]
                 {
                     "building.node-highlight.world.resource-node.19.15"
@@ -303,7 +306,11 @@ namespace WasteCity.Tests
 
             fixture.Interaction.Select(BuildingCatalog.Wall);
             fixture.Placement.UpdatePointer(ScreenCenter);
-            Assert.That(NodeSlots(fixture.Presentation), Is.Empty);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.Empty);
         }
 
         [Test]
@@ -321,6 +328,312 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Placement.CurrentEvaluation.CompatibleResourceNodeId,
                 Is.EqualTo("world.resource-node.19.15"));
+        }
+
+        [Test]
+        public void IDEA0010_MiningGuidanceShowsCompatibleNodesAndFormalLegalAnchors()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 16] = Cell(ResourceIds.Iron);
+            cells[21, 16] = Cell(ResourceIds.EnergyCrystal);
+            cells[16, 12] = Cell(ResourceIds.Iron);
+            cells[27, 12] = Cell(ResourceIds.Iron);
+            cells[18, 16] = Cell(ResourceIds.Stone);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+
+            InvokeRefreshMiningGuidance(fixture.Placement);
+
+            GrayboxVisualSlot[] activeNodes = ActiveGuidanceSlots(
+                fixture.Presentation,
+                "building.node-highlight.");
+            Assert.That(
+                activeNodes.Select(value => value.StableId),
+                Is.EquivalentTo(new[]
+                {
+                    "building.node-highlight.world.resource-node.20.16",
+                    "building.node-highlight.world.resource-node.21.16",
+                    "building.node-highlight.world.resource-node.16.12"
+                }));
+            Assert.That(
+                activeNodes.Select(value => value.StableId),
+                Does.Not.Contain(
+                    "building.node-highlight.world.resource-node.27.12"));
+            Assert.That(
+                activeNodes.Select(value => value.StableId),
+                Does.Not.Contain(
+                    "building.node-highlight.world.resource-node.18.16"));
+
+            Color legalNodeColor = PropertyColor(
+                activeNodes.Single(value => value.StableId.EndsWith(
+                    ".20.16",
+                    StringComparison.Ordinal)).Renderer);
+            Color blockedNodeColor = PropertyColor(
+                activeNodes.Single(value => value.StableId.EndsWith(
+                    ".16.12",
+                    StringComparison.Ordinal)).Renderer);
+            Assert.That(legalNodeColor.g, Is.GreaterThan(legalNodeColor.r));
+            Assert.That(blockedNodeColor.r, Is.GreaterThan(blockedNodeColor.g));
+
+            GrayboxVisualSlot[] anchors = ActiveGuidanceSlots(
+                fixture.Presentation,
+                "building.anchor-highlight.");
+            Assert.That(anchors, Is.Not.Empty);
+            Assert.That(
+                anchors.Select(value => value.StableId).Distinct().Count(),
+                Is.EqualTo(anchors.Length),
+                "An anchor covering two compatible nodes is shown once.");
+            for (var index = 0; index < anchors.Length; index++)
+            {
+                BuildingPlacementEvaluation evaluation =
+                    EvaluateGuidanceAnchor(
+                        fixture.Placement,
+                        anchors[index].StableId);
+                Assert.That(
+                    evaluation.IsValid,
+                    Is.True,
+                    anchors[index].StableId + ": " +
+                    evaluation.PrimaryFailure);
+            }
+        }
+
+        [Test]
+        public void IDEA0010_MiningGuidancePoolsAndCachesUnchangedRefresh()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 16] = Cell(ResourceIds.Iron);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            InvokeRefreshMiningGuidance(fixture.Placement);
+            GrayboxVisualSlot node = ActiveGuidanceSlots(
+                fixture.Presentation,
+                "building.node-highlight.").Single();
+            GrayboxVisualSlot anchor = ActiveGuidanceSlots(
+                fixture.Presentation,
+                "building.anchor-highlight.").First();
+            Mesh nodeMesh = node.GetComponent<MeshFilter>().sharedMesh;
+            Mesh anchorMesh = anchor.GetComponent<MeshFilter>().sharedMesh;
+            Renderer nodeRenderer = node.Renderer;
+            Renderer anchorRenderer = anchor.Renderer;
+            int pooledNodeCount = GuidanceSlotCount(
+                fixture.Presentation,
+                "building.node-highlight.");
+            int pooledAnchorCount = GuidanceSlotCount(
+                fixture.Presentation,
+                "building.anchor-highlight.");
+            int infrastructureTransformCount = fixture.Presentation
+                .transform.Find("infrastructure")
+                .GetComponentsInChildren<Transform>(true).Length;
+
+            Action warmedRefresh =
+                MiningGuidanceRefreshAction(fixture.Placement);
+            warmedRefresh();
+            warmedRefresh();
+            AllocationMeasurement measurement =
+                Profile300Calls(warmedRefresh);
+            TestContext.WriteLine(
+                "IDEA0010GuidanceProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "IDEA0010GuidanceCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            TestContext.WriteLine(
+                "IDEA0010PooledNodeCount=" + pooledNodeCount);
+            TestContext.WriteLine(
+                "IDEA0010PooledAnchorCount=" + pooledAnchorCount);
+            TestContext.WriteLine(
+                "IDEA0010InfrastructureTransformCount=" +
+                infrastructureTransformCount);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+            Assert.That(
+                GuidanceSlotCount(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.EqualTo(pooledNodeCount));
+            Assert.That(
+                GuidanceSlotCount(
+                    fixture.Presentation,
+                    "building.anchor-highlight."),
+                Is.EqualTo(pooledAnchorCount));
+            Assert.That(
+                fixture.Presentation.transform.Find("infrastructure")
+                    .GetComponentsInChildren<Transform>(true).Length,
+                Is.EqualTo(infrastructureTransformCount));
+            Assert.That(node.Renderer, Is.SameAs(nodeRenderer));
+            Assert.That(anchor.Renderer, Is.SameAs(anchorRenderer));
+            Assert.That(
+                node.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(nodeMesh));
+            Assert.That(
+                anchor.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(anchorMesh));
+
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            InvokeRefreshMiningGuidance(fixture.Placement);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.Empty);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.anchor-highlight."),
+                Is.Empty);
+            Assert.That(node != null, Is.True);
+            Assert.That(anchor != null, Is.True);
+        }
+
+        [Test]
+        public void IDEA0010_NonSquareCandidateEnumeratorUsesRotatedFootprint()
+        {
+            var synthetic = new BuildingDefinition(
+                BuildingCatalog.MiningStation.Id.Value,
+                "synthetic mining enumerator",
+                3,
+                2,
+                ResourceIds.Alloy,
+                1,
+                true,
+                operation: BuildingOperation.TerrainDependent);
+            var anchors = new List<Vector2Int>();
+            MethodInfo method =
+                typeof(GrayboxBuildingPlacementController3D).GetMethod(
+                    "CopyFootprintCoveringAnchors",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                "IDEA-0010 requires one orientation-aware enumerator.");
+
+            method.Invoke(
+                null,
+                new object[]
+                {
+                    synthetic,
+                    BuildingOrientation.East,
+                    10,
+                    20,
+                    anchors
+                });
+
+            Assert.That(
+                anchors,
+                Is.EquivalentTo(new[]
+                {
+                    new Vector2Int(9, 18),
+                    new Vector2Int(9, 19),
+                    new Vector2Int(9, 20),
+                    new Vector2Int(10, 18),
+                    new Vector2Int(10, 19),
+                    new Vector2Int(10, 20)
+                }));
+        }
+
+        [TestCase("occupancy", BuildingPlacementFailure.Overlap)]
+        [TestCase("terrain", BuildingPlacementFailure.InvalidTerrain)]
+        [TestCase("city", BuildingPlacementFailure.CityOccupied)]
+        [TestCase("boundary", BuildingPlacementFailure.OutOfBounds)]
+        [TestCase("inventory", BuildingPlacementFailure.InsufficientMaterials)]
+        [TestCase("lock", BuildingPlacementFailure.Overlap)]
+        [TestCase("city-mode", BuildingPlacementFailure.InvalidCityMode)]
+        public void IDEA0010_GuidanceCandidatesExposeEachFormalFailure(
+            string scenario,
+            BuildingPlacementFailure expectedFailure)
+        {
+            WorldCell[,] cells = OpenCells();
+            int nodeX = scenario == "boundary" ? 0 : 20;
+            int nodeY = scenario == "boundary" ? 0 : 16;
+            if (scenario == "city")
+            {
+                nodeX = 16;
+                nodeY = 12;
+            }
+            cells[nodeX, nodeY] = Cell(
+                ResourceIds.Iron,
+                scenario == "terrain"
+                    ? WorldTraversalKind.DeepWater
+                    : WorldTraversalKind.Open);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                scenario == "city-mode"
+                    ? CityMode.Mobile
+                    : CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            int anchorX = scenario == "boundary" ? -1 : nodeX;
+            int anchorY = scenario == "boundary" ? -1 : nodeY;
+            if (scenario == "occupancy")
+            {
+                Assert.That(
+                    fixture.Session.GroundGrid.TryRestore(
+                        BuildingCatalog.Wall,
+                        nodeX,
+                        nodeY,
+                        out _),
+                    Is.True);
+            }
+            if (scenario == "lock")
+            {
+                GrayboxBuildingInstance3D locked = Begin(
+                    fixture,
+                    BuildingCatalog.Wall,
+                    BuildingSite.Ground,
+                    nodeX,
+                    nodeY,
+                    CityMode.Fortress);
+                var work = BuildingEvacuationRules.Create(
+                    locked.StableInstanceId,
+                    locked.Placement.Definition.Cost,
+                    locked.Progress.BaseDuration,
+                    locked.Progress.Remaining /
+                    locked.Progress.BaseDuration,
+                    BuildingEvacuationTreatment.FullDismantle);
+                Assert.That(
+                    fixture.Session.TryCaptureEvacuationWork(
+                        new[] { work },
+                        out string captureFailure),
+                    Is.True,
+                    captureFailure);
+                Assert.That(
+                    fixture.Session.TryLockEvacuationWork(
+                        new[] { work },
+                        out string lockFailure),
+                    Is.True,
+                    lockFailure);
+                Assert.That(locked.IsEvacuationLocked, Is.True);
+            }
+            if (scenario == "inventory")
+                fixture.Session.Inventory.Set(ResourceIds.Alloy, 0);
+
+            BuildingPlacementEvaluation evaluation =
+                EvaluateGuidanceAnchor(
+                    fixture.Placement,
+                    MiningAnchorStableId(
+                        anchorX,
+                        anchorY,
+                        BuildingOrientation.North));
+
+            Assert.That(
+                evaluation.Failures,
+                Does.Contain(expectedFailure),
+                "IDEA-0010 formal failure scenario: " + scenario);
+            InvokeRefreshMiningGuidance(fixture.Placement);
+            if (scenario != "boundary")
+                Assert.That(
+                    ActiveGuidanceSlots(
+                            fixture.Presentation,
+                            "building.node-highlight.")
+                        .Single(value => value.StableId.EndsWith(
+                            "." + nodeX + "." + nodeY,
+                            StringComparison.Ordinal))
+                        .Renderer,
+                    Is.Not.Null,
+                    "Compatible blocked node remains visible: " + scenario);
         }
 
         [TestCase(ResourceIds.Stone)]
@@ -1160,7 +1473,7 @@ namespace WasteCity.Tests
                 2,
                 3,
                 false);
-            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(3));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(4));
 
             UnityEngine.Object.Destroy(clone);
             UnityEngine.Object.Destroy(source);
@@ -1320,7 +1633,7 @@ namespace WasteCity.Tests
             Assert.That(
                 fields.Count(field =>
                     field.FieldType == workspaceType),
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
                 fields.Count(field =>
                     field.FieldType == typeof(Func<string, bool>)),
@@ -2302,6 +2615,101 @@ namespace WasteCity.Tests
                     value => value.StableId.StartsWith(
                         "building.node-highlight.",
                         StringComparison.Ordinal));
+        }
+
+        private static GrayboxVisualSlot[] ActiveGuidanceSlots(
+            GrayboxBuildingWorldView3D presentation,
+            string prefix)
+        {
+            return presentation
+                .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                .Where(value =>
+                    value.gameObject.activeSelf &&
+                    value.StableId.StartsWith(
+                        prefix,
+                        StringComparison.Ordinal))
+                .ToArray();
+        }
+
+        private static int GuidanceSlotCount(
+            GrayboxBuildingWorldView3D presentation,
+            string prefix)
+        {
+            return presentation
+                .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                .Count(value => value.StableId.StartsWith(
+                    prefix,
+                    StringComparison.Ordinal));
+        }
+
+        private static void InvokeRefreshMiningGuidance(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            MiningGuidanceRefreshAction(placement)();
+        }
+
+        private static Action MiningGuidanceRefreshAction(
+            GrayboxBuildingPlacementController3D placement)
+        {
+            MethodInfo method =
+                typeof(GrayboxBuildingPlacementController3D).GetMethod(
+                    "RefreshMiningGuidance",
+                    BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                "IDEA-0010 requires the input-driven refresh seam.");
+            return (Action)Delegate.CreateDelegate(
+                typeof(Action),
+                placement,
+                method);
+        }
+
+        private static BuildingPlacementEvaluation EvaluateGuidanceAnchor(
+            GrayboxBuildingPlacementController3D placement,
+            string stableId)
+        {
+            string[] parts = stableId.Split('.');
+            Assert.That(parts.Length, Is.GreaterThanOrEqualTo(3));
+            Assert.That(
+                int.TryParse(parts[parts.Length - 3], out int x),
+                Is.True,
+                stableId);
+            Assert.That(
+                int.TryParse(parts[parts.Length - 2], out int y),
+                Is.True,
+                stableId);
+            Assert.That(
+                Enum.TryParse(
+                    parts[parts.Length - 1],
+                    true,
+                    out BuildingOrientation orientation),
+                Is.True,
+                stableId);
+            MethodInfo method =
+                typeof(GrayboxBuildingPlacementController3D).GetMethod(
+                    "CreateGroundRequest",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            var request = (BuildingPlacementRequest)method.Invoke(
+                placement,
+                new object[]
+                {
+                    BuildingCatalog.MiningStation,
+                    orientation,
+                    x,
+                    y
+                });
+            return BuildingPlacementRules.Evaluate(request);
+        }
+
+        private static string MiningAnchorStableId(
+            int x,
+            int y,
+            BuildingOrientation orientation)
+        {
+            return "building.anchor-highlight." + x + "." + y + "." +
+                   orientation;
         }
 
         private static void InvokeSetGroundBuildRange(

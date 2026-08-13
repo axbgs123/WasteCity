@@ -32,8 +32,10 @@ namespace WasteCity.Graybox3D.Building
             new Color(.62f, .68f, .72f, 1f);
         private static readonly Color RuinColor =
             new Color(.34f, .28f, .23f, 1f);
-        private static readonly Color NodeColor =
-            new Color(.95f, .83f, .18f, .8f);
+        private static readonly Color LegalGuidanceColor =
+            new Color(.2f, .9f, .35f, .45f);
+        private static readonly Color BlockedNodeColor =
+            new Color(.85f, .62f, .12f, .55f);
 
         private sealed class Visual
         {
@@ -58,6 +60,8 @@ namespace WasteCity.Graybox3D.Building
         private readonly Dictionary<string, Visual> instances =
             new Dictionary<string, Visual>(StringComparer.Ordinal);
         private readonly Dictionary<string, Visual> nodeHighlights =
+            new Dictionary<string, Visual>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Visual> anchorHighlights =
             new Dictionary<string, Visual>(StringComparer.Ordinal);
         private readonly List<Visual> infrastructure =
             new List<Visual>();
@@ -84,9 +88,14 @@ namespace WasteCity.Graybox3D.Building
         public int InfrastructureRendererCount =>
             infrastructure.Count +
             nodeHighlights.Count +
+            anchorHighlights.Count +
             (preview == null ? 0 : 1);
         public int InstanceRendererCount => instances.Count;
         public bool IsBuildGridVisible => buildGridVisible;
+        public int ActiveMiningNodeHighlightCount =>
+            ActiveVisualCount(nodeHighlights);
+        public int ActiveMiningAnchorHighlightCount =>
+            ActiveVisualCount(anchorHighlights);
 
         public void SetBuildGridVisible(bool visible)
         {
@@ -317,30 +326,107 @@ namespace WasteCity.Graybox3D.Building
 
             if (!visible)
             {
-                if (!nodeHighlights.TryGetValue(
+                if (nodeHighlights.TryGetValue(
                         stableNodeVisualId,
-                        out Visual stale))
-                    return;
-                nodeHighlights.Remove(stableNodeVisualId);
-                DestroyVisual(stale);
+                        out Visual pooled))
+                    SetVisualActive(pooled, false);
                 return;
             }
 
-            if (nodeHighlights.ContainsKey(stableNodeVisualId))
+            ShowMiningResourceNode(
+                stableNodeVisualId,
+                worldX,
+                worldY,
+                GroundWidth,
+                GroundHeight,
+                true);
+        }
+
+        public void ShowMiningResourceNode(
+            string stableNodeVisualId,
+            int worldX,
+            int worldY,
+            int worldWidth,
+            int worldHeight,
+            bool hasLegalAnchor)
+        {
+            EnsureConfigured();
+            if (string.IsNullOrWhiteSpace(stableNodeVisualId))
                 return;
-            string visualId =
-                "building.node-highlight." + stableNodeVisualId;
-            Visual visual = CreateVisual(
-                visualId,
-                infrastructureRoot,
-                CreateNodeHighlightMesh(visualId),
-                NodeColor,
-                false);
+
+            if (!nodeHighlights.TryGetValue(
+                    stableNodeVisualId,
+                    out Visual visual))
+            {
+                string visualId =
+                    "building.node-highlight." + stableNodeVisualId;
+                visual = CreateVisual(
+                    visualId,
+                    infrastructureRoot,
+                    CreateNodeHighlightMesh(visualId),
+                    hasLegalAnchor
+                        ? LegalGuidanceColor
+                        : BlockedNodeColor,
+                    false);
+                nodeHighlights.Add(stableNodeVisualId, visual);
+            }
+            else
+            {
+                ConfigureSingleSlot(
+                    visual,
+                    visual.SingleSlot.StableId,
+                    hasLegalAnchor
+                        ? LegalGuidanceColor
+                        : BlockedNodeColor);
+                SetVisualActive(visual, true);
+            }
             visual.Root.transform.position = new Vector3(
-                worldX - GroundWidth * .5f,
+                worldX - worldWidth * .5f,
                 .035f,
-                worldY - GroundHeight * .5f);
-            nodeHighlights.Add(stableNodeVisualId, visual);
+                worldY - worldHeight * .5f);
+        }
+
+        public void ShowMiningAnchor(
+            string stableAnchorId,
+            int anchorX,
+            int anchorY,
+            int width,
+            int height,
+            int worldWidth,
+            int worldHeight)
+        {
+            EnsureConfigured();
+            if (string.IsNullOrWhiteSpace(stableAnchorId))
+                return;
+            if (!anchorHighlights.TryGetValue(
+                    stableAnchorId,
+                    out Visual visual))
+            {
+                visual = CreateVisual(
+                    stableAnchorId,
+                    infrastructureRoot,
+                    CreateAnchorHighlightMesh(
+                        width,
+                        height,
+                        stableAnchorId),
+                    LegalGuidanceColor,
+                    false);
+                anchorHighlights.Add(stableAnchorId, visual);
+            }
+            else
+            {
+                SetVisualActive(visual, true);
+            }
+            visual.Root.transform.position = new Vector3(
+                anchorX - worldWidth * .5f + (width - 1) * .5f,
+                .045f,
+                anchorY - worldHeight * .5f + (height - 1) * .5f);
+        }
+
+        public void HideMiningGuidance()
+        {
+            SetAllVisualsActive(nodeHighlights, false);
+            SetAllVisualsActive(anchorHighlights, false);
         }
 
         public bool TryPickInstance(
@@ -447,6 +533,24 @@ namespace WasteCity.Graybox3D.Building
                 visual.Root.activeSelf == active)
                 return;
             visual.Root.SetActive(active);
+        }
+
+        private static int ActiveVisualCount(
+            Dictionary<string, Visual> visuals)
+        {
+            var count = 0;
+            foreach (Visual visual in visuals.Values)
+                if (visual.Root != null && visual.Root.activeSelf)
+                    count++;
+            return count;
+        }
+
+        private static void SetAllVisualsActive(
+            Dictionary<string, Visual> visuals,
+            bool active)
+        {
+            foreach (Visual visual in visuals.Values)
+                SetVisualActive(visual, active);
         }
 
         private Visual CreateVisual(
@@ -756,6 +860,38 @@ namespace WasteCity.Graybox3D.Building
                 stableId + ".mesh");
         }
 
+        private static Mesh CreateAnchorHighlightMesh(
+            int width,
+            int height,
+            string stableId)
+        {
+            const float thickness = .075f;
+            float extentX = width * .5f - thickness * .5f;
+            float extentZ = height * .5f - thickness * .5f;
+            return GrayboxMeshBuilder.CombinePrimitive(
+                PrimitiveType.Cube,
+                new[]
+                {
+                    Matrix4x4.TRS(
+                        new Vector3(0f, 0f, extentZ),
+                        Quaternion.identity,
+                        new Vector3(width, .025f, thickness)),
+                    Matrix4x4.TRS(
+                        new Vector3(0f, 0f, -extentZ),
+                        Quaternion.identity,
+                        new Vector3(width, .025f, thickness)),
+                    Matrix4x4.TRS(
+                        new Vector3(extentX, 0f, 0f),
+                        Quaternion.identity,
+                        new Vector3(thickness, .025f, height)),
+                    Matrix4x4.TRS(
+                        new Vector3(-extentX, 0f, 0f),
+                        Quaternion.identity,
+                        new Vector3(thickness, .025f, height))
+                },
+                stableId + ".mesh");
+        }
+
         private static void CreateGroundRangeMeshes(
             int cityX,
             int cityY,
@@ -1040,6 +1176,8 @@ namespace WasteCity.Graybox3D.Building
                 DestroyVisual(visual);
             foreach (Visual visual in nodeHighlights.Values)
                 DestroyVisual(visual);
+            foreach (Visual visual in anchorHighlights.Values)
+                DestroyVisual(visual);
             for (var index = infrastructure.Count - 1;
                  index >= 0;
                  index--)
@@ -1048,6 +1186,7 @@ namespace WasteCity.Graybox3D.Building
             ClearSerializedOwnedRoots();
             instances.Clear();
             nodeHighlights.Clear();
+            anchorHighlights.Clear();
             infrastructure.Clear();
             preview = null;
             hasPreviewGeometry = false;

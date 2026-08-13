@@ -101,6 +101,7 @@ namespace WasteCity.Graybox3D.Building
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
+        private uint placementRevision;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -111,6 +112,7 @@ namespace WasteCity.Graybox3D.Building
         public int GroundBuildRadius { get; private set; }
         public float ConstructionMultiplier { get; private set; }
         public uint CatalogRevision => catalogRevision;
+        public uint PlacementRevision => placementRevision;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
 
@@ -150,6 +152,7 @@ namespace WasteCity.Graybox3D.Building
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
             AdvanceCatalogRevision();
+            AdvancePlacementRevision();
         }
 
         public bool TryBeginConstruction(
@@ -227,6 +230,7 @@ namespace WasteCity.Graybox3D.Building
             instances.Add(candidate);
             nextStableInstanceOrdinal++;
             instance = candidate;
+            AdvancePlacementRevision();
             return true;
         }
 
@@ -287,6 +291,7 @@ namespace WasteCity.Graybox3D.Building
                 instance.Placement.Definition.CostId,
                 refund);
             instances.RemoveAt(index);
+            AdvancePlacementRevision();
             return true;
         }
 
@@ -327,7 +332,11 @@ namespace WasteCity.Graybox3D.Building
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
-                if (completed) AdvanceCatalogRevision();
+                if (completed)
+                {
+                    AdvanceCatalogRevision();
+                    AdvancePlacementRevision();
+                }
             }
         }
 
@@ -444,6 +453,7 @@ namespace WasteCity.Graybox3D.Building
             }
             for (var index = 0; index < changedCompleted.Count; index++)
                 AdvanceCatalogRevision();
+            AdvancePlacementRevision();
             return true;
         }
 
@@ -499,6 +509,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (fullDismantleWork == null) return;
             EnsureConfigured();
+            var placementChanged = false;
             for (var index = 0; index < fullDismantleWork.Count; index++)
             {
                 BuildingEvacuationWork work = fullDismantleWork[index];
@@ -516,8 +527,10 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxBuildingInstanceState.Completed &&
                     instance.IsPlayerOwned;
                 instance.SetEvacuationLocked(false);
+                placementChanged = true;
                 if (countedAfter) AdvanceCatalogRevision();
             }
+            if (placementChanged) AdvancePlacementRevision();
         }
 
         public bool TryCommitEvacuation(
@@ -598,7 +611,11 @@ namespace WasteCity.Graybox3D.Building
             bool changed = contacted
                 ? contactedRoutes.Add(route)
                 : contactedRoutes.Remove(route);
-            if (changed) AdvanceCatalogRevision();
+            if (changed)
+            {
+                AdvanceCatalogRevision();
+                AdvancePlacementRevision();
+            }
         }
 
         public void UnlockResearchForDevelopment(string researchId)
@@ -613,6 +630,7 @@ namespace WasteCity.Graybox3D.Building
             restored[completed.Length] = definition.Id.Value;
             Research.Restore(restored, null, 0f);
             AdvanceCatalogRevision();
+            AdvancePlacementRevision();
         }
 
         public void UnlockRouteForDevelopment(ContentRoute route)
@@ -647,6 +665,7 @@ namespace WasteCity.Graybox3D.Building
             if (Population == population) return;
             Population = population;
             AdvanceCatalogRevision();
+            AdvancePlacementRevision();
         }
 
         public void SetConstructionMultiplierForDevelopment(float value)
@@ -680,12 +699,18 @@ namespace WasteCity.Graybox3D.Building
                     throw;
                 }
                 AdvanceCatalogRevision();
+                AdvancePlacementRevision();
             }
         }
 
         private void AdvanceCatalogRevision()
         {
             unchecked { catalogRevision++; }
+        }
+
+        private void AdvancePlacementRevision()
+        {
+            unchecked { placementRevision++; }
         }
 
         private bool TryAbandon(
@@ -717,6 +742,7 @@ namespace WasteCity.Graybox3D.Building
                 throw;
             }
             if (wasCounted) AdvanceCatalogRevision();
+            AdvancePlacementRevision();
             evacuationSnapshots.Remove(instance.StableInstanceId);
             failureReason = string.Empty;
             return true;
@@ -788,6 +814,7 @@ namespace WasteCity.Graybox3D.Building
                 throw;
             }
             if (wasCounted) AdvanceCatalogRevision();
+            AdvancePlacementRevision();
             return true;
         }
 
