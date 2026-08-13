@@ -425,6 +425,209 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator
+            IDEA0009_VirtualInput_HousingCoversInnerGroundAndEvacuation()
+        {
+            const string requirement = "IDEA0009 Housing";
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInteractionModel3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxEvacuationController3D evacuation =
+                Object.FindObjectOfType<GrayboxEvacuationController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            Assert.That(
+                modifier.AddResource(ResourceIds.Alloy, 1000),
+                Is.True,
+                requirement + " fixture resources");
+            Assert.That(
+                modifier.SetConstructionSpeed(
+                    DevelopmentConstructionSpeed.Fast100),
+                Is.True,
+                requirement + " fixture construction speed");
+            Assert.That(
+                city.Mode,
+                Is.EqualTo(CityMode.Mobile),
+                requirement + " starts Mobile");
+
+            yield return TapKey(Key.B);
+            yield return TapKey(Key.Digit2);
+            Assert.That(
+                interaction.Selected,
+                Is.SameAs(BuildingCatalog.Housing),
+                requirement + " must be selected through virtual keyboard");
+            yield return MoveToInnerPreview(city);
+            Assert.That(
+                placement.CurrentHit.Site,
+                Is.EqualTo(BuildingSite.InnerCity),
+                requirement + " Mobile InnerCity projection");
+            Assert.That(
+                placement.CurrentEvaluation.IsValid,
+                Is.True,
+                requirement + " Mobile InnerCity evaluation: " +
+                placement.CurrentEvaluation.PrimaryFailure);
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(
+                session.Instances,
+                Has.Count.EqualTo(1),
+                requirement + " Mobile InnerCity virtual placement");
+            GrayboxBuildingInstance3D inner = session.Instances[0];
+            Assert.That(
+                inner.Placement.Definition,
+                Is.SameAs(BuildingCatalog.Housing),
+                requirement + " Mobile InnerCity canonical definition");
+            Assert.That(
+                inner.Placement.Site,
+                Is.EqualTo(BuildingSite.InnerCity),
+                requirement + " Mobile InnerCity instance site");
+            yield return WaitForCompletion(inner, 2f);
+
+            yield return MoveToGroundPreviewContaining(
+                city,
+                world,
+                placement,
+                BuildingPlacementFailure.InvalidCityMode);
+            Assert.That(
+                placement.CurrentHit.Site,
+                Is.EqualTo(BuildingSite.Ground),
+                requirement + " Mobile Ground projection");
+            Assert.That(
+                placement.CurrentEvaluation.PrimaryFailure,
+                Is.EqualTo(BuildingPlacementFailure.InvalidCityMode),
+                requirement + " Mobile Ground unified evaluation");
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(
+                session.Instances,
+                Is.EqualTo(new[] { inner }),
+                requirement + " Mobile Ground virtual click must be rejected");
+
+            yield return TapKey(Key.F);
+            Assert.That(
+                city.Mode,
+                Is.EqualTo(CityMode.Deploying),
+                requirement + " virtual F begins deployment");
+            float deploymentDeadline = Time.realtimeSinceStartup + 4f;
+            while (city.Mode == CityMode.Deploying &&
+                   Time.realtimeSinceStartup < deploymentDeadline)
+                yield return null;
+            Assert.That(
+                city.Mode,
+                Is.EqualTo(CityMode.Fortress),
+                requirement + " virtual F completes Fortress transition");
+
+            yield return MoveToValidGroundPreview(
+                city,
+                world,
+                placement);
+            Assert.That(
+                placement.CurrentHit.Site,
+                Is.EqualTo(BuildingSite.Ground),
+                requirement + " Fortress Ground projection");
+            Assert.That(
+                placement.CurrentEvaluation.IsValid,
+                Is.True,
+                requirement + " Fortress Ground evaluation: " +
+                placement.CurrentEvaluation.PrimaryFailure);
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(
+                session.Instances,
+                Has.Count.EqualTo(2),
+                requirement + " Fortress Ground virtual placement");
+            GrayboxBuildingInstance3D ground = session.Instances[1];
+            Assert.That(
+                ground.Placement.Definition,
+                Is.SameAs(BuildingCatalog.Housing),
+                requirement + " Fortress Ground canonical definition");
+            Assert.That(
+                ground.Placement.Site,
+                Is.EqualTo(BuildingSite.Ground),
+                requirement + " Fortress Ground instance site");
+            yield return WaitForCompletion(ground, 2f);
+
+            yield return TapKey(Key.F);
+            Assert.That(
+                city.Mode,
+                Is.EqualTo(CityMode.Fortress),
+                requirement + " evacuation entry holds Fortress");
+            Assert.That(
+                evacuation.IsManifestOpen,
+                Is.True,
+                requirement + " virtual F opens evacuation manifest");
+            Assert.That(
+                FindButton(
+                    "Evacuation.Item." + ground.StableInstanceId +
+                    ".FullDismantle"),
+                Is.Not.Null,
+                requirement + " Fortress Ground appears in manifest");
+            Assert.That(
+                FindButton(
+                    "Evacuation.Item." + inner.StableInstanceId +
+                    ".FullDismantle"),
+                Is.Null,
+                requirement + " InnerCity stays outside manifest");
+            yield return SubmitButton(
+                "Evacuation.Item." + ground.StableInstanceId +
+                ".FullDismantle");
+            yield return SubmitButton("Evacuation.Confirm");
+            Assert.That(
+                evacuation.IsManifestOpen,
+                Is.False,
+                requirement + " evacuation manifest confirms");
+            Assert.That(
+                evacuation.Work,
+                Has.Count.EqualTo(1),
+                requirement + " evacuation work count");
+            Assert.That(
+                evacuation.Work[0].StableInstanceId,
+                Is.EqualTo(ground.StableInstanceId),
+                requirement + " evacuation work stable ID");
+            Assert.That(
+                evacuation.Work[0].Treatment,
+                Is.EqualTo(
+                    BuildingEvacuationTreatment.FullDismantle),
+                requirement + " evacuation treatment");
+            Assert.That(
+                evacuation.IsProcessing,
+                Is.True,
+                requirement + " evacuation processing starts");
+            float evacuationDeadline = Time.realtimeSinceStartup + 6f;
+            while (evacuation.IsProcessing &&
+                   Time.realtimeSinceStartup < evacuationDeadline)
+                yield return null;
+            Assert.That(
+                evacuation.IsProcessing,
+                Is.False,
+                requirement + " evacuation processing completes");
+            Assert.That(
+                session.Instances.Contains(inner),
+                Is.True,
+                requirement + " InnerCity survives evacuation");
+            Assert.That(
+                session.Instances.Contains(ground),
+                Is.False,
+                requirement + " Fortress Ground uses evacuation removal");
+        }
+
+        [UnityTest]
         public IEnumerator DeveloperInjectedCatalog_MapsAllTwentyEightRuntimeCards()
         {
             GrayboxBuildingSession3D session =

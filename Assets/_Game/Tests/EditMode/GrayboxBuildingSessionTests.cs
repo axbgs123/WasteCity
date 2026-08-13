@@ -589,6 +589,201 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0009_Housing_UsesUnifiedConstructionAndEvaluationPaths()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            int alloyBefore = session.Inventory.Get(ResourceIds.Alloy);
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    ValidRequest(
+                        session,
+                        BuildingCatalog.Housing,
+                        BuildingSite.InnerCity,
+                        CityMode.Mobile,
+                        0,
+                        0),
+                    presentation,
+                    out GrayboxBuildingInstance3D inner,
+                    out BuildingPlacementEvaluation innerEvaluation),
+                Is.True,
+                "IDEA0009 Housing Mobile InnerCity must use unified construction: " +
+                innerEvaluation.PrimaryFailure);
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(alloyBefore - BuildingCatalog.Housing.Cost),
+                "IDEA0009 Housing Mobile InnerCity must spend exactly once");
+            Assert.That(
+                session.InnerGrid.Count,
+                Is.EqualTo(1),
+                "IDEA0009 Housing Mobile InnerCity must occupy exactly once");
+            Assert.That(
+                session.InnerGrid.IsOccupied(0, 0),
+                Is.True,
+                "IDEA0009 Housing Mobile InnerCity footprint must be occupied");
+
+            int alloyBeforeRejectedGround =
+                session.Inventory.Get(ResourceIds.Alloy);
+            Assert.That(
+                session.TryBeginConstruction(
+                    ValidRequest(
+                        session,
+                        BuildingCatalog.Housing,
+                        BuildingSite.Ground,
+                        CityMode.Mobile,
+                        10,
+                        10),
+                    presentation,
+                    out GrayboxBuildingInstance3D rejectedGround,
+                    out BuildingPlacementEvaluation rejectedEvaluation),
+                Is.False,
+                "IDEA0009 Housing Mobile Ground must be rejected by unified evaluation");
+            Assert.That(
+                rejectedGround,
+                Is.Null,
+                "IDEA0009 Housing Mobile Ground must not create an instance");
+            Assert.That(
+                rejectedEvaluation.PrimaryFailure,
+                Is.EqualTo(BuildingPlacementFailure.InvalidCityMode),
+                "IDEA0009 Housing Mobile Ground must report InvalidCityMode");
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(alloyBeforeRejectedGround),
+                "IDEA0009 Housing Mobile Ground rejection must not spend");
+            Assert.That(
+                session.GroundGrid.Count,
+                Is.Zero,
+                "IDEA0009 Housing Mobile Ground rejection must not occupy");
+
+            Assert.That(
+                session.TryBeginConstruction(
+                    ValidRequest(
+                        session,
+                        BuildingCatalog.Housing,
+                        BuildingSite.Ground,
+                        CityMode.Fortress,
+                        10,
+                        10),
+                    presentation,
+                    out GrayboxBuildingInstance3D ground,
+                    out BuildingPlacementEvaluation groundEvaluation),
+                Is.True,
+                "IDEA0009 Housing Fortress Ground must use unified construction: " +
+                groundEvaluation.PrimaryFailure);
+            Assert.That(
+                ground.Placement.Definition,
+                Is.SameAs(inner.Placement.Definition)
+                    .And.SameAs(BuildingCatalog.Housing),
+                "IDEA0009 Housing InnerCity and Ground must share canonical definition");
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(alloyBefore - BuildingCatalog.Housing.Cost * 2),
+                "IDEA0009 Housing Fortress Ground must spend exactly once");
+            Assert.That(
+                session.GroundGrid.Count,
+                Is.EqualTo(1),
+                "IDEA0009 Housing Fortress Ground must occupy exactly once");
+            Assert.That(
+                session.GroundGrid.IsOccupied(10, 10),
+                Is.True,
+                "IDEA0009 Housing Fortress Ground footprint must be occupied");
+
+            session.TickConstruction(
+                BuildingCatalog.Housing.BuildSeconds,
+                CityMode.Fortress,
+                false,
+                presentation);
+
+            Assert.That(
+                inner.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed),
+                "IDEA0009 Housing Mobile InnerCity construction must complete");
+            Assert.That(
+                ground.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed),
+                "IDEA0009 Housing Fortress Ground construction must complete in place");
+            Assert.That(
+                session.Instances,
+                Is.EqualTo(new[] { inner, ground }),
+                "IDEA0009 Housing unified construction must preserve both instances");
+        }
+
+        [Test]
+        public void IDEA0009_FortressGroundHousing_UsesExistingEvacuationPath()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            int alloyBefore = session.Inventory.Get(ResourceIds.Alloy);
+            GrayboxBuildingInstance3D ground = Begin(
+                session,
+                BuildingCatalog.Housing,
+                BuildingSite.Ground,
+                CityMode.Fortress,
+                10,
+                10,
+                presentation);
+            session.TickConstruction(
+                BuildingCatalog.Housing.BuildSeconds,
+                CityMode.Fortress,
+                false,
+                presentation);
+            var manifest = new List<GrayboxBuildingInstance3D>();
+
+            session.CopyPlayerOwnedGroundInstances(manifest);
+
+            Assert.That(
+                manifest,
+                Is.EqualTo(new[] { ground }),
+                "IDEA0009 Housing Fortress Ground must enter evacuation manifest source");
+            BuildingEvacuationWork quickDismantle =
+                BuildingEvacuationRules.Create(
+                    ground.StableInstanceId,
+                    ground.Placement.Definition.Cost,
+                    ground.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.QuickDismantle);
+            Assert.That(
+                session.TryCaptureEvacuationWork(
+                    new[] { quickDismantle },
+                    out string captureFailure),
+                Is.True,
+                "IDEA0009 Housing Fortress Ground evacuation capture: " +
+                captureFailure);
+            Assert.That(
+                session.TryCommitEvacuation(
+                    quickDismantle,
+                    presentation,
+                    out int acceptedRefund,
+                    out string commitFailure),
+                Is.True,
+                "IDEA0009 Housing Fortress Ground evacuation commit: " +
+                commitFailure);
+            Assert.That(
+                acceptedRefund,
+                Is.EqualTo(BuildingCatalog.Housing.Cost / 2),
+                "IDEA0009 Housing Fortress Ground quick dismantle refund");
+            Assert.That(
+                session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(
+                    alloyBefore - BuildingCatalog.Housing.Cost +
+                    acceptedRefund),
+                "IDEA0009 Housing Fortress Ground evacuation resource path");
+            Assert.That(
+                session.GroundGrid.Count,
+                Is.Zero,
+                "IDEA0009 Housing Fortress Ground evacuation must release occupancy");
+            Assert.That(
+                session.Instances,
+                Is.Empty,
+                "IDEA0009 Housing Fortress Ground evacuation must remove instance");
+            Assert.That(
+                presentation.Removed,
+                Is.EqualTo(new[] { ground }),
+                "IDEA0009 Housing Fortress Ground evacuation must remove presentation");
+        }
+
+        [Test]
         public void ResearchStation_ConstructsAndCompletesInMobileInnerCity()
         {
             GrayboxBuildingSession3D session = CreateSession();

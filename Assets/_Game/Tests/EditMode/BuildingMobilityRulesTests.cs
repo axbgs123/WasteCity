@@ -91,6 +91,66 @@ namespace WasteCity.Tests
                 Is.EqualTo(expected));
         }
 
+        [TestCase(CityMode.Mobile, BuildingSite.InnerCity, true)]
+        [TestCase(CityMode.Mobile, BuildingSite.Ground, false)]
+        [TestCase(CityMode.Deploying, BuildingSite.InnerCity, false)]
+        [TestCase(CityMode.Deploying, BuildingSite.Ground, false)]
+        [TestCase(CityMode.Fortress, BuildingSite.InnerCity, true)]
+        [TestCase(CityMode.Fortress, BuildingSite.Ground, true)]
+        [TestCase(CityMode.Packing, BuildingSite.InnerCity, false)]
+        [TestCase(CityMode.Packing, BuildingSite.Ground, false)]
+        public void IDEA0009_Housing_UsesApprovedFourModeTwoSurfaceMatrix(
+            CityMode mode,
+            BuildingSite site,
+            bool expected)
+        {
+            Assert.That(
+                BuildingMobilityRules.CanConstruct(
+                    BuildingCatalog.Housing,
+                    site,
+                    mode),
+                Is.EqualTo(expected),
+                $"IDEA0009 Housing {mode} {site} construction matrix");
+        }
+
+        [Test]
+        public void IDEA0009_Housing_UsesOneCanonicalDefinitionOnBothSurfaces()
+        {
+            BuildingDefinition housing = BuildingCatalog.Housing;
+            var inner = new PlacedBuilding(
+                housing,
+                0,
+                0,
+                BuildingSite.InnerCity);
+            var ground = new PlacedBuilding(
+                housing,
+                10,
+                10,
+                BuildingSite.Ground);
+
+            Assert.That(
+                inner.Definition,
+                Is.SameAs(housing),
+                "IDEA0009 Housing InnerCity must use canonical definition");
+            Assert.That(
+                ground.Definition,
+                Is.SameAs(housing),
+                "IDEA0009 Housing Ground must use canonical definition");
+            Assert.That(
+                ground.Definition.Cost,
+                Is.EqualTo(inner.Definition.Cost).And.EqualTo(8),
+                "IDEA0009 Housing cost must not fork by surface");
+            Assert.That(
+                (ground.Definition.Width, ground.Definition.Height),
+                Is.EqualTo((inner.Definition.Width, inner.Definition.Height))
+                    .And.EqualTo((2, 2)),
+                "IDEA0009 Housing footprint must not fork by surface");
+            Assert.That(
+                ground.Definition.MaximumHealth,
+                Is.EqualTo(inner.Definition.MaximumHealth).And.EqualTo(250),
+                "IDEA0009 Housing maximum health must not fork by surface");
+        }
+
         [Test]
         public void GroundFactoryOnlyRunsAndConstructsInFortress()
         {
