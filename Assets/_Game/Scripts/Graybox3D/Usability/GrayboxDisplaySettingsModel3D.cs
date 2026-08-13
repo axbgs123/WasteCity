@@ -185,7 +185,8 @@ namespace WasteCity.Graybox3D.Usability
                     out int version,
                     out GrayboxDisplaySettings3D stored) &&
                 version == CurrentVersion &&
-                IsSupported(stored))
+                IsSupported(stored) &&
+                platform.TryApply(stored))
                 LastApplied = stored;
             Staged = LastApplied;
         }

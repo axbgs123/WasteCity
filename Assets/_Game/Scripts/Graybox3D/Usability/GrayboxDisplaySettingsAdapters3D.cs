@@ -119,6 +119,8 @@ namespace WasteCity.Graybox3D.Usability
                 Debug.LogWarning(
                     "Display settings could not be applied: " +
                     exception.Message);
+#else
+                _ = exception;
 #endif
                 return false;
             }

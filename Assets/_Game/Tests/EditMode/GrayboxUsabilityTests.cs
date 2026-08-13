@@ -21,10 +21,13 @@ namespace WasteCity.Tests
             new List<GameObject>();
         private Keyboard testKeyboard;
         private object inputTestFixture;
+        private Dictionary<string, PlayerPrefsIntState>
+            originalPlayerPrefs;
 
         [SetUp]
         public void SetUp()
         {
+            originalPlayerPrefs = CaptureApprovedPlayerPrefs();
             DeleteApprovedPlayerPrefsKeys();
             Time.timeScale = 1f;
         }
@@ -47,7 +50,8 @@ namespace WasteCity.Tests
                 inputTestFixture = null;
             }
             Time.timeScale = 1f;
-            DeleteApprovedPlayerPrefsKeys();
+            RestoreApprovedPlayerPrefs(originalPlayerPrefs);
+            originalPlayerPrefs = null;
         }
 
         [Test]
@@ -94,14 +98,46 @@ namespace WasteCity.Tests
                 1280,
                 720,
                 GrayboxWindowMode3D.FullScreenWindow);
+            FakePlatform platform = StandardPlatform();
             var store = new FakeStore(true, 1, stored);
             var model = new GrayboxDisplaySettingsModel3D(
-                StandardPlatform(),
+                platform,
                 store);
 
             Assert.That(model.LastApplied, Is.EqualTo(stored));
             Assert.That(model.Staged, Is.EqualTo(stored));
             Assert.That(store.LoadCount, Is.EqualTo(1));
+            Assert.That(platform.ApplyCount, Is.EqualTo(1));
+            Assert.That(platform.LastApplied, Is.EqualTo(stored));
+            Assert.That(store.SaveCount, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0007_LoadApplyFailureFallsBackWithoutWritingStore()
+        {
+            GrayboxDisplaySettings3D current = Setting(
+                1600,
+                900,
+                GrayboxWindowMode3D.Windowed);
+            GrayboxDisplaySettings3D stored = Setting(
+                1280,
+                720,
+                GrayboxWindowMode3D.FullScreenWindow);
+            FakePlatform platform = StandardPlatform(current);
+            platform.ApplySucceeds = false;
+            var store = new FakeStore(true, 1, stored);
+
+            GrayboxDisplaySettingsModel3D model = null;
+            Assert.That(
+                () => model = new GrayboxDisplaySettingsModel3D(
+                    platform,
+                    store),
+                Throws.Nothing);
+
+            Assert.That(platform.ApplyCount, Is.EqualTo(1));
+            Assert.That(store.SaveCount, Is.Zero);
+            Assert.That(model.LastApplied, Is.EqualTo(current));
+            Assert.That(model.Staged, Is.EqualTo(current));
         }
 
         [TestCase(0, 1280, 720, (int)GrayboxWindowMode3D.Windowed)]
@@ -314,6 +350,28 @@ namespace WasteCity.Tests
             Assert.That(loaded, Is.EqualTo(expected));
             foreach (string key in ApprovedPlayerPrefsKeys())
                 Assert.That(PlayerPrefs.HasKey(key), Is.True, key);
+        }
+
+        [Test]
+        public void IDEA0007_PlayerPrefsIsolationRestoresPresenceAndValues()
+        {
+            string[] keys = ApprovedPlayerPrefsKeys();
+            PlayerPrefs.SetInt(keys[0], 31);
+            PlayerPrefs.SetInt(keys[1], 47);
+            PlayerPrefs.DeleteKey(keys[2]);
+            PlayerPrefs.SetInt(keys[3], 59);
+            Dictionary<string, PlayerPrefsIntState> snapshot =
+                CaptureApprovedPlayerPrefs();
+
+            foreach (string key in keys)
+                PlayerPrefs.SetInt(key, 999);
+            RestoreApprovedPlayerPrefs(snapshot);
+
+            Assert.That(PlayerPrefs.GetInt(keys[0]), Is.EqualTo(31));
+            Assert.That(PlayerPrefs.GetInt(keys[1]), Is.EqualTo(47));
+            Assert.That(PlayerPrefs.HasKey(keys[2]), Is.False);
+            Assert.That(PlayerPrefs.GetInt(keys[3]), Is.EqualTo(59));
+            DeleteApprovedPlayerPrefsKeys();
         }
 
         [Test]
@@ -935,6 +993,47 @@ namespace WasteCity.Tests
             PlayerPrefs.DeleteKey("wastecity.display.width");
             PlayerPrefs.DeleteKey("wastecity.display.height");
             PlayerPrefs.DeleteKey("wastecity.display.window-mode");
+        }
+
+        private static Dictionary<string, PlayerPrefsIntState>
+            CaptureApprovedPlayerPrefs()
+        {
+            var snapshot = new Dictionary<string, PlayerPrefsIntState>(
+                StringComparer.Ordinal);
+            foreach (string key in ApprovedPlayerPrefsKeys())
+                snapshot.Add(
+                    key,
+                    new PlayerPrefsIntState(
+                        PlayerPrefs.HasKey(key),
+                        PlayerPrefs.GetInt(key)));
+            return snapshot;
+        }
+
+        private static void RestoreApprovedPlayerPrefs(
+            IReadOnlyDictionary<string, PlayerPrefsIntState> snapshot)
+        {
+            foreach (string key in ApprovedPlayerPrefsKeys())
+            {
+                if (snapshot != null &&
+                    snapshot.TryGetValue(key, out PlayerPrefsIntState state) &&
+                    state.Exists)
+                    PlayerPrefs.SetInt(key, state.Value);
+                else
+                    PlayerPrefs.DeleteKey(key);
+            }
+            PlayerPrefs.Save();
+        }
+
+        private readonly struct PlayerPrefsIntState
+        {
+            public PlayerPrefsIntState(bool exists, int value)
+            {
+                Exists = exists;
+                Value = value;
+            }
+
+            public bool Exists { get; }
+            public int Value { get; }
         }
 
         private sealed class FakeStore : IGrayboxDisplaySettingsStore

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -242,24 +242,61 @@ namespace WasteCity.Tests
                 new GrayboxDisplaySettingsModel3D(platform, store),
                 exit,
                 view);
+            GrayboxDisplaySettings3D expected =
+                new GrayboxDisplaySettings3D(
+                    1920,
+                    1080,
+                    GrayboxWindowMode3D.FullScreenWindow);
 
             yield return TapKey(Key.Escape);
             yield return ClickButton("Main.Settings");
             Assert.That(menu.Page,
                 Is.EqualTo(GrayboxSystemMenuPage3D.Settings));
+            yield return SelectDropdownOption(
+                "Settings.Resolution",
+                "1920×1080");
+            Assert.That(
+                menu.Settings.Staged,
+                Is.EqualTo(new GrayboxDisplaySettings3D(
+                    1920,
+                    1080,
+                    GrayboxWindowMode3D.Windowed)));
+            yield return SelectDropdownOption(
+                "Settings.WindowMode",
+                "FullScreenWindow");
+            Assert.That(menu.Settings.Staged, Is.EqualTo(expected));
             yield return ClickButton("Settings.Apply");
             Assert.That(platform.ApplyCount, Is.EqualTo(1));
+            Assert.That(platform.LastApplied, Is.EqualTo(expected));
             Assert.That(store.SaveCount, Is.EqualTo(1));
             Assert.That(store.Version,
                 Is.EqualTo(GrayboxDisplaySettingsModel3D.CurrentVersion));
+            Assert.That(store.Settings, Is.EqualTo(expected));
+            yield return ClickButton("Settings.Cancel");
+            yield return ClickButton("Main.Settings");
+            Assert.That(menu.Settings.Staged, Is.EqualTo(expected));
+            Assert.That(
+                FindDropdown("Settings.Resolution").options[
+                    FindDropdown("Settings.Resolution").value].text,
+                Is.EqualTo("1920×1080"));
+            Assert.That(
+                FindDropdown("Settings.WindowMode").options[
+                    FindDropdown("Settings.WindowMode").value].text,
+                Is.EqualTo("FullScreenWindow"));
             yield return ClickButton("Settings.Cancel");
             yield return ClickButton("Main.Quit");
             Assert.That(menu.Page,
                 Is.EqualTo(GrayboxSystemMenuPage3D.ExitConfirm));
+            yield return ClickButton("Exit.Cancel");
+            Assert.That(exit.Count, Is.Zero);
+            Assert.That(menu.Page,
+                Is.EqualTo(GrayboxSystemMenuPage3D.Main));
+            yield return ClickButton("Main.Quit");
             yield return ClickButton("Exit.Confirm");
             Assert.That(exit.Count, Is.EqualTo(1));
             Assert.That(Application.isPlaying, Is.True);
-            menu.Close();
+            yield return ClickButton("Exit.Cancel");
+            yield return ClickButton("Main.Continue");
             Assert.That(Time.timeScale, Is.EqualTo(2f));
         }
 
@@ -407,12 +444,68 @@ namespace WasteCity.Tests
             Button button = FindButton(name);
             Assert.That(button, Is.Not.Null, name);
             Assert.That(button.gameObject.activeInHierarchy, Is.True, name);
-            EventSystem.current.SetSelectedGameObject(button.gameObject);
-            var eventData = new BaseEventData(EventSystem.current);
-            ExecuteEvents.Execute(
-                button.gameObject,
-                eventData,
-                ExecuteEvents.submitHandler);
+            yield return ClickUiElement(button.gameObject);
+        }
+
+        private IEnumerator SelectDropdownOption(
+            string dropdownName,
+            string optionLabel)
+        {
+            Dropdown dropdown = FindDropdown(dropdownName);
+            Assert.That(dropdown, Is.Not.Null, dropdownName);
+            yield return ClickUiElement(dropdown.gameObject);
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+
+            Toggle option = Object.FindObjectsOfType<Toggle>(true)
+                .FirstOrDefault(value =>
+                    value.gameObject.activeInHierarchy &&
+                    value.GetComponentInChildren<Text>(true)?.text ==
+                    optionLabel);
+            string activeOptions = string.Join(
+                "|",
+                Object.FindObjectsOfType<Toggle>(true)
+                    .Where(value => value.gameObject.activeInHierarchy)
+                    .Select(value =>
+                        value.GetComponentInChildren<Text>(true)?.text ??
+                        "<no text>"));
+            Assert.That(
+                option,
+                Is.Not.Null,
+                optionLabel + "; active options=" + activeOptions +
+                "; dropdown value=" + dropdown.value);
+            yield return ClickUiElement(option.gameObject);
+            yield return new WaitForSecondsRealtime(.2f);
+            Assert.That(
+                Object.FindObjectsOfType<Toggle>(true).Any(value =>
+                    value.gameObject.activeInHierarchy &&
+                    value.GetComponentInChildren<Text>(true)?.text ==
+                    optionLabel),
+                Is.False,
+                dropdownName + " did not close after selection.");
+        }
+
+        private IEnumerator ClickUiElement(GameObject target)
+        {
+            InputSystemUIInputModule module =
+                Object.FindObjectOfType<InputSystemUIInputModule>();
+            Assert.That(module, Is.Not.Null);
+            Assert.That(module.enabled, Is.True);
+            Assert.That(module.leftClick, Is.Not.Null);
+            Assert.That(module.leftClick.action.enabled, Is.True);
+            Assert.That(target.activeInHierarchy, Is.True, target.name);
+            RectTransform rect = target.GetComponent<RectTransform>();
+            Assert.That(rect, Is.Not.Null, target.name);
+            Canvas.ForceUpdateCanvases();
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(
+                null,
+                rect.TransformPoint(rect.rect.center));
+
+            QueueMouse(position);
+            yield return null;
+            QueueMouse(position, MouseButton.Left);
+            yield return null;
+            QueueMouse(position);
             yield return null;
         }
 
@@ -479,6 +572,15 @@ namespace WasteCity.Tests
             return null;
         }
 
+        private static Dropdown FindDropdown(string name)
+        {
+            Dropdown[] dropdowns = Object.FindObjectsOfType<Dropdown>(true);
+            for (var index = 0; index < dropdowns.Length; index++)
+                if (dropdowns[index].name == name)
+                    return dropdowns[index];
+            return null;
+        }
+
         private sealed class FakeDisplayPlatform :
             IGrayboxDisplaySettingsPlatform
         {
@@ -498,10 +600,12 @@ namespace WasteCity.Tests
                     720,
                     GrayboxWindowMode3D.Windowed);
             public int ApplyCount { get; private set; }
+            public GrayboxDisplaySettings3D LastApplied { get; private set; }
 
             public bool TryApply(GrayboxDisplaySettings3D settings)
             {
                 ApplyCount++;
+                LastApplied = settings;
                 return true;
             }
         }
@@ -511,6 +615,7 @@ namespace WasteCity.Tests
         {
             public int SaveCount { get; private set; }
             public int Version { get; private set; }
+            public GrayboxDisplaySettings3D Settings { get; private set; }
 
             public bool TryLoad(
                 out int version,
@@ -527,6 +632,7 @@ namespace WasteCity.Tests
             {
                 SaveCount++;
                 Version = version;
+                Settings = settings;
             }
         }
 
