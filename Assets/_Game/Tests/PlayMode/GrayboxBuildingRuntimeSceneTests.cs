@@ -1617,6 +1617,7 @@ namespace WasteCity.Tests
             for (var frame = 0; frame < 4; frame++)
             {
                 yield return null;
+                yield return null;
                 Vector3 cityDelta = city.position - cityBefore;
                 Vector3 innerDelta = inner.position - innerBefore;
                 if (Mathf.Abs(innerDelta.x - cityDelta.x) <= .001f &&
