@@ -118,7 +118,33 @@ namespace WasteCity.Graybox3D.Building
 
         public void SetBuildGridVisible(bool visible)
         {
-            presentation?.SetBuildGridVisible(visible);
+            if (presentation == null)
+                return;
+            if (visible)
+            {
+                if (session != null &&
+                    city != null &&
+                    world != null &&
+                    world.Model != null &&
+                    world.Coordinates != null &&
+                    world.Coordinates.TryWorldToCell(
+                        city.transform.position,
+                        out int cityX,
+                        out int cityY))
+                {
+                    presentation.SetGroundBuildRange(
+                        cityX,
+                        cityY,
+                        session.GroundBuildRadius,
+                        world.Model.Width,
+                        world.Model.Height);
+                }
+                else
+                {
+                    presentation.ClearGroundBuildRange();
+                }
+            }
+            presentation.SetBuildGridVisible(visible);
         }
 
         private bool EvaluatePointer(Vector2 screenPosition)

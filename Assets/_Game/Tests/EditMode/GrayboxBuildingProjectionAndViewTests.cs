@@ -507,11 +507,12 @@ namespace WasteCity.Tests
             GrayboxVisualSlot ground = Slot(
                 fixture.Presentation,
                 "building.grid.ground");
+            GrayboxVisualSlot boundary = Slot(
+                fixture.Presentation,
+                "building.range.ground-boundary");
             GrayboxVisualSlot inner = Slot(
                 fixture.Presentation,
                 "building.grid.inner-city");
-            Mesh groundMesh =
-                ground.GetComponent<MeshFilter>().sharedMesh;
             Mesh innerMesh =
                 inner.GetComponent<MeshFilter>().sharedMesh;
 
@@ -519,6 +520,7 @@ namespace WasteCity.Tests
                 fixture.Presentation.IsBuildGridVisible,
                 Is.False);
             Assert.That(ground.gameObject.activeSelf, Is.False);
+            Assert.That(boundary.gameObject.activeSelf, Is.False);
             Assert.That(inner.gameObject.activeSelf, Is.False);
 
             fixture.Presentation.ShowCompatibleResourceNode(
@@ -529,14 +531,19 @@ namespace WasteCity.Tests
             GrayboxVisualSlot node = Slot(
                 fixture.Presentation,
                 "building.node-highlight.world.resource-node.20.15");
-            fixture.Presentation.SetBuildGridVisible(true);
+            fixture.Placement.SetBuildGridVisible(true);
 
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.True);
             Assert.That(ground.gameObject.activeSelf, Is.True);
+            Assert.That(boundary.gameObject.activeSelf, Is.True);
             Assert.That(inner.gameObject.activeSelf, Is.True);
             Assert.That(node.gameObject.activeSelf, Is.True);
+            Mesh groundMesh =
+                ground.GetComponent<MeshFilter>().sharedMesh;
+            Mesh boundaryMesh =
+                boundary.GetComponent<MeshFilter>().sharedMesh;
 
             fixture.Presentation.SetBuildGridVisible(false);
 
@@ -544,6 +551,7 @@ namespace WasteCity.Tests
                 fixture.Presentation.IsBuildGridVisible,
                 Is.False);
             Assert.That(ground.gameObject.activeSelf, Is.False);
+            Assert.That(boundary.gameObject.activeSelf, Is.False);
             Assert.That(inner.gameObject.activeSelf, Is.False);
             Assert.That(node.gameObject.activeSelf, Is.True);
             Assert.That(
@@ -556,8 +564,259 @@ namespace WasteCity.Tests
                 ground.GetComponent<MeshFilter>().sharedMesh,
                 Is.SameAs(groundMesh));
             Assert.That(
+                boundary.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(boundaryMesh));
+            Assert.That(
                 inner.GetComponent<MeshFilter>().sharedMesh,
                 Is.SameAs(innerMesh));
+        }
+
+        [Test]
+        public void IDEA0008_VisibleGroundGridMatchesTheFormalInitialRange()
+        {
+            const int width = 32;
+            const int height = 24;
+            const int cityX = 16;
+            const int cityY = 12;
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(width, height),
+                CityMode.Fortress);
+
+            fixture.Placement.SetBuildGridVisible(true);
+
+            Mesh mesh = Slot(
+                    fixture.Presentation,
+                    "building.grid.ground")
+                .GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(
+                MeshGridEdges(mesh, width, height),
+                Is.EquivalentTo(
+                    ExpectedGridEdges(
+                        cityX,
+                        cityY,
+                        BuildingRangeRules.InitialGroundRadius,
+                        width,
+                        height)),
+                "IDEA-0008 ground grid must not imply that rejected " +
+                "world cells are buildable.");
+        }
+
+        [TestCase(8)]
+        [TestCase(12)]
+        [TestCase(24)]
+        public void IDEA0008_SupportedRadiusMeshesUseTheFormalRule(
+            int radius)
+        {
+            const int width = 64;
+            const int height = 48;
+            const int cityX = 31;
+            const int cityY = 23;
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(width, height),
+                CityMode.Fortress);
+
+            InvokeSetGroundBuildRange(
+                fixture.Presentation,
+                cityX,
+                cityY,
+                radius,
+                width,
+                height);
+
+            Assert.That(
+                MeshGridEdges(
+                    Slot(fixture.Presentation, "building.grid.ground")
+                        .GetComponent<MeshFilter>().sharedMesh,
+                    width,
+                    height),
+                Is.EquivalentTo(
+                    ExpectedGridEdges(
+                        cityX,
+                        cityY,
+                        radius,
+                        width,
+                        height)));
+            Assert.That(
+                MeshGridEdges(
+                    Slot(
+                            fixture.Presentation,
+                            "building.range.ground-boundary")
+                        .GetComponent<MeshFilter>().sharedMesh,
+                    width,
+                    height),
+                Is.EquivalentTo(
+                    ExpectedBoundaryEdges(
+                        cityX,
+                        cityY,
+                        radius,
+                        width,
+                        height)));
+        }
+
+        [Test]
+        public void IDEA0008_NearWorldEdgeClipsBothMeshesToTheWorld()
+        {
+            const int width = 32;
+            const int height = 24;
+            const int cityX = 0;
+            const int cityY = 0;
+            const int radius = 8;
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(width, height),
+                CityMode.Fortress);
+
+            InvokeSetGroundBuildRange(
+                fixture.Presentation,
+                cityX,
+                cityY,
+                radius,
+                width,
+                height);
+
+            Assert.That(
+                MeshGridEdges(
+                    Slot(fixture.Presentation, "building.grid.ground")
+                        .GetComponent<MeshFilter>().sharedMesh,
+                    width,
+                    height),
+                Is.EquivalentTo(
+                    ExpectedGridEdges(
+                        cityX,
+                        cityY,
+                        radius,
+                        width,
+                        height)));
+            Assert.That(
+                MeshGridEdges(
+                    Slot(
+                            fixture.Presentation,
+                            "building.range.ground-boundary")
+                        .GetComponent<MeshFilter>().sharedMesh,
+                    width,
+                    height),
+                Is.EquivalentTo(
+                    ExpectedBoundaryEdges(
+                        cityX,
+                        cityY,
+                        radius,
+                        width,
+                        height)));
+        }
+
+        [Test]
+        public void IDEA0008_RangeCachePreservesObjectsAndAllocatesZeroBytes()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            fixture.Placement.SetBuildGridVisible(true);
+            GrayboxVisualSlot ground = Slot(
+                fixture.Presentation,
+                "building.grid.ground");
+            GrayboxVisualSlot boundary = Slot(
+                fixture.Presentation,
+                "building.range.ground-boundary");
+            Mesh groundMesh = ground.GetComponent<MeshFilter>().sharedMesh;
+            Mesh boundaryMesh = boundary.GetComponent<MeshFilter>().sharedMesh;
+            Renderer groundRenderer = ground.Renderer;
+            Renderer boundaryRenderer = boundary.Renderer;
+            Material material = ground.Renderer.sharedMaterial;
+            int infrastructureObjects = fixture.Presentation
+                .transform.Find("infrastructure")
+                .GetComponentsInChildren<Transform>(true).Length;
+
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            fixture.Placement.UpdatePointer(ScreenCenter + Vector2.one);
+            Assert.That(
+                ground.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(groundMesh),
+                "Pointer changes must not rebuild the range grid.");
+            Assert.That(
+                boundary.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(boundaryMesh),
+                "Pointer changes must not rebuild the range boundary.");
+
+            Action warmedSet = () =>
+                fixture.Placement.SetBuildGridVisible(true);
+            warmedSet();
+            warmedSet();
+            AllocationMeasurement measurement = Profile300Calls(warmedSet);
+            TestContext.WriteLine(
+                "IDEA0008RangeCacheProfilerBytes=" +
+                measurement.ProfiledBytes);
+            TestContext.WriteLine(
+                "IDEA0008RangeCacheCurrentThreadBytes=" +
+                measurement.CurrentThreadBytes);
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+
+            Assert.That(
+                fixture.World.Coordinates.TryCellToWorld(
+                    17,
+                    12,
+                    .5f,
+                    out Vector3 movedCity),
+                Is.True);
+            fixture.City.transform.position = movedCity;
+            fixture.Placement.SetBuildGridVisible(true);
+
+            Assert.That(
+                ground.GetComponent<MeshFilter>().sharedMesh,
+                Is.Not.SameAs(groundMesh));
+            Assert.That(
+                boundary.GetComponent<MeshFilter>().sharedMesh,
+                Is.Not.SameAs(boundaryMesh));
+            Mesh movedGroundMesh =
+                ground.GetComponent<MeshFilter>().sharedMesh;
+            Mesh movedBoundaryMesh =
+                boundary.GetComponent<MeshFilter>().sharedMesh;
+            fixture.Placement.SetBuildGridVisible(true);
+            Assert.That(
+                ground.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(movedGroundMesh));
+            Assert.That(
+                boundary.GetComponent<MeshFilter>().sharedMesh,
+                Is.SameAs(movedBoundaryMesh));
+            Assert.That(Slot(fixture.Presentation, ground.StableId),
+                Is.SameAs(ground));
+            Assert.That(Slot(fixture.Presentation, boundary.StableId),
+                Is.SameAs(boundary));
+            Assert.That(ground.Renderer, Is.SameAs(groundRenderer));
+            Assert.That(boundary.Renderer, Is.SameAs(boundaryRenderer));
+            Assert.That(ground.Renderer.sharedMaterial, Is.SameAs(material));
+            Assert.That(boundary.Renderer.sharedMaterial, Is.SameAs(material));
+            Assert.That(
+                fixture.Presentation.transform.Find("infrastructure")
+                    .GetComponentsInChildren<Transform>(true).Length,
+                Is.EqualTo(infrastructureObjects),
+                "IDEA-0008 uses fixed combined visuals, not per-cell roots.");
+            TestContext.WriteLine(
+                "IDEA0008InfrastructureTransformCount=" +
+                infrastructureObjects);
+        }
+
+        [Test]
+        public void IDEA0008_UnmappableCityHidesOnlyExteriorRangeVisuals()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            fixture.Placement.SetBuildGridVisible(true);
+            fixture.City.transform.position = new Vector3(1000f, .5f, 1000f);
+
+            fixture.Placement.SetBuildGridVisible(true);
+
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.ground")
+                    .gameObject.activeSelf,
+                Is.False);
+            Assert.That(
+                Slot(
+                        fixture.Presentation,
+                        "building.range.ground-boundary")
+                    .gameObject.activeSelf,
+                Is.False);
+            Assert.That(
+                Slot(fixture.Presentation, "building.grid.inner-city")
+                    .gameObject.activeSelf,
+                Is.True,
+                "Inner-city grid keeps the existing build-mode behavior.");
         }
 
         [Test]
@@ -566,7 +825,7 @@ namespace WasteCity.Tests
             WorldFixture fixture = CreateWorldFixture();
             Transform infrastructure =
                 fixture.Presentation.transform.Find("infrastructure");
-            fixture.Presentation.SetBuildGridVisible(true);
+            fixture.Placement.SetBuildGridVisible(true);
 
             fixture.Presentation.Configure(
                 fixture.InstanceRoot,
@@ -579,6 +838,12 @@ namespace WasteCity.Tests
                 Is.True);
             Assert.That(
                 Slot(fixture.Presentation, "building.grid.ground")
+                    .gameObject.activeSelf,
+                Is.True);
+            Assert.That(
+                Slot(
+                        fixture.Presentation,
+                        "building.range.ground-boundary")
                     .gameObject.activeSelf,
                 Is.True);
             Assert.That(
@@ -660,6 +925,9 @@ namespace WasteCity.Tests
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToArray();
             Assert.That(ids, Does.Contain("building.grid.ground"));
+            Assert.That(
+                ids,
+                Does.Contain("building.range.ground-boundary"));
             Assert.That(ids, Does.Contain("building.grid.inner-city"));
             Assert.That(ids, Does.Contain("building.preview.core.building.wall"));
             Assert.That(
@@ -683,20 +951,13 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void WorldView_ExpandedGroundGridAlignsCornerCellCenters()
+        public void WorldView_ExpandedGroundPreviewAlignsCornerCellCenters()
         {
             WorldFixture fixture = CreateWorldFixture(
                 OpenCells(
                     GrayboxWorldLayout3D.WorldWidth,
                     GrayboxWorldLayout3D.WorldHeight),
                 CityMode.Fortress);
-            GrayboxVisualSlot ground = Slot(
-                fixture.Presentation,
-                "building.grid.ground");
-            Mesh gridMesh = ground.GetComponent<MeshFilter>().sharedMesh;
-            Assert.That(gridMesh.bounds.size.x, Is.GreaterThan(64f));
-            Assert.That(gridMesh.bounds.size.z, Is.GreaterThan(48f));
-
             var mapper = new PlanarCoordinateMapper3D(64, 48);
             var corners = new[]
             {
@@ -787,11 +1048,18 @@ namespace WasteCity.Tests
                     .GetComponentsInChildren<GrayboxVisualSlot>(true)
                     .Count(
                         value => value.StableId ==
+                        "building.range.ground-boundary"),
+                Is.EqualTo(1));
+            Assert.That(
+                infrastructureRoot
+                    .GetComponentsInChildren<GrayboxVisualSlot>(true)
+                    .Count(
+                        value => value.StableId ==
                         "building.grid.inner-city"),
                 Is.EqualTo(1));
             Assert.That(
                 fixture.Presentation.InfrastructureRendererCount,
-                Is.EqualTo(2));
+                Is.EqualTo(3));
         }
 
         [UnityTest]
@@ -818,6 +1086,9 @@ namespace WasteCity.Tests
                     .GetComponentsInChildren<GrayboxVisualSlot>(true);
             GrayboxVisualSlot ground = slots.Single(
                 value => value.StableId == "building.grid.ground");
+            GrayboxVisualSlot boundary = slots.Single(
+                value => value.StableId ==
+                    "building.range.ground-boundary");
             GrayboxVisualSlot inner = slots.Single(
                 value => value.StableId == "building.grid.inner-city");
 
@@ -829,9 +1100,14 @@ namespace WasteCity.Tests
             Assert.That(
                 slots.Count(
                     value => value.StableId ==
+                    "building.range.ground-boundary"),
+                Is.EqualTo(1));
+            Assert.That(
+                slots.Count(
+                    value => value.StableId ==
                     "building.grid.inner-city"),
                 Is.EqualTo(1));
-            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(3));
             Assert.That(instanceRoot, Is.Not.Null);
             Transform instanceSentinel =
                 instanceRoot.Find("unrelated-instance-sentinel");
@@ -848,6 +1124,9 @@ namespace WasteCity.Tests
                 Is.SameAs(unrelatedMesh));
             Assert.That(
                 ground.Renderer.sharedMaterial,
+                Is.SameAs(material));
+            Assert.That(
+                boundary.Renderer.sharedMaterial,
                 Is.SameAs(material));
             Assert.That(
                 inner.Renderer.sharedMaterial,
@@ -875,13 +1154,13 @@ namespace WasteCity.Tests
             Assert.That(
                 node.Renderer.sharedMaterial,
                 Is.SameAs(material));
-            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(3));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(4));
             view.ShowCompatibleResourceNode(
                 "world.resource-node.2.3",
                 2,
                 3,
                 false);
-            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(2));
+            Assert.That(view.InfrastructureRendererCount, Is.EqualTo(3));
 
             UnityEngine.Object.Destroy(clone);
             UnityEngine.Object.Destroy(source);
@@ -898,6 +1177,7 @@ namespace WasteCity.Tests
                 out _);
             GrayboxBuildingWorldView3D sourceView =
                 source.GetComponentInChildren<GrayboxBuildingWorldView3D>();
+            sourceView.SetGroundBuildRange(16, 12, 8, 32, 24);
             GrayboxVisualSlot sourceGround = Slot(
                 sourceView,
                 "building.grid.ground");
@@ -2024,6 +2304,158 @@ namespace WasteCity.Tests
                         StringComparison.Ordinal));
         }
 
+        private static void InvokeSetGroundBuildRange(
+            GrayboxBuildingWorldView3D presentation,
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            MethodInfo method = typeof(GrayboxBuildingWorldView3D).GetMethod(
+                "SetGroundBuildRange",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                "IDEA-0008 requires the public range configuration seam.");
+            method.Invoke(
+                presentation,
+                new object[]
+                {
+                    cityX,
+                    cityY,
+                    radius,
+                    worldWidth,
+                    worldHeight
+                });
+        }
+
+        private static HashSet<GridEdge> ExpectedGridEdges(
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            HashSet<Vector2Int> cells = ExpectedRangeCells(
+                cityX,
+                cityY,
+                radius,
+                worldWidth,
+                worldHeight);
+            var edges = new HashSet<GridEdge>();
+            foreach (Vector2Int cell in cells)
+            {
+                edges.Add(GridEdge.Vertical(cell.x, cell.y));
+                edges.Add(GridEdge.Vertical(cell.x + 1, cell.y));
+                edges.Add(GridEdge.Horizontal(cell.x, cell.y));
+                edges.Add(GridEdge.Horizontal(cell.x, cell.y + 1));
+            }
+            return edges;
+        }
+
+        private static HashSet<GridEdge> ExpectedBoundaryEdges(
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            HashSet<Vector2Int> cells = ExpectedRangeCells(
+                cityX,
+                cityY,
+                radius,
+                worldWidth,
+                worldHeight);
+            var edges = new HashSet<GridEdge>();
+            foreach (Vector2Int cell in cells)
+            {
+                if (!cells.Contains(new Vector2Int(cell.x - 1, cell.y)))
+                    edges.Add(GridEdge.Vertical(cell.x, cell.y));
+                if (!cells.Contains(new Vector2Int(cell.x + 1, cell.y)))
+                    edges.Add(GridEdge.Vertical(cell.x + 1, cell.y));
+                if (!cells.Contains(new Vector2Int(cell.x, cell.y - 1)))
+                    edges.Add(GridEdge.Horizontal(cell.x, cell.y));
+                if (!cells.Contains(new Vector2Int(cell.x, cell.y + 1)))
+                    edges.Add(GridEdge.Horizontal(cell.x, cell.y + 1));
+            }
+            return edges;
+        }
+
+        private static HashSet<Vector2Int> ExpectedRangeCells(
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            var cells = new HashSet<Vector2Int>();
+            for (var x = 0; x < worldWidth; x++)
+            for (var y = 0; y < worldHeight; y++)
+                if (BuildingRangeRules.IsGroundCellInRange(
+                        cityX,
+                        cityY,
+                        x,
+                        y,
+                        radius))
+                    cells.Add(new Vector2Int(x, y));
+            return cells;
+        }
+
+        private static HashSet<GridEdge> MeshGridEdges(
+            Mesh mesh,
+            int worldWidth,
+            int worldHeight)
+        {
+            Assert.That(mesh, Is.Not.Null);
+            Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            Assert.That(cube, Is.Not.Null);
+            Assert.That(
+                mesh.vertexCount % cube.vertexCount,
+                Is.Zero,
+                "Range meshes must contain only combined line cubes.");
+            Vector3[] vertices = mesh.vertices;
+            var edges = new HashSet<GridEdge>();
+            for (var start = 0;
+                 start < vertices.Length;
+                 start += cube.vertexCount)
+            {
+                Vector3 minimum = vertices[start];
+                Vector3 maximum = vertices[start];
+                int end = start + cube.vertexCount;
+                for (var index = start + 1; index < end; index++)
+                {
+                    minimum = Vector3.Min(minimum, vertices[index]);
+                    maximum = Vector3.Max(maximum, vertices[index]);
+                }
+
+                Vector3 center = (minimum + maximum) * .5f;
+                Vector3 size = maximum - minimum;
+                if (size.z > size.x)
+                {
+                    edges.Add(GridEdge.Vertical(
+                        Mathf.RoundToInt(
+                            center.x + worldWidth * .5f + .5f),
+                        Mathf.RoundToInt(
+                            center.z + worldHeight * .5f)));
+                }
+                else
+                {
+                    edges.Add(GridEdge.Horizontal(
+                        Mathf.RoundToInt(
+                            center.x + worldWidth * .5f),
+                        Mathf.RoundToInt(
+                            center.z + worldHeight * .5f + .5f)));
+                }
+            }
+            Assert.That(
+                vertices.Length / cube.vertexCount,
+                Is.EqualTo(edges.Count),
+                "IDEA-0008 combined meshes must not duplicate grid edges.");
+            return edges;
+        }
+
         private static GrayboxVisualSlot Slot(
             GrayboxBuildingWorldView3D presentation,
             string stableId)
@@ -2264,6 +2696,59 @@ namespace WasteCity.Tests
             public int Samples { get; }
             public long ProfiledBytes { get; }
             public long CurrentThreadBytes { get; }
+        }
+
+        private readonly struct GridEdge : IEquatable<GridEdge>
+        {
+            private GridEdge(int x, int y, bool vertical)
+            {
+                X = x;
+                Y = y;
+                IsVertical = vertical;
+            }
+
+            private int X { get; }
+            private int Y { get; }
+            private bool IsVertical { get; }
+
+            public static GridEdge Vertical(int x, int y)
+            {
+                return new GridEdge(x, y, true);
+            }
+
+            public static GridEdge Horizontal(int x, int y)
+            {
+                return new GridEdge(x, y, false);
+            }
+
+            public bool Equals(GridEdge other)
+            {
+                return X == other.X &&
+                       Y == other.Y &&
+                       IsVertical == other.IsVertical;
+            }
+
+            public override bool Equals(object value)
+            {
+                return value is GridEdge other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = X;
+                    hash = hash * 397 ^ Y;
+                    hash = hash * 397 ^ IsVertical.GetHashCode();
+                    return hash;
+                }
+            }
+
+            public override string ToString()
+            {
+                return (IsVertical ? "V" : "H") +
+                       "(" + X + "," + Y + ")";
+            }
         }
     }
 }

@@ -136,6 +136,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.False);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                false);
 
             PressKey(fixture.Router, Key.B);
             Assert.That(
@@ -145,6 +148,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.True);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                true);
 
             PressKey(fixture.Router, Key.B);
             Assert.That(
@@ -154,6 +160,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.False);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                false);
 
             PressKey(fixture.Router, Key.B);
             PressKey(fixture.Router, Key.Digit4);
@@ -164,6 +173,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.True);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                true);
 
             fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
             GrayboxBuildingInstance3D progressed =
@@ -188,6 +200,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.True);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                true);
 
             PressKey(fixture.Router, Key.Escape);
 
@@ -198,6 +213,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.True);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                true);
 
             PressMouse(fixture.Router, MouseButton.Right);
 
@@ -208,6 +226,9 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Presentation.IsBuildGridVisible,
                 Is.False);
+            AssertIDEA0008OverlayVisibility(
+                fixture.Presentation,
+                false);
         }
 
         [Test]
@@ -2928,6 +2949,30 @@ namespace WasteCity.Tests
                 source,
                 Does.Not.Contain(
                     "TickConstruction(Time.unscaledDeltaTime);"));
+        }
+
+        private static void AssertIDEA0008OverlayVisibility(
+            GrayboxBuildingWorldView3D presentation,
+            bool expected)
+        {
+            string[] stableIds =
+            {
+                "building.grid.ground",
+                "building.range.ground-boundary",
+                "building.grid.inner-city"
+            };
+            GrayboxVisualSlot[] slots = presentation
+                .GetComponentsInChildren<GrayboxVisualSlot>(true);
+            for (var index = 0; index < stableIds.Length; index++)
+            {
+                string stableId = stableIds[index];
+                GrayboxVisualSlot slot = slots.Single(
+                    value => value.StableId == stableId);
+                Assert.That(
+                    slot.gameObject.activeSelf,
+                    Is.EqualTo(expected),
+                    "IDEA-0008 state visibility mismatch for " + stableId);
+            }
         }
 
         private InputRouterFixture CreateInputRouterFixture()

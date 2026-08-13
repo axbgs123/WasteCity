@@ -20,6 +20,8 @@ namespace WasteCity.Graybox3D.Building
             new Color(.45f, .48f, .42f, .35f);
         private static readonly Color InnerGridColor =
             new Color(.3f, .68f, .9f, .45f);
+        private static readonly Color GroundBoundaryColor =
+            new Color(.92f, .76f, .2f, .78f);
         private static readonly Color ValidPreviewColor =
             new Color(.18f, .85f, .32f, .55f);
         private static readonly Color InvalidPreviewColor =
@@ -61,7 +63,15 @@ namespace WasteCity.Graybox3D.Building
             new List<Visual>();
         private Visual preview;
         private Visual groundGrid;
+        private Visual groundBoundary;
         private Visual innerGrid;
+        private int groundRangeCityX;
+        private int groundRangeCityY;
+        private int groundRangeRadius;
+        private int groundRangeWorldWidth;
+        private int groundRangeWorldHeight;
+        private bool hasGroundRangeKey;
+        private bool groundRangeAvailable;
         private int previewWidth;
         private int previewHeight;
         private BuildingSite previewSite;
@@ -81,6 +91,58 @@ namespace WasteCity.Graybox3D.Building
         public void SetBuildGridVisible(bool visible)
         {
             buildGridVisible = visible;
+            ApplyBuildGridVisibility();
+        }
+
+        public void SetGroundBuildRange(
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight)
+        {
+            EnsureConfigured();
+            if (worldWidth <= 0 || worldHeight <= 0)
+            {
+                ClearGroundBuildRange();
+                return;
+            }
+
+            if (hasGroundRangeKey &&
+                groundRangeCityX == cityX &&
+                groundRangeCityY == cityY &&
+                groundRangeRadius == radius &&
+                groundRangeWorldWidth == worldWidth &&
+                groundRangeWorldHeight == worldHeight)
+            {
+                groundRangeAvailable = true;
+                ApplyBuildGridVisibility();
+                return;
+            }
+
+            CreateGroundRangeMeshes(
+                cityX,
+                cityY,
+                radius,
+                worldWidth,
+                worldHeight,
+                out Mesh gridMesh,
+                out Mesh boundaryMesh);
+            ReplaceMesh(groundGrid, gridMesh);
+            ReplaceMesh(groundBoundary, boundaryMesh);
+            groundRangeCityX = cityX;
+            groundRangeCityY = cityY;
+            groundRangeRadius = radius;
+            groundRangeWorldWidth = worldWidth;
+            groundRangeWorldHeight = worldHeight;
+            hasGroundRangeKey = true;
+            groundRangeAvailable = true;
+            ApplyBuildGridVisibility();
+        }
+
+        public void ClearGroundBuildRange()
+        {
+            groundRangeAvailable = false;
             ApplyBuildGridVisibility();
         }
 
@@ -324,13 +386,40 @@ namespace WasteCity.Graybox3D.Building
 
         private void CreateGridVisuals()
         {
+            Mesh groundMesh;
+            Mesh boundaryMesh;
+            if (hasGroundRangeKey)
+            {
+                CreateGroundRangeMeshes(
+                    groundRangeCityX,
+                    groundRangeCityY,
+                    groundRangeRadius,
+                    groundRangeWorldWidth,
+                    groundRangeWorldHeight,
+                    out groundMesh,
+                    out boundaryMesh);
+            }
+            else
+            {
+                groundMesh = CreateEmptyMesh(
+                    "building.grid.ground.mesh");
+                boundaryMesh = CreateEmptyMesh(
+                    "building.range.ground-boundary.mesh");
+            }
             groundGrid = CreateVisual(
                 "building.grid.ground",
                 infrastructureRoot,
-                CreateGroundGridMesh(),
+                groundMesh,
                 GridColor,
                 false);
             infrastructure.Add(groundGrid);
+            groundBoundary = CreateVisual(
+                "building.range.ground-boundary",
+                infrastructureRoot,
+                boundaryMesh,
+                GroundBoundaryColor,
+                false);
+            infrastructure.Add(groundBoundary);
             innerGrid = CreateVisual(
                 "building.grid.inner-city",
                 infrastructureRoot,
@@ -343,7 +432,10 @@ namespace WasteCity.Graybox3D.Building
 
         private void ApplyBuildGridVisibility()
         {
-            SetVisualActive(groundGrid, buildGridVisible);
+            bool showGround =
+                buildGridVisible && groundRangeAvailable;
+            SetVisualActive(groundGrid, showGround);
+            SetVisualActive(groundBoundary, showGround);
             SetVisualActive(innerGrid, buildGridVisible);
         }
 
@@ -664,34 +756,166 @@ namespace WasteCity.Graybox3D.Building
                 stableId + ".mesh");
         }
 
-        private static Mesh CreateGroundGridMesh()
+        private static void CreateGroundRangeMeshes(
+            int cityX,
+            int cityY,
+            int radius,
+            int worldWidth,
+            int worldHeight,
+            out Mesh gridMesh,
+            out Mesh boundaryMesh)
         {
-            const float line = .025f;
-            var matrices =
-                new List<Matrix4x4>(
-                    GroundWidth + GroundHeight + 2);
-            for (var x = 0; x <= GroundWidth; x++)
-                matrices.Add(
-                    Matrix4x4.TRS(
-                        new Vector3(
-                            x - GroundWidth * .5f - .5f,
-                            .012f,
-                            -.5f),
-                        Quaternion.identity,
-                        new Vector3(line, .015f, GroundHeight)));
-            for (var y = 0; y <= GroundHeight; y++)
-                matrices.Add(
-                    Matrix4x4.TRS(
-                        new Vector3(
-                            -.5f,
-                            .012f,
-                            y - GroundHeight * .5f - .5f),
-                        Quaternion.identity,
-                        new Vector3(GroundWidth, .015f, line)));
-            return GrayboxMeshBuilder.CombinePrimitive(
+            var accepted = new bool[worldWidth, worldHeight];
+            var acceptedCount = 0;
+            for (var x = 0; x < worldWidth; x++)
+            for (var y = 0; y < worldHeight; y++)
+            {
+                bool inRange = BuildingRangeRules.IsGroundCellInRange(
+                    cityX,
+                    cityY,
+                    x,
+                    y,
+                    radius);
+                accepted[x, y] = inRange;
+                if (inRange)
+                    acceptedCount++;
+            }
+
+            var gridLines = new List<Matrix4x4>(acceptedCount * 2 + 2);
+            var boundaryLines = new List<Matrix4x4>();
+            for (var x = 0; x < worldWidth; x++)
+            for (var y = 0; y < worldHeight; y++)
+            {
+                if (!accepted[x, y])
+                    continue;
+
+                AddVerticalGroundLine(
+                    gridLines,
+                    x,
+                    y,
+                    worldWidth,
+                    worldHeight,
+                    .025f,
+                    .012f);
+                AddHorizontalGroundLine(
+                    gridLines,
+                    x,
+                    y,
+                    worldWidth,
+                    worldHeight,
+                    .025f,
+                    .012f);
+                if (x == worldWidth - 1 || !accepted[x + 1, y])
+                    AddVerticalGroundLine(
+                        gridLines,
+                        x + 1,
+                        y,
+                        worldWidth,
+                        worldHeight,
+                        .025f,
+                        .012f);
+                if (y == worldHeight - 1 || !accepted[x, y + 1])
+                    AddHorizontalGroundLine(
+                        gridLines,
+                        x,
+                        y + 1,
+                        worldWidth,
+                        worldHeight,
+                        .025f,
+                        .012f);
+
+                if (x == 0 || !accepted[x - 1, y])
+                    AddVerticalGroundLine(
+                        boundaryLines,
+                        x,
+                        y,
+                        worldWidth,
+                        worldHeight,
+                        .075f,
+                        .025f);
+                if (x == worldWidth - 1 || !accepted[x + 1, y])
+                    AddVerticalGroundLine(
+                        boundaryLines,
+                        x + 1,
+                        y,
+                        worldWidth,
+                        worldHeight,
+                        .075f,
+                        .025f);
+                if (y == 0 || !accepted[x, y - 1])
+                    AddHorizontalGroundLine(
+                        boundaryLines,
+                        x,
+                        y,
+                        worldWidth,
+                        worldHeight,
+                        .075f,
+                        .025f);
+                if (y == worldHeight - 1 || !accepted[x, y + 1])
+                    AddHorizontalGroundLine(
+                        boundaryLines,
+                        x,
+                        y + 1,
+                        worldWidth,
+                        worldHeight,
+                        .075f,
+                        .025f);
+            }
+
+            gridMesh = GrayboxMeshBuilder.CombinePrimitive(
                 PrimitiveType.Cube,
-                matrices,
+                gridLines,
                 "building.grid.ground.mesh");
+            boundaryMesh = GrayboxMeshBuilder.CombinePrimitive(
+                PrimitiveType.Cube,
+                boundaryLines,
+                "building.range.ground-boundary.mesh");
+        }
+
+        private static void AddVerticalGroundLine(
+            ICollection<Matrix4x4> lines,
+            int edgeX,
+            int cellY,
+            int worldWidth,
+            int worldHeight,
+            float thickness,
+            float visualY)
+        {
+            lines.Add(
+                Matrix4x4.TRS(
+                    new Vector3(
+                        edgeX - worldWidth * .5f - .5f,
+                        visualY,
+                        cellY - worldHeight * .5f),
+                    Quaternion.identity,
+                    new Vector3(thickness, .015f, 1f)));
+        }
+
+        private static void AddHorizontalGroundLine(
+            ICollection<Matrix4x4> lines,
+            int cellX,
+            int edgeY,
+            int worldWidth,
+            int worldHeight,
+            float thickness,
+            float visualY)
+        {
+            lines.Add(
+                Matrix4x4.TRS(
+                    new Vector3(
+                        cellX - worldWidth * .5f,
+                        visualY,
+                        edgeY - worldHeight * .5f - .5f),
+                    Quaternion.identity,
+                    new Vector3(1f, .015f, thickness)));
+        }
+
+        private static Mesh CreateEmptyMesh(string meshName)
+        {
+            return new Mesh
+            {
+                name = meshName
+            };
         }
 
         private static Mesh CreateInnerGridMesh()
@@ -830,6 +1054,7 @@ namespace WasteCity.Graybox3D.Building
             previewDefinition = null;
             previewStableId = null;
             groundGrid = null;
+            groundBoundary = null;
             innerGrid = null;
             runtimeInitialized = false;
         }
