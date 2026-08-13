@@ -823,6 +823,7 @@ namespace WasteCity.Graybox3D.Building
                     false);
             }
             highlightedNodeId = null;
+            presentation?.HideMiningGuidance();
             presentation?.HidePreview();
             hasPointer = false;
             lastScreenPosition = default;

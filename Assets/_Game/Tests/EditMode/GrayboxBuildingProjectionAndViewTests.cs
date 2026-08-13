@@ -1708,18 +1708,31 @@ namespace WasteCity.Tests
         public void PlacementController_TeardownDiscardsWorkspaceResultAndPreviewIdempotently(
             string lifecycleMethod)
         {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 15] = Cell(ResourceIds.Iron);
             WorldFixture fixture = CreateWorldFixture(
-                OpenCells(),
+                cells,
                 CityMode.Fortress);
-            fixture.Interaction.Select(BuildingCatalog.Wall);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
             PositionCameraAtCell(fixture, 20, 15);
             fixture.Placement.UpdatePointer(ScreenCenter);
+            InvokeRefreshMiningGuidance(fixture.Placement);
             object oldWorkspace =
                 PlacementWorkspace(fixture.Placement);
             GrayboxVisualSlot preview = Slot(
                 fixture.Presentation,
-                "building.preview.core.building.wall");
+                "building.preview.core.building.mining-station");
             Assert.That(preview.gameObject.activeInHierarchy, Is.True);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.Not.Empty);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.anchor-highlight."),
+                Is.Not.Empty);
 
             InvokePlacementLifecycle(
                 fixture.Placement,
@@ -1741,6 +1754,18 @@ namespace WasteCity.Tests
                 fixture.Placement.CurrentHit.IsValid,
                 Is.False);
             Assert.That(preview.gameObject.activeInHierarchy, Is.False);
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.Empty,
+                "IDEA-0010 guidance must hide during teardown.");
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.anchor-highlight."),
+                Is.Empty,
+                "IDEA-0010 guidance must hide during teardown.");
 
             fixture.Placement.Configure(
                 fixture.Session,
@@ -1753,6 +1778,43 @@ namespace WasteCity.Tests
             Assert.That(
                 PlacementWorkspace(fixture.Placement),
                 Is.Not.Null.And.Not.SameAs(oldWorkspace));
+        }
+
+        [TestCase(GrayboxBuildingInteractionState.CatalogOpen)]
+        [TestCase(GrayboxBuildingInteractionState.CancelConfirmation)]
+        public void IDEA0010_MiningGuidanceRemainsVisibleDuringBuildingFlowModalState(
+            GrayboxBuildingInteractionState modalState)
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 15] = Cell(ResourceIds.Iron);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            InvokeRefreshMiningGuidance(fixture.Placement);
+
+            if (modalState == GrayboxBuildingInteractionState.CatalogOpen)
+                fixture.Interaction.ToggleCatalog();
+            else
+                fixture.Interaction.RequestCancelConstruction();
+            InvokeRefreshMiningGuidance(fixture.Placement);
+
+            Assert.That(fixture.Interaction.State, Is.EqualTo(modalState));
+            Assert.That(
+                fixture.Interaction.Selected,
+                Is.SameAs(BuildingCatalog.MiningStation));
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.node-highlight."),
+                Is.Not.Empty,
+                "Both states remain inside the selected MiningStation " +
+                "building flow; only closing it hides guidance.");
+            Assert.That(
+                ActiveGuidanceSlots(
+                    fixture.Presentation,
+                    "building.anchor-highlight."),
+                Is.Not.Empty);
         }
 
         [Test]
