@@ -242,6 +242,10 @@ namespace WasteCity.Tests
             Assert.That(projector, Is.Not.Null);
             Assert.That(platform, Is.Not.Null);
             Assert.That(platform.GetComponent<BoxCollider>(), Is.Not.Null);
+            Assert.That(
+                FindSlot("building.range.ground-boundary"),
+                Is.Not.Null,
+                "IDEA0008 stable range slot survives runtime rehydrate.");
             Assert.That(developer, Is.Not.Null);
 #if UNITY_EDITOR
             Assert.That(developer.IsRuntimeAvailable, Is.True);
@@ -841,6 +845,11 @@ namespace WasteCity.Tests
             Assert.That(presentation.IsBuildGridVisible, Is.False);
             yield return TapKey(Key.B);
             Assert.That(presentation.IsBuildGridVisible, Is.True);
+            Assert.That(
+                FindSlot("building.range.ground-boundary")
+                    .gameObject.activeInHierarchy,
+                Is.True,
+                "IDEA0008 real B input shows the canonical ground range.");
             Assert.That(interaction.CatalogReturnState, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
             yield return TapKey(Key.B);
@@ -1270,10 +1279,33 @@ namespace WasteCity.Tests
                 placement.CurrentEvaluation.CompatibleResourceNodeId,
                 Is.Not.Null.And.Not.Empty);
             Assert.That(
-                FindSlot(
-                    "building.node-highlight." +
-                    placement.CurrentEvaluation.CompatibleResourceNodeId),
-                Is.Not.Null);
+                presentation.ActiveMiningNodeHighlightCount,
+                Is.GreaterThan(0),
+                "IDEA0010 shows every compatible resource node state.");
+            Assert.That(
+                presentation.ActiveMiningAnchorHighlightCount,
+                Is.GreaterThan(0),
+                "IDEA0010 shows truly legal anchors from evaluations.");
+            string compatibleNodeId =
+                placement.CurrentEvaluation.CompatibleResourceNodeId;
+            GrayboxVisualSlot compatibleNode = FindSlot(
+                "building.node-highlight." + compatibleNodeId);
+            Assert.That(compatibleNode, Is.Not.Null);
+            Assert.That(
+                compatibleNode.FallbackColor,
+                Is.EqualTo(new Color(.2f, .9f, .35f, .45f)));
+            modifier.SetResource(
+                BuildingCatalog.MiningStation.CostId,
+                0);
+            yield return MoveMouse(mouse.position.ReadValue());
+            Assert.That(
+                FindSlot("building.node-highlight." + compatibleNodeId)
+                    .FallbackColor,
+                Is.EqualTo(new Color(.85f, .62f, .12f, .55f)),
+                "IDEA0010 real input refreshes colors after inventory mutation.");
+            Assert.That(
+                presentation.ActiveMiningAnchorHighlightCount,
+                Is.Zero);
 
             interaction.Select(BuildingCatalog.Wall);
             modifier.SetResource(ResourceIds.Stone, 1000);

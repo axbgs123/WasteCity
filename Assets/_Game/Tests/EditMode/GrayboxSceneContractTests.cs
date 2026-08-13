@@ -17,6 +17,7 @@ using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Persistence;
 using WasteCity.World;
 using Object = UnityEngine.Object;
@@ -444,10 +445,10 @@ namespace WasteCity.Tests
             Assert.That(inputModule, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<Canvas>(true).Length,
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
                 Object.FindObjectsOfType<GraphicRaycaster>(true).Length,
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
                 Object.FindObjectsOfType<EventSystem>(true).Length,
                 Is.EqualTo(1));
@@ -555,7 +556,8 @@ namespace WasteCity.Tests
             AssertReference(
                 Object.FindObjectOfType<GrayboxInputRouter>(true),
                 "inputInterceptor",
-                buildingInput);
+                Object.FindObjectOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true));
 
             var sessionData = new SerializedObject(session);
             Assert.That(
@@ -591,12 +593,135 @@ namespace WasteCity.Tests
             Assert.That(canvasTransform.childCount, Is.Zero);
         }
 
+        [Test]
+        public void IDEA0007_SceneHasSerializedUsabilityInputContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = GameObject.Find("GrayboxPrototype3D");
+            Transform ui = RequiredChild(root, "GrayboxUI");
+            Canvas buildingCanvas = RequiredChild(
+                    ui.gameObject,
+                    "BuildingCanvas")
+                .GetComponent<Canvas>();
+            Transform systemMenuTransform = RequiredChild(
+                ui.gameObject,
+                "SystemMenuCanvas");
+            Canvas systemMenuCanvas =
+                systemMenuTransform.GetComponent<Canvas>();
+            GraphicRaycaster systemMenuRaycaster =
+                systemMenuTransform.GetComponent<GraphicRaycaster>();
+            GrayboxSystemMenuView3D view =
+                systemMenuTransform.GetComponent<
+                    GrayboxSystemMenuView3D>();
+            Transform systems = RequiredChild(root, "GrayboxSystems");
+            GrayboxSystemMenuController3D controller =
+                RequiredComponent<GrayboxSystemMenuController3D>(
+                    systems,
+                    "GrayboxSystemMenuController");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                RequiredComponent<GrayboxUsabilityInputCoordinator3D>(
+                    systems,
+                    "GrayboxUsabilityInputCoordinator");
+            GrayboxBuildingInputRouter3D buildingInput =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInputRouter3D>(true);
+            GrayboxDeveloperModifierBootstrap3D developer =
+                Object.FindObjectOfType<
+                    GrayboxDeveloperModifierBootstrap3D>(true);
+            EventSystem eventSystem =
+                Object.FindObjectOfType<EventSystem>(true);
+
+            Assert.That(buildingCanvas, Is.Not.Null);
+            Assert.That(systemMenuCanvas, Is.Not.Null);
+            Assert.That(systemMenuCanvas.renderMode,
+                Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+            Assert.That(systemMenuCanvas.sortingOrder,
+                Is.GreaterThan(buildingCanvas.sortingOrder));
+            Assert.That(systemMenuRaycaster, Is.Not.Null);
+            Assert.That(systemMenuRaycaster.enabled, Is.True);
+            Assert.That(view, Is.Not.Null);
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxSystemMenuView3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxSystemMenuController3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<EventSystem>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    InputSystemUIInputModule>(true),
+                Has.Length.EqualTo(1));
+
+            AssertReference(view, "canvas", systemMenuCanvas);
+            AssertReference(view, "eventSystem", eventSystem);
+            AssertReference(view, "controller", controller);
+            AssertReference(controller, "view", view);
+            AssertReference(coordinator, "buildingInput", buildingInput);
+            AssertReference(coordinator, "systemMenu", controller);
+            AssertReference(coordinator, "developer", developer);
+            AssertReference(
+                Object.FindObjectOfType<GrayboxInputRouter>(true),
+                "inputInterceptor",
+                coordinator);
+        }
+
+        [Test]
+        public void IDEA0007_AuthoringUsesDedicatedIdempotentUsabilityContract()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxSceneAuthoring.cs"));
+            StringAssert.Contains(
+                "EnsureUsabilityContract(scene, buildingReferences);",
+                source);
+            string method = ExtractMethod(
+                source,
+                "private static void EnsureUsabilityContract",
+                "private static void EnsureFirstArtTerrainContract");
+            StringAssert.Contains("SystemMenuCanvas", method);
+            StringAssert.Contains("GrayboxUsabilityInputCoordinator", method);
+            StringAssert.Contains("inputInterceptor", method);
+            StringAssert.DoesNotContain("FindObjectOfType", method);
+        }
+
+        [Test]
+        public void IDEA0007_UsabilityAssemblyIsReferencedBySceneConsumers()
+        {
+            Assert.That(
+                typeof(GrayboxUsabilityInputCoordinator3D).Assembly
+                    .GetName().Name,
+                Is.EqualTo("WasteCity.Graybox3D.Usability"));
+            string[] consumers =
+            {
+                "_Game/Editor/WasteCity.Editor.asmdef",
+                "_Game/Tests/EditMode/WasteCity.EditModeTests.asmdef",
+                "_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef"
+            };
+            for (var index = 0; index < consumers.Length; index++)
+            {
+                string source = File.ReadAllText(
+                    Path.Combine(Application.dataPath, consumers[index]));
+                StringAssert.Contains(
+                    "WasteCity.Graybox3D.Usability",
+                    source,
+                    consumers[index]);
+            }
+        }
+
         [UnityTest]
         public IEnumerator Scene_ReopenedUiModuleHasUsablePublicActions()
         {
-            Scene scene =
-                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
-            Assert.That(EditorSceneManager.SaveScene(scene), Is.True);
+            byte[] sceneBytesBefore = File.ReadAllBytes(ScenePath);
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
             EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
                 NewSceneMode.Single);
@@ -611,6 +736,11 @@ namespace WasteCity.Tests
             AssertUsableAction(module.move, "move");
             AssertUsableAction(module.submit, "submit");
             AssertUsableAction(module.cancel, "cancel");
+            CollectionAssert.AreEqual(
+                sceneBytesBefore,
+                File.ReadAllBytes(ScenePath),
+                "EditMode runtime rehydrate must not save lifecycle UI " +
+                "objects into the formal scene asset.");
         }
 
         [Test]

@@ -15,6 +15,7 @@ using WasteCity.ArtIntegration3D;
 using WasteCity.City;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.World;
 
 namespace WasteCity.Editor
@@ -89,6 +90,16 @@ namespace WasteCity.Editor
             public Texture2DArray Normal;
             public Texture2DArray Mask;
             public Texture2DArray Height;
+        }
+
+        private sealed class BuildingContractReferences
+        {
+            public Transform Systems;
+            public Transform Ui;
+            public Canvas BuildingCanvas;
+            public EventSystem EventSystem;
+            public GrayboxBuildingInputRouter3D BuildingInput;
+            public GrayboxDeveloperModifierBootstrap3D Developer;
         }
 
         private sealed class AuthoringHooks
@@ -168,7 +179,9 @@ namespace WasteCity.Editor
                 hooks?.BeforeSceneMutation?.Invoke();
                 scene = CreateFoundationScene(pipeline, material);
             }
-            EnsureBuildingContract(scene, material);
+            BuildingContractReferences buildingReferences =
+                EnsureBuildingContract(scene, material);
+            EnsureUsabilityContract(scene, buildingReferences);
             EnsurePlayableInitialDeployment(scene);
             if (!hasExistingScene)
             {
@@ -618,7 +631,7 @@ namespace WasteCity.Editor
             ValidateFirstArtTerrainLightStructure(scene, true);
         }
 
-        private static void EnsureBuildingContract(
+        private static BuildingContractReferences EnsureBuildingContract(
             Scene scene,
             Material material)
         {
@@ -661,6 +674,7 @@ namespace WasteCity.Editor
             Canvas canvas = EnsureComponent<Canvas>(canvasTransform);
             canvasTransform = canvas.transform;
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 0;
             EnsureComponent<CanvasScaler>(canvasTransform);
             GraphicRaycaster raycaster =
                 EnsureComponent<GraphicRaycaster>(canvasTransform);
@@ -769,6 +783,71 @@ namespace WasteCity.Editor
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", buildingInput));
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            return new BuildingContractReferences
+            {
+                Systems = RequireChild(root.transform, "GrayboxSystems"),
+                Ui = ui,
+                BuildingCanvas = canvas,
+                EventSystem = eventSystem,
+                BuildingInput = buildingInput,
+                Developer = developer
+            };
+        }
+
+        private static void EnsureUsabilityContract(
+            Scene scene,
+            BuildingContractReferences buildingReferences)
+        {
+            if (buildingReferences == null)
+                throw new ArgumentNullException(nameof(buildingReferences));
+
+            Transform systemMenuTransform = EnsureChild(
+                buildingReferences.Ui,
+                "SystemMenuCanvas");
+            systemMenuTransform.gameObject.layer = 5;
+            Canvas systemMenuCanvas = EnsureComponent<Canvas>(
+                systemMenuTransform);
+            systemMenuTransform = systemMenuCanvas.transform;
+            systemMenuCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            systemMenuCanvas.sortingOrder =
+                buildingReferences.BuildingCanvas.sortingOrder + 100;
+            EnsureComponent<CanvasScaler>(systemMenuTransform);
+            GraphicRaycaster raycaster =
+                EnsureComponent<GraphicRaycaster>(systemMenuTransform);
+            raycaster.enabled = true;
+            GrayboxSystemMenuView3D view =
+                EnsureComponent<GrayboxSystemMenuView3D>(
+                    systemMenuTransform);
+
+            Transform controllerTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxSystemMenuController");
+            GrayboxSystemMenuController3D controller =
+                EnsureComponent<GrayboxSystemMenuController3D>(
+                    controllerTransform);
+            Transform coordinatorTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxUsabilityInputCoordinator");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                EnsureComponent<GrayboxUsabilityInputCoordinator3D>(
+                    coordinatorTransform);
+
+            SetReferences(
+                view,
+                ("canvas", systemMenuCanvas),
+                ("eventSystem", buildingReferences.EventSystem),
+                ("controller", controller));
+            SetReferences(controller, ("view", view));
+            SetReferences(
+                coordinator,
+                ("buildingInput", buildingReferences.BuildingInput),
+                ("systemMenu", controller),
+                ("developer", buildingReferences.Developer));
+            SetReferences(
+                RequireSingle<GrayboxInputRouter>(scene),
+                ("inputInterceptor", coordinator));
 
             EditorSceneManager.MarkSceneDirty(scene);
         }
