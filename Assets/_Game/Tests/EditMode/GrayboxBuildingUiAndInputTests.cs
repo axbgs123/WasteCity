@@ -414,6 +414,7 @@ namespace WasteCity.Tests
             PressKey(fixture.Router, Key.B);
 
             PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
             Assert.That(fixture.Interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
 
@@ -423,9 +424,16 @@ namespace WasteCity.Tests
                 BuildingCatalog.Housing));
             PressKey(fixture.Router, Key.Escape);
 
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
             Assert.That(fixture.Interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Inactive));
             Assert.That(fixture.Interaction.Selected, Is.Null);
+
+            fixture.Router.ProcessCurrentInput();
+            Assert.That(
+                fixture.Router.LastEscapeConsumed,
+                Is.False,
+                "Escape ownership resets at the start of every input call.");
         }
 
         [Test]
@@ -671,6 +679,168 @@ namespace WasteCity.Tests
                 "Task9ManifestProcessingToggleCalls=" +
                 deployment.ToggleCalls);
             Assert.That(deployment.ToggleCalls, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0007_EvacuationManifestCancelIsAtomicAndIdempotent()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            var deployment = new SharedDeploymentRequestSpy(
+                CityMode.Fortress,
+                false);
+            fixture.Evacuation.Configure(
+                fixture.Session,
+                deployment,
+                fixture.Presentation,
+                fixture.Ui.Menu);
+            int instanceCount = fixture.Session.Instances.Count;
+            int inventory = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            CityMode mode = fixture.City.Mode;
+
+            Assert.That(fixture.Evacuation.TryCancelManifest(), Is.False);
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Ui.Menu.EvacuationVisible, Is.True);
+            Assert.That(
+                fixture.Ui.Menu.ConstructionCancellationBlocked,
+                Is.True);
+
+            Assert.That(fixture.Evacuation.TryCancelManifest(), Is.True);
+
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
+            Assert.That(fixture.Evacuation.IsProcessing, Is.False);
+            Assert.That(fixture.Evacuation.Work, Is.Empty);
+            Assert.That(fixture.Ui.Menu.EvacuationVisible, Is.False);
+            Assert.That(
+                fixture.Ui.Menu.ConstructionCancellationBlocked,
+                Is.False);
+            Assert.That(fixture.Session.Instances, Has.Count.EqualTo(instanceCount));
+            Assert.That(
+                fixture.Session.Inventory.Get(BuildingCatalog.Wall.CostId),
+                Is.EqualTo(inventory));
+            Assert.That(fixture.City.Mode, Is.EqualTo(mode));
+            Assert.That(deployment.ToggleCalls, Is.Zero);
+            Assert.That(fixture.Evacuation.TryCancelManifest(), Is.False);
+
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.ConfirmManifest(),
+                Is.False,
+                "Canceled assignments must not survive a reopened manifest.");
+        }
+
+        [Test]
+        public void IDEA0007_EvacuationProcessingCannotBeCanceled()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True);
+
+            Assert.That(fixture.Evacuation.TryCancelManifest(), Is.False);
+
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True);
+            Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
+            Assert.That(ground.IsEvacuationLocked, Is.True);
+        }
+
+        [Test]
+        public void IDEA0007_EscapeOwnsFocusConfirmationManifestAndProcessing()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Ui.Menu.RefreshCatalog();
+            InputField input = FindComponent<InputField>(
+                fixture.Canvas.transform,
+                "Catalog.Search");
+            InputSystemUIInputModule inputModule =
+                fixture.EventSystem.GetComponent<
+                    InputSystemUIInputModule>();
+            inputModule.enabled = true;
+            fixture.EventSystem.SetSelectedGameObject(input.gameObject);
+            input.ActivateInputField();
+
+            PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+
+            fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D confirmationTarget =
+                BeginGroundConstruction(
+                    fixture.Session,
+                    BuildingCatalog.Wall,
+                    19,
+                    15,
+                    fixture.Presentation);
+            fixture.Construction.TickConstruction(.5f);
+            Assert.That(
+                fixture.Construction.SelectInstance(
+                    confirmationTarget.StableInstanceId),
+                Is.True);
+            Assert.That(
+                fixture.Construction.RequestCancelSelected(),
+                Is.EqualTo(
+                    ConstructionCancelResult.ConfirmationRequired));
+            PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
+            Assert.That(
+                fixture.Interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+
+            GrayboxBuildingInstance3D ground = confirmationTarget;
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
+
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            PressKey(fixture.Router, Key.Escape);
+            Assert.That(fixture.Router.LastEscapeConsumed, Is.True);
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True);
+            Assert.That(ground.IsEvacuationLocked, Is.True);
         }
 
         [Test]

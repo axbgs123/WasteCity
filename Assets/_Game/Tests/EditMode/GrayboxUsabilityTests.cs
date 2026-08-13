@@ -5,8 +5,12 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.UI;
 using WasteCity.Core;
+using WasteCity.Graybox3D;
+using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
 
 namespace WasteCity.Tests
@@ -15,6 +19,8 @@ namespace WasteCity.Tests
     {
         private readonly List<GameObject> createdObjects =
             new List<GameObject>();
+        private Keyboard testKeyboard;
+        private object inputTestFixture;
 
         [SetUp]
         public void SetUp()
@@ -31,6 +37,15 @@ namespace WasteCity.Tests
                     UnityEngine.Object.DestroyImmediate(
                         createdObjects[index]);
             createdObjects.Clear();
+            if (testKeyboard != null && testKeyboard.added)
+                InputSystem.RemoveDevice(testKeyboard);
+            testKeyboard = null;
+            if (inputTestFixture != null)
+            {
+                inputTestFixture.GetType().GetMethod("TearDown")
+                    .Invoke(inputTestFixture, null);
+                inputTestFixture = null;
+            }
             Time.timeScale = 1f;
             DeleteApprovedPlayerPrefsKeys();
         }
@@ -587,6 +602,203 @@ namespace WasteCity.Tests
             Assert.That(fixture.Store.SaveCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public void IDEA0007_IdleEscapeOpensMenuAfterOneBuildingInputCall()
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+
+            GrayboxInputSuppression suppression = PressCoordinatorKey(
+                fixture.Coordinator,
+                Key.Escape);
+
+            Assert.That(fixture.Coordinator.BuildingInputInvocationCount,
+                Is.EqualTo(1u));
+            Assert.That(fixture.Menu.IsOpen, Is.True);
+            AssertSuppressAll(suppression);
+        }
+
+        [Test]
+        public void IDEA0007_MenuOpenSuppressesAllWithoutBuildingDelegation()
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            fixture.Menu.Open();
+            uint calls = fixture.Coordinator.BuildingInputInvocationCount;
+
+            GrayboxInputSuppression suppression = PressCoordinatorKeys(
+                fixture.Coordinator,
+                Key.W,
+                Key.F,
+                Key.Home);
+
+            AssertSuppressAll(suppression);
+            Assert.That(
+                fixture.Coordinator.BuildingInputInvocationCount,
+                Is.EqualTo(calls));
+            Assert.That(fixture.Menu.IsOpen, Is.True);
+        }
+
+        [Test]
+        public void IDEA0007_MenuEscapeReturnsThenClosesWithoutReplay()
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            fixture.Menu.Open();
+            fixture.Menu.OpenSettings();
+
+            PressCoordinatorKey(fixture.Coordinator, Key.Escape);
+            Assert.That(fixture.Menu.IsOpen, Is.True);
+            Assert.That(
+                fixture.Menu.Page,
+                Is.EqualTo(GrayboxSystemMenuPage3D.Main));
+            Assert.That(fixture.Coordinator.BuildingInputInvocationCount,
+                Is.Zero);
+
+            PressCoordinatorKey(fixture.Coordinator, Key.Escape);
+            Assert.That(fixture.Menu.IsOpen, Is.False);
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(fixture.Coordinator.BuildingInputInvocationCount,
+                Is.Zero);
+
+            GrayboxInputSuppression resumed =
+                fixture.Coordinator.ProcessCurrentInput();
+            Assert.That(fixture.Menu.IsOpen, Is.False);
+            Assert.That(fixture.Coordinator.BuildingInputInvocationCount,
+                Is.EqualTo(1u));
+            Assert.That(resumed.Move, Is.False);
+            Assert.That(resumed.Deployment, Is.False);
+            Assert.That(resumed.Destination, Is.False);
+            Assert.That(resumed.CameraDrag, Is.False);
+            Assert.That(resumed.Home, Is.False);
+        }
+
+        [TestCase(GrayboxSystemMenuPage3D.OperationGuide)]
+        [TestCase(GrayboxSystemMenuPage3D.ExitConfirm)]
+        public void IDEA0007_MenuEscapeReturnsFromSecondaryPages(
+            GrayboxSystemMenuPage3D page)
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            fixture.Menu.Open();
+            if (page == GrayboxSystemMenuPage3D.OperationGuide)
+                fixture.Menu.OpenOperationGuide();
+            else
+                fixture.Menu.OpenExitConfirmation();
+
+            PressCoordinatorKey(fixture.Coordinator, Key.Escape);
+
+            Assert.That(fixture.Menu.IsOpen, Is.True);
+            Assert.That(
+                fixture.Menu.Page,
+                Is.EqualTo(GrayboxSystemMenuPage3D.Main));
+            Assert.That(fixture.Exit.Count, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0007_OpeningMenuClosesDevelopmentPanel()
+        {
+            var development = new FakeDevelopmentPanel { IsOpen = true };
+            CoordinatorFixture fixture = CreateCoordinatorFixture(development);
+
+            PressCoordinatorKey(fixture.Coordinator, Key.Escape);
+
+            Assert.That(development.CloseCount, Is.EqualTo(1));
+            Assert.That(development.IsOpen, Is.False);
+            Assert.That(fixture.Menu.IsOpen, Is.True);
+        }
+
+        [TestCase("OnDisable")]
+        [TestCase("OnDestroy")]
+        public void IDEA0007_CoordinatorTeardownReleasesMenuPause(
+            string lifecycleMethod)
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            fixture.Speed.Set(2f);
+            fixture.Menu.Open();
+            Assert.That(Time.timeScale, Is.Zero);
+
+            InvokeLifecycle(fixture.Coordinator, lifecycleMethod);
+            InvokeLifecycle(fixture.Coordinator, lifecycleMethod);
+
+            Assert.That(fixture.Menu.IsOpen, Is.False);
+            Assert.That(
+                fixture.Speed.IsPaused(GamePauseReason.SystemMenu),
+                Is.False);
+            Assert.That(Time.timeScale, Is.EqualTo(2f));
+        }
+
+        private CoordinatorFixture CreateCoordinatorFixture(
+            IGrayboxDevelopmentPanelControl3D development = null)
+        {
+            MenuFixture menuFixture = CreateMenuControllerFixture();
+            GrayboxBuildingInputRouter3D building =
+                CreateObject("CoordinatorBuildingInput")
+                    .AddComponent<GrayboxBuildingInputRouter3D>();
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                CreateObject("UsabilityInputCoordinator")
+                    .AddComponent<GrayboxUsabilityInputCoordinator3D>();
+            coordinator.Configure(
+                building,
+                menuFixture.Controller,
+                development);
+            return new CoordinatorFixture(
+                coordinator,
+                building,
+                menuFixture.Controller,
+                menuFixture.Speed,
+                menuFixture.Exit);
+        }
+
+        private GrayboxInputSuppression PressCoordinatorKey(
+            GrayboxUsabilityInputCoordinator3D coordinator,
+            Key key)
+        {
+            return PressCoordinatorKeys(coordinator, key);
+        }
+
+        private GrayboxInputSuppression PressCoordinatorKeys(
+            GrayboxUsabilityInputCoordinator3D coordinator,
+            params Key[] keys)
+        {
+            if (inputTestFixture == null)
+            {
+                Type fixtureType = Type.GetType(
+                    "UnityEngine.InputSystem.InputTestFixture, " +
+                    "Unity.InputSystem.TestFramework",
+                    true);
+                inputTestFixture = Activator.CreateInstance(fixtureType);
+                fixtureType.GetMethod("Setup")
+                    .Invoke(inputTestFixture, null);
+            }
+            if (testKeyboard == null)
+                testKeyboard = InputSystem.AddDevice<Keyboard>();
+            testKeyboard.MakeCurrent();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(keys));
+            InputSystem.Update();
+            Assert.That(Keyboard.current, Is.SameAs(testKeyboard));
+            for (var index = 0; index < keys.Length; index++)
+                Assert.That(
+                    testKeyboard[keys[index]].wasPressedThisFrame,
+                    Is.True,
+                    keys[index].ToString());
+            GrayboxInputSuppression suppression =
+                coordinator.ProcessCurrentInput();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState());
+            InputSystem.Update();
+            return suppression;
+        }
+
+        private static void AssertSuppressAll(
+            GrayboxInputSuppression suppression)
+        {
+            Assert.That(suppression.Move, Is.True);
+            Assert.That(suppression.Deployment, Is.True);
+            Assert.That(suppression.Destination, Is.True);
+            Assert.That(suppression.CameraDrag, Is.True);
+            Assert.That(suppression.Home, Is.True);
+        }
+
         private MenuFixture CreateMenuControllerFixture(bool withView = false)
         {
             var speed = new GameSpeedModel();
@@ -825,6 +1037,42 @@ namespace WasteCity.Tests
             {
                 Count++;
             }
+        }
+
+        private sealed class FakeDevelopmentPanel :
+            IGrayboxDevelopmentPanelControl3D
+        {
+            public bool IsOpen { get; set; }
+            public int CloseCount { get; private set; }
+
+            public void Close()
+            {
+                CloseCount++;
+                IsOpen = false;
+            }
+        }
+
+        private sealed class CoordinatorFixture
+        {
+            public CoordinatorFixture(
+                GrayboxUsabilityInputCoordinator3D coordinator,
+                GrayboxBuildingInputRouter3D building,
+                GrayboxSystemMenuController3D menu,
+                GameSpeedModel speed,
+                FakeExit exit)
+            {
+                Coordinator = coordinator;
+                Building = building;
+                Menu = menu;
+                Speed = speed;
+                Exit = exit;
+            }
+
+            public GrayboxUsabilityInputCoordinator3D Coordinator { get; }
+            public GrayboxBuildingInputRouter3D Building { get; }
+            public GrayboxSystemMenuController3D Menu { get; }
+            public GameSpeedModel Speed { get; }
+            public FakeExit Exit { get; }
         }
 
         private sealed class MenuFixture

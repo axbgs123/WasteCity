@@ -19,6 +19,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField]
         private GrayboxDeveloperModifierBootstrap3D developer;
 
+        public bool LastEscapeConsumed { get; private set; }
+
         public void Configure(
             GrayboxBuildingMenuView3D menu,
             GrayboxBuildingInteractionModel3D interaction,
@@ -37,6 +39,7 @@ namespace WasteCity.Graybox3D.Building
 
         public GrayboxInputSuppression ProcessCurrentInput()
         {
+            LastEscapeConsumed = false;
             try
             {
                 return ProcessCurrentInputCore();
@@ -87,7 +90,8 @@ namespace WasteCity.Graybox3D.Building
             {
                 if (keyboard != null &&
                     keyboard.escapeKey.wasPressedThisFrame)
-                    menu.ConsumeFocusedEscape();
+                    LastEscapeConsumed =
+                        menu.ConsumeFocusedEscape();
                 return new GrayboxInputSuppression(
                     move: true,
                     deployment: true,
@@ -102,14 +106,26 @@ namespace WasteCity.Graybox3D.Building
             {
                 if (keyboard != null &&
                     keyboard.escapeKey.wasPressedThisFrame)
+                {
+                    LastEscapeConsumed = true;
                     construction?.ResolveCancelSelected(false);
+                }
                 return SuppressAll();
             }
 
             if (evacuation != null &&
                 (evacuation.IsManifestOpen ||
                  evacuation.IsProcessing))
+            {
+                if (keyboard != null &&
+                    keyboard.escapeKey.wasPressedThisFrame)
+                {
+                    LastEscapeConsumed =
+                        evacuation.IsProcessing ||
+                        evacuation.TryCancelManifest();
+                }
                 return SuppressAll();
+            }
 
             if (keyboard != null &&
                 keyboard.f10Key.wasPressedThisFrame)
@@ -232,6 +248,7 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxBuildingInteractionState.Inactive)
             {
                 CancelBuildState();
+                LastEscapeConsumed = true;
                 owned = true;
             }
 

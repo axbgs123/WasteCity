@@ -137,6 +137,17 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryCancelManifest()
+        {
+            if (!IsManifestOpen || IsProcessing)
+                return false;
+
+            ResetLocalState();
+            menu.HideEvacuation();
+            menu.SetConstructionCancellationBlocked(false);
+            return true;
+        }
+
         public bool Assign(
             string stableInstanceId,
             BuildingEvacuationTreatment treatment)
