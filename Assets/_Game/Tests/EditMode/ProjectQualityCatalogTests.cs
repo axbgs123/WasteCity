@@ -207,7 +207,7 @@ namespace WasteCity.Tests
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
-                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
                 "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
@@ -221,11 +221,106 @@ namespace WasteCity.Tests
                 string.Join("|", feature.PrimarySourceGlobs)).ToArray());
         }
 
+        [Test]
+        public void CommittedCatalog_Maps3DUsabilityFollowupOwnershipAndBoundaries()
+        {
+            ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup building = FindFeature(catalog, "building-construction-evacuation");
+            ProjectFeatureGroup ui = FindFeature(catalog, "ui-input");
+
+            CollectionAssert.IsSubsetOf(new[] { "IDEA-0008", "IDEA-0009", "IDEA-0010" },
+                building.RequirementIds);
+            CollectionAssert.Contains(building.SourceGlobs,
+                "Assets/_Game/Scripts/Building/BuildingResourceNodeCompatibilityRules.cs");
+            CollectionAssert.Contains(building.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/BuildingResourceNodeCompatibilityRulesTests.cs");
+            CollectionAssert.Contains(building.ScenePaths,
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+
+            CollectionAssert.IsSubsetOf(new[] { "IDEA-0007", "IDEA-0008", "IDEA-0010" },
+                ui.RequirementIds);
+            CollectionAssert.Contains(ui.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Usability/**");
+            CollectionAssert.Contains(ui.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Usability/WasteCity.Graybox3D.Usability.asmdef");
+            CollectionAssert.Contains(ui.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs");
+            CollectionAssert.Contains(ui.TestFileGlobs,
+                "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs");
+            CollectionAssert.Contains(ui.ScenePaths,
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+
+            ProjectReuseEntry compatibility = FindReuse(catalog,
+                "building-resource-node-compatibility-rules");
+            Assert.That(compatibility.FeatureGroupId,
+                Is.EqualTo("building-construction-evacuation"));
+            Assert.That(compatibility.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.Contains(compatibility.TypeNames,
+                "BuildingResourceNodeCompatibilityRules");
+            CollectionAssert.Contains(compatibility.RequirementIds,
+                "IDEA-0010");
+
+            ProjectReuseEntry displaySettings = FindReuse(catalog,
+                "graybox-display-settings");
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "GrayboxDisplaySettingsModel3D",
+                "PlayerPrefsGrayboxDisplaySettingsStore3D",
+                "UnityGrayboxDisplaySettingsPlatform3D",
+            }, displaySettings.TypeNames);
+            StringAssert.Contains("IGrayboxDisplaySettingsStore",
+                displaySettings.UseSummary);
+            StringAssert.Contains("IGrayboxDisplaySettingsPlatform",
+                displaySettings.UseSummary);
+            StringAssert.Contains("PlayerPrefs", displaySettings.BoundarySummary);
+            StringAssert.Contains("schema 30", displaySettings.BoundarySummary);
+
+            Assert.That(FindReuse(catalog, "graybox-system-menu-controller").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            Assert.That(FindReuse(catalog, "graybox-usability-input-coordinator").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            Assert.That(FindReuse(catalog, "graybox-system-menu-view").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+
+            ProjectUiEntry systemMenu = FindUi(catalog, "graybox-system-menu");
+            Assert.That(systemMenu.OwnerTypeName,
+                Is.EqualTo("GrayboxSystemMenuView3D"));
+            Assert.That(systemMenu.SceneId, Is.EqualTo("graybox-prototype-3d"));
+            ProjectUiEntry coordinator = FindUi(catalog,
+                "graybox-usability-input-coordinator");
+            Assert.That(coordinator.OwnerTypeName,
+                Is.EqualTo("GrayboxUsabilityInputCoordinator3D"));
+            Assert.That(coordinator.SceneId, Is.EqualTo("graybox-prototype-3d"));
+
+            Assert.That(catalog.ReuseEntries.Where(entry =>
+                    entry.TypeNames.Contains("GrayboxSystemMenuView3D"))
+                .All(entry => entry.ReuseLevel == ProjectReuseLevel.SceneOnly),
+                Is.True,
+                "Scene-specific system menu View must not be promoted to general reuse.");
+        }
+
         private static ProjectFeatureGroup FindFeature(ProjectQualityCatalog catalog, string id)
         {
             foreach (ProjectFeatureGroup feature in catalog.FeatureGroups)
                 if (feature.Id == id) return feature;
             Assert.Fail("Missing feature: " + id);
+            return null;
+        }
+
+        private static ProjectReuseEntry FindReuse(ProjectQualityCatalog catalog, string id)
+        {
+            foreach (ProjectReuseEntry entry in catalog.ReuseEntries)
+                if (entry.Id == id) return entry;
+            Assert.Fail("Missing reuse entry: " + id);
+            return null;
+        }
+
+        private static ProjectUiEntry FindUi(ProjectQualityCatalog catalog, string id)
+        {
+            foreach (ProjectUiEntry entry in catalog.UiEntries)
+                if (entry.Id == id) return entry;
+            Assert.Fail("Missing UI entry: " + id);
             return null;
         }
 

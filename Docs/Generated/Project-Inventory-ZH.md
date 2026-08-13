@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`64f4ea305e1ea2086c1c171f5fad958a8d33236ee4779d651800fa6fbecca003`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`b254a430def51f346bdfc3f00ad085e3b270f6a437907724b46465a132ff07a8`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -11,6 +11,7 @@
 - `WasteCity.Game`：`Assets/_Game/Scripts/WasteCity.Game.asmdef`
 - `WasteCity.Graybox3D`：`Assets/_Game/Scripts/Graybox3D/WasteCity.Graybox3D.asmdef`
 - `WasteCity.Graybox3D.Building`：`Assets/_Game/Scripts/Graybox3D/Building/WasteCity.Graybox3D.Building.asmdef`
+- `WasteCity.Graybox3D.Usability`：`Assets/_Game/Scripts/Graybox3D/Usability/WasteCity.Graybox3D.Usability.asmdef`
 - `WasteCity.PlayModeTests`：`Assets/_Game/Tests/PlayMode/WasteCity.PlayModeTests.asmdef`
 ## 3. 启用场景与顺序
 - 0：`Assets/_Game/Scenes/GrayboxPrototype3D.unity`（三维灰盒原型）
@@ -23,6 +24,7 @@
 - `Assets/_Game/Scripts/Building/BuildingOrientation.cs`
 - `Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`
 - `Assets/_Game/Scripts/Building/BuildingRangeRules.cs`
+- `Assets/_Game/Scripts/Building/BuildingResourceNodeCompatibilityRules.cs`
 - `Assets/_Game/Scripts/Building/BuildingRuntime.cs`
 - `Assets/_Game/Scripts/Building/BuildingUnlockModel.cs`
 - `Assets/_Game/Scripts/Building/BuildingUpgradeModel.cs`
@@ -211,6 +213,11 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsModel3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`
 - `Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs`
 - `Assets/_Game/Scripts/UI/FormalTitleMenuController.cs`
 - `Assets/_Game/Scripts/UI/OnboardingGuideController.cs`
@@ -276,6 +283,9 @@
 - `WasteCity.Graybox3D.GrayboxUrpScope`：`Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs`
 - `WasteCity.Graybox3D.GrayboxVisualSlot`：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`
 - `WasteCity.Graybox3D.GrayboxWorldView3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
+- `WasteCity.Graybox3D.Usability.GrayboxSystemMenuController3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuController3D.cs`
+- `WasteCity.Graybox3D.Usability.GrayboxSystemMenuView3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuView3D.cs`
+- `WasteCity.Graybox3D.Usability.GrayboxUsabilityInputCoordinator3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`
 - `WasteCity.Leader.FormalLeaderController`：`Assets/_Game/Scripts/Leader/FormalLeaderController.cs`
 - `WasteCity.Legacy.ForesightFlashController`：`Assets/_Game/Scripts/Legacy/ForesightFlashController.cs`
 - `WasteCity.Legacy.LegacyEffectsController`：`Assets/_Game/Scripts/Legacy/LegacyEffectsController.cs`
@@ -307,6 +317,8 @@
 ## 7. 界面所有者
 - 灰盒建筑菜单：`GrayboxBuildingMenuView3D`，场景 `graybox-prototype-3d`
 - 灰盒输入路由：`GrayboxInputRouter`，场景 `graybox-prototype-3d`
+- 灰盒系统菜单：`GrayboxSystemMenuView3D`，场景 `graybox-prototype-3d`
+- 灰盒易用性输入协调器：`GrayboxUsabilityInputCoordinator3D`，场景 `graybox-prototype-3d`
 ## 8. 编辑器、构建与性能入口
 - `WasteCity.Editor.FirstArtTerrainAssetBuilder.BuildRuntimeAssets`
 - `WasteCity.Editor.FirstArtTerrainAssetBuilder.BuildTextureArrays`
