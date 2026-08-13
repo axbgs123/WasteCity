@@ -4,6 +4,24 @@ using UnityEngine;
 
 namespace WasteCity.Graybox3D.Usability
 {
+    public interface IGrayboxApplicationExit
+    {
+        void Exit();
+    }
+
+    public sealed class UnityGrayboxApplicationExit3D :
+        IGrayboxApplicationExit
+    {
+        public void Exit()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        }
+    }
+
     public sealed class PlayerPrefsGrayboxDisplaySettingsStore3D :
         IGrayboxDisplaySettingsStore
     {
