@@ -5,6 +5,7 @@
     "WasteCity.ArtIntegration3D",
     "WasteCity.Graybox3D",
     "WasteCity.Graybox3D.Building",
+    "WasteCity.Graybox3D.Usability",
     "Unity.InputSystem",
     "Unity.ugui",
     "Unity.RenderPipelines.Universal.Runtime"
