@@ -51,6 +51,10 @@ namespace WasteCity.Editor
             "417640ccdd04a4121a7180da2ce71277";
         private const string TerrainHeightGuid =
             "9263e65e9f2694421b9fbdb96b3f49a3";
+        private const string RuinsCliffProfileGuid =
+            "6b73f8e68c02943658e63225766dd256";
+        private const string RuinsCliffShaderGuid =
+            "e7ef7b490240461faab128d139bdac74";
         private const string TerrainLightName =
             "FirstArtTerrainDirectionalLight";
         private const float TerrainLightIntensity = .90f;
@@ -60,6 +64,59 @@ namespace WasteCity.Editor
             new Color(1f, .956f, .85f, 1f);
         private static readonly Vector3 TerrainLightEuler =
             new Vector3(50f, -30f, 0f);
+
+        private static readonly string[] RuinsCliffFbxGuids =
+        {
+            "74e0ae6e3a4e045d1879057e4ea83f5e",
+            "a149c94a62a2e4fe2a6e71c76421e675",
+            "349cad0c00bf34b86a2750726e7121f7",
+            "2744c2b66e972468f8cd87761f6dea3e",
+            "592cc0ce77f7346e79d621d6e7c6c849",
+            "a1c090a2695a940f2bb810af1f2ed3c9",
+            "9ab7b78a7195f4702a6f7989e00eb857",
+            "6bb08a29e92924947944d0311102247d",
+            "50c1bb78dbd354435ac7c1a0b28628da",
+            "e13ec3db45dec4203a5c92378746bf55",
+            "c86c3d69e77304a169123123fa0f3b42",
+            "54bdbab6d36ec481ba1302edd418e863",
+            "45d470060d7674595b6182e9ff11af65",
+            "ecf58233b44324484bf41a41fc70b1e9",
+        };
+
+        private static readonly string[] RuinsCliffPrefabGuids =
+        {
+            "f341ced2e61394295b2b2529d92f2df1",
+            "291293ada4a99454686c2363f808e10e",
+            "127ccec2e38214c14a3bb96549a83016",
+            "ba097d85457e7469c9bf81cc6303f906",
+            "d90169849218a4597be2b3ed9e6ee9a6",
+            "17f6c3887760c41d59e30a6dbc38c15a",
+            "f064da28e02d74bdca340008cb26ad7e",
+            "531e0a2a01252465c808487770194704",
+            "7b37f81a7fdc3406ea9c462d56919bc6",
+            "6bb8272b032f0406aa3490694a316c2a",
+            "344999e5fa45c4719a7b2f2476cfe351",
+            "c5af4a6f4c3cb4f1aae3e82bf94a200f",
+            "7f691f28c3d474aadb540a0ff69facce",
+            "65d6a7e1ca6b44584b25846b97a663c1",
+        };
+
+        private static readonly string[] RuinsCliffMaterialGuids =
+        {
+            "be01d9d1a28234ddf91a3d8c0707190e",
+            "7b30f196df8784365977e5b59648eb80",
+            "254a4ae5ae9864b59ab84874141ca44a",
+            "926b4e68afe9f47f1abd9fc6e9ac2c25",
+            "7c24f356a01d74ff5aeffb91bfbde7ac",
+            "fea5ba8f1bcce4af0a9966217773270d",
+            "fe3969b76bb10448896d0051363ef6a6",
+            "854500339ac804983b0822b173e5c248",
+            "507bee9b0ade044d891034434ee7d352",
+            "9e115428bbc7540138aea316c67202dc",
+            "e896518daa9c546fdbda64e093a3b5d1",
+            "125ad5b32ccf9436eb5e9a4064bf023e",
+            "8225153fe66424e57b40c90b933930e7",
+        };
 
         private const string FirstBaseColorSourcePath =
             "Assets/_Game/Art/FirstPass/Environment/Terrain/" +
@@ -92,6 +149,15 @@ namespace WasteCity.Editor
             public Texture2DArray Height;
         }
 
+        private sealed class ApprovedRuinsCliffAssets
+        {
+            public FirstArtRuinsCliffProfile3D Profile;
+            public Shader Shader;
+            public GameObject[] Fbx;
+            public GameObject[] Prefabs;
+            public Material[] Materials;
+        }
+
         private sealed class BuildingContractReferences
         {
             public Transform Systems;
@@ -119,6 +185,13 @@ namespace WasteCity.Editor
             }
         }
 
+        private enum SerializedReferenceState
+        {
+            Null = 0,
+            Live = 1,
+            Missing = 2,
+        }
+
         public static void Configure()
         {
             ConfigureSceneAtPath(ScenePath, true, null);
@@ -143,6 +216,7 @@ namespace WasteCity.Editor
                     nameof(targetScenePath));
             }
 
+            LoadApprovedRuinsCliffAssetsOrThrow();
             bool hasExistingScene =
                 TryOpenAndValidateFoundation(
                     targetScenePath,
@@ -151,12 +225,15 @@ namespace WasteCity.Editor
 
             ApprovedTerrainAssets terrainAssets =
                 EnsureApprovedTerrainAssets(hooks);
+            ApprovedRuinsCliffAssets geometryAssets =
+                LoadApprovedRuinsCliffAssetsOrThrow();
             if (hasExistingScene)
             {
                 hooks?.BeforeSceneMutation?.Invoke();
                 EnsureFirstArtTerrainContract(
                     scene,
-                    terrainAssets.Profile);
+                    terrainAssets.Profile,
+                    geometryAssets.Profile);
                 EnsureFirstArtTerrainLighting(scene);
             }
 
@@ -187,7 +264,8 @@ namespace WasteCity.Editor
             {
                 EnsureFirstArtTerrainContract(
                     scene,
-                    terrainAssets.Profile);
+                    terrainAssets.Profile,
+                    geometryAssets.Profile);
                 EnsureFirstArtTerrainLighting(scene);
             }
             ValidateFirstArtTerrainContract(scene);
@@ -623,10 +701,17 @@ namespace WasteCity.Editor
                 inputRouter,
                 "cameraController",
                 cameraController);
-            ValidateFirstArtTerrainSceneStructure(
+            FirstArtTerrainRenderer3D terrainPresenter =
+                ValidateFirstArtTerrainSceneStructure(
                 scene,
                 AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
                     FirstArtTerrainAssetBuilder.ProfilePath),
+                    true);
+            ApprovedRuinsCliffAssets geometryAssets =
+                LoadApprovedRuinsCliffAssetsOrThrow();
+            ValidateRuinsCliffSceneReference(
+                terrainPresenter,
+                geometryAssets.Profile,
                 true);
             ValidateFirstArtTerrainLightStructure(scene, true);
         }
@@ -854,7 +939,8 @@ namespace WasteCity.Editor
 
         private static void EnsureFirstArtTerrainContract(
             Scene scene,
-            FirstArtTerrainProfile3D profile)
+            FirstArtTerrainProfile3D profile,
+            FirstArtRuinsCliffProfile3D geometryProfile)
         {
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform world = RequireChild(root.transform, "GrayboxWorld");
@@ -870,8 +956,15 @@ namespace WasteCity.Editor
             }
             if (!profile.TryValidate(out string error))
                 throw new InvalidOperationException(error);
+            if (geometryProfile == null)
+            {
+                throw new InvalidOperationException(
+                    "The approved ruins/cliff profile is missing.");
+            }
+            if (!geometryProfile.TryValidate(out string geometryError))
+                throw new InvalidOperationException(geometryError);
 
-            presenter.Configure(profile);
+            presenter.Configure(profile, geometryProfile);
             SetReferences(
                 RequireSingle<GrayboxSceneBootstrap>(scene),
                 ("terrainPresentationBehaviour", presenter));
@@ -899,12 +992,14 @@ namespace WasteCity.Editor
         {
             ValidateFirstArtTerrainContractWithAssets(
                 scene,
-                LoadApprovedTerrainAssetsOrThrow());
+                LoadApprovedTerrainAssetsOrThrow(),
+                LoadApprovedRuinsCliffAssetsOrThrow());
         }
 
         private static void ValidateFirstArtTerrainContractWithAssets(
             Scene scene,
-            ApprovedTerrainAssets assets)
+            ApprovedTerrainAssets assets,
+            ApprovedRuinsCliffAssets geometryAssets)
         {
             FirstArtTerrainRenderer3D presenter =
                 ValidateFirstArtTerrainSceneStructure(
@@ -912,6 +1007,10 @@ namespace WasteCity.Editor
                     assets.Profile,
                     false);
             RequireReference(presenter, "profile", assets.Profile);
+            RequireReference(
+                presenter,
+                "geometryProfile",
+                geometryAssets.Profile);
             ValidateFirstArtTerrainLightStructure(scene, false);
         }
 
@@ -1062,13 +1161,10 @@ namespace WasteCity.Editor
             var namedOwners = 0;
             foreach (GameObject gameObject in FindSceneGameObjects(scene))
             {
-                if (string.Equals(
-                        gameObject.name,
-                        "RuntimeSurface",
-                        StringComparison.Ordinal))
+                if (IsRuntimePresentationName(gameObject.name))
                 {
                     throw new InvalidOperationException(
-                        "RuntimeSurface must not be serialized in the " +
+                        gameObject.name + " must not be serialized in the " +
                         "graybox scene.");
                 }
                 if (!string.Equals(
@@ -1213,6 +1309,69 @@ namespace WasteCity.Editor
             return presenter;
         }
 
+        private static bool IsRuntimePresentationName(string name)
+        {
+            return string.Equals(name, "RuntimeSurface", StringComparison.Ordinal) ||
+                   string.Equals(name, "RuntimeGeometry", StringComparison.Ordinal) ||
+                   string.Equals(name, "RuinsGeometry", StringComparison.Ordinal) ||
+                   string.Equals(name, "CliffGeometry", StringComparison.Ordinal);
+        }
+
+        private static void ValidateRuinsCliffSceneReference(
+            FirstArtTerrainRenderer3D presenter,
+            FirstArtRuinsCliffProfile3D approvedProfile,
+            bool allowRepairableAbsence)
+        {
+            if (presenter == null)
+                return;
+            SerializedReferenceState state = GetReferenceState(
+                presenter,
+                "geometryProfile",
+                out UnityEngine.Object reference);
+            if (state == SerializedReferenceState.Missing)
+            {
+                throw new InvalidOperationException(
+                    "Existing ruins/cliff geometry Profile reference is " +
+                    "missing or unresolved and cannot be repaired implicitly.");
+            }
+            if (state == SerializedReferenceState.Live &&
+                reference == approvedProfile)
+                return;
+            if (allowRepairableAbsence &&
+                state == SerializedReferenceState.Null)
+                return;
+            throw new InvalidOperationException(
+                "Existing ruins/cliff geometry Profile reference must be " +
+                (allowRepairableAbsence
+                    ? "absent or already approved."
+                    : "the approved Profile."));
+        }
+
+        private static SerializedReferenceState GetReferenceState(
+            UnityEngine.Object owner,
+            string propertyName,
+            out UnityEngine.Object reference)
+        {
+            var data = new SerializedObject(owner);
+            data.UpdateIfRequiredOrScript();
+            SerializedProperty property = data.FindProperty(propertyName);
+            if (property == null ||
+                property.propertyType != SerializedPropertyType.ObjectReference)
+            {
+                throw new InvalidOperationException(
+                    $"Serialized object reference {owner.GetType().Name}." +
+                    $"{propertyName} is unavailable.");
+            }
+
+            reference = property.objectReferenceValue;
+            if (reference != null)
+                return SerializedReferenceState.Live;
+            if (!ReferenceEquals(reference, null) ||
+                property.objectReferenceInstanceIDValue != 0)
+                return SerializedReferenceState.Missing;
+            return SerializedReferenceState.Null;
+        }
+
         private static ApprovedTerrainAssets EnsureApprovedTerrainAssets(
             AuthoringHooks hooks)
         {
@@ -1245,6 +1404,132 @@ namespace WasteCity.Editor
                     $"Approved terrain assets are invalid: {error}");
             }
             return assets;
+        }
+
+        private static ApprovedRuinsCliffAssets
+            LoadApprovedRuinsCliffAssetsOrThrow()
+        {
+            if (!TryLoadApprovedRuinsCliffAssets(
+                    out ApprovedRuinsCliffAssets assets,
+                    out string error))
+            {
+                throw new InvalidOperationException(
+                    "Approved ruins/cliff assets are invalid: " + error);
+            }
+            return assets;
+        }
+
+        private static bool TryLoadApprovedRuinsCliffAssets(
+            out ApprovedRuinsCliffAssets assets,
+            out string error)
+        {
+            assets = new ApprovedRuinsCliffAssets
+            {
+                Fbx = new GameObject[FirstArtRuinsCliffCatalog3D.EntryCount],
+                Prefabs = new GameObject[FirstArtRuinsCliffCatalog3D.EntryCount],
+                Materials = new Material[FirstArtRuinsCliffCatalog3D.MaterialRoleCount],
+            };
+            if (RuinsCliffFbxGuids.Length != FirstArtRuinsCliffCatalog3D.EntryCount ||
+                RuinsCliffPrefabGuids.Length != FirstArtRuinsCliffCatalog3D.EntryCount ||
+                RuinsCliffMaterialGuids.Length !=
+                    FirstArtRuinsCliffCatalog3D.MaterialRoleCount)
+            {
+                error = "Frozen ruins/cliff GUID table counts are invalid.";
+                return false;
+            }
+            if (!TryLoadExactAsset(
+                    FirstArtRuinsCliffAssetBuilder.ProfilePath,
+                    RuinsCliffProfileGuid,
+                    out assets.Profile,
+                    out error) ||
+                !TryLoadExactAsset(
+                    FirstArtRuinsCliffAssetBuilder.ShaderPath,
+                    RuinsCliffShaderGuid,
+                    out assets.Shader,
+                    out error))
+                return false;
+
+            for (int index = 0;
+                 index < FirstArtRuinsCliffCatalog3D.EntryCount;
+                 index++)
+            {
+                FirstArtRuinsCliffCatalogEntry3D entry =
+                    FirstArtRuinsCliffCatalog3D.Entries[index];
+                if (!TryLoadExactAsset(
+                        entry.FbxPath,
+                        RuinsCliffFbxGuids[index],
+                        out assets.Fbx[index],
+                        out error) ||
+                    !TryLoadExactAsset(
+                        entry.PrefabPath,
+                        RuinsCliffPrefabGuids[index],
+                        out assets.Prefabs[index],
+                        out error))
+                    return false;
+            }
+
+            for (int index = 0;
+                 index < FirstArtRuinsCliffCatalog3D.MaterialRoleCount;
+                 index++)
+            {
+                FirstArtRuinsCliffMaterialRole3D role =
+                    FirstArtRuinsCliffCatalog3D.MaterialRoles[index];
+                string path = FirstArtRuinsCliffCatalog3D.GeometryMaterialDirectory +
+                    role.Name + ".mat";
+                if (!TryLoadExactAsset(
+                        path,
+                        RuinsCliffMaterialGuids[index],
+                        out assets.Materials[index],
+                        out error))
+                    return false;
+            }
+
+            if (!assets.Profile.TryValidate(out error))
+                return false;
+            if (assets.Profile.GeometryShader != assets.Shader ||
+                !string.Equals(
+                    assets.Shader.name,
+                    FirstArtRuinsCliffCatalog3D.RequiredShaderName,
+                    StringComparison.Ordinal))
+            {
+                error = "Ruins/cliff Profile Shader is not the approved asset.";
+                return false;
+            }
+            for (int index = 0; index < assets.Prefabs.Length; index++)
+            {
+                FirstArtRuinsCliffPrefabBinding3D binding =
+                    assets.Profile.PrefabBindings[index];
+                FirstArtRuinsCliffCatalogEntry3D entry =
+                    FirstArtRuinsCliffCatalog3D.Entries[index];
+                if (!string.Equals(
+                        binding.StableId,
+                        entry.StableId,
+                        StringComparison.Ordinal) ||
+                    binding.Prefab != assets.Prefabs[index])
+                {
+                    error = "Ruins/cliff Profile prefab binding does not match " +
+                        entry.StableId + ".";
+                    return false;
+                }
+            }
+            for (int index = 0; index < assets.Materials.Length; index++)
+            {
+                FirstArtRuinsCliffMaterialBinding3D binding =
+                    assets.Profile.MaterialBindings[index];
+                FirstArtRuinsCliffMaterialRole3D role =
+                    FirstArtRuinsCliffCatalog3D.MaterialRoles[index];
+                if (!string.Equals(binding.Role, role.Name, StringComparison.Ordinal) ||
+                    binding.Material != assets.Materials[index] ||
+                    assets.Materials[index].shader != assets.Shader)
+                {
+                    error = "Ruins/cliff Profile material binding does not match " +
+                        role.Name + ".";
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
         }
 
         private static bool TryLoadApprovedTerrainAssets(
@@ -1363,6 +1648,7 @@ namespace WasteCity.Editor
             asset = AssetDatabase.LoadAssetAtPath<T>(assetPath);
             string actualGuid = AssetDatabase.AssetPathToGUID(assetPath);
             if (asset == null ||
+                AssetDatabase.GetMainAssetTypeAtPath(assetPath) != typeof(T) ||
                 !string.Equals(
                     AssetDatabase.GetAssetPath(asset),
                     assetPath,

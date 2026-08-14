@@ -1549,6 +1549,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   profile: {fileID: 11400000, guid: c2c0273740a844e7bbbee5d059d8af8e, type: 2}
+  geometryProfile: {fileID: 11400000, guid: 6b73f8e68c02943658e63225766dd256, type: 2}
 --- !u!4 &1129381984
 Transform:
   m_ObjectHideFlags: 0

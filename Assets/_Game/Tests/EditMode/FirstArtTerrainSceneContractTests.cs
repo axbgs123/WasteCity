@@ -174,6 +174,12 @@ namespace WasteCity.Tests
                     AssetDatabase.LoadAssetAtPath<
                         FirstArtTerrainProfile3D>(
                             FirstArtTerrainAssetBuilder.ProfilePath)));
+            Assert.That(
+                presenters[0].GeometryProfile,
+                Is.SameAs(
+                    AssetDatabase.LoadAssetAtPath<
+                        FirstArtRuinsCliffProfile3D>(
+                            FirstArtRuinsCliffAssetBuilder.ProfilePath)));
         }
 
         [Test]
@@ -208,17 +214,19 @@ namespace WasteCity.Tests
             Assert.That(
                 presenter.GetComponentsInChildren<Collider>(true),
                 Is.Empty);
+            string[] runtimeNames =
+            {
+                "RuntimeSurface", "RuntimeGeometry",
+                "RuinsGeometry", "CliffGeometry",
+            };
             Assert.That(
                 Object.FindObjectsOfType<Transform>(true),
                 Has.None.Matches<Transform>(
-                    value => string.Equals(
-                        value.name,
-                        "RuntimeSurface",
-                        StringComparison.Ordinal)));
+                    value => runtimeNames.Contains(value.name)));
             AssertSceneHasNoMissingScripts(scene);
-            Assert.That(
-                File.ReadAllText(ProjectAbsolutePath(ScenePath)),
-                Does.Not.Contain("m_Name: RuntimeSurface"));
+            string sceneText = File.ReadAllText(ProjectAbsolutePath(ScenePath));
+            foreach (string runtimeName in runtimeNames)
+                Assert.That(sceneText, Does.Not.Contain("m_Name: " + runtimeName));
         }
 
         [Test]
