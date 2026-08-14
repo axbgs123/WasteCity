@@ -5,9 +5,12 @@
 > 需求状态：已明确 / 已批准 / 开发中
 > 父规格：`Docs/superpowers/specs/2026-08-08-first-art-pass-production-design.md`
 > 地表运行时规格：`Docs/superpowers/specs/2026-08-10-first-terrain-runtime-integration-design.md`
+> 正式路线图：`Docs/05-Formal-Development-Roadmap-ZH.md`
+> 受控记录：`Docs/06-User-Feedback-and-Change-Control-ZH.md` 的 `IDEA-0004`
 > 资产记录：`Docs/Art/FirstPass/Terrain/Ruins/Ruins_ModuleKit_AssetRecord.md`、`Docs/Art/FirstPass/Terrain/Cliff/Cliff_AssetRecord.md`
-> 设计基线：`9b8b533ea7b130a7a93c847c17085adc54f44cbd`
-> 当前阶段：仅书面设计；尚未创建实施计划、Prefab、共享材质、运行时代码或场景引用
+> 设计基线：正式文档提交 `5c3466b`
+> 实施计划：`Docs/superpowers/plans/2026-08-14-ruins-cliff-runtime-integration.md`
+> 当前阶段：书面设计、实施计划与只读模型校准已形成并经主代理目视接受；尚未创建 Prefab、共享材质、运行时代码或场景引用
 
 ## 1. 目标与范围
 
@@ -112,7 +115,13 @@ Cliff: MAT_Cliff_Strata, MAT_Cliff_Fracture,
        MAT_Cliff_Dust, MAT_Cliff_Rubble, MAT_Cliff_Mineral
 ```
 
-它们使用批准的 URP Lit Shader、共享实例和已验收的颜色/PBR职责。运行时不得 `new Material` 或访问 `.material`。同名角色在全部 Prefab 中必须引用同一 Material GUID；Builder 遇到未知、遗漏或重复槽名时在修改正式资产前失败。
+本批新增独立 Shader `WasteCity/Terrain/FirstPassGeometry`。它使用 URP PBR 光照，并通过 object/world triplanar 或等价的垂直面安全映射采样现有四个地表 Texture2DArray：Ruins 固定读取层 `4`，Cliff 固定读取层 `6`。属性名冻结为 `_BaseColorArray`、`_NormalArray`、`_MaskArray`、`_HeightArray`、`_LayerIndex`、`_TriplanarScale` 及角色 tint/PBR 参数；材质必须把 `_LayerIndex` 固定为所属类别，不能由实例覆盖。三投影必须按世界/对象法线权重混合，并对 Tangent Space Normal 在 X/Y/Z 投影面执行轴重定向和符号修正，不能把三张法线样本直接相加。映射不得依赖地表控制图、逐格 UV、相机空间或 FBX 内嵌材质，尤其不能让 Cliff 垂直面发生 XZ 平面投影拉伸。
+
+Shader 至少提供 `UniversalForward` 与 `ShadowCaster`，若当前 URP 深度路径需要则同时提供 `DepthOnly`；正向光照使用 URP 正式 PBR 输入和 `UniversalFragmentPBR`（或 Unity 2022.3 / URP 14.0.12 的等价受支持入口），不能以无光照颜色输出冒充 PBR。验证必须同时包含 Shader 编译、Material/数组引用合同和固定垂直面 RenderTexture 像素差；源码字符串检查只能作为补充，不能单独证明垂直面安全映射。
+
+13 个共享材质只配置各角色的色调、Metallic、AO、Detail/Normal 强度和 Smoothness 等角色参数；它们共享上述 Shader 和既有数组引用，不复制纹理、不生成每-Prefab贴图，也不依赖 FBX 内嵌材质。运行时不得 `new Material` 或访问 `.material`。同名角色在全部 Prefab 中必须引用同一 Material GUID；Builder 遇到未知、遗漏或重复槽名时在修改正式资产前失败。
+
+`WasteCityFirstPassTerrain.shader`、四个 Texture2DArray、其层顺序和 `FirstArtTerrainAssetBuilder` 均保持不变。新增几何 Shader 只消费既有数组，不获得生成、替换或重序列化这些数组的权限。
 
 ## 6. 为什么不直接复用旧 `VisualLibrary`
 
@@ -130,6 +139,7 @@ Cliff: MAT_Cliff_Strata, MAT_Cliff_Fracture,
 - 变体索引使用固定整数哈希 `Hash(width, height, x, y, ruinsSalt) % 8`；
 - 朝向使用另一固定盐得到 `0/90/180/270`；
 - 八件均匀进入候选表，不使用运行时密度滑杆；
+- 八件没有连接边语义；校准矩阵以 FBX 导入时 `0°` 为基础朝向，布局器只在此基础上叠加 placement 的 `quarterTurns`，不添加每资产隐藏旋转或镜像；
 - Prefab 经过一次场景校准后，主体不得越出本格边界到足以误导相邻格通行；如批准模型无法在不明显变形的前提下满足，停止实现并回到设计审查。
 
 ### 7.2 Cliff
@@ -138,16 +148,43 @@ Cliff: MAT_Cliff_Strata, MAT_Cliff_Fracture,
 
 | 正交邻居形态 | 模块 | 朝向规则 |
 |---|---|---|
-| 0 个 | `TopCap` | 哈希四向旋转 |
-| 1 个 | `EndCap` | 开口背向唯一邻居 |
+| 0 个 | `TopCap` | 标准 `0°`；批准套件没有孤立件 |
+| 1 个 | `EndCap` | 标准连接 W=`0°`；N=`90°`、E=`180°`、S=`270°`，圆头背离连接边 |
 | 2 个且相对 | `Straight_A/B` | 轴向由邻居决定，A/B 由哈希奇偶决定 |
-| 2 个且相邻 | `OuterCorner` | 两个连接边决定旋转 |
-| 3 个 | `InnerCorner` | 缺失边决定旋转 |
-| 4 个 | `TopCap` | 哈希四向旋转 |
+| 2 个且相邻、两臂之间对角格不是 Cliff | `InnerCorner` | 标准 N+W=`0°`，按连接边旋转 |
+| 2 个且相邻、两臂之间对角格是 Cliff | `OuterCorner` | 标准 N+W=`0°`，按连接边旋转 |
+| 3 或 4 个 | `TopCap` | 标准 `0°`；批准套件没有 T/Cross 件 |
 
 每个 Cliff 格同样恰好一个 placement。Prefab 根负责将已批准模块校准到一个逻辑格的可读占用；不修改玩法格、不生成多格占用，也不让模型 Collider 决定边界。若单格校准会严重破坏已批准视觉，必须停止并另行批准多格铺设方案，不能让几何越界冒充规则。
 
-哈希算法及盐值在纯 C# 常量中冻结；相同宽高与逐格规则内容必须产生完全相同的 placement 序列和矩阵。地图重建后只按新规则地图重算，不序列化布局。
+Cliff 位定义冻结为 `N=1, E=2, S=4, W=8`，Unity 本地轴为 `N=+Z, E=+X, Up=+Y`；从上往下看，正 `90° Y` 把本地 N 转到 E。标准 mask 为：`StraightA/B=10 (E+W)`、`InnerCorner/OuterCorner=9 (N+W)`、`EndCap=8 (W)`、`TopCap=15 (N+E+S+W)`。旋转查表冻结为：Straight `E|W=0°`, `N|S=90°`；Corner `N|W=0°`, `N|E=90°`, `E|S=180°`, `S|W=270°`；EndCap `W=0°`, `N=90°`, `E=180°`, `S=270°`；孤立或三/四邻接的 TopCap 为 `0°`。相邻两连接边之间的对角格只读取既有 `WorldTraversalKind.Cliff`：对角缺失选择 InnerCorner，对角存在选择 OuterCorner；不得创建第二套拓扑真值。
+
+哈希算法及盐值在纯 C# 常量中冻结；混合步骤使用显式 `unchecked uint` 回绕，或使用不会溢出的宽整数后确定性截断，不能依赖编译器默认溢出设置，也不能让正常坐标因 `checked` 乘法抛异常。placement 先保存整数格、模块索引和 `quarterTurns`，再与已经批准的校准矩阵组合；相同宽高与逐格规则内容必须产生完全相同的 placement 字段和矩阵。地图重建后只按新规则地图重算，不序列化布局。
+
+### 7.3 代码前校准门
+
+只读校准证据位于 `/private/tmp/wastecity-ruins-cliff/calibration/README.md` 与 `/private/tmp/wastecity-ruins-cliff/calibration/calibration_matrix.json`；三张目视证据为同目录 `renders/cliff_cell_fit_top.png`、`renders/cliff_cell_fit_ortho.png`、`renders/cliff_uniform_vs_nonuniform.png`。校准使用 Blender 5.2.0 LTS 只读导入已提交的 14 个 FBX，没有修改 FBX、`.meta` 或正式资产。轴映射为 Blender `XY` 地面/`Z` 高到 Unity `XZ` 地面/`Y` 高；逻辑格为 `1.0`，根位于格中心，子 Mesh 的 XZ bounds 居中、最低 Y 贴到 `0`。
+
+以下数值直接冻结自 `calibration_matrix.json`。`scale` 与 `offset` 均按 Unity `X,Y,Z`；root 保持格中心，`offset` 是 root 下 FBX 子对象的本地位移。Ruins 只做不放大的等比缩放；Cliff 的 XZ 等比收进单格，Y 独立校准到 `0.90`，不修改源 Mesh。基础 Y 旋转均为 `0°`，最终 placement 再叠加上节冻结的 `quarterTurns`。
+
+| 表现稳定 ID | root scale X,Y,Z | child offset X,Y,Z | 校准后 bounds X×Y×Z |
+|---|---|---|---|
+| `art.ruins.boundary-edge` | `0.7438418620039455, 0.7438418620039455, 0.7438418620039455` | `0.011133320925701306, 0.00000004493711649645367, -0.005296984127656602` | `0.9×0.15491270551043693×0.541050134945314` |
+| `art.ruins.broken-pipe` | `0.9755163303025417, 0.9755163303025417, 0.9755163303025417` | `0.002470288718570525, 0.000000051493899180282064, 0.03244276854602628` | `0.9×0.6410873326965777×0.6970203244973145` |
+| `art.ruins.cracked-floor-slab` | `0.7366124449717444, 0.7366124449717444, 0.7366124449717444` | `0.005478553127634332, 0.00000005787199456683777, 0.03353046140802086` | `0.9×0.09877690067009585×0.7774924384932406` |
+| `art.ruins.drainage-channel` | `0.8181818004482052, 0.8181818004482052, 0.8181818004482052` | `0, 0.00000004321330399777432, -0.0056144607475787775` | `0.8999999999999999×0.1825753668205225×0.5192538062170677` |
+| `art.ruins.rebar-concrete-block` | `0.8568209086736785, 0.8568209086736785, 0.8568209086736785` | `-0.0696553438815491, 0.00000005883560678828004, -0.017981657006396753` | `0.9×0.3988768404107975×0.6862975108916366` |
+| `art.ruins.rubble-pile-a` | `0.9302806128327081, 0.9302806128327081, 0.9302806128327081` | `-0.00454897037899669, 0.00000006284143144611042, -0.02610424617700395` | `0.9×0.2321418093319265×0.7192274617189032` |
+| `art.ruins.rubble-pile-b` | `0.6434742705655297, 0.6434742705655297, 0.6434742705655297` | `-0.0014350361567941057, 0.00000003308043718022879, -0.00010610649404046166` | `0.9000000000000001×0.15982392782516824×0.405880371314985` |
+| `art.ruins.worn-marking-plate` | `0.8138665074093977, 0.8138665074093977, 0.8138665074093977` | `-0.00327274226679653, 0.00000005188448785272019, 0.01237233860783203` | `0.9×0.05490496914480248×0.661674071662537` |
+| `art.cliff.end-cap` | `0.36991012107980137, 0.6003284343832568, 0.36991012107980137` | `0.010333405521301657, 0.000000050116234443793, 0.05523510290215231` | `0.9×0.9×0.48955793525425195` |
+| `art.cliff.inner-corner` | `0.33295705133593456, 0.5994717484516436, 0.33295705133593456` | `0.007434509565184104, 0.0000001335870600587246, -0.09329747471624714` | `0.9×0.9×0.724235948234779` |
+| `art.cliff.outer-corner` | `0.39109889207039356, 0.59674880365643, 0.39109889207039356` | `0.1157214599366119, 0.000000134027025689591, -0.0891520673972466` | `0.8677860067279551×0.9×0.9` |
+| `art.cliff.straight-a` | `0.32663329905659955, 0.6002462920829474, 0.32663329905659955` | `0.0016203349578728444, 0.00000005050754956264051, 0.0476678239679167` | `0.9×0.9×0.4327326771259738` |
+| `art.cliff.straight-b` | `0.3322727185105163, 0.5965491125303924, 0.3322727185105163` | `0.010047114768375274, 0.00000005090342182921911, 0.05238271282516175` | `0.9×0.9×0.45282165758321463` |
+| `art.cliff.top-cap` | `0.3274945334777423, 0.6001636951606902, 0.3274945334777423` | `-0.0049633219867498655, 0.00000011846357050606037, 0.053226165581228134` | `0.858200781085434×0.8999999999999999×0.9000000000000001` |
+
+全部 14 件校准后 X/Z extent 都不超过 `0.90`，最低 Y 为 `0`；Cliff 高度为 `0.90`。主代理已目视顶视、倾斜正交和等比/非等比对照图，接受其作为首版接入矩阵。Cliff 的 Y/XZ 比相对源模型提高约 `1.53–1.84×`，因此 Unity 首版仍必须保留默认倾斜正交镜头视觉门：若出现拓扑不可读、triplanar 明显拉伸或任何 X/Z extent 超过 `0.90`，立即停止，不能放宽玩法格、复制规则或用 Collider 绕过；需要时另行批准“可控视觉重叠”或“多格模块”。
 
 ## 8. 表现与玩法真值隔离
 
@@ -169,7 +206,9 @@ Cliff: MAT_Cliff_Strata, MAT_Cliff_Fracture,
 
 ## 9. 分组原子回退
 
-`GrayboxWorldView3D` 增加按稳定 ID 控制 surface slot 的窄接口，同时保留现有“全部显示/隐藏”入口供正式地表使用。新接口只接受已存在的七类 surface 稳定 ID；未知 ID 必须失败，不得静默忽略。
+`GrayboxWorldView3D` 增加按稳定 ID 控制 surface slot 的窄接口，同时保留现有“全部显示/隐藏”入口供正式地表使用。内部保存七个稳定 ID 的独立可见真值；现有 `SurfaceFallbackVisible` 明确定义为“七类 surface fallback 是否全部可见”，部分恢复时为 `false`。`SetSurfaceFallbackVisible(bool)` 原子重置七类状态，`TrySetSurfaceFallbackVisible` 只改目标 ID，`IsSurfaceFallbackVisible` 查询单类状态；Generate 前设置、Generate 后重建、Clear 和全量恢复都必须保留这一语义。新接口只接受已存在的七类 surface 稳定 ID；未知 ID 必须失败且不得改变任何状态或 Renderer。
+
+`WasteCity.Graybox3D` 不得反向引用 `WasteCity.ArtIntegration3D`，否则形成 asmdef 环。实现复用 `GrayboxWorldView3D` 现有 surface allowlist，或在另行批准后把公共稳定 ID 下沉到 `WasteCity.Game`；本批不得为了调用 `FirstArtTerrainCatalog3D` 修改程序集依赖方向。
 
 状态规则：
 
@@ -195,6 +234,8 @@ Cliff: MAT_Cliff_Strata, MAT_Cliff_Fracture,
 - 合计最多 13 个共享材质槽/SetPass；
 - 合批器必须先以检查溢出的整数累计每个最终 Mesh 的实际顶点数，再确定性选择索引格式：不超过 `65,535` 个顶点使用 `UnityEngine.Rendering.IndexFormat.UInt16`，超过该阈值必须在写入三角形和 submesh 前设置为 `IndexFormat.UInt32`；默认 `64×48` 地图只要任一类别超过阈值就必须使用 `UInt32`；
 - 禁止依赖 Unity 的隐式索引格式、截断索引、回绕顶点，或为了规避 `UInt32` 而错误拆分材质 submesh；若目标平台不支持所需索引格式，必须让该类别事务失败并选择性恢复对应灰盒；
+- 不可读 FBX Mesh 的正式路径固定为 `Mesh.AcquireReadOnlyMeshData`；输出固定使用 `Mesh.AllocateWritableMeshData`，先调用 `SetVertexBufferParams` 与 `SetIndexBufferParams(indexCount, IndexFormat)`，写完后设置 `subMeshCount` 并通过 `SetSubMesh(SubMeshDescriptor)` 冻结每个材质范围，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。必须复制 Position、Normal、Tangent 和 UV0：Position 用完整 placement 矩阵变换；Normal 必须用该矩阵线性 `3×3` 部分的 inverse-transpose 变换并归一化，不能直接用非等比矩阵；Tangent.xyz 先用线性 `3×3` 变换，再相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。反射/负行列式矩阵不在批准校准内，遇到即失败，不能静默翻转 handedness。随后按源 submesh 的已批准材质角色归并并重算 Bounds；所有 `MeshDataArray`、`NativeArray`、临时 Mesh/GameObject 在成功、异常和平台拒绝分支均用 `finally` 释放；
+- `SystemInfo.supports32bitsIndexBuffer` 通过默认读取真实平台、测试可注入的只读 capability 提供；生产默认不得被测试覆盖，测试结束必须恢复注入。平台不支持 UInt32 时不得尝试写 buffer；
 - 零 Collider、Rigidbody、Animator 和常驻 `Update/LateUpdate`；
 - 不保留逐格 Prefab、临时 Mesh 或材质实例；
 - 64×48 seed `8128` 的布局与合批五次中位数目标不超过 100 ms；
@@ -236,14 +277,14 @@ Authoring 必须：
 1. Catalog/Profile：14 个稳定 ID、Prefab、FBX 和 13 个材质角色一一对应，重复/缺失/未知槽失败；
 2. 纯布局：Ruins 八变体、Cliff 六种邻接形态、旋转、扫描顺序和哈希确定性；
 3. Prefab 合同：对应 Mesh、贴地/朝向、无脚本/Collider/逐资产材质副本；
-4. 合批：placement 数与规则格一致，长期对象和 Renderer 不随格数增长，材质引用均为共享资产；合成夹具分别覆盖 `65,535` 顶点边界两侧，证明 `UInt16/UInt32` 选择发生在索引和 submesh 写入前，且顶点、索引和每个材质 submesh 均未截断或错位；
+4. 合批：placement 数与规则格一致，长期对象和 Renderer 不随格数增长，材质引用均为共享资产；合成夹具分别覆盖 `65,535` 顶点边界两侧，证明 `UInt16/UInt32` 选择发生在索引和 submesh 写入前，且顶点、索引和每个材质 submesh 均未截断或错位；另用批准的非等比 Cliff scale 夹具断言 Normal 等于 inverse-transpose 结果且单位化、Tangent 与新 Normal 正交且单位化、Tangent.w handedness 不变，并证明结果不同于错误的直接法线线性变换；
 5. 分类回退：注入 Ruins 或 Cliff 单独失败，证明只恢复对应稳定 ID，正式地表和另一类保持；
 6. 生命周期：重复 `TryPresent`、禁用/启用、世界重建、配置替换和销毁无残留、无重复对象；
 7. 场景/authoring：唯一 owner、精确 Profile 引用、运行时子对象未序列化、重复 authoring 幂等；
 8. PlayMode：真实 `GrayboxPrototype3D` 中两类几何与规则格逐项一致，城市移动/展开、A*、建造投影、资源节点和系统菜单不回归；
 9. 性能与 Player 构建：结构、300 帧分配、Profiler、Shader/Material 保留和独立程序日志。
 
-不得删除旧断言、放宽现有地表原子回退测试，或以直接调用内部可见性字段代替真实 presenter 生命周期测试。
+新增类型尚不存在时允许把 Unity 编译失败日志作为第一条 RED，但不得虚构 NUnit XML；希望保留结构化 XML 时，应先用反射或资产缺失断言建立可运行 RED。不得删除旧断言、放宽现有地表原子回退测试，或以直接调用内部可见性字段代替真实 presenter 生命周期测试。A*、建造、真实输入和系统菜单回归应复跑现有测试类，不在新测试中复制其判断规则。
 
 ## 13. 完整验收门
 
@@ -252,8 +293,8 @@ Authoring 必须：
 - focused EditMode 与正式场景 PlayMode 通过；
 - 日常完整 EditMode（排除 `TerrainAssetDeep`）与完整 PlayMode 通过；
 - Unity 无界面编译通过；
-- 默认 Release 3D、Development 3D 和 legacy 2D Windows 构建成功；
-- macOS Player 进行一次 3D 可见性冒烟，防止 `BUG-0005` 类 Shader 剥离回归；
+- 默认 Release 3D 必须通过 `WasteCity.Editor.FormalBuildTools.BuildWindows`，Development 3D 通过 `BuildWindowsGraybox3DDevelopment`，legacy 2D 通过 `BuildWindowsLegacy2D`；显式兼容入口 `BuildWindowsGraybox3D` 不能替代默认 Release 门；
+- 先以 TDD 为 `FormalBuildTools` 增加 `BuildMacOSGraybox3D`，固定只构建 `GrayboxPrototype3D` 到 `Builds/macOS/WasteCity.app`，临时选择 universal 架构并在成功、失败和下次恢复路径还原受保护设置；随后构建并启动 macOS Player 进行一次 3D 可见性冒烟，验证产物为 arm64+x86_64，防止 `BUG-0005` 类 Shader 剥离回归；
 - 能执行时补真实 Windows 10/11 独立程序至少 12 秒冒烟；不能执行时明确待补；
 - 64×48 默认 seed 与合成邻接夹具均满足结构和性能预算；
 - 文档生成、质量目录、复用目录和只读验证通过；
@@ -265,6 +306,8 @@ Authoring 必须：
 本里程碑不得修改地形源 PNG、其 importer 规则、`FirstArtTerrainAssetBuilder`、四个 Texture2DArray、数组层顺序、数组序列化或地表 Shader。新增的是 FBX 对应 Prefab、共享模型材质、确定性布局、合批和分组回退，因此只运行日常 EditMode 和相关美术/场景/PlayMode 测试，不运行 `TerrainAssetDeep`。
 
 如果实现中发现必须修改上述任一深度地形范围，立即停止、报告计划外边界并重新批准；获批后才改变测试调度。
+
+进入实现前建立 SHA-256 保护清单，完成后逐字节比较：14 个 FBX 与 14 个 `.fbx.meta`、28 个地形 PNG `.meta`、四个 Texture2DArray、`WasteCityFirstPassTerrain.shader`、`FirstArtTerrainAssetBuilder.cs`、`MAT_Terrain_FirstPass.mat`、`FirstArtTerrainProfile3D.asset`、`GrayboxURP.asset`、`ProjectSettings/GraphicsSettings.asset`、`ProjectSettings/QualitySettings.asset`、`ProjectSettings/ProjectSettings.asset`、`ProjectSettings/EditorBuildSettings.asset`、`Packages/manifest.json` 和 `Packages/packages-lock.json`。任何非本计划批准的变化都必须停止；现有工作区噪声不能被新提交吸收。
 
 ## 15. 明确排除与停止门
 
