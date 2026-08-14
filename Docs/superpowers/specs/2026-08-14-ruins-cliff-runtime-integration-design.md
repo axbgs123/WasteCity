@@ -91,6 +91,33 @@ Prefab 需要独立的表现稳定 ID；这些 ID 只用于映射、诊断和测
 
 数组顺序必须由上述常量表固定，不得依赖 `AssetDatabase.FindAssets`、目录枚举、Inspector 拖拽顺序或 Prefab 文件名排序。ID 必须通过现有 `StableId` 格式验证。
 
+Unity 2022.3.62f1 的只读导入预检进一步证明：14 个 FBX 的原始 Mesh subasset 不包含轴转换，轴转换保存在共同 imported root Transform。Catalog 因此必须为每项公开同一份冻结的 `SourceImportMatrix`，不能让 Builder 或 Geometry 猜测 Euler 角：
+
+```text
+SourceImportRotation quaternion = (-0.7071068, 0, 0, 0.7071067)
+SourceImportMatrix row-major =
+[ 1,  0,                  0,                  0 ]
+[ 0, -0.00000011920929,   0.99999994,         0 ]
+[ 0, -0.99999994,        -0.00000011920929,   0 ]
+[ 0,  0,                  0,                  1 ]
+```
+
+Catalog 的每项 `MaterialRoles` 必须按 Unity `MeshRenderer.sharedMaterials` 与 raw Mesh submesh 的实际索引顺序冻结，而不是按材料名称或 Blender/文档展示顺序重排：
+
+| 表现稳定 ID | Unity 导入后的 MaterialRoles / submesh 顺序 |
+|---|---|
+| `art.ruins.cracked-floor-slab` | `Aggregate, Concrete, DrainDark, Dust, DustFilm` |
+| `art.ruins.rubble-pile-a` | `Dust, Aggregate, Concrete` |
+| `art.ruins.rubble-pile-b` | `Aggregate, Concrete, Dust, Rust` |
+| `art.ruins.rebar-concrete-block` | `Aggregate, Concrete, DustFilm, Dust, Rust` |
+| `art.ruins.broken-pipe` | `Concrete, Aggregate, Rust, DrainDark, DustFilm, Dust` |
+| `art.ruins.drainage-channel` | `DrainDark, Aggregate, Concrete, Dust, DustFilm` |
+| `art.ruins.boundary-edge` | `Aggregate, DarkFloor, Concrete, DrainDark, Dust, DustFilm` |
+| `art.ruins.worn-marking-plate` | `Aggregate, DarkFloor, Marking, DrainDark, Concrete, Dust, DustFilm` |
+| Cliff 六件 | `Strata, Fracture, Dust, Rubble, Mineral` |
+
+其中七件 Ruins 的旧 Catalog 顺序与 Unity 真值不同，必须按上表纠偏；`broken-pipe` 与 Cliff 六件原顺序已一致。此处只纠正表现映射，不改变 13 个共享材质角色集合。
+
 ## 5. Prefab 与共享材质合同
 
 14 个 Prefab 放在各自 `Runtime/Prefabs/`，外部共享材质放在 `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/Geometry/`。FBX 本身及其 `.meta` 保持批准内容和 GUID 不变。
@@ -100,7 +127,7 @@ Prefab 合同：
 - 根对象名称与 Prefab 名一致；
 - 只允许 Transform、MeshFilter、MeshRenderer；不得包含 Collider、Rigidbody、Animator、脚本、灯光、相机或粒子；
 - Mesh 必须直接来自对应 FBX，不能复制或运行时修改源 Mesh；
-- Prefab 根可保存一次批准的贴地、朝向和视觉尺度校准；运行实例不得再随机缩放或镜像；
+- Prefab 必须镜像 Catalog 的完整零格、零 `quarterTurns` 合成矩阵 `T(childOffset) * S(rootScale) * SourceImportMatrix`，测试比较最终 `localToWorldMatrix`，不能只检查或猜测 Euler/scale 字段；运行实例不得再随机缩放或镜像；
 - `Y=0` 贴合数学地面，仅允许防 Z-fighting 的固定小正偏移；
 - 材质槽必须全部映射到批准的外部共享材质，不能保留自动生成的每-FBX材质副本。
 
@@ -159,32 +186,46 @@ Shader 至少提供 `UniversalForward` 与 `ShadowCaster`，若当前 URP 深度
 
 Cliff 位定义冻结为 `N=1, E=2, S=4, W=8`，Unity 本地轴为 `N=+Z, E=+X, Up=+Y`；从上往下看，正 `90° Y` 把本地 N 转到 E。标准 mask 为：`StraightA/B=10 (E+W)`、`InnerCorner/OuterCorner=9 (N+W)`、`EndCap=8 (W)`、`TopCap=15 (N+E+S+W)`。旋转查表冻结为：Straight `E|W=0°`, `N|S=90°`；Corner `N|W=0°`, `N|E=90°`, `E|S=180°`, `S|W=270°`；EndCap `W=0°`, `N=90°`, `E=180°`, `S=270°`；孤立或三/四邻接的 TopCap 为 `0°`。相邻两连接边之间的对角格只读取既有 `WorldTraversalKind.Cliff`：对角缺失选择 InnerCorner，对角存在选择 OuterCorner；不得创建第二套拓扑真值。
 
-哈希算法及盐值在纯 C# 常量中冻结；混合步骤使用显式 `unchecked uint` 回绕，或使用不会溢出的宽整数后确定性截断，不能依赖编译器默认溢出设置，也不能让正常坐标因 `checked` 乘法抛异常。placement 先保存整数格、模块索引和 `quarterTurns`，再与已经批准的校准矩阵组合；相同宽高与逐格规则内容必须产生完全相同的 placement 字段和矩阵。地图重建后只按新规则地图重算，不序列化布局。
+哈希算法及盐值在纯 C# 常量中冻结；混合步骤使用显式 `unchecked uint` 回绕，或使用不会溢出的宽整数后确定性截断，不能依赖编译器默认溢出设置，也不能让正常坐标因 `checked` 乘法抛异常。placement 先保存整数格、模块索引和 `quarterTurns`，再严格按 `T(cell) * Ry(quarterTurns) * T(childOffset) * S(rootScale) * SourceImportMatrix` 形成 `WorldMatrix`；共同 `SourceImportMatrix` 必须恰好消费一次。相同宽高与逐格规则内容必须产生完全相同的 placement 字段和矩阵。地图重建后只按新规则地图重算，不序列化布局。
 
 ### 7.3 代码前校准门
 
-只读校准证据位于 `/private/tmp/wastecity-ruins-cliff/calibration/README.md` 与 `/private/tmp/wastecity-ruins-cliff/calibration/calibration_matrix.json`；三张目视证据为同目录 `renders/cliff_cell_fit_top.png`、`renders/cliff_cell_fit_ortho.png`、`renders/cliff_uniform_vs_nonuniform.png`。校准使用 Blender 5.2.0 LTS 只读导入已提交的 14 个 FBX，没有修改 FBX、`.meta` 或正式资产。轴映射为 Blender `XY` 地面/`Z` 高到 Unity `XZ` 地面/`Y` 高；逻辑格为 `1.0`，根位于格中心，子 Mesh 的 XZ bounds 居中、最低 Y 贴到 `0`。
+离线比例与视觉证据位于 `/private/tmp/wastecity-ruins-cliff/calibration/README.md`、`calibration_matrix.json` 及同目录 `renders/cliff_cell_fit_top.png`、`renders/cliff_cell_fit_ortho.png`、`renders/cliff_uniform_vs_nonuniform.png`。这些证据继续批准 root scale、目标 size 和视觉比例，但旧 `calibration_matrix.json` 不再是 ChildOffset 权威：它在接入 Unity `SourceImportMatrix` 后使用了相反的水平符号。ChildOffset 的唯一权威改为下表及 Task 3.5 从 Unity raw Mesh bounds 生成的纠偏证据。所有校准和纠偏都只读已提交的 14 个 FBX，没有修改 FBX、`.meta` 或正式资产。
 
-以下数值直接冻结自 `calibration_matrix.json`。`scale` 与 `offset` 均按 Unity `X,Y,Z`；root 保持格中心，`offset` 是 root 下 FBX 子对象的本地位移。Ruins 只做不放大的等比缩放；Cliff 的 XZ 等比收进单格，Y 独立校准到 `0.90`，不修改源 Mesh。基础 Y 旋转均为 `0°`，最终 placement 再叠加上节冻结的 `quarterTurns`。
+下表的 root scale 与目标 size 沿用已批准的离线比例；ChildOffset 则从 Unity raw Mesh 先应用 `SourceImportMatrix`、再应用 `S(rootScale)` 后的 bounds 重新推导。水平分量严格为该 bounds center 的负值，Y 分量严格为使 min Y 回到 `0` 的正微偏移；因此 X/Z 是旧离线表数值取反，Y 保持并须由 raw bounds 复算验证。`scale` 与 `offset` 均按 Unity `X,Y,Z`；root 保持格中心。Ruins 只做不放大的等比缩放；Cliff 的 XZ 等比收进单格，Y 独立校准到 `0.90`，不修改源 Mesh。基础 Y 旋转均为 `0°`，最终 placement 再叠加上节冻结的 `quarterTurns`。
 
 | 表现稳定 ID | root scale X,Y,Z | child offset X,Y,Z | 校准后 bounds X×Y×Z |
 |---|---|---|---|
-| `art.ruins.boundary-edge` | `0.7438418620039455, 0.7438418620039455, 0.7438418620039455` | `0.011133320925701306, 0.00000004493711649645367, -0.005296984127656602` | `0.9×0.15491270551043693×0.541050134945314` |
-| `art.ruins.broken-pipe` | `0.9755163303025417, 0.9755163303025417, 0.9755163303025417` | `0.002470288718570525, 0.000000051493899180282064, 0.03244276854602628` | `0.9×0.6410873326965777×0.6970203244973145` |
-| `art.ruins.cracked-floor-slab` | `0.7366124449717444, 0.7366124449717444, 0.7366124449717444` | `0.005478553127634332, 0.00000005787199456683777, 0.03353046140802086` | `0.9×0.09877690067009585×0.7774924384932406` |
-| `art.ruins.drainage-channel` | `0.8181818004482052, 0.8181818004482052, 0.8181818004482052` | `0, 0.00000004321330399777432, -0.0056144607475787775` | `0.8999999999999999×0.1825753668205225×0.5192538062170677` |
-| `art.ruins.rebar-concrete-block` | `0.8568209086736785, 0.8568209086736785, 0.8568209086736785` | `-0.0696553438815491, 0.00000005883560678828004, -0.017981657006396753` | `0.9×0.3988768404107975×0.6862975108916366` |
-| `art.ruins.rubble-pile-a` | `0.9302806128327081, 0.9302806128327081, 0.9302806128327081` | `-0.00454897037899669, 0.00000006284143144611042, -0.02610424617700395` | `0.9×0.2321418093319265×0.7192274617189032` |
-| `art.ruins.rubble-pile-b` | `0.6434742705655297, 0.6434742705655297, 0.6434742705655297` | `-0.0014350361567941057, 0.00000003308043718022879, -0.00010610649404046166` | `0.9000000000000001×0.15982392782516824×0.405880371314985` |
-| `art.ruins.worn-marking-plate` | `0.8138665074093977, 0.8138665074093977, 0.8138665074093977` | `-0.00327274226679653, 0.00000005188448785272019, 0.01237233860783203` | `0.9×0.05490496914480248×0.661674071662537` |
-| `art.cliff.end-cap` | `0.36991012107980137, 0.6003284343832568, 0.36991012107980137` | `0.010333405521301657, 0.000000050116234443793, 0.05523510290215231` | `0.9×0.9×0.48955793525425195` |
-| `art.cliff.inner-corner` | `0.33295705133593456, 0.5994717484516436, 0.33295705133593456` | `0.007434509565184104, 0.0000001335870600587246, -0.09329747471624714` | `0.9×0.9×0.724235948234779` |
-| `art.cliff.outer-corner` | `0.39109889207039356, 0.59674880365643, 0.39109889207039356` | `0.1157214599366119, 0.000000134027025689591, -0.0891520673972466` | `0.8677860067279551×0.9×0.9` |
-| `art.cliff.straight-a` | `0.32663329905659955, 0.6002462920829474, 0.32663329905659955` | `0.0016203349578728444, 0.00000005050754956264051, 0.0476678239679167` | `0.9×0.9×0.4327326771259738` |
-| `art.cliff.straight-b` | `0.3322727185105163, 0.5965491125303924, 0.3322727185105163` | `0.010047114768375274, 0.00000005090342182921911, 0.05238271282516175` | `0.9×0.9×0.45282165758321463` |
-| `art.cliff.top-cap` | `0.3274945334777423, 0.6001636951606902, 0.3274945334777423` | `-0.0049633219867498655, 0.00000011846357050606037, 0.053226165581228134` | `0.858200781085434×0.8999999999999999×0.9000000000000001` |
+| `art.ruins.boundary-edge` | `0.7438418620039455, 0.7438418620039455, 0.7438418620039455` | `-0.011133320925701306, 0.00000004493711649645367, 0.005296984127656602` | `0.9×0.15491270551043693×0.541050134945314` |
+| `art.ruins.broken-pipe` | `0.9755163303025417, 0.9755163303025417, 0.9755163303025417` | `-0.002470288718570525, 0.000000051493899180282064, -0.03244276854602628` | `0.9×0.6410873326965777×0.6970203244973145` |
+| `art.ruins.cracked-floor-slab` | `0.7366124449717444, 0.7366124449717444, 0.7366124449717444` | `-0.005478553127634332, 0.00000005787199456683777, -0.03353046140802086` | `0.9×0.09877690067009585×0.7774924384932406` |
+| `art.ruins.drainage-channel` | `0.8181818004482052, 0.8181818004482052, 0.8181818004482052` | `0, 0.00000004321330399777432, 0.0056144607475787775` | `0.8999999999999999×0.1825753668205225×0.5192538062170677` |
+| `art.ruins.rebar-concrete-block` | `0.8568209086736785, 0.8568209086736785, 0.8568209086736785` | `0.0696553438815491, 0.00000005883560678828004, 0.017981657006396753` | `0.9×0.3988768404107975×0.6862975108916366` |
+| `art.ruins.rubble-pile-a` | `0.9302806128327081, 0.9302806128327081, 0.9302806128327081` | `0.00454897037899669, 0.00000006284143144611042, 0.02610424617700395` | `0.9×0.2321418093319265×0.7192274617189032` |
+| `art.ruins.rubble-pile-b` | `0.6434742705655297, 0.6434742705655297, 0.6434742705655297` | `0.0014350361567941057, 0.00000003308043718022879, 0.00010610649404046166` | `0.9000000000000001×0.15982392782516824×0.405880371314985` |
+| `art.ruins.worn-marking-plate` | `0.8138665074093977, 0.8138665074093977, 0.8138665074093977` | `0.00327274226679653, 0.00000005188448785272019, -0.01237233860783203` | `0.9×0.05490496914480248×0.661674071662537` |
+| `art.cliff.end-cap` | `0.36991012107980137, 0.6003284343832568, 0.36991012107980137` | `-0.010333405521301657, 0.000000050116234443793, -0.05523510290215231` | `0.9×0.9×0.48955793525425195` |
+| `art.cliff.inner-corner` | `0.33295705133593456, 0.5994717484516436, 0.33295705133593456` | `-0.007434509565184104, 0.0000001335870600587246, 0.09329747471624714` | `0.9×0.9×0.724235948234779` |
+| `art.cliff.outer-corner` | `0.39109889207039356, 0.59674880365643, 0.39109889207039356` | `-0.1157214599366119, 0.000000134027025689591, 0.0891520673972466` | `0.8677860067279551×0.9×0.9` |
+| `art.cliff.straight-a` | `0.32663329905659955, 0.6002462920829474, 0.32663329905659955` | `-0.0016203349578728444, 0.00000005050754956264051, -0.0476678239679167` | `0.9×0.9×0.4327326771259738` |
+| `art.cliff.straight-b` | `0.3322727185105163, 0.5965491125303924, 0.3322727185105163` | `-0.010047114768375274, 0.00000005090342182921911, -0.05238271282516175` | `0.9×0.9×0.45282165758321463` |
+| `art.cliff.top-cap` | `0.3274945334777423, 0.6001636951606902, 0.3274945334777423` | `0.0049633219867498655, 0.00000011846357050606037, -0.053226165581228134` | `0.858200781085434×0.8999999999999999×0.9000000000000001` |
 
-全部 14 件校准后 X/Z extent 都不超过 `0.90`，最低 Y 为 `0`；Cliff 高度为 `0.90`。主代理已目视顶视、倾斜正交和等比/非等比对照图，接受其作为首版接入矩阵。Cliff 的 Y/XZ 比相对源模型提高约 `1.53–1.84×`，因此 Unity 首版仍必须保留默认倾斜正交镜头视觉门：若出现拓扑不可读、triplanar 明显拉伸或任何 X/Z extent 超过 `0.90`，立即停止，不能放宽玩法格、复制规则或用 Collider 绕过；需要时另行批准“可控视觉重叠”或“多格模块”。
+全部 14 件校准后 X/Z extent 都不超过 `0.90`，最终 `abs(bounds.center.x)` 与 `abs(bounds.center.z)` 均须 `<=2e-7`，最低 Y 与 `0` 的误差须 `<=2e-7`；Cliff 高度为 `0.90`。主代理已目视顶视、倾斜正交和等比/非等比对照图，接受其作为首版接入比例；纠偏后的居中数值仍须由 Unity 机器证据闭合。Cliff 的 Y/XZ 比相对源模型提高约 `1.53–1.84×`，因此 Unity 首版仍必须保留默认倾斜正交镜头视觉门：若出现拓扑不可读、triplanar 明显拉伸或任何 X/Z extent 超过 `0.90`，立即停止，不能放宽玩法格、复制规则或用 Collider 绕过；需要时另行批准“可控视觉重叠”或“多格模块”。
+
+### 7.4 Unity 导入真值纠偏门
+
+Task 4 的首轮 RED 后，Unity 导入预检暴露了 Blender 离线校准没有表达的运行时边界。证据冻结在 `/private/tmp/wastecity-ruins-cliff/task4-import-transform-preflight.md`、`.json`、`task4-slot-preflight.md`、`.json` 及对应 raw logs；证据 HEAD 为 `756f4d3678d6de6df91819d795405e2b1ed12ac0`。当时 14 个 FBX 均为一个 imported root、一个 MeshFilter、一个 MeshRenderer，未发布 Material/Prefab/Profile，事务 marker 不存在；现有 Task 4 RED XML/log 必须保留，不能改写为通过。
+
+纠偏权威如下：
+
+1. 14 件共同 imported root 为 position `(0,0,0)`、上述精确 quaternion、scale `(1,1,1)`；raw Mesh bounds 仍是 Blender `XY` 地面/`Z` 高，轴转换不在 raw Mesh 内；
+2. Catalog 同时冻结 `SourceImportMatrix`、每项 root scale/child offset 和按 Unity 实际 submesh 索引排序的 `MaterialRoles`；ChildOffset 必须由 raw Mesh 依次应用 `SourceImportMatrix`、`S(rootScale)` 后的 bounds 推导为 `(-center.x, -minY, -center.z)`，不得复用旧离线表的水平符号；
+3. Layout 是正式运行时矩阵的唯一组合者，严格生成 `T(cell) * Ry * T(childOffset) * S(rootScale) * SourceImportMatrix`，不接受已含导入矩阵的输入；
+4. Builder 只验证 imported root 矩阵、实际槽序和组合后 bounds，并把零格/零旋转的完整组合镜像进 mesh-only Prefab；
+5. Geometry 从 Prefab 只读取 raw `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform，然后只应用已经完整的 placement `WorldMatrix`。若再乘 Prefab Transform 会重复消费校准和导入矩阵，必须由测试阻止。
+
+纠偏前暂停 Task 4，不运行 Builder、不发布资产。Catalog/Layout 的纠偏必须先经历独立 RED、最小 GREEN并输出 `/private/tmp/wastecity-ruins-cliff/task3-5-corrected-calibration.json`、独立审查、提交和普通 push；JSON 必须逐件记录 raw bounds、SourceImportMatrix、root scale、推导出的 ChildOffset、最终 center/minY/size 和判定阈值。旧符号、缺乘或双乘 import matrix 的结果均必须失败。远端同步后才能从现有 Task 4 RED 恢复。本门不授权修改 FBX、`.fbx.meta`、ModelImporter、schema `30`、冻结 2D 或任何玩法真值。
 
 ## 8. 表现与玩法真值隔离
 
@@ -234,7 +275,7 @@ Cliff 位定义冻结为 `N=1, E=2, S=4, W=8`，Unity 本地轴为 `N=+Z, E=+X, 
 - 合计最多 13 个共享材质槽/SetPass；
 - 合批器必须先以检查溢出的整数累计每个最终 Mesh 的实际顶点数，再确定性选择索引格式：不超过 `65,535` 个顶点使用 `UnityEngine.Rendering.IndexFormat.UInt16`，超过该阈值必须在写入三角形和 submesh 前设置为 `IndexFormat.UInt32`；默认 `64×48` 地图只要任一类别超过阈值就必须使用 `UInt32`；
 - 禁止依赖 Unity 的隐式索引格式、截断索引、回绕顶点，或为了规避 `UInt32` 而错误拆分材质 submesh；若目标平台不支持所需索引格式，必须让该类别事务失败并选择性恢复对应灰盒；
-- 不可读 FBX Mesh 的正式路径固定为 `Mesh.AcquireReadOnlyMeshData`；输出固定使用 `Mesh.AllocateWritableMeshData`，先调用 `SetVertexBufferParams` 与 `SetIndexBufferParams(indexCount, IndexFormat)`，写完后设置 `subMeshCount` 并通过 `SetSubMesh(SubMeshDescriptor)` 冻结每个材质范围，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。必须复制 Position、Normal、Tangent 和 UV0：Position 用完整 placement 矩阵变换；Normal 必须用该矩阵线性 `3×3` 部分的 inverse-transpose 变换并归一化，不能直接用非等比矩阵；Tangent.xyz 先用线性 `3×3` 变换，再相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。反射/负行列式矩阵不在批准校准内，遇到即失败，不能静默翻转 handedness。随后按源 submesh 的已批准材质角色归并并重算 Bounds；所有 `MeshDataArray`、`NativeArray`、临时 Mesh/GameObject 在成功、异常和平台拒绝分支均用 `finally` 释放；
+- Geometry 从 Prefab 只读取 raw `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，不读取或相乘 Prefab Transform；不可读 raw Mesh 的正式路径固定为 `Mesh.AcquireReadOnlyMeshData`。输出固定使用 `Mesh.AllocateWritableMeshData`，先调用 `SetVertexBufferParams` 与 `SetIndexBufferParams(indexCount, IndexFormat)`，写完后设置 `subMeshCount` 并通过 `SetSubMesh(SubMeshDescriptor)` 冻结每个材质范围，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。必须复制 Position、Normal、Tangent 和 UV0：Position 用已包含 `SourceImportMatrix` 的完整 placement 矩阵变换；Normal 必须用该矩阵线性 `3×3` 部分的 inverse-transpose 变换并归一化，不能直接用非等比矩阵；Tangent.xyz 先用线性 `3×3` 变换，再相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。反射/负行列式矩阵不在批准校准内，遇到即失败，不能静默翻转 handedness。随后按源 submesh 的已批准材质角色归并并重算 Bounds；所有 `MeshDataArray`、`NativeArray`、临时 Mesh/GameObject 在成功、异常和平台拒绝分支均用 `finally` 释放；
 - `SystemInfo.supports32bitsIndexBuffer` 通过默认读取真实平台、测试可注入的只读 capability 提供；生产默认不得被测试覆盖，测试结束必须恢复注入。平台不支持 UInt32 时不得尝试写 buffer；
 - 零 Collider、Rigidbody、Animator 和常驻 `Update/LateUpdate`；
 - 不保留逐格 Prefab、临时 Mesh 或材质实例；
@@ -277,7 +318,7 @@ Authoring 必须：
 1. Catalog/Profile：14 个稳定 ID、Prefab、FBX 和 13 个材质角色一一对应，重复/缺失/未知槽失败；
 2. 纯布局：Ruins 八变体、Cliff 六种邻接形态、旋转、扫描顺序和哈希确定性；
 3. Prefab 合同：对应 Mesh、贴地/朝向、无脚本/Collider/逐资产材质副本；
-4. 合批：placement 数与规则格一致，长期对象和 Renderer 不随格数增长，材质引用均为共享资产；合成夹具分别覆盖 `65,535` 顶点边界两侧，证明 `UInt16/UInt32` 选择发生在索引和 submesh 写入前，且顶点、索引和每个材质 submesh 均未截断或错位；另用批准的非等比 Cliff scale 夹具断言 Normal 等于 inverse-transpose 结果且单位化、Tangent 与新 Normal 正交且单位化、Tangent.w handedness 不变，并证明结果不同于错误的直接法线线性变换；
+4. 合批：placement 数与规则格一致，长期对象和 Renderer 不随格数增长，材质引用均为共享资产；合成夹具分别覆盖 `65,535` 顶点边界两侧，证明 `UInt16/UInt32` 选择发生在索引和 submesh 写入前，且顶点、索引和每个材质 submesh 均未截断或错位；另用批准的非等比 Cliff scale 夹具断言 Normal 等于 inverse-transpose 结果且单位化、Tangent 与新 Normal 正交且单位化、Tangent.w handedness 不变，并证明结果不同于错误的直接法线线性变换；用带非 identity Prefab Transform 的夹具证明 Geometry 只应用 placement，一旦额外相乘 Prefab Transform 测试必须失败；
 5. 分类回退：注入 Ruins 或 Cliff 单独失败，证明只恢复对应稳定 ID，正式地表和另一类保持；
 6. 生命周期：重复 `TryPresent`、禁用/启用、世界重建、配置替换和销毁无残留、无重复对象；
 7. 场景/authoring：唯一 owner、精确 Profile 引用、运行时子对象未序列化、重复 authoring 幂等；

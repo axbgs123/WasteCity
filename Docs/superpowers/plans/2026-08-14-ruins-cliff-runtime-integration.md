@@ -67,9 +67,9 @@ git diff --cached --name-only
 
 **Gate C — approved model calibration**
 
-校准证据固定在 `$WASTECITY_EVIDENCE/calibration/README.md`、`calibration_matrix.json` 与 `renders/` 三张对照图；校准过程只读 14 个 FBX/importer 和批准记录，没有修改 FBX、`.meta`、Prefab 或正式场景。精确的 14 件 root scale、child offset、校准后 bounds、Ruins 基础朝向和 Cliff mask/连接/旋转表以权威规格第 7.1–7.3 节为唯一实施输入，代码和 Builder 不再持有任何校准占位或推导规则。
+离线比例与视觉证据固定在 `$WASTECITY_EVIDENCE/calibration/README.md`、`calibration_matrix.json` 与 `renders/` 三张对照图；它们继续批准 root scale、目标 size 和视觉比例，但旧 JSON 不再拥有 ChildOffset 权威。Task 3.5 必须以 Unity raw Mesh 经 `SourceImportMatrix` 和 root scale 后的 bounds 推导纠偏 ChildOffset，并输出 `$WASTECITY_EVIDENCE/task3-5-corrected-calibration.json`。最终精确矩阵、Ruins 基础朝向和 Cliff mask/连接/旋转表以权威规格第 7.1–7.4 节为唯一实施输入。全过程只读 14 个 FBX/importer 和批准记录，不修改 FBX、`.meta`、Prefab 或正式场景。
 
-校准结论为：root 位于 `1.0` 逻辑格中心，子 Mesh 最低 Y 贴 `0`；全部 X/Z extent `<=0.90`，Ruins 仅等比缩小，Cliff XZ 等比缩入单格且 Y 独立校准为 `0.90`。Ruins 无连接语义，以 FBX `0°` 为基础再叠加布局 `quarterTurns`；Cliff 冻结 `N=1,E=2,S=4,W=8`、标准 mask、四向旋转表，并以两臂间对角 Cliff 格的缺失/存在分别选择 Inner/Outer Corner。主代理已目视顶视、倾斜正交及等比/非等比对照图，接受首版接入矩阵。
+校准目标与进入实现门槛为：root 位于 `1.0` 逻辑格中心，子 Mesh 最低 Y 贴 `0`；全部 X/Z extent `<=0.90`，Ruins 仅等比缩小，Cliff XZ 等比缩入单格且 Y 独立校准为 `0.90`。Ruins 无连接语义，以 FBX `0°` 为基础再叠加布局 `quarterTurns`；Cliff 冻结 `N=1,E=2,S=4,W=8`、标准 mask、四向旋转表，并以两臂间对角 Cliff 格的缺失/存在分别选择 Inner/Outer Corner。主代理已目视并接受首版比例与轮廓；最终居中/贴地仍必须由 Task 3.5 纠偏 JSON 闭合，不能把旧 offset 当成已通过。
 
 Unity 接入仍保留视觉停止门：若默认倾斜正交镜头下出现拓扑不可读、triplanar 明显拉伸或任何 X/Z extent 超过 `0.90`，立即停止并提交“可控视觉重叠”或“多格模块”设计供用户另行批准；不能放宽玩法格、复制规则或用 Collider 绕过。
 
@@ -91,7 +91,7 @@ Task 0 的 RED 是计划 B 尚未回填规格提交 A 的真实 SHA、失真的�
 
 **Interfaces**
 
-- `FirstArtRuinsCliffCatalog3D` 固定 14 个表现稳定 ID、FBX 路径、Prefab 路径、类别、模块语义及 13 个材质角色；顺序不得来自目录或 Inspector。
+- `FirstArtRuinsCliffCatalog3D` 固定 14 个表现稳定 ID、FBX 路径、Prefab 路径、类别、模块语义、root scale/child offset、14 件共同的 `SourceImportMatrix` 及每项按 Unity raw Mesh submesh 索引排列的 `MaterialRoles`；顺序不得来自目录或 Inspector。共同矩阵冻结为 quaternion `(-0.7071068,0,0,0.7071067)` 对应的规格第 4 节 row-major 矩阵；ChildOffset 冻结为 raw Mesh 先乘 import matrix、再乘 root scale 后 bounds 的 `(-center.x, -minY, -center.z)`，不能沿用旧离线表的 X/Z 符号。
 - `FirstArtRuinsCliffProfile3D` 序列化 14 个 Prefab、13 个 Material 和模块 Shader，提供 `TryValidate(out string error)`；重复、缺失、未知槽、错误名称或跨类别引用必须失败。
 - Profile 不保存地图、seed、规则格、Collider 或存档数据。
 
@@ -105,7 +105,7 @@ Task 0 的 RED 是计划 B 尚未回填规格提交 A 的真实 SHA、失真的�
   -logFile "$WASTECITY_EVIDENCE/task1-red.log"
 ```
 
-优先用反射检查新类型/固定映射不存在，使 RED 仍能产出 NUnit XML；如果测试必须直接引用尚不存在的类型，则把 Unity 编译失败日志保存为 RED，并明确记录“无有效 XML”，不得伪造测试计数。随后实现最小常量表和纯验证。GREEN 使用相同过滤器，输出 `task1-green.xml/log`。确认没有 FBX/meta 差异。
+优先用反射检查新类型/固定映射不存在，使 RED 仍能产出 NUnit XML；如果测试必须直接引用尚不存在的类型，则把 Unity 编译失败日志保存为 RED，并明确记录“无有效 XML”，不得伪造测试计数。随后实现最小常量表和纯验证。测试除固定表外，还必须用 `AssetDatabase` 只读加载 14 个 FBX，断言 imported root 矩阵、raw Mesh/submesh 数和 `renderer.sharedMaterials` 顺序与 Catalog 一致；其中七个 Ruins 槽序按规格第 4 节 Unity 预检真值纠正。GREEN 使用相同过滤器，输出 `task1-green.xml/log`。确认没有 FBX/meta/importer 差异。
 
 **Commit:** `feat: define ruins cliff art catalog`
 
@@ -159,7 +159,7 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
 - `Project(WorldMapModel, PlanarCoordinateMapper3D)` 按 `y` 后 `x` 返回只读 placement 序列；placement 含类别、Catalog 索引、格坐标、世界矩阵和四邻 mask。
 - 固定 `unchecked uint` 回绕哈希及盐；或使用无溢出的宽整数并确定性截断。不得依赖编译器默认 overflow，也不得使用 `UnityEngine.Random`、时间、相机、文件顺序或 PlayerPrefs。
 - Ruins 每格恰好一个、八变体均可达；Cliff 严格执行 0/1/相对2/相邻2/3/4 邻居模块表和四向旋转。
-- placement 保存整数格、Catalog 索引、邻接 mask 和 `quarterTurns`，再组合 Task 0 已批准的 root calibration matrix；任何校准占位未闭合时本任务立即停止。
+- placement 保存整数格、Catalog 索引、邻接 mask 和 `quarterTurns`，并严格组合 `T(cell) * Ry(quarterTurns) * T(childOffset) * S(rootScale) * SourceImportMatrix`；共同 import matrix 恰好消费一次，任何校准/导入矩阵占位未闭合时本任务立即停止。
 
 **RED / GREEN**
 
@@ -171,11 +171,64 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
   -logFile "$WASTECITY_EVIDENCE/task3-red.log"
 ```
 
-夹具冻结六种 Cliff 拓扑、Ruins 八变体、扫描顺序、旋转、同图字节一致、不同规则图变化，以及默认 seed `8128` 的 Ruins/Cliff 数量。GREEN 输出 `task3-green.xml/log`，并证明投影前后所有 `WorldCell` 逐字段一致。
+夹具冻结六种 Cliff 拓扑、Ruins 八变体、扫描顺序、旋转、同图字节一致、不同规则图变化，以及默认 seed `8128` 的 Ruins/Cliff 数量；矩阵断言必须包含共同 `SourceImportMatrix`，并用 raw Mesh 顶点/Bounds 证明缺乘和双乘都失败。GREEN 输出 `task3-green.xml/log`，并证明投影前后所有 `WorldCell` 逐字段一致。
 
 **Commit:** `feat: project deterministic ruins cliff layout`
 
 主代理审查：无第二套地图、无玩法写入、单格停止门可观测。
+
+---
+
+## Task 3.5: Corrective Unity Import Truth Gate
+
+**触发与停止状态**
+
+Task 4 首轮 RED 已真实执行并保存在 `$WASTECITY_EVIDENCE/task4-red.xml` 与 `task4-red.log`：5 个资产合同测试按预期全部失败。后续只读预检在 HEAD `756f4d3678d6de6df91819d795405e2b1ed12ac0` 暴露 imported root 轴转换未进入 Catalog/Layout，以及七个 Ruins 的 Catalog 槽序与 Unity submesh 顺序不一致。证据为：
+
+- `$WASTECITY_EVIDENCE/task4-import-transform-preflight.md`
+- `$WASTECITY_EVIDENCE/task4-import-transform-preflight.json`
+- `$WASTECITY_EVIDENCE/task4-slot-preflight.md`
+- `$WASTECITY_EVIDENCE/task4-slot-preflight.json`
+- 对应 `task4-import-transform-preflight.log`、`task4-slot-preflight.log`
+
+当次运行未发布 Material/Prefab/Profile，事务 marker 不存在。立即暂停 Task 4；已存在的 Task 4 RED、未跟踪 Builder/Shader/测试草稿和外部证据均不得删除、改写成 GREEN 或提前纳入纠偏提交。
+
+**Files**
+
+- Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtRuinsCliffCatalogProfileTests.cs`
+- Modify: `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`
+- Modify: `Assets/_Game/Tests/EditMode/FirstArtRuinsCliffLayoutTests.cs`
+- Evidence only outside repository: 上述 preflight、新的 `task3-5-*.xml/log` 与 `$WASTECITY_EVIDENCE/task3-5-corrected-calibration.json`
+
+**Corrective contract**
+
+- Catalog 新增并冻结共同 `SourceImportMatrix`：quaternion `(-0.7071068,0,0,0.7071067)`，精确 row-major 数值引用权威规格第 4 节；禁止硬编码猜测 `-90°` Euler。
+- 按权威规格第 4 节把七个 Ruins 的 `MaterialRoles` 改为 Unity `renderer.sharedMaterials` / raw Mesh submesh 实际顺序；`broken-pipe` 与 Cliff 六件保持已正确顺序。
+- 对每件 raw Mesh 先应用 `SourceImportMatrix`、再应用 `S(rootScale)` 计算 bounds；Catalog ChildOffset 严格冻结为 `(-center.x, -minY, -center.z)`。这使规格 14 行的 X/Z 等于旧离线表数值取反，Y 保留使 min Y 为零的正微偏移并由 raw bounds 复算；旧 `calibration_matrix.json` 不再是 offset 权威。
+- Layout 的唯一正式组合为 `T(cell) * Ry(quarterTurns) * T(childOffset) * S(rootScale) * SourceImportMatrix`，import matrix 只消费一次。
+- Catalog EditMode 测试只读 14 个 Unity FBX imported roots，冻结共同位置/四元数/scale、raw Mesh/submesh 与实际 renderer 槽序；Layout 测试冻结完整矩阵和校准后 bounds，逐件断言 `abs(finalBounds.center.x/z)<=2e-7`、`abs(finalBounds.min.y)<=2e-7` 且 size 与规格目标逐轴误差 `<=2e-7`，并让遗漏 import matrix、双乘 import matrix、使用旧 ChildOffset 水平符号三类实现都失败。
+- GREEN 测试原子写入 `$WASTECITY_EVIDENCE/task3-5-corrected-calibration.json`；JSON 顶层记录 Unity/HEAD/容差/共同 import quaternion 和 matrix，每个 entry 记录 stable ID、raw center/size、root scale、derived ChildOffset、final center/minY/size、expected size 与逐项 pass。缺少任一 entry、非有限数、阈值失败或写出半份文件均视为 GREEN 失败。
+- 不修改 FBX、`.fbx.meta`、ModelImporter、schema `30`、冻结 2D、Prefab/Material/Profile 或任何玩法/存档真值。
+
+**RED / GREEN / review**
+
+先只改测试，保存能归因于旧 Catalog/Layout 的 RED；RED 阶段把输出指向独立临时路径，不能覆盖最终纠偏证据：
+
+```bash
+export WASTECITY_RUINS_CLIFF_CORRECTED_CALIBRATION="$WASTECITY_EVIDENCE/task3-5-corrected-calibration-red.json"
+"$WASTECITY_UNITY" -batchmode -projectPath "$WASTECITY_PROJECT" \
+  -runTests -testPlatform EditMode \
+  -testFilter 'WasteCity.Tests.FirstArtRuinsCliffCatalogProfileTests|WasteCity.Tests.FirstArtRuinsCliffLayoutTests' \
+  -testResults "$WASTECITY_EVIDENCE/task3-5-red.xml" \
+  -logFile "$WASTECITY_EVIDENCE/task3-5-red.log"
+```
+
+再最小修改 Catalog/Layout，把 `WASTECITY_RUINS_CLIFF_CORRECTED_CALIBRATION` 改为 `$WASTECITY_EVIDENCE/task3-5-corrected-calibration.json`，使用同一过滤器输出 `task3-5-green.xml/log`；验证最终 JSON 的 14 个 entry 和全部 pass 后，复跑各自完整 Task 1/Task 3 focused tests，比较完整受保护 SHA 清单。由独立代理复审 offset 推导和符号、矩阵乘法方向、七个槽序、旧符号/缺乘/双乘 fixture、机器证据、代码/测试 diff 和 FBX/meta/importer 零变化。
+
+**Commit:** `fix: align ruins cliff catalog with unity import truth`
+
+只暂存上述四个文件，普通 push 后证明本提交 HEAD 与 `origin/codex/3d-usability-followup` 同步；主代理确认独立审查和保护清单通过后，才能回到现有 Task 4 RED 继续实现。
 
 ---
 
@@ -197,9 +250,9 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
 
 **Builder Contract**
 
-- 先预检全部 FBX/槽名/Shader、输出路径冲突和 Task 0 校准表，再在仓库内固定 staging 目录准备但不引用正式场景；验证全部 staging 资产成功后才按 Catalog 固定顺序发布。
+- 先预检全部 FBX/槽名/Shader、输出路径冲突和 Task 0/3.5 校准真值，再在仓库内固定 staging 目录准备但不引用正式场景；验证全部 staging 资产成功后才按 Catalog 固定顺序发布。每个 FBX 必须验证唯一 imported root 的 position `(0,0,0)`、共同精确 quaternion/`SourceImportMatrix`、scale `(1,1,1)`、MeshFilter/Renderer 位于该 root、raw Mesh submesh 数与 `renderer.sharedMaterials` 顺序逐项匹配 Catalog；再从 raw bounds 独立复算 ChildOffset，并用完整组合逐项验证 `abs(finalBounds.center.x/z)<=2e-7`、`abs(finalBounds.min.y)<=2e-7`、size 与纠偏证据误差 `<=2e-7`。任一不符在 mutation 前失败。
 - Builder 实现显式跨资产事务：首次创建通过 staging asset 连同 `.meta` 的 `AssetDatabase.MoveAsset` 发布；更新已有资产时先在 `Library/WasteCity.RuinsCliffAssetRestore/` 保存逐字节内容、GUID/路径清单和恢复 marker，再用保持既有 `.meta`/GUID 的序列化更新。任一 publish/save/reimport/最终验证失败时按逆序 rollback；编辑器下次初始化先恢复遗留 marker。成功后删除 marker/备份。连续重跑不得改变 Prefab/Material/Profile GUID 或字节。
-- Prefab 仅 Transform/MeshFilter/MeshRenderer，Mesh 直接引用对应 FBX，零 Collider/Rigidbody/脚本；全部槽映射到 13 个共享 Material。
+- Prefab 仅 Transform/MeshFilter/MeshRenderer，Mesh 直接引用对应 FBX raw Mesh，零 Collider/Rigidbody/脚本；全部槽按 Catalog 的 Unity 实际 submesh 顺序映射到 13 个共享 Material。Prefab 在 cell 原点、零 `quarterTurns` 时必须镜像完整 `T(childOffset) * S(rootScale) * SourceImportMatrix`，以最终 `localToWorldMatrix` 比较为准，不能只复制 imported root rotation 或只写 cell-fit scale。
 - 新 Shader 名冻结为 `WasteCity/Terrain/FirstPassGeometry`，属性冻结为 `_BaseColorArray`、`_NormalArray`、`_MaskArray`、`_HeightArray`、`_LayerIndex`、`_TriplanarScale` 与角色 tint/PBR 参数。Ruins 材质 `_LayerIndex=4`，Cliff 材质 `_LayerIndex=6`，不得由实例覆盖。
 - Shader 使用 URP 正式 PBR 路径，至少包含 `UniversalForward` 和 `ShadowCaster`，当前 URP 深度路径需要时增加 `DepthOnly`。三平面采样必须按法线权重混合，并对 Tangent Space Normal 的 X/Y/Z 投影做轴重定向与符号修正；不得使用逐格 UV、相机空间或地表控制图。
 - 13 个共享 Material 只配置角色色调与 PBR 参数，共享新 Shader 和既有数组引用；不得复制纹理、生成每-Prefab贴图或引用 FBX 内嵌材质。
@@ -226,7 +279,7 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
   -logFile "$WASTECITY_EVIDENCE/task4-build-assets.log"
 ```
 
-连续执行两次，比较 GUID/hash，再重跑 focused test 为 GREEN。测试冻结 Shader 名/属性/Pass、Ruins/Cliff 层号、13 个材质仅保存角色参数/既有数组引用，以及全部 Prefab 不引用 FBX 内嵌材质；另在固定相机和光照下把水平面与两个正交垂直面渲染到 RenderTexture，断言垂直面存在非退化二维变化且不是 XZ 投影的常量拉伸。Shader 源字符串断言只作补充，不能代替编译和像素证据。注入每个 publish 阶段失败，证明 rollback 和下次启动 recovery 保持既有 GUID/字节且无半套资产。不得运行 `TerrainAssetDeep`。
+连续执行两次，比较 GUID/hash，再重跑 focused test 为 GREEN。测试冻结 Shader 名/属性/Pass、Ruins/Cliff 层号、13 个材质仅保存角色参数/既有数组引用，以及全部 Prefab 不引用 FBX 内嵌材质；逐项断言 imported root matrix、实际 slot/submesh 顺序、raw bounds、完整 Prefab 合成矩阵、最终 center/minY/size，防止旧 offset 符号、只乘 cell-fit 或只乘 import matrix。另在固定相机和光照下把水平面与两个正交垂直面渲染到 RenderTexture，断言垂直面存在非退化二维变化且不是 XZ 投影的常量拉伸。Shader 源字符串断言只作补充，不能代替编译和像素证据。注入每个 publish 阶段失败，证明 rollback 和下次启动 recovery 保持既有 GUID/字节且无半套资产。不得运行 `TerrainAssetDeep`。
 
 **Commit:** `art: build ruins cliff runtime assets`
 
@@ -244,9 +297,9 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
 **Interfaces**
 
 - 类别级 `TryBuild(profile, placements, parent, out CategoryGeometry, out error)`；只在成功后返回拥有的 Mesh/GameObject。
-- 使用 `Mesh.AcquireReadOnlyMeshData` 读取不可读 FBX Mesh；输出使用 `Mesh.AllocateWritableMeshData`，不修改 importer/readability。
+- 从 Prefab 只取得 `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform；使用 `Mesh.AcquireReadOnlyMeshData` 读取该 raw FBX Mesh。输出使用 `Mesh.AllocateWritableMeshData`，不修改 importer/readability。
 - 每类先以 `checked long` 累计实际顶点/索引并验证能安全转换到 Unity 接受的 `int`。在 writable `MeshData` 上先调用 `SetVertexBufferParams` 和 `SetIndexBufferParams(indexCount, IndexFormat)`：`<= 65,535` 个顶点显式使用 `UInt16`，`> 65,535` 显式使用 `UInt32`；随后才写 buffer、设置 `subMeshCount` 并对每个角色调用 `SetSubMesh(SubMeshDescriptor)`，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。
-- 明确复制和变换 Position、Normal、Tangent、UV0；Position 使用完整 placement 矩阵，Normal 使用线性 `3×3` 的 inverse-transpose 后归一化，Tangent.xyz 使用线性 `3×3` 后相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。批准矩阵均为正行列式；遇到反射/负行列式矩阵原子失败。按源 submesh 对应的 Catalog 材质角色归并，保持三角形 winding 和每角色范围，最终重算 Bounds。源缺少必需通道、属性格式不支持或材质槽不匹配时原子失败。
+- 明确复制和变换 Position、Normal、Tangent、UV0；Position 只使用已含共同 `SourceImportMatrix` 的完整 placement 矩阵，绝不能再乘 Prefab Transform。Normal 使用线性 `3×3` 的 inverse-transpose 后归一化，Tangent.xyz 使用线性 `3×3` 后相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。批准矩阵均为正行列式；遇到反射/负行列式矩阵原子失败。按 raw submesh 对应的 Catalog 材质角色归并，保持三角形 winding 和每角色范围，最终重算 Bounds。源缺少必需通道、属性格式不支持或材质槽不匹配时原子失败。
 - 32 位索引支持通过默认读取 `SystemInfo.supports32bitsIndexBuffer`、测试可注入的只读 capability 提供；测试注入不得改变生产默认且必须在 teardown 恢复。平台不支持时在分配/写入 UInt32 buffer 前失败。
 - 按 13 个固定材质角色归并 submesh；不能为规避 UInt32 错拆材质 submesh。
 - 长期最多 `RuntimeGeometry/RuinsGeometry/CliffGeometry`、两个 MeshFilter、两个 MeshRenderer、两个 owned Mesh；无逐格实例和材质实例。
@@ -262,7 +315,7 @@ RED 覆盖只恢复 Ruins、只恢复 Cliff、部分状态下的聚合属性、�
   -logFile "$WASTECITY_EVIDENCE/task5-red.log"
 ```
 
-合成夹具必须覆盖 `65,535` 顶点及其上一点，证明格式在 buffer/submesh 写入前选择，顶点、法线、切线、UV、索引、Bounds 和各材质 submesh 均未截断、回绕或错位；另用至少一件批准的非等比 Cliff scale 构造非轴对齐 Normal/Tangent，断言新 Normal 与 inverse-transpose 参考值一致且长度为 1、新 Tangent 长度为 1 且与 Normal 点积近零、Tangent.w 与源值一致，并断言错误的直接法线线性变换不能通过。另测负行列式拒绝、`checked long` 到 `int` 边界、注入平台不支持、未知槽、缺失通道和每个中途异常点的原生/Unity 对象清理。GREEN 输出 `task5-green.xml/log`。
+合成夹具必须覆盖 `65,535` 顶点及其上一点，证明格式在 buffer/submesh 写入前选择，顶点、法线、切线、UV、索引、Bounds 和各材质 submesh 均未截断、回绕或错位；另用至少一件批准的非等比 Cliff scale 构造非轴对齐 Normal/Tangent，断言新 Normal 与 inverse-transpose 参考值一致且长度为 1、新 Tangent 长度为 1 且与 Normal 点积近零、Tangent.w 与源值一致，并断言错误的直接法线线性变换不能通过。加入带完整非 identity Prefab Transform 的 fixture：运行结果必须等于 raw Mesh 仅乘 placement 的参考值，并明确不等于额外再乘 Prefab Transform 的双乘结果。另测负行列式拒绝、`checked long` 到 `int` 边界、注入平台不支持、未知槽、缺失通道和每个中途异常点的原生/Unity 对象清理。GREEN 输出 `task5-green.xml/log`。
 
 **Commit:** `feat: batch ruins cliff runtime geometry`
 
