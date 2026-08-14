@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9668fe34467348c9b431ef879f90d375, type: 3}
+  m_Name: FirstArtRuinsCliffProfile3D
+  m_EditorClassIdentifier:
+  prefabBindings:
+  - stableId: art.ruins.cracked-floor-slab
+    prefab: {fileID: 2687134824801229712, guid: f341ced2e61394295b2b2529d92f2df1, type: 3}
+  - stableId: art.ruins.rubble-pile-a
+    prefab: {fileID: 7477469591016412334, guid: 291293ada4a99454686c2363f808e10e, type: 3}
+  - stableId: art.ruins.rubble-pile-b
+    prefab: {fileID: 4212050750434162021, guid: 127ccec2e38214c14a3bb96549a83016, type: 3}
+  - stableId: art.ruins.rebar-concrete-block
+    prefab: {fileID: 5723935647139521051, guid: ba097d85457e7469c9bf81cc6303f906, type: 3}
+  - stableId: art.ruins.broken-pipe
+    prefab: {fileID: 7013247024935075349, guid: d90169849218a4597be2b3ed9e6ee9a6, type: 3}
+  - stableId: art.ruins.drainage-channel
+    prefab: {fileID: 33457954284565532, guid: 17f6c3887760c41d59e30a6dbc38c15a, type: 3}
+  - stableId: art.ruins.boundary-edge
+    prefab: {fileID: 6975921012485864327, guid: f064da28e02d74bdca340008cb26ad7e, type: 3}
+  - stableId: art.ruins.worn-marking-plate
+    prefab: {fileID: 2934713666835625703, guid: 531e0a2a01252465c808487770194704, type: 3}
+  - stableId: art.cliff.straight-a
+    prefab: {fileID: 5674601123364538858, guid: 7b37f81a7fdc3406ea9c462d56919bc6, type: 3}
+  - stableId: art.cliff.straight-b
+    prefab: {fileID: 2745644961400629088, guid: 6bb8272b032f0406aa3490694a316c2a, type: 3}
+  - stableId: art.cliff.inner-corner
+    prefab: {fileID: 4713001177224308823, guid: 344999e5fa45c4719a7b2f2476cfe351, type: 3}
+  - stableId: art.cliff.outer-corner
+    prefab: {fileID: 1373493929245130587, guid: c5af4a6f4c3cb4f1aae3e82bf94a200f, type: 3}
+  - stableId: art.cliff.end-cap
+    prefab: {fileID: 4647326631397401194, guid: 7f691f28c3d474aadb540a0ff69facce, type: 3}
+  - stableId: art.cliff.top-cap
+    prefab: {fileID: 5480548924997311312, guid: 65d6a7e1ca6b44584b25846b97a663c1, type: 3}
+  materialBindings:
+  - role: MAT_Ruins_Concrete
+    material: {fileID: 2100000, guid: be01d9d1a28234ddf91a3d8c0707190e, type: 2}
+  - role: MAT_Ruins_Aggregate
+    material: {fileID: 2100000, guid: 7b30f196df8784365977e5b59648eb80, type: 2}
+  - role: MAT_Ruins_DustFilm
+    material: {fileID: 2100000, guid: 254a4ae5ae9864b59ab84874141ca44a, type: 2}
+  - role: MAT_Ruins_Dust
+    material: {fileID: 2100000, guid: 926b4e68afe9f47f1abd9fc6e9ac2c25, type: 2}
+  - role: MAT_Ruins_DarkFloor
+    material: {fileID: 2100000, guid: 7c24f356a01d74ff5aeffb91bfbde7ac, type: 2}
+  - role: MAT_Ruins_DrainDark
+    material: {fileID: 2100000, guid: fea5ba8f1bcce4af0a9966217773270d, type: 2}
+  - role: MAT_Ruins_Rust
+    material: {fileID: 2100000, guid: fe3969b76bb10448896d0051363ef6a6, type: 2}
+  - role: MAT_Ruins_Marking
+    material: {fileID: 2100000, guid: 854500339ac804983b0822b173e5c248, type: 2}
+  - role: MAT_Cliff_Strata
+    material: {fileID: 2100000, guid: 507bee9b0ade044d891034434ee7d352, type: 2}
+  - role: MAT_Cliff_Fracture
+    material: {fileID: 2100000, guid: 9e115428bbc7540138aea316c67202dc, type: 2}
+  - role: MAT_Cliff_Dust
+    material: {fileID: 2100000, guid: e896518daa9c546fdbda64e093a3b5d1, type: 2}
+  - role: MAT_Cliff_Rubble
+    material: {fileID: 2100000, guid: 125ad5b32ccf9436eb5e9a4064bf023e, type: 2}
+  - role: MAT_Cliff_Mineral
+    material: {fileID: 2100000, guid: 8225153fe66424e57b40c90b933930e7, type: 2}
+  geometryShader: {fileID: 4800000, guid: e7ef7b490240461faab128d139bdac74, type: 3}
