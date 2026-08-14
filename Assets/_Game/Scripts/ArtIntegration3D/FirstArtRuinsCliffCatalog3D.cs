@@ -55,6 +55,8 @@ namespace WasteCity.ArtIntegration3D
             RootScale = rootScale;
             ChildOffset = childOffset;
             CalibratedBounds = calibratedBounds;
+            SourceImportMatrix =
+                FirstArtRuinsCliffCatalog3D.SourceImportMatrix;
             CanonicalConnectionMask = canonicalConnectionMask;
             this.materialRoles = Array.AsReadOnly(
                 (string[])materialRoles.Clone());
@@ -68,6 +70,7 @@ namespace WasteCity.ArtIntegration3D
         public Vector3 RootScale { get; }
         public Vector3 ChildOffset { get; }
         public Vector3 CalibratedBounds { get; }
+        public Matrix4x4 SourceImportMatrix { get; }
         public int BaseRotationYDegrees => 0;
         public int CanonicalConnectionMask { get; }
         public IReadOnlyList<string> MaterialRoles => materialRoles;
@@ -110,6 +113,11 @@ namespace WasteCity.ArtIntegration3D
         private const string TerrainRoot =
             "Assets/_Game/Art/FirstPass/Environment/Terrain/";
 
+        private static readonly Quaternion sourceImportRotation =
+            new Quaternion(-0.7071068f, 0f, 0f, 0.7071067f);
+        private static readonly Matrix4x4 sourceImportMatrix =
+            CreateSourceImportMatrix();
+
         private static readonly ReadOnlyCollection<FirstArtRuinsCliffCatalogEntry3D>
             entries = Array.AsReadOnly(new[]
             {
@@ -119,9 +127,9 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_CrackedFloorSlab",
                     "PF_Ruins_CrackedFloorSlab",
                     V(0.736612445, 0.736612445, 0.736612445),
-                    V(0.005478553, 0.000000058, 0.033530462),
+                    V(-0.005478553, 0.000000058, -0.033530462),
                     V(0.9, 0.098776901, 0.777492438),
-                    "MAT_Ruins_Concrete", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Aggregate", "MAT_Ruins_Concrete",
                     "MAT_Ruins_DrainDark", "MAT_Ruins_Dust",
                     "MAT_Ruins_DustFilm"),
                 Ruins(
@@ -130,19 +138,19 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_RubblePile_A",
                     "PF_Ruins_RubblePile_A",
                     V(0.930280613, 0.930280613, 0.930280613),
-                    V(-0.004548970, 0.000000063, -0.026104246),
+                    V(0.004548970, 0.000000063, 0.026104246),
                     V(0.9, 0.232141809, 0.719227462),
-                    "MAT_Ruins_Dust", "MAT_Ruins_Concrete",
-                    "MAT_Ruins_Aggregate"),
+                    "MAT_Ruins_Dust", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Concrete"),
                 Ruins(
                     "art.ruins.rubble-pile-b",
                     FirstArtRuinsCliffModule3D.RubblePileB,
                     "SM_Ruins_RubblePile_B",
                     "PF_Ruins_RubblePile_B",
                     V(0.643474271, 0.643474271, 0.643474271),
-                    V(-0.001435036, 0.000000033, -0.000106106),
+                    V(0.001435036, 0.000000033, 0.000106106),
                     V(0.9, 0.159823928, 0.405880371),
-                    "MAT_Ruins_Concrete", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Aggregate", "MAT_Ruins_Concrete",
                     "MAT_Ruins_Dust", "MAT_Ruins_Rust"),
                 Ruins(
                     "art.ruins.rebar-concrete-block",
@@ -150,9 +158,9 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_RebarConcreteBlock",
                     "PF_Ruins_RebarConcreteBlock",
                     V(0.856820909, 0.856820909, 0.856820909),
-                    V(-0.069655344, 0.000000059, -0.017981657),
+                    V(0.069655344, 0.000000059, 0.017981657),
                     V(0.9, 0.398876840, 0.686297511),
-                    "MAT_Ruins_Concrete", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Aggregate", "MAT_Ruins_Concrete",
                     "MAT_Ruins_DustFilm", "MAT_Ruins_Dust",
                     "MAT_Ruins_Rust"),
                 Ruins(
@@ -161,7 +169,7 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_BrokenPipe",
                     "PF_Ruins_BrokenPipe",
                     V(0.975516330, 0.975516330, 0.975516330),
-                    V(0.002470289, 0.000000051, 0.032442769),
+                    V(-0.002470289, 0.000000051, -0.032442769),
                     V(0.9, 0.641087333, 0.697020324),
                     "MAT_Ruins_Concrete", "MAT_Ruins_Aggregate",
                     "MAT_Ruins_Rust", "MAT_Ruins_DrainDark",
@@ -172,10 +180,10 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_DrainageChannel",
                     "PF_Ruins_DrainageChannel",
                     V(0.818181800, 0.818181800, 0.818181800),
-                    V(0, 0.000000043, -0.005614461),
+                    V(0, 0.000000043, 0.005614461),
                     V(0.9, 0.182575367, 0.519253806),
-                    "MAT_Ruins_DrainDark", "MAT_Ruins_Concrete",
-                    "MAT_Ruins_Aggregate", "MAT_Ruins_Dust",
+                    "MAT_Ruins_DrainDark", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Concrete", "MAT_Ruins_Dust",
                     "MAT_Ruins_DustFilm"),
                 Ruins(
                     "art.ruins.boundary-edge",
@@ -183,9 +191,9 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_BoundaryEdge",
                     "PF_Ruins_BoundaryEdge",
                     V(0.743841862, 0.743841862, 0.743841862),
-                    V(0.011133321, 0.000000045, -0.005296984),
+                    V(-0.011133321, 0.000000045, 0.005296984),
                     V(0.9, 0.154912706, 0.541050135),
-                    "MAT_Ruins_DarkFloor", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Aggregate", "MAT_Ruins_DarkFloor",
                     "MAT_Ruins_Concrete", "MAT_Ruins_DrainDark",
                     "MAT_Ruins_Dust", "MAT_Ruins_DustFilm"),
                 Ruins(
@@ -194,9 +202,9 @@ namespace WasteCity.ArtIntegration3D
                     "SM_Ruins_WornMarkingPlate",
                     "PF_Ruins_WornMarkingPlate",
                     V(0.813866507, 0.813866507, 0.813866507),
-                    V(-0.003272742, 0.000000052, 0.012372339),
+                    V(0.003272742, 0.000000052, -0.012372339),
                     V(0.9, 0.054904969, 0.661674072),
-                    "MAT_Ruins_DarkFloor", "MAT_Ruins_Aggregate",
+                    "MAT_Ruins_Aggregate", "MAT_Ruins_DarkFloor",
                     "MAT_Ruins_Marking", "MAT_Ruins_DrainDark",
                     "MAT_Ruins_Concrete", "MAT_Ruins_Dust",
                     "MAT_Ruins_DustFilm"),
@@ -207,7 +215,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_Straight_A",
                     10,
                     V(0.326633299, 0.600246292, 0.326633299),
-                    V(0.001620335, 0.000000051, 0.047667824),
+                    V(-0.001620335, 0.000000051, -0.047667824),
                     V(0.9, 0.9, 0.432732677)),
                 Cliff(
                     "art.cliff.straight-b",
@@ -216,7 +224,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_Straight_B",
                     10,
                     V(0.332272719, 0.596549113, 0.332272719),
-                    V(0.010047115, 0.000000051, 0.052382713),
+                    V(-0.010047115, 0.000000051, -0.052382713),
                     V(0.9, 0.9, 0.452821658)),
                 Cliff(
                     "art.cliff.inner-corner",
@@ -225,7 +233,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_InnerCorner",
                     9,
                     V(0.332957051, 0.599471748, 0.332957051),
-                    V(0.007434510, 0.000000134, -0.093297475),
+                    V(-0.007434510, 0.000000134, 0.093297475),
                     V(0.9, 0.9, 0.724235948)),
                 Cliff(
                     "art.cliff.outer-corner",
@@ -234,7 +242,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_OuterCorner",
                     9,
                     V(0.391098892, 0.596748804, 0.391098892),
-                    V(0.115721460, 0.000000134, -0.089152067),
+                    V(-0.115721460, 0.000000134, 0.089152067),
                     V(0.867786007, 0.9, 0.9)),
                 Cliff(
                     "art.cliff.end-cap",
@@ -243,7 +251,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_EndCap",
                     8,
                     V(0.369910121, 0.600328434, 0.369910121),
-                    V(0.010333406, 0.000000050, 0.055235103),
+                    V(-0.010333406, 0.000000050, -0.055235103),
                     V(0.9, 0.9, 0.489557935)),
                 Cliff(
                     "art.cliff.top-cap",
@@ -252,7 +260,7 @@ namespace WasteCity.ArtIntegration3D
                     "PF_Cliff_TopCap",
                     15,
                     V(0.327494533, 0.600163695, 0.327494533),
-                    V(-0.004963322, 0.000000118, 0.053226166),
+                    V(0.004963322, 0.000000118, -0.053226166),
                     V(0.858200781, 0.9, 0.9)),
             });
 
@@ -279,6 +287,10 @@ namespace WasteCity.ArtIntegration3D
 
         public static IReadOnlyList<FirstArtRuinsCliffMaterialRole3D> MaterialRoles =>
             materialRoles;
+
+        public static Quaternion SourceImportRotation => sourceImportRotation;
+
+        public static Matrix4x4 SourceImportMatrix => sourceImportMatrix;
 
         public static bool TryGetEntry(
             string stableId,
@@ -372,6 +384,28 @@ namespace WasteCity.ArtIntegration3D
         private static Vector3 V(double x, double y, double z)
         {
             return new Vector3((float)x, (float)y, (float)z);
+        }
+
+        private static Matrix4x4 CreateSourceImportMatrix()
+        {
+            var matrix = Matrix4x4.identity;
+            matrix.m00 = 1f;
+            matrix.m01 = 0f;
+            matrix.m02 = 0f;
+            matrix.m03 = 0f;
+            matrix.m10 = 0f;
+            matrix.m11 = -0.00000011920929f;
+            matrix.m12 = 0.99999994f;
+            matrix.m13 = 0f;
+            matrix.m20 = 0f;
+            matrix.m21 = -0.99999994f;
+            matrix.m22 = -0.00000011920929f;
+            matrix.m23 = 0f;
+            matrix.m30 = 0f;
+            matrix.m31 = 0f;
+            matrix.m32 = 0f;
+            matrix.m33 = 1f;
+            return matrix;
         }
     }
 }

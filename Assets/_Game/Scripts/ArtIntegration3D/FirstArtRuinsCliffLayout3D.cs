@@ -137,7 +137,8 @@ namespace WasteCity.ArtIntegration3D
             Matrix4x4 calibrationMatrix = Matrix4x4.TRS(
                 entry.ChildOffset,
                 Quaternion.identity,
-                entry.RootScale);
+                entry.RootScale) *
+                entry.SourceImportMatrix;
             return new FirstArtRuinsCliffPlacement3D(
                 family,
                 catalogIndex,
