@@ -431,6 +431,7 @@
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
+        "BUG-0005",
         "DOC-0001"
       ],
       "HumanDocumentPaths": [
@@ -1151,19 +1152,21 @@
       "Id": "formal-build-tools",
       "ChineseName": "正式构建工具",
       "TypeNames": [
-        "FormalBuildTools"
+        "FormalBuildTools",
+        "GrayboxRenderPipelineBuildScope"
       ],
       "AssetPaths": [
         "Assets/_Game/Editor/FormalBuildTools.cs"
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于执行正式构建检查。",
-      "BoundarySummary": "不修改游戏规则。",
+      "UseSummary": "用于执行正式构建检查，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线。",
+      "BoundarySummary": "不修改游戏规则；构建作用域必须恢复进入构建前的渲染管线、Quality 内存态和三个受保护文件字节。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
       ],
       "RequirementIds": [
+        "BUG-0005",
         "DOC-0001"
       ]
     },

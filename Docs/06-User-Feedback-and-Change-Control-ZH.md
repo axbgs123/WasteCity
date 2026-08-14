@@ -2,7 +2,7 @@
 
 > 建立日期：2026-08-04
 > 最近更新：2026-08-14
-> 当前版本：v1.22
+> 当前版本：v1.23
 > GitHub 更新方式：每次新增记录或状态变化后，单独提交并推送当前开发分支
 
 ## 1. 开发前必读
@@ -111,7 +111,7 @@
 | `BUG-0002` | 测试 Bug | 默认 3D 场景按 F 后城市没有展开 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-11 | 初始出生格已移到合法 3×3 区域，部署失败原因已有可见反馈；等待用户试玩确认 |
 | `BUG-0003` | 测试 Bug | 第一版地表接入后场景光照过亮 | `P2` | `已明确` | `已批准` | `已实现待验证` | 2026-08-11 | 主方向光由 1.25 降至 0.90，不改已验收源贴图；等待用户视觉复验 |
 | `BUG-0004` | 测试 Bug | 部分移动城市内建筑无法放置 | `P1` | `已明确` | `已批准` | `已验证` | 2026-08-11 | 正式场景九类移动内城建筑矩阵全部通过；原试玩阻断来自开发夹具人口固定 200，已补 F10 人口修改入口 |
-| `BUG-0005` | 测试 Bug | macOS 原生 Player 中 3D 世界全黑 | `P0` | `已明确` | `已批准` | `开发中` | 2026-08-14 | universal Player 中 UI 与输入响应正常，但默认 3D 世界视口全黑；限定修复跨平台渲染、场景接线或启动显示逻辑 |
+| `BUG-0005` | 测试 Bug | macOS 原生 Player 中 3D 世界全黑 | `P0` | `已明确` | `已批准` | `已实现待验证` | 2026-08-14 | 构建期 URP Shader 变体剥离已修复，最终 macOS universal Player 的 3D 世界恢复可见；等待用户人工试玩确认 |
 | `DOC-0001` | 文档变更 | 项目测试、可复用目录与自动文档维护规范 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-12 | 普通中文指南、测试定位、复用目录、自动清单与完成门已实现并通过机器验证；等待用户复验 |
 
 ## 6. Bug 详细记录
@@ -219,7 +219,7 @@
 - 优先级：`P0`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`开发中`
+- 实现状态：`已实现待验证`
 - 用户原始描述：macOS 原生 Player 启动后只有 UI 可见，3D 世界全黑；请修复。
 - 运行环境：macOS，Unity `2022.3.62f1`，从默认 `GrayboxPrototype3D` 构建的 universal 原生 Player。Player 已进入场景，UI 可见，按 `B` 可触发提示；Metal 和场景初始化日志未报告异常。
 - 复现步骤：
@@ -230,11 +230,11 @@
 - 预期结果：默认镜头应显示正常受光且可辨认的 3D 世界；HUD、系统菜单、建造提示和真实输入继续正常工作。
 - 实际结果：UI 与输入响应存在，但 UI 后方的整个 3D 世界视口为黑色；现有 Metal 与场景初始化日志没有给出直接异常。
 - 影响范围：macOS 原生 Player 的默认 3D 试玩入口完全不可见，核心流程无法继续；修复范围仅限跨平台渲染、默认 3D 场景接线或启动显示逻辑。
-- 关联正式文档：`Docs/01-Game-Design-Document-ZH.md`、`Docs/05-Formal-Development-Roadmap-ZH.md`、`IDEA-0001`、`IDEA-0003`、`IDEA-0007`
-- 关联提交：—（正在开发）
+- 关联正式文档：`Docs/01-Game-Design-Document-ZH.md`、`Docs/05-Formal-Development-Roadmap-ZH.md`、`Docs/09-Reusable-Project-Catalog-ZH.md`、`Docs/superpowers/specs/2026-08-05-3d-graybox-foundation-design.md`、`IDEA-0001`、`IDEA-0003`、`IDEA-0007`
+- 关联提交：`4d35585`（BUG 登记）；`94675b9`（构建期 URP 登记、精确恢复保护与回归测试）
 - 验收条件：先用自动化稳定复现导致世界被遮黑或无法渲染的启动条件并保留 RED；最小修复后，macOS universal Player 进入默认场景时 3D 世界可见，HUD 与真实输入保持可用，系统菜单 dimmer 只在相应模态页面打开时遮罩；场景合同与相关真实输入 PlayMode 回归通过。不得修改玩法、schema `30`、冻结 2D、地形源贴图、地形导入规则、Texture2DArray 或生成数组。
-- 验证证据：用户于 2026-08-14 亲眼确认 macOS 原生 Player 的 UI 与 `B` 输入提示正常、3D 世界全黑，并明确要求“修复一下”；结合此前授权类似实现决策由开发方按文档和长期维护自行解决，本条范围、优先级和验收边界视为已确认并批准。当前尚未完成根因定位、失败测试或实现，状态保持“开发中”。
-- 决策原因或备注：现象发生在 UI/输入已启动而世界完全不可见的边界，优先审查新系统菜单全屏 dimmer 的初始可见性与 Player 初始化顺序，其次才检查场景作用域 URP、Renderer stripping、主相机与 culling。只修复实际 RED 根因，不用提高环境光、替换地形资产或放宽玩法规则掩盖问题。
+- 验证证据：只读诊断排除系统菜单 dimmer、主相机、Metal 初始化和场景启动失败后，构建日志确认根因是源项目的 `GraphicsSettings` 与全部 Quality 档都未登记 URP，而 `GrayboxURP` 仅在运行时由场景作用域切换；Unity 在运行时切换发生前已把 `Universal Render Pipeline/Lit`、`WasteCity/Terrain/FirstPassBlend` 与 URP Blit 的 scriptable 变体裁为 `0`，因此屏幕空间 UI 正常而 3D 世界全黑。第一条 RED `/private/tmp/wastecity-bug0005/build-scope-red.xml` 为 `1/1` 失败，精确指出缺少通用 Player 构建回调；Windows Release 又暴露 Quality Ultra 抗锯齿由 `2` 被构建处理器改为 `0`，第二条 RED `/private/tmp/wastecity-bug0005/project-settings-red.xml` 为 `1/1` 失败，精确指出缺少项目设置字节备份。提交 `94675b9` 仅在实际构建场景包含 `GrayboxPrototype3D` 时临时登记批准的 `GrayboxURP`，Begin 在任何 setter 前逐字节备份 `GrayboxURP.asset`、`GraphicsSettings.asset`、`QualitySettings.asset` 并记录抗锯齿内存值，postprocess、现有构建入口 `finally`、编辑器退出和下次初始化共用恢复路径；纯 `FormalPrototype` 构建不激活。最终专项 GREEN `/private/tmp/wastecity-bug0005/project-settings-green-final.xml` 为 `1/1`，覆盖重复 Begin 不替换首份快照、正常构建后恢复、中断恢复、抗锯齿内存恢复及标记/备份清理。精确 HEAD `94675b90968de61f258eaf09f4bd23f9f97841b3` 上的日常 EditMode `/private/tmp/wastecity-bug0005-final/editmode-final-head.xml` 为 `1348/1348`，失败与跳过均为 `0`，实际 `TerrainAssetDeep` 类别用例为 `0`；其中六类 Project Quality 合计 `138/138`（`35+23+20+16+21+23`），已包含在该完整结果中。完整 PlayMode `/private/tmp/wastecity-bug0005-final/playmode-final-head.xml` 为 `88/88`；无界面编译 `/private/tmp/wastecity-bug0005-final/compile.log` 正常退出且 C# 错误、警告均为 `0`。Windows Release `/private/tmp/wastecity-bug0005/build-windows-project-settings-green-final.log` 与 Development `/private/tmp/wastecity-bug0005-final/build-windows-development-final-head.log` 均构建成功，产物均为 `PE32+` GUI x86-64；Release 进程退出后受保护三文件 SHA-256 与构建前逐字节一致。最终 macOS `/private/tmp/wastecity-bug0005-final/build-macos-final-head.log` 构建成功，产物为 arm64+x86_64 universal；`URP/Lit ForwardLit` 的 vp/fp 变体为 `2/8`、Terrain UniversalForward 为 `2/2`、URP Blit 为 `1/2`，均不再是 `0`。开发者已在最终 `/private/tmp/wastecity-bug0005-final/WasteCityMacFinal.app` 桌面启动验证：荒地、城市、资源节点、建筑占位和 HUD 均正常显示，黑屏消失，Player 日志无异常；该结论仅为开发者视觉验证，不等同用户人工验收，用户试玩仍待确认，因此状态保持“已实现待验证”。
+- 决策原因或备注：实际 RED 根因不是系统菜单 dimmer、环境光、地形资产或玩法规则，而是场景作用域 URP 启用晚于构建期 Shader stripping。修复把既有 `GrayboxURP` 作为唯一管线真值临时暴露给构建器，不创建第二份渲染规则；同时保护构建处理器可能改写的三个源文件及 Quality 抗锯齿内存态，避免构建成功污染工作树。没有修改 gameplay、schema `30`、冻结 2D、地形源贴图、地形导入策略、Texture2DArray Builder 或生成数组。
 
 ### Bug 模板：`BUG-XXXX`
 

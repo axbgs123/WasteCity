@@ -162,7 +162,7 @@
 
 ### 正式构建工具（复用前审查）
 
-能解决什么：执行正式构建检查。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于执行正式构建检查。先审查目标平台和构建配置。不能负责什么：不修改游戏规则。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`。代码名：`FormalBuildTools`。
+能解决什么：执行正式构建检查，并让包含三维灰盒场景的 Player 构建在 Shader stripping 前识别批准的 URP 管线。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：通过 `FormalBuildTools` 选择正式构建入口；`GrayboxRenderPipelineBuildScope` 只按实际场景列表临时登记 `GrayboxURP`，并在构建后恢复进入构建前的管线、Quality 抗锯齿内存态和受保护文件精确字节。不能负责什么：不修改游戏规则，不得把临时管线写成永久 ProjectSettings，也不得用于绕过纯二维构建边界。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`，并执行受影响平台的真实 Player 构建。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。
 
 ### 灰盒性能探针（仅限场景）
 
