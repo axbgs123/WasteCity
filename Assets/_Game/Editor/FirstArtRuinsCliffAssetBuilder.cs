@@ -7,7 +7,9 @@ using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
+using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 using WasteCity.ArtIntegration3D;
 
 [assembly: InternalsVisibleTo("WasteCity.EditModeTests")]
@@ -192,6 +194,16 @@ namespace WasteCity.Editor
             {
                 if (string.IsNullOrEmpty(AssetDatabase.AssetPathToGUID(entry.FbxPath)))
                     throw new InvalidOperationException("Approved FBX has no stable GUID: " + entry.FbxPath);
+                ModelImporter importer =
+                    AssetImporter.GetAtPath(entry.FbxPath) as ModelImporter;
+                if (importer == null)
+                    throw new InvalidOperationException(
+                        "Approved FBX has no ModelImporter: " +
+                        entry.FbxPath);
+                if (importer.isReadable)
+                    throw new InvalidOperationException(
+                        "Approved raw FBX must keep Read/Write disabled: " +
+                        entry.FbxPath);
                 GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(entry.FbxPath);
                 if (model == null)
                     throw new InvalidOperationException("Approved FBX is missing: " + entry.FbxPath);
@@ -309,7 +321,8 @@ namespace WasteCity.Editor
                         entry,
                         preflight.Meshes[entry.StableId].bounds);
                     root.isStatic = true;
-                    root.AddComponent<MeshFilter>().sharedMesh = preflight.Meshes[entry.StableId];
+                    MeshFilter filter = root.AddComponent<MeshFilter>();
+                    filter.sharedMesh = preflight.Meshes[entry.StableId];
                     root.AddComponent<MeshRenderer>().sharedMaterials = entry.MaterialRoles
                         .Select(role => materials[role])
                         .ToArray();
@@ -317,6 +330,17 @@ namespace WasteCity.Editor
                     GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, stagingPath);
                     if (prefab == null)
                         throw new InvalidOperationException("Could not stage Prefab for " + entry.StableId + ".");
+                    filter.sharedMesh = AddReadableMeshSubAsset(
+                        preflight.Meshes[entry.StableId],
+                        entry.StableId,
+                        stagingPath);
+                    prefab = PrefabUtility.SaveAsPrefabAsset(
+                        root,
+                        stagingPath);
+                    if (prefab == null)
+                        throw new InvalidOperationException(
+                            "Could not embed runtime Mesh for " +
+                            entry.StableId + ".");
                     prefabs.Add(entry.StableId, prefab);
                 }
                 finally
@@ -369,9 +393,23 @@ namespace WasteCity.Editor
                 string destination = entry.PrefabPath;
                 if (File.Exists(ProjectPath(destination)))
                 {
-                    GameObject contents = PrefabUtility.LoadPrefabContents(stagingPath);
+                    // Load the destination itself before saving it back.  Loading the
+                    // staging Prefab here imports the staging object's fileID layout
+                    // into the destination.  A staging component fileID can collide
+                    // with the destination's embedded Mesh fileID, causing Unity to
+                    // silently allocate a replacement local fileID for that Mesh.
+                    GameObject contents = PrefabUtility.LoadPrefabContents(destination);
                     try
                     {
+                        ConfigureExistingPrefabContents(
+                            contents,
+                            entry,
+                            preflight.Meshes[entry.StableId].bounds);
+                        contents.GetComponent<MeshFilter>().sharedMesh =
+                            UpdateReadableMeshSubAssetInPlace(
+                                preflight.Meshes[entry.StableId],
+                                entry.StableId,
+                                destination);
                         contents.GetComponent<MeshRenderer>().sharedMaterials = entry.MaterialRoles
                             .Select(role => finalMaterials[role])
                             .ToArray();
@@ -395,15 +433,33 @@ namespace WasteCity.Editor
                     entry => entry.StableId,
                     entry => AssetDatabase.LoadAssetAtPath<GameObject>(entry.PrefabPath),
                     StringComparer.Ordinal);
-            staged.Profile.Configure(
-                preflight.Shader,
-                FirstArtRuinsCliffCatalog3D.Entries.Select(entry =>
-                    new FirstArtRuinsCliffPrefabBinding3D(entry.StableId, finalPrefabs[entry.StableId])).ToArray(),
-                FirstArtRuinsCliffCatalog3D.MaterialRoles.Select(role =>
-                    new FirstArtRuinsCliffMaterialBinding3D(role.Name, finalMaterials[role.Name])).ToArray());
-            AssetDatabase.SaveAssetIfDirty(staged.Profile);
-            string stagedProfilePath = AssetDatabase.GetAssetPath(staged.Profile);
-            PublishAsset(stagedProfilePath, ProfilePath, staged.Profile);
+            FirstArtRuinsCliffProfile3D finalProfile =
+                AssetDatabase.LoadAssetAtPath<
+                    FirstArtRuinsCliffProfile3D>(ProfilePath);
+            if (!ProfileMatchesExpectedBindings(
+                    finalProfile,
+                    preflight.Shader,
+                    finalPrefabs,
+                    finalMaterials))
+            {
+                staged.Profile.Configure(
+                    preflight.Shader,
+                    FirstArtRuinsCliffCatalog3D.Entries.Select(entry =>
+                        new FirstArtRuinsCliffPrefabBinding3D(
+                            entry.StableId,
+                            finalPrefabs[entry.StableId])).ToArray(),
+                    FirstArtRuinsCliffCatalog3D.MaterialRoles.Select(role =>
+                        new FirstArtRuinsCliffMaterialBinding3D(
+                            role.Name,
+                            finalMaterials[role.Name])).ToArray());
+                AssetDatabase.SaveAssetIfDirty(staged.Profile);
+                string stagedProfilePath =
+                    AssetDatabase.GetAssetPath(staged.Profile);
+                PublishAsset(
+                    stagedProfilePath,
+                    ProfilePath,
+                    staged.Profile);
+            }
             PublishCheckpoint?.Invoke(PublishPhase.Profile, 1, ProfilePath);
 
             foreach (string path in DestinationPaths())
@@ -428,6 +484,43 @@ namespace WasteCity.Editor
             PublishCheckpoint?.Invoke(PublishPhase.AfterFinalValidation, 1, ProfilePath);
         }
 
+        private static void ConfigureExistingPrefabContents(
+            GameObject contents,
+            FirstArtRuinsCliffCatalogEntry3D entry,
+            Bounds sourceBounds)
+        {
+            if (contents == null)
+                throw new InvalidOperationException(
+                    "Could not load existing Prefab contents for " +
+                    entry.StableId + ".");
+
+            while (contents.transform.childCount > 0)
+                UnityEngine.Object.DestroyImmediate(
+                    contents.transform.GetChild(0).gameObject);
+
+            foreach (Component component in contents.GetComponents<Component>())
+            {
+                if (component is Transform ||
+                    component is MeshFilter ||
+                    component is MeshRenderer)
+                    continue;
+                UnityEngine.Object.DestroyImmediate(component);
+            }
+
+            contents.name = FileNameWithoutExtension(entry.PrefabPath);
+            contents.transform.localPosition = entry.ChildOffset;
+            contents.transform.localRotation =
+                FirstArtRuinsCliffCatalog3D.SourceImportRotation;
+            contents.transform.localScale = PrefabTransformScale(
+                entry,
+                sourceBounds);
+            contents.isStatic = true;
+            if (contents.GetComponent<MeshFilter>() == null)
+                contents.AddComponent<MeshFilter>();
+            if (contents.GetComponent<MeshRenderer>() == null)
+                contents.AddComponent<MeshRenderer>();
+        }
+
         private static void PublishAsset(
             string stagingPath,
             string destination,
@@ -441,6 +534,54 @@ namespace WasteCity.Editor
             }
             EditorUtility.CopySerialized(stagedAsset, existing);
             AssetDatabase.SaveAssetIfDirty(existing);
+        }
+
+        private static bool ProfileMatchesExpectedBindings(
+            FirstArtRuinsCliffProfile3D profile,
+            Shader shader,
+            IReadOnlyDictionary<string, GameObject> prefabs,
+            IReadOnlyDictionary<string, Material> materials)
+        {
+            if (profile == null ||
+                profile.GeometryShader != shader ||
+                profile.PrefabBindings.Count !=
+                FirstArtRuinsCliffCatalog3D.EntryCount ||
+                profile.MaterialBindings.Count !=
+                FirstArtRuinsCliffCatalog3D.MaterialRoleCount)
+                return false;
+            for (var index = 0;
+                 index < FirstArtRuinsCliffCatalog3D.EntryCount;
+                 index++)
+            {
+                FirstArtRuinsCliffCatalogEntry3D entry =
+                    FirstArtRuinsCliffCatalog3D.Entries[index];
+                FirstArtRuinsCliffPrefabBinding3D binding =
+                    profile.PrefabBindings[index];
+                if (binding == null ||
+                    !string.Equals(
+                        binding.StableId,
+                        entry.StableId,
+                        StringComparison.Ordinal) ||
+                    binding.Prefab != prefabs[entry.StableId])
+                    return false;
+            }
+            for (var index = 0;
+                 index < FirstArtRuinsCliffCatalog3D.MaterialRoleCount;
+                 index++)
+            {
+                FirstArtRuinsCliffMaterialRole3D role =
+                    FirstArtRuinsCliffCatalog3D.MaterialRoles[index];
+                FirstArtRuinsCliffMaterialBinding3D binding =
+                    profile.MaterialBindings[index];
+                if (binding == null ||
+                    !string.Equals(
+                        binding.Role,
+                        role.Name,
+                        StringComparison.Ordinal) ||
+                    binding.Material != materials[role.Name])
+                    return false;
+            }
+            return true;
         }
 
         private static void MoveAsset(string source, string destination)
@@ -519,8 +660,28 @@ namespace WasteCity.Editor
                     prefab.GetComponent<MeshRenderer>() == null ||
                     prefab.transform.childCount != 0)
                     throw new InvalidOperationException(entry.StableId + " is not a mesh-only Prefab.");
-                if (prefab.GetComponent<MeshFilter>().sharedMesh != preflight.Meshes[entry.StableId])
-                    throw new InvalidOperationException(entry.StableId + " references the wrong FBX Mesh.");
+                Mesh runtimeMesh =
+                    prefab.GetComponent<MeshFilter>().sharedMesh;
+                string prefabPath = AssetDatabase.GetAssetPath(prefab);
+                Mesh approvedEmbeddedMesh = RequireSoleApprovedRuntimeMesh(
+                    prefabPath,
+                    entry.StableId);
+                if (runtimeMesh == null ||
+                    runtimeMesh != approvedEmbeddedMesh ||
+                    !EditorUtility.IsPersistent(runtimeMesh) ||
+                    !runtimeMesh.isReadable ||
+                    !string.Equals(
+                        AssetDatabase.GetAssetPath(runtimeMesh),
+                        prefabPath,
+                        StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        entry.StableId +
+                        " must embed one persistent readable runtime Mesh in its Prefab.");
+                Mesh approvedMesh = preflight.Meshes[entry.StableId];
+                if (!MeshContentMatches(approvedMesh, runtimeMesh))
+                    throw new InvalidOperationException(
+                        entry.StableId +
+                        " embedded runtime Mesh differs from the approved FBX Mesh.");
                 Matrix4x4 approvedMatrix = CalibrationMatrix(entry);
                 if (!MatrixApproximately(
                         prefab.transform.localToWorldMatrix,
@@ -551,6 +712,311 @@ namespace WasteCity.Editor
                         throw new InvalidOperationException(entry.StableId + " does not use the shared final Material.");
                 }
             }
+        }
+
+        internal static bool MeshContentMatchesForTests(
+            Mesh approved,
+            Mesh runtime)
+        {
+            return MeshContentMatches(approved, runtime);
+        }
+
+        private static bool MeshContentMatches(
+            Mesh approved,
+            Mesh runtime)
+        {
+            if (approved == null || runtime == null ||
+                approved.vertexCount != runtime.vertexCount ||
+                approved.subMeshCount != runtime.subMeshCount ||
+                approved.indexFormat != runtime.indexFormat ||
+                approved.blendShapeCount != 0 ||
+                runtime.blendShapeCount != 0 ||
+                !BoundsExactlyEqual(approved.bounds, runtime.bounds))
+                return false;
+
+            VertexAttributeDescriptor[] approvedAttributes =
+                approved.GetVertexAttributes();
+            VertexAttributeDescriptor[] runtimeAttributes =
+                runtime.GetVertexAttributes();
+            if (approvedAttributes.Length != runtimeAttributes.Length)
+                return false;
+            for (var index = 0;
+                 index < approvedAttributes.Length;
+                 index++)
+                if (!VertexAttributeExactlyEqual(
+                        approvedAttributes[index],
+                        runtimeAttributes[index]))
+                    return false;
+
+            Mesh.MeshDataArray approvedData = default;
+            Mesh.MeshDataArray runtimeData = default;
+            var approvedAllocated = false;
+            var runtimeAllocated = false;
+            try
+            {
+                approvedData = Mesh.AcquireReadOnlyMeshData(approved);
+                approvedAllocated = true;
+                runtimeData = Mesh.AcquireReadOnlyMeshData(runtime);
+                runtimeAllocated = true;
+                Mesh.MeshData approvedMeshData = approvedData[0];
+                Mesh.MeshData runtimeMeshData = runtimeData[0];
+                if (approvedMeshData.vertexCount !=
+                        runtimeMeshData.vertexCount ||
+                    approvedMeshData.vertexBufferCount !=
+                        runtimeMeshData.vertexBufferCount ||
+                    approvedMeshData.indexFormat !=
+                        runtimeMeshData.indexFormat ||
+                    approvedMeshData.subMeshCount !=
+                        runtimeMeshData.subMeshCount)
+                    return false;
+
+                for (var stream = 0;
+                     stream < approvedMeshData.vertexBufferCount;
+                     stream++)
+                {
+                    if (approvedMeshData.GetVertexBufferStride(stream) !=
+                        runtimeMeshData.GetVertexBufferStride(stream))
+                        return false;
+                    if (!BytesExactlyEqual(
+                            approvedMeshData.GetVertexData<byte>(stream),
+                            runtimeMeshData.GetVertexData<byte>(stream)))
+                        return false;
+                }
+
+                if (!BytesExactlyEqual(
+                        approvedMeshData.GetIndexData<byte>(),
+                        runtimeMeshData.GetIndexData<byte>()))
+                    return false;
+                for (var subMesh = 0;
+                     subMesh < approvedMeshData.subMeshCount;
+                     subMesh++)
+                    if (!SubMeshExactlyEqual(
+                            approvedMeshData.GetSubMesh(subMesh),
+                            runtimeMeshData.GetSubMesh(subMesh)))
+                        return false;
+                return true;
+            }
+            finally
+            {
+                if (runtimeAllocated)
+                    runtimeData.Dispose();
+                if (approvedAllocated)
+                    approvedData.Dispose();
+            }
+        }
+
+        private static bool VertexAttributeExactlyEqual(
+            VertexAttributeDescriptor approved,
+            VertexAttributeDescriptor runtime)
+        {
+            return approved.attribute == runtime.attribute &&
+                   approved.format == runtime.format &&
+                   approved.dimension == runtime.dimension &&
+                   approved.stream == runtime.stream;
+        }
+
+        private static bool BytesExactlyEqual(
+            NativeArray<byte> approved,
+            NativeArray<byte> runtime)
+        {
+            if (approved.Length != runtime.Length)
+                return false;
+            for (var index = 0; index < approved.Length; index++)
+                if (approved[index] != runtime[index])
+                    return false;
+            return true;
+        }
+
+        private static bool SubMeshExactlyEqual(
+            SubMeshDescriptor approved,
+            SubMeshDescriptor runtime)
+        {
+            return approved.indexStart == runtime.indexStart &&
+                   approved.indexCount == runtime.indexCount &&
+                   approved.topology == runtime.topology &&
+                   approved.baseVertex == runtime.baseVertex &&
+                   approved.firstVertex == runtime.firstVertex &&
+                   approved.vertexCount == runtime.vertexCount &&
+                   BoundsExactlyEqual(approved.bounds, runtime.bounds);
+        }
+
+        private static bool BoundsExactlyEqual(
+            Bounds approved,
+            Bounds runtime)
+        {
+            return VectorExactlyEqual(approved.center, runtime.center) &&
+                   VectorExactlyEqual(approved.size, runtime.size);
+        }
+
+        private static bool VectorExactlyEqual(
+            Vector3 approved,
+            Vector3 runtime)
+        {
+            return approved.x == runtime.x &&
+                   approved.y == runtime.y &&
+                   approved.z == runtime.z;
+        }
+
+        private static Mesh AddReadableMeshSubAsset(
+            Mesh source,
+            string stableId,
+            string prefabPath)
+        {
+            Mesh runtimeMesh = CreateReadableMeshCopy(
+                source,
+                stableId + "_RuntimeMesh");
+            try
+            {
+                AssetDatabase.AddObjectToAsset(
+                    runtimeMesh,
+                    prefabPath);
+                AssetDatabase.SaveAssetIfDirty(runtimeMesh);
+                return runtimeMesh;
+            }
+            catch
+            {
+                if (!EditorUtility.IsPersistent(runtimeMesh))
+                    UnityEngine.Object.DestroyImmediate(runtimeMesh);
+                throw;
+            }
+        }
+
+        private static Mesh CreateReadableMeshCopy(
+            Mesh source,
+            string name)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            if (source.blendShapeCount != 0)
+                throw new InvalidOperationException(
+                    source.name +
+                    " uses unsupported blend shapes for a static runtime Prefab.");
+
+            Mesh.MeshDataArray readable = default;
+            Mesh.MeshDataArray writable = default;
+            bool readableAllocated = false;
+            bool writableAllocated = false;
+            Mesh copy = null;
+            try
+            {
+                readable = Mesh.AcquireReadOnlyMeshData(source);
+                readableAllocated = true;
+                writable = Mesh.AllocateWritableMeshData(1);
+                writableAllocated = true;
+                Mesh.MeshData input = readable[0];
+                Mesh.MeshData output = writable[0];
+                output.SetVertexBufferParams(
+                    input.vertexCount,
+                    source.GetVertexAttributes());
+                for (var stream = 0;
+                     stream < input.vertexBufferCount;
+                     stream++)
+                {
+                    var sourceData = input.GetVertexData<byte>(stream);
+                    var destinationData =
+                        output.GetVertexData<byte>(stream);
+                    if (sourceData.Length != destinationData.Length)
+                        throw new InvalidOperationException(
+                            source.name +
+                            " vertex stream size changed while baking a runtime copy.");
+                    sourceData.CopyTo(destinationData);
+                }
+
+                var sourceIndices = input.GetIndexData<byte>();
+                int bytesPerIndex = input.indexFormat == IndexFormat.UInt16
+                    ? sizeof(ushort)
+                    : sizeof(uint);
+                if (sourceIndices.Length % bytesPerIndex != 0)
+                    throw new InvalidOperationException(
+                        source.name +
+                        " has a malformed index buffer.");
+                output.SetIndexBufferParams(
+                    sourceIndices.Length / bytesPerIndex,
+                    input.indexFormat);
+                sourceIndices.CopyTo(output.GetIndexData<byte>());
+                output.subMeshCount = input.subMeshCount;
+                for (var subMesh = 0;
+                     subMesh < input.subMeshCount;
+                     subMesh++)
+                    output.SetSubMesh(
+                        subMesh,
+                        input.GetSubMesh(subMesh),
+                        MeshUpdateFlags.DontRecalculateBounds |
+                        MeshUpdateFlags.DontValidateIndices);
+
+                copy = new Mesh { name = name };
+                Mesh.ApplyAndDisposeWritableMeshData(
+                    writable,
+                    copy,
+                    MeshUpdateFlags.DontRecalculateBounds |
+                    MeshUpdateFlags.DontValidateIndices);
+                writableAllocated = false;
+                copy.bounds = source.bounds;
+                if (!copy.isReadable)
+                    throw new InvalidOperationException(
+                        source.name +
+                        " runtime Mesh copy is unexpectedly unreadable.");
+                return copy;
+            }
+            catch
+            {
+                if (copy != null)
+                    UnityEngine.Object.DestroyImmediate(copy);
+                throw;
+            }
+            finally
+            {
+                if (writableAllocated)
+                    writable.Dispose();
+                if (readableAllocated)
+                    readable.Dispose();
+            }
+        }
+
+        private static Mesh UpdateReadableMeshSubAssetInPlace(
+            Mesh source,
+            string stableId,
+            string prefabPath)
+        {
+            string approvedName = stableId + "_RuntimeMesh";
+            Mesh persistentMesh = RequireSoleApprovedRuntimeMesh(
+                prefabPath,
+                stableId);
+            Mesh readableCopy = CreateReadableMeshCopy(source, approvedName);
+            try
+            {
+                EditorUtility.CopySerialized(readableCopy, persistentMesh);
+                persistentMesh.name = approvedName;
+                AssetDatabase.SaveAssetIfDirty(persistentMesh);
+                return persistentMesh;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(readableCopy);
+            }
+        }
+
+        private static Mesh RequireSoleApprovedRuntimeMesh(
+            string prefabPath,
+            string stableId)
+        {
+            string approvedName = stableId + "_RuntimeMesh";
+            Mesh[] meshes = AssetDatabase.LoadAllAssetsAtPath(prefabPath)
+                .OfType<Mesh>()
+                .ToArray();
+            if (meshes.Length != 1 || !string.Equals(
+                    meshes[0].name,
+                    approvedName,
+                    StringComparison.Ordinal))
+            {
+                string found = meshes.Length == 0
+                    ? "none"
+                    : string.Join(", ", meshes.Select(mesh => mesh.name));
+                throw new InvalidOperationException(
+                    prefabPath + " must contain exactly one approved embedded runtime Mesh named " +
+                    approvedName + "; found " + meshes.Length + " (" + found + ").");
+            }
+            return meshes[0];
         }
 
         private static void ConfigureMaterial(Material material, RoleSpec spec, Preflight preflight)

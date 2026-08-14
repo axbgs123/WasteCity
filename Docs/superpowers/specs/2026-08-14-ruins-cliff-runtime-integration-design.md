@@ -126,7 +126,7 @@ Prefab 合同：
 
 - 根对象名称与 Prefab 名一致；
 - 只允许 Transform、MeshFilter、MeshRenderer；不得包含 Collider、Rigidbody、Animator、脚本、灯光、相机或粒子；
-- Mesh 必须直接来自对应 FBX，不能复制或运行时修改源 Mesh；
+- 每个 Prefab 的 Mesh 必须由对应原始 FBX 确定性派生为唯一、可读的内嵌运行时 Mesh 子资源；原始 FBX 保持 Read/Write 关闭且不被修改，Prefab GUID 与 Mesh localFileID 在重建后保持稳定；
 - Prefab 必须镜像 Catalog 的完整零格、零 `quarterTurns` 合成矩阵 `T(childOffset) * S(rootScale) * SourceImportMatrix`，测试比较最终 `localToWorldMatrix`，不能只检查或猜测 Euler/scale 字段；运行实例不得再随机缩放或镜像；
 - `Y=0` 贴合数学地面，仅允许防 Z-fighting 的固定小正偏移；
 - 材质槽必须全部映射到批准的外部共享材质，不能保留自动生成的每-FBX材质副本。
@@ -223,7 +223,7 @@ Task 4 的首轮 RED 后，Unity 导入预检暴露了 Blender 离线校准没�
 2. Catalog 同时冻结 `SourceImportMatrix`、每项 root scale/child offset 和按 Unity 实际 submesh 索引排序的 `MaterialRoles`；ChildOffset 必须由 raw Mesh 依次应用 `SourceImportMatrix`、`S(rootScale)` 后的 bounds 推导为 `(-center.x, -minY, -center.z)`，不得复用旧离线表的水平符号；
 3. Layout 是正式运行时矩阵的唯一组合者，严格生成 `T(cell) * Ry * T(childOffset) * S(rootScale) * SourceImportMatrix`，不接受已含导入矩阵的输入；
 4. Builder 只验证 imported root 矩阵、实际槽序和组合后 bounds，并把零格/零旋转的完整组合镜像进 mesh-only Prefab；
-5. Geometry 从 Prefab 只读取 raw `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform，然后只应用已经完整的 placement `WorldMatrix`。若再乘 Prefab Transform 会重复消费校准和导入矩阵，必须由测试阻止。
+5. Geometry 从 Prefab 只读取内嵌可读的运行时 `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform，然后只应用已经完整的 placement `WorldMatrix`。原始 FBX 继续保持 Read/Write 关闭；若再乘 Prefab Transform 会重复消费校准和导入矩阵，必须由测试阻止。
 
 纠偏前暂停 Task 4，不运行 Builder、不发布资产。Catalog/Layout 的纠偏必须先经历独立 RED、最小 GREEN并输出 `/private/tmp/wastecity-ruins-cliff/task3-5-corrected-calibration.json`、独立审查、提交和普通 push；JSON 必须逐件记录 raw bounds、SourceImportMatrix、root scale、推导出的 ChildOffset、最终 center/minY/size 和判定阈值。旧符号、缺乘或双乘 import matrix 的结果均必须失败。远端同步后才能从现有 Task 4 RED 恢复。本门不授权修改 FBX、`.fbx.meta`、ModelImporter、schema `30`、冻结 2D 或任何玩法真值。
 
@@ -275,7 +275,7 @@ Task 4 的首轮 RED 后，Unity 导入预检暴露了 Blender 离线校准没�
 - 合计最多 13 个共享材质槽/SetPass；
 - 合批器必须先以检查溢出的整数累计每个最终 Mesh 的实际顶点数，再确定性选择索引格式：不超过 `65,535` 个顶点使用 `UnityEngine.Rendering.IndexFormat.UInt16`，超过该阈值必须在写入三角形和 submesh 前设置为 `IndexFormat.UInt32`；默认 `64×48` 地图只要任一类别超过阈值就必须使用 `UInt32`；
 - 禁止依赖 Unity 的隐式索引格式、截断索引、回绕顶点，或为了规避 `UInt32` 而错误拆分材质 submesh；若目标平台不支持所需索引格式，必须让该类别事务失败并选择性恢复对应灰盒；
-- Geometry 从 Prefab 只读取 raw `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，不读取或相乘 Prefab Transform；不可读 raw Mesh 的正式路径固定为 `Mesh.AcquireReadOnlyMeshData`。输出固定使用 `Mesh.AllocateWritableMeshData`，先调用 `SetVertexBufferParams` 与 `SetIndexBufferParams(indexCount, IndexFormat)`，写完后设置 `subMeshCount` 并通过 `SetSubMesh(SubMeshDescriptor)` 冻结每个材质范围，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。必须复制 Position、Normal、Tangent 和 UV0：Position 用已包含 `SourceImportMatrix` 的完整 placement 矩阵变换；Normal 必须用该矩阵线性 `3×3` 部分的 inverse-transpose 变换并归一化，不能直接用非等比矩阵；Tangent.xyz 先用线性 `3×3` 变换，再相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。反射/负行列式矩阵不在批准校准内，遇到即失败，不能静默翻转 handedness。随后按源 submesh 的已批准材质角色归并并重算 Bounds；所有 `MeshDataArray`、`NativeArray`、临时 Mesh/GameObject 在成功、异常和平台拒绝分支均用 `finally` 释放；
+- Geometry 从 Prefab 只读取内嵌可读的运行时 `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，不读取或相乘 Prefab Transform；原始 FBX importer 必须保持 Read/Write 关闭。运行时 Mesh 由 Builder 在 Editor 中通过 `Mesh.AcquireReadOnlyMeshData` 从批准的原始 FBX 确定性复制，并作为 Prefab 子资源保存；更新时原位改写同一子资源，保持 Prefab GUID 与 Mesh localFileID 稳定。Geometry 对该内嵌运行时 Mesh 使用 `Mesh.AcquireReadOnlyMeshData`，输出固定使用 `Mesh.AllocateWritableMeshData`，先调用 `SetVertexBufferParams` 与 `SetIndexBufferParams(indexCount, IndexFormat)`，写完后设置 `subMeshCount` 并通过 `SetSubMesh(SubMeshDescriptor)` 冻结每个材质范围，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。必须复制 Position、Normal、Tangent 和 UV0：Position 用已包含 `SourceImportMatrix` 的完整 placement 矩阵变换；Normal 必须用该矩阵线性 `3×3` 部分的 inverse-transpose 变换并归一化，不能直接用非等比矩阵；Tangent.xyz 先用线性 `3×3` 变换，再相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。反射/负行列式矩阵不在批准校准内，遇到即失败，不能静默翻转 handedness。随后按源 submesh 的已批准材质角色归并并重算 Bounds；所有 `MeshDataArray`、`NativeArray`、临时 Mesh/GameObject 在成功、异常和平台拒绝分支均用 `finally` 释放；
 - `SystemInfo.supports32bitsIndexBuffer` 通过默认读取真实平台、测试可注入的只读 capability 提供；生产默认不得被测试覆盖，测试结束必须恢复注入。平台不支持 UInt32 时不得尝试写 buffer；
 - 零 Collider、Rigidbody、Animator 和常驻 `Update/LateUpdate`；
 - 不保留逐格 Prefab、临时 Mesh 或材质实例；
@@ -334,7 +334,7 @@ Authoring 必须：
 - focused EditMode 与正式场景 PlayMode 通过；
 - 日常完整 EditMode（排除 `TerrainAssetDeep`）与完整 PlayMode 通过；
 - Unity 无界面编译通过；
-- 默认 Release 3D 必须通过 `WasteCity.Editor.FormalBuildTools.BuildWindows`，Development 3D 通过 `BuildWindowsGraybox3DDevelopment`，legacy 2D 通过 `BuildWindowsLegacy2D`；显式兼容入口 `BuildWindowsGraybox3D` 不能替代默认 Release 门；
+- 本子项最终 Release 3D 通过显式正式入口 `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D`，Development 3D 通过 `BuildWindowsGraybox3DDevelopment`，legacy 2D 通过 `BuildWindowsLegacy2D`；三者必须构建各自独立产物并验证为 Windows GUI x86-64；
 - 先以 TDD 为 `FormalBuildTools` 增加 `BuildMacOSGraybox3D`，固定只构建 `GrayboxPrototype3D` 到 `Builds/macOS/WasteCity.app`，临时选择 universal 架构并在成功、失败和下次恢复路径还原受保护设置；随后构建并启动 macOS Player 进行一次 3D 可见性冒烟，验证产物为 arm64+x86_64，防止 `BUG-0005` 类 Shader 剥离回归；
 - 能执行时补真实 Windows 10/11 独立程序至少 12 秒冒烟；不能执行时明确待补；
 - 64×48 默认 seed 与合成邻接夹具均满足结构和性能预算；
@@ -376,3 +376,11 @@ Authoring 必须：
 本规格经主审后才能编写独立实施计划。实现、测试、构建、性能、固定视觉证据和用户验收全部完成前，状态只能是“开发中”或“已实现待验证”。
 
 最终回写必须准确区分：14 个源模型已验收、Prefab/运行时接入已实现、自动验证已通过、用户视觉是否通过。任何一项不得替代另一项。
+
+## 17. 2026-08-15 当前执行证据
+
+- Ruins/Cliff AssetBuilder focused EditMode 为 `37/37`；日常完整 EditMode 为 `1454/1454`，唯一排除类别为本批不运行的 `TerrainAssetDeep`；完整 PlayMode 为 `91/91`。以上均为零失败、零跳过。
+- 最终 v8 依次通过 `BuildWindowsGraybox3D`、`BuildWindowsGraybox3DDevelopment`、`BuildWindowsLegacy2D` 和 `BuildMacOSGraybox3D`。三个 Windows Player 均确认为 `PE32+` GUI x86-64；macOS 精确 binary 确认为 universal `x86_64 arm64`。
+- 每次构建带 `-batchmode -nographics -quit` 完整退出后，`21` 个 ProjectSettings 和 `14` 个运行时 Prefab 的哈希均精确稳定，普通/最终退出恢复标记和备份均为 `0`。
+- macOS 精确 binary 已运行 `45` 秒 NullGfx 启动冒烟；`31` 条错误全部为无图形设备下预期的 unsupported Shader，脚本异常、空引用、未处理异常、Missing Script 与崩溃均为 `0`。该结果只覆盖启动和关闭生命周期，不满足真实画面、GPU 或显存门。
+- 真实 Windows 10/11 Player 的视觉、GPU、显存和内存冒烟以及用户对 Ruins/Cliff 运行时画面的视觉复验仍待完成。因此本子项只能写“已实现待用户视觉复验”，整个 `IDEA-0004` 继续保持 `开发中`，不得写成“已验证”。

@@ -252,7 +252,7 @@ export WASTECITY_RUINS_CLIFF_CORRECTED_CALIBRATION="$WASTECITY_EVIDENCE/task3-5-
 
 - 先预检全部 FBX/槽名/Shader、输出路径冲突和 Task 0/3.5 校准真值，再在仓库内固定 staging 目录准备但不引用正式场景；验证全部 staging 资产成功后才按 Catalog 固定顺序发布。每个 FBX 必须验证唯一 imported root 的 position `(0,0,0)`、共同精确 quaternion/`SourceImportMatrix`、scale `(1,1,1)`、MeshFilter/Renderer 位于该 root、raw Mesh submesh 数与 `renderer.sharedMaterials` 顺序逐项匹配 Catalog；再从 raw bounds 独立复算 ChildOffset，并用完整组合逐项验证 `abs(finalBounds.center.x/z)<=2e-7`、`abs(finalBounds.min.y)<=2e-7`、size 与纠偏证据误差 `<=2e-7`。任一不符在 mutation 前失败。
 - Builder 实现显式跨资产事务：首次创建通过 staging asset 连同 `.meta` 的 `AssetDatabase.MoveAsset` 发布；更新已有资产时先在 `Library/WasteCity.RuinsCliffAssetRestore/` 保存逐字节内容、GUID/路径清单和恢复 marker，再用保持既有 `.meta`/GUID 的序列化更新。任一 publish/save/reimport/最终验证失败时按逆序 rollback；编辑器下次初始化先恢复遗留 marker。成功后删除 marker/备份。连续重跑不得改变 Prefab/Material/Profile GUID 或字节。
-- Prefab 仅 Transform/MeshFilter/MeshRenderer，Mesh 直接引用对应 FBX raw Mesh，零 Collider/Rigidbody/脚本；全部槽按 Catalog 的 Unity 实际 submesh 顺序映射到 13 个共享 Material。Prefab 在 cell 原点、零 `quarterTurns` 时必须镜像完整 `T(childOffset) * S(rootScale) * SourceImportMatrix`，以最终 `localToWorldMatrix` 比较为准，不能只复制 imported root rotation 或只写 cell-fit scale。
+- Prefab 仅 Transform/MeshFilter/MeshRenderer，零 Collider/Rigidbody/脚本；Builder 从对应原始 FBX 确定性复制 Mesh，并在每个 Prefab 内嵌唯一可读的 `<StableId>_RuntimeMesh` 子资源。原始 FBX importer 必须保持 Read/Write 关闭；重建时原位更新子资源，Prefab GUID 与 Mesh localFileID 必须稳定。全部槽按 Catalog 的 Unity 实际 submesh 顺序映射到 13 个共享 Material。Prefab 在 cell 原点、零 `quarterTurns` 时必须镜像完整 `T(childOffset) * S(rootScale) * SourceImportMatrix`，以最终 `localToWorldMatrix` 比较为准，不能只复制 imported root rotation 或只写 cell-fit scale。
 - 新 Shader 名冻结为 `WasteCity/Terrain/FirstPassGeometry`，属性冻结为 `_BaseColorArray`、`_NormalArray`、`_MaskArray`、`_HeightArray`、`_LayerIndex`、`_TriplanarScale` 与角色 tint/PBR 参数。Ruins 材质 `_LayerIndex=4`，Cliff 材质 `_LayerIndex=6`，不得由实例覆盖。
 - Shader 使用 URP 正式 PBR 路径，至少包含 `UniversalForward` 和 `ShadowCaster`，当前 URP 深度路径需要时增加 `DepthOnly`。三平面采样必须按法线权重混合，并对 Tangent Space Normal 的 X/Y/Z 投影做轴重定向与符号修正；不得使用逐格 UV、相机空间或地表控制图。
 - 13 个共享 Material 只配置角色色调与 PBR 参数，共享新 Shader 和既有数组引用；不得复制纹理、生成每-Prefab贴图或引用 FBX 内嵌材质。
@@ -297,7 +297,7 @@ export WASTECITY_RUINS_CLIFF_CORRECTED_CALIBRATION="$WASTECITY_EVIDENCE/task3-5-
 **Interfaces**
 
 - 类别级 `TryBuild(profile, placements, parent, out CategoryGeometry, out error)`；只在成功后返回拥有的 Mesh/GameObject。
-- 从 Prefab 只取得 `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform；使用 `Mesh.AcquireReadOnlyMeshData` 读取该 raw FBX Mesh。输出使用 `Mesh.AllocateWritableMeshData`，不修改 importer/readability。
+- 从 Prefab 只取得内嵌可读的运行时 `MeshFilter.sharedMesh` 与 `MeshRenderer.sharedMaterials`，明确忽略 Prefab Transform；使用 `Mesh.AcquireReadOnlyMeshData` 读取该运行时 Mesh。输出使用 `Mesh.AllocateWritableMeshData`，不修改原始 FBX importer/readability。
 - 每类先以 `checked long` 累计实际顶点/索引并验证能安全转换到 Unity 接受的 `int`。在 writable `MeshData` 上先调用 `SetVertexBufferParams` 和 `SetIndexBufferParams(indexCount, IndexFormat)`：`<= 65,535` 个顶点显式使用 `UInt16`，`> 65,535` 显式使用 `UInt32`；随后才写 buffer、设置 `subMeshCount` 并对每个角色调用 `SetSubMesh(SubMeshDescriptor)`，最后调用 `Mesh.ApplyAndDisposeWritableMeshData`。
 - 明确复制和变换 Position、Normal、Tangent、UV0；Position 只使用已含共同 `SourceImportMatrix` 的完整 placement 矩阵，绝不能再乘 Prefab Transform。Normal 使用线性 `3×3` 的 inverse-transpose 后归一化，Tangent.xyz 使用线性 `3×3` 后相对新 Normal 做 Gram-Schmidt 正交化并归一化，Tangent.w 保留源 handedness。批准矩阵均为正行列式；遇到反射/负行列式矩阵原子失败。按 raw submesh 对应的 Catalog 材质角色归并，保持三角形 winding 和每角色范围，最终重算 Bounds。源缺少必需通道、属性格式不支持或材质槽不匹配时原子失败。
 - 32 位索引支持通过默认读取 `SystemInfo.supports32bitsIndexBuffer`、测试可注入的只读 capability 提供；测试注入不得改变生产默认且必须在 teardown 恢复。平台不支持时在分配/写入 UInt32 buffer 前失败。
@@ -410,7 +410,7 @@ shasum -a 256 Assets/_Game/Scenes/GrayboxPrototype3D.unity
 **RED / GREEN and gates**
 
 - PlayMode 用正式场景逐格核对 placement、两个 Renderer、真实禁用/恢复、世界重建。A* 复用 `FirstArtTerrainRuntimeSceneTests` 的真实右键路径测试；建造与菜单真实输入分别复跑现有 `GrayboxBuildingRuntimeSceneTests`、`GrayboxUsabilityRuntimeSceneTests`，不在新测试中复制导航、放置或菜单规则；完整 PlayMode 再统一兜底。
-- 性能测试冻结结构；真实性能探针的 public、static、无参数 `WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance` 只从 `WASTECITY_RUINS_CLIFF_PERF_RESULT` 取得仓库外输出路径，记录布局+合批五次原始样本/中位数 `<=100 ms`、总初始化五次原始样本/中位数 `<=250 ms`、预热后 300 帧后代分配 `0 B`、Renderer/长期对象/顶点/三角形/SetPass 统计，失败时抛异常且不得留下半份 JSON。NUnit 只冻结入口、结构和阈值，不以 NUnit stopwatch 冒充 GUI Profiler。
+- 性能测试冻结结构；真实性能探针的 public、static、无参数 `WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance` 只从 `WASTECITY_RUINS_CLIFF_PERF_RESULT` 取得仓库外输出路径，记录布局+合批五次原始样本/中位数 `<=100 ms`、总初始化五次原始样本/中位数 `<=250 ms`、预热后 `300` 次稳定观察的当前线程托管分配 `0 B`，以及 Renderer/长期对象/顶点/三角形/`materialSlotCount` 统计，失败时抛异常且不得留下半份 JSON。NUnit 只冻结入口、结构和阈值，不以 NUnit stopwatch 冒充 GUI Profiler；真实连续 `300` 帧与 SetPass 由后文独立 GUI Profiler 门记录。
 - 证据捕获的 public、static、无参数自动入口冻结为 `WasteCity.Editor.FirstArtRuinsCliffEvidenceCapture.StartAutomatedCapture`，只从 `WASTECITY_RUINS_CLIFF_EVIDENCE_DIR` 取得仓库外目录；输出 `manifest.json`、默认镜头、顶视、Ruins 近景、Cliff 六拓扑夹具、双成功及 Ruins/Cliff 单失败回退 PNG。manifest 必须记录场景、seed、相机矩阵、Profile/Material/Prefab GUID、每张图 SHA-256 与捕获结果；任何必需图缺失、全黑、粉色或 manifest 不完整时进程失败。
 - 先在 `GrayboxBuildAndPerformanceTests` 写 RED：要求存在 `FormalBuildTools.BuildMacOSGraybox3D`，只构建 `Assets/_Game/Scenes/GrayboxPrototype3D.unity` 到 `Builds/macOS/WasteCity.app`，目标为 `BuildTarget.StandaloneOSX`，临时选择 universal 架构并在 build `finally`、构建后回调、Editor 退出和下次初始化恢复原设置；复用 `GrayboxRenderPipelineBuildScope`，不得创建第二套 URP 保护真值。实现后 focused GREEN。
 
@@ -479,16 +479,16 @@ GUI Profiler 是独立人工技术门，不由上述 JSON 或 NUnit 代替。在
 构建：
 
 ```bash
-"$WASTECITY_UNITY" -batchmode -quit -projectPath "$WASTECITY_PROJECT" \
-  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindows \
+"$WASTECITY_UNITY" -batchmode -nographics -quit -projectPath "$WASTECITY_PROJECT" \
+  -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D \
   -logFile "$WASTECITY_EVIDENCE/build-release-3d.log"
-"$WASTECITY_UNITY" -batchmode -quit -projectPath "$WASTECITY_PROJECT" \
+"$WASTECITY_UNITY" -batchmode -nographics -quit -projectPath "$WASTECITY_PROJECT" \
   -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment \
   -logFile "$WASTECITY_EVIDENCE/build-development-3d.log"
-"$WASTECITY_UNITY" -batchmode -quit -projectPath "$WASTECITY_PROJECT" \
+"$WASTECITY_UNITY" -batchmode -nographics -quit -projectPath "$WASTECITY_PROJECT" \
   -executeMethod WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D \
   -logFile "$WASTECITY_EVIDENCE/build-legacy-2d.log"
-"$WASTECITY_UNITY" -batchmode -quit -projectPath "$WASTECITY_PROJECT" \
+"$WASTECITY_UNITY" -batchmode -nographics -quit -projectPath "$WASTECITY_PROJECT" \
   -executeMethod WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D \
   -logFile "$WASTECITY_EVIDENCE/build-macos-3d.log"
 ```
@@ -498,6 +498,14 @@ GUI Profiler 是独立人工技术门，不由上述 JSON 或 NUnit 代替。在
 **Commit:** `test: verify ruins cliff runtime integration`
 
 主代理审查：测试 XML、探针 JSON、GUI Profiler 原始 `.data`/三图/notes、自动视觉 manifest/PNG、四次构建、macOS 日志/截图和 Windows 待补声明。
+
+### Task 8 最终执行记录（2026-08-15）
+
+- AssetBuilder focused EditMode `37/37`；日常完整 EditMode `1454/1454`，唯一排除类别为 `TerrainAssetDeep`；完整 PlayMode `91/91`。全部零失败、零跳过。
+- 最终 v8 按上方四个显式入口顺序执行，四份日志均记录 `Build Finished, Result: Success.` 和正常 batchmode 退出。三个 Windows Player 均为 `PE32+` GUI x86-64，macOS 精确 binary 为 universal `x86_64 arm64`。
+- 每次构建完整退出后，`21` 个 ProjectSettings 与 `14` 个运行时 Prefab 哈希精确稳定，普通/最终退出恢复标记和备份均无残留。
+- macOS 精确 binary 的 `45` 秒 NullGfx 冒烟中，`31` 条错误全部为无图形设备下预期的 unsupported Shader，脚本异常、空引用、未处理异常、Missing Script 与崩溃为 `0`。该结果不能作为画面、GPU 或显存验收。
+- 真实 Windows 10/11 Player 的视觉/GPU/显存/内存冒烟与用户 Ruins/Cliff 运行时视觉复验仍待完成；不得把本 Task 8 自动证据写成整个 `IDEA-0004` 已验证。
 
 ---
 
@@ -526,10 +534,10 @@ GUI Profiler 是独立人工技术门，不由上述 JSON 或 NUnit 代替。在
 
 ```json
 {"Builds":[
-  {"Name":"Windows default Release 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/build-release-3d.log"},
-  {"Name":"Windows Development 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/build-development-3d.log"},
-  {"Name":"Windows legacy 2D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/build-legacy-2d.log"},
-  {"Name":"macOS universal 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/build-macos-3d.log"}
+  {"Name":"Windows Release 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/task8-builds-final8/windows-release3d.log"},
+  {"Name":"Windows Development 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/task8-builds-final8/windows-development3d.log"},
+  {"Name":"Windows legacy 2D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/task8-builds-final8/windows-legacy2d.log"},
+  {"Name":"macOS universal 3D","Status":"Succeeded","EvidenceLogPath":"/private/tmp/wastecity-ruins-cliff/task8-builds-final8/macos.log"}
 ]}
 ```
 

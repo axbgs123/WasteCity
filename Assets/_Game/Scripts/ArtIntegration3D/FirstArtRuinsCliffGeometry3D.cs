@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -30,6 +33,10 @@ namespace WasteCity.ArtIntegration3D
             if (disposed)
                 return;
             disposed = true;
+            // PlayMode destruction is deferred until after the current update.
+            // Hide owned geometry now so fallback cannot share a render frame.
+            if (Application.isPlaying && GameObject != null)
+                GameObject.SetActive(false);
             DestroyOwned(GameObject);
             DestroyOwned(Mesh);
         }
@@ -50,6 +57,8 @@ namespace WasteCity.ArtIntegration3D
         private const string RuntimeMeshName = "FirstArtRuinsCliffCombinedGeometry";
         private static bool? supportsUInt32Override;
         private static string failureCheckpoint;
+        private static int readOnlyMeshDataAcquisitionCount;
+        private static int directVertexViewCount;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct OutputVertex
@@ -58,6 +67,84 @@ namespace WasteCity.ArtIntegration3D
             public Vector3 Normal;
             public Vector4 Tangent;
             public Vector2 Uv0;
+        }
+
+        private struct DirectVertexTransformJob : IJobParallelFor
+        {
+            [ReadOnly]
+            public NativeArray<OutputVertex> Source;
+
+            [NativeDisableParallelForRestriction]
+            public NativeArray<OutputVertex> Destination;
+
+            [NativeDisableParallelForRestriction]
+            public NativeArray<int> ErrorCode;
+
+            public Matrix4x4 Matrix;
+            public Matrix4x4 NormalMatrix;
+            public int DestinationStart;
+
+            public void Execute(int index)
+            {
+                OutputVertex sourceVertex = Source[index];
+                Vector3 transformedNormal = NormalMatrix.MultiplyVector(
+                    sourceVertex.Normal);
+                if (!TryNormalize(transformedNormal, out transformedNormal))
+                {
+                    RecordFirstTransformError(ErrorCode, 1);
+                    return;
+                }
+                Vector3 sourceTangentDirection = new Vector3(
+                    sourceVertex.Tangent.x,
+                    sourceVertex.Tangent.y,
+                    sourceVertex.Tangent.z);
+                if (!IsFinite(sourceTangentDirection))
+                {
+                    RecordFirstTransformError(ErrorCode, 2);
+                    return;
+                }
+                Vector3 transformedTangent = Matrix.MultiplyVector(
+                    sourceTangentDirection);
+                transformedTangent -= transformedNormal *
+                    Vector3.Dot(transformedNormal, transformedTangent);
+                if (!TryNormalize(transformedTangent, out transformedTangent))
+                {
+                    Vector3 fallbackAxis = Mathf.Abs(transformedNormal.y) < 0.9f
+                        ? Vector3.up
+                        : Vector3.right;
+                    transformedTangent = Vector3.Cross(
+                        fallbackAxis,
+                        transformedNormal).normalized;
+                }
+
+                Vector3 position = Matrix.MultiplyPoint3x4(sourceVertex.Position);
+                if (!IsFinite(position) || !IsFinite(sourceVertex.Uv0) ||
+                    !IsFinite(sourceVertex.Tangent.w))
+                {
+                    RecordFirstTransformError(ErrorCode, 3);
+                    return;
+                }
+                Destination[DestinationStart + index] = new OutputVertex
+                {
+                    Position = position,
+                    Normal = transformedNormal,
+                    Tangent = new Vector4(
+                        transformedTangent.x,
+                        transformedTangent.y,
+                        transformedTangent.z,
+                        sourceVertex.Tangent.w),
+                    Uv0 = sourceVertex.Uv0,
+                };
+            }
+        }
+
+        private static unsafe void RecordFirstTransformError(
+            NativeArray<int> errorCode,
+            int value)
+        {
+            int* errorCodePointer =
+                (int*)NativeArrayUnsafeUtility.GetUnsafePtr(errorCode);
+            Interlocked.CompareExchange(ref *errorCodePointer, value, 0);
         }
 
         private sealed class SourcePlacement
@@ -69,6 +156,12 @@ namespace WasteCity.ArtIntegration3D
 
         public static bool IsUsingSystemIndexCapability =>
             !supportsUInt32Override.HasValue;
+
+        public static int ReadOnlyMeshDataAcquisitionCountForTests =>
+            readOnlyMeshDataAcquisitionCount;
+
+        public static int DirectVertexViewCountForTests =>
+            directVertexViewCount;
 
         public static bool TryBuild(
             FirstArtRuinsCliffProfile3D profile,
@@ -232,6 +325,8 @@ namespace WasteCity.ArtIntegration3D
         {
             supportsUInt32Override = null;
             failureCheckpoint = null;
+            readOnlyMeshDataAcquisitionCount = 0;
+            directVertexViewCount = 0;
         }
 
         private static bool TryPreflight(
@@ -470,53 +565,99 @@ namespace WasteCity.ArtIntegration3D
                 indices32 = output.GetIndexData<uint>();
 
             int vertexBase = 0;
-            for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)
+            var readableByMesh = new Dictionary<Mesh, Mesh.MeshDataArray>();
+            var directVerticesByMesh =
+                new Dictionary<Mesh, NativeArray<OutputVertex>>();
+            NativeArray<int> directTransformErrorCode = default;
+            try
             {
-                SourcePlacement source = sources[sourceIndex];
-                Mesh.MeshDataArray readable = Mesh.AcquireReadOnlyMeshData(source.Mesh);
-                try
+                for (int sourceIndex = 0; sourceIndex < sources.Count; sourceIndex++)
                 {
-                    Mesh.MeshData input = readable[0];
-                    if (!TryCopyVertices(
-                            input,
-                            source.Placement.WorldMatrix,
-                            vertices,
-                            vertexBase,
-                            out error))
-                        return false;
-
-                    for (int slot = 0; slot < source.Mesh.subMeshCount; slot++)
+                    SourcePlacement source = sources[sourceIndex];
+                    if (!readableByMesh.TryGetValue(
+                            source.Mesh,
+                            out Mesh.MeshDataArray readable))
                     {
-                        int roleIndex = roleIndices[source.Entry.MaterialRoles[slot]];
-                        SubMeshDescriptor descriptor = input.GetSubMesh(slot);
-                        for (int localIndex = 0;
-                             localIndex < descriptor.indexCount;
-                             localIndex++)
+                        readable = Mesh.AcquireReadOnlyMeshData(source.Mesh);
+                        readableByMesh.Add(source.Mesh, readable);
+                        readOnlyMeshDataAcquisitionCount++;
+                        Mesh.MeshData acquiredInput = readable[0];
+                        if (HasDirectInterleavedVertexLayout(acquiredInput))
                         {
-                            uint rawIndex = ReadSourceIndex(
-                                input,
-                                source.Mesh.indexFormat,
-                                descriptor.indexStart + localIndex);
-                            long combined = (long)vertexBase + descriptor.baseVertex + rawIndex;
-                            if (combined < vertexBase ||
-                                combined >= (long)vertexBase + source.Mesh.vertexCount)
-                            {
-                                error = "Source mesh contains an out-of-range index.";
-                                return false;
-                            }
-                            int destination = roleCursors[roleIndex]++;
-                            if (outputIndexFormat == IndexFormat.UInt16)
-                                indices16[destination] = checked((ushort)combined);
-                            else
-                                indices32[destination] = checked((uint)combined);
+                            directVerticesByMesh.Add(
+                                source.Mesh,
+                                acquiredInput.GetVertexData<OutputVertex>(0));
+                            directVertexViewCount++;
                         }
                     }
+                    Mesh.MeshData input = readable[0];
+                    directVerticesByMesh.TryGetValue(
+                        source.Mesh,
+                        out NativeArray<OutputVertex> directVertices);
+                    NativeArray<ushort> sourceIndices16 = default;
+                    NativeArray<uint> sourceIndices32 = default;
+                    if (source.Mesh.indexFormat == IndexFormat.UInt16)
+                        sourceIndices16 = input.GetIndexData<ushort>();
+                    else
+                        sourceIndices32 = input.GetIndexData<uint>();
+                    if (directVertices.IsCreated)
+                    {
+                        if (!directTransformErrorCode.IsCreated)
+                        {
+                            directTransformErrorCode = new NativeArray<int>(
+                                1,
+                                Allocator.TempJob,
+                                NativeArrayOptions.ClearMemory);
+                        }
+                        if (!TryCopyDirectInterleavedPlacement(
+                                source,
+                                input,
+                                directVertices,
+                                vertices,
+                                directTransformErrorCode,
+                                sourceIndices16,
+                                sourceIndices32,
+                                indices16,
+                                indices32,
+                                outputIndexFormat,
+                                roleIndices,
+                                roleCursors,
+                                vertexBase,
+                                out error))
+                            return false;
+                    }
+                    else
+                    {
+                        if (!TryCopyVertices(
+                                input,
+                                source.Placement.WorldMatrix,
+                                vertices,
+                                vertexBase,
+                                out error))
+                            return false;
+                        if (!TryCopyIndices(
+                                source,
+                                input,
+                                sourceIndices16,
+                                sourceIndices32,
+                                indices16,
+                                indices32,
+                                outputIndexFormat,
+                                roleIndices,
+                                roleCursors,
+                                vertexBase,
+                                out error))
+                            return false;
+                    }
+                    vertexBase = checked(vertexBase + source.Mesh.vertexCount);
                 }
-                finally
-                {
+            }
+            finally
+            {
+                if (directTransformErrorCode.IsCreated)
+                    directTransformErrorCode.Dispose();
+                foreach (Mesh.MeshDataArray readable in readableByMesh.Values)
                     readable.Dispose();
-                }
-                vertexBase = checked(vertexBase + source.Mesh.vertexCount);
             }
 
             for (int role = 0; role < familyRoles.Count; role++)
@@ -541,22 +682,34 @@ namespace WasteCity.ArtIntegration3D
             int destinationStart,
             out string error)
         {
-            int positionStream = input.GetVertexAttributeStream(VertexAttribute.Position);
-            int normalStream = input.GetVertexAttributeStream(VertexAttribute.Normal);
-            int tangentStream = input.GetVertexAttributeStream(VertexAttribute.Tangent);
-            int uvStream = input.GetVertexAttributeStream(VertexAttribute.TexCoord0);
-            NativeArray<byte> positions = input.GetVertexData<byte>(positionStream);
-            NativeArray<byte> normals = input.GetVertexData<byte>(normalStream);
-            NativeArray<byte> tangents = input.GetVertexData<byte>(tangentStream);
-            NativeArray<byte> uvs = input.GetVertexData<byte>(uvStream);
-            int positionStride = input.GetVertexBufferStride(positionStream);
-            int normalStride = input.GetVertexBufferStride(normalStream);
-            int tangentStride = input.GetVertexBufferStride(tangentStream);
-            int uvStride = input.GetVertexBufferStride(uvStream);
-            int positionOffset = input.GetVertexAttributeOffset(VertexAttribute.Position);
-            int normalOffset = input.GetVertexAttributeOffset(VertexAttribute.Normal);
-            int tangentOffset = input.GetVertexAttributeOffset(VertexAttribute.Tangent);
-            int uvOffset = input.GetVertexAttributeOffset(VertexAttribute.TexCoord0);
+            int positionStream =
+                input.GetVertexAttributeStream(VertexAttribute.Position);
+            int normalStream =
+                input.GetVertexAttributeStream(VertexAttribute.Normal);
+            int tangentStream =
+                input.GetVertexAttributeStream(VertexAttribute.Tangent);
+            int uvStream =
+                input.GetVertexAttributeStream(VertexAttribute.TexCoord0);
+            NativeArray<float> positions = input.GetVertexData<byte>(positionStream)
+                .Reinterpret<float>(1);
+            NativeArray<float> normals = input.GetVertexData<byte>(normalStream)
+                .Reinterpret<float>(1);
+            NativeArray<float> tangents = input.GetVertexData<byte>(tangentStream)
+                .Reinterpret<float>(1);
+            NativeArray<float> uvs = input.GetVertexData<byte>(uvStream)
+                .Reinterpret<float>(1);
+            int positionStride = input.GetVertexBufferStride(positionStream) / 4;
+            int normalStride = input.GetVertexBufferStride(normalStream) / 4;
+            int tangentStride = input.GetVertexBufferStride(tangentStream) / 4;
+            int uvStride = input.GetVertexBufferStride(uvStream) / 4;
+            int positionOffset =
+                input.GetVertexAttributeOffset(VertexAttribute.Position) / 4;
+            int normalOffset =
+                input.GetVertexAttributeOffset(VertexAttribute.Normal) / 4;
+            int tangentOffset =
+                input.GetVertexAttributeOffset(VertexAttribute.Tangent) / 4;
+            int uvOffset =
+                input.GetVertexAttributeOffset(VertexAttribute.TexCoord0) / 4;
             Matrix4x4 normalMatrix = matrix.inverse.transpose;
 
             for (int vertex = 0; vertex < input.vertexCount; vertex++)
@@ -627,48 +780,223 @@ namespace WasteCity.ArtIntegration3D
             return true;
         }
 
-        private static uint ReadSourceIndex(
+        private static unsafe bool TryCopyDirectInterleavedPlacement(
+            SourcePlacement source,
             Mesh.MeshData input,
-            IndexFormat format,
-            int index)
+            NativeArray<OutputVertex> sourceVertices,
+            NativeArray<OutputVertex> destinationVertices,
+            NativeArray<int> transformErrorCode,
+            NativeArray<ushort> sourceIndices16,
+            NativeArray<uint> sourceIndices32,
+            NativeArray<ushort> destinationIndices16,
+            NativeArray<uint> destinationIndices32,
+            IndexFormat outputIndexFormat,
+            Dictionary<string, int> roleIndices,
+            int[] roleCursors,
+            int vertexBase,
+            out string error)
         {
-            if (format == IndexFormat.UInt16)
-                return input.GetIndexData<ushort>()[index];
-            return input.GetIndexData<uint>()[index];
+            if (vertexBase < 0 ||
+                input.vertexCount < 0 ||
+                vertexBase > destinationVertices.Length - input.vertexCount)
+            {
+                error = "Combined vertex destination range is invalid.";
+                return false;
+            }
+
+            transformErrorCode[0] = 0;
+            Matrix4x4 matrix = source.Placement.WorldMatrix;
+            var transformJob = new DirectVertexTransformJob
+            {
+                Source = sourceVertices,
+                Destination = destinationVertices,
+                ErrorCode = transformErrorCode,
+                Matrix = matrix,
+                NormalMatrix = matrix.inverse.transpose,
+                DestinationStart = vertexBase,
+            };
+            transformJob.Schedule(input.vertexCount, 64).Complete();
+            switch (transformErrorCode[0])
+            {
+                case 1:
+                    error = "A transformed normal is degenerate or non-finite.";
+                    return false;
+                case 2:
+                    error = "Source tangent data is non-finite.";
+                    return false;
+                case 3:
+                    error = "Source or transformed vertex data is non-finite.";
+                    return false;
+            }
+
+            ushort* sourceIndex16Pointer = source.Mesh.indexFormat == IndexFormat.UInt16
+                ? (ushort*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(sourceIndices16)
+                : null;
+            uint* sourceIndex32Pointer = source.Mesh.indexFormat == IndexFormat.UInt32
+                ? (uint*)NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(sourceIndices32)
+                : null;
+            ushort* destinationIndex16Pointer = outputIndexFormat == IndexFormat.UInt16
+                ? (ushort*)NativeArrayUnsafeUtility.GetUnsafePtr(destinationIndices16)
+                : null;
+            uint* destinationIndex32Pointer = outputIndexFormat == IndexFormat.UInt32
+                ? (uint*)NativeArrayUnsafeUtility.GetUnsafePtr(destinationIndices32)
+                : null;
+
+            int sourceIndexLength = source.Mesh.indexFormat == IndexFormat.UInt16
+                ? sourceIndices16.Length
+                : sourceIndices32.Length;
+            int destinationIndexLength = outputIndexFormat == IndexFormat.UInt16
+                ? destinationIndices16.Length
+                : destinationIndices32.Length;
+            for (int slot = 0; slot < source.Mesh.subMeshCount; slot++)
+            {
+                int roleIndex = roleIndices[source.Entry.MaterialRoles[slot]];
+                SubMeshDescriptor descriptor = input.GetSubMesh(slot);
+                for (int localIndex = 0;
+                     localIndex < descriptor.indexCount;
+                     localIndex++)
+                {
+                    long sourceIndexOffsetLong =
+                        (long)descriptor.indexStart + localIndex;
+                    if (sourceIndexOffsetLong < 0 ||
+                        sourceIndexOffsetLong >= sourceIndexLength)
+                    {
+                        error = "Source mesh contains an invalid index range.";
+                        return false;
+                    }
+                    int sourceIndexOffset = (int)sourceIndexOffsetLong;
+                    uint rawIndex = source.Mesh.indexFormat == IndexFormat.UInt16
+                        ? sourceIndex16Pointer[sourceIndexOffset]
+                        : sourceIndex32Pointer[sourceIndexOffset];
+                    long combined = (long)vertexBase + descriptor.baseVertex + rawIndex;
+                    if (combined < vertexBase ||
+                        combined >= (long)vertexBase + source.Mesh.vertexCount)
+                    {
+                        error = "Source mesh contains an out-of-range index.";
+                        return false;
+                    }
+                    int destination = roleCursors[roleIndex];
+                    if (destination < 0 || destination >= destinationIndexLength)
+                    {
+                        error = "Combined index destination range is invalid.";
+                        return false;
+                    }
+                    roleCursors[roleIndex] = destination + 1;
+                    if (outputIndexFormat == IndexFormat.UInt16)
+                    {
+                        if (combined > ushort.MaxValue)
+                        {
+                            error = "A combined index exceeds the selected 16-bit format.";
+                            return false;
+                        }
+                        destinationIndex16Pointer[destination] = (ushort)combined;
+                    }
+                    else
+                    {
+                        if (combined > uint.MaxValue)
+                        {
+                            error = "A combined index exceeds the selected 32-bit format.";
+                            return false;
+                        }
+                        destinationIndex32Pointer[destination] = (uint)combined;
+                    }
+                }
+            }
+
+            error = null;
+            return true;
         }
 
-        private static Vector2 ReadVector2(NativeArray<byte> bytes, int offset)
+        private static bool TryCopyIndices(
+            SourcePlacement source,
+            Mesh.MeshData input,
+            NativeArray<ushort> sourceIndices16,
+            NativeArray<uint> sourceIndices32,
+            NativeArray<ushort> destinationIndices16,
+            NativeArray<uint> destinationIndices32,
+            IndexFormat outputIndexFormat,
+            Dictionary<string, int> roleIndices,
+            int[] roleCursors,
+            int vertexBase,
+            out string error)
         {
-            return new Vector2(ReadFloat(bytes, offset), ReadFloat(bytes, offset + 4));
+            for (int slot = 0; slot < source.Mesh.subMeshCount; slot++)
+            {
+                int roleIndex = roleIndices[source.Entry.MaterialRoles[slot]];
+                SubMeshDescriptor descriptor = input.GetSubMesh(slot);
+                for (int localIndex = 0;
+                     localIndex < descriptor.indexCount;
+                     localIndex++)
+                {
+                    int sourceIndexOffset = descriptor.indexStart + localIndex;
+                    uint rawIndex = source.Mesh.indexFormat == IndexFormat.UInt16
+                        ? sourceIndices16[sourceIndexOffset]
+                        : sourceIndices32[sourceIndexOffset];
+                    long combined = (long)vertexBase + descriptor.baseVertex + rawIndex;
+                    if (combined < vertexBase ||
+                        combined >= (long)vertexBase + source.Mesh.vertexCount)
+                    {
+                        error = "Source mesh contains an out-of-range index.";
+                        return false;
+                    }
+                    int destination = roleCursors[roleIndex]++;
+                    if (outputIndexFormat == IndexFormat.UInt16)
+                        destinationIndices16[destination] = checked((ushort)combined);
+                    else
+                        destinationIndices32[destination] = checked((uint)combined);
+                }
+            }
+
+            error = null;
+            return true;
         }
 
-        private static Vector3 ReadVector3(NativeArray<byte> bytes, int offset)
+        private static bool HasDirectInterleavedVertexLayout(Mesh.MeshData input)
+        {
+            return Marshal.SizeOf<OutputVertex>() == 48 &&
+                input.GetVertexAttributeStream(VertexAttribute.Position) == 0 &&
+                input.GetVertexAttributeStream(VertexAttribute.Normal) == 0 &&
+                input.GetVertexAttributeStream(VertexAttribute.Tangent) == 0 &&
+                input.GetVertexAttributeStream(VertexAttribute.TexCoord0) == 0 &&
+                input.GetVertexAttributeOffset(VertexAttribute.Position) == 0 &&
+                input.GetVertexAttributeOffset(VertexAttribute.Normal) == 12 &&
+                input.GetVertexAttributeOffset(VertexAttribute.Tangent) == 24 &&
+                input.GetVertexAttributeOffset(VertexAttribute.TexCoord0) == 40 &&
+                input.GetVertexBufferStride(0) == 48 &&
+                input.GetVertexAttributeFormat(VertexAttribute.Position) ==
+                    VertexAttributeFormat.Float32 &&
+                input.GetVertexAttributeFormat(VertexAttribute.Normal) ==
+                    VertexAttributeFormat.Float32 &&
+                input.GetVertexAttributeFormat(VertexAttribute.Tangent) ==
+                    VertexAttributeFormat.Float32 &&
+                input.GetVertexAttributeFormat(VertexAttribute.TexCoord0) ==
+                    VertexAttributeFormat.Float32 &&
+                input.GetVertexAttributeDimension(VertexAttribute.Position) == 3 &&
+                input.GetVertexAttributeDimension(VertexAttribute.Normal) == 3 &&
+                input.GetVertexAttributeDimension(VertexAttribute.Tangent) == 4 &&
+                input.GetVertexAttributeDimension(VertexAttribute.TexCoord0) == 2;
+        }
+
+        private static Vector2 ReadVector2(NativeArray<float> values, int offset)
+        {
+            return new Vector2(values[offset], values[offset + 1]);
+        }
+
+        private static Vector3 ReadVector3(NativeArray<float> values, int offset)
         {
             return new Vector3(
-                ReadFloat(bytes, offset),
-                ReadFloat(bytes, offset + 4),
-                ReadFloat(bytes, offset + 8));
+                values[offset],
+                values[offset + 1],
+                values[offset + 2]);
         }
 
-        private static Vector4 ReadVector4(NativeArray<byte> bytes, int offset)
+        private static Vector4 ReadVector4(NativeArray<float> values, int offset)
         {
             return new Vector4(
-                ReadFloat(bytes, offset),
-                ReadFloat(bytes, offset + 4),
-                ReadFloat(bytes, offset + 8),
-                ReadFloat(bytes, offset + 12));
-        }
-
-        private static float ReadFloat(NativeArray<byte> bytes, int offset)
-        {
-            var bits = new FloatBits
-            {
-                Bits = (uint)(bytes[offset] |
-                    (bytes[offset + 1] << 8) |
-                    (bytes[offset + 2] << 16) |
-                    (bytes[offset + 3] << 24)),
-            };
-            return bits.Value;
+                values[offset],
+                values[offset + 1],
+                values[offset + 2],
+                values[offset + 3]);
         }
 
         private static bool TryNormalize(Vector3 value, out Vector3 normalized)
@@ -712,13 +1040,6 @@ namespace WasteCity.ArtIntegration3D
                 UnityEngine.Object.Destroy(value);
             else
                 UnityEngine.Object.DestroyImmediate(value);
-        }
-
-        [StructLayout(LayoutKind.Explicit)]
-        private struct FloatBits
-        {
-            [FieldOffset(0)] public uint Bits;
-            [FieldOffset(0)] public float Value;
         }
 
         private sealed class RestoreScope : IDisposable

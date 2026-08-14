@@ -154,7 +154,23 @@
 
 能解决什么：在场景渲染首版地形。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`。怎么复用：用于在场景渲染首版地形。仅在已批准的三维场景接入。不能负责什么：不管理地形资源导入。改后跑哪组测试：`FirstArtTerrainRendererTests`。代码名：`FirstArtTerrainRenderer3D`。
 
+### 废墟与悬崖三维配置（复用前审查）
+
+能解决什么：冻结废墟与悬崖的稳定标识、模块语义和批准资源引用。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`、`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`。怎么复用：用于冻结废墟与悬崖稳定标识、模块语义和批准资源引用。不能负责什么：不复制地形规则真值；修改目录、材质槽或 Prefab 绑定前需要资产合同复核。改后跑哪组测试：`FirstArtRuinsCliffAssetBuilderTests`、`FirstArtRuinsCliffCatalogProfileTests`。代码名：`FirstArtRuinsCliffCatalog3D`、`FirstArtRuinsCliffProfile3D`。
+
+### 废墟与悬崖三维布局合批（复用前审查）
+
+能解决什么：从既有世界地图确定性投影并合批 Ruins/Cliff 几何。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`、`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`。怎么复用：用于从既有世界地图确定性投影并合批废墟与悬崖几何。不能负责什么：只消费既有地图与配置，不创建第二套地形判断或逐格常驻对象。改后跑哪组测试：`FirstArtRuinsCliffGeometryTests`、`FirstArtRuinsCliffLayoutTests`。代码名：`FirstArtRuinsCliffGeometry3D`、`FirstArtRuinsCliffLayout3D`。
+
+### 废墟与悬崖三维呈现（仅限场景）
+
+能解决什么：在唯一正式三维地形 presenter 中呈现 Ruins/Cliff，并在类别失败时恢复对应灰盒。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`。怎么复用：用于在正式三维地形 presenter 中呈现废墟与悬崖并保留分类回退。不能负责什么：必须复用唯一地形 presenter；不得增加第二个场景 owner 或绕过分类回退。改后跑哪组测试：`FirstArtRuinsCliffEvidenceCaptureTests`、`FirstArtRuinsCliffPresentationTests`、`FirstArtRuinsCliffSceneContractTests`。代码名：`FirstArtTerrainRenderer3D`。
+
 ## 场景、构建与检查工具
+
+### 废墟与悬崖视觉证据捕获（复用前审查）
+
+能解决什么：为 Ruins/Cliff 运行时接入留下可核对的固定画面和清单。在哪里：`Assets/_Game/Editor/FirstArtRuinsCliffEvidenceCapture.cs`。怎么复用：用于在批准的 GrayboxPrototype3D 场景中以固定 1280×720 视角自动采集 Ruins/Cliff 正常、单件和分类回退证据，并生成带资产 GUID、相机矩阵与 SHA-256 的清单。不能负责什么：仅供编辑器验证；输出必须是项目外的空绝对目录，必须消费既有场景、profile 和唯一地形 presenter，不修改玩法真值，也不替代用户视觉验收；正式说明路径为 Docs/09-Reusable-Project-Catalog-ZH.md。改后跑哪组测试：`FirstArtRuinsCliffEvidenceCaptureTests`。代码名：`FirstArtRuinsCliffEvidenceCapture`。
 
 ### 灰盒场景编写（仅限场景）
 
@@ -162,7 +178,7 @@
 
 ### 正式构建工具（复用前审查）
 
-能解决什么：执行正式构建检查，并让包含三维灰盒场景的 Player 构建在 Shader stripping 前识别批准的 URP 管线。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于执行正式构建检查，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线。通过 `FormalBuildTools` 选择正式构建入口；`GrayboxRenderPipelineBuildScope` 只按实际场景列表临时登记 `GrayboxURP`，并在构建后恢复进入构建前的管线、Quality 抗锯齿内存态和受保护文件精确字节。不能负责什么：不修改游戏规则；构建作用域必须恢复进入构建前的渲染管线、Quality 内存态和三个受保护文件字节。不得把临时管线写成永久 ProjectSettings，也不得用于绕过纯二维构建边界。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`，并执行受影响平台的真实 Player 构建。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。
+能解决什么：执行正式 Windows、冻结 2D 回归和 universal macOS 构建，并让包含三维灰盒场景的 Player 构建在 Shader stripping 前识别批准的 URP 管线。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于执行正式 Windows、冻结 2D 回归和 universal x86_64+arm64 macOS 构建，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线；带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。通过 `FormalBuildTools` 选择正式构建入口；`GrayboxRenderPipelineBuildScope` 只按实际场景列表临时登记 `GrayboxURP`。不能负责什么：不修改游戏规则；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。冻结 2D 构建不得获得 3D 管线覆盖，普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。改后跑哪组测试：`GrayboxBuildAndPerformanceTests` 中的 `Bug0005_BuildTools_ExposeRestorableUniversalMacOSGrayboxTarget`、`Bug0005_FinalExitRestoreActivatesOnlyForQuitFormalBuilds`、`Bug0005_FinalExitRestoreSynchronizesRuntimeBeforeExactBytes`，并执行受影响平台的真实 Player 构建与退出后哈希检查。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。
 
 ### 灰盒性能探针（仅限场景）
 

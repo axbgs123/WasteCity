@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -174,10 +175,10 @@ namespace WasteCity.Tests
                 Is.EqualTo(1));
             Assert.That(
                 presenter.GetComponentsInChildren<MeshRenderer>().Length,
-                Is.EqualTo(1));
+                Is.EqualTo(3));
             Assert.That(
                 presenter.GetComponentsInChildren<MeshFilter>().Length,
-                Is.EqualTo(1));
+                Is.EqualTo(3));
             Assert.That(
                 presenter.GetComponentsInChildren<Collider>(),
                 Is.Empty);
@@ -186,6 +187,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(0f).Within(.0001f));
             Assert.That(world.SurfaceFallbackVisible, Is.False);
             AssertFallbackAndPlaceholderSlots(world, false);
+            AssertRuinsCliffPresentation(presenter, world);
 
             FirstArtTerrainControlMap3D maps = presenter.ControlMaps;
             Assert.That(maps, Is.Not.Null);
@@ -218,6 +220,7 @@ namespace WasteCity.Tests
                 presenter.transform.Find("RuntimeSurface"),
                 Is.Null);
             Assert.That(RuntimeTerrainMeshCount(), Is.Zero);
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.Zero);
             Assert.That(RuntimeControlTextureCount(), Is.Zero);
             AssertFallbackAndPlaceholderSlots(world, true);
 
@@ -228,10 +231,12 @@ namespace WasteCity.Tests
             Assert.That(presenter.Profile, Is.SameAs(approvedProfile));
             Assert.That(
                 presenter.GetComponentsInChildren<MeshRenderer>().Length,
-                Is.EqualTo(1));
+                Is.EqualTo(3));
             Assert.That(RuntimeTerrainMeshCount(), Is.EqualTo(1));
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.EqualTo(2));
             Assert.That(RuntimeControlTextureCount(), Is.EqualTo(2));
             AssertFallbackAndPlaceholderSlots(world, false);
+            AssertRuinsCliffPresentation(presenter, world);
 
             presenter.enabled = false;
             yield return null;
@@ -248,8 +253,145 @@ namespace WasteCity.Tests
                 presenter.transform.Find("RuntimeSurface"),
                 Is.Null);
             Assert.That(RuntimeTerrainMeshCount(), Is.Zero);
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.Zero);
             Assert.That(RuntimeControlTextureCount(), Is.Zero);
             AssertFallbackAndPlaceholderSlots(world, true);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0004_CategoryFallbackDeactivatesPreviousGeometryInSameFrame()
+        {
+            FirstArtTerrainRenderer3D presenter = Presenter();
+            GrayboxWorldView3D world = World();
+            Transform previousRoot =
+                presenter.transform.Find("RuntimeGeometry");
+            Assert.That(previousRoot, Is.Not.Null);
+            MeshRenderer[] previousRenderers =
+                previousRoot.GetComponentsInChildren<MeshRenderer>(true);
+            Assert.That(previousRenderers, Has.Length.EqualTo(2));
+            Assert.That(
+                previousRenderers.All(renderer =>
+                    renderer != null && renderer.gameObject.activeInHierarchy),
+                Is.True);
+
+            using (FirstArtRuinsCliffGeometry3D.OverrideTestConfiguration(
+                       true,
+                       "AfterPreflight"))
+            {
+                Assert.That(presenter.TryPresent(world, false), Is.True);
+            }
+
+            Assert.That(
+                presenter.RuinsStatus,
+                Is.EqualTo(
+                    FirstArtRuinsCliffPresentationStatus3D.Fallback));
+            Assert.That(
+                presenter.CliffStatus,
+                Is.EqualTo(
+                    FirstArtRuinsCliffPresentationStatus3D.Fallback));
+            Assert.That(
+                world.IsSurfaceFallbackVisible("world.obstacle.ruins"),
+                Is.True);
+            Assert.That(
+                world.IsSurfaceFallbackVisible("world.obstacle.cliff"),
+                Is.True);
+            Assert.That(
+                previousRenderers.All(renderer =>
+                    renderer == null || !renderer.gameObject.activeInHierarchy),
+                Is.True,
+                "Fallback must hide the previous category geometry before " +
+                "PlayMode's delayed Destroy is processed.");
+
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RuinsCliffGeometry_ProjectsEveryRuleCellIntoTwoBatches()
+        {
+            FirstArtTerrainRenderer3D presenter = Presenter();
+            GrayboxWorldView3D world = World();
+            IReadOnlyList<FirstArtRuinsCliffPlacement3D> placements =
+                FirstArtRuinsCliffLayout3D.Project(
+                    world.Model,
+                    world.Coordinates);
+
+            int ruinsCells = 0;
+            int cliffCells = 0;
+            for (int y = 0; y < world.Model.Height; y++)
+            for (int x = 0; x < world.Model.Width; x++)
+            {
+                WorldTraversalKind traversal =
+                    world.Model.Get(x, y).Traversal;
+                if (traversal != WorldTraversalKind.Ruins &&
+                    traversal != WorldTraversalKind.Cliff)
+                    continue;
+
+                FirstArtRuinsCliffFamily3D expectedFamily =
+                    traversal == WorldTraversalKind.Ruins
+                        ? FirstArtRuinsCliffFamily3D.Ruins
+                        : FirstArtRuinsCliffFamily3D.Cliff;
+                FirstArtRuinsCliffPlacement3D[] cellPlacements =
+                    placements.Where(placement =>
+                            placement.CellX == x &&
+                            placement.CellY == y)
+                        .ToArray();
+                Assert.That(
+                    cellPlacements,
+                    Has.Length.EqualTo(1),
+                    $"Rule cell {x},{y} must produce exactly one placement.");
+                Assert.That(
+                    cellPlacements[0].Family,
+                    Is.EqualTo(expectedFamily),
+                    $"Rule cell {x},{y} projected the wrong family.");
+                Assert.That(
+                    cellPlacements[0].CatalogIndex,
+                    Is.InRange(0, FirstArtRuinsCliffCatalog3D.EntryCount - 1));
+                Assert.That(
+                    cellPlacements[0].WorldMatrix.ValidTRS(),
+                    Is.True,
+                    $"Rule cell {x},{y} projected an invalid matrix.");
+
+                if (expectedFamily == FirstArtRuinsCliffFamily3D.Ruins)
+                    ruinsCells++;
+                else
+                    cliffCells++;
+            }
+
+            Assert.That(ruinsCells, Is.GreaterThan(0));
+            Assert.That(cliffCells, Is.GreaterThan(0));
+            Assert.That(placements, Has.Count.EqualTo(ruinsCells + cliffCells));
+            Assert.That(
+                placements.Count(placement =>
+                    placement.Family == FirstArtRuinsCliffFamily3D.Ruins),
+                Is.EqualTo(ruinsCells));
+            Assert.That(
+                placements.Count(placement =>
+                    placement.Family == FirstArtRuinsCliffFamily3D.Cliff),
+                Is.EqualTo(cliffCells));
+            AssertRuinsCliffPresentation(presenter, world);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator WorldRebuild_ReprojectsBothBatchesWithoutRuntimeResidue()
+        {
+            FirstArtTerrainRenderer3D presenter = Presenter();
+            GrayboxWorldView3D world = World();
+            Mesh[] geometryBefore = GeometryMeshes(presenter);
+            Assert.That(geometryBefore, Has.Length.EqualTo(2));
+
+            world.Generate(GrayboxWorldLayout3D.CreateDefault());
+            yield return null;
+
+            Assert.That(presenter.IsPresented, Is.True);
+            Assert.That(world.HasActiveTerrainPresentation, Is.True);
+            Assert.That(RuntimeTerrainMeshCount(), Is.EqualTo(1));
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.EqualTo(2));
+            Assert.That(
+                geometryBefore.All(mesh => mesh == null),
+                Is.True,
+                "World rebuild must release both previous category meshes.");
+            AssertRuinsCliffPresentation(presenter, world);
         }
 
         [UnityTest]
@@ -386,7 +528,8 @@ namespace WasteCity.Tests
 
             Assert.That(
                 presenter.GetComponentsInChildren<MeshRenderer>().Length,
-                Is.EqualTo(1));
+                Is.EqualTo(3));
+            AssertRuinsCliffPresentation(presenter, World());
         }
 
         [UnityTest]
@@ -398,6 +541,7 @@ namespace WasteCity.Tests
             Texture2D controlA = presenter.ControlMaps.ControlA;
             Texture2D controlB = presenter.ControlMaps.ControlB;
             Assert.That(RuntimeTerrainMeshCount(), Is.EqualTo(1));
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.EqualTo(2));
             Assert.That(RuntimeControlTextureCount(), Is.EqualTo(2));
 
             yield return LoadEmptyScene();
@@ -408,6 +552,7 @@ namespace WasteCity.Tests
             Assert.That(controlA == null, Is.True);
             Assert.That(controlB == null, Is.True);
             Assert.That(RuntimeTerrainMeshCount(), Is.Zero);
+            Assert.That(RuntimeRuinsCliffMeshCount(), Is.Zero);
             Assert.That(RuntimeControlTextureCount(), Is.Zero);
         }
 
@@ -488,6 +633,7 @@ namespace WasteCity.Tests
             Assert.That(distanceAfter, Is.LessThan(distanceBefore));
             Assert.That(presenter.IsPresented, Is.True);
             Assert.That(World().SurfaceFallbackVisible, Is.False);
+            AssertRuinsCliffPresentation(presenter, world);
         }
 
         [UnityTest]
@@ -1035,6 +1181,72 @@ namespace WasteCity.Tests
                 .Count(mesh =>
                     mesh != null &&
                     mesh.name == "first-art.terrain.surface");
+        }
+
+        private static int RuntimeRuinsCliffMeshCount()
+        {
+            return Resources.FindObjectsOfTypeAll<Mesh>()
+                .Count(mesh =>
+                    mesh != null &&
+                    mesh.name == "FirstArtRuinsCliffCombinedGeometry");
+        }
+
+        private static Mesh[] GeometryMeshes(
+            FirstArtTerrainRenderer3D presenter)
+        {
+            Transform root = presenter.transform.Find("RuntimeGeometry");
+            if (root == null)
+                return new Mesh[0];
+            return root.GetComponentsInChildren<MeshFilter>(true)
+                .Select(filter => filter.sharedMesh)
+                .ToArray();
+        }
+
+        private static void AssertRuinsCliffPresentation(
+            FirstArtTerrainRenderer3D presenter,
+            GrayboxWorldView3D world)
+        {
+            Assert.That(presenter.GeometryProfile, Is.Not.Null);
+            Assert.That(
+                presenter.RuinsStatus,
+                Is.EqualTo(FirstArtRuinsCliffPresentationStatus3D.Presented));
+            Assert.That(
+                presenter.CliffStatus,
+                Is.EqualTo(FirstArtRuinsCliffPresentationStatus3D.Presented));
+            Assert.That(presenter.RuinsError, Is.Null);
+            Assert.That(presenter.CliffError, Is.Null);
+            Assert.That(
+                world.IsSurfaceFallbackVisible("world.obstacle.ruins"),
+                Is.False);
+            Assert.That(
+                world.IsSurfaceFallbackVisible("world.obstacle.cliff"),
+                Is.False);
+
+            Transform geometryRoot =
+                presenter.transform.Find("RuntimeGeometry");
+            Assert.That(geometryRoot, Is.Not.Null);
+            Assert.That(geometryRoot.childCount, Is.EqualTo(2));
+            MeshRenderer[] renderers =
+                geometryRoot.GetComponentsInChildren<MeshRenderer>(true);
+            MeshFilter[] filters =
+                geometryRoot.GetComponentsInChildren<MeshFilter>(true);
+            Assert.That(renderers, Has.Length.EqualTo(2));
+            Assert.That(filters, Has.Length.EqualTo(2));
+            Assert.That(
+                renderers.Select(renderer => renderer.name),
+                Is.EquivalentTo(new[] { "RuinsGeometry", "CliffGeometry" }));
+            Assert.That(
+                filters.Select(filter => filter.sharedMesh),
+                Has.All.Not.Null);
+            Assert.That(
+                filters.Select(filter => filter.sharedMesh.vertexCount),
+                Has.All.GreaterThan(0));
+            Assert.That(
+                geometryRoot.GetComponentsInChildren<Collider>(true),
+                Is.Empty);
+            Assert.That(
+                geometryRoot.GetComponentsInChildren<MonoBehaviour>(true),
+                Is.Empty);
         }
 
         private static int RuntimeControlTextureCount()

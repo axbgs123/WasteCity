@@ -3,16 +3,25 @@
 ## 状态与边界
 
 - 关联需求：`IDEA-0004`
-- 生产状态：参考板与八件重制模型均已由用户批准；技术验证通过，尚未接入 Unity
+- 生产状态：参考板与八件重制模型均已由用户批准；Unity 运行时接入已实现，待用户视觉复验
 - 制作日期：2026-08-09
 - 工具：Blender 5.2.0 LTS，hash `fbe6228777e7`；Blender MCP 1.2 已启用
 - 源文件：`ArtSource/FirstPass/Environment/Terrain/Ruins/Ruins_ModuleKit.blend`
 - Unity 交换目录：`Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/Models/`
 - 坐标：Blender 内部 Z-up；FBX 使用 `-Z Forward / Y Up / Scale 1.0`
 - Pivot：每件模型原点为 `(0,0,0)`，底面在 Blender `Z=0`，导入 Unity 后对应底面 `Y=0`
-- 接入状态：未接入 Unity 场景、Prefab、材质或 VisualSlot
+- 接入状态：已通过 `FirstArtRuinsCliffCatalog3D`、Profile、8 个运行时 Prefab、共享材质、确定性布局和 Ruins 类别合批接入默认 3D 场景；不扩展冻结 2D `VisualLibrary`
 - 交付提交：`323f5e2`（已推送 `codex/first-art-pass-terrain`）
-- 玩法边界：没有 Collider、Rigidbody、WasteCity MonoBehaviour、资源节点、通行规则或稳定 ID；模型仅为可替换视觉资产
+- 玩法边界：原始模型和运行时 Prefab 没有 Collider、Rigidbody、WasteCity MonoBehaviour、资源节点或通行规则；稳定 ID 仅由 Catalog 提供表现映射，不成为第二套玩法真值
+
+## Unity 运行时接入
+
+- 原始 FBX 保持在 `Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/Models/`，ModelImporter 的 Read/Write 关闭；Builder 不修改 FBX 或 `.meta`。
+- 8 个运行时 Prefab 位于 `Assets/_Game/Art/FirstPass/Environment/Terrain/Ruins/Runtime/Prefabs/`。每个 Prefab 只含 Transform、MeshFilter、MeshRenderer，并内嵌唯一可读的 `<StableId>_RuntimeMesh` 子资源。
+- Profile 位于 `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Profiles/FirstArtRuinsCliffProfile3D.asset`；共享几何材质位于 `Assets/_Game/Art/FirstPass/Environment/Terrain/Runtime/Materials/Geometry/`。
+- Builder 从批准的 raw FBX 确定性复制运行时 Mesh；重复重建原位更新同一子资源，Prefab GUID 与 Mesh localFileID 由 focused 测试保护。
+- 运行时只消费既有 `WorldMapModel` 地形分类和 Profile 映射，把 Ruins placement 合批为一个 owned Mesh/Renderer；不保留逐格 Prefab，不提供 Collider、阻挡、展开或建造真值。Ruins 失败时只恢复 Ruins 灰盒，不触碰 Cliff、连续地表或资源节点。
+- 当前自动证据：Ruins/Cliff AssetBuilder focused EditMode `37/37`，固定捕获 `12/12` 张；最终日常 EditMode `1454/1454`（只排除 `TerrainAssetDeep`）、完整 PlayMode `91/91`，均为零失败、零跳过。两类合计布局与合批五次中位数 `59.1255 ms`、总初始化五次中位数 `95.8269 ms`、稳定观察 `300` 次托管分配 `0 B`。最终 v8 的 Windows Release 3D、Development 3D、legacy 2D 与 macOS universal 3D 四个构建均成功；三个 Windows Player 为 `PE32+` GUI x86-64，macOS 精确 binary 为 universal `x86_64 arm64`。每次完整退出后 `21` 个 ProjectSettings 与 `14` 个运行时 Prefab 哈希精确稳定，恢复标记和备份无残留。macOS 精确 binary 的 `45` 秒 NullGfx 冒烟只有 `31` 条预期 unsupported Shader 错误，脚本异常、空引用、未处理异常、Missing Script 与崩溃为 `0`；该无图形设备冒烟不证明真实渲染。真实 Windows 10/11 Player 的 GPU/显存/内存/视觉冒烟和本次运行时用户视觉复验仍待补。
 
 ## 逐件规格
 
@@ -70,4 +79,4 @@
 3. `QA_Ruins_ModuleKit_Top.png`：八件职责是否清楚、占地是否紧凑、细长瓦砾堆是否仅轻微超格；
 4. `QA_Ruins_ModuleKit_Wireframe.png`：低模轮廓是否清晰、没有隐藏高密度网格。
 
-本次批准仅覆盖模型视觉与当前 Blender/FBX 交付，不等于 Unity 接入批准。
+2026-08-09 的“可以了”只批准离线模型视觉与 Blender/FBX 交付；本次 Unity 运行时接入虽已实现并有自动证据，仍需用户另行视觉复验，不能沿用旧批准冒充运行时人工验收。

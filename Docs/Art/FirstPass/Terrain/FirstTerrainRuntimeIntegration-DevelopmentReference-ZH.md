@@ -4,7 +4,7 @@
 > 建立日期：2026-08-11<br>
 > 关联需求：`IDEA-0004`<br>
 > 关联规格：`Docs/superpowers/specs/2026-08-10-first-terrain-runtime-integration-design.md`<br>
-> 当前基线：七类地表已经接入 `GrayboxPrototype3D`；本文不代表全部第一版美术完成，也不改变玩法规则。
+> 当前基线：七类连续地表和 Ruins/Cliff 首批运行时几何已经接入 `GrayboxPrototype3D`；Ruins/Cliff 已实现待用户视觉复验。本文不代表全部第一版美术完成，也不改变玩法规则或 schema `30`。
 
 ## 1. 文档目的
 
@@ -23,6 +23,10 @@
 - 两张确定性控制图；
 - 柔和地表权重混合；
 - 一个连续 Mesh、一个 MeshFilter、一个 MeshRenderer；
+- 14 个可替换 Prefab（Ruins `8`、Cliff `6`），每个 Prefab 内嵌唯一可读运行时 Mesh；
+- `FirstArtRuinsCliffCatalog3D` 与 Profile 提供稳定表现映射，运行时按类别确定性布局并合批为最多两个 MeshRenderer；
+- 13 个共享几何材质和一个独立 URP 几何 Shader；
+- Ruins/Cliff 类别级原子回退，复用同一个正式地形 presenter；
 - 正式表现失败时恢复灰盒的原子回退；
 - seed `8128` 下与二维规则地图相同的地形类别和资源节点布局。
 
@@ -61,7 +65,7 @@
 | Normal | Linear、NormalMap | Repeat、MipMap、最大 2048 |
 | Mask | Linear、RGBA | 保留 Alpha、Uncompressed 源合同 |
 | Height | Linear、SingleChannel | 16-bit 源；运行副本可确定性降采样 |
-| 静态 FBX | Model | 关闭 Animation、Camera、Light、自动 Collider |
+| 静态 FBX | Model | 关闭 Animation、Camera、Light、自动 Collider 和 Read/Write |
 
 Mask 通道始终为：
 
@@ -146,11 +150,11 @@ A = Smoothness
 
 ```text
 方向光颜色 = (1.0, 0.956, 0.85)
-方向光强度 = 1.25
+方向光强度 = 0.90
 环境光强度 = 1.0
 ```
 
-普通荒地 BaseColor 本身已经偏暖、偏亮；方向光与环境光叠加后，默认镜头中会压缩中间调，让荒地发白、不同类别更难区分。这不是只替换一张贴图就能稳定解决的问题。
+普通荒地 BaseColor 本身已经偏暖、偏亮；原合同 `1.25` 的方向光与环境光叠加后会压缩中间调，让荒地发白、不同类别更难区分。`BUG-0003` 已把主方向光降到 `0.90`，不修改已验收源贴图；当前状态仍是“已实现待用户视觉复验”，不是视觉问题已经人工通过。
 
 后续优化顺序：
 
@@ -189,6 +193,19 @@ A = Smoothness
 
 当前 DeepWater 动态不足已经被用户接受为第一版已知偏差，但仍是后续优化项。
 
+### 3.11 原始 FBX 可导入不等于适合直接作为运行时合批源
+
+问题：批准的 14 个原始 FBX 必须保持 Read/Write 关闭，但 Ruins/Cliff 运行时合批需要稳定读取完整顶点、索引、法线、切线和 UV。让 Prefab 直接引用 raw FBX Mesh 会把 importer 可读性与运行时实现耦合，也不利于以稳定 localFileID 管理重建。
+
+已验证做法：
+
+- Builder 在 Editor 中使用 `Mesh.AcquireReadOnlyMeshData` 从批准的 raw FBX 确定性复制数据；raw FBX 和 `.meta` 不修改，ModelImporter 的 Read/Write 始终关闭；
+- 每个运行时 Prefab 内嵌且只内嵌一个命名为 `<StableId>_RuntimeMesh` 的可读 Mesh 子资源，Prefab 只含 Transform、MeshFilter、MeshRenderer；
+- 首次发布固定 Prefab GUID，后续重建原位更新同一 Mesh 子资源，并以测试保护 Prefab GUID 和 Mesh localFileID 稳定；
+- Geometry 只读取 Prefab 的 `sharedMesh` 与共享材质，明确忽略 Prefab Transform；完整 placement 矩阵是唯一空间变换来源；
+- 输出合批 Mesh 在累计顶点数超过 `65,535` 时显式使用 `UInt32`；法线使用 inverse-transpose，切线使用线性变换后对新法线执行 Gram-Schmidt 正交化；
+- 14 个 Prefab 是资产合同与 Mesh/材质来源，不实例化为逐格常驻对象。默认世界只保留 `RuntimeGeometry`、`RuinsGeometry`、`CliffGeometry` 三个长期对象和两个 Renderer。
+
 ## 4. 正式表现与灰盒回退
 
 正确接入顺序：
@@ -203,7 +220,7 @@ A = Smoothness
   -> 最后隐藏对应灰盒 Renderer
 ```
 
-任何一步失败：
+连续地表的任何一步失败：
 
 - 销毁本次未完成的运行对象；
 - 恢复全部对应灰盒 Renderer；
@@ -213,12 +230,15 @@ A = Smoothness
 
 禁止先隐藏灰盒再尝试创建正式表现。
 
+Ruins/Cliff 在连续地表成功后按类别独立事务：完整验证并生成某一类别的合批几何，成功后才隐藏该类别灰盒；失败时只清理该类别正式几何并恢复其灰盒，不触碰另一类别、连续地表或资源节点。`ClearPresentation`、禁用、销毁、世界重建和 Profile 替换都必须先恢复对应灰盒，再销毁 owned Mesh。
+
 ## 5. Authoring 与场景合同
 
 后续美术接入不能只手工拖入场景，应由 authoring 和测试共同保护：
 
 - 场景对象数量和名称唯一；
 - 资产引用精确指向批准 GUID；
+- Ruins/Cliff 的 14 个 Prefab、13 个共享材质、Profile 与唯一内嵌运行时 Mesh 均通过 Catalog/Builder 合同生成，不在场景中手工复制；
 - 重复运行 authoring 后场景字节、关键 GlobalObjectId 和 `.meta` GUID 稳定；
 - 破损场景在 mutation 前失败，而不是静默生成第二套对象；
 - authoring 是最终灯光/材质参数的唯一写入者之一，避免手改被下一次生成覆盖；
@@ -234,6 +254,16 @@ A = Smoothness
 - 无逐格 GameObject、Renderer 或 Material；
 - 地表 presenter 无常驻 `Update` / `LateUpdate`；
 - 稳定运行预热后连续 300 帧托管分配 `0 B`。
+
+Ruins/Cliff 子项的当前结构与性能证据：
+
+- Ruins/Cliff 长期对象 `3`、Renderer `2`、运行时 owned Mesh `2`、材质槽 `13`，无逐格 Prefab 实例；
+- seed `8128`、`64×48` 的 placement 数 `108`（Ruins `76`、Cliff `32`），布局与合批五次中位数 `59.1255 ms`，连续地表加几何总初始化五次中位数 `95.8269 ms`；
+- 输出 `312,914` 顶点、`168,824` 三角形，稳定观察 `300` 次托管分配 `0 B`；
+- GUI Profiler 连续 `300` 帧平均 `174.083 FPS / 5.7444 ms`，Rendering 观察为 SetPass `19`、Draw Calls/Batches `49/49`；GPU 帧时显示不可用，目标平台显存和真实 Windows 10/11 Player 冒烟仍待补。
+- 2026-08-15 最终权威自动化为 AssetBuilder focused EditMode `37/37`、日常完整 EditMode `1454/1454`（只排除本批不运行的 `TerrainAssetDeep`）和完整 PlayMode `91/91`，全部零失败、零跳过；
+- 最终 v8 的 Windows Release 3D、Development 3D、legacy 2D 与 macOS universal 3D 四个正式构建均成功；三个 Windows Player 均为 `PE32+` GUI x86-64，macOS 精确 binary 为 universal `x86_64 arm64`。每次完整退出后 `21` 个 ProjectSettings 与 `14` 个运行时 Prefab 哈希精确稳定，普通/最终退出恢复标记和备份均无残留；
+- macOS 精确 binary 的 `45` 秒 NullGfx 启动冒烟中，`31` 条错误全部是无图形设备下预期的 unsupported Shader，脚本异常、空引用、未处理异常、Missing Script 与崩溃均为 `0`。该结果只证明 Player 启动/关闭路径，不证明真实渲染、GPU 或显存；真实 Windows 10/11 Player 的视觉/GPU/显存/内存冒烟和用户对 Ruins/Cliff 运行时画面的视觉复验仍待完成。
 
 当前 seed `8128`、`96×64` 世界五次生成中位数约 `173.9275 ms`；连续 300 帧平均约 `469 FPS / 2.13 ms`。这些数据只能证明当前 Mac Editor 基线，不替代目标 Windows Player 的 GPU 和显存验证。
 
@@ -271,6 +301,7 @@ A = Smoothness
 - [ ] 二进制源和交付文件由 LFS 管理，索引内容为真实 pointer；
 - [ ] 来源、许可证、负责人、版本和哈希已记录；
 - [ ] `.meta` GUID 重导入稳定；
+- [ ] raw FBX 保持 Read/Write 关闭，Prefab 内嵌运行时 Mesh 可读且 GUID/localFileID 重建稳定；
 - [ ] 未提交 Library、Temp、Logs、本机 ProjectSettings 或账号信息。
 
 ### 贴图与材质
@@ -308,6 +339,6 @@ A = Smoothness
 2. 在固定默认镜头下重新校准方向光、环境光和地表中间调；
 3. 增强 DeepWater 蓝黑比、高光可读性和缓慢动态；
 4. 提高 Rocky/Wetland/Crystal 的远景分类辨识，同时保持柔和过渡；
-5. 接入 Ruins/Cliff 模块时用积尘、瓦砾和落石隐藏模型与连续地表的视觉接缝；
+5. 在已接入的 Ruins/Cliff 模块上继续复验积尘、瓦砾、落石、连续地表接缝和俯视遮挡；当前自动证据已生成，仍待用户视觉复验；
 6. 为玩家可见的展开/放置失败原因增加统一 HUD 反馈；
 7. 在真实 Windows 10/11 Player 上补 GPU、显存和视觉冒烟。

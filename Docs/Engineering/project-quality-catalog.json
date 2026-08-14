@@ -50,6 +50,13 @@
         "Assets/_Game/Tests/EditMode/RescueSiteTests.cs",
         "Assets/_Game/Tests/EditMode/ScoutDroneTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtPassImportPolicyTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffAssetBuilderTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffCatalogProfileTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffEvidenceCaptureTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffGeometryTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffLayoutTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainControlMapTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs",
@@ -392,6 +399,8 @@
       "ChineseName": "场景编辑构建与性能",
       "SourceGlobs": [
         "Assets/_Game/Editor/FirstArtPassImportPolicy.cs",
+        "Assets/_Game/Editor/FirstArtRuinsCliffAssetBuilder.cs",
+        "Assets/_Game/Editor/FirstArtRuinsCliffEvidenceCapture.cs",
         "Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs",
         "Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs",
         "Assets/_Game/Editor/FormalBuildTools.cs",
@@ -1129,6 +1138,95 @@
       ]
     },
     {
+      "Id": "first-art-ruins-cliff-profile-3d",
+      "ChineseName": "废墟与悬崖三维配置",
+      "TypeNames": [
+        "FirstArtRuinsCliffCatalog3D",
+        "FirstArtRuinsCliffProfile3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs",
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于冻结废墟与悬崖稳定标识、模块语义和批准资源引用。",
+      "BoundarySummary": "不复制地形规则真值；修改目录、材质槽或 Prefab 绑定前需要资产合同复核。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffAssetBuilderTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffCatalogProfileTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0004"
+      ]
+    },
+    {
+      "Id": "first-art-ruins-cliff-geometry-3d",
+      "ChineseName": "废墟与悬崖三维布局合批",
+      "TypeNames": [
+        "FirstArtRuinsCliffGeometry3D",
+        "FirstArtRuinsCliffLayout3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs",
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于从既有世界地图确定性投影并合批废墟与悬崖几何。",
+      "BoundarySummary": "只消费既有地图与配置，不创建第二套地形判断或逐格常驻对象。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffGeometryTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffLayoutTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0004"
+      ]
+    },
+    {
+      "Id": "first-art-ruins-cliff-presentation-3d",
+      "ChineseName": "废墟与悬崖三维呈现",
+      "TypeNames": [
+        "FirstArtTerrainRenderer3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于在正式三维地形 presenter 中呈现废墟与悬崖并保留分类回退。",
+      "BoundarySummary": "必须复用唯一地形 presenter；不得增加第二个场景 owner 或绕过分类回退。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffEvidenceCaptureTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffSceneContractTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0004"
+      ]
+    },
+    {
+      "Id": "first-art-ruins-cliff-evidence-capture",
+      "ChineseName": "废墟与悬崖视觉证据捕获",
+      "TypeNames": [
+        "FirstArtRuinsCliffEvidenceCapture"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/FirstArtRuinsCliffEvidenceCapture.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于在批准的 GrayboxPrototype3D 场景中以固定 1280×720 视角自动采集 Ruins/Cliff 正常、单件和分类回退证据，并生成带资产 GUID、相机矩阵与 SHA-256 的清单。",
+      "BoundarySummary": "仅供编辑器验证；输出必须是项目外的空绝对目录，必须消费既有场景、profile 和唯一地形 presenter，不修改玩法真值，也不替代用户视觉验收；正式说明路径为 Docs/09-Reusable-Project-Catalog-ZH.md。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtRuinsCliffEvidenceCaptureTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0004",
+        "DOC-0001"
+      ]
+    },
+    {
       "Id": "graybox-scene-authoring",
       "ChineseName": "灰盒场景编写",
       "TypeNames": [
@@ -1160,8 +1258,8 @@
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于执行正式构建检查，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线。",
-      "BoundarySummary": "不修改游戏规则；构建作用域必须恢复进入构建前的渲染管线、Quality 内存态和三个受保护文件字节。",
+      "UseSummary": "用于执行正式 Windows、冻结 2D 回归和 universal x86_64+arm64 macOS 构建，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线；带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。",
+      "BoundarySummary": "不修改游戏规则；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。冻结 2D 构建不得获得 3D 管线覆盖，普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
       ],

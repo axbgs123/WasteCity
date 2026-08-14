@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -250,6 +251,206 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0004_DirectLayoutOptimizationKeepsUnsafeInsideDedicatedHelpers()
+        {
+            string geometrySource = File.ReadAllText(Path.Combine(
+                Application.dataPath,
+                "_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs"));
+            string assemblyDefinition = File.ReadAllText(Path.Combine(
+                Application.dataPath,
+                "_Game/Scripts/ArtIntegration3D/WasteCity.ArtIntegration3D.asmdef"));
+
+            StringAssert.Contains(
+                "\"allowUnsafeCode\": true",
+                assemblyDefinition,
+                "The ArtIntegration3D assembly must opt in explicitly for the isolated direct-layout helper.");
+            StringAssert.Contains(
+                "private static unsafe bool TryCopyDirectInterleavedPlacement(",
+                geometrySource,
+                "The pointer loop must remain isolated behind a dedicated direct-layout helper.");
+            StringAssert.Contains(
+                "NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr",
+                geometrySource);
+            StringAssert.Contains(
+                "NativeArrayUnsafeUtility.GetUnsafePtr",
+                geometrySource);
+            StringAssert.Contains(
+                "private struct DirectVertexTransformJob : IJobParallelFor",
+                geometrySource,
+                "Only the compatible direct vertex path may use the parallel transform job.");
+            StringAssert.Contains(
+                "[NativeDisableParallelForRestriction]",
+                geometrySource,
+                "The job must explicitly restrict parallel writes to its placement slice.");
+            StringAssert.Contains(
+                "private static unsafe void RecordFirstTransformError(",
+                geometrySource,
+                "Shared transform failures must be isolated behind a dedicated atomic helper.");
+            StringAssert.Contains(
+                "Interlocked.CompareExchange(ref *errorCodePointer, value, 0);",
+                geometrySource,
+                "Parallel workers must preserve the first reported transform failure atomically.");
+            int transformJobStart = geometrySource.IndexOf(
+                "private struct DirectVertexTransformJob : IJobParallelFor",
+                StringComparison.Ordinal);
+            int transformJobEnd = geometrySource.IndexOf(
+                "private static unsafe void RecordFirstTransformError(",
+                transformJobStart,
+                StringComparison.Ordinal);
+            Assert.That(transformJobStart, Is.GreaterThanOrEqualTo(0));
+            Assert.That(transformJobEnd, Is.GreaterThan(transformJobStart));
+            string transformJobSource = geometrySource.Substring(
+                transformJobStart,
+                transformJobEnd - transformJobStart);
+            StringAssert.DoesNotContain(
+                "ErrorCode[0] =",
+                transformJobSource,
+                "Parallel workers must never race by overwriting the shared error slot directly.");
+            StringAssert.Contains(
+                "RecordFirstTransformError(ErrorCode, 1);",
+                geometrySource,
+                "Degenerate normals must retain error category 1.");
+            StringAssert.Contains(
+                "RecordFirstTransformError(ErrorCode, 2);",
+                geometrySource,
+                "Non-finite tangents must retain error category 2.");
+            StringAssert.Contains(
+                "RecordFirstTransformError(ErrorCode, 3);",
+                geometrySource,
+                "Non-finite positions, UVs, or tangent handedness must retain error category 3.");
+            StringAssert.Contains(
+                "Allocator.TempJob",
+                geometrySource,
+                "Direct transform error state must use one reusable job-lifetime allocation.");
+            StringAssert.Contains(
+                ".Schedule(input.vertexCount, 64).Complete();",
+                geometrySource,
+                "Every direct placement must complete before its index ranges are assembled.");
+            StringAssert.DoesNotContain(
+                "Unity.Burst",
+                geometrySource,
+                "This optimization stage must remain independent of Burst.");
+            Assert.That(
+                Regex.Matches(geometrySource, @"\bunsafe\b").Count,
+                Is.EqualTo(2),
+                "Pointer access must remain limited to the direct-layout copy and atomic-error helpers.");
+            StringAssert.DoesNotContain(
+                "unsafe bool TryCopyVertices(",
+                geometrySource,
+                "The future-layout fallback must stay bounds-checked and safe.");
+        }
+
+        [Test]
+        public void IDEA0004_DirectParallelTransformPreservesDegenerateNormalFailure()
+        {
+            Mesh source = CreateMesh(3);
+            source.normals = new[] { Vector3.zero, Vector3.zero, Vector3.zero };
+            using (var fixture = new ProfileFixture(source))
+            {
+                var parent = new GameObject("GeometryParent");
+                try
+                {
+                    Assert.That(FirstArtRuinsCliffGeometry3D.TryBuild(
+                        fixture.Profile,
+                        OnePlacement(Matrix4x4.identity),
+                        parent.transform,
+                        out FirstArtRuinsCliffCategoryGeometry3D geometry,
+                        out string error), Is.False);
+                    Assert.That(geometry, Is.Null);
+                    Assert.That(error,
+                        Is.EqualTo("A transformed normal is degenerate or non-finite."));
+                    Assert.That(parent.transform.childCount, Is.Zero,
+                        "A failed direct transform must remain category-atomic.");
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(parent);
+                }
+            }
+        }
+
+        [Test]
+        public void IDEA0004_DirectParallelTransformPreservesNonFiniteErrorContracts()
+        {
+            Mesh nonFiniteTangent = CreateMesh(3);
+            nonFiniteTangent.tangents = Enumerable.Repeat(
+                new Vector4(float.NaN, 0f, 0f, 1f),
+                3).ToArray();
+            AssertDirectTransformFailure(
+                nonFiniteTangent,
+                "Source tangent data is non-finite.");
+
+            Mesh nonFiniteUv = CreateMesh(3);
+            nonFiniteUv.uv = Enumerable.Repeat(
+                new Vector2(float.NaN, 0f),
+                3).ToArray();
+            AssertDirectTransformFailure(
+                nonFiniteUv,
+                "Source or transformed vertex data is non-finite.");
+        }
+
+        [Test]
+        public void IDEA0004_ReusesOneReadableMeshViewAcrossSharedSourcePlacements()
+        {
+            Mesh source = CreateMesh(3);
+            using (var fixture = new ProfileFixture(source))
+            {
+                var parent = new GameObject("GeometryParent");
+                try
+                {
+                    var placements = new[]
+                    {
+                        CreatePlacement(
+                            Matrix4x4.identity,
+                            FirstArtRuinsCliffFamily3D.Ruins,
+                            0),
+                        CreatePlacement(
+                            Matrix4x4.Translate(Vector3.right * 2f),
+                            FirstArtRuinsCliffFamily3D.Ruins,
+                            0),
+                        CreatePlacement(
+                            Matrix4x4.Translate(Vector3.forward * 2f),
+                            FirstArtRuinsCliffFamily3D.Ruins,
+                            0),
+                    };
+
+                    Assert.That(FirstArtRuinsCliffGeometry3D.TryBuild(
+                        fixture.Profile,
+                        placements,
+                        parent.transform,
+                        out FirstArtRuinsCliffCategoryGeometry3D geometry,
+                        out string error), Is.True, error);
+                    using (geometry)
+                    {
+                        Assert.That(geometry.Mesh.vertexCount, Is.EqualTo(9));
+                        Assert.That(geometry.Mesh.GetTriangles(1), Is.EqualTo(new[]
+                        {
+                            0, 1, 2,
+                            3, 4, 5,
+                            6, 7, 8,
+                        }));
+                        Assert.That(geometry.Mesh.subMeshCount, Is.EqualTo(8));
+                        Assert.That(geometry.GameObject.GetComponent<MeshRenderer>()
+                            .sharedMaterials.Length, Is.EqualTo(8));
+                    }
+                    Assert.That(
+                        FirstArtRuinsCliffGeometry3D
+                            .ReadOnlyMeshDataAcquisitionCountForTests,
+                        Is.EqualTo(1),
+                        "Every unique source Mesh must be acquired once and reused by all placements.");
+                    Assert.That(
+                        FirstArtRuinsCliffGeometry3D.DirectVertexViewCountForTests,
+                        Is.EqualTo(1),
+                        "A compatible shared source Mesh must create one direct vertex view.");
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(parent);
+                }
+            }
+        }
+
+        [Test]
         public void IDEA0004_UInt32CapabilityOverrideFailsAtomicallyAndRestores()
         {
             Mesh source = CreateMesh(65536);
@@ -488,6 +689,11 @@ namespace WasteCity.Tests
                 new VertexAttributeDescriptor(
                     VertexAttribute.TexCoord0, VertexAttributeFormat.Float16, 2, 3));
             mesh.SetIndexBufferParams(3, IndexFormat.UInt16);
+            mesh.SetIndexBufferData(
+                new ushort[] { 0, 1, 2 },
+                0,
+                0,
+                3);
             mesh.subMeshCount = 5;
             mesh.SetSubMesh(0, new SubMeshDescriptor(0, 3, MeshTopology.Triangles));
             for (int slot = 1; slot < 5; slot++)
@@ -513,6 +719,33 @@ namespace WasteCity.Tests
                     Assert.That(geometry, Is.Null);
                     StringAssert.Contains(expectedError.ToLowerInvariant(), error.ToLowerInvariant());
                     Assert.That(parent.transform.childCount, Is.Zero);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(parent);
+                }
+            }
+        }
+
+        private static void AssertDirectTransformFailure(
+            Mesh source,
+            string expectedError)
+        {
+            using (var fixture = new ProfileFixture(source))
+            {
+                var parent = new GameObject("GeometryParent");
+                try
+                {
+                    Assert.That(FirstArtRuinsCliffGeometry3D.TryBuild(
+                        fixture.Profile,
+                        OnePlacement(Matrix4x4.identity),
+                        parent.transform,
+                        out FirstArtRuinsCliffCategoryGeometry3D geometry,
+                        out string error), Is.False);
+                    Assert.That(geometry, Is.Null);
+                    Assert.That(error, Is.EqualTo(expectedError));
+                    Assert.That(parent.transform.childCount, Is.Zero,
+                        "A failed direct transform must remain category-atomic.");
                 }
                 finally
                 {

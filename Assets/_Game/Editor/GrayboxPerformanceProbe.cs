@@ -6,6 +6,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEditor.Profiling;
 using UnityEditorInternal;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
@@ -31,6 +32,8 @@ namespace WasteCity.Editor
             "WASTECITY_FIRST_TERRAIN_PERF_RESULT";
         private const string FirstTerrainRuntimeResultEnvironmentVariable =
             "WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT";
+        private const string RuinsCliffResultEnvironmentVariable =
+            "WASTECITY_RUINS_CLIFF_PERF_RESULT";
         private const string GuiProfilerInputEnvironmentVariable =
             "WASTECITY_GUI_PROFILER_INPUT";
         private const string GuiProfilerResultEnvironmentVariable =
@@ -43,6 +46,19 @@ namespace WasteCity.Editor
         private const int FirstTerrainHeight = 64;
         private const int FirstTerrainSeed = 8128;
         private const double FirstTerrainMaximumMedianMilliseconds = 250d;
+        private const int RuinsCliffRunCount = 5;
+        private const int RuinsCliffStableObservationCount = 300;
+        private const double
+            RuinsCliffLayoutAndBatchingMaximumMedianMilliseconds = 100d;
+        private const double
+            RuinsCliffTotalInitializationMaximumMedianMilliseconds = 250d;
+        private const int RuinsCliffMaximumRendererCount = 2;
+        private const int RuinsCliffMaximumPersistentObjectCount = 3;
+        private const int RuinsCliffMaximumMaterialSlotCount = 13;
+        private static readonly ProfilerMarker RuinsCliffLayoutAndBatchingMarker =
+            new ProfilerMarker("WasteCity.RuinsCliff.LayoutAndBatching");
+        private static readonly ProfilerMarker RuinsCliffTotalInitializationMarker =
+            new ProfilerMarker("WasteCity.RuinsCliff.TotalInitialization");
 
         [Serializable]
         private sealed class Result
@@ -86,6 +102,28 @@ namespace WasteCity.Editor
             public int controlWidth;
             public int controlHeight;
             public long managedAllocationBytesAfterWarmup;
+        }
+
+        [Serializable]
+        private sealed class RuinsCliffPerformanceResult
+        {
+            public int seed;
+            public int width;
+            public int height;
+            public int placementCount;
+            public int ruinsPlacementCount;
+            public int cliffPlacementCount;
+            public double[] layoutAndBatchingMilliseconds;
+            public double layoutAndBatchingMedianMilliseconds;
+            public double[] totalInitializationMilliseconds;
+            public double totalInitializationMedianMilliseconds;
+            public int stableObservationCount;
+            public long managedAllocationBytesAcrossStableObservations;
+            public int rendererCount;
+            public int persistentObjectCount;
+            public int vertexCount;
+            public int triangleCount;
+            public int materialSlotCount;
         }
 
         [Serializable]
@@ -186,6 +224,38 @@ namespace WasteCity.Editor
             public int InstanceRendererCount { get; }
             public int InfrastructureRendererCount { get; }
             public int PersistentBuildingObjectCount { get; }
+        }
+
+        private readonly struct RuinsCliffMetrics
+        {
+            public RuinsCliffMetrics(
+                int placementCount,
+                int ruinsPlacementCount,
+                int cliffPlacementCount,
+                int rendererCount,
+                int persistentObjectCount,
+                int vertexCount,
+                int triangleCount,
+                int materialSlotCount)
+            {
+                PlacementCount = placementCount;
+                RuinsPlacementCount = ruinsPlacementCount;
+                CliffPlacementCount = cliffPlacementCount;
+                RendererCount = rendererCount;
+                PersistentObjectCount = persistentObjectCount;
+                VertexCount = vertexCount;
+                TriangleCount = triangleCount;
+                MaterialSlotCount = materialSlotCount;
+            }
+
+            public int PlacementCount { get; }
+            public int RuinsPlacementCount { get; }
+            public int CliffPlacementCount { get; }
+            public int RendererCount { get; }
+            public int PersistentObjectCount { get; }
+            public int VertexCount { get; }
+            public int TriangleCount { get; }
+            public int MaterialSlotCount { get; }
         }
 
         public static void MeasureWorldGeneration()
@@ -434,6 +504,568 @@ namespace WasteCity.Editor
                 UnityEngine.Object.DestroyImmediate(root);
                 UnityEngine.Object.DestroyImmediate(fallbackMaterial);
             }
+        }
+
+        public static void MeasureRuinsCliffPerformance()
+        {
+            string resultPath = ResolveExternalPath(
+                RuinsCliffResultEnvironmentVariable,
+                true);
+            string temporaryPath = resultPath + ".tmp";
+            DeleteIfPresent(resultPath);
+            DeleteIfPresent(temporaryPath);
+            try
+            {
+                FirstArtRuinsCliffProfile3D geometryProfile =
+                    AssetDatabase.LoadAssetAtPath<FirstArtRuinsCliffProfile3D>(
+                        FirstArtRuinsCliffAssetBuilder.ProfilePath);
+                string geometryError = null;
+                if (geometryProfile == null ||
+                    !geometryProfile.TryValidate(out geometryError))
+                {
+                    throw new InvalidOperationException(
+                        "Approved ruins/cliff profile is invalid: " +
+                        geometryError);
+                }
+
+                FirstArtTerrainProfile3D terrainProfile =
+                    AssetDatabase.LoadAssetAtPath<FirstArtTerrainProfile3D>(
+                        FirstArtTerrainAssetBuilder.ProfilePath);
+                string terrainError = null;
+                if (terrainProfile == null ||
+                    !terrainProfile.TryValidate(out terrainError))
+                {
+                    throw new InvalidOperationException(
+                        "Approved first-art terrain profile is invalid: " +
+                        terrainError);
+                }
+
+                var layoutSamples = new double[RuinsCliffRunCount];
+                RuinsCliffMetrics frozenMetrics = default;
+                for (int run = 0; run < RuinsCliffRunCount; run++)
+                {
+                    RuinsCliffMetrics metrics =
+                        MeasureRuinsCliffLayoutAndBatching(
+                            geometryProfile,
+                            out layoutSamples[run]);
+                    if (run == 0)
+                        frozenMetrics = metrics;
+                    else
+                        EnsureMatchingMetrics(frozenMetrics, metrics);
+                }
+
+                var totalSamples = new double[RuinsCliffRunCount];
+                for (int run = 0; run < RuinsCliffRunCount; run++)
+                {
+                    RuinsCliffMetrics metrics =
+                        MeasureRuinsCliffTotalInitialization(
+                            terrainProfile,
+                            geometryProfile,
+                            out totalSamples[run]);
+                    EnsureMatchingMetrics(frozenMetrics, metrics);
+                }
+
+                long stableObservationAllocation =
+                    MeasureStableRuinsCliffObservationAllocation(
+                        terrainProfile,
+                        geometryProfile);
+                var result = new RuinsCliffPerformanceResult
+                {
+                    seed = GrayboxSceneBootstrap.WorldSeedValue,
+                    width = GrayboxSceneBootstrap.WorldWidth,
+                    height = GrayboxSceneBootstrap.WorldHeight,
+                    placementCount = frozenMetrics.PlacementCount,
+                    ruinsPlacementCount = frozenMetrics.RuinsPlacementCount,
+                    cliffPlacementCount = frozenMetrics.CliffPlacementCount,
+                    layoutAndBatchingMilliseconds = layoutSamples,
+                    layoutAndBatchingMedianMilliseconds = Median(layoutSamples),
+                    totalInitializationMilliseconds = totalSamples,
+                    totalInitializationMedianMilliseconds = Median(totalSamples),
+                    stableObservationCount =
+                        RuinsCliffStableObservationCount,
+                    managedAllocationBytesAcrossStableObservations =
+                        stableObservationAllocation,
+                    rendererCount = frozenMetrics.RendererCount,
+                    persistentObjectCount = frozenMetrics.PersistentObjectCount,
+                    vertexCount = frozenMetrics.VertexCount,
+                    triangleCount = frozenMetrics.TriangleCount,
+                    materialSlotCount = frozenMetrics.MaterialSlotCount,
+                };
+                Debug.Log(
+                    "Ruins/cliff performance candidate: " +
+                    JsonUtility.ToJson(result, true));
+                ValidateRuinsCliffResult(result);
+                File.WriteAllText(
+                    temporaryPath,
+                    JsonUtility.ToJson(result, true));
+                File.Move(temporaryPath, resultPath);
+                Debug.Log(
+                    "Ruins/cliff performance result: " + resultPath);
+            }
+            finally
+            {
+                DeleteIfPresent(temporaryPath);
+            }
+        }
+
+        private static RuinsCliffMetrics
+            MeasureRuinsCliffLayoutAndBatching(
+                FirstArtRuinsCliffProfile3D profile,
+                out double milliseconds)
+        {
+            WorldMapModel model = GrayboxWorldLayout3D.CreateDefault();
+            var mapper = new PlanarCoordinateMapper3D(
+                model.Width,
+                model.Height);
+            CountRuinsCliffCells(
+                model,
+                out int ruinsCount,
+                out int cliffCount);
+            var root = new GameObject("RuinsCliffPerformanceGeometry");
+            FirstArtRuinsCliffCategoryGeometry3D ruins = null;
+            FirstArtRuinsCliffCategoryGeometry3D cliffs = null;
+            try
+            {
+                long before = Stopwatch.GetTimestamp();
+                using (RuinsCliffLayoutAndBatchingMarker.Auto())
+                {
+                    IReadOnlyList<FirstArtRuinsCliffPlacement3D> projected =
+                        FirstArtRuinsCliffLayout3D.Project(model, mapper);
+                    SplitRuinsCliffPlacements(
+                        projected,
+                        out List<FirstArtRuinsCliffPlacement3D>
+                            ruinsPlacements,
+                        out List<FirstArtRuinsCliffPlacement3D>
+                            cliffPlacements);
+                    if (!FirstArtRuinsCliffGeometry3D.TryBuild(
+                            profile,
+                            ruinsPlacements,
+                            root.transform,
+                            out ruins,
+                            out string ruinsError))
+                    {
+                        throw new InvalidOperationException(
+                            "Ruins layout/batching probe failed: " +
+                            ruinsError);
+                    }
+                    if (!FirstArtRuinsCliffGeometry3D.TryBuild(
+                            profile,
+                            cliffPlacements,
+                            root.transform,
+                            out cliffs,
+                            out string cliffError))
+                    {
+                        throw new InvalidOperationException(
+                            "Cliff layout/batching probe failed: " +
+                            cliffError);
+                    }
+                }
+                long after = Stopwatch.GetTimestamp();
+                milliseconds =
+                    (after - before) * 1000d / Stopwatch.Frequency;
+                return ReadRuinsCliffMetrics(
+                    root.transform,
+                    ruinsCount + cliffCount,
+                    ruinsCount,
+                    cliffCount);
+            }
+            finally
+            {
+                ruins?.Dispose();
+                cliffs?.Dispose();
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static RuinsCliffMetrics
+            MeasureRuinsCliffTotalInitialization(
+                FirstArtTerrainProfile3D terrainProfile,
+                FirstArtRuinsCliffProfile3D geometryProfile,
+                out double milliseconds)
+        {
+            var root = new GameObject("RuinsCliffTotalPerformanceProbe");
+            var presenterObject =
+                new GameObject("FirstArtTerrainRenderer");
+            Shader shader = Shader.Find("Hidden/InternalErrorShader");
+            if (shader == null)
+            {
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(root);
+                throw new InvalidOperationException(
+                    "Hidden/InternalErrorShader is unavailable.");
+            }
+            var fallbackMaterial = new Material(shader);
+            GrayboxWorldView3D world = null;
+            FirstArtTerrainRenderer3D presenter = null;
+            try
+            {
+                world = CreatePerformanceWorld(root, fallbackMaterial);
+                presenter = presenterObject.AddComponent<
+                    FirstArtTerrainRenderer3D>();
+                presenter.runInEditMode = true;
+                presenter.Configure(terrainProfile, geometryProfile);
+                WorldMapModel model = GrayboxWorldLayout3D.CreateDefault();
+                CountRuinsCliffCells(
+                    model,
+                    out int ruinsCount,
+                    out int cliffCount);
+
+                long before = Stopwatch.GetTimestamp();
+                using (RuinsCliffTotalInitializationMarker.Auto())
+                {
+                    world.Generate(model);
+                    if (!presenter.TryPresent(world, false))
+                    {
+                        throw new InvalidOperationException(
+                            "Ruins/cliff total initialization failed: " +
+                            presenter.LastPresentationError);
+                    }
+                    EnsureBothCategoriesPresented(presenter);
+                }
+                long after = Stopwatch.GetTimestamp();
+                milliseconds =
+                    (after - before) * 1000d / Stopwatch.Frequency;
+                Transform geometryRoot =
+                    presenter.transform.Find("RuntimeGeometry");
+                return ReadRuinsCliffMetrics(
+                    geometryRoot,
+                    ruinsCount + cliffCount,
+                    ruinsCount,
+                    cliffCount);
+            }
+            finally
+            {
+                presenter?.ReleasePresentationSource();
+                world?.ClearGenerated();
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(fallbackMaterial);
+            }
+        }
+
+        private static long MeasureStableRuinsCliffObservationAllocation(
+            FirstArtTerrainProfile3D terrainProfile,
+            FirstArtRuinsCliffProfile3D geometryProfile)
+        {
+            var root = new GameObject("RuinsCliffStableAllocationProbe");
+            var presenterObject =
+                new GameObject("FirstArtTerrainRenderer");
+            Shader shader = Shader.Find("Hidden/InternalErrorShader");
+            if (shader == null)
+            {
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(root);
+                throw new InvalidOperationException(
+                    "Hidden/InternalErrorShader is unavailable.");
+            }
+            var fallbackMaterial = new Material(shader);
+            GrayboxWorldView3D world = null;
+            FirstArtTerrainRenderer3D presenter = null;
+            try
+            {
+                world = CreatePerformanceWorld(root, fallbackMaterial);
+                presenter = presenterObject.AddComponent<
+                    FirstArtTerrainRenderer3D>();
+                presenter.runInEditMode = true;
+                presenter.Configure(terrainProfile, geometryProfile);
+                world.Generate(GrayboxWorldLayout3D.CreateDefault());
+                if (!presenter.TryPresent(world, false))
+                {
+                    throw new InvalidOperationException(
+                        "Ruins/cliff allocation setup failed: " +
+                        presenter.LastPresentationError);
+                }
+                EnsureBothCategoriesPresented(presenter);
+                Transform geometryRoot =
+                    presenter.transform.Find("RuntimeGeometry");
+                MeshRenderer[] renderers = geometryRoot
+                    .GetComponentsInChildren<MeshRenderer>(true);
+                MeshFilter[] filters = geometryRoot
+                    .GetComponentsInChildren<MeshFilter>(true);
+                if (renderers.Length != 2 || filters.Length != 2)
+                    throw new InvalidOperationException(
+                        "Stable allocation setup requires two category batches.");
+
+                int perObservation = ObserveRuinsCliff(
+                    presenter,
+                    renderers[0],
+                    renderers[1],
+                    filters[0].sharedMesh,
+                    filters[1].sharedMesh);
+                int observable = perObservation;
+                observable += ObserveRuinsCliff(
+                    presenter,
+                    renderers[0],
+                    renderers[1],
+                    filters[0].sharedMesh,
+                    filters[1].sharedMesh);
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int observation = 0;
+                     observation < RuinsCliffStableObservationCount;
+                     observation++)
+                {
+                    observable += ObserveRuinsCliff(
+                        presenter,
+                        renderers[0],
+                        renderers[1],
+                        filters[0].sharedMesh,
+                        filters[1].sharedMesh);
+                }
+                long allocation =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+                if (observable !=
+                    perObservation *
+                        (RuinsCliffStableObservationCount + 2))
+                {
+                    throw new InvalidOperationException(
+                        "Ruins/cliff stable observation was incomplete.");
+                }
+                return allocation;
+            }
+            finally
+            {
+                presenter?.ReleasePresentationSource();
+                world?.ClearGenerated();
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(fallbackMaterial);
+            }
+        }
+
+        private static GrayboxWorldView3D CreatePerformanceWorld(
+            GameObject root,
+            Material fallbackMaterial)
+        {
+            Transform terrain = NewChild(root.transform, "TerrainRoot");
+            Transform resources = NewChild(root.transform, "ResourceRoot");
+            Transform obstacles = NewChild(root.transform, "ObstacleRoot");
+            GrayboxWorldView3D world =
+                root.AddComponent<GrayboxWorldView3D>();
+            world.Configure(
+                terrain,
+                resources,
+                obstacles,
+                fallbackMaterial);
+            return world;
+        }
+
+        private static void SplitRuinsCliffPlacements(
+            IReadOnlyList<FirstArtRuinsCliffPlacement3D> projected,
+            out List<FirstArtRuinsCliffPlacement3D> ruins,
+            out List<FirstArtRuinsCliffPlacement3D> cliffs)
+        {
+            ruins = new List<FirstArtRuinsCliffPlacement3D>();
+            cliffs = new List<FirstArtRuinsCliffPlacement3D>();
+            for (int index = 0; index < projected.Count; index++)
+            {
+                FirstArtRuinsCliffPlacement3D placement = projected[index];
+                if (placement.Family == FirstArtRuinsCliffFamily3D.Ruins)
+                    ruins.Add(placement);
+                else if (placement.Family == FirstArtRuinsCliffFamily3D.Cliff)
+                    cliffs.Add(placement);
+                else
+                    throw new InvalidOperationException(
+                        "Projected placement has an unknown family.");
+            }
+        }
+
+        private static void CountRuinsCliffCells(
+            WorldMapModel model,
+            out int ruins,
+            out int cliffs)
+        {
+            ruins = 0;
+            cliffs = 0;
+            for (int x = 0; x < model.Width; x++)
+            for (int y = 0; y < model.Height; y++)
+            {
+                WorldTraversalKind traversal = model.Get(x, y).Traversal;
+                if (traversal == WorldTraversalKind.Ruins)
+                    ruins++;
+                else if (traversal == WorldTraversalKind.Cliff)
+                    cliffs++;
+            }
+        }
+
+        private static RuinsCliffMetrics ReadRuinsCliffMetrics(
+            Transform geometryRoot,
+            int placementCount,
+            int ruinsPlacementCount,
+            int cliffPlacementCount)
+        {
+            if (geometryRoot == null)
+                throw new InvalidOperationException(
+                    "Ruins/cliff geometry root is missing.");
+            MeshRenderer[] renderers =
+                geometryRoot.GetComponentsInChildren<MeshRenderer>(true);
+            MeshFilter[] filters =
+                geometryRoot.GetComponentsInChildren<MeshFilter>(true);
+            int vertexCount = 0;
+            long indexCount = 0;
+            for (int index = 0; index < filters.Length; index++)
+            {
+                Mesh mesh = filters[index].sharedMesh;
+                if (mesh == null)
+                    throw new InvalidOperationException(
+                        "Ruins/cliff category mesh is missing.");
+                vertexCount = checked(vertexCount + mesh.vertexCount);
+                for (int subMesh = 0;
+                     subMesh < mesh.subMeshCount;
+                     subMesh++)
+                    indexCount = checked(
+                        indexCount + mesh.GetIndexCount(subMesh));
+            }
+            int materialSlotCount = 0;
+            for (int index = 0; index < renderers.Length; index++)
+                materialSlotCount = checked(
+                    materialSlotCount +
+                    renderers[index].sharedMaterials.Length);
+            if (indexCount % 3L != 0L || indexCount / 3L > int.MaxValue)
+                throw new InvalidOperationException(
+                    "Ruins/cliff triangle count is invalid.");
+            return new RuinsCliffMetrics(
+                placementCount,
+                ruinsPlacementCount,
+                cliffPlacementCount,
+                renderers.Length,
+                geometryRoot.GetComponentsInChildren<Transform>(true).Length,
+                vertexCount,
+                checked((int)(indexCount / 3L)),
+                materialSlotCount);
+        }
+
+        private static void EnsureBothCategoriesPresented(
+            FirstArtTerrainRenderer3D presenter)
+        {
+            if (presenter.RuinsStatus !=
+                    FirstArtRuinsCliffPresentationStatus3D.Presented ||
+                presenter.CliffStatus !=
+                    FirstArtRuinsCliffPresentationStatus3D.Presented)
+            {
+                throw new InvalidOperationException(
+                    "Both ruins and cliff categories must be presented. " +
+                    "Ruins=" + presenter.RuinsStatus + ":" +
+                    presenter.RuinsError + ", Cliff=" +
+                    presenter.CliffStatus + ":" + presenter.CliffError);
+            }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(
+            System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static int ObserveRuinsCliff(
+            FirstArtTerrainRenderer3D presenter,
+            MeshRenderer ruinsRenderer,
+            MeshRenderer cliffRenderer,
+            Mesh ruinsMesh,
+            Mesh cliffMesh)
+        {
+            int value = presenter.IsPresented ? 1 : 0;
+            value += presenter.RuinsStatus ==
+                FirstArtRuinsCliffPresentationStatus3D.Presented ? 2 : 0;
+            value += presenter.CliffStatus ==
+                FirstArtRuinsCliffPresentationStatus3D.Presented ? 4 : 0;
+            value += ruinsRenderer != null && ruinsRenderer.enabled ? 8 : 0;
+            value += cliffRenderer != null && cliffRenderer.enabled ? 16 : 0;
+            value += ruinsMesh != null ? ruinsMesh.vertexCount : 0;
+            value += cliffMesh != null ? cliffMesh.vertexCount : 0;
+            value += string.IsNullOrEmpty(presenter.RuinsError) ? 32 : 0;
+            value += string.IsNullOrEmpty(presenter.CliffError) ? 64 : 0;
+            return value;
+        }
+
+        private static void EnsureMatchingMetrics(
+            RuinsCliffMetrics expected,
+            RuinsCliffMetrics actual)
+        {
+            if (expected.PlacementCount != actual.PlacementCount ||
+                expected.RuinsPlacementCount != actual.RuinsPlacementCount ||
+                expected.CliffPlacementCount != actual.CliffPlacementCount ||
+                expected.RendererCount != actual.RendererCount ||
+                expected.PersistentObjectCount != actual.PersistentObjectCount ||
+                expected.VertexCount != actual.VertexCount ||
+                expected.TriangleCount != actual.TriangleCount ||
+                expected.MaterialSlotCount != actual.MaterialSlotCount)
+            {
+                throw new InvalidOperationException(
+                    "Ruins/cliff performance metrics changed between runs.");
+            }
+        }
+
+        private static double Median(double[] samples)
+        {
+            var sorted = (double[])samples.Clone();
+            Array.Sort(sorted);
+            return sorted[sorted.Length / 2];
+        }
+
+        private static void ValidateRuinsCliffResult(
+            RuinsCliffPerformanceResult result)
+        {
+            if (result.layoutAndBatchingMilliseconds == null ||
+                result.layoutAndBatchingMilliseconds.Length !=
+                    RuinsCliffRunCount ||
+                result.totalInitializationMilliseconds == null ||
+                result.totalInitializationMilliseconds.Length !=
+                    RuinsCliffRunCount)
+            {
+                throw new InvalidOperationException(
+                    "Ruins/cliff performance evidence requires five samples " +
+                    "for both measurements.");
+            }
+            if (result.layoutAndBatchingMedianMilliseconds >
+                RuinsCliffLayoutAndBatchingMaximumMedianMilliseconds)
+            {
+                throw new InvalidOperationException(
+                    "Ruins/cliff layout and batching median exceeded 100 ms: " +
+                    result.layoutAndBatchingMedianMilliseconds);
+            }
+            if (result.totalInitializationMedianMilliseconds >
+                RuinsCliffTotalInitializationMaximumMedianMilliseconds)
+            {
+                throw new InvalidOperationException(
+                    "Ruins/cliff total initialization median exceeded 250 ms: " +
+                    result.totalInitializationMedianMilliseconds);
+            }
+            if (result.stableObservationCount !=
+                    RuinsCliffStableObservationCount ||
+                result.managedAllocationBytesAcrossStableObservations != 0L)
+            {
+                throw new InvalidOperationException(
+                    "The 300 stable ruins/cliff observations allocated " +
+                    result.managedAllocationBytesAcrossStableObservations +
+                    " managed bytes.");
+            }
+            if (result.placementCount <= 0 ||
+                result.ruinsPlacementCount <= 0 ||
+                result.cliffPlacementCount <= 0 ||
+                result.placementCount !=
+                    result.ruinsPlacementCount + result.cliffPlacementCount)
+            {
+                throw new InvalidOperationException(
+                    "Ruins/cliff placement counts are incomplete.");
+            }
+            if (result.rendererCount != RuinsCliffMaximumRendererCount)
+                throw new InvalidOperationException(
+                    "Ruins/cliff presentation must use two Renderers.");
+            if (result.persistentObjectCount >
+                    RuinsCliffMaximumPersistentObjectCount ||
+                result.persistentObjectCount < result.rendererCount)
+                throw new InvalidOperationException(
+                    "Ruins/cliff persistent object count is outside budget.");
+            if (result.vertexCount <= 0 || result.triangleCount <= 0)
+                throw new InvalidOperationException(
+                    "Ruins/cliff geometry counts must be positive.");
+            if (result.materialSlotCount <= 0 ||
+                result.materialSlotCount >
+                    RuinsCliffMaximumMaterialSlotCount)
+                throw new InvalidOperationException(
+                    "Ruins/cliff material slot count exceeded its budget of 13.");
+        }
+
+        private static void DeleteIfPresent(string path)
+        {
+            if (File.Exists(path))
+                File.Delete(path);
         }
 
         [MenuItem("WasteCity/Performance/Record First Terrain Runtime Evidence")]

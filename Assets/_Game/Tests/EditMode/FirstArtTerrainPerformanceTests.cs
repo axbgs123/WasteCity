@@ -54,6 +54,62 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PerformanceProbe_ExposesFrozenRuinsCliffContract()
+        {
+            Type probe = FindLoadedType(PerformanceProbeTypeName);
+            Assert.That(probe, Is.Not.Null);
+
+            MethodInfo method = probe.GetMethod(
+                "MeasureRuinsCliffPerformance",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            Type result = probe.GetNestedType(
+                "RuinsCliffPerformanceResult",
+                BindingFlags.NonPublic);
+            Assert.That(result, Is.Not.Null);
+            AssertField<double[]>(result, "layoutAndBatchingMilliseconds");
+            AssertField<double>(result, "layoutAndBatchingMedianMilliseconds");
+            AssertField<double[]>(result, "totalInitializationMilliseconds");
+            AssertField<double>(result, "totalInitializationMedianMilliseconds");
+            AssertField<int>(result, "stableObservationCount");
+            AssertField<long>(
+                result,
+                "managedAllocationBytesAcrossStableObservations");
+            AssertField<int>(result, "rendererCount");
+            AssertField<int>(result, "persistentObjectCount");
+            AssertField<int>(result, "vertexCount");
+            AssertField<int>(result, "triangleCount");
+            AssertField<int>(result, "materialSlotCount");
+
+            AssertConstant(probe, "RuinsCliffRunCount", 5);
+            AssertConstant(
+                probe,
+                "RuinsCliffStableObservationCount",
+                300);
+            AssertConstant(
+                probe,
+                "RuinsCliffLayoutAndBatchingMaximumMedianMilliseconds",
+                100d);
+            AssertConstant(
+                probe,
+                "RuinsCliffTotalInitializationMaximumMedianMilliseconds",
+                250d);
+            AssertConstant(probe, "RuinsCliffMaximumRendererCount", 2);
+            AssertConstant(probe, "RuinsCliffMaximumPersistentObjectCount", 3);
+            AssertConstant(
+                probe,
+                "RuinsCliffMaximumMaterialSlotCount",
+                13);
+            AssertConstant(
+                probe,
+                "RuinsCliffResultEnvironmentVariable",
+                "WASTECITY_RUINS_CLIFF_PERF_RESULT");
+        }
+
+        [Test]
         public void PerformanceProbe_ExposesTerrainRuntimeEvidenceAndProfilerMarker()
         {
             Type probe = FindLoadedType(PerformanceProbeTypeName);
@@ -302,6 +358,32 @@ namespace WasteCity.Tests
                     return type;
             }
             return null;
+        }
+
+        private static void AssertField<T>(Type owner, string name)
+        {
+            FieldInfo field = owner?.GetField(
+                name,
+                BindingFlags.Instance |
+                BindingFlags.Public |
+                BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, name);
+            Assert.That(field?.FieldType, Is.EqualTo(typeof(T)), name);
+        }
+
+        private static void AssertConstant<T>(
+            Type owner,
+            string name,
+            T expected)
+        {
+            FieldInfo field = owner?.GetField(
+                name,
+                BindingFlags.Static |
+                BindingFlags.Public |
+                BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, name);
+            Assert.That(field?.IsLiteral, Is.True, name);
+            Assert.That(field?.GetRawConstantValue(), Is.EqualTo(expected), name);
         }
 
         private static Transform NewChild(Transform parent, string name)

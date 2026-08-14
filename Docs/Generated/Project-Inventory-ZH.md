@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`365cef429aeb360ade830d58bbf7b328b52b607ffb99d9cc2518d892deef4e1f`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`5c6b68f42fe39306a1f4f37739ceb1b292f44e2af8ae40e928c0106fb6fb61f3`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -161,6 +161,10 @@
 - `Assets/_Game/Scripts/Persistence/FormalSaveController.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveData.cs`
 - 展示与美术整合（`presentation-art-integration`）：
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMap3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs`
@@ -192,6 +196,8 @@
 - `Assets/_Game/Scripts/Research/RouteTechnologyEffects.cs`
 - 场景编辑构建与性能（`scene-editor-build-performance`）：
 - `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`
+- `Assets/_Game/Editor/FirstArtRuinsCliffAssetBuilder.cs`
+- `Assets/_Game/Editor/FirstArtRuinsCliffEvidenceCapture.cs`
 - `Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`
 - `Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs`
 - `Assets/_Game/Editor/FormalBuildTools.cs`
@@ -311,6 +317,7 @@
 - `WasteCity.World.RescueSiteController`：`Assets/_Game/Scripts/World/RescueSiteController.cs`
 - `WasteCity.World.WorldExplorationController`：`Assets/_Game/Scripts/World/WorldExplorationController.cs`
 ## 6. ScriptableObject 资源
+- `WasteCity.ArtIntegration3D.FirstArtRuinsCliffProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `WasteCity.Presentation.VisualDefinition`：`Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `WasteCity.Presentation.VisualLibrary`：`Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
@@ -326,12 +333,14 @@
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.CaptureAll`
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.CaptureAllAcceptedDeviationFromEnvironment`
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.StartAutomatedCapture`
+- `WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D`
 - `WasteCity.Editor.FormalBuildTools.BuildWindows`
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D`
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment`
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureBuildingPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFirstArtTerrainPerformance`
+- `WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureWorldGeneration`
 - `WasteCity.Editor.GrayboxPerformanceProbe.RecordFirstArtTerrainRuntimeEvidence`
 - `WasteCity.Editor.GrayboxPerformanceProbe.SummarizeGuiProfilerCapture`
@@ -342,6 +351,10 @@
 - `WasteCity.Editor.ProjectQuality.ProjectQualityTools.RecordVerification`
 - `WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation`
 ## 9. 美术接入与稳定展示路径
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMap3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainControlMapGenerator3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainLayer3D.cs`

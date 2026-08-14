@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
@@ -33,6 +34,8 @@ namespace WasteCity.Tests
             "ProjectSettings/GraphicsSettings.asset";
         private const string QualitySettingsPath =
             "ProjectSettings/QualitySettings.asset";
+        private const string PlayerSettingsPath =
+            "ProjectSettings/ProjectSettings.asset";
         private const string RestoreMarkerPath =
             "Library/WasteCity.GrayboxBuildPipelineRestore.txt";
         private const string GrayboxPipelineBackupPath =
@@ -41,6 +44,10 @@ namespace WasteCity.Tests
             "Library/WasteCity.GrayboxBuildPipelineRestore.GraphicsSettings.asset";
         private const string QualitySettingsBackupPath =
             "Library/WasteCity.GrayboxBuildPipelineRestore.QualitySettings.asset";
+        private const string PlayerSettingsBackupPath =
+            "Library/WasteCity.GrayboxBuildPipelineRestore.ProjectSettings.asset";
+        private const string MacArchitectureRestoreMarkerPath =
+            "Library/WasteCity.GrayboxBuildMacArchitectureRestore.txt";
         private const string PerformanceProbeTypeName =
             "WasteCity.Editor.GrayboxPerformanceProbe";
         private const int BuildingInstanceCount = 128;
@@ -171,6 +178,497 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Bug0005_BuildTools_ExposeRestorableUniversalMacOSGrayboxTarget()
+        {
+            Type buildTools = FindLoadedType(FormalBuildToolsTypeName);
+            Assert.That(buildTools, Is.Not.Null);
+            MethodInfo method = buildTools?.GetMethod(
+                "BuildMacOSGraybox3D",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FormalBuildTools.cs"));
+            string macOS = ExtractMethodBlock(
+                source,
+                "BuildMacOSGraybox3D");
+            StringAssert.Contains(GrayboxScenePath, macOS);
+            StringAssert.DoesNotContain(FormalScenePath, macOS);
+            StringAssert.Contains(
+                "Builds/macOS/WasteCity.app",
+                macOS);
+            StringAssert.Contains(
+                "BuildTarget.StandaloneOSX",
+                macOS);
+            StringAssert.DoesNotContain(
+                "BuildOptions.Development",
+                macOS);
+            StringAssert.Contains(
+                "GrayboxRenderPipelineBuildScope.BeginUniversalMacBuild()",
+                macOS);
+            StringAssert.Contains("finally", macOS);
+            StringAssert.Contains(
+                "GrayboxRenderPipelineBuildScope.RestoreAfterBuild()",
+                macOS);
+
+            string begin = ExtractMethodBlock(
+                source,
+                "BeginUniversalMacBuild");
+            StringAssert.Contains("BeginForScenes", begin);
+            StringAssert.Contains("OSArchitecture.x64ARM64", begin);
+            StringAssert.Contains(
+                "MacArchitectureRestoreMarkerPath",
+                ExtractMethodBlock(source, "RestoreAfterBuild"));
+            StringAssert.Contains(
+                "MacArchitectureRestoreMarkerPath",
+                ExtractMethodBlock(source, "RecoverAbandonedBuild"));
+            StringAssert.Contains(
+                "EditorApplication.quitting += RestoreAfterBuild",
+                source);
+            StringAssert.Contains(
+                "public void OnPostprocessBuild(BuildReport report)\n" +
+                "        {\n" +
+                "            RestoreAfterPostprocessBuild();\n" +
+                "        }",
+                source);
+            string postprocessRestore = ExtractMethodBlock(
+                source,
+                "RestoreAfterPostprocessBuild");
+            StringAssert.Contains(
+                "deferPostprocessRestoreForUniversalMacBuild",
+                postprocessRestore);
+            StringAssert.Contains("RestoreAfterBuild();", postprocessRestore);
+        }
+
+        [Test]
+        public void Bug0005_RestoreFlushesSettingsMemoryBeforeExactProtectedBytes()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FormalBuildTools.cs"));
+            string restore = ExtractMethodBlock(source, "RestoreAfterBuild");
+            int saveAssets = restore.IndexOf(
+                "AssetDatabase.SaveAssets();",
+                StringComparison.Ordinal);
+            int restoreProtectedFiles = restore.IndexOf(
+                "RestoreProtectedFiles();",
+                StringComparison.Ordinal);
+
+            Assert.That(saveAssets, Is.GreaterThanOrEqualTo(0),
+                "Restoration must flush and clean Unity's in-memory ProjectSettings state before exit.");
+            Assert.That(restoreProtectedFiles, Is.GreaterThan(saveAssets),
+                "Exact protected bytes must be the final disk authority after the in-memory settings flush.");
+        }
+
+        [Test]
+        public void Bug0005_QualityBackupParserUsesCurrentEntryAndFailsClosed()
+        {
+            Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
+            MethodInfo parser = scope?.GetMethod(
+                "ParseCurrentQualityAntiAliasingForTests",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(parser, Is.Not.Null);
+
+            const string valid =
+                "QualitySettings:\n" +
+                "  m_CurrentQuality: 1\n" +
+                "  m_QualitySettings:\n" +
+                "  - name: Low\n" +
+                "    antiAliasing: 0\n" +
+                "  - name: Current\n" +
+                "    antiAliasing: 2\n" +
+                "  - name: LastButNotCurrent\n" +
+                "    antiAliasing: 8\n" +
+                "  m_PerPlatformDefaultQuality:\n" +
+                "    Standalone: 0\n" +
+                "    iPhone: 2\n";
+            Assert.That(
+                parser.Invoke(null, new object[] { valid }),
+                Is.EqualTo(2),
+                "The current quality entry, not the last entry or a platform default, owns restored AA.");
+
+            AssertQualityParserRejects(
+                parser,
+                valid.Replace("m_CurrentQuality: 1", "m_CurrentQuality: 3"));
+            AssertQualityParserRejects(
+                parser,
+                valid.Replace("    antiAliasing: 2\n", string.Empty));
+            AssertQualityParserRejects(
+                parser,
+                valid.Replace("    antiAliasing: 2", "    antiAliasing: 3"));
+        }
+
+        [Test]
+        public void Bug0005_FinalExitRestoreActivatesOnlyForQuitFormalBuilds()
+        {
+            Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
+            MethodInfo activation = scope?.GetMethod(
+                "IsCommandLineQuitFormalBuildForTests",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(activation, Is.Not.Null);
+
+            string[] formalMethods =
+            {
+                "WasteCity.Editor.FormalBuildTools.BuildWindows",
+                "WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D",
+                "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D",
+                "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment",
+                "WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D"
+            };
+            foreach (string formalMethod in formalMethods)
+                Assert.That(
+                    activation.Invoke(null, new object[]
+                    {
+                        new[]
+                        {
+                            "Unity",
+                            "-batchmode",
+                            "-quit",
+                            "-executeMethod",
+                            formalMethod
+                        }
+                    }),
+                    Is.EqualTo(true),
+                    formalMethod);
+
+            Assert.That(
+                activation.Invoke(null, new object[]
+                {
+                    new[]
+                    {
+                        "Unity",
+                        "-executeMethod",
+                        formalMethods[4]
+                    }
+                }),
+                Is.EqualTo(false),
+                "A GUI/editor invocation without -quit must not retain final-exit state.");
+            Assert.That(
+                activation.Invoke(null, new object[]
+                {
+                    new[]
+                    {
+                        "Unity",
+                        "-quit",
+                        "-executeMethod",
+                        "WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance"
+                    }
+                }),
+                Is.EqualTo(false),
+                "An unrelated command-line task must not arm formal-build exit restoration.");
+        }
+
+        [Test]
+        public void Bug0005_FinalExitRestoreSynchronizesRuntimeBeforeExactBytes()
+        {
+            Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
+            MethodInfo exactRestore = scope?.GetMethod(
+                "RestoreExactProtectedBytesForTests",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(exactRestore, Is.Not.Null);
+
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "WasteCity-BUG0005-FinalExit-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                string backupA = Path.Combine(root, "a.backup");
+                string backupB = Path.Combine(root, "b.backup");
+                string targetA = Path.Combine(root, "a.asset");
+                string targetB = Path.Combine(root, "b.asset");
+                byte[] expectedA = { 0, 1, 2, 13, 10, 255 };
+                byte[] expectedB = { 9, 8, 7, 0, 6 };
+                File.WriteAllBytes(backupA, expectedA);
+                File.WriteAllBytes(backupB, expectedB);
+                File.WriteAllBytes(targetA, new byte[] { 4 });
+                File.WriteAllBytes(targetB, new byte[] { 5 });
+
+                exactRestore.Invoke(null, new object[]
+                {
+                    new[] { backupA, backupB },
+                    new[] { targetA, targetB }
+                });
+                CollectionAssert.AreEqual(expectedA, File.ReadAllBytes(targetA));
+                CollectionAssert.AreEqual(expectedB, File.ReadAllBytes(targetB));
+
+                byte[] unchangedA = { 4, 3, 2, 1 };
+                File.WriteAllBytes(targetA, unchangedA);
+                File.Delete(backupB);
+                TargetInvocationException incompleteRestore =
+                    Assert.Throws<TargetInvocationException>(() =>
+                        exactRestore.Invoke(null, new object[]
+                        {
+                            new[] { backupA, backupB },
+                            new[] { targetA, targetB }
+                        }));
+                Assert.That(
+                    incompleteRestore?.InnerException,
+                    Is.InstanceOf<IOException>());
+                CollectionAssert.AreEqual(
+                    unchangedA,
+                    File.ReadAllBytes(targetA),
+                    "All backups must validate before any protected target is replaced.");
+            }
+            finally
+            {
+                if (Directory.Exists(root))
+                    Directory.Delete(root, true);
+            }
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FormalBuildTools.cs"));
+            string finalExit = ExtractMethodBlock(
+                source,
+                "RestoreFinalExitOnEditorQuitting");
+            int readBackup = finalExit.IndexOf(
+                "ReadFinalExitRestoreAntiAliasing",
+                StringComparison.Ordinal);
+            int synchronizeRuntime = finalExit.IndexOf(
+                "QualitySettings.antiAliasing = antiAliasing;",
+                StringComparison.Ordinal);
+            int saveAssets = finalExit.IndexOf(
+                "AssetDatabase.SaveAssets();",
+                StringComparison.Ordinal);
+            int restoreExact = finalExit.IndexOf(
+                "RestoreFinalExitProtectedFiles",
+                StringComparison.Ordinal);
+            Assert.That(readBackup, Is.GreaterThanOrEqualTo(0));
+            Assert.That(synchronizeRuntime, Is.GreaterThan(readBackup));
+            Assert.That(saveAssets, Is.GreaterThan(synchronizeRuntime));
+            Assert.That(restoreExact, Is.GreaterThan(saveAssets));
+            StringAssert.DoesNotContain("RestoreAfterBuild", finalExit);
+            StringAssert.Contains(
+                "EditorApplication.quitting +=\n" +
+                "                RestoreFinalExitOnEditorQuitting",
+                source);
+            StringAssert.DoesNotContain("ProcessExit", source);
+
+            int normalQuittingRestore = source.IndexOf(
+                "EditorApplication.quitting += RestoreAfterBuild",
+                StringComparison.Ordinal);
+            int finalQuittingRestore = source.IndexOf(
+                "EditorApplication.quitting +=\n" +
+                "                RestoreFinalExitOnEditorQuitting",
+                StringComparison.Ordinal);
+            Assert.That(normalQuittingRestore, Is.GreaterThanOrEqualTo(0));
+            Assert.That(
+                finalQuittingRestore,
+                Is.GreaterThan(normalQuittingRestore),
+                "The ordinary restoration handler must run before the final exact-byte handler.");
+
+            foreach (string buildMethod in new[]
+                     {
+                         "BuildWindows",
+                         "BuildWindowsLegacy2D",
+                         "BuildWindowsGraybox3D",
+                         "BuildWindowsGraybox3DDevelopment",
+                         "BuildMacOSGraybox3D"
+                     })
+            {
+                string block = ExtractMethodBlock(source, buildMethod);
+                int arm = block.IndexOf(
+                    "BeginCommandLineFinalExitRestore();",
+                    StringComparison.Ordinal);
+                int build = block.IndexOf(
+                    "BuildPipeline.BuildPlayer",
+                    StringComparison.Ordinal);
+                Assert.That(arm, Is.GreaterThanOrEqualTo(0), buildMethod);
+                Assert.That(build, Is.GreaterThan(arm), buildMethod);
+            }
+        }
+
+        [Test]
+        public void Bug0005_MacOSGrayboxArchitecture_RestoresAfterBuildAndRecovery()
+        {
+            Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
+            Assert.That(scope, Is.Not.Null);
+            MethodInfo begin = scope?.GetMethod(
+                "BeginUniversalMacBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo restore = scope?.GetMethod(
+                "RestoreAfterBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo restoreAfterPostprocess = scope?.GetMethod(
+                "RestoreAfterPostprocessBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo recover = scope?.GetMethod(
+                "RecoverAbandonedBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo ownsArchitecture = scope?.GetField(
+                "ownsMacArchitectureOverride",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo hasOriginalArchitecture = scope?.GetField(
+                "hasOriginalMacArchitectureState",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo originalArchitectureState = scope?.GetField(
+                "originalMacArchitecture",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(begin, Is.Not.Null);
+            Assert.That(restore, Is.Not.Null);
+            Assert.That(restoreAfterPostprocess, Is.Not.Null);
+            Assert.That(recover, Is.Not.Null);
+            Assert.That(ownsArchitecture, Is.Not.Null);
+            Assert.That(hasOriginalArchitecture, Is.Not.Null);
+            Assert.That(originalArchitectureState, Is.Not.Null);
+
+            int originalArchitecture = PlayerSettings.GetArchitecture(
+                BuildTargetGroup.Standalone);
+            string projectSettingsPath = ProjectPath(
+                "ProjectSettings/ProjectSettings.asset");
+            byte[] originalProjectSettings =
+                File.ReadAllBytes(projectSettingsPath);
+            try
+            {
+                begin.Invoke(null, null);
+                Assert.That(
+                    PlayerSettings.GetArchitecture(
+                        BuildTargetGroup.Standalone),
+                    Is.EqualTo((int)OSArchitecture.x64ARM64));
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        MacArchitectureRestoreMarkerPath)),
+                    Is.True);
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        PlayerSettingsBackupPath)),
+                    Is.True,
+                    "The macOS architecture override must protect ProjectSettings.asset bytes.");
+
+                restoreAfterPostprocess.Invoke(null, null);
+                Assert.That(
+                    PlayerSettings.GetArchitecture(
+                        BuildTargetGroup.Standalone),
+                    Is.EqualTo((int)OSArchitecture.x64ARM64),
+                    "The inner postprocess callback must defer restoration until the explicit macOS build returns.");
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        MacArchitectureRestoreMarkerPath)),
+                    Is.True,
+                    "Deferred postprocess restoration must retain the macOS recovery marker.");
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        PlayerSettingsBackupPath)),
+                    Is.True,
+                    "Deferred postprocess restoration must retain exact protected-file backups.");
+
+                restore.Invoke(null, null);
+                Assert.That(
+                    PlayerSettings.GetArchitecture(
+                        BuildTargetGroup.Standalone),
+                    Is.EqualTo(originalArchitecture));
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        MacArchitectureRestoreMarkerPath)),
+                    Is.False);
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        PlayerSettingsBackupPath)),
+                    Is.False);
+                CollectionAssert.AreEqual(
+                    originalProjectSettings,
+                    File.ReadAllBytes(projectSettingsPath),
+                    "The normal build restoration path must preserve ProjectSettings.asset exactly.");
+                AssetDatabase.SaveAssets();
+                CollectionAssert.AreEqual(
+                    originalProjectSettings,
+                    File.ReadAllBytes(projectSettingsPath),
+                    "An editor-exit settings save must not overwrite the restored macOS ProjectSettings bytes.");
+
+                begin.Invoke(null, null);
+                restoreAfterPostprocess.Invoke(null, null);
+                InvalidOperationException simulatedBuildFailure =
+                    Assert.Throws<InvalidOperationException>(() =>
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException(
+                                "simulated macOS build failure");
+                        }
+                        finally
+                        {
+                            restore.Invoke(null, null);
+                        }
+                    });
+                Assert.That(
+                    simulatedBuildFailure?.Message,
+                    Is.EqualTo("simulated macOS build failure"),
+                    "The outer finally must restore state without swallowing the build failure.");
+                Assert.That(
+                    PlayerSettings.GetArchitecture(
+                        BuildTargetGroup.Standalone),
+                    Is.EqualTo(originalArchitecture));
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        MacArchitectureRestoreMarkerPath)),
+                    Is.False);
+                CollectionAssert.AreEqual(
+                    originalProjectSettings,
+                    File.ReadAllBytes(projectSettingsPath),
+                    "The explicit macOS build failure path must preserve ProjectSettings.asset exactly.");
+
+                begin.Invoke(null, null);
+                ownsArchitecture.SetValue(null, false);
+                hasOriginalArchitecture.SetValue(null, false);
+                originalArchitectureState.SetValue(null, 0);
+                recover.Invoke(null, null);
+                Assert.That(
+                    PlayerSettings.GetArchitecture(
+                        BuildTargetGroup.Standalone),
+                    Is.EqualTo(originalArchitecture),
+                    "The next editor initialization must recover an abandoned universal override.");
+                Assert.That(
+                    File.Exists(ProjectPath(
+                        MacArchitectureRestoreMarkerPath)),
+                    Is.False);
+                CollectionAssert.AreEqual(
+                    originalProjectSettings,
+                    File.ReadAllBytes(projectSettingsPath),
+                    "Initialization recovery must preserve ProjectSettings.asset exactly.");
+                AssetDatabase.SaveAssets();
+                CollectionAssert.AreEqual(
+                    originalProjectSettings,
+                    File.ReadAllBytes(projectSettingsPath),
+                    "Recovery must leave ProjectSettings clean before editor exit.");
+            }
+            finally
+            {
+                try
+                {
+                    restore?.Invoke(null, null);
+                }
+                finally
+                {
+                    try
+                    {
+                        if (PlayerSettings.GetArchitecture(
+                                BuildTargetGroup.Standalone) !=
+                            originalArchitecture)
+                            PlayerSettings.SetArchitecture(
+                                BuildTargetGroup.Standalone,
+                                originalArchitecture);
+                    }
+                    finally
+                    {
+                        File.WriteAllBytes(
+                            projectSettingsPath,
+                            originalProjectSettings);
+                        AssetDatabase.Refresh(
+                            ImportAssetOptions.ForceSynchronousImport |
+                            ImportAssetOptions.ForceUpdate);
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void Bug0005_PlayerBuildScope_RegistersGrayboxUrpOnlyFor3DBuildsAndRestores()
         {
             Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
@@ -190,12 +688,20 @@ namespace WasteCity.Tests
             MethodInfo restore = scope.GetMethod(
                 "RestoreAfterBuild",
                 BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo restoreAfterPostprocess = scope.GetMethod(
+                "RestoreAfterPostprocessBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo qualityParser = scope.GetMethod(
+                "ParseCurrentQualityAntiAliasingForTests",
+                BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo recover = scope.GetMethod(
                 "RecoverAbandonedBuild",
                 BindingFlags.NonPublic | BindingFlags.Static);
             Assert.That(requires, Is.Not.Null);
             Assert.That(begin, Is.Not.Null);
             Assert.That(restore, Is.Not.Null);
+            Assert.That(restoreAfterPostprocess, Is.Not.Null);
+            Assert.That(qualityParser, Is.Not.Null);
             Assert.That(recover, Is.Not.Null);
 
             Assert.That(
@@ -216,13 +722,21 @@ namespace WasteCity.Tests
                     UniversalRenderPipelineAsset>(GrayboxPipelinePath);
             RenderPipelineAsset original =
                 GraphicsSettings.defaultRenderPipeline;
-            int originalAntiAliasing = QualitySettings.antiAliasing;
-            int changedAntiAliasing = originalAntiAliasing == 0 ? 2 : 0;
+            int serializedAntiAliasing = (int)qualityParser.Invoke(
+                null,
+                new object[]
+                {
+                    File.ReadAllText(ProjectPath(QualitySettingsPath))
+                });
+            Assert.That(serializedAntiAliasing, Is.EqualTo(2),
+                "The committed current quality level is the AA=2 restore authority.");
+            const int simulatedBatchAntiAliasing = 0;
             string[] protectedPaths =
             {
                 ProjectPath(GrayboxPipelinePath),
                 ProjectPath(GraphicsSettingsPath),
-                ProjectPath(QualitySettingsPath)
+                ProjectPath(QualitySettingsPath),
+                ProjectPath(PlayerSettingsPath)
             };
             var originalBytes = new Dictionary<string, byte[]>();
             foreach (string protectedPath in protectedPaths)
@@ -232,6 +746,7 @@ namespace WasteCity.Tests
             Assert.That(approved, Is.Not.Null);
             try
             {
+                QualitySettings.antiAliasing = simulatedBatchAntiAliasing;
                 Assert.That(
                     begin.Invoke(null, new object[]
                     {
@@ -253,7 +768,7 @@ namespace WasteCity.Tests
                     File.AppendAllText(
                         protectedPath,
                         "\n# BUG-0005 simulated build mutation\n");
-                QualitySettings.antiAliasing = changedAntiAliasing;
+                QualitySettings.antiAliasing = simulatedBatchAntiAliasing;
                 Assert.That(
                     begin.Invoke(null, new object[]
                     {
@@ -261,8 +776,12 @@ namespace WasteCity.Tests
                     }),
                     Is.EqualTo(true),
                     "Repeated build preparation must not replace the original byte backups.");
+                StringAssert.Contains(
+                    "antiAliasing=" + serializedAntiAliasing,
+                    File.ReadAllText(ProjectPath(RestoreMarkerPath)),
+                    "The marker must record serialized current-quality AA instead of batch runtime AA.");
 
-                restore.Invoke(null, null);
+                restoreAfterPostprocess.Invoke(null, null);
                 AssertProtectedFilesMatch(
                     protectedPaths,
                     originalBytes,
@@ -284,8 +803,13 @@ namespace WasteCity.Tests
                     Is.SameAs(original));
                 Assert.That(
                     QualitySettings.antiAliasing,
-                    Is.EqualTo(originalAntiAliasing),
-                    "The editor's in-memory quality state must be restored before exact file restoration.");
+                    Is.EqualTo(serializedAntiAliasing),
+                    "The backup's serialized current-quality AA must replace the batch runtime value before exact file restoration.");
+                AssetDatabase.SaveAssets();
+                AssertProtectedFilesMatch(
+                    protectedPaths,
+                    originalBytes,
+                    "Simulated editor-exit settings save");
 
                 Assert.That(
                     begin.Invoke(null, new object[]
@@ -307,7 +831,7 @@ namespace WasteCity.Tests
                     File.AppendAllText(
                         protectedPath,
                         "\n# BUG-0005 simulated interrupted build mutation\n");
-                QualitySettings.antiAliasing = changedAntiAliasing;
+                QualitySettings.antiAliasing = simulatedBatchAntiAliasing;
                 recover.Invoke(null, null);
                 AssertProtectedFilesMatch(
                     protectedPaths,
@@ -319,13 +843,19 @@ namespace WasteCity.Tests
                     "A stale build override must recover on the next editor initialization.");
                 Assert.That(
                     QualitySettings.antiAliasing,
-                    Is.EqualTo(originalAntiAliasing));
+                    Is.EqualTo(serializedAntiAliasing));
+                AssetDatabase.SaveAssets();
+                AssertProtectedFilesMatch(
+                    protectedPaths,
+                    originalBytes,
+                    "Interrupted-build recovery followed by editor-exit settings save");
             }
             finally
             {
                 restore?.Invoke(null, null);
                 GraphicsSettings.defaultRenderPipeline = original;
-                QualitySettings.antiAliasing = originalAntiAliasing;
+                QualitySettings.antiAliasing = serializedAntiAliasing;
+                AssetDatabase.SaveAssets();
                 foreach (KeyValuePair<string, byte[]> snapshot in originalBytes)
                     File.WriteAllBytes(snapshot.Key, snapshot.Value);
             }
@@ -342,6 +872,18 @@ namespace WasteCity.Tests
                     File.ReadAllBytes(protectedPath),
                     restorationPath + " must restore exact bytes for " +
                     protectedPath);
+        }
+
+        private static void AssertQualityParserRejects(
+            MethodInfo parser,
+            string yaml)
+        {
+            TargetInvocationException exception =
+                Assert.Throws<TargetInvocationException>(
+                    () => parser.Invoke(null, new object[] { yaml }));
+            Assert.That(
+                exception?.InnerException,
+                Is.InstanceOf<BuildFailedException>());
         }
 
         private static string ProjectPath(string relativePath)

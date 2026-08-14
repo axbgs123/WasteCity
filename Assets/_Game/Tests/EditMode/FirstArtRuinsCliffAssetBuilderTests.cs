@@ -178,7 +178,9 @@ namespace WasteCity.Tests
                 MeshFilter filter = prefab.GetComponent<MeshFilter>();
                 MeshRenderer renderer = prefab.GetComponent<MeshRenderer>();
                 Assert.That(filter.sharedMesh, Is.Not.Null, entry.StableId);
-                Assert.That(AssetDatabase.GetAssetPath(filter.sharedMesh), Is.EqualTo(entry.FbxPath));
+                Assert.That(
+                    AssetDatabase.GetAssetPath(filter.sharedMesh),
+                    Is.EqualTo(entry.PrefabPath));
                 Assert.That(renderer.sharedMaterials.Length, Is.EqualTo(entry.MaterialRoles.Count));
                 Assert.That(filter.sharedMesh.subMeshCount, Is.EqualTo(entry.MaterialRoles.Count));
                 for (int index = 0; index < entry.MaterialRoles.Count; index++)
@@ -204,6 +206,49 @@ namespace WasteCity.Tests
                 Assert.That(calibrated.size.x, Is.LessThanOrEqualTo(0.9002f), entry.StableId);
                 Assert.That(calibrated.size.z, Is.LessThanOrEqualTo(0.9002f), entry.StableId);
                 AssertVector(calibrated.size, entry.CalibratedBounds, entry.StableId + " bounds", 0.0000002f);
+            }
+        }
+
+        [Test]
+        public void RuntimePrefabs_EmbedReadableMeshesWithoutChangingRawFbxImporters()
+        {
+            foreach (FirstArtRuinsCliffCatalogEntry3D entry in
+                     FirstArtRuinsCliffCatalog3D.Entries)
+            {
+                GameObject prefab =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(
+                        entry.PrefabPath);
+                Assert.That(prefab, Is.Not.Null, entry.PrefabPath);
+                Mesh mesh = prefab.GetComponent<MeshFilter>()?.sharedMesh;
+                Assert.That(mesh, Is.Not.Null, entry.StableId);
+                Assert.That(
+                    EditorUtility.IsPersistent(mesh),
+                    Is.True,
+                    entry.StableId + " runtime Mesh must be persistent.");
+                Assert.That(
+                    AssetDatabase.GetAssetPath(mesh),
+                    Is.EqualTo(entry.PrefabPath),
+                    entry.StableId +
+                    " runtime Mesh must be a subasset of its Prefab.");
+                Assert.That(
+                    AssetDatabase.LoadAllAssetsAtPath(entry.PrefabPath),
+                    Does.Contain(mesh),
+                    entry.StableId +
+                    " runtime Mesh must be loadable from its Prefab asset.");
+                Assert.That(
+                    mesh.isReadable,
+                    Is.True,
+                    entry.StableId +
+                    " runtime geometry generation requires readable vertex/index data.");
+
+                ModelImporter importer =
+                    AssetImporter.GetAtPath(entry.FbxPath) as ModelImporter;
+                Assert.That(importer, Is.Not.Null, entry.FbxPath);
+                Assert.That(
+                    importer.isReadable,
+                    Is.False,
+                    entry.StableId +
+                    " must not enable Read/Write on the approved raw FBX.");
             }
         }
 
@@ -284,6 +329,199 @@ namespace WasteCity.Tests
             AssertStates(second, first, "second idempotent run");
             Assert.That(Directory.Exists(ProjectPath(FirstArtRuinsCliffAssetBuilder.RestoreRoot)), Is.False);
             Assert.That(AssetDatabase.IsValidFolder(FirstArtRuinsCliffAssetBuilder.StagingRoot), Is.False);
+        }
+
+        [Test]
+        public void Builder_ForcedFullRebuildPreservesAllRuntimeMeshLocalIdsAndReferences()
+        {
+            FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets();
+            Dictionary<string, AssetState> original = CaptureOutputStates();
+            Dictionary<string, RuntimeMeshIdentity> before =
+                CaptureRuntimeMeshIdentities();
+            Assert.That(before.Count, Is.EqualTo(14),
+                "The stability contract must cover every approved runtime Prefab Mesh.");
+            try
+            {
+                CorruptOneMaterial();
+                FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets();
+
+                Dictionary<string, RuntimeMeshIdentity> after =
+                    CaptureRuntimeMeshIdentities();
+                Assert.That(after.Count, Is.EqualTo(before.Count));
+                foreach (FirstArtRuinsCliffCatalogEntry3D entry in
+                         FirstArtRuinsCliffCatalog3D.Entries)
+                {
+                    RuntimeMeshIdentity expected = before[entry.StableId];
+                    RuntimeMeshIdentity actual = after[entry.StableId];
+                    Assert.That(actual.Guid, Is.EqualTo(expected.Guid),
+                        entry.StableId + " embedded Mesh GUID changed during full rebuild.");
+                    Assert.That(actual.LocalFileId, Is.EqualTo(expected.LocalFileId),
+                        entry.StableId + " embedded Mesh local fileID changed during full rebuild.");
+                }
+            }
+            finally
+            {
+                RestoreStates(original);
+            }
+        }
+
+        [Test]
+        public void Builder_SameCountAndBoundsMeshDriftRebuildsInPlaceAndThenStaysStable()
+        {
+            FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets();
+            Dictionary<string, AssetState> original = CaptureOutputStates();
+            FirstArtRuinsCliffCatalogEntry3D entry =
+                FirstArtRuinsCliffCatalog3D.Entries[0];
+            RuntimeMeshIdentity identityBefore =
+                CaptureRuntimeMeshIdentities()[entry.StableId];
+            try
+            {
+                GameObject prefab =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(
+                        entry.PrefabPath);
+                Mesh runtimeMesh =
+                    prefab.GetComponent<MeshFilter>().sharedMesh;
+                int vertexCount = runtimeMesh.vertexCount;
+                Bounds bounds = runtimeMesh.bounds;
+                Vector3[] normals = runtimeMesh.normals;
+                Assert.That(normals.Length, Is.EqualTo(vertexCount));
+                normals[0] = normals[0].Equals(Vector3.up)
+                    ? Vector3.right
+                    : Vector3.up;
+                runtimeMesh.normals = normals;
+                runtimeMesh.bounds = bounds;
+                AssetDatabase.SaveAssetIfDirty(runtimeMesh);
+
+                Assert.That(runtimeMesh.vertexCount, Is.EqualTo(vertexCount));
+                Assert.That(runtimeMesh.bounds, Is.EqualTo(bounds));
+                Mesh approvedBeforeRepair =
+                    AssetDatabase.LoadAllAssetsAtPath(entry.FbxPath)
+                        .OfType<Mesh>()
+                        .Single();
+                Assert.That(
+                    FirstArtRuinsCliffAssetBuilder.
+                        MeshContentMatchesForTests(
+                            approvedBeforeRepair,
+                            runtimeMesh),
+                    Is.False,
+                    "The full-content validator must reject same-count/same-bounds drift.");
+                FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets();
+
+                GameObject repairedPrefab =
+                    AssetDatabase.LoadAssetAtPath<GameObject>(
+                        entry.PrefabPath);
+                Mesh repaired = repairedPrefab
+                    .GetComponent<MeshFilter>().sharedMesh;
+                Mesh approved = AssetDatabase.LoadAllAssetsAtPath(
+                        entry.FbxPath)
+                    .OfType<Mesh>()
+                    .Single();
+                Assert.That(
+                    FirstArtRuinsCliffAssetBuilder.
+                        MeshContentMatchesForTests(approved, repaired),
+                    Is.True,
+                    "Same-count/same-bounds attribute drift must not take the fast return.");
+                RuntimeMeshIdentity identityAfter =
+                    CaptureRuntimeMeshIdentities()[entry.StableId];
+                Assert.That(identityAfter.Guid, Is.EqualTo(identityBefore.Guid));
+                Assert.That(
+                    identityAfter.LocalFileId,
+                    Is.EqualTo(identityBefore.LocalFileId));
+
+                Dictionary<string, AssetState> repairedState =
+                    CaptureOutputStates();
+                FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets();
+                AssertStates(
+                    CaptureOutputStates(),
+                    repairedState,
+                    "stable repeat after Mesh content repair");
+            }
+            finally
+            {
+                RestoreStates(original);
+            }
+        }
+
+        [Test]
+        public void MeshContentComparison_CoversAllCopiedVertexAndIndexData()
+        {
+            var meshes = new List<Mesh>();
+            try
+            {
+                Mesh approved = CreateComparisonMesh(IndexFormat.UInt16);
+                Mesh identical = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(approved);
+                meshes.Add(identical);
+                Assert.That(
+                    FirstArtRuinsCliffAssetBuilder.
+                        MeshContentMatchesForTests(approved, identical),
+                    Is.True);
+
+                Mesh vertexDrift = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(vertexDrift);
+                Vector3[] vertices = vertexDrift.vertices;
+                vertices[4] = new Vector3(.25f, .1f, .25f);
+                vertexDrift.vertices = vertices;
+                vertexDrift.bounds = approved.bounds;
+
+                Mesh normalDrift = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(normalDrift);
+                Vector3[] normals = normalDrift.normals;
+                normals[4] = Vector3.down;
+                normalDrift.normals = normals;
+
+                Mesh tangentDrift = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(tangentDrift);
+                Vector4[] tangents = tangentDrift.tangents;
+                tangents[4].w = -1f;
+                tangentDrift.tangents = tangents;
+
+                Mesh uvDrift = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(uvDrift);
+                Vector2[] uv = uvDrift.uv;
+                uv[4] = new Vector2(.25f, .75f);
+                uvDrift.uv = uv;
+
+                Mesh indexDrift = CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(indexDrift);
+                indexDrift.SetIndices(
+                    new[] { 1, 0, 4, 1, 2, 4 },
+                    MeshTopology.Triangles,
+                    0,
+                    false);
+                indexDrift.bounds = approved.bounds;
+
+                Mesh topologyDrift =
+                    CreateComparisonMesh(IndexFormat.UInt16);
+                meshes.Add(topologyDrift);
+                topologyDrift.SetIndices(
+                    new[] { 0, 1, 1, 2, 2, 4 },
+                    MeshTopology.Lines,
+                    0,
+                    false);
+                topologyDrift.bounds = approved.bounds;
+
+                Mesh indexFormatDrift =
+                    CreateComparisonMesh(IndexFormat.UInt32);
+                meshes.Add(indexFormatDrift);
+
+                foreach (Mesh drifted in meshes.Skip(2))
+                {
+                    Assert.That(drifted.vertexCount,
+                        Is.EqualTo(approved.vertexCount));
+                    Assert.That(drifted.bounds, Is.EqualTo(approved.bounds));
+                    Assert.That(
+                        FirstArtRuinsCliffAssetBuilder.
+                            MeshContentMatchesForTests(approved, drifted),
+                        Is.False,
+                        drifted.name);
+                }
+            }
+            finally
+            {
+                foreach (Mesh mesh in meshes)
+                    UnityEngine.Object.DestroyImmediate(mesh);
+            }
         }
 
         [TestCase((int)FirstArtRuinsCliffAssetBuilder.PublishPhase.Material)]
@@ -566,7 +804,10 @@ namespace WasteCity.Tests
                     throw new InjectedPublishFailure("after commit cleanup")));
                 Assert.DoesNotThrow(FirstArtRuinsCliffAssetBuilder.BuildRuntimeAssets,
                     "Cleanup failure after the atomic commit boundary must not request rollback.");
-                AssertStates(CaptureOutputStates(), expectedPublished, "committed publication");
+                AssertCommittedStatesEqualAllowingYamlLineEndWhitespace(
+                    CaptureOutputStates(),
+                    expectedPublished,
+                    "committed publication");
                 string restoreDirectory = ProjectPath(FirstArtRuinsCliffAssetBuilder.RestoreRoot);
                 Assert.That(Directory.Exists(restoreDirectory), Is.True);
                 Assert.That(File.Exists(Path.Combine(restoreDirectory, "transaction.json")), Is.False);
@@ -575,7 +816,10 @@ namespace WasteCity.Tests
                 checkpoint.SetValue(null, null);
                 FirstArtRuinsCliffAssetBuilder.RecoverInterruptedBuild();
                 Assert.That(Directory.Exists(restoreDirectory), Is.False);
-                AssertStates(CaptureOutputStates(), expectedPublished, "post-commit residue cleanup");
+                AssertCommittedStatesEqualAllowingYamlLineEndWhitespace(
+                    CaptureOutputStates(),
+                    expectedPublished,
+                    "post-commit residue cleanup");
             }
             finally
             {
@@ -777,6 +1021,8 @@ namespace WasteCity.Tests
             var readback = new Texture2D(96, 96, TextureFormat.RGBA32, false, false);
             try
             {
+                Assert.That(renderTexture.Create(), Is.True,
+                    "The shader contract requires an allocated GPU render target.");
                 Mesh mesh = CreatePlane(normal);
                 root.AddComponent<MeshFilter>().sharedMesh = mesh;
                 root.AddComponent<MeshRenderer>().sharedMaterial = material;
@@ -793,9 +1039,13 @@ namespace WasteCity.Tests
                 camera.targetTexture = renderTexture;
                 camera.transform.position = normal * 3f;
                 camera.transform.rotation = Quaternion.LookRotation(-normal, Math.Abs(normal.y) > 0.5f ? Vector3.forward : Vector3.up);
+                RenderTexture previous = RenderTexture.active;
+                RenderTexture.active = renderTexture;
+                GL.Clear(true, true, Color.magenta);
+                RenderTexture.active = previous;
                 camera.Render();
 
-                RenderTexture previous = RenderTexture.active;
+                previous = RenderTexture.active;
                 RenderTexture.active = renderTexture;
                 readback.ReadPixels(new Rect(0, 0, 96, 96), 0, 0);
                 readback.Apply();
@@ -921,6 +1171,44 @@ namespace WasteCity.Tests
                 StringComparer.Ordinal);
         }
 
+        private static Dictionary<string, RuntimeMeshIdentity>
+            CaptureRuntimeMeshIdentities()
+        {
+            var identities = new Dictionary<string, RuntimeMeshIdentity>(
+                StringComparer.Ordinal);
+            foreach (FirstArtRuinsCliffCatalogEntry3D entry in
+                     FirstArtRuinsCliffCatalog3D.Entries)
+            {
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                    entry.PrefabPath);
+                Assert.That(prefab, Is.Not.Null, entry.PrefabPath);
+                Mesh referencedMesh = prefab.GetComponent<MeshFilter>()?.sharedMesh;
+                Assert.That(referencedMesh, Is.Not.Null, entry.StableId);
+                Mesh[] embeddedMeshes = AssetDatabase.LoadAllAssetsAtPath(
+                        entry.PrefabPath)
+                    .OfType<Mesh>()
+                    .ToArray();
+                Assert.That(embeddedMeshes.Length, Is.EqualTo(1),
+                    entry.StableId + " must contain exactly one embedded runtime Mesh.");
+                Assert.That(embeddedMeshes[0].name,
+                    Is.EqualTo(entry.StableId + "_RuntimeMesh"),
+                    entry.StableId + " embedded runtime Mesh name changed.");
+                Assert.That(referencedMesh, Is.SameAs(embeddedMeshes[0]),
+                    entry.StableId + " MeshFilter must reference its sole embedded runtime Mesh.");
+                Assert.That(AssetDatabase.TryGetGUIDAndLocalFileIdentifier(
+                    referencedMesh,
+                    out string guid,
+                    out long localFileId), Is.True, entry.StableId);
+                Assert.That(guid,
+                    Is.EqualTo(AssetDatabase.AssetPathToGUID(entry.PrefabPath)),
+                    entry.StableId + " embedded Mesh must share its Prefab GUID.");
+                identities.Add(
+                    entry.StableId,
+                    new RuntimeMeshIdentity(guid, localFileId));
+            }
+            return identities;
+        }
+
         private static void AssertStates(
             IReadOnlyDictionary<string, AssetState> actual,
             IReadOnlyDictionary<string, AssetState> expected,
@@ -940,6 +1228,75 @@ namespace WasteCity.Tests
                 CollectionAssert.AreEqual(expectedState.MetaBytes, actualState.MetaBytes,
                     message + ":meta:" + path);
             }
+        }
+
+        private static void AssertCommittedStatesEqualAllowingYamlLineEndWhitespace(
+            IReadOnlyDictionary<string, AssetState> actual,
+            IReadOnlyDictionary<string, AssetState> expected,
+            string message)
+        {
+            Assert.That(actual.Keys, Is.EquivalentTo(expected.Keys), message);
+            foreach (string path in expected.Keys)
+            {
+                AssetState expectedState = expected[path];
+                AssetState actualState = actual[path];
+                Assert.That(actualState.Exists, Is.EqualTo(expectedState.Exists),
+                    message + ":" + path);
+                Assert.That(actualState.Guid, Is.EqualTo(expectedState.Guid),
+                    message + ":GUID:" + path);
+                if (!expectedState.Exists)
+                    continue;
+
+                if (IsYamlTextAsset(expectedState.AssetBytes) &&
+                    IsYamlTextAsset(actualState.AssetBytes))
+                {
+                    Assert.That(
+                        NormalizeYamlLineEndWhitespace(actualState.AssetBytes),
+                        Is.EqualTo(NormalizeYamlLineEndWhitespace(
+                            expectedState.AssetBytes)),
+                        message + ":asset:" + path);
+                }
+                else
+                {
+                    CollectionAssert.AreEqual(
+                        expectedState.AssetBytes,
+                        actualState.AssetBytes,
+                        message + ":asset:" + path);
+                }
+                CollectionAssert.AreEqual(
+                    expectedState.MetaBytes,
+                    actualState.MetaBytes,
+                    message + ":meta:" + path);
+            }
+        }
+
+        private static bool IsYamlTextAsset(byte[] bytes)
+        {
+            if (bytes == null)
+                return false;
+            int offset = bytes.Length >= 3 &&
+                         bytes[0] == 0xef &&
+                         bytes[1] == 0xbb &&
+                         bytes[2] == 0xbf
+                ? 3
+                : 0;
+            return bytes.Length - offset >= 5 &&
+                   bytes[offset] == '%' &&
+                   bytes[offset + 1] == 'Y' &&
+                   bytes[offset + 2] == 'A' &&
+                   bytes[offset + 3] == 'M' &&
+                   bytes[offset + 4] == 'L';
+        }
+
+        private static string NormalizeYamlLineEndWhitespace(byte[] bytes)
+        {
+            string text = System.Text.Encoding.UTF8.GetString(bytes)
+                .Replace("\r\n", "\n")
+                .Replace('\r', '\n');
+            string[] lines = text.Split('\n');
+            for (int index = 0; index < lines.Length; index++)
+                lines[index] = lines[index].TrimEnd(' ', '\t');
+            return string.Join("\n", lines).TrimEnd('\n');
         }
 
         private static void RestoreStates(IReadOnlyDictionary<string, AssetState> states)
@@ -966,6 +1323,51 @@ namespace WasteCity.Tests
             Assert.That(material, Is.Not.Null, path);
             material.SetFloat("_HeightStrength", material.GetFloat("_HeightStrength") + 0.125f);
             AssetDatabase.SaveAssetIfDirty(material);
+        }
+
+        private static Mesh CreateComparisonMesh(IndexFormat indexFormat)
+        {
+            var mesh = new Mesh
+            {
+                name = "MeshContentComparison_" + indexFormat,
+                indexFormat = indexFormat
+            };
+            mesh.vertices = new[]
+            {
+                new Vector3(-1f, 0f, -1f),
+                new Vector3(1f, 0f, -1f),
+                new Vector3(1f, 0f, 1f),
+                new Vector3(-1f, 0f, 1f),
+                Vector3.zero
+            };
+            mesh.normals = Enumerable.Repeat(Vector3.up, 5).ToArray();
+            mesh.tangents = Enumerable.Repeat(
+                    new Vector4(1f, 0f, 0f, 1f),
+                    5)
+                .ToArray();
+            mesh.uv = new[]
+            {
+                Vector2.zero,
+                Vector2.right,
+                Vector2.one,
+                Vector2.up,
+                new Vector2(.5f, .5f)
+            };
+            mesh.subMeshCount = 2;
+            mesh.SetIndices(
+                new[] { 0, 1, 4, 1, 2, 4 },
+                MeshTopology.Triangles,
+                0,
+                false);
+            mesh.SetIndices(
+                new[] { 2, 3, 4, 3, 0, 4 },
+                MeshTopology.Triangles,
+                1,
+                false);
+            mesh.bounds = new Bounds(
+                Vector3.zero,
+                new Vector3(2f, 0f, 2f));
+            return mesh;
         }
 
         private static string ProjectPath(string relativePath)
@@ -1157,6 +1559,18 @@ namespace WasteCity.Tests
                     File.ReadAllBytes(absolute + ".meta"),
                     guid);
             }
+        }
+
+        private sealed class RuntimeMeshIdentity
+        {
+            public RuntimeMeshIdentity(string guid, long localFileId)
+            {
+                Guid = guid;
+                LocalFileId = localFileId;
+            }
+
+            public string Guid { get; }
+            public long LocalFileId { get; }
         }
 
         private sealed class InjectedPublishFailure : Exception
