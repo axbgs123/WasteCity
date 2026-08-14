@@ -1,10 +1,18 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Graybox3D;
 using WasteCity.World;
 
 namespace WasteCity.ArtIntegration3D
 {
+    public enum FirstArtRuinsCliffPresentationStatus3D
+    {
+        NotConfigured = 0,
+        Presented = 1,
+        Fallback = 2,
+    }
+
     public sealed class FirstArtTerrainRenderer3D : MonoBehaviour,
         IGrayboxTerrainPresentation3D,
         IGrayboxTerrainPresentationAttempt3D,
@@ -36,6 +44,7 @@ namespace WasteCity.ArtIntegration3D
             Shader.PropertyToID("_WaterVelocityB");
 
         [SerializeField] private FirstArtTerrainProfile3D profile;
+        [SerializeField] private FirstArtRuinsCliffProfile3D geometryProfile;
 
         private GrayboxWorldView3D retainedWorldView;
         private GameObject runtimeSurface;
@@ -43,8 +52,12 @@ namespace WasteCity.ArtIntegration3D
         private MeshRenderer surfaceRenderer;
         private FirstArtTerrainControlMap3D controlMaps;
         private MaterialPropertyBlock propertyBlock;
+        private GameObject runtimeGeometry;
+        private FirstArtRuinsCliffCategoryGeometry3D ruinsGeometry;
+        private FirstArtRuinsCliffCategoryGeometry3D cliffGeometry;
 
         public FirstArtTerrainProfile3D Profile => profile;
+        public FirstArtRuinsCliffProfile3D GeometryProfile => geometryProfile;
         public bool IsPresented =>
             runtimeSurface != null &&
             ownedMesh != null &&
@@ -53,15 +66,29 @@ namespace WasteCity.ArtIntegration3D
         public MeshRenderer SurfaceRenderer => surfaceRenderer;
         public FirstArtTerrainControlMap3D ControlMaps => controlMaps;
         public string LastPresentationError { get; private set; }
+        public FirstArtRuinsCliffPresentationStatus3D RuinsStatus { get; private set; }
+        public FirstArtRuinsCliffPresentationStatus3D CliffStatus { get; private set; }
+        public string RuinsError { get; private set; }
+        public string CliffError { get; private set; }
 
         public void Configure(FirstArtTerrainProfile3D profile)
         {
-            if (ReferenceEquals(this.profile, profile))
+            Configure(profile, null);
+        }
+
+        public void Configure(
+            FirstArtTerrainProfile3D profile,
+            FirstArtRuinsCliffProfile3D geometryProfile)
+        {
+            if (ReferenceEquals(this.profile, profile) &&
+                ReferenceEquals(this.geometryProfile, geometryProfile))
                 return;
 
             ClearPresentation();
             this.profile = profile;
+            this.geometryProfile = geometryProfile;
             LastPresentationError = null;
+            ResetFamilyResults();
         }
 
         public bool TryPresent(GrayboxWorldView3D worldView)
@@ -73,8 +100,9 @@ namespace WasteCity.ArtIntegration3D
             GrayboxWorldView3D worldView,
             bool logFailure)
         {
-            LastPresentationError = null;
             ClearPresentation();
+            LastPresentationError = null;
+            ResetFamilyResults();
             retainedWorldView = worldView;
 
             Mesh localMesh = null;
@@ -121,6 +149,8 @@ namespace WasteCity.ArtIntegration3D
 
                 worldView.AttachTerrainPresentation(this);
                 worldView.SetSurfaceFallbackVisible(false);
+                if (geometryProfile != null)
+                    PresentGeometryCategories(worldView, logFailure);
                 return true;
             }
             catch (Exception exception)
@@ -131,6 +161,7 @@ namespace WasteCity.ArtIntegration3D
                 DestroyOwned(localMesh);
                 propertyBlock?.Clear();
                 LastPresentationError = exception.Message;
+                ResetFamilyResults();
                 if (logFailure)
                 {
                     Debug.LogError(
@@ -152,10 +183,31 @@ namespace WasteCity.ArtIntegration3D
                     retainedWorldView.HasActiveTerrainPresentation &&
                     !ownsFallback;
                 if (ownsFallback)
+                {
+                    retainedWorldView.TrySetSurfaceFallbackVisible(
+                        SurfaceStableId(FirstArtRuinsCliffFamily3D.Ruins),
+                        true,
+                        out _);
+                    retainedWorldView.TrySetSurfaceFallbackVisible(
+                        SurfaceStableId(FirstArtRuinsCliffFamily3D.Cliff),
+                        true,
+                        out _);
+                }
+                if (ownsFallback)
                     retainedWorldView.DetachTerrainPresentation(this);
                 if (!hasCompetingPresentation)
                     retainedWorldView.SetSurfaceFallbackVisible(true);
             }
+
+            FirstArtRuinsCliffCategoryGeometry3D ruinsToDispose = ruinsGeometry;
+            FirstArtRuinsCliffCategoryGeometry3D cliffToDispose = cliffGeometry;
+            GameObject geometryRootToDestroy = runtimeGeometry;
+            ruinsGeometry = null;
+            cliffGeometry = null;
+            runtimeGeometry = null;
+            ruinsToDispose?.Dispose();
+            cliffToDispose?.Dispose();
+            DestroyOwned(geometryRootToDestroy);
 
             if (propertyBlock != null)
             {
@@ -175,6 +227,7 @@ namespace WasteCity.ArtIntegration3D
             DestroyOwned(surfaceToDestroy);
             mapsToDispose?.Dispose();
             DestroyOwned(meshToDestroy);
+            ResetFamilyResults();
         }
 
         public void ReleasePresentationSource()
@@ -286,6 +339,226 @@ namespace WasteCity.ArtIntegration3D
                 Destroy(value);
             else
                 DestroyImmediate(value);
+        }
+
+        private void PresentGeometryCategories(
+            GrayboxWorldView3D worldView,
+            bool logFailure)
+        {
+            IReadOnlyList<FirstArtRuinsCliffPlacement3D> projected;
+            try
+            {
+                projected = FirstArtRuinsCliffLayout3D.Project(
+                    worldView.Model,
+                    worldView.Coordinates);
+            }
+            catch (Exception exception)
+            {
+                SetCategoryFailure(
+                    worldView,
+                    FirstArtRuinsCliffFamily3D.Ruins,
+                    exception.Message,
+                    logFailure);
+                SetCategoryFailure(
+                    worldView,
+                    FirstArtRuinsCliffFamily3D.Cliff,
+                    exception.Message,
+                    logFailure);
+                return;
+            }
+
+            var ruins = new List<FirstArtRuinsCliffPlacement3D>();
+            var cliffs = new List<FirstArtRuinsCliffPlacement3D>();
+            for (int index = 0; index < projected.Count; index++)
+            {
+                FirstArtRuinsCliffPlacement3D placement = projected[index];
+                if (placement.Family == FirstArtRuinsCliffFamily3D.Ruins)
+                    ruins.Add(placement);
+                else
+                    cliffs.Add(placement);
+            }
+
+            if (projected.Count > 0)
+            {
+                runtimeGeometry = new GameObject("RuntimeGeometry");
+                runtimeGeometry.transform.SetParent(transform, false);
+            }
+
+            PresentGeometryCategory(
+                worldView,
+                FirstArtRuinsCliffFamily3D.Ruins,
+                ruins,
+                logFailure);
+            PresentGeometryCategory(
+                worldView,
+                FirstArtRuinsCliffFamily3D.Cliff,
+                cliffs,
+                logFailure);
+
+            if (ruinsGeometry == null && cliffGeometry == null)
+            {
+                GameObject emptyRoot = runtimeGeometry;
+                runtimeGeometry = null;
+                DestroyOwned(emptyRoot);
+            }
+        }
+
+        private void PresentGeometryCategory(
+            GrayboxWorldView3D worldView,
+            FirstArtRuinsCliffFamily3D family,
+            IReadOnlyList<FirstArtRuinsCliffPlacement3D> placements,
+            bool logFailure)
+        {
+            string stableId = SurfaceStableId(family);
+            if (placements.Count == 0)
+            {
+                if (!worldView.TrySetSurfaceFallbackVisible(
+                        stableId,
+                        false,
+                        out string visibilityError))
+                {
+                    SetCategoryFailure(worldView, family, visibilityError, logFailure);
+                    return;
+                }
+                SetCategorySuccess(family, null);
+                return;
+            }
+
+            FirstArtRuinsCliffCategoryGeometry3D localGeometry = null;
+            string error = null;
+            try
+            {
+                if (runtimeGeometry == null)
+                    throw new InvalidOperationException("Runtime geometry root is missing.");
+                if (!FirstArtRuinsCliffGeometry3D.TryBuild(
+                        geometryProfile,
+                        placements,
+                        runtimeGeometry.transform,
+                        out localGeometry,
+                        out error))
+                {
+                    SetCategoryFailure(worldView, family, error, logFailure);
+                    return;
+                }
+                VerifyCategoryGeometry(localGeometry, family);
+                if (!worldView.TrySetSurfaceFallbackVisible(
+                        stableId,
+                        false,
+                        out error))
+                    throw new InvalidOperationException(error);
+
+                SetCategorySuccess(family, localGeometry);
+                localGeometry = null;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                SetCategoryFailure(worldView, family, error, logFailure);
+            }
+            finally
+            {
+                localGeometry?.Dispose();
+            }
+        }
+
+        private static void VerifyCategoryGeometry(
+            FirstArtRuinsCliffCategoryGeometry3D geometry,
+            FirstArtRuinsCliffFamily3D family)
+        {
+            int expectedSlots = family == FirstArtRuinsCliffFamily3D.Ruins
+                ? 8
+                : 5;
+            if (geometry == null ||
+                geometry.Family != family ||
+                geometry.GameObject == null ||
+                geometry.Mesh == null)
+                throw new InvalidOperationException("Category geometry ownership is incomplete.");
+            MeshFilter filter = geometry.GameObject.GetComponent<MeshFilter>();
+            MeshRenderer renderer = geometry.GameObject.GetComponent<MeshRenderer>();
+            if (filter == null || renderer == null ||
+                filter.sharedMesh != geometry.Mesh ||
+                geometry.Mesh.subMeshCount != expectedSlots ||
+                renderer.sharedMaterials.Length != expectedSlots)
+            {
+                throw new InvalidOperationException(
+                    "Category geometry renderer references are incomplete.");
+            }
+        }
+
+        private void SetCategorySuccess(
+            FirstArtRuinsCliffFamily3D family,
+            FirstArtRuinsCliffCategoryGeometry3D geometry)
+        {
+            if (family == FirstArtRuinsCliffFamily3D.Ruins)
+            {
+                ruinsGeometry = geometry;
+                RuinsStatus = FirstArtRuinsCliffPresentationStatus3D.Presented;
+                RuinsError = null;
+            }
+            else
+            {
+                cliffGeometry = geometry;
+                CliffStatus = FirstArtRuinsCliffPresentationStatus3D.Presented;
+                CliffError = null;
+            }
+        }
+
+        private void SetCategoryFailure(
+            GrayboxWorldView3D worldView,
+            FirstArtRuinsCliffFamily3D family,
+            string error,
+            bool logFailure)
+        {
+            string stableId = SurfaceStableId(family);
+            if (!worldView.TrySetSurfaceFallbackVisible(
+                    stableId,
+                    true,
+                    out string visibilityError))
+            {
+                error = string.IsNullOrEmpty(error)
+                    ? visibilityError
+                    : error + " " + visibilityError;
+            }
+            error = string.IsNullOrEmpty(error)
+                ? "Unknown category presentation failure."
+                : error;
+            if (family == FirstArtRuinsCliffFamily3D.Ruins)
+            {
+                RuinsStatus = FirstArtRuinsCliffPresentationStatus3D.Fallback;
+                RuinsError = error;
+            }
+            else
+            {
+                CliffStatus = FirstArtRuinsCliffPresentationStatus3D.Fallback;
+                CliffError = error;
+            }
+            if (logFailure)
+            {
+                Debug.LogError(
+                    "First-art " + family +
+                    " geometry presentation failed: " + error,
+                    this);
+            }
+        }
+
+        private static string SurfaceStableId(FirstArtRuinsCliffFamily3D family)
+        {
+            return family == FirstArtRuinsCliffFamily3D.Ruins
+                ? FirstArtRuinsCliffCatalog3D.Entries[0].SurfaceStableId
+                : FirstArtRuinsCliffCatalog3D.Entries[
+                    FirstArtRuinsCliffCatalog3D.RuinsEntryCount].SurfaceStableId;
+        }
+
+        private void ResetFamilyResults()
+        {
+            FirstArtRuinsCliffPresentationStatus3D resetStatus =
+                geometryProfile == null
+                    ? FirstArtRuinsCliffPresentationStatus3D.NotConfigured
+                    : FirstArtRuinsCliffPresentationStatus3D.Fallback;
+            RuinsStatus = resetStatus;
+            CliffStatus = resetStatus;
+            RuinsError = null;
+            CliffError = null;
         }
 
         private void OnEnable()

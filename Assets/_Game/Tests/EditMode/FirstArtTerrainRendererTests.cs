@@ -44,6 +44,13 @@ namespace WasteCity.Tests
             Assert.That(presenter.TryPresent(view), Is.True);
 
             Assert.That(presenter.Profile, Is.SameAs(profile));
+            Assert.That(presenter.GeometryProfile, Is.Null);
+            Assert.That(presenter.RuinsStatus,
+                Is.EqualTo(FirstArtRuinsCliffPresentationStatus3D.NotConfigured));
+            Assert.That(presenter.CliffStatus,
+                Is.EqualTo(FirstArtRuinsCliffPresentationStatus3D.NotConfigured));
+            Assert.That(presenter.RuinsError, Is.Null);
+            Assert.That(presenter.CliffError, Is.Null);
             Assert.That(presenter.IsPresented, Is.True);
             Assert.That(presenter.SurfaceRenderer, Is.Not.Null);
             Assert.That(presenter.ControlMaps, Is.Not.Null);
