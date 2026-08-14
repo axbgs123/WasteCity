@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor.Build;
+using UnityEditor.Build.Reporting;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -17,6 +21,26 @@ namespace WasteCity.Tests
     {
         private const string FormalBuildToolsTypeName =
             "WasteCity.Editor.FormalBuildTools";
+        private const string RenderPipelineBuildScopeTypeName =
+            "WasteCity.Editor.GrayboxRenderPipelineBuildScope";
+        private const string GrayboxScenePath =
+            "Assets/_Game/Scenes/GrayboxPrototype3D.unity";
+        private const string FormalScenePath =
+            "Assets/_Game/Scenes/FormalPrototype.unity";
+        private const string GrayboxPipelinePath =
+            "Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset";
+        private const string GraphicsSettingsPath =
+            "ProjectSettings/GraphicsSettings.asset";
+        private const string QualitySettingsPath =
+            "ProjectSettings/QualitySettings.asset";
+        private const string RestoreMarkerPath =
+            "Library/WasteCity.GrayboxBuildPipelineRestore.txt";
+        private const string GrayboxPipelineBackupPath =
+            "Library/WasteCity.GrayboxBuildPipelineRestore.asset";
+        private const string GraphicsSettingsBackupPath =
+            "Library/WasteCity.GrayboxBuildPipelineRestore.GraphicsSettings.asset";
+        private const string QualitySettingsBackupPath =
+            "Library/WasteCity.GrayboxBuildPipelineRestore.QualitySettings.asset";
         private const string PerformanceProbeTypeName =
             "WasteCity.Editor.GrayboxPerformanceProbe";
         private const int BuildingInstanceCount = 128;
@@ -144,6 +168,188 @@ namespace WasteCity.Tests
             StringAssert.Contains(
                 "BuildOptions.Development",
                 development);
+        }
+
+        [Test]
+        public void Bug0005_PlayerBuildScope_RegistersGrayboxUrpOnlyFor3DBuildsAndRestores()
+        {
+            Type scope = FindLoadedType(RenderPipelineBuildScopeTypeName);
+            Assert.That(scope, Is.Not.Null,
+                "BUG-0005 requires a generic player-build callback so direct macOS builds retain URP shader variants.");
+            Assert.That(typeof(BuildPlayerProcessor).IsAssignableFrom(scope),
+                Is.True);
+            Assert.That(typeof(IPostprocessBuildWithReport).IsAssignableFrom(scope),
+                Is.True);
+
+            MethodInfo requires = scope.GetMethod(
+                "RequiresGrayboxPipeline",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo begin = scope.GetMethod(
+                "BeginForScenes",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo restore = scope.GetMethod(
+                "RestoreAfterBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo recover = scope.GetMethod(
+                "RecoverAbandonedBuild",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(requires, Is.Not.Null);
+            Assert.That(begin, Is.Not.Null);
+            Assert.That(restore, Is.Not.Null);
+            Assert.That(recover, Is.Not.Null);
+
+            Assert.That(
+                requires.Invoke(null, new object[]
+                {
+                    new[] { GrayboxScenePath, FormalScenePath }
+                }),
+                Is.EqualTo(true));
+            Assert.That(
+                requires.Invoke(null, new object[]
+                {
+                    new[] { FormalScenePath }
+                }),
+                Is.EqualTo(false));
+
+            UniversalRenderPipelineAsset approved =
+                UnityEditor.AssetDatabase.LoadAssetAtPath<
+                    UniversalRenderPipelineAsset>(GrayboxPipelinePath);
+            RenderPipelineAsset original =
+                GraphicsSettings.defaultRenderPipeline;
+            int originalAntiAliasing = QualitySettings.antiAliasing;
+            int changedAntiAliasing = originalAntiAliasing == 0 ? 2 : 0;
+            string[] protectedPaths =
+            {
+                ProjectPath(GrayboxPipelinePath),
+                ProjectPath(GraphicsSettingsPath),
+                ProjectPath(QualitySettingsPath)
+            };
+            var originalBytes = new Dictionary<string, byte[]>();
+            foreach (string protectedPath in protectedPaths)
+                originalBytes.Add(
+                    protectedPath,
+                    File.ReadAllBytes(protectedPath));
+            Assert.That(approved, Is.Not.Null);
+            try
+            {
+                Assert.That(
+                    begin.Invoke(null, new object[]
+                    {
+                        new[] { GrayboxScenePath }
+                    }),
+                    Is.EqualTo(true));
+                Assert.That(
+                    GraphicsSettings.defaultRenderPipeline,
+                    Is.SameAs(approved));
+                Assert.That(
+                    File.Exists(ProjectPath(GraphicsSettingsBackupPath)),
+                    Is.True,
+                    "BUG-0005 must preserve the exact pre-build GraphicsSettings bytes.");
+                Assert.That(
+                    File.Exists(ProjectPath(QualitySettingsBackupPath)),
+                    Is.True,
+                    "BUG-0005 must preserve the exact pre-build QualitySettings bytes.");
+                foreach (string protectedPath in protectedPaths)
+                    File.AppendAllText(
+                        protectedPath,
+                        "\n# BUG-0005 simulated build mutation\n");
+                QualitySettings.antiAliasing = changedAntiAliasing;
+                Assert.That(
+                    begin.Invoke(null, new object[]
+                    {
+                        new[] { GrayboxScenePath }
+                    }),
+                    Is.EqualTo(true),
+                    "Repeated build preparation must not replace the original byte backups.");
+
+                restore.Invoke(null, null);
+                AssertProtectedFilesMatch(
+                    protectedPaths,
+                    originalBytes,
+                    "Postprocess/finally restoration");
+                Assert.That(
+                    File.Exists(ProjectPath(RestoreMarkerPath)),
+                    Is.False);
+                Assert.That(
+                    File.Exists(ProjectPath(GrayboxPipelineBackupPath)),
+                    Is.False);
+                Assert.That(
+                    File.Exists(ProjectPath(GraphicsSettingsBackupPath)),
+                    Is.False);
+                Assert.That(
+                    File.Exists(ProjectPath(QualitySettingsBackupPath)),
+                    Is.False);
+                Assert.That(
+                    GraphicsSettings.defaultRenderPipeline,
+                    Is.SameAs(original));
+                Assert.That(
+                    QualitySettings.antiAliasing,
+                    Is.EqualTo(originalAntiAliasing),
+                    "The editor's in-memory quality state must be restored before exact file restoration.");
+
+                Assert.That(
+                    begin.Invoke(null, new object[]
+                    {
+                        new[] { FormalScenePath }
+                    }),
+                    Is.EqualTo(false));
+                Assert.That(
+                    GraphicsSettings.defaultRenderPipeline,
+                    Is.SameAs(original));
+
+                Assert.That(
+                    begin.Invoke(null, new object[]
+                    {
+                        new[] { GrayboxScenePath }
+                    }),
+                    Is.EqualTo(true));
+                foreach (string protectedPath in protectedPaths)
+                    File.AppendAllText(
+                        protectedPath,
+                        "\n# BUG-0005 simulated interrupted build mutation\n");
+                QualitySettings.antiAliasing = changedAntiAliasing;
+                recover.Invoke(null, null);
+                AssertProtectedFilesMatch(
+                    protectedPaths,
+                    originalBytes,
+                    "Interrupted-build recovery");
+                Assert.That(
+                    GraphicsSettings.defaultRenderPipeline,
+                    Is.SameAs(original),
+                    "A stale build override must recover on the next editor initialization.");
+                Assert.That(
+                    QualitySettings.antiAliasing,
+                    Is.EqualTo(originalAntiAliasing));
+            }
+            finally
+            {
+                restore?.Invoke(null, null);
+                GraphicsSettings.defaultRenderPipeline = original;
+                QualitySettings.antiAliasing = originalAntiAliasing;
+                foreach (KeyValuePair<string, byte[]> snapshot in originalBytes)
+                    File.WriteAllBytes(snapshot.Key, snapshot.Value);
+            }
+        }
+
+        private static void AssertProtectedFilesMatch(
+            IEnumerable<string> protectedPaths,
+            IReadOnlyDictionary<string, byte[]> originalBytes,
+            string restorationPath)
+        {
+            foreach (string protectedPath in protectedPaths)
+                CollectionAssert.AreEqual(
+                    originalBytes[protectedPath],
+                    File.ReadAllBytes(protectedPath),
+                    restorationPath + " must restore exact bytes for " +
+                    protectedPath);
+        }
+
+        private static string ProjectPath(string relativePath)
+        {
+            return Path.GetFullPath(Path.Combine(
+                Application.dataPath,
+                "..",
+                relativePath));
         }
 
         [Test]

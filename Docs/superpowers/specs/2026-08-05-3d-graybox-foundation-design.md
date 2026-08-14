@@ -487,7 +487,7 @@ Following 只把 CameraRig 的 X/Z 对准目标 X/Z，并保持 CameraRig Y。Fr
 4. 确认灰盒 Pipeline 使用 Universal Renderer，而不是 2D Renderer；
 5. 只在管线激活后允许 `GrayboxSceneBootstrap` 生成灰盒表现。
 
-灰盒材质直接引用灰盒 URP Asset 可用的 URP Shader，确保 Windows 独立构建不会因场景作用域切换而剥离所需 Shader。
+灰盒材质或场景直接引用 URP Shader 并不足以阻止 URP 的 scriptable stripping：若构建期 `GraphicsSettings` 与全部 Quality 档都没有登记任何 URP Asset，Unity 可能在运行时场景作用域切换发生前把所需 Forward 变体裁为 `0`，表现为 Player 中 UI 正常而 3D 世界全黑。`BUG-0005` 因此增加通用 Player 构建作用域：只有本次实际场景列表包含 `GrayboxPrototype3D` 时，构建预处理才临时把批准的 `GrayboxURP` 注册为默认管线；Begin 在任何 setter 前逐字节备份 `GrayboxURP.asset`、`GraphicsSettings.asset` 与 `QualitySettings.asset`，并记录当前抗锯齿内存值；构建后先恢复管线与抗锯齿内存态，再通过 postprocess 和现有构建入口的 `finally` 恢复三个文件的原始字节，编辑器退出及下次初始化还会根据统一标记恢复中断遗留。纯 `FormalPrototype` 构建不激活该作用域，源仓库的三个受保护文件仍保持零差异。
 
 ### 10.2 退出
 
