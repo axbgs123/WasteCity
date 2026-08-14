@@ -2,7 +2,7 @@
 
 > 建立日期：2026-08-04
 > 最近更新：2026-08-14
-> 当前版本：v1.23
+> 当前版本：v1.24
 > GitHub 更新方式：每次新增记录或状态变化后，单独提交并推送当前开发分支
 
 ## 1. 开发前必读
@@ -103,15 +103,15 @@
 | `IDEA-0004` | 新构思 | 第一版正式美术样板包与高效生产流程 | `P2` | `已明确` | `已批准` | `开发中` | 2026-08-11 | 七类地表已完成首个运行时接入；严格视觉门未通过但用户接受为第一版已知偏差，Ruins/Cliff、城市、建筑、UI、VFX、SFX 仍待接入 |
 | `IDEA-0005` | 新构思 | 移动城市研究站与全状态研究效率 | `P1` | `已明确` | `已批准` | `开发中` | 2026-08-11 | 研究站移动内城建造已实现待用户验证；研究界面与推进留待后续，届时堡垒 100%、其余城市状态 50% |
 | `IDEA-0006` | 新构思 | 3D 64×48 稀疏地图扩展 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-11 | 原 32×24 内容原样居中，新增 2304 格外圈仅使用可通行普通荒地且不新增资源、遗迹或障碍 |
-| `IDEA-0007` | 新构思 | 游戏内退出与设置菜单 | `P2` | `已明确` | `已批准` | `已实现待验证` | 2026-08-13 | Esc 取消链、模态暂停、显示设置、操作说明与安全退出已接入 3D 场景并通过聚焦自动化；等待完整回归、构建和用户试玩 |
-| `IDEA-0008` | 新构思 | 外城可建造区域可视化 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-13 | 建造模式已读取既有范围规则显示外城边界和淡色格网并通过聚焦自动化；等待完整回归和用户试玩 |
-| `IDEA-0009` | 新构思 | 住房允许放置在外城 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-13 | 基线已允许住房在要塞形态放置于内外城、在移动形态放置于内城；本轮补齐需求化验证，不提前实现未来外城住房数值差异 |
-| `IDEA-0010` | 新构思 | 采矿站合法位置高亮 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-13 | 范围内兼容节点和完整放置评估高亮已接入 3D 场景并通过聚焦自动化；等待完整回归和用户试玩 |
+| `IDEA-0007` | 新构思 | 游戏内退出与设置菜单 | `P2` | `已明确` | `已批准` | `已验证` | 2026-08-14 | Esc 取消链、模态暂停、显示设置、操作说明与安全退出已接入 3D 场景；自动化、构建和用户试玩均已通过 |
+| `IDEA-0008` | 新构思 | 外城可建造区域可视化 | `P1` | `已明确` | `已批准` | `已验证` | 2026-08-14 | 建造模式读取既有范围规则显示外城边界和淡色格网；自动化和用户试玩均已通过 |
+| `IDEA-0009` | 新构思 | 住房允许放置在外城 | `P1` | `已明确` | `已批准` | `已验证` | 2026-08-14 | 要塞形态内外城住房和移动形态内城住房已通过自动化与用户试玩；未提前实现未来外城住房数值差异 |
+| `IDEA-0010` | 新构思 | 采矿站合法位置高亮 | `P1` | `已明确` | `已批准` | `已验证` | 2026-08-14 | 范围内兼容节点和完整放置评估高亮已接入 3D 场景；自动化和用户试玩均已通过 |
 | `BUG-0001` | 测试 Bug | 建造菜单不显示可建造内容 | `P1` | `已明确` | `已批准` | `不适用` | 2026-08-05 | 冻结 2D `FormalPrototype` 历史问题；决定不修复 |
 | `BUG-0002` | 测试 Bug | 默认 3D 场景按 F 后城市没有展开 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-11 | 初始出生格已移到合法 3×3 区域，部署失败原因已有可见反馈；等待用户试玩确认 |
 | `BUG-0003` | 测试 Bug | 第一版地表接入后场景光照过亮 | `P2` | `已明确` | `已批准` | `已实现待验证` | 2026-08-11 | 主方向光由 1.25 降至 0.90，不改已验收源贴图；等待用户视觉复验 |
 | `BUG-0004` | 测试 Bug | 部分移动城市内建筑无法放置 | `P1` | `已明确` | `已批准` | `已验证` | 2026-08-11 | 正式场景九类移动内城建筑矩阵全部通过；原试玩阻断来自开发夹具人口固定 200，已补 F10 人口修改入口 |
-| `BUG-0005` | 测试 Bug | macOS 原生 Player 中 3D 世界全黑 | `P0` | `已明确` | `已批准` | `已实现待验证` | 2026-08-14 | 构建期 URP Shader 变体剥离已修复，最终 macOS universal Player 的 3D 世界恢复可见；等待用户人工试玩确认 |
+| `BUG-0005` | 测试 Bug | macOS 原生 Player 中 3D 世界全黑 | `P0` | `已明确` | `已批准` | `已验证` | 2026-08-14 | 构建期 URP Shader 变体剥离已修复，最终 macOS universal Player 的 3D 世界恢复可见；用户人工试玩已确认 |
 | `DOC-0001` | 文档变更 | 项目测试、可复用目录与自动文档维护规范 | `P1` | `已明确` | `已批准` | `已实现待验证` | 2026-08-12 | 普通中文指南、测试定位、复用目录、自动清单与完成门已实现并通过机器验证；等待用户复验 |
 
 ## 6. Bug 详细记录
@@ -219,7 +219,7 @@
 - 优先级：`P0`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`已实现待验证`
+- 实现状态：`已验证`
 - 用户原始描述：macOS 原生 Player 启动后只有 UI 可见，3D 世界全黑；请修复。
 - 运行环境：macOS，Unity `2022.3.62f1`，从默认 `GrayboxPrototype3D` 构建的 universal 原生 Player。Player 已进入场景，UI 可见，按 `B` 可触发提示；Metal 和场景初始化日志未报告异常。
 - 复现步骤：
@@ -234,6 +234,7 @@
 - 关联提交：`4d35585`（BUG 登记）；`94675b9`（构建期 URP 登记、精确恢复保护与回归测试）
 - 验收条件：先用自动化稳定复现导致世界被遮黑或无法渲染的启动条件并保留 RED；最小修复后，macOS universal Player 进入默认场景时 3D 世界可见，HUD 与真实输入保持可用，系统菜单 dimmer 只在相应模态页面打开时遮罩；场景合同与相关真实输入 PlayMode 回归通过。不得修改玩法、schema `30`、冻结 2D、地形源贴图、地形导入规则、Texture2DArray 或生成数组。
 - 验证证据：只读诊断排除系统菜单 dimmer、主相机、Metal 初始化和场景启动失败后，构建日志确认根因是源项目的 `GraphicsSettings` 与全部 Quality 档都未登记 URP，而 `GrayboxURP` 仅在运行时由场景作用域切换；Unity 在运行时切换发生前已把 `Universal Render Pipeline/Lit`、`WasteCity/Terrain/FirstPassBlend` 与 URP Blit 的 scriptable 变体裁为 `0`，因此屏幕空间 UI 正常而 3D 世界全黑。第一条 RED `/private/tmp/wastecity-bug0005/build-scope-red.xml` 为 `1/1` 失败，精确指出缺少通用 Player 构建回调；Windows Release 又暴露 Quality Ultra 抗锯齿由 `2` 被构建处理器改为 `0`，第二条 RED `/private/tmp/wastecity-bug0005/project-settings-red.xml` 为 `1/1` 失败，精确指出缺少项目设置字节备份。提交 `94675b9` 仅在实际构建场景包含 `GrayboxPrototype3D` 时临时登记批准的 `GrayboxURP`，Begin 在任何 setter 前逐字节备份 `GrayboxURP.asset`、`GraphicsSettings.asset`、`QualitySettings.asset` 并记录抗锯齿内存值，postprocess、现有构建入口 `finally`、编辑器退出和下次初始化共用恢复路径；纯 `FormalPrototype` 构建不激活。最终专项 GREEN `/private/tmp/wastecity-bug0005/project-settings-green-final.xml` 为 `1/1`，覆盖重复 Begin 不替换首份快照、正常构建后恢复、中断恢复、抗锯齿内存恢复及标记/备份清理。精确 HEAD `94675b90968de61f258eaf09f4bd23f9f97841b3` 上的日常 EditMode `/private/tmp/wastecity-bug0005-final/editmode-final-head.xml` 为 `1348/1348`，失败与跳过均为 `0`，实际 `TerrainAssetDeep` 类别用例为 `0`；其中六类 Project Quality 合计 `138/138`（`35+23+20+16+21+23`），已包含在该完整结果中。完整 PlayMode `/private/tmp/wastecity-bug0005-final/playmode-final-head.xml` 为 `88/88`；无界面编译 `/private/tmp/wastecity-bug0005-final/compile.log` 正常退出且 C# 错误、警告均为 `0`。Windows Release `/private/tmp/wastecity-bug0005/build-windows-project-settings-green-final.log` 与 Development `/private/tmp/wastecity-bug0005-final/build-windows-development-final-head.log` 均构建成功，产物均为 `PE32+` GUI x86-64；Release 进程退出后受保护三文件 SHA-256 与构建前逐字节一致。最终 macOS `/private/tmp/wastecity-bug0005-final/build-macos-final-head.log` 构建成功，产物为 arm64+x86_64 universal；`URP/Lit ForwardLit` 的 vp/fp 变体为 `2/8`、Terrain UniversalForward 为 `2/2`、URP Blit 为 `1/2`，均不再是 `0`。开发者已在最终 `/private/tmp/wastecity-bug0005-final/WasteCityMacFinal.app` 桌面启动验证：荒地、城市、资源节点、建筑占位和 HUD 均正常显示，黑屏消失，Player 日志无异常；该结论仅为开发者视觉验证，不等同用户人工验收，用户试玩仍待确认，因此状态保持“已实现待验证”。
+- 用户试玩验收：用户于 2026-08-14 完成最终 macOS Player 人工试玩，并明确确认所需功能均已实现；上述“用户试玩仍待确认”边界由本次人工结论闭合，`BUG-0005` 更新为 `已验证`。
 - 决策原因或备注：实际 RED 根因不是系统菜单 dimmer、环境光、地形资产或玩法规则，而是场景作用域 URP 启用晚于构建期 Shader stripping。修复把既有 `GrayboxURP` 作为唯一管线真值临时暴露给构建器，不创建第二份渲染规则；同时保护构建处理器可能改写的三个源文件及 Quality 抗锯齿内存态，避免构建成功污染工作树。没有修改 gameplay、schema `30`、冻结 2D、地形源贴图、地形导入策略、Texture2DArray Builder 或生成数组。
 
 ### Bug 模板：`BUG-XXXX`
@@ -484,11 +485,11 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 ### IDEA-0007：游戏内退出与设置菜单
 
 - 提出日期：2026-08-12
-- 最近更新：2026-08-13
+- 最近更新：2026-08-14
 - 优先级：`P2`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`已实现待验证`
+- 实现状态：`已验证`
 - 用户原始描述：没有退出和设置菜单。
 - 设计动机：当前 3D 试玩只能依赖操作系统或编辑器关闭程序，也没有玩家可见的设置入口。
 - 目标体验：既有建造取消链结束后，玩家可在空闲状态按 `Esc` 打开模态暂停菜单；菜单清楚显示暂停状态，提供继续、设置与退出，关闭后恢复打开前的游戏速度。退出必须二次确认，并明确当前 3D 灰盒进度不会保存。
@@ -501,16 +502,17 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 关联提交：`2e3888ff02d6adb7831e62deb172889b950ff43c feat: add graybox display settings model`、`73ac1a4bbe158bff8756d33f89a8b24925ac66f2 feat: add modal graybox system menu`、`93220d5c148e53a47d14da050f998fc43a2a4d11 feat: coordinate escape and system menu input`、`636642b512ce5b17d1688620d91587a97b14a0b8 feat: wire 3d usability into graybox scene`、`3fdcb7ecb1b3cc13e446a975391b12304b986b41 test: verify system menu through real input`。
 - 验收条件：使用真实 Input System 输入验证完整 `Esc` 取消链和系统菜单开关；暂停菜单期间规则时间与世界操作停止，镜头不得穿透模态 UI，关闭菜单恢复原速度；设置重启后保持且不触碰 schema `30`；退出确认可以通过可替换出口验证，自动化测试不得真实关闭测试进程；Editor、Development Player 与 Release Player 的差异符合上述规则。
 - 验证证据：2026-08-12 用户在当前 macOS 3D 试玩中确认没有退出和设置菜单；2026-08-13 用户批准上述菜单、暂停、退出、设置保存和 Development/Release 边界。聚焦 EditMode 已分别达到显示设置 `18/18`、模态菜单 `31/31`、输入协调 `39/39`；最终场景合同 `18/18`、真实输入 PlayMode `5/5`，证据位于 `/tmp/wastecity-task5-green-final.xml`、`/tmp/wastecity-task6-green-final.xml`、`/tmp/wastecity-task7-usability-green-2.xml`、`/tmp/wastecity-task8-scene-contract-isolated-green.xml`、`/tmp/wastecity-task8-usability-playmode-green-final-3.xml`。提交 `3fdcb7ecb1b3cc13e446a975391b12304b986b41` 进一步将系统菜单按钮、分辨率与窗口模式下拉项改为经过真实场景 `InputSystemUIInputModule` 的虚拟鼠标输入，并验证四个批准 PlayerPrefs 键的测试隔离、重载应用与失败回退；没有以直接调用按钮回调或内部设置值冒充玩家操作。该提交上的日常 EditMode（明确排除且实际执行 `TerrainAssetDeep` 为 `0`）`1347/1347`、完整 PlayMode `88/88`、六类 Project Quality `138/138` 均通过，零失败、零跳过；无界面编译退出 `0` 且 C# 错误/警告均为 `0`。默认 Release 3D 与 Development 3D Windows 构建均成功，产物均确认为 `PE32+` Windows GUI x86-64，Release/Development 的可用性程序集 SHA-256 分别为 `fc58cd96799049c7820f85f4023a963b82e181da8fa536f7e7c480dd23fdc669`、`09208cf988eff3eeac784ed29b5caeb13fc5f8f7a303fe17c4f70820b397e516`。PlayerPrefs 仍仅使用四个批准键，schema 保持 `30`。正确 WasteCity Unity GUI 已安全关闭；桌面 Unity 接口因同 Bundle ID 只能落到 `SwordVFXLab` 而中止，没有连接或操作错误项目，因此本轮未记开发者 GUI 场景检查。真实 Input System PlayMode 与场景契约自动验证通过，但 macOS 未执行 Windows 启动冒烟，人工试玩仍等待用户确认，状态保持“已实现待验证”。最终证据位于 `/private/tmp/wastecity-task10-final-3fdcb7e/`。
+- 用户试玩验收：用户于 2026-08-14 完成最终 macOS Player 人工试玩，并明确确认退出与设置菜单已经实现；此前等待的人工验收已闭合，`IDEA-0007` 更新为 `已验证`。
 - 决策原因或备注：系统菜单暂停与 `Space` 战术暂停是两个入口：前者为模态 UI，后者继续保留“可查看和规划、规则时间不推进”的正式玩法目标。本轮不以系统菜单顺带实现正式存档或尚无消费端的设置。
 
 ### IDEA-0008：外城可建造区域可视化
 
 - 提出日期：2026-08-12
-- 最近更新：2026-08-13
+- 最近更新：2026-08-14
 - 优先级：`P1`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`已实现待验证`
+- 实现状态：`已验证`
 - 用户原始描述：外城的区域可以用一些方式表示。
 - 设计动机：当前玩家难以直接判断外城可建造范围和范围边界。
 - 目标体验：玩家进入建造模式后，能够通过低透明度格网和清晰边界看出当前城市的真实外城建造范围；退出建造模式后覆盖层隐藏。
@@ -522,16 +524,17 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 关联提交：`42619e768ebfadb202e885721ad1650564e25280 feat: visualize exterior building range`、`636642b512ce5b17d1688620d91587a97b14a0b8 feat: wire 3d usability into graybox scene`。
 - 验收条件：半径 `8` 及既有 `12/24` 扩展参数下，显示单元与 `BuildingRangeRules` 逐格一致；城市中心变化后正确刷新；建造模式外隐藏；当前蓝图红绿与范围层含义可区分；重复开关不持续创建对象或材质，并通过既有 3D 性能门。
 - 验证证据：2026-08-12 用户提出目标；2026-08-13 用户批准“建造模式显示真实边界与淡色格网，红绿仅用于当前预览”的方案。范围显示聚焦 EditMode `47/47` 通过，最终场景合同 `18/18`、建筑真实输入 PlayMode `15/15` 通过，证据位于 `/tmp/wastecity-task3-evidence/green-projection-final-2.xml`、`/tmp/wastecity-task8-scene-contract-isolated-green.xml`、`/tmp/wastecity-task8-building-playmode-green-final.xml`。提交 `3fdcb7ecb1b3cc13e446a975391b12304b986b41` 上的日常 EditMode（排除 `TerrainAssetDeep`）`1347/1347`、完整 PlayMode `88/88`、六类 Project Quality `138/138`、无界面编译和 Release/Development 3D Windows 构建全部通过。真实输入与场景契约自动验证已覆盖建造模式显示边界；正确 WasteCity Unity GUI 已安全关闭，桌面 Unity 接口因同 Bundle ID 只能落到 `SwordVFXLab` 而中止且未操作错误项目，因此 GUI 视觉检查、Windows 启动冒烟和用户试玩仍待确认，状态保持“已实现待验证”。最终证据位于 `/private/tmp/wastecity-task10-final-3fdcb7e/`。
+- 用户试玩验收：用户于 2026-08-14 完成最终 macOS Player 人工试玩，并明确确认外城可建造区域表现已经实现；此前等待的人工验收已闭合，`IDEA-0008` 更新为 `已验证`。
 - 决策原因或备注：当前全世界地面网格覆盖 `64×48`，但初始可建范围是切比雪夫半径 `8`，因此现有表现可能误导。新覆盖层只修正范围可读性，不改变任何放置规则。
 
 ### IDEA-0009：住房允许放置在外城
 
 - 提出日期：2026-08-12
-- 最近更新：2026-08-13
+- 最近更新：2026-08-14
 - 优先级：`P1`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`已实现待验证`
+- 实现状态：`已验证`
 - 用户原始描述：住房可以放在外城。
 - 设计动机：玩家需要明确住房可以选择内城或外城；审计发现准确基线中 `Housing` 已配置为 `Either + MobileAllowed`，原记录中“当前受限”的前提与代码事实不一致，需要将现有行为正式纳入需求和验收。
 - 目标体验：保留现有内城住房能力，并允许玩家在满足规则的外城位置建造住房。
@@ -544,16 +547,17 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 关联提交：`556ebba2338e6309202cef6f65342733ac5e7306 test: verify exterior housing workflow`、`636642b512ce5b17d1688620d91587a97b14a0b8 feat: wire 3d usability into graybox scene`。
 - 验收条件：规则层验证住房支持内城与地面；真实 3D 输入验证移动形态内城合法、移动形态外城因城市状态非法、要塞形态内外城在其余条件满足时合法；外城住房进入统一施工实例并出现在收起前撤离清单；本阶段内外城住房数值相同。
 - 验证证据：2026-08-13 只读审计确认准确基线已经包含 `Either + MobileAllowed` 及场景级外城住房合法断言；同日用户批准维持该行为，并将生命值和人口容量差异留作未来工作。需求化聚焦 EditMode 分别 `60/60`、`63/63` 通过，建筑 PlayMode `15/15` 通过；最终场景后的建筑 PlayMode 再次 `15/15` 通过，证据位于 `/tmp/wastecity-3d-usability-followup/task1-housing-mobility-editmode.xml`、`/tmp/wastecity-3d-usability-followup/task1-housing-session-editmode.xml`、`/tmp/wastecity-3d-usability-followup/task1-housing-runtime-class-playmode.xml`、`/tmp/wastecity-task8-building-playmode-green-final.xml`。提交 `3fdcb7ecb1b3cc13e446a975391b12304b986b41` 上的日常 EditMode（排除 `TerrainAssetDeep`）`1347/1347`、完整 PlayMode `88/88`、六类 Project Quality `138/138`、无界面编译和 Release/Development 3D Windows 构建全部通过，schema 保持 `30`。住房真实输入与场景契约自动验证通过；Windows 启动冒烟和用户试玩仍待确认，状态保持“已实现待验证”。最终证据位于 `/private/tmp/wastecity-task10-final-3fdcb7e/`。
+- 用户试玩验收：用户于 2026-08-14 完成最终 macOS Player 人工试玩，并明确确认当前阶段的内外城住房能力已经实现；此前等待的人工验收已闭合，`IDEA-0009` 更新为 `已验证`。未来外城住房生命值与人口容量差异仍保持未实现，需另行设计和审批。
 - 决策原因或备注：本条从“未实现的新能力”校正为“基线已有行为、待需求化验证”。若测试揭示实际缺陷，仍须先报告边界再实施修复；不能为了制造代码改动而重写现有正确规则。
 
 ### IDEA-0010：采矿站合法位置高亮
 
 - 提出日期：2026-08-12
-- 最近更新：2026-08-13
+- 最近更新：2026-08-14
 - 优先级：`P1`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`已实现待验证`
+- 实现状态：`已验证`
 - 用户原始描述：采矿站可以放置的位置需要高亮。
 - 设计动机：采矿站依赖兼容资源节点，玩家目前难以快速发现可放置位置和理解失败原因。
 - 目标体验：选择采矿站后，兼容资源节点及真正合法的放置位置得到清晰高亮，非法位置仍保留明确失败反馈。
@@ -565,6 +569,7 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 关联提交：`1bae220ecf8c514641335c33bab38cd2cc59092d refactor: centralize mining node compatibility`、`d19f4fb9ea2b8878772f4cbc47ec5892567b3914 feat: guide legal mining station placement`、`e88e2358526f0fbd2e48e1e9f2b51f63210712d fix: hide mining guidance on placement teardown`、`636642b512ce5b17d1688620d91587a97b14a0b8 feat: wire 3d usability into graybox scene`。
 - 验收条件：通过真实输入选择采矿站后，铁矿和能量晶体节点按规则显示，石材、生物质和水节点不显示；绿色锚点逐个等同于 `BuildingPlacementEvaluation` 的成功结果，暗黄色节点没有可用绿色锚点；旋转、城市位置、占用、障碍、资源、解锁和城市状态变化后正确刷新；取消选择后全部隐藏；稳定高亮对象可复用且通过性能门。
 - 验证证据：2026-08-12 用户提出目标；2026-08-13 用户批准“范围内全兼容节点、合法锚点绿色、兼容但暂时非法节点暗黄、范围外隐藏”的方案。共享兼容规则 EditMode `11/11`、采矿引导投影视图 EditMode `57/57`、最终场景合同 `18/18`、建筑真实输入 PlayMode `15/15` 均通过，证据位于 `/tmp/wastecity-3d-usability-followup/task2-mining-compatibility-green-editmode.xml`、`/tmp/wastecity-task4-green-projection-final-3.xml`、`/tmp/wastecity-task8-scene-contract-isolated-green.xml`、`/tmp/wastecity-task8-building-playmode-green-final.xml`。提交 `3fdcb7ecb1b3cc13e446a975391b12304b986b41` 上的日常 EditMode（排除 `TerrainAssetDeep`）`1347/1347`、完整 PlayMode `88/88`、六类 Project Quality `138/138`、无界面编译和 Release/Development 3D Windows 构建全部通过。真实输入与场景契约自动验证已覆盖采矿站选择、高亮和取消；正确 WasteCity Unity GUI 已安全关闭，桌面 Unity 接口因同 Bundle ID 只能落到 `SwordVFXLab` 而中止且未操作错误项目，因此 GUI 视觉检查、Windows 启动冒烟和用户试玩仍待确认，状态保持“已实现待验证”。最终证据位于 `/private/tmp/wastecity-task10-final-3fdcb7e/`。
+- 用户试玩验收：用户于 2026-08-14 完成最终 macOS Player 人工试玩，并明确确认采矿站合法位置高亮已经实现；此前等待的人工验收已闭合，`IDEA-0010` 更新为 `已验证`。
 - 决策原因或备注：资源类型兼容关系应成为共享规则，由放置请求和高亮共同消费；每个候选锚点的最终结论仍必须消费 `BuildingPlacementEvaluation`，不能复制位置、范围、地形、占用、成本或解锁判断。
 
 ### 新构思模板：`IDEA-XXXX`
