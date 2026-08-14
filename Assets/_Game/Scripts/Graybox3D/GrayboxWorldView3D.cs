@@ -8,6 +8,17 @@ namespace WasteCity.Graybox3D
 {
     public sealed class GrayboxWorldView3D : MonoBehaviour
     {
+        private static readonly string[] SurfaceStableIds =
+        {
+            "world.terrain.wasteland",
+            "world.terrain.rocky",
+            "world.terrain.wetland",
+            "world.terrain.crystal",
+            "world.obstacle.ruins",
+            "world.obstacle.deep-water",
+            "world.obstacle.cliff"
+        };
+
         private sealed class Group
         {
             public string StableId { get; }
@@ -42,11 +53,26 @@ namespace WasteCity.Graybox3D
         private readonly List<Mesh> generatedMeshes = new List<Mesh>();
         private readonly List<GrayboxVisualSlot> surfaceSlots =
             new List<GrayboxVisualSlot>();
+        private readonly Dictionary<string, bool> surfaceFallbackVisibility =
+            CreateSurfaceFallbackVisibility();
         private IGrayboxTerrainPresentation3D activeTerrainPresentation;
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
-        public bool SurfaceFallbackVisible { get; private set; } = true;
+        public bool SurfaceFallbackVisible
+        {
+            get
+            {
+                for (int index = 0;
+                     index < SurfaceStableIds.Length;
+                     index++)
+                {
+                    if (!surfaceFallbackVisibility[SurfaceStableIds[index]])
+                        return false;
+                }
+                return true;
+            }
+        }
         public int WorldRendererCount => generatedObjects.Count;
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
         public bool HasActiveTerrainPresentation =>
@@ -142,13 +168,56 @@ namespace WasteCity.Graybox3D
 
         public void SetSurfaceFallbackVisible(bool visible)
         {
-            SurfaceFallbackVisible = visible;
+            for (int index = 0;
+                 index < SurfaceStableIds.Length;
+                 index++)
+            {
+                surfaceFallbackVisibility[SurfaceStableIds[index]] = visible;
+            }
+
             for (int index = 0; index < surfaceSlots.Count; index++)
             {
                 GrayboxVisualSlot slot = surfaceSlots[index];
                 if (slot != null && slot.Renderer != null)
                     slot.Renderer.enabled = visible;
             }
+        }
+
+        public bool TrySetSurfaceFallbackVisible(
+            string stableId,
+            bool visible,
+            out string error)
+        {
+            if (!IsSurfaceSlot(stableId))
+            {
+                error = "Unknown surface fallback stable ID: '" +
+                    (stableId ?? "<null>") + "'.";
+                return false;
+            }
+
+            surfaceFallbackVisibility[stableId] = visible;
+            for (int index = 0; index < surfaceSlots.Count; index++)
+            {
+                GrayboxVisualSlot slot = surfaceSlots[index];
+                if (slot != null &&
+                    slot.StableId == stableId &&
+                    slot.Renderer != null)
+                {
+                    slot.Renderer.enabled = visible;
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        public bool IsSurfaceFallbackVisible(string stableId)
+        {
+            return !string.IsNullOrEmpty(stableId) &&
+                surfaceFallbackVisibility.TryGetValue(
+                    stableId,
+                    out bool visible) &&
+                visible;
         }
 
         public void ClearGenerated()
@@ -482,7 +551,8 @@ namespace WasteCity.Graybox3D
             if (IsSurfaceSlot(group.StableId))
             {
                 surfaceSlots.Add(slot);
-                renderer.enabled = SurfaceFallbackVisible;
+                renderer.enabled =
+                    IsSurfaceFallbackVisible(group.StableId);
             }
             generatedMeshes.Add(filter.sharedMesh);
             generatedObjects.Add(go);
@@ -490,19 +560,31 @@ namespace WasteCity.Graybox3D
 
         private static bool IsSurfaceSlot(string stableId)
         {
-            switch (stableId)
+            if (string.IsNullOrEmpty(stableId))
+                return false;
+            for (int index = 0;
+                 index < SurfaceStableIds.Length;
+                 index++)
             {
-                case "world.terrain.wasteland":
-                case "world.terrain.rocky":
-                case "world.terrain.wetland":
-                case "world.terrain.crystal":
-                case "world.obstacle.ruins":
-                case "world.obstacle.deep-water":
-                case "world.obstacle.cliff":
+                if (SurfaceStableIds[index] == stableId)
                     return true;
-                default:
-                    return false;
             }
+            return false;
+        }
+
+        private static Dictionary<string, bool>
+            CreateSurfaceFallbackVisibility()
+        {
+            var result = new Dictionary<string, bool>(
+                SurfaceStableIds.Length,
+                StringComparer.Ordinal);
+            for (int index = 0;
+                 index < SurfaceStableIds.Length;
+                 index++)
+            {
+                result.Add(SurfaceStableIds[index], true);
+            }
+            return result;
         }
 
         private static void DestroyOwned(UnityEngine.Object value)

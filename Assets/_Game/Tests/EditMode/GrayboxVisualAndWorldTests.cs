@@ -241,6 +241,140 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0004_TrySetSurfaceFallbackVisible_RestoresOnlyRuins()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+            view.SetSurfaceFallbackVisible(false);
+
+            bool changed = view.TrySetSurfaceFallbackVisible(
+                "world.obstacle.ruins",
+                true,
+                out string error);
+
+            Assert.That(changed, Is.True, error);
+            Assert.That(error, Is.Empty);
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            Assert.That(
+                view.IsSurfaceFallbackVisible("world.obstacle.ruins"),
+                Is.True);
+            AssertOnlySurfaceVisible(view, "world.obstacle.ruins");
+        }
+
+        [Test]
+        public void IDEA0004_TrySetSurfaceFallbackVisible_RestoresOnlyCliff()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+            view.SetSurfaceFallbackVisible(false);
+
+            bool changed = view.TrySetSurfaceFallbackVisible(
+                "world.obstacle.cliff",
+                true,
+                out string error);
+
+            Assert.That(changed, Is.True, error);
+            Assert.That(error, Is.Empty);
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            Assert.That(
+                view.IsSurfaceFallbackVisible("world.obstacle.cliff"),
+                Is.True);
+            AssertOnlySurfaceVisible(view, "world.obstacle.cliff");
+        }
+
+        [Test]
+        public void IDEA0004_TrySetSurfaceFallbackVisible_UnknownIdFailsAtomically()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+            view.SetSurfaceFallbackVisible(false);
+            Assert.That(
+                view.TrySetSurfaceFallbackVisible(
+                    "world.obstacle.ruins",
+                    true,
+                    out string setupError),
+                Is.True,
+                setupError);
+            Dictionary<string, bool> before = SurfaceRendererStates(view);
+
+            bool changed = view.TrySetSurfaceFallbackVisible(
+                "world.resource.iron",
+                true,
+                out string error);
+
+            Assert.That(changed, Is.False);
+            Assert.That(error, Does.Contain("world.resource.iron"));
+            Assert.That(
+                SurfaceRendererStates(view),
+                Is.EqualTo(before));
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            Assert.That(
+                view.IsSurfaceFallbackVisible("world.resource.iron"),
+                Is.False);
+        }
+
+        [Test]
+        public void IDEA0004_SelectiveFallback_PersistsBeforeGenerateRebuildAndClear()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.SetSurfaceFallbackVisible(false);
+            Assert.That(
+                view.TrySetSurfaceFallbackVisible(
+                    "world.obstacle.ruins",
+                    true,
+                    out string error),
+                Is.True,
+                error);
+
+            view.Generate(CreateCatalogMap());
+            AssertOnlySurfaceVisible(view, "world.obstacle.ruins");
+
+            view.Generate(CreateCatalogMap());
+            AssertOnlySurfaceVisible(view, "world.obstacle.ruins");
+
+            view.ClearGenerated();
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            Assert.That(
+                view.IsSurfaceFallbackVisible("world.obstacle.ruins"),
+                Is.True);
+            Assert.That(
+                view.IsSurfaceFallbackVisible("world.obstacle.cliff"),
+                Is.False);
+
+            view.Generate(CreateCatalogMap());
+            AssertOnlySurfaceVisible(view, "world.obstacle.ruins");
+        }
+
+        [Test]
+        public void IDEA0004_SetSurfaceFallbackVisible_ResetsEverySelectiveState()
+        {
+            GrayboxWorldView3D view = CreateView();
+            view.Generate(CreateCatalogMap());
+            view.SetSurfaceFallbackVisible(false);
+            Assert.That(
+                view.TrySetSurfaceFallbackVisible(
+                    "world.obstacle.ruins",
+                    true,
+                    out string error),
+                Is.True,
+                error);
+
+            view.SetSurfaceFallbackVisible(true);
+
+            Assert.That(view.SurfaceFallbackVisible, Is.True);
+            Assert.That(
+                SurfaceRendererStates(view).Values.All(visible => visible),
+                Is.True);
+
+            view.SetSurfaceFallbackVisible(false);
+
+            Assert.That(view.SurfaceFallbackVisible, Is.False);
+            Assert.That(
+                SurfaceRendererStates(view).Values.All(visible => !visible),
+                Is.True);
+        }
+
+        [Test]
         public void ClearGenerated_DiscardsSurfaceTrackingWithoutTouchingUnrelatedRenderer()
         {
             GrayboxWorldView3D view = CreateView();
@@ -388,6 +522,34 @@ namespace WasteCity.Tests
                 block.GetColor(Shader.PropertyToID("_BaseColor")),
                 Is.EqualTo(expectedColor),
                 stableId);
+        }
+
+        private static void AssertOnlySurfaceVisible(
+            GrayboxWorldView3D view,
+            string visibleStableId)
+        {
+            foreach (GrayboxVisualSlot slot in
+                     view.GetComponentsInChildren<GrayboxVisualSlot>(true))
+            {
+                bool isSurface =
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(slot.StableId);
+                bool expected = !isSurface || slot.StableId == visibleStableId;
+                Assert.That(
+                    slot.Renderer.enabled,
+                    Is.EqualTo(expected),
+                    slot.StableId);
+            }
+        }
+
+        private static Dictionary<string, bool> SurfaceRendererStates(
+            GrayboxWorldView3D view)
+        {
+            return view.GetComponentsInChildren<GrayboxVisualSlot>(true)
+                .Where(slot =>
+                    FirstArtTerrainCatalog3D.IsSurfaceStableId(slot.StableId))
+                .ToDictionary(
+                    slot => slot.StableId,
+                    slot => slot.Renderer.enabled);
         }
 
         private static Bounds MeshBounds(GrayboxVisualSlot slot)

@@ -96,6 +96,28 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0004_PresentationLifecycle_ResetsSelectiveFallbackState()
+        {
+            GrayboxWorldView3D view = CreateCatalogView();
+            view.SetSurfaceFallbackVisible(false);
+            Assert.That(
+                view.TrySetSurfaceFallbackVisible(
+                    "world.obstacle.ruins",
+                    true,
+                    out string error),
+                Is.True,
+                error);
+            FirstArtTerrainRenderer3D presenter =
+                CreatePresenter(LoadApprovedProfile());
+
+            Assert.That(presenter.TryPresent(view), Is.True);
+            AssertFallbackState(view, false);
+
+            presenter.ClearPresentation();
+            AssertFallbackState(view, true);
+        }
+
+        [Test]
         public void Configure_WhenProfileChanges_ClearsOwnedPresentationAndRestoresFallback()
         {
             GrayboxWorldView3D view = CreateCatalogView();
