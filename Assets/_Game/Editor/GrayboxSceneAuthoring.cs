@@ -259,6 +259,7 @@ namespace WasteCity.Editor
             BuildingContractReferences buildingReferences =
                 EnsureBuildingContract(scene, material);
             EnsureUsabilityContract(scene, buildingReferences);
+            EnsureProductionContract(scene);
             EnsurePlayableInitialDeployment(scene);
             if (!hasExistingScene)
             {
@@ -934,6 +935,33 @@ namespace WasteCity.Editor
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
 
+            EditorSceneManager.MarkSceneDirty(scene);
+        }
+
+        private static void EnsureProductionContract(Scene scene)
+        {
+            GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
+            Transform systems = RequireChild(root.transform, "GrayboxSystems");
+            Transform controllerTransform = EnsureChild(
+                systems,
+                "GrayboxProductionController");
+            GrayboxProductionController3D controller =
+                EnsureComponent<GrayboxProductionController3D>(
+                    controllerTransform);
+            GrayboxBuildingSession3D session =
+                RequireSingle<GrayboxBuildingSession3D>(scene);
+            GrayboxWorldView3D worldView =
+                RequireSingle<GrayboxWorldView3D>(scene);
+            GrayboxMobileCityController3D cityController =
+                RequireSingle<GrayboxMobileCityController3D>(scene);
+            GrayboxSystemMenuController3D ruleTimeSource =
+                RequireSingle<GrayboxSystemMenuController3D>(scene);
+            SetReferences(
+                controller,
+                ("session", session),
+                ("worldView", worldView),
+                ("cityController", cityController),
+                ("ruleTimeSource", ruleTimeSource));
             EditorSceneManager.MarkSceneDirty(scene);
         }
 

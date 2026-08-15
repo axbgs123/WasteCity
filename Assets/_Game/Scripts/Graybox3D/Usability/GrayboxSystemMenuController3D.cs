@@ -12,7 +12,9 @@ namespace WasteCity.Graybox3D.Usability
         ExitConfirm
     }
 
-    public sealed class GrayboxSystemMenuController3D : MonoBehaviour
+    public sealed class GrayboxSystemMenuController3D :
+        MonoBehaviour,
+        IGrayboxProductionRuleTimeSource3D
     {
         [SerializeField] private GrayboxSystemMenuView3D view;
 
@@ -28,6 +30,7 @@ namespace WasteCity.Graybox3D.Usability
         public GrayboxSystemMenuPage3D Page { get; private set; } =
             GrayboxSystemMenuPage3D.Main;
         public GrayboxDisplaySettingsModel3D Settings => settings;
+        public float ProductionRuleSpeed => speed?.Speed ?? 1f;
 
         public void Configure(
             GameSpeedModel speed,
