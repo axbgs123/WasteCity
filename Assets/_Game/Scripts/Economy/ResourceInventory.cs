@@ -33,6 +33,20 @@ namespace WasteCity.Economy
             if (amount >= 0) return;
             foreach (string id in new List<string>(values.Keys)) values[id] = Math.Min(values[id], capacityPerResource);
         }
+        public bool CanReduceCapacity(int amount)
+        {
+            if (amount < 0 || amount > capacityPerResource) return false;
+            int reducedCapacity = capacityPerResource - amount;
+            foreach (int value in values.Values)
+                if (value > reducedCapacity) return false;
+            return true;
+        }
+        public bool TryReduceCapacity(int amount)
+        {
+            if (!CanReduceCapacity(amount)) return false;
+            capacityPerResource -= amount;
+            return true;
+        }
         public void SetDebtLimit(int amount) => debtLimit = Math.Max(0, amount);
         public void Restore(string id, int amount) => values[id] = Math.Max(-debtLimit, Math.Min(capacityPerResource, amount));
     }

@@ -52,7 +52,7 @@ namespace WasteCity.Graybox3D.Production
         public int CompletedCycles { get; internal set; }
         internal bool CycleActive { get; set; }
         internal bool ManuallyPaused => manuallyPaused;
-        internal bool LogisticsConnected => logisticsConnected;
+        public bool LogisticsConnected => logisticsConnected;
 
         public static GrayboxBuildingProductionState3D CreateRecipe(
             string stableInstanceId,

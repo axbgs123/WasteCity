@@ -6,7 +6,9 @@ using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
+using WasteCity.Graybox3D.Production;
 using WasteCity.Research;
+using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -22,7 +24,10 @@ namespace WasteCity.Graybox3D.Building
         internal GrayboxBuildingInstance3D(
             string stableInstanceId,
             PlacedBuilding placement,
-            ConstructionProgress progress)
+            ConstructionProgress progress,
+            string compatibleResourceNodeId = null,
+            int compatibleResourceNodeX = -1,
+            int compatibleResourceNodeY = -1)
         {
             StableInstanceId = stableInstanceId;
             Placement = placement;
@@ -30,6 +35,9 @@ namespace WasteCity.Graybox3D.Building
             State = GrayboxBuildingInstanceState.UnderConstruction;
             IsPlayerOwned = true;
             IsEvacuationLocked = false;
+            CompatibleResourceNodeId = compatibleResourceNodeId;
+            CompatibleResourceNodeX = compatibleResourceNodeX;
+            CompatibleResourceNodeY = compatibleResourceNodeY;
         }
 
         public string StableInstanceId { get; }
@@ -38,6 +46,10 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxBuildingInstanceState State { get; private set; }
         public bool IsPlayerOwned { get; private set; }
         public bool IsEvacuationLocked { get; private set; }
+        public string CompatibleResourceNodeId { get; }
+        public int CompatibleResourceNodeX { get; }
+        public int CompatibleResourceNodeY { get; }
+        internal bool WarehouseCapacityApplied { get; private set; }
 
         internal void Complete()
         {
@@ -68,6 +80,11 @@ namespace WasteCity.Graybox3D.Building
             IsPlayerOwned = playerOwned;
             State = state;
         }
+
+        internal void SetWarehouseCapacityApplied(bool value)
+        {
+            WarehouseCapacityApplied = value;
+        }
     }
 
     public interface IGrayboxBuildingPresentation3D
@@ -86,6 +103,7 @@ namespace WasteCity.Graybox3D.Building
         private const int InnerGridWidth = 8;
         private const int InnerGridHeight = 6;
         private const int DevelopmentGroundBuildRadius = 8;
+        private const int WarehouseCapacityPerResource = 150;
         private const string PresentationCleanupFailureDataKey =
             "WasteCity.Graybox3D.Building.PresentationCleanupFailure";
 
@@ -99,6 +117,18 @@ namespace WasteCity.Graybox3D.Building
         private readonly Dictionary<string, BuildingEvacuationWork> evacuationSnapshots =
             new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
+        private readonly List<GrayboxBuildingProductionState3D>
+            productionStates = new List<GrayboxBuildingProductionState3D>();
+        private readonly Dictionary<string, GrayboxBuildingProductionState3D>
+            productionStatesById =
+                new Dictionary<string, GrayboxBuildingProductionState3D>(
+                    StringComparer.Ordinal);
+        private readonly Dictionary<string, GrayboxBuildingProductionState3D>
+            productionStateMemoryById =
+                new Dictionary<string, GrayboxBuildingProductionState3D>(
+                    StringComparer.Ordinal);
+        private IReadOnlyList<GrayboxBuildingProductionState3D>
+            readOnlyProductionStates;
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
         private uint placementRevision;
@@ -115,6 +145,8 @@ namespace WasteCity.Graybox3D.Building
         public uint PlacementRevision => placementRevision;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
+        public IReadOnlyList<GrayboxBuildingProductionState3D>
+            ProductionStates => readOnlyProductionStates;
 
         private void Awake()
         {
@@ -150,6 +182,12 @@ namespace WasteCity.Graybox3D.Building
             evacuationSnapshots.Clear();
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
+            productionStates.Clear();
+            productionStatesById.Clear();
+            productionStateMemoryById.Clear();
+            readOnlyProductionStates =
+                new ReadOnlyCollection<GrayboxBuildingProductionState3D>(
+                    productionStates);
             nextStableInstanceOrdinal = 1;
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
@@ -191,10 +229,26 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
+            int compatibleNodeX = -1;
+            int compatibleNodeY = -1;
+            if (!string.IsNullOrEmpty(evaluation.CompatibleResourceNodeId) &&
+                GrayboxResourceNodeIdentity3D.TryParse(
+                    evaluation.CompatibleResourceNodeId,
+                    GrayboxWorldLayout3D.WorldWidth,
+                    GrayboxWorldLayout3D.WorldHeight,
+                    out int parsedNodeX,
+                    out int parsedNodeY))
+            {
+                compatibleNodeX = parsedNodeX;
+                compatibleNodeY = parsedNodeY;
+            }
             var candidate = new GrayboxBuildingInstance3D(
                 CreateStableInstanceId(nextStableInstanceOrdinal),
                 placement,
-                new ConstructionProgress(refreshed.Definition.BuildSeconds));
+                new ConstructionProgress(refreshed.Definition.BuildSeconds),
+                evaluation.CompatibleResourceNodeId,
+                compatibleNodeX,
+                compatibleNodeY);
             bool presentationCreated;
             try
             {
@@ -322,13 +376,18 @@ namespace WasteCity.Graybox3D.Building
                     unscaledDeltaTime,
                     ConstructionMultiplier);
                 if (instance.Progress.Remaining >= remainingBefore) continue;
-                if (completed) instance.Complete();
+                if (completed)
+                {
+                    instance.Complete();
+                    ApplyCompletionEffects(instance);
+                }
                 try
                 {
                     presentation.UpdateInstance(instance);
                 }
                 catch
                 {
+                    if (completed) RollbackCompletionEffects(instance);
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
@@ -579,6 +638,13 @@ namespace WasteCity.Graybox3D.Building
                 failureReason = "撤离项目已锁定";
                 return false;
             }
+            if (instance.WarehouseCapacityApplied &&
+                !Inventory.CanReduceCapacity(WarehouseCapacityPerResource))
+            {
+                failureReason =
+                    "城市库存高于移除仓库后的容量，请先转移资源";
+                return false;
+            }
             if (work.Treatment == BuildingEvacuationTreatment.Abandon)
                 return TryAbandon(instance, presentation, out failureReason);
             return TryRemoveEvacuatedInstance(
@@ -689,18 +755,92 @@ namespace WasteCity.Graybox3D.Building
                 float remainingBefore = instance.Progress.Remaining;
                 instance.Progress.Restore(0f);
                 instance.Complete();
+                ApplyCompletionEffects(instance);
                 try
                 {
                     presentation.UpdateInstance(instance);
                 }
                 catch
                 {
+                    RollbackCompletionEffects(instance);
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
                 AdvanceCatalogRevision();
                 AdvancePlacementRevision();
             }
+        }
+
+        public bool TryGetProductionState(
+            string stableInstanceId,
+            out GrayboxBuildingProductionState3D state)
+        {
+            EnsureConfigured();
+            if (string.IsNullOrWhiteSpace(stableInstanceId))
+            {
+                state = null;
+                return false;
+            }
+            return productionStatesById.TryGetValue(stableInstanceId, out state);
+        }
+
+        public void SynchronizeProductionRuntime(
+            WorldMapModel world,
+            CityMode mode,
+            int cityX,
+            int cityY)
+        {
+            EnsureConfigured();
+            for (int index = productionStates.Count - 1; index >= 0; index--)
+            {
+                GrayboxBuildingProductionState3D state = productionStates[index];
+                int instanceIndex = FindInstanceIndex(state.StableInstanceId);
+                if (instanceIndex >= 0 &&
+                    IsProductionEligible(instances[instanceIndex]))
+                    continue;
+                productionStates.RemoveAt(index);
+                productionStatesById.Remove(state.StableInstanceId);
+                if (instanceIndex < 0 ||
+                    !CanRetainProductionState(instances[instanceIndex]))
+                    productionStateMemoryById.Remove(state.StableInstanceId);
+            }
+
+            for (int index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (!IsProductionEligible(instance) ||
+                    !GrayboxProductionCatalog3D.TryGet(
+                        instance.Placement.Definition.Id.Value,
+                        out GrayboxProductionDefinition3D definition))
+                    continue;
+
+                if (!productionStatesById.TryGetValue(
+                        instance.StableInstanceId,
+                        out GrayboxBuildingProductionState3D state))
+                {
+                    if (!productionStateMemoryById.TryGetValue(
+                            instance.StableInstanceId,
+                            out state))
+                    {
+                        state = CreateProductionState(instance, definition, world);
+                        if (state != null)
+                            productionStateMemoryById.Add(
+                                instance.StableInstanceId,
+                                state);
+                    }
+                    if (state == null) continue;
+                    productionStates.Add(state);
+                    productionStatesById.Add(instance.StableInstanceId, state);
+                }
+                state.SetLogisticsConnected(IsLogisticsConnected(
+                    instance,
+                    mode,
+                    cityX,
+                    cityY));
+            }
+            productionStates.Sort((left, right) => string.CompareOrdinal(
+                left.StableInstanceId,
+                right.StableInstanceId));
         }
 
         private void AdvanceCatalogRevision()
@@ -721,6 +861,17 @@ namespace WasteCity.Graybox3D.Building
             bool wasCounted = IsCountedCompleted(instance);
             bool playerOwned = instance.IsPlayerOwned;
             GrayboxBuildingInstanceState state = instance.State;
+            bool removedWarehouseCapacity =
+                instance.WarehouseCapacityApplied &&
+                Inventory.TryReduceCapacity(WarehouseCapacityPerResource);
+            if (instance.WarehouseCapacityApplied && !removedWarehouseCapacity)
+            {
+                failureReason =
+                    "城市库存高于移除仓库后的容量，请先转移资源";
+                return false;
+            }
+            if (removedWarehouseCapacity)
+                instance.SetWarehouseCapacityApplied(false);
             instance.Abandon();
             try
             {
@@ -729,6 +880,11 @@ namespace WasteCity.Graybox3D.Building
             catch (Exception operationFailure)
             {
                 instance.RestoreEvacuationState(playerOwned, state);
+                if (removedWarehouseCapacity)
+                {
+                    Inventory.AddCapacity(WarehouseCapacityPerResource);
+                    instance.SetWarehouseCapacityApplied(true);
+                }
                 try
                 {
                     presentation.UpdateInstance(instance);
@@ -761,6 +917,7 @@ namespace WasteCity.Graybox3D.Building
                 : GroundGrid;
             int inventoryBefore = Inventory.Get(instance.Placement.Definition.CostId);
             bool wasCounted = IsCountedCompleted(instance);
+            bool removedWarehouseCapacity = false;
             acceptedRefund = 0;
             failureReason = string.Empty;
             try { presentation.Remove(instance); }
@@ -788,6 +945,15 @@ namespace WasteCity.Graybox3D.Building
 
             try
             {
+                if (instance.WarehouseCapacityApplied)
+                {
+                    if (!Inventory.TryReduceCapacity(
+                            WarehouseCapacityPerResource))
+                        throw new InvalidOperationException(
+                            "Warehouse capacity preflight changed before commit.");
+                    removedWarehouseCapacity = true;
+                    instance.SetWarehouseCapacityApplied(false);
+                }
                 acceptedRefund = Inventory.Add(
                     instance.Placement.Definition.CostId,
                     work.Refund);
@@ -798,6 +964,11 @@ namespace WasteCity.Graybox3D.Building
             }
             catch
             {
+                if (removedWarehouseCapacity)
+                {
+                    Inventory.AddCapacity(WarehouseCapacityPerResource);
+                    instance.SetWarehouseCapacityApplied(true);
+                }
                 Inventory.Restore(instance.Placement.Definition.CostId, inventoryBefore);
                 grid.TryRestore(
                     instance.Placement.Definition,
@@ -833,6 +1004,110 @@ namespace WasteCity.Graybox3D.Building
                    instance.State == GrayboxBuildingInstanceState.Completed &&
                    instance.IsPlayerOwned &&
                    !instance.IsEvacuationLocked;
+        }
+
+        private static bool IsProductionEligible(
+            GrayboxBuildingInstance3D instance)
+        {
+            return IsCountedCompleted(instance) &&
+                   GrayboxProductionCatalog3D.TryGet(
+                       instance.Placement.Definition.Id.Value,
+                       out _);
+        }
+
+        private static bool CanRetainProductionState(
+            GrayboxBuildingInstance3D instance)
+        {
+            return instance != null &&
+                   instance.State == GrayboxBuildingInstanceState.Completed &&
+                   instance.IsPlayerOwned &&
+                   GrayboxProductionCatalog3D.TryGet(
+                       instance.Placement.Definition.Id.Value,
+                       out _);
+        }
+
+        private static GrayboxBuildingProductionState3D CreateProductionState(
+            GrayboxBuildingInstance3D instance,
+            GrayboxProductionDefinition3D definition,
+            WorldMapModel world)
+        {
+            if (definition.Kind == GrayboxProductionKind3D.Recipe)
+                return GrayboxBuildingProductionState3D.CreateRecipe(
+                    instance.StableInstanceId,
+                    definition);
+            if (world == null ||
+                instance.CompatibleResourceNodeX < 0 ||
+                instance.CompatibleResourceNodeY < 0 ||
+                instance.CompatibleResourceNodeX >= world.Width ||
+                instance.CompatibleResourceNodeY >= world.Height)
+                return null;
+            WorldCell node = world.Get(
+                instance.CompatibleResourceNodeX,
+                instance.CompatibleResourceNodeY);
+            if (!BuildingResourceNodeCompatibilityRules.IsCompatible(
+                    instance.Placement.Definition,
+                    node.ResourceId))
+                return null;
+            return GrayboxBuildingProductionState3D.CreateExtraction(
+                instance.StableInstanceId,
+                definition,
+                instance.CompatibleResourceNodeId,
+                instance.CompatibleResourceNodeX,
+                instance.CompatibleResourceNodeY,
+                node.ResourceId);
+        }
+
+        private bool IsLogisticsConnected(
+            GrayboxBuildingInstance3D instance,
+            CityMode mode,
+            int cityX,
+            int cityY)
+        {
+            if (!BuildingMobilityRules.CanOperate(
+                    instance.Placement.Definition,
+                    instance.Placement.Site,
+                    mode))
+                return false;
+            if (instance.Placement.Site == BuildingSite.InnerCity) return true;
+            int width = BuildingOrientationRules.Width(
+                instance.Placement.Definition,
+                instance.Placement.Orientation);
+            int height = BuildingOrientationRules.Height(
+                instance.Placement.Definition,
+                instance.Placement.Orientation);
+            for (int offsetX = 0; offsetX < width; offsetX++)
+                for (int offsetY = 0; offsetY < height; offsetY++)
+                    if (!BuildingRangeRules.IsGroundCellInRange(
+                            cityX,
+                            cityY,
+                            instance.Placement.X + offsetX,
+                            instance.Placement.Y + offsetY,
+                            GroundBuildRadius))
+                        return false;
+            return true;
+        }
+
+        private void ApplyCompletionEffects(
+            GrayboxBuildingInstance3D instance)
+        {
+            if (instance.WarehouseCapacityApplied ||
+                !string.Equals(
+                    instance.Placement.Definition.Id.Value,
+                    BuildingCatalog.Warehouse.Id.Value,
+                    StringComparison.Ordinal))
+                return;
+            Inventory.AddCapacity(WarehouseCapacityPerResource);
+            instance.SetWarehouseCapacityApplied(true);
+        }
+
+        private void RollbackCompletionEffects(
+            GrayboxBuildingInstance3D instance)
+        {
+            if (!instance.WarehouseCapacityApplied) return;
+            if (!Inventory.TryReduceCapacity(WarehouseCapacityPerResource))
+                throw new InvalidOperationException(
+                    "Failed to roll back warehouse capacity safely.");
+            instance.SetWarehouseCapacityApplied(false);
         }
 
         private static double EvacuationRemainingRatio(
