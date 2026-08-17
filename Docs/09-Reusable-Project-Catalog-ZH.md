@@ -120,9 +120,25 @@
 
 ## 资源、研究、人口、战斗和存档
 
+### 正式资源定义目录（推荐复用）
+
+能解决什么：集中提供 15 种正式资源的稳定 ID、中文名称、显示顺序、单格栈上限、图标回退键和正式 3D 初始城市数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`。怎么复用：提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。资源 UI、背包和正式 3D 会话接入时统一从目录读取定义；正式城市账本接入时必须通过 `CreateFormalCityInventory` 创建。不能负责什么：只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。工厂返回的是允许保留超额数量的 backing ledger，不代表城市拥有无限有效容量；正式入库接线后仍必须经过 `ResourceCapacityPolicy`。当前默认 3D 场景尚未切换到该工厂。改后跑哪组测试：`ResourceDefinitionCatalogTests`。代码名：`ResourceDefinition`、`ResourceDefinitionCatalog`。
+
 ### 资源库存（推荐复用）
 
-能解决什么：管理资源数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。统一由库存读取和改变数量。不能负责什么：不驱动生产周期。改后跑哪组测试：`FoundationTests`。代码名：`ResourceInventory`。
+能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。旧 2D 继续按既有方式使用；正式 3D 城市库存接入时通过 `ResourceDefinitionCatalog.CreateFormalCityInventory` 创建，并由 `ResourceCapacityPolicy` 和 `ResourceTransaction` 约束正式写入。不能负责什么：不驱动生产周期。它也不提供资源显示定义、背包槽位、原子多资源事务、仓库有效容量或降容保留超额；`AddCapacity` 降容会裁切数量，`TrySpend` 在启用债务额度后可产生负数，因此正式 3D 新功能不得直接使用这两个行为实现容量变化或生产扣款。改后跑哪组测试：`FoundationTests`。代码名：`ResourceInventory`。
+
+### 城市资源容量策略（推荐复用）
+
+能解决什么：计算城市每种资源的正式有效容量，并在基础 150、每座有效仓库增加 150 的规则下预检或执行入库。在哪里：`Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`。怎么复用：按基础容量和有效仓库数计算每种城市资源的当前可接收量。正式 3D 城市库存的所有自动和人工入库统一通过该策略；容量降低时只改变有效上限，不修改账本已有数量。不能负责什么：不判定仓库所有权、完成状态或撤离资格，也不拥有资源账本。不改变物流距离，也不裁切超额库存；调用方必须提供已经按正式建筑资格派生的仓库数量。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceCapacityPolicy`。
+
+### 原子资源事务（推荐复用）
+
+能解决什么：在城市账本、建筑账本和玩家背包之间提供多输入扣除、输出预检及守恒转移基础，并统一返回完成、部分完成或失败状态。在哪里：`Assets/_Game/Scripts/Economy/ResourceTransaction.cs`。怎么复用：聚合同资源请求，预检输入与输出，并执行批量提交和允许部分接收的原子转移。生产、研究、合成和人工转移后续接入时必须调用事务入口，不得在 UI 或控制器中自行拼接 `TrySpend`、`Add`、`Remove`；当前已覆盖账本批事务和背包单资源双向转移，背包合成的多输入预留、产出与取消返还仍待后续 TDD。正式事务只允许使用已有非负余额，不借用旧债务额度。不能负责什么：只处理资源数量与容量提交；不决定物流连接、交互距离、建筑资格、配方周期或界面状态。也不统计仓库数量。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceAmount`、`ResourceTransferResult`、`ResourceTransaction`。
+
+### 玩家背包模型（推荐复用）
+
+能解决什么：维护会话级 30 格个人背包，包括同类稳定合并、每格正式栈上限、稳定扣除、拆半、逐个移动、整栈合并与交换。在哪里：`Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`。怎么复用：管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。背包 UI 只读取槽位快照，并通过模型或 `ResourceTransaction` 提交操作；资源栈上限继续来自资源定义目录。不能负责什么：只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。背包不进入当前 schema 30 存档。改后跑哪组测试：`PlayerBackpackModelTests`。代码名：`BackpackSlot`、`PlayerBackpackModel`。
 
 ### 研究模型（推荐复用）
 

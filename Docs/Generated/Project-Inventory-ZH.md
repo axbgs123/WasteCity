@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`5c6b68f42fe39306a1f4f37739ceb1b292f44e2af8ae40e928c0106fb6fb61f3`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`b90b793b015e3a55ce96ba9f25f5310fd8fa7a1b20f5921d7aa21d579ea99d05`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -97,10 +97,14 @@
 - `Assets/_Game/Scripts/Economy/AlchemyModel.cs`
 - `Assets/_Game/Scripts/Economy/ElixirController.cs`
 - `Assets/_Game/Scripts/Economy/FormalEconomyController.cs`
+- `Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`
 - `Assets/_Game/Scripts/Economy/ProductionModel.cs`
+- `Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`
+- `Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/ResourceExtractionProcess.cs`
 - `Assets/_Game/Scripts/Economy/ResourceIds.cs`
 - `Assets/_Game/Scripts/Economy/ResourceInventory.cs`
+- `Assets/_Game/Scripts/Economy/ResourceTransaction.cs`
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/TechnologyProductionController.cs`
 - 基础时钟与会话（`foundation-clock`）：

@@ -248,14 +248,19 @@
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
         "Assets/_Game/Tests/EditMode/ProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs"
       ],
       "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0011"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1015,6 +1020,90 @@
       ],
       "RequirementIds": [
         "DOC-0001"
+      ]
+    },
+    {
+      "Id": "resource-definition-catalog",
+      "ChineseName": "正式资源定义目录",
+      "TypeNames": [
+        "ResourceDefinition",
+        "ResourceDefinitionCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。",
+      "BoundarySummary": "只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "player-backpack-model",
+      "ChineseName": "玩家背包模型",
+      "TypeNames": [
+        "BackpackSlot",
+        "PlayerBackpackModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。",
+      "BoundarySummary": "只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "resource-capacity-policy",
+      "ChineseName": "城市资源容量策略",
+      "TypeNames": [
+        "ResourceCapacityPolicy"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按基础容量和有效仓库数计算每种城市资源的当前可接收量。",
+      "BoundarySummary": "不判定仓库所有权、完成状态或撤离资格，也不拥有资源账本。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "resource-transaction",
+      "ChineseName": "原子资源事务",
+      "TypeNames": [
+        "ResourceAmount",
+        "ResourceTransferResult",
+        "ResourceTransaction"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceTransaction.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "聚合同资源请求，预检输入与输出，并执行批量提交和允许部分接收的原子转移。",
+      "BoundarySummary": "只处理资源数量与容量提交；不决定物流连接、交互距离、建筑资格、配方周期或界面状态。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
       ]
     },
     {

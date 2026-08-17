@@ -300,6 +300,104 @@ namespace WasteCity.Tests
                 "Scene-specific system menu View must not be promoted to general reuse.");
         }
 
+        [Test]
+        public void CommittedCatalog_MapsProductionLogisticsFoundationOwnershipAndReuse()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup economy =
+                FindFeature(catalog, "economy-production-logistics");
+
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
+                "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+                "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+            }, economy.TestFileGlobs);
+            CollectionAssert.Contains(economy.RequirementIds, "IDEA-0011");
+            CollectionAssert.Contains(economy.ScenePaths,
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+
+            AssertReuseContract(
+                FindReuse(catalog, "resource-definition-catalog"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs",
+                },
+                new[]
+                {
+                    "ResourceDefinition",
+                    "ResourceDefinitionCatalog",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "player-backpack-model"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs",
+                },
+                new[]
+                {
+                    "BackpackSlot",
+                    "PlayerBackpackModel",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "resource-capacity-policy"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs",
+                },
+                new[]
+                {
+                    "ResourceCapacityPolicy",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "resource-transaction"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ResourceTransaction.cs",
+                },
+                new[]
+                {
+                    "ResourceAmount",
+                    "ResourceTransferResult",
+                    "ResourceTransaction",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+                });
+        }
+
+        private static void AssertReuseContract(
+            ProjectReuseEntry entry,
+            string[] expectedAssetPaths,
+            string[] expectedTypeNames,
+            string[] expectedRequiredTestFiles)
+        {
+            Assert.That(entry.FeatureGroupId,
+                Is.EqualTo("economy-production-logistics"));
+            CollectionAssert.AreEqual(expectedAssetPaths, entry.AssetPaths);
+            CollectionAssert.AreEqual(expectedTypeNames, entry.TypeNames);
+            CollectionAssert.AreEqual(
+                expectedRequiredTestFiles,
+                entry.RequiredTestFiles);
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0011" },
+                entry.RequirementIds);
+        }
+
         private static ProjectFeatureGroup FindFeature(ProjectQualityCatalog catalog, string id)
         {
             foreach (ProjectFeatureGroup feature in catalog.FeatureGroups)
