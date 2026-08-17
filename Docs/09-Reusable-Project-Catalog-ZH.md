@@ -140,6 +140,18 @@
 
 能解决什么：维护会话级 30 格个人背包，包括同类稳定合并、每格正式栈上限、稳定扣除、拆半、逐个移动、整栈合并与交换。在哪里：`Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`。怎么复用：管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。背包 UI 只读取槽位快照，并通过模型或 `ResourceTransaction` 提交操作；资源栈上限继续来自资源定义目录。不能负责什么：只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。背包不进入当前 schema 30 存档。改后跑哪组测试：`PlayerBackpackModelTests`。代码名：`BackpackSlot`、`PlayerBackpackModel`。
 
+### 正式机器生产定义目录（推荐复用）
+
+能解决什么：集中提供采矿、冶炼和装配三条正式机器配方的稳定 ID、依次为 `3`、`6`、`6` 秒的周期、输入输出和内部库存容量。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`。怎么复用：提供采矿、冶炼和装配三条正式机器配方的稳定标识、周期、输入输出与内部容量。生产状态、研究解锁和后续 UI 必须引用目录条目，不得复制配方数值。不能负责什么：只定义机器生产静态配置；不保存建筑实例状态，不推进周期，也不判断物流连接。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionDefinition`、`FormalProductionDefinitionCatalog`。
+
+### 逐建筑生产状态（推荐复用）
+
+能解决什么：为每个稳定建筑实例保存独立输入/输出缓存、已取得的输入批次、周期进度、玩家暂停和单一停工原因。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。场景适配器后续应按 `GrayboxBuildingInstance3D.StableInstanceId` 持有并清理这些会话状态。不能负责什么：只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。当前默认 3D 场景尚未接入。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
+
+### 正式生产与物流模拟（推荐复用）
+
+能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。调用方必须提供当前世界模型、正式城市账本、容量策略、有效仓库数和已经由权威规则派生的物流连接。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。它不替代 `BuildingRangeRules`、`BuildingResourceNodeCompatibilityRules` 或 `WorldMapModel`；当前仍是纯领域层，尚未接入默认 3D 场景。旧 `ProductionModel`、`ResourceExtractionProcess` 和允许建筑链式中继的 `LogisticsNetworkModel` 不得作为本轮正式 3D 运行真值。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionSimulation`。
+
 ### 研究模型（推荐复用）
 
 能解决什么：管理研究状态。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：用于管理研究状态。把研究状态放在这里。不能负责什么：不展示研究界面。改后跑哪组测试：`ResearchTests`。代码名：`ResearchModel`。

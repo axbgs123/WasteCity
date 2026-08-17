@@ -246,6 +246,7 @@
       "FailureLocationSummary": "先检查库存、生产循环、物流网络和建筑接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
@@ -1101,6 +1102,67 @@
       "BoundarySummary": "只处理资源数量与容量提交；不决定物流连接、交互距离、建筑资格、配方周期或界面状态。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "formal-production-definition-catalog",
+      "ChineseName": "正式机器生产定义目录",
+      "TypeNames": [
+        "FormalProductionDefinition",
+        "FormalProductionDefinitionCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供采矿、冶炼和装配三条正式机器配方的稳定标识、周期、输入输出与内部容量。",
+      "BoundarySummary": "只定义机器生产静态配置；不保存建筑实例状态，不推进周期，也不判断物流连接。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "building-production-state",
+      "ChineseName": "逐建筑生产状态",
+      "TypeNames": [
+        "BuildingProductionState"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/BuildingProductionState.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。",
+      "BoundarySummary": "只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "formal-production-simulation",
+      "ChineseName": "正式生产与物流模拟",
+      "TypeNames": [
+        "FormalProductionSimulation"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。",
+      "BoundarySummary": "不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011"

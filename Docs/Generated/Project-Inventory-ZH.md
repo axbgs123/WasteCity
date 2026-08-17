@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`b90b793b015e3a55ce96ba9f25f5310fd8fa7a1b20f5921d7aa21d579ea99d05`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`df11765a49d7227108dcd4aab6e663a35ea1210794a558e994a98f031ec7ee13`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -95,8 +95,11 @@
 - 经济生产与物流（`economy-production-logistics`）：
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Economy/AlchemyModel.cs`
+- `Assets/_Game/Scripts/Economy/BuildingProductionState.cs`
 - `Assets/_Game/Scripts/Economy/ElixirController.cs`
 - `Assets/_Game/Scripts/Economy/FormalEconomyController.cs`
+- `Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`
+- `Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`
 - `Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`
 - `Assets/_Game/Scripts/Economy/ProductionModel.cs`
 - `Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`

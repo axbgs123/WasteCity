@@ -313,6 +313,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
                 "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
                 "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+                "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
             }, economy.TestFileGlobs);
             CollectionAssert.Contains(economy.RequirementIds, "IDEA-0011");
             CollectionAssert.Contains(economy.ScenePaths,
@@ -377,6 +378,49 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "formal-production-definition-catalog"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs",
+                },
+                new[]
+                {
+                    "FormalProductionDefinition",
+                    "FormalProductionDefinitionCatalog",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "building-production-state"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/BuildingProductionState.cs",
+                },
+                new[]
+                {
+                    "BuildingProductionState",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "formal-production-simulation"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs",
+                },
+                new[]
+                {
+                    "FormalProductionSimulation",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
                 });
         }
 
