@@ -631,11 +631,7 @@ namespace WasteCity.Graybox3D.Building
             ResearchDefinition definition = ResearchCatalog.Find(researchId);
             if (definition == null || Research.IsCompleted(definition.Id)) return;
 
-            string[] completed = Research.CaptureCompleted();
-            var restored = new string[completed.Length + 1];
-            Array.Copy(completed, restored, completed.Length);
-            restored[completed.Length] = definition.Id.Value;
-            Research.Restore(restored, null, 0f);
+            Research.GrantCompletedForDevelopment(definition);
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
         }

@@ -96,6 +96,29 @@ namespace WasteCity.Economy
             return amount - remaining;
         }
 
+        internal BackpackSlot[] CaptureSlots()
+        {
+            var snapshot = new BackpackSlot[SlotCount];
+            for (int index = 0; index < SlotCount; index++)
+                snapshot[index] = new BackpackSlot(
+                    resourceIds[index],
+                    amounts[index]);
+            return snapshot;
+        }
+
+        internal void RestoreSlots(BackpackSlot[] snapshot)
+        {
+            if (snapshot == null || snapshot.Length != SlotCount)
+                throw new ArgumentException(
+                    "Backpack snapshot does not match slot count.",
+                    nameof(snapshot));
+            for (int index = 0; index < SlotCount; index++)
+            {
+                resourceIds[index] = snapshot[index].ResourceId;
+                amounts[index] = snapshot[index].Amount;
+            }
+        }
+
         public bool SplitHalf(int sourceIndex, int targetIndex)
         {
             if (!CanMoveBetween(sourceIndex, targetIndex))

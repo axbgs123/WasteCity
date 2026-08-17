@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`511130236b5c17ff501b6c23ca2f60485d8f639a65088e248f6f94e5f82e9599`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`200c8e8ee645a5781f97ad44ef5f37117f8d7bb408e22473d8617b51c62fc18b`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -100,6 +100,7 @@
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Economy/AlchemyModel.cs`
 - `Assets/_Game/Scripts/Economy/BuildingProductionState.cs`
+- `Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`
 - `Assets/_Game/Scripts/Economy/ElixirController.cs`
 - `Assets/_Game/Scripts/Economy/FormalEconomyController.cs`
 - `Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`
@@ -111,6 +112,7 @@
 - `Assets/_Game/Scripts/Economy/ResourceExtractionProcess.cs`
 - `Assets/_Game/Scripts/Economy/ResourceIds.cs`
 - `Assets/_Game/Scripts/Economy/ResourceInventory.cs`
+- `Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`
 - `Assets/_Game/Scripts/Economy/ResourceTransaction.cs`
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/TechnologyProductionController.cs`
@@ -206,6 +208,8 @@
 - `Assets/_Game/Scripts/Progression/FormalAdvancementController.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionController.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
+- `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
+- `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`
 - `Assets/_Game/Scripts/Research/ResearchController.cs`
 - `Assets/_Game/Scripts/Research/ResearchModel.cs`
 - `Assets/_Game/Scripts/Research/RouteTechnologyEffects.cs`

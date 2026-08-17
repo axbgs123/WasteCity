@@ -328,6 +328,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
                 "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
                 "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
+                "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
                 "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
@@ -373,6 +374,35 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "resource-recipe-catalog"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs",
+                },
+                new[]
+                {
+                    "ResourceRecipeDefinition",
+                    "ResourceRecipeCatalog",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "crafting-queue-model"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/CraftingQueueModel.cs",
+                },
+                new[]
+                {
+                    "CraftingQueueModel",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
                 });
             AssertReuseContract(
                 FindReuse(catalog, "resource-capacity-policy"),
@@ -518,6 +548,61 @@ namespace WasteCity.Tests
             Assert.That(FindReuse(catalog,
                     "graybox-production-controller-3d").ReuseLevel,
                 Is.EqualTo(ProjectReuseLevel.SceneOnly));
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsDemoResearchOwnershipAndReuse()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup research =
+                FindFeature(catalog, "research-population");
+
+            CollectionAssert.Contains(research.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs");
+            CollectionAssert.Contains(research.ScenePaths,
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+            CollectionAssert.Contains(research.RequirementIds, "IDEA-0011");
+
+            ProjectReuseEntry demoCatalog = FindReuse(catalog,
+                "demo-research-catalog");
+            Assert.That(demoCatalog.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(demoCatalog.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.AreEqual(new[]
+            {
+                "DemoResearchCatalog",
+            }, demoCatalog.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Scripts/Research/DemoResearchCatalog.cs",
+            }, demoCatalog.AssetPaths);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+            }, demoCatalog.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0011" },
+                demoCatalog.RequirementIds);
+
+            ProjectReuseEntry demoRuntime = FindReuse(catalog,
+                "demo-research-runtime");
+            Assert.That(demoRuntime.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(demoRuntime.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.AreEqual(new[] { "DemoResearchRuntime" },
+                demoRuntime.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Scripts/Research/DemoResearchRuntime.cs",
+            }, demoRuntime.AssetPaths);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+            }, demoRuntime.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0011" },
+                demoRuntime.RequirementIds);
         }
 
         private static void AssertReuseContract(

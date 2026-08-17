@@ -251,6 +251,7 @@
       "FailureLocationSummary": "先检查库存、生产循环、物流网络和建筑接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
@@ -291,16 +292,19 @@
       ],
       "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
       "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
         "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
       ],
       "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0011"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1096,6 +1100,47 @@
       ]
     },
     {
+      "Id": "resource-recipe-catalog",
+      "ChineseName": "正式资源配方目录",
+      "TypeNames": [
+        "ResourceRecipeDefinition",
+        "ResourceRecipeCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "统一提供三条机器配方和两条应急手工配方的稳定 ID、输入输出、周期、绑定节点动态产出与研究解锁条件。",
+      "BoundarySummary": "只定义正式配方静态配置并复用既有机器生产定义；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "crafting-queue-model",
+      "ChineseName": "应急合成队列",
+      "TypeNames": [
+        "CraftingQueueModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/CraftingQueueModel.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还。",
+      "BoundarySummary": "只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；不访问城市或建筑库存，不自动合成前置材料，不解释鼠标手势，也不进入 schema 30 存档。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
       "Id": "resource-capacity-policy",
       "ChineseName": "城市资源容量策略",
       "TypeNames": [
@@ -1299,6 +1344,46 @@
       ],
       "RequirementIds": [
         "DOC-0001"
+      ]
+    },
+    {
+      "Id": "demo-research-catalog",
+      "ChineseName": "三维首版科技目录",
+      "TypeNames": [
+        "DemoResearchCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Research/DemoResearchCatalog.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供 A16.4 六节点的稳定顺序、稳定 ID、前置、成本、时长、效果与发布状态，3D 科技树和解锁投影必须读取该目录。",
+      "BoundarySummary": "只定义 3D Demo release profile 的静态配置；不保存完成状态、不扣资源、不推进时间，也不回写冻结 2D 的 43 节点目录。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "demo-research-runtime",
+      "ChineseName": "三维首版科技运行时",
+      "TypeNames": [
+        "DemoResearchRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Research/DemoResearchRuntime.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款。",
+      "BoundarySummary": "只拥有当前 3D 会话的研究规则适配；调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实。它不处理 Unity 输入、UI、关注度、战斗效果或 schema 30 存档。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
       ]
     },
     {

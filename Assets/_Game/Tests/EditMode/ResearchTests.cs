@@ -78,5 +78,38 @@ namespace WasteCity.Tests
             Assert.That(model.Start(definition, inventory, inheritedProgressRatio), Is.True);
             Assert.That(model.Remaining, Is.EqualTo(expectedRemaining).Within(.0001f));
         }
+
+        [Test]
+        public void ResearchStartPreservesConfiguredDebtAllowance()
+        {
+            var inventory = new ResourceInventory(100);
+            inventory.SetDebtLimit(10);
+            var model = new ResearchModel();
+
+            Assert.That(
+                model.Start(ResearchCatalog.Starting[0], inventory),
+                Is.True);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.EqualTo(-10));
+        }
+
+        [Test]
+        public void LegacyZeroCostDefinitionKeepsItsCostIdAndCanStart()
+        {
+            var definition = new ResearchDefinition(
+                "test.research.free",
+                "免费研究",
+                DevelopmentRoute.Technology,
+                ResourceIds.Iron,
+                0,
+                5f);
+            var inventory = new ResourceInventory(100);
+            var model = new ResearchModel();
+
+            Assert.That(definition.CostId, Is.EqualTo(ResourceIds.Iron));
+            Assert.That(definition.Cost, Is.Zero);
+            Assert.That(definition.Costs, Is.Empty);
+            Assert.That(model.Start(definition, inventory), Is.True);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.Zero);
+        }
     }
 }

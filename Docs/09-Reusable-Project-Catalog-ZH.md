@@ -144,6 +144,14 @@
 
 能解决什么：维护会话级 30 格个人背包，包括同类稳定合并、每格正式栈上限、稳定扣除、拆半、逐个移动、整栈合并与交换。在哪里：`Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`。怎么复用：管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。背包 UI 只读取槽位快照，并通过模型或 `ResourceTransaction` 提交操作；资源栈上限继续来自资源定义目录。不能负责什么：只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。背包不进入当前 schema 30 存档。改后跑哪组测试：`PlayerBackpackModelTests`。代码名：`BackpackSlot`、`PlayerBackpackModel`。
 
+### 正式资源配方目录（推荐复用）
+
+能解决什么：用一份正式目录统一三条机器配方与两条应急手工配方，避免 UI、生产和合成各自复制数值。在哪里：`Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`。怎么复用：统一提供三条机器配方和两条应急手工配方的稳定 ID、输入输出、周期、绑定节点动态产出与研究解锁条件。机器条目继续从正式机器生产定义投影；科技树和合成 UI 只引用稳定配方 ID。不能负责什么：只定义正式配方静态配置并复用既有机器生产定义；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。改后跑哪组测试：`CraftingQueueModelTests`。代码名：`ResourceRecipeDefinition`、`ResourceRecipeCatalog`。
+
+### 应急合成队列（推荐复用）
+
+能解决什么：维护最多 20 次执行的 FIFO 应急合成队列，保证入队预留、顺序推进、产出阻塞和取消返还不丢失资源。在哪里：`Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`。怎么复用：管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还。界面应把左 1、右 5 和 Shift 最大请求转换为模型命令，不自行扣除材料或推进时间。不能负责什么：只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；不访问城市或建筑库存，不自动合成前置材料，不解释鼠标手势，也不进入 schema 30 存档。改后跑哪组测试：`CraftingQueueModelTests`。代码名：`CraftingQueueModel`。
+
 ### 正式机器生产定义目录（推荐复用）
 
 能解决什么：集中提供采矿、冶炼和装配三条正式机器配方的稳定 ID、依次为 `3`、`6`、`6` 秒的周期、输入输出和内部库存容量。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`。怎么复用：提供采矿、冶炼和装配三条正式机器配方的稳定标识、周期、输入输出与内部容量。生产状态、研究解锁和后续 UI 必须引用目录条目，不得复制配方数值。不能负责什么：只定义机器生产静态配置；不保存建筑实例状态，不推进周期，也不判断物流连接。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionDefinition`、`FormalProductionDefinitionCatalog`。
@@ -175,6 +183,14 @@
 ### 研究模型（推荐复用）
 
 能解决什么：管理研究状态。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：用于管理研究状态。把研究状态放在这里。不能负责什么：不展示研究界面。改后跑哪组测试：`ResearchTests`。代码名：`ResearchModel`。
+
+### 三维首版科技目录（推荐复用）
+
+能解决什么：集中提供 GDD A16.4 六节点科技树的稳定顺序、稳定 ID、前置、成本、时长、效果与正式发布状态。在哪里：`Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`。怎么复用：提供 A16.4 六节点的稳定顺序、稳定 ID、前置、成本、时长、效果与发布状态，3D 科技树和解锁投影必须读取该目录。不能负责什么：只定义 3D Demo release profile 的静态配置；不保存完成状态、不扣资源、不推进时间，也不回写冻结 2D 的 43 节点目录。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchCatalog`。
+
+### 三维首版科技运行时（推荐复用）
+
+能解决什么：在当前 3D 会话中统一提交科技启动、不同城市形态下的推进、研究站失效暂停和取消退款。在哪里：`Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`。怎么复用：组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款。不能负责什么：只拥有当前 3D 会话的研究规则适配；调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实。它不处理 Unity 输入、UI、关注度、战斗效果或 schema 30 存档。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchRuntime`。
 
 ### 人口模型（推荐复用）
 

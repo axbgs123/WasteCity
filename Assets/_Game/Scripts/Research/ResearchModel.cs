@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using WasteCity.Content;
 using WasteCity.Economy;
-using System.Linq;
 
 namespace WasteCity.Research
 {
@@ -21,13 +22,111 @@ namespace WasteCity.Research
         public DevelopmentRoute Route { get; }
         public string CostId { get; }
         public int Cost { get; }
+        public IReadOnlyList<ResourceAmount> Costs { get; }
         public float Duration { get; }
         public string RequiredResearchId { get; }
         public IReadOnlyList<string> RequiredResearchIds { get; }
         public int Tier { get; }
         public string EffectSummary { get; }
-        public ResearchDefinition(string id, string name, DevelopmentRoute route, string costId, int cost, float duration,string requiredResearchId=null,int tier=1,string effectSummary=null,params string[] additionalRequirements)
-        { Id = new StableId(id); Name = name; Route = route; CostId = costId; Cost = Math.Max(0, cost); Duration = Math.Max(0.1f, duration);RequiredResearchId=requiredResearchId;Tier=Math.Max(1,Math.Min(3,tier));EffectSummary=effectSummary??"规则效果待运行系统接入";var requirements=new List<string>();if(!string.IsNullOrEmpty(requiredResearchId))requirements.Add(requiredResearchId);if(additionalRequirements!=null)requirements.AddRange(additionalRequirements.Where(value=>!string.IsNullOrEmpty(value)));RequiredResearchIds=requirements; }
+        public ResearchDefinition(
+            string id,
+            string name,
+            DevelopmentRoute route,
+            string costId,
+            int cost,
+            float duration,
+            string requiredResearchId = null,
+            int tier = 1,
+            string effectSummary = null,
+            params string[] additionalRequirements)
+            : this(
+                id,
+                name,
+                route,
+                string.IsNullOrWhiteSpace(costId) || cost <= 0
+                    ? Array.Empty<ResourceAmount>()
+                    : new[] { new ResourceAmount(costId, cost) },
+                duration,
+                requiredResearchId,
+                tier,
+                effectSummary,
+                minimumDuration: .1f,
+                additionalRequirements)
+        {
+            CostId = costId;
+            Cost = Math.Max(0, cost);
+        }
+
+        public ResearchDefinition(
+            string id,
+            string name,
+            DevelopmentRoute route,
+            IReadOnlyList<ResourceAmount> costs,
+            float duration,
+            string requiredResearchId = null,
+            int tier = 1,
+            string effectSummary = null,
+            params string[] additionalRequirements)
+            : this(
+                id,
+                name,
+                route,
+                costs,
+                duration,
+                requiredResearchId,
+                tier,
+                effectSummary,
+                minimumDuration: 0f,
+                additionalRequirements)
+        {
+        }
+
+        private ResearchDefinition(
+            string id,
+            string name,
+            DevelopmentRoute route,
+            IReadOnlyList<ResourceAmount> costs,
+            float duration,
+            string requiredResearchId,
+            int tier,
+            string effectSummary,
+            float minimumDuration,
+            params string[] additionalRequirements)
+        {
+            Id = new StableId(id);
+            Name = name;
+            Route = route;
+            var costSnapshot = new List<ResourceAmount>();
+            if (costs != null)
+            {
+                for (int index = 0; index < costs.Count; index++)
+                {
+                    ResourceAmount value = costs[index];
+                    if (!string.IsNullOrWhiteSpace(value.ResourceId) &&
+                        value.Amount > 0)
+                    {
+                        costSnapshot.Add(value);
+                    }
+                }
+            }
+            Costs = new ReadOnlyCollection<ResourceAmount>(costSnapshot);
+            CostId = Costs.Count == 0 ? null : Costs[0].ResourceId;
+            Cost = Costs.Count == 0 ? 0 : Costs[0].Amount;
+            Duration = Math.Max(minimumDuration, duration);
+            RequiredResearchId = requiredResearchId;
+            Tier = Math.Max(1, Math.Min(3, tier));
+            EffectSummary = effectSummary ?? "规则效果待运行系统接入";
+            var requirements = new List<string>();
+            if (!string.IsNullOrEmpty(requiredResearchId))
+                requirements.Add(requiredResearchId);
+            if (additionalRequirements != null)
+            {
+                requirements.AddRange(additionalRequirements.Where(
+                    value => !string.IsNullOrEmpty(value)));
+            }
+            RequiredResearchIds =
+                new ReadOnlyCollection<string>(requirements);
+        }
     }
     public static class ResearchCatalog
     {
@@ -95,7 +194,12 @@ namespace WasteCity.Research
         public event Action<ResearchDefinition> Completed;
         public bool Start(ResearchDefinition definition, ResourceInventory inventory, float inheritedProgressRatio = 0f)
         {
-            if (Active != null || definition == null || completed.Contains(definition.Id) || definition.RequiredResearchIds.Any(required=>!completed.Any(id=>id.Value==required)) || !inventory.TrySpend(definition.CostId, definition.Cost)) return false;
+            if (Active != null || definition == null || inventory == null ||
+                completed.Contains(definition.Id) ||
+                definition.RequiredResearchIds.Any(required =>
+                    !completed.Any(id => id.Value == required)) ||
+                !TrySpendResearchCosts(inventory, definition.Costs))
+                return false;
             float ratio=Math.Max(0f,Math.Min(1f,inheritedProgressRatio));
             Active = definition; Remaining = Math.Max(.001f,definition.Duration*(1f-ratio)); return true;
         }
@@ -105,7 +209,109 @@ namespace WasteCity.Research
             ResearchDefinition finished = Active; completed.Add(finished.Id); Active = null; Remaining = 0f; Completed?.Invoke(finished); return true;
         }
         public bool IsCompleted(StableId id) => completed.Contains(id);
-        public string[] CaptureCompleted()=>completed.Select(id=>id.Value).ToArray();
+        public string[] CaptureCompleted()=>completed.Select(id=>id.Value)
+            .OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        internal void GrantCompleted(ResearchDefinition definition)
+        {
+            if (definition != null)
+                completed.Add(definition.Id);
+        }
+
+        public void GrantCompletedForDevelopment(
+            ResearchDefinition definition)
+        {
+            GrantCompleted(definition);
+        }
+        internal bool TryCancel(
+            ResourceInventory inventory,
+            ResourceCapacityPolicy capacity,
+            int activeWarehouseCount,
+            float refundRatio)
+        {
+            if (Active == null || inventory == null || capacity == null)
+                return false;
+            ResourceAmount[] refund = Active.Costs
+                .Select(value => new ResourceAmount(
+                    value.ResourceId,
+                    (int)Math.Floor(
+                        value.Amount * Math.Max(0f, refundRatio))))
+                .Where(value => value.Amount > 0)
+                .ToArray();
+            if (refund.Length > 0 &&
+                !ResourceTransaction.TryCommitBatch(
+                    inventory,
+                    Array.Empty<ResourceAmount>(),
+                    inventory,
+                    capacity,
+                    activeWarehouseCount,
+                    refund))
+            {
+                return false;
+            }
+            Active = null;
+            Remaining = 0f;
+            return true;
+        }
+
+        private static bool TrySpendResearchCosts(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> costs)
+        {
+            var totals = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (costs != null)
+            {
+                for (int index = 0; index < costs.Count; index++)
+                {
+                    ResourceAmount cost = costs[index];
+                    if (!ResourceCapacityPolicy.IsRegisteredResource(
+                            cost.ResourceId) ||
+                        cost.Amount <= 0)
+                    {
+                        return false;
+                    }
+
+                    totals.TryGetValue(cost.ResourceId, out int existing);
+                    long aggregate = (long)existing + cost.Amount;
+                    if (aggregate > int.MaxValue) return false;
+                    totals[cost.ResourceId] = (int)aggregate;
+                }
+            }
+
+            foreach (KeyValuePair<string, int> cost in totals)
+                if (!inventory.CanSpend(cost.Key, cost.Value))
+                    return false;
+
+            var before = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string resourceId in totals.Keys)
+                before[resourceId] = inventory.Get(resourceId);
+
+            try
+            {
+                foreach (KeyValuePair<string, int> cost in totals)
+                {
+                    if (!inventory.TrySpend(cost.Key, cost.Value))
+                    {
+                        RestoreResearchCosts(inventory, before);
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                RestoreResearchCosts(inventory, before);
+                return false;
+            }
+        }
+
+        private static void RestoreResearchCosts(
+            ResourceInventory inventory,
+            Dictionary<string, int> before)
+        {
+            foreach (KeyValuePair<string, int> value in before)
+                inventory.Restore(value.Key, value.Value);
+        }
+
         public void Restore(string[] completedIds,string activeId,float remaining)
         {
             completed.Clear();if(completedIds!=null)foreach(string id in completedIds){var definition=ResearchCatalog.Find(id);if(definition!=null)completed.Add(definition.Id);}
