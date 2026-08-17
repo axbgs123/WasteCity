@@ -68,6 +68,10 @@
 
 能解决什么：评估建筑能否放下。在哪里：`Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`。怎么复用：用于评估建筑放置。由它给出放置判断。不能负责什么：不管理施工进度。改后跑哪组测试：`BuildingPlacementEvaluationTests`。代码名：`BuildingPlacementEvaluation`。
 
+### 资源节点稳定绑定（推荐复用）
+
+能解决什么：让采矿建筑从放置评估到运行时始终持有同一个资源节点身份与地图坐标。在哪里：`Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs`。怎么复用：在合法放置结果、建筑实例和生产状态之间传递同一资源节点的稳定 ID 与地图坐标。不能负责什么：只承载权威放置评估确认的节点身份和坐标；不判断兼容性、放置合法性、储量或物流范围。改后跑哪组测试：`GrayboxProductionLifecycleTests`、`GrayboxProductionRuntimeTests`。代码名：`ResourceNodeBinding`。
+
 ### 建筑资源节点兼容规则（推荐复用）
 
 能解决什么：让放置评估与采矿引导共享同一套建筑和资源节点兼容关系。在哪里：`Assets/_Game/Scripts/Building/BuildingResourceNodeCompatibilityRules.cs`。怎么复用：供放置评估与采矿引导共同判断建筑和资源节点是否兼容。不能负责什么：只回答资源类型兼容性；不复制范围、占地、成本、解锁或城市状态判断。改后跑哪组测试：`BuildingResourceNodeCompatibilityRulesTests`。代码名：`BuildingResourceNodeCompatibilityRules`。
@@ -151,6 +155,22 @@
 ### 正式生产与物流模拟（推荐复用）
 
 能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。调用方必须提供当前世界模型、正式城市账本、容量策略、有效仓库数和已经由权威规则派生的物流连接。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。它不替代 `BuildingRangeRules`、`BuildingResourceNodeCompatibilityRules` 或 `WorldMapModel`；当前仍是纯领域层，尚未接入默认 3D 场景。旧 `ProductionModel`、`ResourceExtractionProcess` 和允许建筑链式中继的 `LogisticsNetworkModel` 不得作为本轮正式 3D 运行真值。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionSimulation`。
+
+### 三维生产建筑资格（复用前审查）
+
+能解决什么：从既有建筑生命周期统一派生仓库是否应计入容量。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`。怎么复用：从现有三维建筑实例生命周期派生有效仓库资格。不能负责什么：只组合已完成、玩家拥有、未撤离锁定和稳定建筑 ID；不计算容量、物流距离、配方或放置合法性。改后跑哪组测试：`GrayboxProductionLifecycleTests`、`GrayboxProductionRuntimeTests`。代码名：`GrayboxProductionEligibility3D`。
+
+### 三维生产运行时（复用前审查）
+
+能解决什么：让正式生产状态跟随当前三维建筑的完成、撤离、遗弃、移动资格与物流范围变化。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合、物流连接和有效仓库数。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置或节点兼容规则。改后跑哪组测试：`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`。代码名：`GrayboxProductionRuntime3D`。
+
+### 三维生产固定时钟（复用前审查）
+
+能解决什么：让不同帧率下的三维生产保持同一固定步结果，并在暂停期间不积累追赶时间。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`。怎么复用：用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。不能负责什么：只拥有会话级余量并组合运行时、模拟和容量策略；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionClockTests`。代码名：`GrayboxProductionClock3D`。
+
+### 三维生产场景控制器（仅限场景）
+
+能解决什么：把默认三维场景的真实建筑、城市、世界与暂停状态送进固定生产时钟。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`。怎么复用：把当前三维场景的建筑会话、城市模式、世界坐标和 Unity 暂停状态接到固定步生产时钟。不能负责什么：只负责 GrayboxPrototype3D 场景引用与时间输入；不复制生产配方、物流范围、资源节点兼容性、库存事务或界面规则。改后跑哪组测试：`GrayboxProductionControllerTests`、`GrayboxSceneContractTests`。代码名：`GrayboxProductionController3D`。
 
 ### 研究模型（推荐复用）
 

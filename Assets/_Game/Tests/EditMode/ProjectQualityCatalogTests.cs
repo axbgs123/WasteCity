@@ -234,6 +234,8 @@ namespace WasteCity.Tests
                 "Assets/_Game/Scripts/Building/BuildingResourceNodeCompatibilityRules.cs");
             CollectionAssert.Contains(building.TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/BuildingResourceNodeCompatibilityRulesTests.cs");
+            CollectionAssert.Contains(building.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs");
             CollectionAssert.Contains(building.ScenePaths,
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
 
@@ -260,6 +262,19 @@ namespace WasteCity.Tests
                 "BuildingResourceNodeCompatibilityRules");
             CollectionAssert.Contains(compatibility.RequirementIds,
                 "IDEA-0010");
+
+            ProjectReuseEntry nodeBinding = FindReuse(catalog,
+                "resource-node-binding");
+            Assert.That(nodeBinding.FeatureGroupId,
+                Is.EqualTo("building-construction-evacuation"));
+            Assert.That(nodeBinding.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.AreEqual(
+                new[] { "ResourceNodeBinding" },
+                nodeBinding.TypeNames);
+            CollectionAssert.IsSubsetOf(
+                new[] { "IDEA-0010", "IDEA-0011" },
+                nodeBinding.RequirementIds);
 
             ProjectReuseEntry displaySettings = FindReuse(catalog,
                 "graybox-display-settings");
@@ -314,7 +329,17 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
                 "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
                 "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
             }, economy.TestFileGlobs);
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs",
+            }, economy.SourceGlobs);
             CollectionAssert.Contains(economy.RequirementIds, "IDEA-0011");
             CollectionAssert.Contains(economy.ScenePaths,
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
@@ -422,6 +447,77 @@ namespace WasteCity.Tests
                 {
                     "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
                 });
+            AssertReuseContract(
+                FindReuse(catalog, "graybox-production-eligibility-3d"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
+                },
+                new[]
+                {
+                    "GrayboxProductionEligibility3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "graybox-production-runtime-3d"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
+                },
+                new[]
+                {
+                    "GrayboxProductionRuntime3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "graybox-production-clock-3d"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
+                },
+                new[]
+                {
+                    "GrayboxProductionClock3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "graybox-production-controller-3d"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs",
+                },
+                new[]
+                {
+                    "GrayboxProductionController3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+                });
+            Assert.That(FindReuse(catalog,
+                    "graybox-production-eligibility-3d").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            Assert.That(FindReuse(catalog,
+                    "graybox-production-runtime-3d").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            Assert.That(FindReuse(catalog,
+                    "graybox-production-clock-3d").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            Assert.That(FindReuse(catalog,
+                    "graybox-production-controller-3d").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
         }
 
         private static void AssertReuseContract(

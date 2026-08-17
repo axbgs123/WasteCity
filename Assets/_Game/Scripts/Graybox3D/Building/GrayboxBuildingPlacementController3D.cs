@@ -344,8 +344,8 @@ namespace WasteCity.Graybox3D.Building
             bool terrainPassable = true;
             bool obstacleFree = true;
             bool touchesCity = false;
-            bool coversCompatibleNode = false;
-            string compatibleNodeId = null;
+            ResourceNodeBinding compatibleNode =
+                ResourceNodeBinding.None;
 
             if (definition != null &&
                 hit.Site == BuildingSite.Ground &&
@@ -382,15 +382,16 @@ namespace WasteCity.Graybox3D.Building
                         Math.Abs(x - cityX) <= 1 &&
                         Math.Abs(y - cityY) <= 1)
                         touchesCity = true;
-                    if (!coversCompatibleNode &&
+                    if (!compatibleNode.IsValid &&
                         cell.HasResource &&
                         BuildingResourceNodeCompatibilityRules.IsCompatible(
                             definition,
                             cell.ResourceId))
                     {
-                        coversCompatibleNode = true;
-                        compatibleNodeId =
-                            ResourceNodeVisualId(x, y);
+                        compatibleNode = new ResourceNodeBinding(
+                            ResourceNodeVisualId(x, y),
+                            x,
+                            y);
                     }
                 }
             }
@@ -429,8 +430,7 @@ namespace WasteCity.Graybox3D.Building
                 touchesCity,
                 terrainPassable,
                 obstacleFree,
-                coversCompatibleNode,
-                compatibleNodeId,
+                compatibleNode,
                 contentVisible,
                 unlock,
                 canAfford);

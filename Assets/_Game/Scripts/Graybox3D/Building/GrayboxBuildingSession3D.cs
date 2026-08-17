@@ -22,11 +22,13 @@ namespace WasteCity.Graybox3D.Building
         internal GrayboxBuildingInstance3D(
             string stableInstanceId,
             PlacedBuilding placement,
-            ConstructionProgress progress)
+            ConstructionProgress progress,
+            ResourceNodeBinding boundResourceNode)
         {
             StableInstanceId = stableInstanceId;
             Placement = placement;
             Progress = progress;
+            BoundResourceNode = boundResourceNode;
             State = GrayboxBuildingInstanceState.UnderConstruction;
             IsPlayerOwned = true;
             IsEvacuationLocked = false;
@@ -35,6 +37,7 @@ namespace WasteCity.Graybox3D.Building
         public string StableInstanceId { get; }
         public PlacedBuilding Placement { get; }
         public ConstructionProgress Progress { get; }
+        public ResourceNodeBinding BoundResourceNode { get; }
         public GrayboxBuildingInstanceState State { get; private set; }
         public bool IsPlayerOwned { get; private set; }
         public bool IsEvacuationLocked { get; private set; }
@@ -169,6 +172,9 @@ namespace WasteCity.Graybox3D.Building
             evaluation = BuildingPlacementRules.Evaluate(refreshed);
             instance = null;
             if (!evaluation.IsValid) return false;
+            if (refreshed.Definition.RequiresResourceNode &&
+                !evaluation.CompatibleResourceNode.IsValid)
+                return false;
 
             int inventoryBefore =
                 Inventory.Get(refreshed.Definition.CostId);
@@ -194,7 +200,8 @@ namespace WasteCity.Graybox3D.Building
             var candidate = new GrayboxBuildingInstance3D(
                 CreateStableInstanceId(nextStableInstanceOrdinal),
                 placement,
-                new ConstructionProgress(refreshed.Definition.BuildSeconds));
+                new ConstructionProgress(refreshed.Definition.BuildSeconds),
+                evaluation.CompatibleResourceNode);
             bool presentationCreated;
             try
             {
@@ -881,7 +888,8 @@ namespace WasteCity.Graybox3D.Building
                 request.TerrainPassable,
                 request.ObstacleFree,
                 request.CoversCompatibleResourceNode,
-                request.CompatibleResourceNodeId,
+                request.CompatibleResourceNode,
+                request.RequiresValidResourceNodeBinding,
                 contentVisible,
                 unlock,
                 canAfford);

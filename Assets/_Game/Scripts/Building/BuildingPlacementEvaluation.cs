@@ -37,6 +37,24 @@ namespace WasteCity.Building
         }
     }
 
+    public readonly struct ResourceNodeBinding
+    {
+        public static ResourceNodeBinding None => default(ResourceNodeBinding);
+
+        public ResourceNodeBinding(string stableId, int x, int y)
+        {
+            StableId = stableId;
+            X = x;
+            Y = y;
+        }
+
+        public string StableId { get; }
+        public int X { get; }
+        public int Y { get; }
+        public bool IsValid =>
+            !string.IsNullOrWhiteSpace(StableId) && X >= 0 && Y >= 0;
+    }
+
     public readonly struct BuildingPlacementRequest
     {
         public BuildingDefinition Definition { get; }
@@ -55,6 +73,8 @@ namespace WasteCity.Building
         public bool ObstacleFree { get; }
         public bool CoversCompatibleResourceNode { get; }
         public string CompatibleResourceNodeId { get; }
+        public ResourceNodeBinding CompatibleResourceNode { get; }
+        public bool RequiresValidResourceNodeBinding { get; }
         public bool ContentVisible { get; }
         public BuildingUnlockEvaluation Unlock { get; }
         public bool CanAfford { get; }
@@ -79,6 +99,97 @@ namespace WasteCity.Building
             bool contentVisible,
             BuildingUnlockEvaluation unlock,
             bool canAfford)
+            : this(
+                definition,
+                grid,
+                site,
+                orientation,
+                x,
+                y,
+                cityX,
+                cityY,
+                groundRadius,
+                cityMode,
+                projectionSucceeded,
+                footprintTouchesCity,
+                terrainPassable,
+                obstacleFree,
+                coversCompatibleResourceNode,
+                new ResourceNodeBinding(
+                    compatibleResourceNodeId,
+                    -1,
+                    -1),
+                requiresValidResourceNodeBinding: false,
+                contentVisible,
+                unlock,
+                canAfford)
+        {
+        }
+
+        public BuildingPlacementRequest(
+            BuildingDefinition definition,
+            BuildingGrid grid,
+            BuildingSite site,
+            BuildingOrientation orientation,
+            int x,
+            int y,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityMode cityMode,
+            bool projectionSucceeded,
+            bool footprintTouchesCity,
+            bool terrainPassable,
+            bool obstacleFree,
+            ResourceNodeBinding compatibleResourceNode,
+            bool contentVisible,
+            BuildingUnlockEvaluation unlock,
+            bool canAfford)
+            : this(
+                definition,
+                grid,
+                site,
+                orientation,
+                x,
+                y,
+                cityX,
+                cityY,
+                groundRadius,
+                cityMode,
+                projectionSucceeded,
+                footprintTouchesCity,
+                terrainPassable,
+                obstacleFree,
+                compatibleResourceNode.IsValid,
+                compatibleResourceNode,
+                requiresValidResourceNodeBinding: true,
+                contentVisible,
+                unlock,
+                canAfford)
+        {
+        }
+
+        public BuildingPlacementRequest(
+            BuildingDefinition definition,
+            BuildingGrid grid,
+            BuildingSite site,
+            BuildingOrientation orientation,
+            int x,
+            int y,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityMode cityMode,
+            bool projectionSucceeded,
+            bool footprintTouchesCity,
+            bool terrainPassable,
+            bool obstacleFree,
+            bool coversCompatibleResourceNode,
+            ResourceNodeBinding compatibleResourceNode,
+            bool requiresValidResourceNodeBinding,
+            bool contentVisible,
+            BuildingUnlockEvaluation unlock,
+            bool canAfford)
         {
             Definition = definition;
             Grid = grid;
@@ -95,7 +206,10 @@ namespace WasteCity.Building
             TerrainPassable = terrainPassable;
             ObstacleFree = obstacleFree;
             CoversCompatibleResourceNode = coversCompatibleResourceNode;
-            CompatibleResourceNodeId = compatibleResourceNodeId;
+            CompatibleResourceNode = compatibleResourceNode;
+            CompatibleResourceNodeId = compatibleResourceNode.StableId;
+            RequiresValidResourceNodeBinding =
+                requiresValidResourceNodeBinding;
             ContentVisible = contentVisible;
             Unlock = unlock;
             CanAfford = canAfford;
@@ -112,6 +226,7 @@ namespace WasteCity.Building
         public int RotatedWidth { get; }
         public int RotatedHeight { get; }
         public string CompatibleResourceNodeId { get; }
+        public ResourceNodeBinding CompatibleResourceNode { get; }
         public IReadOnlyList<BuildingCell> Footprint { get; }
 
         internal BuildingPlacementEvaluation(
@@ -120,7 +235,7 @@ namespace WasteCity.Building
             BuildingOrientation orientation,
             int rotatedWidth,
             int rotatedHeight,
-            string compatibleResourceNodeId,
+            ResourceNodeBinding compatibleResourceNode,
             IReadOnlyList<BuildingCell> footprint)
         {
             IsValid = failures.Count == 0;
@@ -130,7 +245,8 @@ namespace WasteCity.Building
             Orientation = orientation;
             RotatedWidth = rotatedWidth;
             RotatedHeight = rotatedHeight;
-            CompatibleResourceNodeId = compatibleResourceNodeId;
+            CompatibleResourceNode = compatibleResourceNode;
+            CompatibleResourceNodeId = compatibleResourceNode.StableId;
             Footprint = footprint;
         }
     }
@@ -194,7 +310,7 @@ namespace WasteCity.Building
                 evaluation.Orientation,
                 evaluation.RotatedWidth,
                 evaluation.RotatedHeight,
-                evaluation.CompatibleResourceNodeId,
+                evaluation.CompatibleResourceNode,
                 Snapshot(evaluation.Footprint));
         }
 
@@ -257,9 +373,14 @@ namespace WasteCity.Building
 
             if (hasDefinition && hasValidOrientation &&
                 request.Site == BuildingSite.Ground &&
-                !IsGroundFootprintInRange(
-                    request,
-                    workspace.Footprint))
+                !BuildingRangeRules.IsGroundFootprintInRange(
+                    request.Definition,
+                    request.X,
+                    request.Y,
+                    request.Orientation,
+                    request.CityX,
+                    request.CityY,
+                    request.GroundRadius))
                 workspace.AddFailure(
                     BuildingPlacementFailure.OutsideBuildRange);
             if (hasGrid && footprintInBounds &&
@@ -277,8 +398,12 @@ namespace WasteCity.Building
             if (!request.ObstacleFree)
                 workspace.AddFailure(
                     BuildingPlacementFailure.Obstacle);
-            var hasCompatibleResourceNode = request.CoversCompatibleResourceNode &&
-                !string.IsNullOrEmpty(request.CompatibleResourceNodeId);
+            var hasCompatibleResourceNode =
+                request.RequiresValidResourceNodeBinding
+                    ? request.CompatibleResourceNode.IsValid
+                    : request.CoversCompatibleResourceNode &&
+                      !string.IsNullOrEmpty(
+                          request.CompatibleResourceNodeId);
             if (hasDefinition && request.Definition.RequiresResourceNode && !hasCompatibleResourceNode)
                 workspace.AddFailure(
                     BuildingPlacementFailure.IncompatibleResourceNode);
@@ -296,32 +421,19 @@ namespace WasteCity.Building
                 workspace.AddFailure(
                     BuildingPlacementFailure.InsufficientMaterials);
 
-            var nodeId = hasDefinition && request.Definition.RequiresResourceNode && hasCompatibleResourceNode
-                ? request.CompatibleResourceNodeId
-                : null;
+            ResourceNodeBinding node = hasDefinition &&
+                request.Definition.RequiresResourceNode &&
+                hasCompatibleResourceNode
+                    ? request.CompatibleResourceNode
+                    : ResourceNodeBinding.None;
             return new BuildingPlacementEvaluation(
                 workspace.Failures,
                 request.Site,
                 request.Orientation,
                 rotatedWidth,
                 rotatedHeight,
-                nodeId,
+                node,
                 workspace.Footprint);
-        }
-
-        private static bool IsGroundFootprintInRange(
-            BuildingPlacementRequest request,
-            IReadOnlyList<BuildingCell> footprint)
-        {
-            for (var index = 0; index < footprint.Count; index++)
-                if (!BuildingRangeRules.IsGroundCellInRange(
-                    request.CityX,
-                    request.CityY,
-                    footprint[index].X,
-                    footprint[index].Y,
-                    request.GroundRadius))
-                    return false;
-            return true;
         }
 
         private static bool IsAnyFootprintCellOccupied(BuildingGrid grid, IReadOnlyList<BuildingCell> footprint)

@@ -412,6 +412,9 @@ namespace WasteCity.Tests
             GrayboxConstructionController3D construction =
                 RequiredComponent<GrayboxConstructionController3D>(
                     building, "Construction");
+            GrayboxProductionController3D production =
+                RequiredComponent<GrayboxProductionController3D>(
+                    building, "Production");
             GrayboxEvacuationController3D evacuation =
                 RequiredComponent<GrayboxEvacuationController3D>(
                     building, "Evacuation");
@@ -462,6 +465,9 @@ namespace WasteCity.Tests
                     GrayboxMobileCityController3D>(true);
             GrayboxWorldView3D world =
                 Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxProductionController3D>(true),
+                Has.Length.EqualTo(1));
             Camera camera = Camera.main;
             Transform platform = RequiredChild(
                 city.gameObject,
@@ -534,6 +540,9 @@ namespace WasteCity.Tests
             AssertReference(construction, "interaction", interaction);
             AssertReference(construction, "controlledCamera", camera);
             AssertReference(construction, "menu", menu);
+            AssertReference(production, "session", session);
+            AssertReference(production, "city", city);
+            AssertReference(production, "worldView", world);
             AssertReference(evacuation, "session", session);
             AssertReference(evacuation, "city", city);
             AssertReference(evacuation, "presentation", presentation);

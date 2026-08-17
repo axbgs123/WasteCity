@@ -171,6 +171,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"
@@ -237,7 +238,11 @@
       "ChineseName": "经济生产与物流",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
-        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
+        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
@@ -247,6 +252,9 @@
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
@@ -756,6 +764,28 @@
       ]
     },
     {
+      "Id": "resource-node-binding",
+      "ChineseName": "资源节点稳定绑定",
+      "TypeNames": [
+        "ResourceNodeBinding"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingPlacementEvaluation.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "在合法放置结果、建筑实例和生产状态之间传递同一资源节点的稳定 ID 与地图坐标。",
+      "BoundarySummary": "只承载权威放置评估确认的节点身份和坐标；不判断兼容性、放置合法性、储量或物流范围。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0010",
+        "IDEA-0011"
+      ]
+    },
+    {
       "Id": "building-resource-node-compatibility-rules",
       "ChineseName": "建筑资源节点兼容规则",
       "TypeNames": [
@@ -1163,6 +1193,89 @@
       "BoundarySummary": "不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "graybox-production-eligibility-3d",
+      "ChineseName": "三维生产建筑资格",
+      "TypeNames": [
+        "GrayboxProductionEligibility3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从现有三维建筑实例生命周期派生有效仓库资格。",
+      "BoundarySummary": "只组合已完成、玩家拥有、未撤离锁定和稳定建筑 ID；不计算容量、物流距离、配方或放置合法性。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "graybox-production-runtime-3d",
+      "ChineseName": "三维生产运行时",
+      "TypeNames": [
+        "GrayboxProductionRuntime3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合、物流连接和有效仓库数。",
+      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置或节点兼容规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "graybox-production-clock-3d",
+      "ChineseName": "三维生产固定时钟",
+      "TypeNames": [
+        "GrayboxProductionClock3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。",
+      "BoundarySummary": "只拥有会话级余量并组合运行时、模拟和容量策略；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "graybox-production-controller-3d",
+      "ChineseName": "三维生产场景控制器",
+      "TypeNames": [
+        "GrayboxProductionController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "把当前三维场景的建筑会话、城市模式、世界坐标和 Unity 暂停状态接到固定步生产时钟。",
+      "BoundarySummary": "只负责 GrayboxPrototype3D 场景引用与时间输入；不复制生产配方、物流范围、资源节点兼容性、库存事务或界面规则。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011"

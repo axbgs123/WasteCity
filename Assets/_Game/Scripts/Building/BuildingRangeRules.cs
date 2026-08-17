@@ -22,7 +22,49 @@ namespace WasteCity.Building
             return IsSupportedGroundRadius(radius) &&
                    Math.Max(
                        Math.Abs((long)cellX - cityX),
-                       Math.Abs((long)cellY - cityY)) <= radius;
+                   Math.Abs((long)cellY - cityY)) <= radius;
+        }
+
+        public static bool IsGroundFootprintInRange(
+            BuildingDefinition definition,
+            int x,
+            int y,
+            BuildingOrientation orientation,
+            int cityX,
+            int cityY,
+            int radius)
+        {
+            if (definition == null ||
+                !BuildingOrientationRules.IsValid(orientation))
+            {
+                return false;
+            }
+
+            int width = BuildingOrientationRules.Width(
+                definition,
+                orientation);
+            int height = BuildingOrientationRules.Height(
+                definition,
+                orientation);
+            for (int offsetX = 0; offsetX < width; offsetX++)
+            for (int offsetY = 0; offsetY < height; offsetY++)
+            {
+                long cellX = (long)x + offsetX;
+                long cellY = (long)y + offsetY;
+                if (cellX < int.MinValue || cellX > int.MaxValue ||
+                    cellY < int.MinValue || cellY > int.MaxValue ||
+                    !IsGroundCellInRange(
+                        cityX,
+                        cityY,
+                        (int)cellX,
+                        (int)cellY,
+                        radius))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public static bool IsInnerFootprintInBounds(

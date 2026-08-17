@@ -796,6 +796,11 @@ namespace WasteCity.Editor
             GrayboxConstructionController3D construction =
                 EnsureComponent<GrayboxConstructionController3D>(
                     constructionTransform);
+            Transform productionTransform =
+                EnsureChild(building, "Production");
+            GrayboxProductionController3D production =
+                EnsureComponent<GrayboxProductionController3D>(
+                    productionTransform);
             Transform evacuationTransform =
                 EnsureChild(building, "Evacuation");
             GrayboxEvacuationController3D evacuation =
@@ -845,6 +850,11 @@ namespace WasteCity.Editor
                 ("interaction", interaction),
                 ("controlledCamera", camera),
                 ("menu", menu));
+            SetReferences(
+                production,
+                ("session", session),
+                ("city", city),
+                ("worldView", world));
             SetReferences(
                 evacuation,
                 ("session", session),
