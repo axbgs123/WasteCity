@@ -195,7 +195,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             if (keyboard != null &&
-                keyboard.f10Key.wasPressedThisFrame)
+                keyboard.digit0Key.wasPressedThisFrame)
                 developer?.TryTogglePanel();
 
             buildInputOwnedThisFrame |=
@@ -380,7 +380,6 @@ namespace WasteCity.Graybox3D.Building
             if (keyboard.digit7Key.wasPressedThisFrame) return 6;
             if (keyboard.digit8Key.wasPressedThisFrame) return 7;
             if (keyboard.digit9Key.wasPressedThisFrame) return 8;
-            if (keyboard.digit0Key.wasPressedThisFrame) return 9;
             return -1;
         }
 

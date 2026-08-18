@@ -786,7 +786,7 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
-        public IEnumerator FocusedSearch_OwnsKeyboardThenF10TogglesExactlyOnce()
+        public IEnumerator FocusedSearch_OwnsKeyboardThenZeroTogglesExactlyOnce()
         {
             GrayboxBuildingInteractionModel3D interaction =
                 Object.FindObjectOfType<
@@ -884,7 +884,7 @@ namespace WasteCity.Tests
 
             eventSystem.SetSelectedGameObject(null);
             yield return null;
-            yield return TapKey(Key.F10);
+            yield return TapKey(Key.Digit0);
 #if UNITY_EDITOR
             Assert.That(developer.IsPanelOpen, Is.Not.EqualTo(developerBefore));
 #endif
@@ -892,6 +892,9 @@ namespace WasteCity.Tests
 #if UNITY_EDITOR
             Assert.That(developer.IsPanelOpen, Is.Not.EqualTo(developerBefore));
 #endif
+            bool afterZero = developer.IsPanelOpen;
+            yield return TapKey(Key.F10);
+            Assert.That(developer.IsPanelOpen, Is.EqualTo(afterZero));
         }
 
         [UnityTest]
@@ -1260,7 +1263,7 @@ namespace WasteCity.Tests
                 GrayboxBuildingInstanceState.UnderConstruction));
 
             int ironBefore = session.Inventory.Get(ResourceIds.Iron);
-            yield return TapKey(Key.F10);
+            yield return TapKey(Key.Digit0);
 #if UNITY_EDITOR
             Assert.That(developer.IsPanelOpen, Is.True);
             GameObject panel = GameObject.Find("Graybox Developer Modifier");
