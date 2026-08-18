@@ -256,7 +256,7 @@
 - 影响范围：正式 3D 建造选择、输入路由、放置评估、世界预览表现、连续放置和相关真实输入测试；不修改冻结 2D。
 - 关联正式文档：`Docs/01-Game-Design-Document-ZH.md` A7.2、`Docs/05-Formal-Development-Roadmap-ZH.md`、`IDEA-0003`、`IDEA-0012`。
 - 设计规格与实施计划：`Docs/superpowers/specs/2026-08-18-building-warehouse-resource-feedback-design.md`；`Docs/superpowers/plans/2026-08-18-building-warehouse-resource-feedback.md`。
-- 关联提交：`28844c2`（需求批准与设计计划）；实现提交待本阶段最终提交后补记。
+- 关联提交：`28844c2`（需求批准与设计计划）；`c354fa542ef90cd59b14457757dd68eb1a5f3f0a`（正式 3D 旋转、预览、仓储、资源图标和精确缺料实现）。
 - 验收条件：必须先加入能在当前实现失败的矩形建筑真实输入测试；修复后四次旋转回到原方向和原锚点，模型、占格、合法性与箭头每次同帧一致；指针静止和移动时均稳定；点击 UI 不触发旋转或世界放置；连续放置仍保留当前方向；相关循环不得产生逐帧对象泄漏或无界分配。
 - 验证证据：2026-08-18 已按 TDD 完成正式 `R` 输入到四向 yaw、旋转后 footprint、稳定锚点、方向标记、独立半透明预览材质和场景 authoring 接线；真实输入、投影、场景合同与运行时测试均已纳入日常完整 EditMode `1656/1656` 和完整 PlayMode `105/105`。旋转/预览独立只读审查未发现 P0—P2；Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个构建均成功。上述是自动化与开发机证据，不等同用户试玩；用户对旋转手感、比例、朝向辨识和连续放置的人工确认仍待完成。
 - 决策原因或备注：复用现有 `BuildingOrientationRules`、统一 footprint 投影和 `BuildingPlacementEvaluation`，不在表现层复制旋转或合法性规则；预览只显示正式评估结果，不拥有第二套建造真值。
@@ -674,7 +674,7 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 影响系统：正式资源配置与图标目录、`WorldMapModel` seed 内容、资源节点可视化、采矿兼容规则、仓库库存与物流路由、城市资源聚合快照、背包/合成/科技/建造 UI、放置评估与真实输入。
 - 关联正式文档：`Docs/01-Game-Design-Document-ZH.md` A4.4、A4.5、A6.2、A7.2、A16.1—A16.3；`Docs/05-Formal-Development-Roadmap-ZH.md`；`IDEA-0003`、`IDEA-0006`、`IDEA-0010`、`IDEA-0011`、`BUG-0006`、`DOC-0001`。
 - 设计规格与实施计划：`Docs/superpowers/specs/2026-08-18-building-warehouse-resource-feedback-design.md`；`Docs/superpowers/plans/2026-08-18-building-warehouse-resource-feedback.md`。
-- 关联提交：`28844c2`（需求批准与设计计划）；实现提交待本阶段最终提交后补记。
+- 关联提交：`28844c2`（需求批准与设计计划）；`c354fa542ef90cd59b14457757dd68eb1a5f3f0a`（正式 3D 旋转、预览、仓储、资源图标和精确缺料实现）。
 - 验收条件：先建立当前实现必失败的测试；覆盖每仓库共享 150、内容可见、不限/单资源过滤、非空不兼容切换拒绝、原子转移、脱离/重连、聚合数量与动态容量；覆盖 seed `8128` 石料节点、三类采矿兼容与真实 `Harvest`、节点浮标稳定对象和全部 15 资源图标映射；覆盖成本缺口逐项计算、预览和真实点击提示；UI 操作必须经过正式 Input System。完成聚焦测试后运行日常完整 EditMode、完整 PlayMode、项目质量门、正式构建、文档生成、验证与 `RecordVerification`。
 - 验证证据：2026-08-18 已依照 TDD 完成 `CityResourceStorageModel` 与每实例 `WarehouseStorageState`：每仓库跨资源共享 `150` 总容量，支持不限/单资源过滤、断网保留、确定性聚合存取、原子批事务和非空撤离迁移；建造、生产、研究、背包及撤离退款均通过同一城市仓储入口。seed `8128` 的石料节点已可见且可由采矿站按节点真值采集；全部 `15` 种正式资源共享同一图标目录，已接矿点、资源栏、账本、仓库、背包、合成、科技、建造成本和生产详情；材料不足预览与真实点击会显示资源名、拥有、需要和缺少。聚焦真实输入、仓储、图标、性能与场景合同已通过；日常完整 EditMode `1656/1656`、完整 PlayMode `105/105`、质量门和四个正式构建均成功。macOS universal 精确产物通过 15 秒 NullGfx 脚本/崩溃冒烟，未发现脚本异常、Missing Script 或崩溃；该冒烟不证明画面、GPU 或显存。真实 Windows 10/11 视觉、GPU、显存、内存复验以及用户人工试玩均未完成，因此状态保持“已实现待验证”。
 - 决策原因或备注：真实仓库以独立共享容器表达“存了什么”，比在全局库存上伪造仓库视图更可维护；过滤只约束接收，不改变容量。所有图标和提示都从稳定资源 ID、正式成本和权威快照派生，不引入平行数据源。
