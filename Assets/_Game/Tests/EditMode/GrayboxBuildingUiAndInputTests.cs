@@ -1974,6 +1974,46 @@ namespace WasteCity.Tests
             Assert.That(fixture.Menu.EvacuationVisible, Is.False);
         }
 
+        [Test]
+        public void Menu_KeepsBuildBarAndPlacesFeedbackDirectlyAboveIt()
+        {
+            UiFixture fixture = CreateMenuFixture();
+
+            RectTransform quickbar = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Quickbar");
+            RectTransform catalog = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Catalog");
+            RectTransform status = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            RectTransform miningLegend = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Mining.Guidance.Legend");
+
+            Assert.That(quickbar.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(quickbar.anchorMax, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(quickbar.anchoredPosition,
+                Is.EqualTo(new Vector2(0f, 8f)));
+            Assert.That(catalog.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(catalog.anchorMax, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(catalog.anchoredPosition,
+                Is.EqualTo(new Vector2(0f, 66f)));
+            Assert.That(status.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(status.anchorMax, Is.EqualTo(new Vector2(.5f, 0f)));
+            Assert.That(status.anchoredPosition,
+                Is.EqualTo(new Vector2(0f, 66f)));
+            Assert.That(status.GetComponent<Image>().raycastTarget, Is.False,
+                "Placement feedback must not create a world-input dead zone.");
+            Assert.That(miningLegend.anchorMin,
+                Is.EqualTo(new Vector2(.5f, 1f)));
+            Assert.That(miningLegend.anchorMax,
+                Is.EqualTo(new Vector2(.5f, 1f)));
+            Assert.That(miningLegend.anchoredPosition,
+                Is.EqualTo(new Vector2(0f, -52f)));
+        }
+
         [UnityTest]
         public IEnumerator
             Menu_SerializedCloneLifecycleBuildsExactlyOneRuntimeTree()

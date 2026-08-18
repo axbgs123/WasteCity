@@ -683,10 +683,11 @@ namespace WasteCity.Graybox3D.Building
             placementStatusRoot = CreatePanel(
                 uiRoot,
                 "Placement.Status",
-                new Vector2(.5f, 1f),
-                new Vector2(.5f, 1f),
-                new Vector2(0f, -8f),
+                new Vector2(.5f, 0f),
+                new Vector2(.5f, 0f),
+                new Vector2(0f, 66f),
                 new Vector2(480f, 38f));
+            placementStatusRoot.GetComponent<Image>().raycastTarget = false;
             placementStatusText = CreateLabel(
                 placementStatusRoot,
                 "Placement.Status.Text",
