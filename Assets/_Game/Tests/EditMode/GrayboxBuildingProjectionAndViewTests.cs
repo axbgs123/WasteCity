@@ -355,17 +355,13 @@ namespace WasteCity.Tests
                 {
                     "building.node-highlight.world.resource-node.20.16",
                     "building.node-highlight.world.resource-node.21.16",
-                    "building.node-highlight.world.resource-node.16.12"
+                    "building.node-highlight.world.resource-node.16.12",
+                    "building.node-highlight.world.resource-node.18.16"
                 }));
             Assert.That(
                 activeNodes.Select(value => value.StableId),
                 Does.Not.Contain(
                     "building.node-highlight.world.resource-node.27.12"));
-            Assert.That(
-                activeNodes.Select(value => value.StableId),
-                Does.Not.Contain(
-                    "building.node-highlight.world.resource-node.18.16"));
-
             Color legalNodeColor = PropertyColor(
                 activeNodes.Single(value => value.StableId.EndsWith(
                     ".20.16",
@@ -636,7 +632,6 @@ namespace WasteCity.Tests
                     "Compatible blocked node remains visible: " + scenario);
         }
 
-        [TestCase(ResourceIds.Stone)]
         [TestCase(ResourceIds.Biomass)]
         [TestCase(ResourceIds.Water)]
         public void Placement_MiningRejectsIncompatibleResourceTypes(
@@ -728,7 +723,10 @@ namespace WasteCity.Tests
             menu.SetPlacementController(fixture.Placement);
             Assert.That(
                 PlacementStatusText(menu).gameObject.activeInHierarchy,
-                Is.False);
+                Is.True);
+            Assert.That(
+                PlacementStatusText(menu).text,
+                Does.Contain("方向 北").And.Contain("占地 1×1"));
 
             Assert.That(
                 fixture.Placement.ConfirmCurrentPlacement(out _),
@@ -755,7 +753,7 @@ namespace WasteCity.Tests
             Assert.That(shown.r, Is.GreaterThan(shown.g));
             Assert.That(
                 PlacementStatusText(menu).text,
-                Does.Contain("材料不足"));
+                Does.Contain("缺少石料 2"));
             Assert.That(
                 PlacementStatusText(menu).text,
                 Does.Not.Contain("重叠"));
@@ -1264,6 +1262,174 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void BUG0006_SquarePreviewShowsAllFourDirectionsWithOneStableVisual()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            var hit = new BuildingSurfaceHit(
+                true,
+                BuildingSite.Ground,
+                20,
+                15,
+                new Vector3(4f, 0f, 3f),
+                "外城");
+            BuildingPlacementEvaluation evaluation = ValidEvaluation(
+                fixture.Session,
+                BuildingCatalog.Housing,
+                BuildingSite.Ground,
+                20,
+                15,
+                CityMode.Fortress);
+            GameObject stableRoot = null;
+            Mesh stableMesh = null;
+
+            foreach (BuildingOrientation orientation in new[]
+                     {
+                         BuildingOrientation.North,
+                         BuildingOrientation.East,
+                         BuildingOrientation.South,
+                         BuildingOrientation.West
+                     })
+            {
+                fixture.Presentation.ShowPreview(
+                    BuildingCatalog.Housing,
+                    hit,
+                    orientation,
+                    evaluation);
+                GrayboxVisualSlot preview = Slot(
+                    fixture.Presentation,
+                    "building.preview." + BuildingCatalog.Housing.Id.Value);
+                if (stableRoot == null)
+                {
+                    stableRoot = preview.gameObject;
+                    stableMesh = preview.GetComponent<MeshFilter>().sharedMesh;
+                    Assert.That(
+                        stableMesh.vertexCount,
+                        Is.GreaterThan(24),
+                        "BUG-0006 preview must include a visible direction marker, not only one cube.");
+                }
+                else
+                {
+                    Assert.That(preview.gameObject, Is.SameAs(stableRoot));
+                    Assert.That(
+                        preview.GetComponent<MeshFilter>().sharedMesh,
+                        Is.SameAs(stableMesh));
+                }
+
+                Assert.That(
+                    Mathf.DeltaAngle(
+                        preview.transform.eulerAngles.y,
+                        (int)orientation * 90f),
+                    Is.EqualTo(0f).Within(.01f),
+                    orientation.ToString());
+            }
+        }
+
+        [Test]
+        public void BUG0006_RectangularRotationKeepsAnchorAndUpdatesFootprintAndYaw()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            fixture.Session.SetRouteContact(
+                WasteCity.Content.ContentRoute.BiologicalAscension,
+                true);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.BehemothPen.RequiredResearchId);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.BehemothPen.CostId,
+                BuildingCatalog.BehemothPen.Cost);
+            fixture.Interaction.Select(BuildingCatalog.BehemothPen);
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            int anchorX = fixture.Placement.CurrentHit.X;
+            int anchorY = fixture.Placement.CurrentHit.Y;
+            GrayboxVisualSlot preview = Slot(
+                fixture.Presentation,
+                "building.preview." + BuildingCatalog.BehemothPen.Id.Value);
+            GameObject previewRoot = preview.gameObject;
+
+            fixture.Interaction.RotateClockwise();
+            fixture.Placement.UpdatePointer(ScreenCenter);
+
+            Assert.That(fixture.Placement.CurrentHit.X, Is.EqualTo(anchorX));
+            Assert.That(fixture.Placement.CurrentHit.Y, Is.EqualTo(anchorY));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.RotatedWidth,
+                Is.EqualTo(2));
+            Assert.That(
+                fixture.Placement.CurrentEvaluation.RotatedHeight,
+                Is.EqualTo(3));
+            GrayboxVisualSlot rotated = Slot(
+                fixture.Presentation,
+                "building.preview." + BuildingCatalog.BehemothPen.Id.Value);
+            Assert.That(rotated.gameObject, Is.SameAs(previewRoot));
+            Assert.That(
+                Mathf.DeltaAngle(rotated.transform.eulerAngles.y, 90f),
+                Is.EqualTo(0f).Within(.01f));
+            Physics.SyncTransforms();
+            Bounds previewBounds = rotated.Renderer.bounds;
+            Assert.That(previewBounds.size.x, Is.EqualTo(1.92f).Within(.02f));
+            Assert.That(previewBounds.size.z, Is.EqualTo(2.92f).Within(.02f));
+
+            var rectangular = new BuildingDefinition(
+                "test.building.bug0006-three-by-two",
+                "方向测试建筑",
+                3,
+                2,
+                ResourceIds.Stone,
+                1);
+            fixture.Session.Inventory.Set(ResourceIds.Stone, 1);
+            GrayboxBuildingInstance3D instance = Begin(
+                fixture,
+                rectangular,
+                BuildingSite.Ground,
+                10,
+                10,
+                CityMode.Fortress,
+                BuildingOrientation.East);
+            Transform instanceRoot = fixture.InstanceRoot
+                .Cast<Transform>()
+                .Single(value => value.name == instance.StableInstanceId);
+            Physics.SyncTransforms();
+            Bounds instanceBounds =
+                instanceRoot.GetComponent<MeshRenderer>().bounds;
+            Assert.That(instanceBounds.size.x, Is.EqualTo(1.92f).Within(.02f));
+            Assert.That(instanceBounds.size.z, Is.EqualTo(2.92f).Within(.02f));
+            Assert.That(
+                Mathf.DeltaAngle(instanceRoot.eulerAngles.y, 90f),
+                Is.EqualTo(0f).Within(.01f));
+        }
+
+        [Test]
+        public void BUG0006_ValidPreviewStatusNamesBuildingDirectionFootprintAndRotateKey()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            fixture.Interaction.Select(BuildingCatalog.BehemothPen);
+            fixture.Interaction.RotateClockwise();
+            PositionCameraAtCell(fixture, 20, 15);
+            fixture.Placement.UpdatePointer(ScreenCenter);
+            GrayboxBuildingMenuView3D menu =
+                CreatePlacementStatusMenu(fixture);
+
+            typeof(GrayboxBuildingMenuView3D)
+                .GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(menu, null);
+
+            Text status = PlacementStatusText(menu);
+            Assert.That(status.gameObject.activeInHierarchy, Is.True);
+            Assert.That(status.text, Does.Contain("巨兽栏"));
+            Assert.That(status.text, Does.Contain("方向 东"));
+            Assert.That(status.text, Does.Contain("占地 2×3"));
+            Assert.That(status.text, Does.Contain("R"));
+        }
+
+        [Test]
         public void WorldView_ExpandedGroundPreviewAlignsCornerCellCenters()
         {
             WorldFixture fixture = CreateWorldFixture(
@@ -1641,7 +1807,7 @@ namespace WasteCity.Tests
             Assert.That(
                 fields.Count(field =>
                     field.FieldType == typeof(Func<string, int>)),
-                Is.EqualTo(1));
+                Is.EqualTo(2));
         }
 
         [Test]
@@ -2609,7 +2775,8 @@ namespace WasteCity.Tests
             int y,
             CityMode mode,
             bool terrainPassable = true,
-            bool obstacleFree = true)
+            bool obstacleFree = true,
+            BuildingOrientation orientation = BuildingOrientation.North)
         {
             return new BuildingPlacementRequest(
                 definition,
@@ -2617,7 +2784,7 @@ namespace WasteCity.Tests
                     ? session.InnerGrid
                     : session.GroundGrid,
                 site,
-                BuildingOrientation.North,
+                orientation,
                 x,
                 y,
                 16,
@@ -2649,7 +2816,8 @@ namespace WasteCity.Tests
             BuildingSite site,
             int x,
             int y,
-            CityMode mode)
+            CityMode mode,
+            BuildingOrientation orientation = BuildingOrientation.North)
         {
             Assert.That(
                 fixture.Session.TryBeginConstruction(
@@ -2659,7 +2827,8 @@ namespace WasteCity.Tests
                         site,
                         x,
                         y,
-                        mode),
+                        mode,
+                        orientation: orientation),
                     fixture.Presentation,
                     out GrayboxBuildingInstance3D instance,
                     out BuildingPlacementEvaluation evaluation),

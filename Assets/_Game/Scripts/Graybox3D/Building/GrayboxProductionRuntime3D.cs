@@ -21,6 +21,9 @@ namespace WasteCity.Graybox3D.Building
         private readonly HashSet<string> retainedStateIds =
             new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> removedStateIds = new List<string>();
+        private readonly HashSet<string> retainedWarehouseIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> warehouseIds = new List<string>();
         private readonly ReadOnlyCollection<BuildingProductionState> readOnlyStates;
         private readonly ReadOnlyCollection<BuildingProductionState>
             readOnlyRunnableStates;
@@ -44,10 +47,47 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius)
         {
+            SynchronizeCore(
+                instances,
+                cityMode,
+                cityX,
+                cityY,
+                groundRadius,
+                cityStorage: null);
+        }
+
+        public void Synchronize(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityResourceStorageModel cityStorage)
+        {
+            if (cityStorage == null)
+                throw new ArgumentNullException(nameof(cityStorage));
+            SynchronizeCore(
+                instances,
+                cityMode,
+                cityX,
+                cityY,
+                groundRadius,
+                cityStorage);
+        }
+
+        private void SynchronizeCore(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityResourceStorageModel cityStorage)
+        {
             orderedInstances.Clear();
             states.Clear();
             runnableStates.Clear();
             retainedStateIds.Clear();
+            retainedWarehouseIds.Clear();
             ActiveWarehouseCount = 0;
 
             if (instances != null)
@@ -67,8 +107,21 @@ namespace WasteCity.Graybox3D.Building
             for (int index = 0; index < orderedInstances.Count; index++)
             {
                 GrayboxBuildingInstance3D instance = orderedInstances[index];
-                if (GrayboxProductionEligibility3D.IsActiveWarehouse(instance))
-                    ActiveWarehouseCount++;
+                if (cityStorage == null)
+                {
+                    if (GrayboxProductionEligibility3D.IsActiveWarehouse(instance))
+                        ActiveWarehouseCount++;
+                }
+                else
+                {
+                    SynchronizeWarehouse(
+                        instance,
+                        cityMode,
+                        cityX,
+                        cityY,
+                        groundRadius,
+                        cityStorage);
+                }
 
                 if (!CanRetainProductionState(instance) ||
                     !FormalProductionDefinitionCatalog.TryGetByBuildingId(
@@ -116,6 +169,68 @@ namespace WasteCity.Graybox3D.Building
             }
             for (int index = 0; index < removedStateIds.Count; index++)
                 stateById.Remove(removedStateIds[index]);
+
+            if (cityStorage != null)
+            {
+                cityStorage.CopyWarehouseIds(warehouseIds);
+                for (int index = 0; index < warehouseIds.Count; index++)
+                {
+                    string stableInstanceId = warehouseIds[index];
+                    if (retainedWarehouseIds.Contains(stableInstanceId))
+                        continue;
+                    cityStorage.TrySetWarehouseConnected(
+                        stableInstanceId,
+                        connected: false);
+                    cityStorage.TryRemoveWarehouse(stableInstanceId);
+                }
+            }
+        }
+
+        private void SynchronizeWarehouse(
+            GrayboxBuildingInstance3D instance,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            CityResourceStorageModel cityStorage)
+        {
+            if (!IsWarehouse(instance)) return;
+            bool canOwnStorage =
+                instance.State == GrayboxBuildingInstanceState.Completed &&
+                instance.IsPlayerOwned;
+            if (canOwnStorage &&
+                !cityStorage.ContainsWarehouse(instance.StableInstanceId))
+            {
+                cityStorage.TryRegisterWarehouse(
+                    instance.StableInstanceId,
+                    connected: false);
+            }
+            if (!cityStorage.ContainsWarehouse(instance.StableInstanceId))
+                return;
+
+            retainedWarehouseIds.Add(instance.StableInstanceId);
+            bool connected =
+                GrayboxProductionEligibility3D.IsActiveWarehouse(instance) &&
+                CanRunLocally(instance, cityMode) &&
+                IsLogisticsConnected(
+                    instance,
+                    cityMode,
+                    cityX,
+                    cityY,
+                    groundRadius);
+            cityStorage.TrySetWarehouseConnected(
+                instance.StableInstanceId,
+                connected);
+            if (connected) ActiveWarehouseCount++;
+        }
+
+        private static bool IsWarehouse(GrayboxBuildingInstance3D instance)
+        {
+            return instance?.Placement?.Definition != null &&
+                string.Equals(
+                    instance.Placement.Definition.Id.Value,
+                    BuildingCatalog.Warehouse.Id.Value,
+                    StringComparison.Ordinal);
         }
 
         public bool TryGetState(

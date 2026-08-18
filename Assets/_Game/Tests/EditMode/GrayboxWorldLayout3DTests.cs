@@ -1,6 +1,7 @@
 using System;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.World;
 
@@ -94,6 +95,22 @@ namespace WasteCity.Tests
         {
             Assert.That(GrayboxWorldLayout3D.ToExpandedX(7), Is.EqualTo(23));
             Assert.That(GrayboxWorldLayout3D.ToExpandedY(8), Is.EqualTo(20));
+        }
+
+        [Test]
+        public void IDEA0012_DefaultWorldContainsApprovedReachableStoneNode()
+        {
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
+            int stoneX = GrayboxWorldLayout3D.ToExpandedX(6);
+            int stoneY = GrayboxWorldLayout3D.ToExpandedY(5);
+
+            WorldCell stone = world.Get(stoneX, stoneY);
+
+            Assert.That(stone.ResourceId, Is.EqualTo(ResourceIds.Stone));
+            Assert.That(stone.ResourceAmount, Is.EqualTo(240));
+            Assert.That(stone.Traversal, Is.EqualTo(WorldTraversalKind.Open));
+            Assert.That(stoneX, Is.EqualTo(22));
+            Assert.That(stoneY, Is.EqualTo(17));
         }
 
         [TestCase(-1)]

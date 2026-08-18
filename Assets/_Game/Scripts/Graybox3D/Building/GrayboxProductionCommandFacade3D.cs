@@ -67,6 +67,62 @@ namespace WasteCity.Graybox3D.Building
             return result;
         }
 
+        public ResourceTransferResult TransferInputFromCityStorage(
+            string stableInstanceId,
+            string resourceId,
+            int requestedAmount,
+            bool accessValidated)
+        {
+            CityResourceStorageModel source = owner.LatestCityStorage;
+            if (source == null || requestedAmount <= 0 || !TryGetInputState(
+                    stableInstanceId,
+                    resourceId,
+                    accessValidated,
+                    out BuildingProductionState state))
+            {
+                return Invalid(requestedAmount);
+            }
+
+            int available = source.GetNetworkAmount(resourceId);
+            if (available <= 0)
+                return Result(requestedAmount, 0, ResourceTransferStatus.SourceEmpty);
+            int candidate = Math.Min(requestedAmount, available);
+            int accepted = state.InputCapacityPolicy.GetAcceptableAmount(
+                state.Input,
+                resourceId,
+                candidate,
+                activeWarehouseCount: 0);
+            if (accepted <= 0)
+                return Result(requestedAmount, 0, ResourceTransferStatus.TargetFull);
+
+            using (source.AttributeChanges(new ResourceChangeAttribution(
+                       ResourceChangeAttributionKind.Production,
+                       state.Definition.BuildingId)))
+            {
+                if (!source.TrySpendFromNetwork(resourceId, accepted))
+                    return Result(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                if (state.Input.Add(resourceId, accepted) != accepted)
+                {
+                    source.AddToNetwork(resourceId, accepted);
+                    return Result(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                }
+            }
+            var result = Result(
+                requestedAmount,
+                accepted,
+                accepted == requestedAmount
+                    ? ResourceTransferStatus.Completed
+                    : ResourceTransferStatus.Partial);
+            PublishAfterSuccess(result);
+            return result;
+        }
+
         public ResourceTransferResult TransferInputFromBackpack(
             string stableInstanceId,
             PlayerBackpackModel source,
@@ -126,6 +182,64 @@ namespace WasteCity.Graybox3D.Building
                     resourceId,
                     requestedAmount);
             }
+            PublishAfterSuccess(result);
+            return result;
+        }
+
+        public ResourceTransferResult TransferOutputToCityStorage(
+            string stableInstanceId,
+            string resourceId,
+            int requestedAmount,
+            bool accessValidated)
+        {
+            CityResourceStorageModel target = owner.LatestCityStorage;
+            if (target == null || requestedAmount <= 0 || !TryGetOutputState(
+                    stableInstanceId,
+                    resourceId,
+                    accessValidated,
+                    out BuildingProductionState state))
+            {
+                return Invalid(requestedAmount);
+            }
+
+            int available = state.Output.Get(resourceId);
+            if (available <= 0)
+                return Result(requestedAmount, 0, ResourceTransferStatus.SourceEmpty);
+            int candidate = Math.Min(requestedAmount, available);
+            int accepted = target.GetNetworkAcceptableAmount(
+                resourceId,
+                candidate);
+            if (accepted <= 0)
+                return Result(requestedAmount, 0, ResourceTransferStatus.TargetFull);
+
+            int before = available;
+            using (target.AttributeChanges(new ResourceChangeAttribution(
+                       ResourceChangeAttributionKind.Production,
+                       state.Definition.BuildingId)))
+            {
+                if (!state.Output.TrySpend(resourceId, accepted))
+                    return Result(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                int stored = target.AddToNetwork(resourceId, accepted);
+                if (stored != accepted)
+                {
+                    if (stored > 0)
+                        target.TrySpendFromNetwork(resourceId, stored);
+                    state.Output.Restore(resourceId, before);
+                    return Result(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                }
+            }
+            var result = Result(
+                requestedAmount,
+                accepted,
+                accepted == requestedAmount
+                    ? ResourceTransferStatus.Completed
+                    : ResourceTransferStatus.Partial);
             PublishAfterSuccess(result);
             return result;
         }
@@ -208,6 +322,17 @@ namespace WasteCity.Graybox3D.Building
                 requestedAmount,
                 0,
                 ResourceTransferStatus.InvalidRequest);
+        }
+
+        private static ResourceTransferResult Result(
+            int requestedAmount,
+            int movedAmount,
+            ResourceTransferStatus status)
+        {
+            return new ResourceTransferResult(
+                requestedAmount,
+                movedAmount,
+                status);
         }
     }
 }

@@ -8,6 +8,8 @@ namespace WasteCity.Graybox3D
 {
     public sealed class GrayboxWorldView3D : MonoBehaviour
     {
+        private const float ResourceNodeRefreshIntervalSeconds = .1f;
+
         private static readonly string[] SurfaceStableIds =
         {
             "world.terrain.wasteland",
@@ -45,6 +47,7 @@ namespace WasteCity.Graybox3D
         [SerializeField] private Transform resourceRoot;
         [SerializeField] private Transform obstacleRoot;
         [SerializeField] private Material sharedMaterial;
+        [SerializeField] private ResourceIconCatalog3D resourceIconCatalog;
 
         private readonly Dictionary<string, Group> groups =
             new Dictionary<string, Group>();
@@ -53,9 +56,18 @@ namespace WasteCity.Graybox3D
         private readonly List<Mesh> generatedMeshes = new List<Mesh>();
         private readonly List<GrayboxVisualSlot> surfaceSlots =
             new List<GrayboxVisualSlot>();
+        private readonly List<GrayboxResourceNodeMarker3D>
+            resourceNodeMarkers =
+                new List<GrayboxResourceNodeMarker3D>();
+        private readonly Dictionary<long, GrayboxResourceNodeMarker3D>
+            resourceNodeMarkersByCell =
+                new Dictionary<long, GrayboxResourceNodeMarker3D>();
         private readonly Dictionary<string, bool> surfaceFallbackVisibility =
             CreateSurfaceFallbackVisibility();
         private IGrayboxTerrainPresentation3D activeTerrainPresentation;
+        private float nextResourceNodeRefreshAt;
+        private Quaternion lastResourceNodeFacingRotation;
+        private bool hasResourceNodeFacingRotation;
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
@@ -75,6 +87,13 @@ namespace WasteCity.Graybox3D
         }
         public int WorldRendererCount => generatedObjects.Count;
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
+        public int ResourceNodeMarkerCount => resourceNodeMarkers.Count;
+        public int ResourceNodeMarkerRendererCount =>
+            resourceNodeMarkers.Count * 2;
+        public int TotalGeneratedRendererCount =>
+            WorldRendererCount + ResourceNodeMarkerRendererCount;
+        public int TotalPersistentGeneratedObjectCount =>
+            PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 3;
         public bool HasActiveTerrainPresentation =>
             IsPresentationAlive(activeTerrainPresentation);
 
@@ -107,6 +126,17 @@ namespace WasteCity.Graybox3D
             this.sharedMaterial = sharedMaterial;
         }
 
+        public void ConfigureResourceIcons(ResourceIconCatalog3D catalog)
+        {
+            resourceIconCatalog = catalog;
+            for (var index = 0; index < resourceNodeMarkers.Count; index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    resourceNodeMarkers[index];
+                marker.SetIcon(ResolveResourceIcon(marker.ResourceId));
+            }
+        }
+
         public void Generate(WorldMapModel model)
         {
             if (model == null)
@@ -133,7 +163,10 @@ namespace WasteCity.Graybox3D
                 AddTerrain(cell.Terrain, origin);
                 AddTraversal(cell.Traversal, origin);
                 if (cell.HasResource)
+                {
                     AddResource(cell.ResourceId, origin);
+                    AddResourceNodeMarker(x, y, cell, origin);
+                }
             }
 
             foreach (Group group in groups.Values)
@@ -142,6 +175,9 @@ namespace WasteCity.Graybox3D
 
             if (IsPresentationAlive(presentationToRestore))
                 RestoreTerrainPresentation(presentationToRestore);
+            nextResourceNodeRefreshAt = Time.unscaledTime +
+                ResourceNodeRefreshIntervalSeconds;
+            hasResourceNodeFacingRotation = false;
         }
 
         public void AttachTerrainPresentation(
@@ -226,8 +262,78 @@ namespace WasteCity.Graybox3D
             ClearGeneratedObjects();
         }
 
+        public bool TryGetResourceNodeMarker(
+            int worldX,
+            int worldY,
+            out GrayboxResourceNodeMarker3D marker)
+        {
+            return resourceNodeMarkersByCell.TryGetValue(
+                CellKey(worldX, worldY),
+                out marker);
+        }
+
+        public bool RefreshResourceNodeMarkers()
+        {
+            if (Model == null || resourceNodeMarkers.Count == 0)
+                return false;
+            bool changed = false;
+            for (var index = 0; index < resourceNodeMarkers.Count; index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    resourceNodeMarkers[index];
+                if (marker != null &&
+                    marker.WorldX >= 0 && marker.WorldY >= 0 &&
+                    marker.WorldX < Model.Width &&
+                    marker.WorldY < Model.Height)
+                {
+                    changed |= marker.Refresh(
+                        Model.Get(marker.WorldX, marker.WorldY));
+                }
+            }
+            return changed;
+        }
+
+        private void LateUpdate()
+        {
+            if (Time.unscaledTime >= nextResourceNodeRefreshAt)
+            {
+                RefreshResourceNodeMarkers();
+                nextResourceNodeRefreshAt = Time.unscaledTime +
+                    ResourceNodeRefreshIntervalSeconds;
+            }
+            Camera camera = Camera.main;
+            if (camera != null)
+                FaceResourceNodeMarkers(camera.transform);
+        }
+
+        public bool FaceResourceNodeMarkers(Transform cameraTransform)
+        {
+            if (cameraTransform == null) return false;
+            Quaternion rotation = cameraTransform.rotation;
+            if (hasResourceNodeFacingRotation &&
+                rotation == lastResourceNodeFacingRotation)
+                return false;
+            for (var index = 0; index < resourceNodeMarkers.Count; index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    resourceNodeMarkers[index];
+                if (marker != null)
+                    marker.FaceCamera(cameraTransform);
+            }
+            lastResourceNodeFacingRotation = rotation;
+            hasResourceNodeFacingRotation = true;
+            return true;
+        }
+
         private void ClearGeneratedObjects()
         {
+            for (int index = resourceNodeMarkers.Count - 1;
+                 index >= 0;
+                 index--)
+            {
+                if (resourceNodeMarkers[index] != null)
+                    DestroyOwned(resourceNodeMarkers[index].gameObject);
+            }
             for (int index = generatedObjects.Count - 1; index >= 0; index--)
                 DestroyOwned(generatedObjects[index]);
             for (int index = generatedMeshes.Count - 1; index >= 0; index--)
@@ -236,6 +342,10 @@ namespace WasteCity.Graybox3D
             generatedObjects.Clear();
             generatedMeshes.Clear();
             surfaceSlots.Clear();
+            resourceNodeMarkers.Clear();
+            resourceNodeMarkersByCell.Clear();
+            nextResourceNodeRefreshAt = 0f;
+            hasResourceNodeFacingRotation = false;
             groups.Clear();
             Model = null;
             Coordinates = null;
@@ -482,6 +592,47 @@ namespace WasteCity.Graybox3D
                     new Vector3(.4f, .15f, .4f),
                     .08f);
             }
+        }
+
+        private void AddResourceNodeMarker(
+            int worldX,
+            int worldY,
+            WorldCell cell,
+            Vector3 origin)
+        {
+            if (!ResourceDefinitionCatalog.TryGet(cell.ResourceId, out _))
+                return;
+            string stableId = GrayboxResourceNodeIdentity3D.Create(
+                worldX,
+                worldY);
+            var markerObject = new GameObject(stableId);
+            markerObject.transform.SetParent(resourceRoot, false);
+            GrayboxResourceNodeMarker3D marker =
+                markerObject.AddComponent<GrayboxResourceNodeMarker3D>();
+            marker.Configure(
+                stableId,
+                cell.ResourceId,
+                worldX,
+                worldY,
+                origin,
+                ResolveResourceIcon(cell.ResourceId));
+            marker.Refresh(cell);
+            resourceNodeMarkers.Add(marker);
+            resourceNodeMarkersByCell.Add(
+                CellKey(worldX, worldY),
+                marker);
+        }
+
+        private Sprite ResolveResourceIcon(string resourceId)
+        {
+            return resourceIconCatalog == null
+                ? ResourceIconCatalog3D.Resolve(resourceId)
+                : resourceIconCatalog.ResolveIcon(resourceId);
+        }
+
+        private static long CellKey(int worldX, int worldY)
+        {
+            return ((long)worldX << 32) | (uint)worldY;
         }
 
         private void AddResourceCube(

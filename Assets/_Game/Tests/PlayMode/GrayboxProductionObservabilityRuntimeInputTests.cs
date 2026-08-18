@@ -169,6 +169,12 @@ namespace WasteCity.Tests
                     "ResourceStatus.Item." + resourceId + ".Capacity");
                 Text flow = RequireText(
                     "ResourceStatus.Item." + resourceId + ".NetFlow");
+                Image icon = RequireSceneObject(
+                        "ResourceStatus.Item." + resourceId + ".Icon")
+                    .GetComponent<Image>();
+                Assert.That(icon.sprite,
+                    Is.SameAs(ResourceIconCatalog3D.Resolve(resourceId)),
+                    resourceId);
                 Assert.That(amount.text,
                     Does.Contain(session.Inventory.Get(resourceId).ToString()),
                     resourceId);
@@ -487,6 +493,17 @@ namespace WasteCity.Tests
                         "Research.Node." + definition.Id.Value),
                     Is.Not.Null,
                     definition.Id.Value);
+                foreach (ResourceAmount cost in definition.Costs)
+                {
+                    Image costIcon = RequireSceneObject(
+                            "Research.Node." + definition.Id.Value +
+                            ".Cost." + cost.ResourceId + ".Icon")
+                        .GetComponent<Image>();
+                    Assert.That(costIcon.sprite,
+                        Is.SameAs(ResourceIconCatalog3D.Resolve(
+                            cost.ResourceId)),
+                        definition.Id.Value);
+                }
             }
             Assert.That(RequireText(
                     "Research.Node." +
@@ -557,6 +574,16 @@ namespace WasteCity.Tests
 
             GameObject recipe = RequireSceneObject(
                 "Crafting.Recipe." + ResourceRecipeCatalog.FieldAlloyId);
+            Assert.That(RequireSceneObject(
+                    "Crafting.Recipe." +
+                    ResourceRecipeCatalog.FieldAlloyId + ".Input." +
+                    ResourceIds.Iron + ".Icon").GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+            Assert.That(RequireSceneObject(
+                    "Crafting.Recipe." +
+                    ResourceRecipeCatalog.FieldAlloyId + ".Output." +
+                    ResourceIds.Alloy + ".Icon").GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Alloy)));
             Assert.That(recipe.GetComponentInChildren<Text>(true).text,
                 Does.Contain("当前可排 20"));
             Text count = RequireText("Crafting.Queue.Count");
@@ -612,6 +639,10 @@ namespace WasteCity.Tests
                 0,
                 ResourceIds.Iron,
                 100);
+            Assert.That(RequireSceneObject(
+                    "Inventory.City." + ResourceIds.Iron + ".Icon")
+                    .GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
 
             yield return ClickUiElement(
                 RequireSceneObject("InventoryCrafting.Tab.Backpack"),
@@ -622,6 +653,10 @@ namespace WasteCity.Tests
                 "Inventory.Backpack.Slot.1");
             GameObject slot2 = RequireSceneObject(
                 "Inventory.Backpack.Slot.2");
+            Assert.That(RequireSceneObject(
+                    "Inventory.Backpack.Slot.0.Icon")
+                    .GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
             Assert.That(slot0.GetComponent<Button>(), Is.Not.Null,
                 "Backpack slots must receive real Input System clicks.");
             Assert.That(slot1.GetComponent<Button>(), Is.Not.Null);
@@ -737,6 +772,112 @@ namespace WasteCity.Tests
             Assert.That(session.Inventory.Get(ResourceIds.Iron), Is.EqualTo(5));
             Assert.That(RequireText("Inventory.TransferStatus").text,
                 Does.Contain("目标库存已满"));
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0012_RealWarehouseClickShowsContentsAndRevalidatesFilter()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 100), Is.True);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            Assert.That(world.Coordinates.TryWorldToCell(
+                city.transform.position,
+                out int cityX,
+                out int cityY), Is.True);
+            int buildingX = cityX + 2;
+            int buildingY = cityY;
+            GrayboxBuildingInstance3D warehouse = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Warehouse,
+                buildingX,
+                buildingY,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            yield return null;
+            Assert.That(session.CityStorage.AddToWarehouse(
+                warehouse.StableInstanceId,
+                ResourceIds.Iron,
+                7), Is.EqualTo(7));
+            Assert.That(session.CityStorage.AddToWarehouse(
+                warehouse.StableInstanceId,
+                ResourceIds.Stone,
+                3), Is.EqualTo(3));
+            yield return null;
+
+            Assert.That(world.Coordinates.TryCellToWorld(
+                buildingX,
+                buildingY,
+                1f,
+                out Vector3 buildingWorld), Is.True);
+            QueueMouse(Camera.main.WorldToScreenPoint(buildingWorld));
+            yield return null;
+            yield return ClickWorld(MouseButton.Left);
+
+            GameObject panel = RequireSceneObject("WarehouseDetailPanel", true);
+            Assert.That(panel.activeInHierarchy, Is.True);
+            Assert.That(RequireText("WarehouseDetail.StableId").text,
+                Is.EqualTo(warehouse.StableInstanceId));
+            Assert.That(RequireText("WarehouseDetail.Capacity").text,
+                Does.Contain("10/150").And.Contain("剩余 140"));
+            Assert.That(RequireText(
+                    "WarehouseDetail.Resource." + ResourceIds.Iron + ".Amount")
+                    .text,
+                Does.Contain("7"));
+            Assert.That(RequireText(
+                    "WarehouseDetail.Resource." + ResourceIds.Stone + ".Amount")
+                    .text,
+                Does.Contain("3"));
+
+            foreach (ResourceDefinition definition in
+                     ResourceDefinitionCatalog.All)
+            {
+                Image ledgerIcon = RequireSceneObject(
+                        "ResourceLedger.Item." + definition.Id + ".Icon",
+                        true)
+                    .GetComponent<Image>();
+                Image warehouseIcon = RequireSceneObject(
+                        "WarehouseDetail.Resource." + definition.Id + ".Icon",
+                        true)
+                    .GetComponent<Image>();
+                Assert.That(ledgerIcon.sprite,
+                    Is.SameAs(ResourceIconCatalog3D.Resolve(definition.Id)),
+                    definition.Id);
+                Assert.That(warehouseIcon.sprite,
+                    Is.SameAs(ledgerIcon.sprite),
+                    definition.Id);
+            }
+
+            yield return ClickUiElement(
+                RequireSceneObject(
+                    "WarehouseDetail.Filter." + ResourceIds.Iron),
+                MouseButton.Left);
+            Assert.That(session.CityStorage.GetWarehouseFilter(
+                warehouse.StableInstanceId), Is.Null);
+            Assert.That(RequireText("WarehouseDetail.FilterStatus").text,
+                Does.Contain("不能").Or.Contain("不兼容"));
+
+            Assert.That(session.CityStorage.TrySpendFromWarehouse(
+                warehouse.StableInstanceId,
+                ResourceIds.Stone,
+                3), Is.True);
+            yield return ClickUiElement(
+                RequireSceneObject(
+                    "WarehouseDetail.Filter." + ResourceIds.Iron),
+                MouseButton.Left);
+            Assert.That(session.CityStorage.GetWarehouseFilter(
+                warehouse.StableInstanceId), Is.EqualTo(ResourceIds.Iron));
+            Assert.That(RequireText("WarehouseDetail.FilterStatus").text,
+                Does.Contain("铁矿"));
         }
 
         [UnityTest]
@@ -903,6 +1044,14 @@ namespace WasteCity.Tests
                 Does.StartWith("输出：").And.Not.Contains("输出：输出："));
             Assert.That(RequireText(productionRowName + ".Status").text,
                 Does.Contain("物流已连接"));
+            Assert.That(RequireSceneObject(
+                    productionRowName + ".Input.Icon")
+                    .GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+            Assert.That(RequireSceneObject(
+                    productionRowName + ".Output.Icon")
+                    .GetComponent<Image>().sprite,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Alloy)));
 
             yield return ClickUiElement(pause, MouseButton.Left);
             Assert.That(state.IsPlayerPaused, Is.True);

@@ -34,9 +34,6 @@ namespace WasteCity.Tests
             Assert.That(snapshot.Revision, Is.EqualTo(1));
             Assert.That(clock.Revision, Is.EqualTo(snapshot.Revision));
             Assert.That(snapshot.ActiveWarehouseCount, Is.Zero);
-            Assert.That(snapshot.CityCapacityPerResource,
-                Is.EqualTo(
-                    ResourceCapacityPolicy.FormalBaseCapacityPerResource));
             Assert.That(snapshot.Entries, Has.Count.EqualTo(2));
             Assert.That(snapshot.Entries[0].StableInstanceId,
                 Is.EqualTo(mine.StableInstanceId));
@@ -88,7 +85,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void WarehouseCountAndCityCapacityAreVersionedSnapshotFacts()
+        public void WarehouseCountIsAVersionedSnapshotFact()
         {
             GrayboxBuildingInstance3D smelter = CompletedInstance(
                 "building.instance.production",
@@ -106,19 +103,12 @@ namespace WasteCity.Tests
             Tick(clock, new[] { smelter }, world, .1f);
             ProductionObservabilitySnapshot withoutWarehouse = clock.Snapshot;
             Assert.That(withoutWarehouse.ActiveWarehouseCount, Is.Zero);
-            Assert.That(withoutWarehouse.CityCapacityPerResource,
-                Is.EqualTo(
-                    ResourceCapacityPolicy.FormalBaseCapacityPerResource));
 
             Tick(clock, new[] { smelter, warehouse }, world, .1f);
             ProductionObservabilitySnapshot withWarehouse = clock.Snapshot;
             Assert.That(withWarehouse.Revision,
                 Is.GreaterThan(withoutWarehouse.Revision));
             Assert.That(withWarehouse.ActiveWarehouseCount, Is.EqualTo(1));
-            Assert.That(withWarehouse.CityCapacityPerResource,
-                Is.EqualTo(
-                    ResourceCapacityPolicy.FormalBaseCapacityPerResource +
-                    ResourceCapacityPolicy.FormalCapacityPerWarehouse));
             Assert.That(withoutWarehouse.ActiveWarehouseCount, Is.Zero,
                 "A published snapshot must not change when warehouse eligibility changes later.");
 
@@ -126,9 +116,18 @@ namespace WasteCity.Tests
             Assert.That(clock.Snapshot.Revision,
                 Is.GreaterThan(withWarehouse.Revision));
             Assert.That(clock.Snapshot.ActiveWarehouseCount, Is.Zero);
-            Assert.That(clock.Snapshot.CityCapacityPerResource,
-                Is.EqualTo(
-                    ResourceCapacityPolicy.FormalBaseCapacityPerResource));
+        }
+
+        [Test]
+        public void SnapshotDoesNotExposeObsoletePerResourceWarehouseCapacity()
+        {
+            PropertyInfo obsoleteCapacity =
+                typeof(ProductionObservabilitySnapshot).GetProperty(
+                    "CityCapacityPerResource",
+                    BindingFlags.Instance | BindingFlags.Public);
+
+            Assert.That(obsoleteCapacity, Is.Null,
+                "Warehouse capacity is shared across stored resources; the city storage model owns the capacity truth.");
         }
 
         [Test]

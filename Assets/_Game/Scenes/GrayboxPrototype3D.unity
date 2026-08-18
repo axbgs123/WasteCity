@@ -761,6 +761,7 @@ MonoBehaviour:
   eventSystem: {fileID: 277173301}
   session: {fileID: 764810524}
   interaction: {fileID: 122867925}
+  resourceIconCatalog: {fileID: 11400000, guid: 14424676478b94d528670f05d60a8bc5, type: 2}
   placement: {fileID: 682762449}
 --- !u!114 &438030070
 MonoBehaviour:
@@ -1549,6 +1550,7 @@ MonoBehaviour:
   resourceRoot: {fileID: 1497081789}
   obstacleRoot: {fileID: 842902525}
   sharedMaterial: {fileID: 2100000, guid: 752d4ddbbb84842099ba69793267c952, type: 2}
+  resourceIconCatalog: {fileID: 11400000, guid: 14424676478b94d528670f05d60a8bc5, type: 2}
 --- !u!4 &962754567
 Transform:
   m_ObjectHideFlags: 0
@@ -2057,6 +2059,7 @@ MonoBehaviour:
   instanceRoot: {fileID: 1711310367}
   infrastructureRoot: {fileID: 5917648}
   sharedMaterial: {fileID: 2100000, guid: 752d4ddbbb84842099ba69793267c952, type: 2}
+  previewMaterial: {fileID: 2100000, guid: 620f10b70c8f44d46889ced3b605db16, type: 2}
   city: {fileID: 505702829}
   ownedVisualRoots: []
 --- !u!4 &1545501226
@@ -2420,6 +2423,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   canvas: {fileID: 1804086896}
+  resourceIconCatalog: {fileID: 11400000, guid: 14424676478b94d528670f05d60a8bc5, type: 2}
 --- !u!114 &1804086894
 MonoBehaviour:
   m_ObjectHideFlags: 0

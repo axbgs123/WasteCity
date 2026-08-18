@@ -9,6 +9,7 @@ namespace WasteCity.Tests
     {
         [TestCase(ResourceIds.Iron)]
         [TestCase(ResourceIds.EnergyCrystal)]
+        [TestCase(ResourceIds.Stone)]
         public void IDEA0010_MiningStation_AcceptsApprovedResource(
             string resourceId)
         {
@@ -22,7 +23,6 @@ namespace WasteCity.Tests
 
         [TestCase(null)]
         [TestCase("")]
-        [TestCase(ResourceIds.Stone)]
         [TestCase(ResourceIds.Biomass)]
         [TestCase(ResourceIds.Water)]
         [TestCase("unknown.resource")]
@@ -77,6 +77,12 @@ namespace WasteCity.Tests
                         ResourceIds.EnergyCrystal),
                     Is.False,
                     $"IDEA0010 {definition.Id.Value} must reject EnergyCrystal");
+                Assert.That(
+                    BuildingResourceNodeCompatibilityRules.IsCompatible(
+                        definition,
+                        ResourceIds.Stone),
+                    Is.False,
+                    $"IDEA0012 {definition.Id.Value} must reject Stone");
             }
         }
 
@@ -107,6 +113,12 @@ namespace WasteCity.Tests
                     ResourceIds.EnergyCrystal),
                 Is.True,
                 "IDEA0010 equivalent MiningStation stable ID must accept EnergyCrystal");
+            Assert.That(
+                BuildingResourceNodeCompatibilityRules.IsCompatible(
+                    equivalent,
+                    ResourceIds.Stone),
+                Is.True,
+                "IDEA0012 equivalent MiningStation stable ID must accept Stone");
         }
     }
 }

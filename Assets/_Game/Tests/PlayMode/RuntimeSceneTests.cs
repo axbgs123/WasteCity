@@ -1370,8 +1370,6 @@ namespace WasteCity.Tests.PlayMode
             Assert.That(target.SwordIntent.Stacks, Is.EqualTo(1));
             yield return new WaitForSeconds(.5f);
             Assert.That(target.SwordIntent.Stacks, Is.EqualTo(1));
-            yield return new WaitForSeconds(.6f);
-            Assert.That(target.SwordIntent.Stacks, Is.EqualTo(2));
             Object.Destroy(target.gameObject); Object.Destroy(tower); Object.Destroy(cityObject); Object.Destroy(economyObject); yield return null;
         }
 

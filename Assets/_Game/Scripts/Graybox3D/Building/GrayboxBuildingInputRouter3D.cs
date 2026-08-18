@@ -214,7 +214,7 @@ namespace WasteCity.Graybox3D.Building
                     Camera.main.ScreenPointToRay(pointerPosition),
                     out string selectedStableId) &&
                 operations != null &&
-                operations.TryOpenProductionDetail(selectedStableId))
+                operations.TryOpenBuildingDetail(selectedStableId))
             {
                 buildInputOwnedThisFrame = true;
             }

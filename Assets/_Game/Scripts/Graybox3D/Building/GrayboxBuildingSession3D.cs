@@ -101,6 +101,8 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
         private readonly Dictionary<string, BuildingEvacuationWork> evacuationSnapshots =
             new Dictionary<string, BuildingEvacuationWork>(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> evacuationWarehouseConnectivity =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
         private IReadOnlyList<GrayboxBuildingInstance3D> readOnlyInstances;
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
@@ -108,6 +110,7 @@ namespace WasteCity.Graybox3D.Building
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
+        public CityResourceStorageModel CityStorage { get; private set; }
         public ResearchModel Research { get; private set; }
         public BuildingGrid GroundGrid { get; private set; }
         public BuildingGrid InnerGrid { get; private set; }
@@ -118,6 +121,13 @@ namespace WasteCity.Graybox3D.Building
         public uint PlacementRevision => placementRevision;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
+
+        public int GetCityResourceAmount(string resourceId)
+        {
+            return CityStorage == null
+                ? 0
+                : CityStorage.GetNetworkAmount(resourceId);
+        }
 
         private void Awake()
         {
@@ -141,21 +151,28 @@ namespace WasteCity.Graybox3D.Building
             inventory.Set(ResourceIds.Biomass, 20);
             inventory.Set(ResourceIds.Water, 20);
             inventory.Set(ResourceIds.Alloy, 30);
-            ConfigureSession(inventory);
+            ConfigureSession(inventory, ResourceCapacity);
         }
 
         public void ConfigureFormalSession()
         {
             ConfigureSession(
-                ResourceDefinitionCatalog.CreateFormalCityInventory());
+                ResourceDefinitionCatalog.CreateFormalCityInventory(),
+                ResourceCapacityPolicy.FormalBaseCapacityPerResource);
         }
 
-        private void ConfigureSession(ResourceInventory inventory)
+        private void ConfigureSession(
+            ResourceInventory inventory,
+            int coreCapacityPerResource)
         {
             if (Research != null)
                 Research.Completed -= HandleResearchCompleted;
             Inventory = inventory ??
                 throw new ArgumentNullException(nameof(inventory));
+            CityStorage?.Dispose();
+            CityStorage = new CityResourceStorageModel(
+                Inventory,
+                coreCapacityPerResource);
             Research = new ResearchModel();
             Research.Completed += HandleResearchCompleted;
             GroundGrid = new BuildingGrid(
@@ -169,6 +186,7 @@ namespace WasteCity.Graybox3D.Building
             instances = new List<GrayboxBuildingInstance3D>();
             evacuationLocks.Clear();
             evacuationSnapshots.Clear();
+            evacuationWarehouseConnectivity.Clear();
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
@@ -180,6 +198,8 @@ namespace WasteCity.Graybox3D.Building
         {
             if (Research != null)
                 Research.Completed -= HandleResearchCompleted;
+            CityStorage?.Dispose();
+            CityStorage = null;
         }
 
         private void HandleResearchCompleted(ResearchDefinition definition)
@@ -207,9 +227,7 @@ namespace WasteCity.Graybox3D.Building
                 !evaluation.CompatibleResourceNode.IsValid)
                 return false;
 
-            int inventoryBefore =
-                Inventory.Get(refreshed.Definition.CostId);
-            if (!Inventory.TrySpend(
+            if (!CityStorage.TrySpendFromNetwork(
                     refreshed.Definition.CostId,
                     refreshed.Definition.Cost))
                 return false;
@@ -222,9 +240,9 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Site,
                     refreshed.Orientation))
             {
-                Inventory.Restore(
+                CityStorage.AddToNetwork(
                     refreshed.Definition.CostId,
-                    inventoryBefore);
+                    refreshed.Definition.Cost);
                 return false;
             }
 
@@ -246,7 +264,7 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Grid,
                     placement,
                     refreshed.Definition.CostId,
-                    inventoryBefore);
+                    refreshed.Definition.Cost);
                 if (cleanupFailure != null)
                     createFailure.Data[PresentationCleanupFailureDataKey] =
                         cleanupFailure;
@@ -260,7 +278,7 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Grid,
                     placement,
                     refreshed.Definition.CostId,
-                    inventoryBefore);
+                    refreshed.Definition.Cost);
                 if (cleanupFailure != null) throw cleanupFailure;
                 return false;
             }
@@ -325,7 +343,7 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
-            acceptedRefund = Inventory.Add(
+            acceptedRefund = CityStorage.AddToNetwork(
                 instance.Placement.Definition.CostId,
                 refund);
             instances.RemoveAt(index);
@@ -372,6 +390,7 @@ namespace WasteCity.Graybox3D.Building
                 }
                 if (completed)
                 {
+                    RegisterCompletedWarehouse(instance);
                     AdvanceCatalogRevision();
                     AdvancePlacementRevision();
                 }
@@ -474,6 +493,18 @@ namespace WasteCity.Graybox3D.Building
                     bool countedBefore = IsCountedCompleted(instance);
                     evacuationLocks.Add(work.StableInstanceId, work);
                     instance.SetEvacuationLocked(true);
+                    if (CityStorage != null &&
+                        CityStorage.TryGetWarehouseSnapshot(
+                            instance.StableInstanceId,
+                            out WarehouseStorageSnapshot warehouse))
+                    {
+                        evacuationWarehouseConnectivity.Add(
+                            instance.StableInstanceId,
+                            warehouse.IsConnected);
+                        CityStorage.TrySetWarehouseConnected(
+                            instance.StableInstanceId,
+                            connected: false);
+                    }
                     if (countedBefore) changedCompleted.Add(instance);
                 }
             }
@@ -486,6 +517,7 @@ namespace WasteCity.Graybox3D.Building
                     int instanceIndex = FindInstanceIndex(work.StableInstanceId);
                     if (instanceIndex >= 0)
                         instances[instanceIndex].SetEvacuationLocked(false);
+                    RestoreWarehouseConnectivity(work.StableInstanceId);
                 }
                 throw;
             }
@@ -565,6 +597,7 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxBuildingInstanceState.Completed &&
                     instance.IsPlayerOwned;
                 instance.SetEvacuationLocked(false);
+                RestoreWarehouseConnectivity(work.StableInstanceId);
                 placementChanged = true;
                 if (countedAfter) AdvanceCatalogRevision();
             }
@@ -615,6 +648,12 @@ namespace WasteCity.Graybox3D.Building
                 work.Treatment != BuildingEvacuationTreatment.FullDismantle)
             {
                 failureReason = "撤离项目已锁定";
+                return false;
+            }
+            if (!CanReleaseWarehouseStorage(instance))
+            {
+                failureReason =
+                    "仓库未清空，且其余联网库存空间不足，请先清空仓库";
                 return false;
             }
             if (work.Treatment == BuildingEvacuationTreatment.Abandon)
@@ -732,6 +771,7 @@ namespace WasteCity.Graybox3D.Building
                     instance.RestoreConstruction(remainingBefore);
                     throw;
                 }
+                RegisterCompletedWarehouse(instance);
                 AdvanceCatalogRevision();
                 AdvancePlacementRevision();
             }
@@ -775,9 +815,18 @@ namespace WasteCity.Graybox3D.Building
                 }
                 throw;
             }
+            if (!ReleaseWarehouseStorage(instance))
+            {
+                instance.RestoreEvacuationState(playerOwned, state);
+                presentation.UpdateInstance(instance);
+                failureReason =
+                    "仓库未清空，且其余联网库存空间不足，请先清空仓库";
+                return false;
+            }
             if (wasCounted) AdvanceCatalogRevision();
             AdvancePlacementRevision();
             evacuationSnapshots.Remove(instance.StableInstanceId);
+            evacuationWarehouseConnectivity.Remove(instance.StableInstanceId);
             failureReason = string.Empty;
             return true;
         }
@@ -793,7 +842,6 @@ namespace WasteCity.Graybox3D.Building
             BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
                 ? InnerGrid
                 : GroundGrid;
-            int inventoryBefore = Inventory.Get(instance.Placement.Definition.CostId);
             bool wasCounted = IsCountedCompleted(instance);
             acceptedRefund = 0;
             failureReason = string.Empty;
@@ -822,17 +870,43 @@ namespace WasteCity.Graybox3D.Building
 
             try
             {
-                acceptedRefund = Inventory.Add(
+                if (!ReleaseWarehouseStorage(instance))
+                {
+                    grid.TryRestore(
+                        instance.Placement.Definition,
+                        instance.Placement.X,
+                        instance.Placement.Y,
+                        out _,
+                        instance.Placement.Site,
+                        instance.Placement.Orientation);
+                    Exception restoreFailure = TryRestorePresentation(
+                        presentation,
+                        instance);
+                    if (restoreFailure != null)
+                        throw new InvalidOperationException(
+                            "Failed to restore presentation after warehouse migration failed.",
+                            restoreFailure);
+                    failureReason =
+                        "仓库未清空，且其余联网库存空间不足，请先清空仓库";
+                    return false;
+                }
+                acceptedRefund = CityStorage.AddToNetwork(
                     instance.Placement.Definition.CostId,
                     work.Refund);
                 instance.SetEvacuationLocked(false);
                 instances.RemoveAt(instanceIndex);
                 evacuationLocks.Remove(work.StableInstanceId);
                 evacuationSnapshots.Remove(work.StableInstanceId);
+                evacuationWarehouseConnectivity.Remove(work.StableInstanceId);
             }
             catch
             {
-                Inventory.Restore(instance.Placement.Definition.CostId, inventoryBefore);
+                if (acceptedRefund > 0)
+                {
+                    CityStorage.TrySpendFromNetwork(
+                        instance.Placement.Definition.CostId,
+                        acceptedRefund);
+                }
                 grid.TryRestore(
                     instance.Placement.Definition,
                     instance.Placement.X,
@@ -858,6 +932,58 @@ namespace WasteCity.Graybox3D.Building
             return instance != null &&
                    instance.IsPlayerOwned &&
                    instance.Placement.Site == BuildingSite.Ground;
+        }
+
+        private void RegisterCompletedWarehouse(
+            GrayboxBuildingInstance3D instance)
+        {
+            if (CityStorage == null ||
+                !IsWarehouse(instance) ||
+                CityStorage.TryGetWarehouseSnapshot(
+                    instance.StableInstanceId,
+                    out _))
+            {
+                return;
+            }
+            CityStorage.TryRegisterWarehouse(
+                instance.StableInstanceId,
+                connected: false);
+        }
+
+        private bool CanReleaseWarehouseStorage(
+            GrayboxBuildingInstance3D instance)
+        {
+            return !IsWarehouse(instance) ||
+                CityStorage == null ||
+                !CityStorage.TryGetWarehouseSnapshot(
+                    instance.StableInstanceId,
+                    out _) ||
+                CityStorage.CanRemoveWarehouseWithMigration(
+                    instance.StableInstanceId,
+                    out _);
+        }
+
+        private bool ReleaseWarehouseStorage(
+            GrayboxBuildingInstance3D instance)
+        {
+            return !IsWarehouse(instance) ||
+                CityStorage == null ||
+                !CityStorage.TryGetWarehouseSnapshot(
+                    instance.StableInstanceId,
+                    out _) ||
+                CityStorage.TryRemoveWarehouseWithMigration(
+                    instance.StableInstanceId,
+                    out _);
+        }
+
+        private static bool IsWarehouse(
+            GrayboxBuildingInstance3D instance)
+        {
+            return instance?.Placement?.Definition != null &&
+                string.Equals(
+                    instance.Placement.Definition.Id.Value,
+                    BuildingCatalog.Warehouse.Id.Value,
+                    StringComparison.Ordinal);
         }
 
         private static bool IsCountedCompleted(
@@ -898,7 +1024,9 @@ namespace WasteCity.Graybox3D.Building
                 IsResearchCompleted,
                 CompletedBuildingCount);
             bool canAfford = definition != null &&
-                Inventory.CanSpend(definition.CostId, definition.Cost);
+                CityStorage.CanSpendFromNetwork(
+                    definition.CostId,
+                    definition.Cost);
             return new BuildingPlacementRequest(
                 definition,
                 evaluationGrid,
@@ -925,8 +1053,22 @@ namespace WasteCity.Graybox3D.Building
         private void EnsureConfigured()
         {
             if (Inventory == null || Research == null || GroundGrid == null ||
-                InnerGrid == null || instances == null)
+                InnerGrid == null || instances == null || CityStorage == null)
                 ConfigureDevelopmentFixture();
+        }
+
+        private void RestoreWarehouseConnectivity(string stableInstanceId)
+        {
+            if (!evacuationWarehouseConnectivity.TryGetValue(
+                    stableInstanceId,
+                    out bool connected))
+            {
+                return;
+            }
+            evacuationWarehouseConnectivity.Remove(stableInstanceId);
+            CityStorage?.TrySetWarehouseConnected(
+                stableInstanceId,
+                connected);
         }
 
         private int FindInstanceIndex(string stableInstanceId)
@@ -1046,10 +1188,10 @@ namespace WasteCity.Graybox3D.Building
             BuildingGrid grid,
             PlacedBuilding placement,
             string costId,
-            int inventoryBefore)
+            int spentCost)
         {
             grid.Remove(placement);
-            Inventory.Restore(costId, inventoryBefore);
+            CityStorage.AddToNetwork(costId, spentCost);
         }
     }
 }

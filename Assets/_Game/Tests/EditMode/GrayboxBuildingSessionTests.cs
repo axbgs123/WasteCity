@@ -598,12 +598,15 @@ namespace WasteCity.Tests
         {
             GrayboxBuildingSession3D session = CreateSession();
             var presentation = new RecordingPresentation();
-            session.Inventory.Set(ResourceIds.Stone, 0);
-            session.Inventory.SetDebtLimit(2);
+            session.Inventory.Set(ResourceIds.Stone, 2);
             var callbackCount = 0;
             PlacedBuilding injectedPlacement = null;
-            session.Inventory.DebtIncreased += _ =>
+            session.CityStorage.AttributedChanged +=
+                (resourceId, delta, _) =>
             {
+                if (resourceId != ResourceIds.Stone || delta >= 0 ||
+                    callbackCount > 0)
+                    return;
                 callbackCount++;
                 session.GroundGrid.TryRestore(
                     BuildingCatalog.Wall,
@@ -629,14 +632,13 @@ namespace WasteCity.Tests
             Assert.That(evaluation.IsValid, Is.True);
             Assert.That(callbackCount, Is.EqualTo(1));
             Assert.That(injectedPlacement, Is.Not.Null);
-            Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.Zero);
+            Assert.That(session.Inventory.Get(ResourceIds.Stone), Is.EqualTo(2));
             Assert.That(session.GroundGrid.Count, Is.EqualTo(1));
             Assert.That(session.Instances, Is.Empty);
             Assert.That(instance, Is.Null);
             Assert.That(presentation.Created, Is.Empty);
 
             Assert.That(session.GroundGrid.Remove(injectedPlacement), Is.True);
-            session.Inventory.Set(ResourceIds.Stone, 2);
             Assert.That(
                 session.TryBeginConstruction(
                     request,

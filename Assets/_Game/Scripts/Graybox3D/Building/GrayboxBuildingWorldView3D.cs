@@ -52,6 +52,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private Transform instanceRoot;
         [SerializeField] private Transform infrastructureRoot;
         [SerializeField] private Material sharedMaterial;
+        [SerializeField] private Material previewMaterial;
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField, HideInInspector]
         private List<GameObject> ownedVisualRoots =
@@ -161,12 +162,29 @@ namespace WasteCity.Graybox3D.Building
             Material sharedMaterial,
             GrayboxMobileCityController3D city)
         {
+            Configure(
+                instanceRoot,
+                infrastructureRoot,
+                sharedMaterial,
+                sharedMaterial,
+                city);
+        }
+
+        public void Configure(
+            Transform instanceRoot,
+            Transform infrastructureRoot,
+            Material sharedMaterial,
+            Material previewMaterial,
+            GrayboxMobileCityController3D city)
+        {
             if (instanceRoot == null)
                 throw new ArgumentNullException(nameof(instanceRoot));
             if (infrastructureRoot == null)
                 throw new ArgumentNullException(nameof(infrastructureRoot));
             if (sharedMaterial == null)
                 throw new ArgumentNullException(nameof(sharedMaterial));
+            if (previewMaterial == null)
+                throw new ArgumentNullException(nameof(previewMaterial));
             if (city == null)
                 throw new ArgumentNullException(nameof(city));
 
@@ -174,6 +192,7 @@ namespace WasteCity.Graybox3D.Building
             this.instanceRoot = instanceRoot;
             this.infrastructureRoot = infrastructureRoot;
             this.sharedMaterial = sharedMaterial;
+            this.previewMaterial = previewMaterial;
             this.city = city;
             TryRehydrate();
         }
@@ -244,12 +263,14 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
 
-            int width = BuildingOrientationRules.Width(
+            int rotatedWidth = BuildingOrientationRules.Width(
                 definition,
                 orientation);
-            int height = BuildingOrientationRules.Height(
+            int rotatedHeight = BuildingOrientationRules.Height(
                 definition,
                 orientation);
+            int meshWidth = definition.Width;
+            int meshHeight = definition.Height;
             string stableId = PreviewStableId(definition);
             Color color = evaluation.IsValid
                 ? ValidPreviewColor
@@ -260,32 +281,37 @@ namespace WasteCity.Graybox3D.Building
                     stableId,
                     infrastructureRoot,
                     CreatePreviewMesh(
-                        width,
-                        height,
+                        meshWidth,
+                        meshHeight,
                         hit.Site,
                         stableId),
                     color,
-                    false);
-                SetPreviewGeometry(width, height, hit.Site);
+                    false,
+                    previewMaterial);
+                SetPreviewGeometry(meshWidth, meshHeight, hit.Site);
             }
             else
             {
                 preview.Root.SetActive(true);
                 if (!MatchesPreviewGeometry(
-                        width,
-                        height,
+                        meshWidth,
+                        meshHeight,
                         hit.Site))
                 {
                     ReplaceMesh(
                         preview,
                         CreatePreviewMesh(
-                            width,
-                            height,
+                            meshWidth,
+                            meshHeight,
                             hit.Site,
                             stableId));
-                    SetPreviewGeometry(width, height, hit.Site);
+                    SetPreviewGeometry(meshWidth, meshHeight, hit.Site);
                 }
-                ConfigureSingleSlot(preview, stableId, color);
+                ConfigureSingleSlot(
+                    preview,
+                    stableId,
+                    color,
+                    previewMaterial);
             }
 
             float cellSize = hit.Site == BuildingSite.InnerCity
@@ -299,13 +325,12 @@ namespace WasteCity.Graybox3D.Building
                 : Vector3.forward;
             preview.Root.transform.position =
                 hit.WorldPoint +
-                right * ((width - 1) * cellSize * .5f) +
-                forward * ((height - 1) * cellSize * .5f) +
+                right * ((rotatedWidth - 1) * cellSize * .5f) +
+                forward * ((rotatedHeight - 1) * cellSize * .5f) +
                 Vector3.up * .06f;
-            preview.Root.transform.rotation =
-                hit.Site == BuildingSite.InnerCity
-                    ? city.transform.rotation
-                    : Quaternion.identity;
+            preview.Root.transform.rotation = SiteRotation(
+                hit.Site,
+                orientation);
         }
 
         public void HidePreview()
@@ -558,7 +583,8 @@ namespace WasteCity.Graybox3D.Building
             Transform parent,
             Mesh mesh,
             Color color,
-            bool withCollider)
+            bool withCollider,
+            Material material = null)
         {
             var root = new GameObject(stableId);
             root.transform.SetParent(parent, false);
@@ -573,7 +599,11 @@ namespace WasteCity.Graybox3D.Building
                 Renderer = renderer,
                 Mesh = mesh
             };
-            ConfigureSingleSlot(visual, stableId, color);
+            ConfigureSingleSlot(
+                visual,
+                stableId,
+                color,
+                material == null ? sharedMaterial : material);
             if (withCollider)
                 visual.Collider = root.AddComponent<BoxCollider>();
             return visual;
@@ -584,6 +614,19 @@ namespace WasteCity.Graybox3D.Building
             string stableId,
             Color color)
         {
+            ConfigureSingleSlot(
+                visual,
+                stableId,
+                color,
+                sharedMaterial);
+        }
+
+        private static void ConfigureSingleSlot(
+            Visual visual,
+            string stableId,
+            Color color,
+            Material material)
+        {
             if (visual.SingleSlot == null)
                 visual.SingleSlot =
                     visual.Root.AddComponent<GrayboxVisualSlot>();
@@ -592,7 +635,7 @@ namespace WasteCity.Graybox3D.Building
                 stableId,
                 visual.Renderer,
                 color);
-            visual.SingleSlot.ApplyFallback(sharedMaterial);
+            visual.SingleSlot.ApplyFallback(material);
         }
 
         private void ConfigureInstanceSlots(
@@ -654,12 +697,8 @@ namespace WasteCity.Graybox3D.Building
         {
             BuildingDefinition definition =
                 instance.Placement.Definition;
-            int width = BuildingOrientationRules.Width(
-                definition,
-                instance.Placement.Orientation);
-            int height = BuildingOrientationRules.Height(
-                definition,
-                instance.Placement.Orientation);
+            int width = definition.Width;
+            int height = definition.Height;
             float cellSize =
                 instance.Placement.Site == BuildingSite.InnerCity
                     ? InnerCellSize
@@ -696,7 +735,7 @@ namespace WasteCity.Graybox3D.Building
             float xSize = width * cellSize - cellSize * .08f;
             float zSize = height * cellSize - cellSize * .08f;
             float post = Math.Max(.035f, cellSize * .1f);
-            var matrices = new List<Matrix4x4>(5)
+            var matrices = new List<Matrix4x4>(6)
             {
                 Matrix4x4.TRS(
                     new Vector3(0f, .04f, 0f),
@@ -712,6 +751,11 @@ namespace WasteCity.Graybox3D.Building
                         new Vector3(signX * x, .3f, signZ * z),
                         Quaternion.identity,
                         new Vector3(post, .6f, post)));
+            matrices.Add(
+                Matrix4x4.TRS(
+                    new Vector3(0f, .48f, zSize * .38f),
+                    Quaternion.identity,
+                    new Vector3(xSize * .42f, post, post)));
             return GrayboxMeshBuilder.CombinePrimitive(
                 PrimitiveType.Cube,
                 matrices,
@@ -737,7 +781,11 @@ namespace WasteCity.Graybox3D.Building
                     Matrix4x4.TRS(
                         new Vector3(0f, .72f, 0f),
                         Quaternion.identity,
-                        new Vector3(xSize * .65f, .24f, zSize * .65f))
+                        new Vector3(xSize * .65f, .24f, zSize * .65f)),
+                    Matrix4x4.TRS(
+                        new Vector3(0f, .82f, zSize * .34f),
+                        Quaternion.identity,
+                        new Vector3(xSize * .28f, .16f, zSize * .12f))
                 },
                 "building.complete.mesh." + stableId);
         }
@@ -800,14 +848,35 @@ namespace WasteCity.Graybox3D.Building
             BuildingSite site,
             string stableId)
         {
-            return CreateBlockMesh(
-                width,
-                height,
-                site == BuildingSite.InnerCity
-                    ? InnerCellSize
-                    : GroundCellSize,
-                .12f,
-                stableId);
+            float cellSize = site == BuildingSite.InnerCity
+                ? InnerCellSize
+                : GroundCellSize;
+            float xSize = width * cellSize - cellSize * .08f;
+            float zSize = height * cellSize - cellSize * .08f;
+            float shaftWidth = Mathf.Min(xSize * .18f, cellSize * .28f);
+            float shaftLength = Mathf.Min(zSize * .46f, cellSize * .72f);
+            float headWidth = Mathf.Min(xSize * .48f, cellSize * .62f);
+            float headDepth = Mathf.Min(zSize * .18f, cellSize * .24f);
+            float headZ = zSize * .5f - headDepth * .7f;
+            float shaftZ = headZ - headDepth * .5f - shaftLength * .5f;
+            return GrayboxMeshBuilder.CombinePrimitive(
+                PrimitiveType.Cube,
+                new[]
+                {
+                    Matrix4x4.TRS(
+                        Vector3.zero,
+                        Quaternion.identity,
+                        new Vector3(xSize, .12f, zSize)),
+                    Matrix4x4.TRS(
+                        new Vector3(0f, .09f, shaftZ),
+                        Quaternion.identity,
+                        new Vector3(shaftWidth, .06f, shaftLength)),
+                    Matrix4x4.TRS(
+                        new Vector3(0f, .09f, headZ),
+                        Quaternion.identity,
+                        new Vector3(headWidth, .06f, headDepth))
+                },
+                stableId + ".mesh");
         }
 
         private bool MatchesPreviewGeometry(
@@ -1109,7 +1178,9 @@ namespace WasteCity.Graybox3D.Building
                     (placement.Y + height * .5f) * InnerCellSize);
                 visual.Root.transform.position =
                     city.transform.TransformPoint(local);
-                visual.Root.transform.rotation = city.transform.rotation;
+                visual.Root.transform.rotation = SiteRotation(
+                    placement.Site,
+                    placement.Orientation);
                 return;
             }
 
@@ -1117,7 +1188,22 @@ namespace WasteCity.Graybox3D.Building
                 placement.X - GroundWidth * .5f + (width - 1) * .5f,
                 .02f,
                 placement.Y - GroundHeight * .5f + (height - 1) * .5f);
-            visual.Root.transform.rotation = Quaternion.identity;
+            visual.Root.transform.rotation = SiteRotation(
+                placement.Site,
+                placement.Orientation);
+        }
+
+        private Quaternion SiteRotation(
+            BuildingSite site,
+            BuildingOrientation orientation)
+        {
+            Quaternion direction = Quaternion.Euler(
+                0f,
+                (int)orientation * 90f,
+                0f);
+            return site == BuildingSite.InnerCity
+                ? city.transform.rotation * direction
+                : direction;
         }
 
         private static void ConfigureCollider(Visual visual)
@@ -1150,6 +1236,7 @@ namespace WasteCity.Graybox3D.Building
             if (instanceRoot == null ||
                 infrastructureRoot == null ||
                 sharedMaterial == null ||
+                previewMaterial == null ||
                 city == null)
                 throw new InvalidOperationException(
                     "Configure the graybox building view before use.");

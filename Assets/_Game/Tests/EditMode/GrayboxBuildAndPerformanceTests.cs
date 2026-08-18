@@ -1076,7 +1076,10 @@ namespace WasteCity.Tests
             Assert.That(
                 view.PersistentGeneratedObjectCount,
                 Is.LessThanOrEqualTo(16));
-            Assert.That(generatedRendererCount, Is.LessThan(32 * 24));
+            Assert.That(
+                generatedRendererCount,
+                Is.EqualTo(view.TotalGeneratedRendererCount));
+            Assert.That(generatedRendererCount, Is.LessThan(64 * 24));
         }
 
         [Test]

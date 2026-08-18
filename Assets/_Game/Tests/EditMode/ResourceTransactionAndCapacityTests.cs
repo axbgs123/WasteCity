@@ -381,6 +381,34 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CityStorageTransferToBackpackUsesConnectedWarehouse()
+        {
+            var core = new ResourceInventory(1000);
+            using var city = new CityResourceStorageModel(core, 150);
+            var backpack = new PlayerBackpackModel();
+            Assert.That(city.TryRegisterWarehouse(
+                "building.instance.backpack-source",
+                connected: true), Is.True);
+            Assert.That(city.AddToWarehouse(
+                "building.instance.backpack-source",
+                ResourceIds.Iron,
+                20), Is.EqualTo(20));
+
+            ResourceTransferResult result =
+                ResourceTransaction.TransferToBackpack(
+                    city,
+                    backpack,
+                    ResourceIds.Iron,
+                    12);
+
+            Assert.That(result.Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(result.MovedAmount, Is.EqualTo(12));
+            Assert.That(city.GetNetworkAmount(ResourceIds.Iron), Is.EqualTo(8));
+            Assert.That(BackpackTotal(backpack, ResourceIds.Iron), Is.EqualTo(12));
+        }
+
+        [Test]
         public void TransferFromBackpackPartiallyAcceptsAndPreservesTotalQuantity()
         {
             var backpack = new PlayerBackpackModel();
@@ -428,6 +456,35 @@ namespace WasteCity.Tests
             Assert.That(BackpackTotal(backpack, ResourceIds.Iron), Is.EqualTo(30));
             Assert.That(city.Get(ResourceIds.Iron), Is.EqualTo(150));
             Assert.That(Total(city, backpack, ResourceIds.Iron), Is.EqualTo(totalBefore));
+        }
+
+        [Test]
+        public void BackpackSlotTransferUsesWarehouseWhenCityCoreIsFull()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Iron, 20);
+            var core = new ResourceInventory(1000);
+            core.Add(ResourceIds.Iron, 150);
+            using var city = new CityResourceStorageModel(core, 150);
+            Assert.That(city.TryRegisterWarehouse(
+                "building.instance.backpack-target",
+                connected: true), Is.True);
+
+            ResourceTransferResult result =
+                ResourceTransaction.TransferFromBackpackSlot(
+                    backpack,
+                    0,
+                    city,
+                    12);
+
+            Assert.That(result.Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(result.MovedAmount, Is.EqualTo(12));
+            Assert.That(core.Get(ResourceIds.Iron), Is.EqualTo(150));
+            Assert.That(city.GetWarehouseAmount(
+                "building.instance.backpack-target",
+                ResourceIds.Iron), Is.EqualTo(12));
+            Assert.That(BackpackTotal(backpack, ResourceIds.Iron), Is.EqualTo(8));
         }
 
         [Test]

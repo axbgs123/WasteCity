@@ -4,6 +4,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
+using WasteCity.Economy;
 using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
@@ -25,6 +26,9 @@ namespace WasteCity.Graybox3D.Building
             evaluationWorkspace;
         private Func<string, bool> researchCompleted;
         private Func<string, int> completedBuildings;
+        private Func<string, int> availableResourceAmount;
+        private readonly ResourceShortfall[] materialShortfallBuffer =
+            new ResourceShortfall[1];
         private string[] resourceNodeVisualIds;
         private int resourceNodeVisualWidth;
         private int resourceNodeVisualHeight;
@@ -78,6 +82,8 @@ namespace WasteCity.Graybox3D.Building
         public BuildingSurfaceHit CurrentHit { get; private set; } =
             BuildingSurfaceHit.Invalid;
         public uint MiningGuidanceRefreshCount { get; private set; }
+        public IReadOnlyList<ResourceShortfall> CurrentMaterialShortfalls
+            { get; private set; } = Array.Empty<ResourceShortfall>();
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -115,6 +121,9 @@ namespace WasteCity.Graybox3D.Building
                 session == null
                     ? null
                     : session.CompletedBuildingCount;
+            availableResourceAmount = session?.CityStorage == null
+                ? null
+                : session.GetCityResourceAmount;
             ConfigureResourceNodeIdentityWorkspace(world);
         }
 
@@ -122,7 +131,7 @@ namespace WasteCity.Graybox3D.Building
             int worldX,
             int worldY)
         {
-            return $"world.resource-node.{worldX}.{worldY}";
+            return GrayboxResourceNodeIdentity3D.Create(worldX, worldY);
         }
 
         public void UpdatePointer(Vector2 screenPosition)
@@ -226,7 +235,7 @@ namespace WasteCity.Graybox3D.Building
             CityMode cityMode = city.Mode;
             uint placementRevision = session.PlacementRevision;
             uint catalogRevision = session.CatalogRevision;
-            int inventory = session.Inventory.Get(
+            int inventory = session.CityStorage.GetNetworkAmount(
                 BuildingCatalog.MiningStation.CostId);
             int population = session.Population;
             int gridCount = session.GroundGrid.Count;
@@ -274,6 +283,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 HidePreview();
                 CurrentEvaluation = default;
+                CurrentMaterialShortfalls = Array.Empty<ResourceShortfall>();
                 return false;
             }
 
@@ -289,6 +299,7 @@ namespace WasteCity.Graybox3D.Building
                 CurrentEvaluation = BuildingPlacementRules.Evaluate(
                     MissingRequest(definition),
                     evaluationWorkspace);
+                RefreshMaterialShortfalls(definition);
                 return false;
             }
 
@@ -298,6 +309,7 @@ namespace WasteCity.Graybox3D.Building
                 CurrentEvaluation = BuildingPlacementRules.Evaluate(
                     ProjectionFailedRequest(definition),
                     evaluationWorkspace);
+                RefreshMaterialShortfalls(definition);
                 ClearNodeHighlight();
                 presentation.HidePreview();
                 return false;
@@ -307,6 +319,7 @@ namespace WasteCity.Graybox3D.Building
             CurrentEvaluation = BuildingPlacementRules.Evaluate(
                 CreateRequest(definition, hit),
                 evaluationWorkspace);
+            RefreshMaterialShortfalls(definition);
             presentation.ShowPreview(
                 definition,
                 hit,
@@ -412,7 +425,7 @@ namespace WasteCity.Graybox3D.Building
                     completedBuildings,
                     evaluationWorkspace.Unlock);
             bool canAfford = definition != null &&
-                session.Inventory.CanSpend(
+                session.CityStorage.CanSpendFromNetwork(
                     definition.CostId,
                     definition.Cost);
             bool projectionSucceeded =
@@ -662,9 +675,32 @@ namespace WasteCity.Graybox3D.Building
                     completedBuildings,
                     evaluationWorkspace.Unlock),
                 definition != null &&
-                session.Inventory.CanSpend(
+                session.CityStorage.CanSpendFromNetwork(
                     definition.CostId,
                     definition.Cost));
+        }
+
+        private void RefreshMaterialShortfalls(BuildingDefinition definition)
+        {
+            if (session?.CityStorage == null)
+            {
+                CurrentMaterialShortfalls = Array.Empty<ResourceShortfall>();
+                return;
+            }
+            if (availableResourceAmount == null)
+                availableResourceAmount = session.GetCityResourceAmount;
+            if (ResourceShortfallRules.TryEvaluateBuilding(
+                    definition,
+                    availableResourceAmount,
+                    out ResourceShortfall shortfall))
+            {
+                materialShortfallBuffer[0] = shortfall;
+                CurrentMaterialShortfalls = materialShortfallBuffer;
+            }
+            else
+            {
+                CurrentMaterialShortfalls = Array.Empty<ResourceShortfall>();
+            }
         }
 
         private void UpdateNodeHighlight(
@@ -841,6 +877,7 @@ namespace WasteCity.Graybox3D.Building
             hasMiningGuidanceKey = false;
             researchCompleted = null;
             completedBuildings = null;
+            availableResourceAmount = null;
             resourceNodeVisualIds = null;
             resourceNodeVisualWidth = 0;
             resourceNodeVisualHeight = 0;

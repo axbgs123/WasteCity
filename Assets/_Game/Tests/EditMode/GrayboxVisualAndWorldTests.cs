@@ -95,6 +95,22 @@ namespace WasteCity.Tests
             Assert.That(view.Model, Is.SameAs(model));
             Assert.That(view.Coordinates.Width, Is.EqualTo(32));
             Assert.That(view.Coordinates.Height, Is.EqualTo(24));
+            Assert.That(view.ResourceNodeMarkerCount,
+                Is.EqualTo(model.ResourceNodeCount));
+            Assert.That(view.ResourceNodeMarkerRendererCount,
+                Is.EqualTo(model.ResourceNodeCount * 2));
+            Assert.That(view.TotalGeneratedRendererCount,
+                Is.EqualTo(view.WorldRendererCount +
+                    model.ResourceNodeCount * 2));
+            Assert.That(view.TotalPersistentGeneratedObjectCount,
+                Is.EqualTo(view.PersistentGeneratedObjectCount +
+                    model.ResourceNodeCount * 3));
+            Assert.That(
+                view.GetComponentsInChildren<Renderer>(true).Length,
+                Is.EqualTo(view.TotalGeneratedRendererCount));
+            Assert.That(
+                view.GetComponentsInChildren<Transform>(true).Length - 4,
+                Is.EqualTo(view.TotalPersistentGeneratedObjectCount));
             for (int x = 0; x < model.Width; x++)
             for (int y = 0; y < model.Height; y++)
                 AssertCellEqual(before[x, y], model.Get(x, y));
@@ -174,6 +190,154 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0012_DefaultResourceIconsCoverAllResourcesWithStableDistinctColorAndShape()
+        {
+            var colorKeys = new HashSet<Color32>();
+            var shapeKeys = new HashSet<string>();
+
+            foreach (ResourceDefinition definition in
+                     ResourceDefinitionCatalog.All)
+            {
+                Sprite first = ResourceIconCatalog3D.Resolve(
+                    definition.Id);
+                Sprite second = ResourceIconCatalog3D.Resolve(
+                    definition.Id);
+
+                Assert.That(first, Is.Not.Null, definition.Id);
+                Assert.That(second, Is.SameAs(first), definition.Id);
+                Assert.That(first.name,
+                    Is.EqualTo(definition.IconFallbackKey), definition.Id);
+                Assert.That(first.texture, Is.Not.Null, definition.Id);
+                Assert.That(first.texture.width, Is.EqualTo(64));
+                Assert.That(first.texture.height, Is.EqualTo(64));
+                colorKeys.Add(ResourceIconCatalog3D.FallbackColor(
+                    definition.Id));
+                shapeKeys.Add(ResourceIconCatalog3D.FallbackShapeKey(
+                    definition.Id));
+            }
+
+            Assert.That(colorKeys, Has.Count.EqualTo(15));
+            Assert.That(shapeKeys, Has.Count.EqualTo(15));
+            Assert.That(ResourceIconCatalog3D.Resolve("unknown.resource"),
+                Is.Null);
+        }
+
+        [Test]
+        public void IDEA0012_SerializedIconOverrideWinsWithoutChangingResourceIdentity()
+        {
+            Texture2D texture = Track(new Texture2D(8, 8));
+            Sprite replacement = Track(Sprite.Create(
+                texture,
+                new Rect(0f, 0f, 8f, 8f),
+                Vector2.one * .5f,
+                8f));
+            ResourceIconCatalog3D catalog =
+                Track(ScriptableObject.CreateInstance<ResourceIconCatalog3D>());
+            catalog.ConfigureOverrides(new[]
+            {
+                new ResourceIconOverride3D(ResourceIds.Stone, replacement)
+            });
+
+            Assert.That(catalog.ResolveIcon(ResourceIds.Stone),
+                Is.SameAs(replacement));
+            Assert.That(catalog.ResolveIcon(ResourceIds.Iron),
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+        }
+
+        [Test]
+        public void IDEA0012_ResourceNodeMarkersReadLiveWorldTruthAndReuseStableObjects()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+
+            view.Generate(model);
+
+            Assert.That(view.ResourceNodeMarkerCount, Is.EqualTo(5));
+            Assert.That(view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            Assert.That(marker.StableId,
+                Is.EqualTo(GrayboxResourceNodeIdentity3D.Create(9, 0)));
+            Assert.That(marker.ResourceId, Is.EqualTo(ResourceIds.Stone));
+            Assert.That(marker.DisplayedAmount, Is.EqualTo(100));
+            Assert.That(marker.DisplayText, Does.Contain("石料"));
+            Assert.That(marker.DisplayText, Does.Contain("100"));
+            Assert.That(marker.Icon,
+                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Stone)));
+
+            Assert.That(model.Harvest(9, 0, 7, out string resourceId),
+                Is.EqualTo(7));
+            Assert.That(resourceId, Is.EqualTo(ResourceIds.Stone));
+            Assert.That(view.RefreshResourceNodeMarkers(), Is.True);
+            Assert.That(view.ResourceNodeMarkerCount, Is.EqualTo(5));
+            Assert.That(view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D refreshed),
+                Is.True);
+            Assert.That(refreshed, Is.SameAs(marker));
+            Assert.That(refreshed.DisplayedAmount, Is.EqualTo(93));
+            Assert.That(refreshed.DisplayText, Does.Contain("93"));
+            Assert.That(view.RefreshResourceNodeMarkers(), Is.False);
+        }
+
+        [Test]
+        public void IDEA0012_StableMarkerRefreshAndCameraDoNotAllocateOrRewrite()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+            GameObject cameraObject = Track(new GameObject("MarkerCamera"));
+            Transform camera = cameraObject.transform;
+            camera.rotation = Quaternion.Euler(52f, 0f, 0f);
+            view.Generate(model);
+            Assert.That(view.RefreshResourceNodeMarkers(), Is.False);
+            Assert.That(view.FaceResourceNodeMarkers(camera), Is.True);
+            Assert.That(view.FaceResourceNodeMarkers(camera), Is.False);
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            bool changed = false;
+            for (var index = 0; index < 300; index++)
+            {
+                changed |= view.RefreshResourceNodeMarkers();
+                changed |= view.FaceResourceNodeMarkers(camera);
+            }
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.That(changed, Is.False);
+            Assert.That(allocated, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0012_RepeatedGenerateAndClearDoNotLeakMarkerObjects()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+
+            view.Generate(model);
+            Assert.That(
+                view.GetComponentsInChildren<GrayboxResourceNodeMarker3D>(true),
+                Has.Length.EqualTo(model.ResourceNodeCount));
+
+            view.Generate(model);
+            Assert.That(view.ResourceNodeMarkerCount,
+                Is.EqualTo(model.ResourceNodeCount));
+            Assert.That(
+                view.GetComponentsInChildren<GrayboxResourceNodeMarker3D>(true),
+                Has.Length.EqualTo(model.ResourceNodeCount));
+
+            view.ClearGenerated();
+            Assert.That(view.ResourceNodeMarkerCount, Is.Zero);
+            Assert.That(view.ResourceNodeMarkerRendererCount, Is.Zero);
+            Assert.That(view.TotalGeneratedRendererCount, Is.Zero);
+            Assert.That(view.TotalPersistentGeneratedObjectCount, Is.Zero);
+            Assert.That(
+                view.GetComponentsInChildren<GrayboxResourceNodeMarker3D>(true),
+                Is.Empty);
+        }
+
+        [Test]
         public void ClearGenerated_ReleasesObjectsAndMeshes()
         {
             GrayboxWorldView3D view = CreateView();
@@ -183,6 +347,10 @@ namespace WasteCity.Tests
 
             Assert.That(view.WorldRendererCount, Is.Zero);
             Assert.That(view.PersistentGeneratedObjectCount, Is.Zero);
+            Assert.That(view.ResourceNodeMarkerCount, Is.Zero);
+            Assert.That(
+                view.GetComponentsInChildren<GrayboxResourceNodeMarker3D>(true),
+                Is.Empty);
             Assert.That(
                 view.GetComponentsInChildren<GrayboxVisualSlot>(true),
                 Is.Empty);

@@ -1303,7 +1303,7 @@ namespace WasteCity.Tests
                 15,
                 new WorldCell(
                     TerrainKind.Rocky,
-                    WasteCity.Economy.ResourceIds.Stone,
+                    WasteCity.Economy.ResourceIds.Alloy,
                     100,
                     WorldTraversalKind.Open));
 

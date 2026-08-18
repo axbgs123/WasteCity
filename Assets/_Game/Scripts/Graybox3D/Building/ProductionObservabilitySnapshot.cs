@@ -87,13 +87,6 @@ namespace WasteCity.Graybox3D.Building
         {
             Revision = revision;
             ActiveWarehouseCount = Math.Max(0, activeWarehouseCount);
-            long capacity =
-                ResourceCapacityPolicy.FormalBaseCapacityPerResource +
-                (long)ActiveWarehouseCount *
-                ResourceCapacityPolicy.FormalCapacityPerWarehouse;
-            CityCapacityPerResource = capacity >= int.MaxValue
-                ? int.MaxValue
-                : (int)capacity;
             var copy = new List<ProductionBuildingObservability>(entries);
             copy.Sort((left, right) => string.Compare(
                 left.StableInstanceId,
@@ -114,7 +107,6 @@ namespace WasteCity.Graybox3D.Building
         public static ProductionObservabilitySnapshot Empty => empty;
         public ulong Revision { get; }
         public int ActiveWarehouseCount { get; }
-        public int CityCapacityPerResource { get; }
         public IReadOnlyList<ProductionBuildingObservability> Entries { get; }
 
         public bool TryGet(
@@ -131,7 +123,6 @@ namespace WasteCity.Graybox3D.Building
         {
             if (other == null ||
                 ActiveWarehouseCount != other.ActiveWarehouseCount ||
-                CityCapacityPerResource != other.CityCapacityPerResource ||
                 Entries.Count != other.Entries.Count)
                 return false;
             for (var index = 0; index < Entries.Count; index++)

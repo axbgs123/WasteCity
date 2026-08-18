@@ -42,6 +42,20 @@ namespace WasteCity.Research
                 Model.Start(definition, cityInventory);
         }
 
+        public bool TryStart(
+            string researchId,
+            CityResourceStorageModel cityStorage,
+            bool hasEligibleResearchStation)
+        {
+            ResearchDefinition definition =
+                DemoResearchCatalog.Find(researchId);
+            return hasEligibleResearchStation &&
+                definition != null &&
+                DemoResearchCatalog.ReleaseState(researchId) ==
+                    DemoResearchReleaseState.Researchable &&
+                Model.Start(definition, cityStorage);
+        }
+
         public bool Tick(
             float deltaSeconds,
             CityMode cityMode,
@@ -70,6 +84,12 @@ namespace WasteCity.Research
                 capacity,
                 activeWarehouseCount,
                 .8f);
+        }
+
+        public bool TryCancel(CityResourceStorageModel cityStorage)
+        {
+            return OwnsActiveResearch() &&
+                Model.TryCancel(cityStorage, .8f);
         }
 
         private bool OwnsActiveResearch()

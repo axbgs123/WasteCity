@@ -34,6 +34,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!IsConfigured ||
                 session.Inventory == null ||
+                session.CityStorage == null ||
                 session.Instances == null ||
                 worldView.Model == null ||
                 worldView.Coordinates == null ||
@@ -54,7 +55,7 @@ namespace WasteCity.Graybox3D.Building
                 cityY,
                 session.GroundBuildRadius,
                 worldView.Model,
-                session.Inventory);
+                session.CityStorage);
             return true;
         }
 

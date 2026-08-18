@@ -35,6 +35,10 @@ namespace WasteCity.Tests
             "Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset";
         private const string MaterialPath =
             "Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat";
+        private const string PreviewMaterialPath =
+            "Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat";
+        private const string ResourceIconCatalogPath =
+            "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset";
 
         [Test]
         public void Scene_HasIndependentBootstrapHierarchyAndReferences()
@@ -121,6 +125,9 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxUrpScope>(true);
             GrayboxWorldView3D view =
                 Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            GrayboxBuildingWorldView3D buildingView =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>(true);
+            Assert.That(buildingView, Is.Not.Null);
             var scopeData = new SerializedObject(scope);
             var viewData = new SerializedObject(view);
             Assert.That(
@@ -129,6 +136,48 @@ namespace WasteCity.Tests
             Assert.That(
                 viewData.FindProperty("sharedMaterial").objectReferenceValue,
                 Is.SameAs(material));
+
+            Material previewMaterial =
+                AssetDatabase.LoadAssetAtPath<Material>(PreviewMaterialPath);
+            Assert.That(previewMaterial, Is.Not.Null);
+            Assert.That(previewMaterial, Is.Not.SameAs(material));
+            Assert.That(
+                previewMaterial.shader.name,
+                Is.EqualTo("Universal Render Pipeline/Lit"));
+            Assert.That(previewMaterial.GetFloat("_Surface"), Is.EqualTo(1f));
+            Assert.That(previewMaterial.GetFloat("_ZWrite"), Is.Zero);
+            Assert.That(
+                previewMaterial.renderQueue,
+                Is.EqualTo((int)UnityEngine.Rendering.RenderQueue.Transparent));
+            Assert.That(
+                new SerializedObject(buildingView)
+                    .FindProperty("previewMaterial")
+                    .objectReferenceValue,
+                Is.SameAs(previewMaterial));
+        }
+
+        [Test]
+        public void IDEA0012_SceneConsumersShareApprovedResourceIconCatalog()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            ResourceIconCatalog3D catalog =
+                AssetDatabase.LoadAssetAtPath<ResourceIconCatalog3D>(
+                    ResourceIconCatalogPath);
+
+            Assert.That(catalog, Is.Not.Null);
+            Assert.That(catalog.TryValidate(out string error), Is.True, error);
+            AssertReference(
+                Object.FindObjectOfType<GrayboxWorldView3D>(true),
+                "resourceIconCatalog",
+                catalog);
+            AssertReference(
+                Object.FindObjectOfType<GrayboxBuildingMenuView3D>(true),
+                "resourceIconCatalog",
+                catalog);
+            AssertReference(
+                Object.FindObjectOfType<GrayboxOperationsView3D>(true),
+                "resourceIconCatalog",
+                catalog);
         }
 
         [Test]
@@ -523,6 +572,10 @@ namespace WasteCity.Tests
                 presentation,
                 "sharedMaterial",
                 AssetDatabase.LoadAssetAtPath<Material>(MaterialPath));
+            AssertReference(
+                presentation,
+                "previewMaterial",
+                AssetDatabase.LoadAssetAtPath<Material>(PreviewMaterialPath));
             AssertReference(presentation, "city", city);
             AssertReference(surfaceProjector, "controlledCamera", camera);
             AssertReference(surfaceProjector, "worldView", world);
@@ -785,7 +838,7 @@ namespace WasteCity.Tests
                     Application.dataPath,
                     "_Game/Editor/GrayboxSceneAuthoring.cs"));
             StringAssert.Contains(
-                "EnsureUsabilityContract(scene, buildingReferences);",
+                "EnsureUsabilityContract(",
                 source);
             string method = ExtractMethod(
                 source,

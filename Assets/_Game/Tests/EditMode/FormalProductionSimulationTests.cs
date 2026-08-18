@@ -189,6 +189,7 @@ namespace WasteCity.Tests
 
         [TestCase(ResourceIds.Iron)]
         [TestCase(ResourceIds.EnergyCrystal)]
+        [TestCase(ResourceIds.Stone)]
         public void MiningHarvestsTheBoundNodeOnlyAtCompletionAndProducesItsTrueResource(
             string resourceId)
         {

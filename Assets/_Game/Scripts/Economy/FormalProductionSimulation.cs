@@ -51,6 +51,53 @@ namespace WasteCity.Economy
             }
         }
 
+        public void Tick(
+            IReadOnlyList<BuildingProductionState> states,
+            float deltaSeconds,
+            WorldMapModel world,
+            CityResourceStorageModel cityStorage,
+            bool globallyPaused)
+        {
+            if (states == null || cityStorage == null) return;
+
+            PrepareOrderedStates(states);
+            if (globallyPaused) return;
+
+            float safeDelta = Math.Max(0f, deltaSeconds);
+            for (int index = 0; index < orderedStates.Count; index++)
+            {
+                BuildingProductionState state = orderedStates[index];
+                using (cityStorage.AttributeChanges(
+                           new ResourceChangeAttribution(
+                               ResourceChangeAttributionKind.Production,
+                               state.Definition.BuildingId)))
+                {
+                    RunLogistics(state, world, cityStorage);
+                }
+                AdvanceProduction(
+                    state,
+                    safeDelta,
+                    world,
+                    cityInventory: null,
+                    cityStorage: cityStorage);
+            }
+        }
+
+        private void PrepareOrderedStates(
+            IReadOnlyList<BuildingProductionState> states)
+        {
+            orderedStates.Clear();
+            for (int index = 0; index < states.Count; index++)
+            {
+                if (states[index] != null)
+                    orderedStates.Add(states[index]);
+            }
+            orderedStates.Sort((left, right) => string.Compare(
+                left.StableInstanceId,
+                right.StableInstanceId,
+                StringComparison.Ordinal));
+        }
+
         private static void RunLogistics(
             BuildingProductionState state,
             WorldMapModel world,
@@ -112,11 +159,75 @@ namespace WasteCity.Economy
             }
         }
 
+        private static void RunLogistics(
+            BuildingProductionState state,
+            WorldMapModel world,
+            CityResourceStorageModel cityStorage)
+        {
+            if (!state.IsLogisticsConnected) return;
+
+            string outputResourceId = ResolveOutputResourceId(state, world);
+            if (!string.IsNullOrEmpty(outputResourceId))
+            {
+                int outputAmount = state.Output.Get(outputResourceId);
+                int moved = Math.Min(
+                    outputAmount,
+                    cityStorage.GetNetworkAcceptableSpace(outputResourceId));
+                if (moved > 0)
+                {
+                    int before = outputAmount;
+                    if (state.Output.TrySpend(outputResourceId, moved))
+                    {
+                        int accepted = cityStorage.AddToNetwork(
+                            outputResourceId,
+                            moved);
+                        if (accepted != moved)
+                        {
+                            if (accepted > 0)
+                                cityStorage.TrySpendFromNetwork(
+                                    outputResourceId,
+                                    accepted);
+                            state.Output.Restore(outputResourceId, before);
+                        }
+                    }
+                }
+            }
+
+            FormalProductionDefinition definition = state.Definition;
+            if (definition.InputAmount <= 0 ||
+                string.IsNullOrEmpty(definition.InputResourceId))
+            {
+                return;
+            }
+            int missing = Math.Max(
+                0,
+                definition.InputCapacity -
+                state.Input.Get(definition.InputResourceId));
+            int supplied = Math.Min(
+                missing,
+                cityStorage.GetNetworkAmount(definition.InputResourceId));
+            if (supplied <= 0 || !cityStorage.TrySpendFromNetwork(
+                    definition.InputResourceId,
+                    supplied))
+            {
+                return;
+            }
+            if (state.Input.Add(
+                    definition.InputResourceId,
+                    supplied) != supplied)
+            {
+                cityStorage.AddToNetwork(
+                    definition.InputResourceId,
+                    supplied);
+            }
+        }
+
         private static void AdvanceProduction(
             BuildingProductionState state,
             float deltaSeconds,
             WorldMapModel world,
-            ResourceInventory cityInventory)
+            ResourceInventory cityInventory,
+            CityResourceStorageModel cityStorage = null)
         {
             if (state.IsPlayerPaused)
             {
@@ -128,7 +239,11 @@ namespace WasteCity.Economy
             while (true)
             {
                 if (!state.HasReservedInputs &&
-                    !TryBeginCycle(state, world, cityInventory))
+                    !TryBeginCycle(
+                        state,
+                        world,
+                        cityInventory,
+                        cityStorage))
                 {
                     return;
                 }
@@ -150,7 +265,11 @@ namespace WasteCity.Economy
 
                 if (remaining <= 0f)
                 {
-                    TryBeginCycle(state, world, cityInventory);
+                    TryBeginCycle(
+                        state,
+                        world,
+                        cityInventory,
+                        cityStorage);
                     return;
                 }
             }
@@ -159,7 +278,8 @@ namespace WasteCity.Economy
         private static bool TryBeginCycle(
             BuildingProductionState state,
             WorldMapModel world,
-            ResourceInventory cityInventory)
+            ResourceInventory cityInventory,
+            CityResourceStorageModel cityStorage = null)
         {
             FormalProductionDefinition definition = state.Definition;
             string outputResourceId = ResolveOutputResourceId(state, world);
@@ -196,9 +316,12 @@ namespace WasteCity.Economy
                     0,
                     definition.InputAmount -
                     state.Input.Get(definition.InputResourceId));
-                bool cityCouldSupply = cityInventory != null &&
-                    cityInventory.Get(definition.InputResourceId) >=
-                    localShortfall;
+                int cityAvailable = cityStorage != null
+                    ? cityStorage.GetNetworkAmount(definition.InputResourceId)
+                    : cityInventory == null
+                        ? 0
+                        : cityInventory.Get(definition.InputResourceId);
+                bool cityCouldSupply = cityAvailable >= localShortfall;
                 state.SetStopReason(
                     !state.IsLogisticsConnected && cityCouldSupply
                         ? ProductionStopReason.OutOfLogistics

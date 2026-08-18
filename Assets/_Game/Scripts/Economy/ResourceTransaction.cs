@@ -289,6 +289,47 @@ namespace WasteCity.Economy
             return CompletedOrPartial(requestedAmount, acceptable);
         }
 
+        public static ResourceTransferResult TransferToBackpack(
+            CityResourceStorageModel source,
+            PlayerBackpackModel target,
+            string resourceId,
+            int requestedAmount)
+        {
+            if (source == null || target == null ||
+                !ResourceCapacityPolicy.IsRegisteredResource(resourceId) ||
+                requestedAmount <= 0)
+            {
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.InvalidRequest);
+            }
+            int available = source.GetNetworkAmount(resourceId);
+            if (available <= 0)
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.SourceEmpty);
+            int acceptable = GetBackpackAcceptableAmount(
+                target,
+                resourceId,
+                Math.Min(requestedAmount, available));
+            if (acceptable <= 0)
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.TargetFull);
+
+            BackpackSlot[] before = target.CaptureSlots();
+            if (!source.TrySpendFromNetwork(resourceId, acceptable))
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.CommitFailed);
+            if (target.Add(resourceId, acceptable) != acceptable)
+            {
+                target.RestoreSlots(before);
+                source.AddToNetwork(resourceId, acceptable);
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.CommitFailed);
+            }
+            return CompletedOrPartial(requestedAmount, acceptable);
+        }
+
         public static ResourceTransferResult TransferFromBackpack(
             PlayerBackpackModel source,
             ResourceInventory target,
@@ -453,6 +494,51 @@ namespace WasteCity.Economy
                     ResourceTransferStatus.CommitFailed);
             }
 
+            return CompletedOrPartial(requestedAmount, acceptable);
+        }
+
+        public static ResourceTransferResult TransferFromBackpackSlot(
+            PlayerBackpackModel source,
+            int sourceSlotIndex,
+            CityResourceStorageModel target,
+            int requestedAmount)
+        {
+            if (source == null || target == null ||
+                sourceSlotIndex < 0 || sourceSlotIndex >= source.SlotCount ||
+                requestedAmount <= 0)
+            {
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.InvalidRequest);
+            }
+            BackpackSlot slot = source.GetSlot(sourceSlotIndex);
+            if (!ResourceCapacityPolicy.IsRegisteredResource(slot.ResourceId) ||
+                slot.Amount <= 0)
+            {
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.SourceEmpty);
+            }
+            int acceptable = target.GetNetworkAcceptableAmount(
+                slot.ResourceId,
+                Math.Min(requestedAmount, slot.Amount));
+            if (acceptable <= 0)
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.TargetFull);
+
+            BackpackSlot[] before = source.CaptureSlots();
+            if (source.RemoveFromSlot(sourceSlotIndex, acceptable) != acceptable)
+            {
+                source.RestoreSlots(before);
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.CommitFailed);
+            }
+            if (target.AddToNetwork(slot.ResourceId, acceptable) != acceptable)
+            {
+                source.RestoreSlots(before);
+                return new ResourceTransferResult(
+                    requestedAmount, 0, ResourceTransferStatus.CommitFailed);
+            }
             return CompletedOrPartial(requestedAmount, acceptable);
         }
 

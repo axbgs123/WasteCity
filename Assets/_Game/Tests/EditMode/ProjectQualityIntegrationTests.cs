@@ -491,7 +491,7 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(61));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(66));
             ProjectReuseEntry resourceInventory = catalog.ReuseEntries.Single(
                 entry => string.Equals(
                     entry.Id,

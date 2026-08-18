@@ -199,6 +199,31 @@ namespace WasteCity.Tests
             Assert.That(model.Active.Id.Value, Is.EqualTo(BasicMetallurgy));
         }
 
+        [Test]
+        public void ResearchSpendsAndRefundsThroughConnectedWarehouse()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            var core = new ResourceInventory(500);
+            using var city = new CityResourceStorageModel(core, 150);
+            const string warehouseId = "building.instance.research-storage";
+            Assert.That(city.TryRegisterWarehouse(
+                warehouseId,
+                connected: true), Is.True);
+            Assert.That(city.AddToWarehouse(
+                warehouseId,
+                ResourceIds.Iron,
+                10), Is.EqualTo(10));
+
+            Assert.That(runtime.TryStart(
+                BasicMetallurgy,
+                city,
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(city.GetNetworkAmount(ResourceIds.Iron), Is.Zero);
+            Assert.That(runtime.TryCancel(city), Is.True);
+            Assert.That(city.GetNetworkAmount(ResourceIds.Iron), Is.EqualTo(8));
+        }
+
         [TestCase(CityMode.Fortress, 10f)]
         [TestCase(CityMode.Mobile, 15f)]
         [TestCase(CityMode.Deploying, 15f)]

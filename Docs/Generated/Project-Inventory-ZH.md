@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`da61cac4cc27626fe3ac0904c5d9e4b9b5d08242a35f4ceda62a72649c04ac91`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`25c3345ef317904a296abcbbe691081b1854d543b6dfd3e8a14da73e0b4803d7`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -104,6 +104,7 @@
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Economy/AlchemyModel.cs`
 - `Assets/_Game/Scripts/Economy/BuildingProductionState.cs`
+- `Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`
 - `Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`
 - `Assets/_Game/Scripts/Economy/ElixirController.cs`
 - `Assets/_Game/Scripts/Economy/FormalEconomyController.cs`
@@ -118,9 +119,11 @@
 - `Assets/_Game/Scripts/Economy/ResourceIds.cs`
 - `Assets/_Game/Scripts/Economy/ResourceInventory.cs`
 - `Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`
+- `Assets/_Game/Scripts/Economy/ResourceShortfallRules.cs`
 - `Assets/_Game/Scripts/Economy/ResourceTransaction.cs`
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/TechnologyProductionController.cs`
+- `Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
@@ -198,10 +201,13 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
+- `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibraryProvider.cs`
@@ -316,6 +322,7 @@
 - `WasteCity.Graybox3D.GrayboxInputRouter`：`Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
 - `WasteCity.Graybox3D.GrayboxLeaderController3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs`
 - `WasteCity.Graybox3D.GrayboxMobileCityController3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs`
+- `WasteCity.Graybox3D.GrayboxResourceNodeMarker3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`
 - `WasteCity.Graybox3D.GrayboxSceneBootstrap`：`Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs`
 - `WasteCity.Graybox3D.GrayboxUrpScope`：`Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs`
 - `WasteCity.Graybox3D.GrayboxVisualSlot`：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`
@@ -350,6 +357,7 @@
 ## 6. ScriptableObject 资源
 - `WasteCity.ArtIntegration3D.FirstArtRuinsCliffProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
+- `WasteCity.Graybox3D.ResourceIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `WasteCity.Presentation.VisualDefinition`：`Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `WasteCity.Presentation.VisualLibrary`：`Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 ## 7. 界面所有者
@@ -395,10 +403,13 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
+- `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibraryProvider.cs`

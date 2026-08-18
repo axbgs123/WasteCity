@@ -30,6 +30,7 @@ namespace WasteCity.Graybox3D.Building
             new Color(.22f, .22f, .22f, .92f);
 
         [SerializeField] private Canvas canvas;
+        [SerializeField] private ResourceIconCatalog3D resourceIconCatalog;
 
         private RectTransform uiRoot;
         private RectTransform resourceStatusBar;
@@ -42,6 +43,12 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform backpackPage;
         private RectTransform craftingPage;
         private RectTransform productionStateContent;
+        private RectTransform productionStatePanel;
+        private RectTransform warehouseDetailPanel;
+        private Text warehouseStableId;
+        private Text warehouseLogistics;
+        private Text warehouseCapacity;
+        private Text warehouseFilterStatus;
         private RectTransform researchActiveRoot;
         private Text researchActiveName;
         private Text researchActiveProgress;
@@ -63,12 +70,17 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, ResourceRow>(StringComparer.Ordinal);
         private readonly Dictionary<string, Text> cityRows =
             new Dictionary<string, Text>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Text> warehouseResourceRows =
+            new Dictionary<string, Text>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Button> warehouseFilterButtons =
+            new Dictionary<string, Button>(StringComparer.Ordinal);
         private readonly Dictionary<string, Button> recipeButtons =
             new Dictionary<string, Button>(StringComparer.Ordinal);
         private readonly Dictionary<string, ResearchRow> researchRows =
             new Dictionary<string, ResearchRow>(StringComparer.Ordinal);
         private readonly Text[] backpackSlotLabels = new Text[30];
         private readonly Button[] backpackSlotButtons = new Button[30];
+        private readonly Image[] backpackSlotIcons = new Image[30];
         private readonly List<ProductionRow> productionRows =
             new List<ProductionRow>();
 
@@ -84,6 +96,7 @@ namespace WasteCity.Graybox3D.Building
         public event Action<string> ResearchSelected;
         public event Action ResearchStartRequested;
         public event Action ResearchCancelRequested;
+        public event Action<string, string> WarehouseFilterRequested;
         public event Action InventoryCloseRequested;
 
         public bool IsInventoryOpen =>
@@ -124,6 +137,7 @@ namespace WasteCity.Graybox3D.Building
             ResearchSelected = null;
             ResearchStartRequested = null;
             ResearchCancelRequested = null;
+            WarehouseFilterRequested = null;
             InventoryCloseRequested = null;
             canvas = null;
         }
@@ -135,6 +149,15 @@ namespace WasteCity.Graybox3D.Building
             if (ReferenceEquals(canvas, value) && uiRoot != null) return;
             DestroyUi();
             canvas = value;
+            TryBuildUi();
+        }
+
+        public void ConfigureResourceIcons(ResourceIconCatalog3D catalog)
+        {
+            if (ReferenceEquals(resourceIconCatalog, catalog) && uiRoot != null)
+                return;
+            DestroyUi();
+            resourceIconCatalog = catalog;
             TryBuildUi();
         }
 
@@ -245,6 +268,14 @@ namespace WasteCity.Graybox3D.Building
             label.text = string.IsNullOrWhiteSpace(resourceId) || amount <= 0
                 ? "空"
                 : ResourceName(resourceId) + "\n" + amount;
+            Image icon = backpackSlotIcons[index];
+            if (icon != null)
+            {
+                bool visible = !string.IsNullOrWhiteSpace(resourceId) &&
+                    amount > 0;
+                icon.sprite = visible ? ResolveIcon(resourceId) : null;
+                icon.gameObject.SetActive(visible && icon.sprite != null);
+            }
         }
 
         public void SetBackpackSelection(
@@ -313,6 +344,75 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
             if (index < 0 || productionStateContent == null) return;
             EnsureProductionRow(index).AccessStatus.text = status ?? string.Empty;
+        }
+
+        public void SetProductionResourceIcons(
+            int index,
+            string inputResourceId,
+            string outputResourceId)
+        {
+            TryBuildUi();
+            if (index < 0 || productionStateContent == null) return;
+            ProductionRow row = EnsureProductionRow(index);
+            SetIcon(row.InputIcon, inputResourceId);
+            SetIcon(row.OutputIcon, outputResourceId);
+        }
+
+        public void SetWarehouseDetail(
+            WarehouseStorageSnapshot snapshot,
+            string feedback,
+            bool visible)
+        {
+            TryBuildUi();
+            if (warehouseDetailPanel == null) return;
+            warehouseDetailPanel.gameObject.SetActive(visible);
+            if (productionStatePanel != null)
+                productionStatePanel.gameObject.SetActive(!visible);
+            if (!visible || snapshot == null) return;
+
+            warehouseStableId.text = snapshot.StableInstanceId;
+            warehouseLogistics.text = snapshot.IsConnected
+                ? "物流：已连接城市库存"
+                : "物流：脱离物流（内容保留）";
+            warehouseCapacity.text = "共享容量：" + snapshot.TotalAmount +
+                "/" + snapshot.Capacity + " · 剩余 " + snapshot.FreeSpace;
+            warehouseFilterStatus.text = "当前过滤：" +
+                (string.IsNullOrWhiteSpace(snapshot.FilterResourceId)
+                    ? "不限资源"
+                    : ResourceName(snapshot.FilterResourceId)) +
+                (string.IsNullOrWhiteSpace(feedback)
+                    ? string.Empty
+                    : " · " + feedback);
+
+            foreach (ResourceDefinition definition in
+                     ResourceDefinitionCatalog.All)
+            {
+                if (warehouseResourceRows.TryGetValue(
+                        definition.Id,
+                        out Text row))
+                {
+                    row.text = definition.ChineseName + "  " +
+                        snapshot.Get(definition.Id);
+                }
+                if (warehouseFilterButtons.TryGetValue(
+                        definition.Id,
+                        out Button button))
+                {
+                    button.image.color = string.Equals(
+                            snapshot.FilterResourceId,
+                            definition.Id,
+                            StringComparison.Ordinal)
+                        ? SelectedColor
+                        : ButtonColor;
+                }
+            }
+            if (warehouseFilterButtons.TryGetValue(string.Empty, out Button any))
+            {
+                any.image.color = string.IsNullOrWhiteSpace(
+                        snapshot.FilterResourceId)
+                    ? SelectedColor
+                    : ButtonColor;
+            }
         }
 
         public void SetProductionPaused(
@@ -498,20 +598,12 @@ namespace WasteCity.Graybox3D.Building
                 bool isBase = ContainsResource(
                     ResourceDefinitionCatalog.BaseHudResourceIds,
                     definition.Id);
-                bool isConditional = string.Equals(
-                        definition.Id,
-                        ResourceIds.Alloy,
-                        StringComparison.Ordinal) ||
-                    string.Equals(
-                        definition.Id,
-                        ResourceIds.Ammunition,
-                        StringComparison.Ordinal);
-                if (!isBase && !isConditional) continue;
                 string resourceId = definition.Id;
                 ResourceRow row = CreateResourceRow(
                     items,
                     "ResourceStatus.Item." + resourceId,
                     definition.ChineseName,
+                    resourceId,
                     () => ResourceClicked?.Invoke(resourceId),
                     compact: true);
                 var trigger = row.Root.gameObject.AddComponent<EventTrigger>();
@@ -586,6 +678,7 @@ namespace WasteCity.Graybox3D.Building
                     grid,
                     "ResourceLedger.Item." + definition.Id,
                     definition.ChineseName,
+                    definition.Id,
                     callback: null,
                     compact: false);
                 ledgerRows.Add(definition.Id, row);
@@ -594,6 +687,7 @@ namespace WasteCity.Graybox3D.Building
             RectTransform production = CreateRect(
                 body,
                 "ProductionState.Panel");
+            productionStatePanel = production;
             SetLayout(production, 0f, 0f, 1f);
             Image productionBackground =
                 production.gameObject.AddComponent<Image>();
@@ -642,11 +736,149 @@ namespace WasteCity.Graybox3D.Building
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 24f;
 
+            BuildWarehouseDetail(body);
+
             CreateButton(
                 resourceLedgerPanel,
                 "ResourceLedger.Close",
                 "关闭",
                 () => SetLedgerOpen(false));
+        }
+
+        private void BuildWarehouseDetail(Transform parent)
+        {
+            warehouseDetailPanel = CreateRect(parent, "WarehouseDetailPanel");
+            SetLayout(warehouseDetailPanel, 0f, 0f, 1f);
+            Image background =
+                warehouseDetailPanel.gameObject.AddComponent<Image>();
+            background.color = new Color(.09f, .12f, .14f, .94f);
+            background.raycastTarget = false;
+            AddVerticalLayout(warehouseDetailPanel, 8, 4f);
+
+            Text title = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.Title",
+                "仓库真实库存",
+                16);
+            SetLayout(title.rectTransform, 0f, 28f, 1f);
+            warehouseStableId = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.StableId",
+                string.Empty,
+                10);
+            warehouseStableId.alignment = TextAnchor.MiddleLeft;
+            SetLayout(warehouseStableId.rectTransform, 0f, 20f, 1f);
+            warehouseLogistics = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.Logistics",
+                string.Empty,
+                12);
+            warehouseLogistics.alignment = TextAnchor.MiddleLeft;
+            SetLayout(warehouseLogistics.rectTransform, 0f, 22f, 1f);
+            warehouseCapacity = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.Capacity",
+                string.Empty,
+                12);
+            warehouseCapacity.alignment = TextAnchor.MiddleLeft;
+            SetLayout(warehouseCapacity.rectTransform, 0f, 22f, 1f);
+
+            RectTransform contents = CreateRect(
+                warehouseDetailPanel,
+                "WarehouseDetail.Resources");
+            SetLayout(contents, 0f, 210f, 1f);
+            var contentsLayout =
+                contents.gameObject.AddComponent<GridLayoutGroup>();
+            contentsLayout.cellSize = new Vector2(142f, 36f);
+            contentsLayout.spacing = new Vector2(5f, 5f);
+            contentsLayout.constraint =
+                GridLayoutGroup.Constraint.FixedColumnCount;
+            contentsLayout.constraintCount = 3;
+            foreach (ResourceDefinition definition in
+                     ResourceDefinitionCatalog.All)
+            {
+                RectTransform row = CreateRect(
+                    contents,
+                    "WarehouseDetail.Resource." + definition.Id);
+                Image rowBackground = row.gameObject.AddComponent<Image>();
+                rowBackground.color = ButtonColor;
+                rowBackground.raycastTarget = false;
+                CreateOverlayResourceIcon(
+                    row,
+                    "WarehouseDetail.Resource." + definition.Id + ".Icon",
+                    definition.Id,
+                    28f,
+                    new Vector2(18f, 0f));
+                Text label = CreateLabel(
+                    row,
+                    "WarehouseDetail.Resource." + definition.Id + ".Amount",
+                    definition.ChineseName + "  0",
+                    10);
+                label.alignment = TextAnchor.MiddleLeft;
+                label.rectTransform.offsetMin = new Vector2(38f, 0f);
+                warehouseResourceRows.Add(definition.Id, label);
+            }
+
+            Text filterTitle = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.Filter",
+                "入库过滤（共享容量仍为 150）",
+                12);
+            filterTitle.alignment = TextAnchor.MiddleLeft;
+            SetLayout(filterTitle.rectTransform, 0f, 20f, 1f);
+            RectTransform filters = CreateRect(
+                warehouseDetailPanel,
+                "WarehouseDetail.Filter.Options");
+            SetLayout(filters, 0f, 156f, 1f);
+            var filterLayout = filters.gameObject.AddComponent<GridLayoutGroup>();
+            filterLayout.cellSize = new Vector2(104f, 34f);
+            filterLayout.spacing = new Vector2(5f, 5f);
+            filterLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            filterLayout.constraintCount = 4;
+            Button any = CreateButton(
+                filters,
+                "WarehouseDetail.Filter.Any",
+                "不限",
+                () => RequestWarehouseFilter(null));
+            warehouseFilterButtons.Add(string.Empty, any);
+            foreach (ResourceDefinition definition in
+                     ResourceDefinitionCatalog.All)
+            {
+                string resourceId = definition.Id;
+                Button button = CreateButton(
+                    filters,
+                    "WarehouseDetail.Filter." + resourceId,
+                    definition.ChineseName,
+                    () => RequestWarehouseFilter(resourceId));
+                CreateOverlayResourceIcon(
+                    button.transform,
+                    "WarehouseDetail.Filter." + resourceId + ".Icon",
+                    resourceId,
+                    22f,
+                    new Vector2(14f, 0f));
+                Text label = button.GetComponentInChildren<Text>(true);
+                if (label != null)
+                    label.rectTransform.offsetMin = new Vector2(28f, 0f);
+                warehouseFilterButtons.Add(resourceId, button);
+            }
+            warehouseFilterStatus = CreateLabel(
+                warehouseDetailPanel,
+                "WarehouseDetail.FilterStatus",
+                string.Empty,
+                11);
+            warehouseFilterStatus.alignment = TextAnchor.MiddleLeft;
+            warehouseFilterStatus.color = new Color(.95f, .78f, .42f, 1f);
+            SetLayout(warehouseFilterStatus.rectTransform, 0f, 24f, 1f);
+            warehouseDetailPanel.gameObject.SetActive(false);
+        }
+
+        private void RequestWarehouseFilter(string resourceId)
+        {
+            string stableId = warehouseStableId == null
+                ? null
+                : warehouseStableId.text;
+            if (!string.IsNullOrWhiteSpace(stableId))
+                WarehouseFilterRequested?.Invoke(stableId, resourceId);
         }
 
         private void BuildInventoryCrafting()
@@ -739,9 +971,18 @@ namespace WasteCity.Graybox3D.Building
                     "Inventory.City." + resourceId,
                     definition.ChineseName + "  0",
                     data => HandleCityResourceClick(resourceId, data));
+                CreateOverlayResourceIcon(
+                    button.transform,
+                    "Inventory.City." + resourceId + ".Icon",
+                    resourceId,
+                    34f,
+                    new Vector2(24f, 0f));
+                Text label = button.GetComponentInChildren<Text>(true);
+                if (label != null)
+                    label.rectTransform.offsetMin = new Vector2(48f, 0f);
                 cityRows.Add(
                     resourceId,
-                    button.GetComponentInChildren<Text>(true));
+                    label);
             }
         }
 
@@ -764,6 +1005,17 @@ namespace WasteCity.Graybox3D.Building
                 backpackSlotButtons[capturedIndex] = button;
                 backpackSlotLabels[capturedIndex] =
                     button.GetComponentInChildren<Text>(true);
+                backpackSlotIcons[capturedIndex] = CreateOverlayResourceIcon(
+                    button.transform,
+                    "Inventory.Backpack.Slot." + capturedIndex + ".Icon",
+                    null,
+                    30f,
+                    new Vector2(40f, 14f));
+                backpackSlotIcons[capturedIndex].gameObject.SetActive(false);
+                backpackSlotLabels[capturedIndex].rectTransform.offsetMin =
+                    new Vector2(0f, 0f);
+                backpackSlotLabels[capturedIndex].rectTransform.offsetMax =
+                    new Vector2(0f, -24f);
             }
         }
 
@@ -787,6 +1039,16 @@ namespace WasteCity.Graybox3D.Building
                     66f,
                     1f);
                 recipeButtons.Add(recipeId, button);
+                AddAmountIcons(
+                    button.transform,
+                    "Crafting.Recipe." + recipeId + ".Input.",
+                    definition.Inputs,
+                    new Vector2(22f, 20f));
+                AddAmountIcons(
+                    button.transform,
+                    "Crafting.Recipe." + recipeId + ".Output.",
+                    definition.Outputs,
+                    new Vector2(22f, -20f));
             }
 
             RectTransform queue = CreateRect(
@@ -882,6 +1144,11 @@ namespace WasteCity.Graybox3D.Building
                     "待刷新",
                     12);
                 Anchor(state.rectTransform, 0f, .18f);
+                AddAmountIcons(
+                    rect,
+                    "Research.Node." + definition.Id.Value + ".Cost.",
+                    definition.Costs,
+                    new Vector2(18f, 14f));
                 researchRows.Add(
                     definition.Id.Value,
                     new ResearchRow(button, name, details, state));
@@ -938,6 +1205,7 @@ namespace WasteCity.Graybox3D.Building
             Transform parent,
             string name,
             string title,
+            string resourceId,
             Action callback,
             bool compact)
         {
@@ -962,8 +1230,21 @@ namespace WasteCity.Graybox3D.Building
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
-            Text nameLabel = CreateLabel(rect, name + ".Name", title, 12);
-            SetLayout(nameLabel.rectTransform, 0f, compact ? 16f : 20f, 1f);
+            RectTransform header = CreateRect(rect, name + ".Header");
+            SetLayout(header, 0f, compact ? 16f : 20f, 1f);
+            var headerLayout =
+                header.gameObject.AddComponent<HorizontalLayoutGroup>();
+            headerLayout.spacing = 3f;
+            headerLayout.childAlignment = TextAnchor.MiddleCenter;
+            headerLayout.childForceExpandWidth = false;
+            headerLayout.childForceExpandHeight = true;
+            Image icon = CreateResourceIcon(
+                header,
+                name + ".Icon",
+                resourceId);
+            SetLayout(icon.rectTransform, compact ? 15f : 18f, 0f, 0f);
+            Text nameLabel = CreateLabel(header, name + ".Name", title, 12);
+            SetLayout(nameLabel.rectTransform, 0f, 0f, 1f);
 
             RectTransform values = CreateRect(rect, name + ".Values");
             SetLayout(values, 0f, compact ? 28f : 34f, 1f);
@@ -974,7 +1255,7 @@ namespace WasteCity.Graybox3D.Building
             Text amount = CreateLabel(values, name + ".Amount", "0", 12);
             Text capacity = CreateLabel(values, name + ".Capacity", "/0", 12);
             Text flow = CreateLabel(values, name + ".NetFlow", "0/s", 12);
-            return new ResourceRow(rect, amount, capacity, flow, button);
+            return new ResourceRow(rect, icon, amount, capacity, flow, button);
         }
 
         private void HandleCityResourceClick(
@@ -1101,6 +1382,14 @@ namespace WasteCity.Graybox3D.Building
                 "输入：",
                 10);
             input.alignment = TextAnchor.MiddleLeft;
+            Image inputIcon = CreateOverlayResourceIcon(
+                input.transform,
+                "ProductionState.Item." + index + ".Input.Icon",
+                null,
+                14f,
+                new Vector2(8f, 0f));
+            inputIcon.gameObject.SetActive(false);
+            input.rectTransform.offsetMin = new Vector2(22f, 0f);
             SetLayout(input.rectTransform, 0f, 15f, 1f);
             Text output = CreateLabel(
                 root,
@@ -1108,6 +1397,14 @@ namespace WasteCity.Graybox3D.Building
                 "输出：",
                 10);
             output.alignment = TextAnchor.MiddleLeft;
+            Image outputIcon = CreateOverlayResourceIcon(
+                output.transform,
+                "ProductionState.Item." + index + ".Output.Icon",
+                null,
+                14f,
+                new Vector2(8f, 0f));
+            outputIcon.gameObject.SetActive(false);
+            output.rectTransform.offsetMin = new Vector2(22f, 0f);
             SetLayout(output.rectTransform, 0f, 15f, 1f);
 
             RectTransform actions = CreateRect(
@@ -1171,6 +1468,8 @@ namespace WasteCity.Graybox3D.Building
                 status,
                 input,
                 output,
+                inputIcon,
+                outputIcon,
                 pause,
                 accessStatus);
         }
@@ -1240,6 +1539,12 @@ namespace WasteCity.Graybox3D.Building
             backpackPage = null;
             craftingPage = null;
             productionStateContent = null;
+            productionStatePanel = null;
+            warehouseDetailPanel = null;
+            warehouseStableId = null;
+            warehouseLogistics = null;
+            warehouseCapacity = null;
+            warehouseFilterStatus = null;
             researchActiveRoot = null;
             researchActiveName = null;
             researchActiveProgress = null;
@@ -1252,11 +1557,14 @@ namespace WasteCity.Graybox3D.Building
             statusRows.Clear();
             ledgerRows.Clear();
             cityRows.Clear();
+            warehouseResourceRows.Clear();
+            warehouseFilterButtons.Clear();
             recipeButtons.Clear();
             researchRows.Clear();
             productionRows.Clear();
             Array.Clear(backpackSlotLabels, 0, backpackSlotLabels.Length);
             Array.Clear(backpackSlotButtons, 0, backpackSlotButtons.Length);
+            Array.Clear(backpackSlotIcons, 0, backpackSlotIcons.Length);
             selectedBackpackSlot = -1;
             productionStateCount = 0;
             hoveredResourceId = null;
@@ -1319,6 +1627,69 @@ namespace WasteCity.Graybox3D.Building
                 EventTriggerType.PointerClick,
                 data => callback?.Invoke(data as PointerEventData));
             return button;
+        }
+
+        private Image CreateResourceIcon(
+            Transform parent,
+            string name,
+            string resourceId)
+        {
+            RectTransform rect = CreateRect(parent, name);
+            var icon = rect.gameObject.AddComponent<Image>();
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            icon.sprite = ResolveIcon(resourceId);
+            return icon;
+        }
+
+        private Image CreateOverlayResourceIcon(
+            Transform parent,
+            string name,
+            string resourceId,
+            float size,
+            Vector2 anchoredPosition)
+        {
+            Image icon = CreateResourceIcon(parent, name, resourceId);
+            RectTransform rect = icon.rectTransform;
+            rect.anchorMin = new Vector2(0f, .5f);
+            rect.anchorMax = new Vector2(0f, .5f);
+            rect.pivot = new Vector2(.5f, .5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = new Vector2(size, size);
+            return icon;
+        }
+
+        private void AddAmountIcons(
+            Transform parent,
+            string namePrefix,
+            IReadOnlyList<ResourceAmount> amounts,
+            Vector2 firstPosition)
+        {
+            if (amounts == null) return;
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                ResourceAmount amount = amounts[index];
+                CreateOverlayResourceIcon(
+                    parent,
+                    namePrefix + amount.ResourceId + ".Icon",
+                    amount.ResourceId,
+                    20f,
+                    firstPosition + Vector2.right * (index * 24f));
+            }
+        }
+
+        private Sprite ResolveIcon(string resourceId)
+        {
+            return resourceIconCatalog == null
+                ? ResourceIconCatalog3D.Resolve(resourceId)
+                : resourceIconCatalog.ResolveIcon(resourceId);
+        }
+
+        private void SetIcon(Image icon, string resourceId)
+        {
+            if (icon == null) return;
+            icon.sprite = ResolveIcon(resourceId);
+            icon.gameObject.SetActive(icon.sprite != null);
         }
 
         private static Text CreateLabel(
@@ -1512,12 +1883,14 @@ namespace WasteCity.Graybox3D.Building
         {
             public ResourceRow(
                 RectTransform root,
+                Image icon,
                 Text amount,
                 Text capacity,
                 Text netFlow,
                 Button button)
             {
                 Root = root;
+                Icon = icon;
                 Amount = amount;
                 Capacity = capacity;
                 NetFlow = netFlow;
@@ -1525,6 +1898,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             public RectTransform Root { get; }
+            public Image Icon { get; }
             public Text Amount { get; }
             public Text Capacity { get; }
             public Text NetFlow { get; }
@@ -1566,6 +1940,8 @@ namespace WasteCity.Graybox3D.Building
                 Text status,
                 Text input,
                 Text output,
+                Image inputIcon,
+                Image outputIcon,
                 Button pause,
                 Text accessStatus)
             {
@@ -1576,6 +1952,8 @@ namespace WasteCity.Graybox3D.Building
                 Status = status;
                 Input = input;
                 Output = output;
+                InputIcon = inputIcon;
+                OutputIcon = outputIcon;
                 Pause = pause;
                 AccessStatus = accessStatus;
             }
@@ -1588,6 +1966,8 @@ namespace WasteCity.Graybox3D.Building
             public Text Status { get; }
             public Text Input { get; }
             public Text Output { get; }
+            public Image InputIcon { get; }
+            public Image OutputIcon { get; }
             public Button Pause { get; }
             public Text AccessStatus { get; }
         }

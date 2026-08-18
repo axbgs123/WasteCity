@@ -32,6 +32,10 @@ namespace WasteCity.Editor
             "GrayboxUniversalRenderer.asset";
         private const string MaterialPath =
             "Assets/_Game/Rendering/Graybox3D/GrayboxLit.mat";
+        private const string PreviewMaterialPath =
+            "Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat";
+        private const string ResourceIconCatalogPath =
+            "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset";
         private const string DefaultRendererPath =
             "Packages/com.unity.render-pipelines.universal/" +
             "Runtime/Data/UniversalRendererData.asset";
@@ -255,6 +259,9 @@ namespace WasteCity.Editor
             UniversalRenderPipelineAsset pipeline =
                 EnsurePipeline(renderer);
             Material material = EnsureMaterial(litShader);
+            Material previewMaterial = EnsurePreviewMaterial(litShader);
+            ResourceIconCatalog3D resourceIconCatalog =
+                EnsureResourceIconCatalog();
             AssetDatabase.SaveAssets();
 
             if (!hasExistingScene)
@@ -263,8 +270,15 @@ namespace WasteCity.Editor
                 scene = CreateFoundationScene(pipeline, material);
             }
             BuildingContractReferences buildingReferences =
-                EnsureBuildingContract(scene, material);
-            EnsureUsabilityContract(scene, buildingReferences);
+                EnsureBuildingContract(
+                    scene,
+                    material,
+                    previewMaterial,
+                    resourceIconCatalog);
+            EnsureUsabilityContract(
+                scene,
+                buildingReferences,
+                resourceIconCatalog);
             EnsurePlayableInitialDeployment(scene);
             if (!hasExistingScene)
             {
@@ -446,6 +460,60 @@ namespace WasteCity.Editor
             }
 
             return material;
+        }
+
+        private static Material EnsurePreviewMaterial(Shader litShader)
+        {
+            Material material =
+                AssetDatabase.LoadAssetAtPath<Material>(PreviewMaterialPath);
+            if (material == null)
+            {
+                material = new Material(litShader)
+                {
+                    name = "GrayboxPreview"
+                };
+                AssetDatabase.CreateAsset(material, PreviewMaterialPath);
+            }
+            else if (material.shader != litShader)
+            {
+                material.shader = litShader;
+            }
+
+            material.SetOverrideTag("RenderType", "Transparent");
+            material.SetFloat("_Surface", 1f);
+            material.SetFloat("_Blend", 0f);
+            material.SetFloat(
+                "_SrcBlend",
+                (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat(
+                "_DstBlend",
+                (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.DisableKeyword("_ALPHATEST_ON");
+            material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.renderQueue =
+                (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            material.SetShaderPassEnabled("ShadowCaster", false);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        private static ResourceIconCatalog3D EnsureResourceIconCatalog()
+        {
+            ResourceIconCatalog3D catalog =
+                AssetDatabase.LoadAssetAtPath<ResourceIconCatalog3D>(
+                    ResourceIconCatalogPath);
+            if (catalog == null)
+            {
+                catalog = ScriptableObject.CreateInstance<
+                    ResourceIconCatalog3D>();
+                catalog.name = "ResourceIconCatalog3D";
+                AssetDatabase.CreateAsset(catalog, ResourceIconCatalogPath);
+            }
+            if (!catalog.TryValidate(out string error))
+                throw new InvalidOperationException(error);
+            return catalog;
         }
 
         private static bool TryOpenAndValidateFoundation(out Scene scene)
@@ -724,7 +792,9 @@ namespace WasteCity.Editor
 
         private static BuildingContractReferences EnsureBuildingContract(
             Scene scene,
-            Material material)
+            Material material,
+            Material previewMaterial,
+            ResourceIconCatalog3D resourceIconCatalog)
         {
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform building = EnsureChild(root.transform, "GrayboxBuilding");
@@ -830,6 +900,7 @@ namespace WasteCity.Editor
                 ("instanceRoot", instanceRoot),
                 ("infrastructureRoot", infrastructureRoot),
                 ("sharedMaterial", material),
+                ("previewMaterial", previewMaterial),
                 ("city", city));
             SetReferences(
                 surfaceProjector,
@@ -851,7 +922,11 @@ namespace WasteCity.Editor
                 ("eventSystem", eventSystem),
                 ("session", session),
                 ("interaction", interaction),
-                ("placement", placement));
+                ("placement", placement),
+                ("resourceIconCatalog", resourceIconCatalog));
+            SetReferences(
+                world,
+                ("resourceIconCatalog", resourceIconCatalog));
             SetReferences(
                 construction,
                 ("session", session),
@@ -909,7 +984,8 @@ namespace WasteCity.Editor
 
         private static void EnsureUsabilityContract(
             Scene scene,
-            BuildingContractReferences buildingReferences)
+            BuildingContractReferences buildingReferences,
+            ResourceIconCatalog3D resourceIconCatalog)
         {
             if (buildingReferences == null)
                 throw new ArgumentNullException(nameof(buildingReferences));
@@ -985,7 +1061,8 @@ namespace WasteCity.Editor
             SetReferences(controller, ("view", view));
             SetReferences(
                 operationsView,
-                ("canvas", operationsCanvas));
+                ("canvas", operationsCanvas),
+                ("resourceIconCatalog", resourceIconCatalog));
             SetReferences(
                 operationsController,
                 ("session", buildingReferences.Session),

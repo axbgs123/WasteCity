@@ -21,6 +21,10 @@ namespace WasteCity.Building
                  string.Equals(
                      resourceId,
                      ResourceIds.EnergyCrystal,
+                     StringComparison.Ordinal) ||
+                 string.Equals(
+                     resourceId,
+                     ResourceIds.Stone,
                      StringComparison.Ordinal));
         }
     }

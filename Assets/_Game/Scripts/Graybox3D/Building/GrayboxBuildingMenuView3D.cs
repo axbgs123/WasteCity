@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.Content;
+using WasteCity.Economy;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -23,6 +24,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private EventSystem eventSystem;
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxBuildingInteractionModel3D interaction;
+        [SerializeField] private ResourceIconCatalog3D resourceIconCatalog;
         [SerializeField]
         private GrayboxBuildingPlacementController3D placement;
 
@@ -45,6 +47,9 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxBuildingInteractionState lastPlacementState;
         private BuildingPlacementFailure lastPlacementFailure;
         private bool lastPlacementValid;
+        private string lastPlacementBuildingId;
+        private BuildingOrientation lastPlacementOrientation;
+        private ulong lastPlacementStorageRevision;
         private bool hasCatalogRevision;
         private uint lastCatalogRevision;
         private bool constructionCancellationBlocked;
@@ -882,13 +887,25 @@ namespace WasteCity.Graybox3D.Building
             Text cost = CreateLabel(
                 summary,
                 "Cost",
-                "成本 " + definition.Cost + " " + definition.CostId);
+                "成本 " + definition.Cost + " " +
+                ResourceName(definition.CostId));
             AnchorInside(
                 cost.rectTransform,
                 new Vector2(0f, .36f),
                 new Vector2(1f, .66f),
                 Vector2.zero,
                 Vector2.zero);
+            cost.rectTransform.offsetMin = new Vector2(30f, 0f);
+            Image costIcon = CreateResourceIcon(
+                summary,
+                "Catalog.Card." + definition.Id.Value + ".Cost.Icon",
+                definition.CostId);
+            AnchorInside(
+                costIcon.rectTransform,
+                new Vector2(0f, .38f),
+                new Vector2(0f, .64f),
+                new Vector2(4f, 0f),
+                new Vector2(28f, 0f));
             if (!string.IsNullOrEmpty(item.PrimaryLockReason))
             {
                 Text reason = CreateLabel(
@@ -967,6 +984,30 @@ namespace WasteCity.Graybox3D.Building
             lines.Add("前置 " + (definition.RequiredBuildingId ?? "无"));
             lines.Add("锁定原因 " + reasons);
             return string.Join("\n", lines);
+        }
+
+        private Image CreateResourceIcon(
+            Transform parent,
+            string name,
+            string resourceId)
+        {
+            RectTransform rect = CreateRect(parent, name);
+            var icon = rect.gameObject.AddComponent<Image>();
+            icon.sprite = resourceIconCatalog == null
+                ? ResourceIconCatalog3D.Resolve(resourceId)
+                : resourceIconCatalog.ResolveIcon(resourceId);
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            return icon;
+        }
+
+        private static string ResourceName(string resourceId)
+        {
+            return ResourceDefinitionCatalog.TryGet(
+                    resourceId,
+                    out ResourceDefinition definition)
+                ? definition.ChineseName
+                : resourceId ?? string.Empty;
         }
 
         private void CreateEvacuationItem(
@@ -1074,41 +1115,122 @@ namespace WasteCity.Graybox3D.Building
         {
             if (placementStatusRoot == null || interaction == null) return;
             GrayboxBuildingInteractionState state = interaction.State;
+            BuildingDefinition selected = interaction.Selected;
+            string buildingId = selected == null
+                ? null
+                : selected.Id.Value;
+            BuildingOrientation orientation = interaction.Orientation;
             BuildingPlacementEvaluation evaluation =
                 placement == null
                     ? default
                     : placement.CurrentEvaluation;
             BuildingPlacementFailure failure =
                 evaluation.PrimaryFailure;
+            ulong storageRevision = session?.CityStorage?.Revision ?? 0ul;
             if (hasPlacementStatusCache &&
                 lastPlacementState == state &&
                 lastPlacementFailure == failure &&
-                lastPlacementValid == evaluation.IsValid)
+                lastPlacementValid == evaluation.IsValid &&
+                string.Equals(
+                    lastPlacementBuildingId,
+                    buildingId,
+                    StringComparison.Ordinal) &&
+                lastPlacementOrientation == orientation &&
+                lastPlacementStorageRevision == storageRevision)
                 return;
 
             hasPlacementStatusCache = true;
             lastPlacementState = state;
             lastPlacementFailure = failure;
             lastPlacementValid = evaluation.IsValid;
-            bool placementFailureVisible =
-                placement != null &&
+            lastPlacementBuildingId = buildingId;
+            lastPlacementOrientation = orientation;
+            lastPlacementStorageRevision = storageRevision;
+            bool previewVisible =
                 state == GrayboxBuildingInteractionState.Previewing &&
+                selected != null;
+            bool placementFailureVisible =
+                previewVisible &&
+                placement != null &&
                 !evaluation.IsValid &&
                 failure != BuildingPlacementFailure.None;
             bool deploymentFailureVisible =
-                !placementFailureVisible &&
+                !previewVisible &&
                 state == GrayboxBuildingInteractionState.Inactive &&
                 !string.IsNullOrEmpty(DeploymentFailureMessage);
             bool visible =
-                placementFailureVisible || deploymentFailureVisible;
+                previewVisible || deploymentFailureVisible;
             placementStatusRoot.gameObject.SetActive(visible);
-            if (placementFailureVisible)
-                placementStatusText.text =
-                    PlacementFailureMessage(failure);
+            if (previewVisible)
+            {
+                int width = BuildingOrientationRules.Width(
+                    selected,
+                    orientation);
+                int height = BuildingOrientationRules.Height(
+                    selected,
+                    orientation);
+                string summary = selected.Name +
+                    " · 方向 " + OrientationName(orientation) +
+                    " · 占地 " + width + "×" + height +
+                    " · R 旋转";
+                string failureMessage = failure ==
+                        BuildingPlacementFailure.InsufficientMaterials
+                    ? MaterialShortfallMessage(
+                        selected,
+                        placement.CurrentMaterialShortfalls)
+                    : PlacementFailureMessage(failure);
+                placementStatusText.text = placementFailureVisible
+                    ? summary + "\n" + failureMessage
+                    : summary + "\n可以放置";
+            }
             else if (deploymentFailureVisible)
                 placementStatusText.text = DeploymentFailureMessage;
             else if (!string.IsNullOrEmpty(placementStatusText.text))
                 placementStatusText.text = string.Empty;
+        }
+
+        private static string OrientationName(BuildingOrientation orientation)
+        {
+            switch (orientation)
+            {
+                case BuildingOrientation.North:
+                    return "北";
+                case BuildingOrientation.East:
+                    return "东";
+                case BuildingOrientation.South:
+                    return "南";
+                case BuildingOrientation.West:
+                    return "西";
+                default:
+                    return "未知";
+            }
+        }
+
+        private static string MaterialShortfallMessage(
+            BuildingDefinition definition,
+            IReadOnlyList<ResourceShortfall> shortfalls)
+        {
+            if (definition == null || shortfalls == null ||
+                shortfalls.Count == 0)
+            {
+                return PlacementFailureMessage(
+                    BuildingPlacementFailure.InsufficientMaterials);
+            }
+            string message = "无法建造" + definition.Name + "：";
+            for (var index = 0; index < shortfalls.Count; index++)
+            {
+                ResourceShortfall shortfall = shortfalls[index];
+                if (index > 0) message += "；";
+                string name = ResourceDefinitionCatalog.TryGet(
+                        shortfall.ResourceId,
+                        out ResourceDefinition resource)
+                    ? resource.ChineseName
+                    : shortfall.ResourceId;
+                message += "缺少" + name + " " + shortfall.Missing +
+                    "（拥有 " + shortfall.Owned + "，需要 " +
+                    shortfall.Required + "）";
+            }
+            return message;
         }
 
         private static InputField CreateInputField(

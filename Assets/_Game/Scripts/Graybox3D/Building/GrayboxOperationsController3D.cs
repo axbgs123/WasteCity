@@ -21,8 +21,6 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxWorldView3D worldView;
         [SerializeField] private GrayboxLeaderController3D leader;
 
-        private readonly ResourceCapacityPolicy cityCapacity =
-            new ResourceCapacityPolicy();
         private readonly Dictionary<string, float> netFlowByResource =
             new Dictionary<string, float>(StringComparer.Ordinal);
         private readonly Dictionary<string, float> incomeFlowByResource =
@@ -41,7 +39,7 @@ namespace WasteCity.Graybox3D.Building
             new HashSet<string>(StringComparer.Ordinal);
 
         private GrayboxBuildingSession3D modelSession;
-        private ResourceInventory observedInventory;
+        private CityResourceStorageModel observedStorage;
         private PlayerBackpackModel backpack;
         private CraftingQueueModel crafting;
         private DemoResearchRuntime research;
@@ -54,6 +52,8 @@ namespace WasteCity.Graybox3D.Building
         private string inventoryTransferStatus;
         private string craftingFeedback;
         private string selectedProductionId;
+        private string selectedWarehouseId;
+        private string warehouseFilterFeedback;
         private ulong lastViewFingerprint;
         private bool hasViewFingerprint;
 
@@ -123,21 +123,41 @@ namespace WasteCity.Graybox3D.Building
             view.SetResearchOpen(false);
             view.SetLedgerOpen(false);
             selectedProductionId = null;
+            selectedWarehouseId = null;
         }
 
         public bool TryOpenProductionDetail(string stableInstanceId)
+        {
+            return TryFindProductionDetails(stableInstanceId, out _) &&
+                TryOpenBuildingDetail(stableInstanceId);
+        }
+
+        public bool TryOpenBuildingDetail(string stableInstanceId)
         {
             if (!EnsureReady() ||
                 !TryFindBuildingInstance(
                     stableInstanceId,
                     out GrayboxBuildingInstance3D instance) ||
                 instance.State != GrayboxBuildingInstanceState.Completed ||
-                !instance.IsPlayerOwned ||
-                !TryFindProductionDetails(stableInstanceId, out _))
+                !instance.IsPlayerOwned)
             {
                 return false;
             }
-            selectedProductionId = stableInstanceId;
+            bool productionDetails =
+                TryFindProductionDetails(stableInstanceId, out _);
+            bool warehouseDetails = string.Equals(
+                    instance.Placement.Definition.Id.Value,
+                    BuildingCatalog.Warehouse.Id.Value,
+                    StringComparison.Ordinal) &&
+                session.CityStorage.ContainsWarehouse(stableInstanceId);
+            if (!productionDetails && !warehouseDetails) return false;
+            selectedProductionId = productionDetails
+                ? stableInstanceId
+                : null;
+            selectedWarehouseId = warehouseDetails
+                ? stableInstanceId
+                : null;
+            warehouseFilterFeedback = string.Empty;
             ClearBackpackSelection();
             view.SetInventoryOpen(false);
             view.SetResearchOpen(false);
@@ -203,6 +223,7 @@ namespace WasteCity.Graybox3D.Building
         private bool EnsureModels()
         {
             if (session == null || session.Inventory == null ||
+                session.CityStorage == null ||
                 session.Research == null)
             {
                 return false;
@@ -227,6 +248,8 @@ namespace WasteCity.Graybox3D.Building
             discoveredHudResources.Clear();
             inventoryTransferStatus = string.Empty;
             craftingFeedback = string.Empty;
+            selectedWarehouseId = null;
+            warehouseFilterFeedback = string.Empty;
             recentInventoryChanges.Clear();
             hasViewFingerprint = false;
             ClearBackpackSelection();
@@ -236,21 +259,21 @@ namespace WasteCity.Graybox3D.Building
 
         private void BindInventoryEvents()
         {
-            if (session?.Inventory == null ||
-                ReferenceEquals(observedInventory, session.Inventory))
+            if (session?.CityStorage == null ||
+                ReferenceEquals(observedStorage, session.CityStorage))
             {
                 return;
             }
             UnbindInventoryEvents();
-            observedInventory = session.Inventory;
-            observedInventory.AttributedChanged += HandleInventoryChanged;
+            observedStorage = session.CityStorage;
+            observedStorage.AttributedChanged += HandleInventoryChanged;
         }
 
         private void UnbindInventoryEvents()
         {
-            if (observedInventory != null)
-                observedInventory.AttributedChanged -= HandleInventoryChanged;
-            observedInventory = null;
+            if (observedStorage != null)
+                observedStorage.AttributedChanged -= HandleInventoryChanged;
+            observedStorage = null;
         }
 
         private void HandleInventoryChanged(
@@ -281,6 +304,7 @@ namespace WasteCity.Graybox3D.Building
             view.ResearchSelected += SelectResearch;
             view.ResearchStartRequested += StartResearch;
             view.ResearchCancelRequested += CancelResearch;
+            view.WarehouseFilterRequested += SetWarehouseFilter;
             view.InventoryCloseRequested += ClosePanels;
             eventsBound = true;
         }
@@ -304,6 +328,7 @@ namespace WasteCity.Graybox3D.Building
             view.ResearchSelected -= SelectResearch;
             view.ResearchStartRequested -= StartResearch;
             view.ResearchCancelRequested -= CancelResearch;
+            view.WarehouseFilterRequested -= SetWarehouseFilter;
             view.InventoryCloseRequested -= ClosePanels;
             eventsBound = false;
         }
@@ -316,6 +341,7 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
             selectedProductionId = null;
+            selectedWarehouseId = null;
             view.SetInventoryOpen(false);
             view.SetResearchOpen(false);
             view.SetLedgerOpen(true);
@@ -332,14 +358,14 @@ namespace WasteCity.Graybox3D.Building
                 RefreshView();
                 return;
             }
-            int requested = session.Inventory.Get(resourceId);
+            int requested = session.CityStorage.GetNetworkAmount(resourceId);
             ResourceTransferResult result;
-            using (session.Inventory.AttributeChanges(
+            using (session.CityStorage.AttributeChanges(
                        new ResourceChangeAttribution(
                            ResourceChangeAttributionKind.Backpack)))
             {
                 result = ResourceTransaction.TransferToBackpack(
-                    session.Inventory,
+                    session.CityStorage,
                     backpack,
                     resourceId,
                     requested);
@@ -474,16 +500,14 @@ namespace WasteCity.Graybox3D.Building
             if (slot.Amount <= 0 || string.IsNullOrWhiteSpace(slot.ResourceId))
                 return;
             ResourceTransferResult result;
-            using (session.Inventory.AttributeChanges(
+            using (session.CityStorage.AttributeChanges(
                        new ResourceChangeAttribution(
                            ResourceChangeAttributionKind.Backpack)))
             {
                 result = ResourceTransaction.TransferFromBackpackSlot(
                     backpack,
                     slotIndex,
-                    session.Inventory,
-                    cityCapacity,
-                    ActiveWarehouseCount(),
+                    session.CityStorage,
                     slot.Amount);
             }
             inventoryTransferStatus = TransferStatusText(result);
@@ -530,14 +554,14 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!EnsureReady() || string.IsNullOrWhiteSpace(selectedResearchId))
                 return;
-            using (session.Inventory.AttributeChanges(
+            using (session.CityStorage.AttributeChanges(
                        new ResourceChangeAttribution(
                            ResourceChangeAttributionKind.Research,
                            selectedResearchId)))
             {
                 research.TryStart(
                     selectedResearchId,
-                    session.Inventory,
+                    session.CityStorage,
                     HasEligibleResearchStation());
             }
             RefreshView();
@@ -546,15 +570,12 @@ namespace WasteCity.Graybox3D.Building
         private void CancelResearch()
         {
             if (!EnsureReady()) return;
-            using (session.Inventory.AttributeChanges(
+            using (session.CityStorage.AttributeChanges(
                        new ResourceChangeAttribution(
                            ResourceChangeAttributionKind.Research,
                            research.Model.Active?.Id.Value)))
             {
-                research.TryCancel(
-                    session.Inventory,
-                    cityCapacity,
-                    ActiveWarehouseCount());
+                research.TryCancel(session.CityStorage);
             }
             RefreshView();
         }
@@ -564,13 +585,13 @@ namespace WasteCity.Graybox3D.Building
             if (!EnsureReady()) return;
             unchecked { ViewRefreshCount++; }
             CaptureRecentFlow();
-            int capacity = CityCapacityPerResource();
-
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
             {
                 string id = definition.Id;
-                int amount = session.Inventory.Get(id);
+                int amount = session.CityStorage.GetNetworkAmount(id);
+                int capacity =
+                    session.CityStorage.GetNetworkCapacityLimit(id);
                 float netFlow = NetFlow(id);
                 bool visible = IsHudResourceVisible(id, amount);
                 view.SetResource(id, visible, amount, capacity, netFlow);
@@ -716,7 +737,9 @@ namespace WasteCity.Graybox3D.Building
             for (int index = 0; index < definition.Costs.Count; index++)
             {
                 ResourceAmount cost = definition.Costs[index];
-                if (!session.Inventory.CanSpend(cost.ResourceId, cost.Amount))
+                if (!session.CityStorage.CanSpendFromNetwork(
+                        cost.ResourceId,
+                        cost.Amount))
                     return "资源不足";
             }
             return "可研究";
@@ -743,7 +766,9 @@ namespace WasteCity.Graybox3D.Building
             for (int index = 0; index < definition.Costs.Count; index++)
             {
                 ResourceAmount cost = definition.Costs[index];
-                if (!session.Inventory.CanSpend(cost.ResourceId, cost.Amount))
+                if (!session.CityStorage.CanSpendFromNetwork(
+                        cost.ResourceId,
+                        cost.Amount))
                     return false;
             }
             return true;
@@ -859,12 +884,6 @@ namespace WasteCity.Graybox3D.Building
             return production?.Clock?.Snapshot?.ActiveWarehouseCount ?? 0;
         }
 
-        private int CityCapacityPerResource()
-        {
-            return production?.Clock?.Snapshot?.CityCapacityPerResource ??
-                ResourceCapacityPolicy.FormalBaseCapacityPerResource;
-        }
-
         private bool IsHudResourceVisible(string resourceId, int amount)
         {
             for (int index = 0;
@@ -926,6 +945,7 @@ namespace WasteCity.Graybox3D.Building
             MixFingerprint(ref value, hoveredResourceId);
             MixFingerprint(ref value, selectedResearchId);
             MixFingerprint(ref value, selectedProductionId);
+            MixFingerprint(ref value, selectedWarehouseId);
             MixFingerprint(ref value, recentInventoryChanges.Count);
             MixFingerprint(ref value, ActiveWarehouseCount());
             for (int resourceIndex = 0;
@@ -936,7 +956,7 @@ namespace WasteCity.Graybox3D.Building
                     ResourceDefinitionCatalog.All[resourceIndex];
                 MixFingerprint(
                     ref value,
-                    session.Inventory.Get(definition.Id));
+                    session.CityStorage.GetNetworkAmount(definition.Id));
             }
             if (backpack != null)
             {
@@ -962,6 +982,7 @@ namespace WasteCity.Graybox3D.Building
                     research.Model.Remaining * 10f));
             }
             MixFingerprint(ref value, session.CatalogRevision);
+            MixFingerprint(ref value, session.CityStorage.Revision);
             MixFingerprint(ref value, city == null ? 0 : (int)city.Mode);
             MixFingerprint(ref value, Time.timeScale <= 0f);
             MixFingerprint(ref value, production?.Clock?.Revision ?? 0ul);
@@ -1022,6 +1043,19 @@ namespace WasteCity.Graybox3D.Building
 
         private void RefreshProductionStates()
         {
+            if (!string.IsNullOrWhiteSpace(selectedWarehouseId) &&
+                session.CityStorage.TryGetWarehouseSnapshot(
+                    selectedWarehouseId,
+                    out WarehouseStorageSnapshot warehouse))
+            {
+                view.SetProductionStateCount(0);
+                view.SetWarehouseDetail(
+                    warehouse,
+                    warehouseFilterFeedback,
+                    visible: true);
+                return;
+            }
+            view.SetWarehouseDetail(null, string.Empty, visible: false);
             IReadOnlyList<ProductionBuildingObservability> states =
                 production?.Clock?.Snapshot?.Entries;
             int count = states?.Count ?? 0;
@@ -1047,6 +1081,10 @@ namespace WasteCity.Graybox3D.Building
                             selectedProductionId,
                             state.StableInstanceId,
                             StringComparison.Ordinal));
+                view.SetProductionResourceIcons(
+                    index,
+                    state.InputResourceId,
+                    state.OutputResourceId);
                 view.SetProductionPaused(
                     index,
                     state.IsPlayerPaused,
@@ -1062,6 +1100,40 @@ namespace WasteCity.Graybox3D.Building
                         ? accessStatus
                         : string.Empty);
             }
+        }
+
+        private void SetWarehouseFilter(
+            string stableInstanceId,
+            string resourceId)
+        {
+            if (!EnsureReady() || !string.Equals(
+                    stableInstanceId,
+                    selectedWarehouseId,
+                    StringComparison.Ordinal) ||
+                !TryFindBuildingInstance(
+                    stableInstanceId,
+                    out GrayboxBuildingInstance3D instance) ||
+                instance.State != GrayboxBuildingInstanceState.Completed ||
+                !instance.IsPlayerOwned || instance.IsEvacuationLocked)
+            {
+                warehouseFilterFeedback = "设置失败：仓库状态已变化";
+                RefreshView();
+                return;
+            }
+            if (!CanAccessBuildingInventory(instance))
+            {
+                warehouseFilterFeedback =
+                    "设置失败：需由城市或已招募领队在 2 格内操作";
+                RefreshView();
+                return;
+            }
+            bool changed = session.CityStorage.TrySetWarehouseFilter(
+                stableInstanceId,
+                resourceId);
+            warehouseFilterFeedback = changed
+                ? "过滤设置成功"
+                : "设置失败：现有内容与目标过滤不兼容，不能切换";
+            RefreshView();
         }
 
         private void ToggleProductionPause(string stableInstanceId)
@@ -1131,7 +1203,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 int requested = useBackpack
                     ? BackpackAmount(resourceId)
-                    : session.Inventory.Get(resourceId);
+                    : session.CityStorage.GetNetworkAmount(resourceId);
                 result = useBackpack
                     ? production.Clock.Commands.TransferInputFromBackpack(
                         stableInstanceId,
@@ -1139,9 +1211,8 @@ namespace WasteCity.Graybox3D.Building
                         resourceId,
                         requested,
                         accessValidated: true)
-                    : production.Clock.Commands.TransferInputFromInventory(
+                    : production.Clock.Commands.TransferInputFromCityStorage(
                         stableInstanceId,
-                        session.Inventory,
                         resourceId,
                         requested,
                         accessValidated: true);
@@ -1156,10 +1227,8 @@ namespace WasteCity.Graybox3D.Building
                         resourceId,
                         requested,
                         accessValidated: true)
-                    : production.Clock.Commands.TransferOutputToInventory(
+                    : production.Clock.Commands.TransferOutputToCityStorage(
                         stableInstanceId,
-                        session.Inventory,
-                        cityCapacity,
                         resourceId,
                         requested,
                         accessValidated: true);
@@ -1481,8 +1550,12 @@ namespace WasteCity.Graybox3D.Building
             }
 
             int warehouses = ActiveWarehouseCount();
-            int capacity = CityCapacityPerResource();
-            int amount = session.Inventory.Get(hoveredResourceId);
+            int amount = session.CityStorage.GetNetworkAmount(
+                hoveredResourceId);
+            int acceptable = session.CityStorage.GetNetworkAcceptableSpace(
+                hoveredResourceId);
+            int capacity = session.CityStorage.GetNetworkCapacityLimit(
+                hoveredResourceId);
             float income = FlowAmount(
                 incomeFlowByResource,
                 hoveredResourceId);
@@ -1490,14 +1563,11 @@ namespace WasteCity.Graybox3D.Building
                 expenseFlowByResource,
                 hoveredResourceId);
             float net = NetFlow(hoveredResourceId);
-            string capacityText = "容量：基础 " +
+            string capacityText = "容量：基础核心 " +
                 ResourceCapacityPolicy.FormalBaseCapacityPerResource +
-                " + 仓库 " + warehouses + "×" +
-                ResourceCapacityPolicy.FormalCapacityPerWarehouse +
-                " = " + capacity;
-            if (amount > capacity)
-                capacityText += " · 超出 " + (amount - capacity) +
-                    "（禁止继续入库）";
+                " · 联网仓库 " + warehouses +
+                " · 当前网络 " + amount + "/" + capacity +
+                " · 可接收 " + acceptable;
             string flowText = "近期收入 " + FormatRate(income) +
                 " · 近期支出 " + FormatRate(expense) +
                 " · 近期净值 " + FormatSignedRate(net);

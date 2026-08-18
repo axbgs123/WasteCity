@@ -90,29 +90,29 @@
 
 ### 三维建筑会话（复用前审查）
 
-能解决什么：协调当前三维建造过程。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：用于协调三维建筑会话。在接入新的三维建造流程前先审查状态关系。不能负责什么：不替代领域建造规则。改后跑哪组测试：`GrayboxBuildingSessionTests`。代码名：`GrayboxBuildingSession3D`。
+能解决什么：协调当前三维建造过程，并持有会话唯一的城市与真实仓库聚合模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel 以同步仓库完成、联网、撤离迁移和正式城市库存。不能负责什么：不替代领域建造、物流距离或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingSession3D`。
 
 ### 三维建筑世界视图（仅限场景）
 
-能解决什么：在当前场景显示建筑。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`。怎么复用：用于场景内显示建筑。只在现有三维场景中绑定。不能负责什么：不作为纯领域模型复用。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
+能解决什么：在当前场景显示建筑、半透明放置预览和稳定前向标记。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs` 与 `Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat`。怎么复用：在场景内显示建筑与半透明放置预览，并用稳定前向标记同步四向旋转、旋转后占地和模型朝向。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现，不作为纯领域模型复用；不得自行决定锚点、旋转合法性、成本或资源节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
 
 ## UI 与输入
 
 ### 三维建筑输入路由（复用前审查）
 
-能解决什么：把建筑界面的输入送到正确位置。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`。怎么复用：用于路由建筑界面输入。先审查焦点和输入优先级。不能负责什么：不决定建筑放置规则。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`。代码名：`GrayboxBuildingInputRouter3D`。
+能解决什么：把建筑界面的真实输入送到正确位置，并将 `R` 旋转应用到当前预览。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`。怎么复用：用于路由建筑界面输入。不能负责什么：不决定建筑放置规则。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingRuntimeSceneTests`。代码名：`GrayboxBuildingInputRouter3D`。
 
 ### 三维建筑菜单视图（复用前审查）
 
-能解决什么：显示建筑菜单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：用于显示建筑菜单。先检查当前界面与场景绑定。不能负责什么：不保存建筑数据。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`。代码名：`GrayboxBuildingMenuView3D`。
+能解决什么：显示建筑菜单、旋转后预览状态、正式资源成本图标和逐项材料缺口。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：显示建筑目录、旋转后预览状态、正式资源成本图标和逐项材料缺口。不能负责什么：不保存建筑或库存数据；方向、占地与缺口必须读取控制器提供的权威预览和 ResourceShortfallRules 结果，图标统一复用 ResourceIconCatalog3D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingMenuView3D`。
 
 ### 三维生产可观察化控制器（仅限场景）
 
-能解决什么：把当前 3D 会话的背包、应急合成、六节点研究、资源状态栏和面板命令接到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏和面板命令，并把真实输入提交到正式模型。只能通过场景 authoring 绑定既有正式模型和输入路由。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
+能解决什么：把当前 3D 会话的背包、应急合成、六节点研究、资源状态栏、真实仓库详情和面板命令接到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
 
 ### 三维生产可观察化视图（仅限场景）
 
-能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成和科技树，并把点击转换为命令事件。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树，并把 UGUI 操作发布为命令事件。只能在 `GrayboxPrototype3D` 的既有 UGUI 层级和输入优先级内接线。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。改后跑哪组测试：`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`。
+能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成、科技树、真实仓库内容和共享材料图标，并把点击转换为命令事件。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树、真实仓库内容与共享资源图标，并把 UGUI 操作发布为命令事件。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；图标必须复用 ResourceIconCatalog3D，视图不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`。
 
 ### 三维灰盒显示设置边界（复用前审查）
 
@@ -134,15 +134,27 @@
 
 ### 正式资源定义目录（推荐复用）
 
-能解决什么：集中提供 15 种正式资源的稳定 ID、中文名称、显示顺序、单格栈上限、图标回退键和正式 3D 初始城市数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`。怎么复用：提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。资源 UI、背包和正式 3D 会话接入时统一从目录读取定义；正式城市账本接入时必须通过 `CreateFormalCityInventory` 创建。不能负责什么：只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。工厂返回的是允许保留超额数量的 backing ledger，不代表城市拥有无限有效容量；正式入库接线后仍必须经过 `ResourceCapacityPolicy`。当前默认 3D 场景尚未切换到该工厂。改后跑哪组测试：`ResourceDefinitionCatalogTests`。代码名：`ResourceDefinition`、`ResourceDefinitionCatalog`。
+能解决什么：集中提供 15 种正式资源的稳定 ID、中文名称、显示顺序、单格栈上限、图标回退键和正式 3D 初始城市数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`。怎么复用：提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。资源 UI、背包和正式 3D 会话接入时统一从目录读取定义；正式城市底层账本通过 `CreateFormalCityInventory` 创建。不能负责什么：只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。工厂返回的是允许保留超额数量的 backing ledger，不代表城市拥有无限有效容量；正式 3D 入库与读取必须经过 `CityResourceStorageModel`。改后跑哪组测试：`ResourceDefinitionCatalogTests`。代码名：`ResourceDefinition`、`ResourceDefinitionCatalog`。
 
 ### 资源库存（推荐复用）
 
-能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。旧 2D 继续按既有方式使用；正式 3D 城市库存接入时通过 `ResourceDefinitionCatalog.CreateFormalCityInventory` 创建，并由 `ResourceCapacityPolicy` 和 `ResourceTransaction` 约束正式写入；资源状态栏等观察者订阅账本的实际数量变化通知，生产、背包和研究调用方可用只在事务作用域内生效的稳定归因标记说明来源或去向，数量仍以账本为唯一真值。不能负责什么：不驱动生产周期。它也不提供资源显示定义、背包槽位、原子多资源事务、仓库有效容量或降容保留超额；变化与归因通知不拥有 UI 状态，也不替代资源事务，`AddCapacity` 降容会裁切数量，`TrySpend` 在启用债务额度后可产生负数，因此正式 3D 新功能不得直接使用这两个行为实现容量变化或生产扣款。改后跑哪组测试：`FoundationTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
+能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。正式 3D 只把它作为 `CityResourceStorageModel` 的城市核心 backing ledger。不能负责什么：不驱动生产周期。它也不提供真实仓库共享容量；正式 3D 新功能不得直接使用债务行为实现生产扣款。改后跑哪组测试：`FoundationTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
 
-### 城市资源容量策略（推荐复用）
+### 旧每资源城市容量策略（复用前审查）
 
-能解决什么：计算城市每种资源的正式有效容量，并在基础 150、每座有效仓库增加 150 的规则下预检或执行入库。在哪里：`Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`。怎么复用：按基础容量和有效仓库数计算每种城市资源的当前可接收量。正式 3D 城市库存的所有自动和人工入库统一通过该策略；容量降低时只改变有效上限，不修改账本已有数量。不能负责什么：不判定仓库所有权、完成状态或撤离资格，也不拥有资源账本。不改变物流距离，也不裁切超额库存；调用方必须提供已经按正式建筑资格派生的仓库数量。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceCapacityPolicy`。
+能解决什么：保留 `IDEA-0011` 的基础容量加有效仓库数、且每种资源分别增加 150 的旧兼容算法。在哪里：`Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`。怎么复用：保留 IDEA-0011 的基础容量加每座仓库、且每种资源分别扩容的旧兼容算法，供旧接口和冻结回归使用；IDEA-0012 的正式 3D 仓库不再使用此模型。不能负责什么：IDEA-0012 已用每仓库 150 共享总容量替代旧的每资源加仓库模型；正式 3D 必须通过 CityResourceStorageModel 读写城市与仓库库存，不得向 ResourceCapacityPolicy 传仓库数模拟真实仓库。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceCapacityPolicy`。
+
+### 城市与真实仓库库存模型（推荐复用）
+
+能解决什么：提供正式 3D 城市库存的唯一聚合入口，并把城市核心库存与每座真实仓库组合成一个可观察的物流网络。在哪里：`Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`。怎么复用：作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、可接收空间、确定性存取、原子批事务、迁移删除、不可变快照和变化归因。不能负责什么：不决定建筑是否完成、玩家所有权、物流距离或交互资格；调用方必须先用既有建筑与物流规则提供权威连接状态。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`CityResourceChangeAttributionScope`、`CityResourceStorageModel`、`CityResourceStorageSnapshot`。
+
+### 单仓库共享容量状态（推荐复用）
+
+能解决什么：保存一座仓库的真实内容、150 共享总容量、联网状态和可选单资源过滤。在哪里：`Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`。怎么复用：按稳定建筑实例 ID 保存一座仓库的 150 共享总容量、真实内容、联网状态与可选单资源过滤，并发布不可变快照。不能负责什么：只拥有单仓库会话状态，不聚合城市库存、不计算物流范围、不执行建筑生命周期；正式调用必须由 CityResourceStorageModel 统一编排，不能绕过聚合模型直接充当城市账本。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`WarehouseStorageState`、`WarehouseStorageSnapshot`。
+
+### 资源缺口规则（推荐复用）
+
+能解决什么：按正式成本顺序给出每种材料的拥有、需要和缺少数量，让“材料不足”变成精确可读反馈。在哪里：`Assets/_Game/Scripts/Economy/ResourceShortfallRules.cs`。怎么复用：按正式成本顺序计算每种材料的拥有、需要与缺少数量，供放置失败和其他资源不足反馈统一投影。不能负责什么：只计算纯缺口数据，不读取 Unity 场景、不执行扣款、不决定放置合法性，也不生成最终 UI 文案；调用方必须传入当前权威库存读取函数。改后跑哪组测试：`ResourceShortfallRulesTests`。代码名：`ResourceShortfall`、`ResourceShortfallRules`。
 
 ### 原子资源事务（推荐复用）
 
@@ -174,7 +186,7 @@
 
 ### 正式生产与物流模拟（推荐复用）
 
-能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。调用方必须提供当前世界模型、正式城市账本、容量策略、有效仓库数和已经由权威规则派生的物流连接。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。它不替代 `BuildingRangeRules`、`BuildingResourceNodeCompatibilityRules` 或 `WorldMapModel`；默认 3D 场景只通过 `GrayboxProductionClock3D` 和运行时适配器调用这一纯领域层，不把场景职责移入模拟。旧 `ProductionModel`、`ResourceExtractionProcess` 和允许建筑链式中继的 `LogisticsNetworkModel` 不得作为本轮正式 3D 运行真值。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionSimulation`。
+能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 通过 `CityResourceStorageModel` 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序通过 CityResourceStorageModel 执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格、连接状态和正式城市仓库聚合模型。保留 ResourceCapacityPolicy 重载只用于旧接口兼容。改后跑哪组测试：`FormalProductionSimulationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`FormalProductionSimulation`。
 
 ### 三维生产建筑资格（复用前审查）
 
@@ -182,19 +194,19 @@
 
 ### 三维生产运行时（复用前审查）
 
-能解决什么：让正式生产状态跟随当前三维建筑的完成、撤离、遗弃、移动资格与物流范围变化。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合、物流连接和有效仓库数。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置或节点兼容规则。改后跑哪组测试：`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`。代码名：`GrayboxProductionRuntime3D`。
+能解决什么：让正式生产状态和真实仓库连接跟随当前三维建筑的完成、撤离、遗弃、移动资格与物流范围变化。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合、物流连接，并把真实仓库完成、断网和清理状态同步到 CityResourceStorageModel。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置、物流范围或节点兼容规则。改后跑哪组测试：`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionRuntime3D`。
 
 ### 三维生产固定时钟（复用前审查）
 
-能解决什么：让不同帧率下的三维生产保持同一固定步结果，并在暂停期间不积累追赶时间。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`。怎么复用：用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。不能负责什么：只拥有会话级余量并组合运行时、模拟和容量策略；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionClockTests`。代码名：`GrayboxProductionClock3D`。
+能解决什么：让不同帧率下的三维生产保持同一固定步结果，并在暂停期间不积累追赶时间。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`。怎么复用：用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。不能负责什么：只拥有会话级余量并组合运行时、模拟和 CityResourceStorageModel；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。旧 ResourceInventory 重载仅用于兼容回归。改后跑哪组测试：`GrayboxProductionClockTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionClock3D`。
 
 ### 三维生产可观察化只读边界（推荐复用）
 
-能解决什么：向资源状态栏和生产面板提供按稳定实例 ID 排序、内容变化后才换版的不可变生产详情，并把暂停、输入补给和输出提取收口到生产命令门面。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs` 和 `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`。怎么复用：发布按稳定实例 ID 排序的不可变生产详情、有效仓库数和城市每资源容量；仓库资格变化进入内容哈希并产生新 revision。通过命令门面提交暂停和缓存转移时，输出入城容量由命令所有者按权威运行时仓库数派生，不接受 UI 传入的仓库数量。不能负责什么：快照只读，不暴露 BuildingProductionState 或可变库存；命令只按 stable ID 调用既有 ResourceTransaction 原子提交。访问距离、物流和建筑生命周期资格仍由当前 3D 场景适配器在每次提交前基于权威事实重新验证；本边界不复制资格规则、不接入冻结 2D，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionObservabilityFacadeTests`。代码名：`ProductionBuildingObservability`、`ProductionObservabilitySnapshot`、`GrayboxProductionCommandFacade3D`。
+能解决什么：向资源状态栏和生产面板提供按稳定实例 ID 排序、内容变化后才换版的不可变生产详情，并把暂停、输入补给和输出提取收口到生产命令门面。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs` 和 `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`。怎么复用：发布按稳定实例 ID 排序的不可变生产详情；仓库与城市库存变化通过 CityResourceStorageModel.Revision 进入内容哈希。命令门面按 stable ID 在建筑缓存、背包和权威城市仓库聚合模型之间提交转移。不能负责什么：快照只读，不暴露 BuildingProductionState 或可变库存；命令不接受 UI 传入仓库数量。访问距离、物流和建筑生命周期资格仍由当前 3D 场景适配器在每次提交前基于权威事实重新验证；本边界不复制资格规则、不接入冻结 2D，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionObservabilityFacadeTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`ProductionBuildingObservability`、`ProductionObservabilitySnapshot`、`GrayboxProductionCommandFacade3D`。
 
 ### 三维生产场景控制器（仅限场景）
 
-能解决什么：把默认三维场景的真实建筑、城市、世界与暂停状态送进固定生产时钟。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`。怎么复用：把当前三维场景的建筑会话、城市模式、世界坐标和 Unity 暂停状态接到固定步生产时钟。不能负责什么：只负责 GrayboxPrototype3D 场景引用与时间输入；不复制生产配方、物流范围、资源节点兼容性、库存事务或界面规则。改后跑哪组测试：`GrayboxProductionControllerTests`、`GrayboxSceneContractTests`。代码名：`GrayboxProductionController3D`。
+能解决什么：把默认三维场景的真实建筑、城市、世界与暂停状态送进固定生产时钟。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`。怎么复用：把当前三维场景的建筑会话、城市模式、世界坐标、CityResourceStorageModel 和 Unity 暂停状态接到固定步生产时钟。不能负责什么：只负责 GrayboxPrototype3D 场景引用与时间输入；不复制生产配方、物流范围、资源节点兼容性、仓库库存事务或界面规则。改后跑哪组测试：`GrayboxProductionControllerTests`、`GrayboxSceneContractTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionController3D`。
 
 ### 研究模型（推荐复用）
 
@@ -217,6 +229,14 @@
 能解决什么：保存正式存档字段。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：用于保存正式存档字段。变更需要兼容性评审。不能负责什么：不替代存档迁移方案。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
 
 ## 3D 表现与美术
+
+### 三维共享资源图标目录（推荐复用）
+
+能解决什么：为全部正式资源提供稳定 Sprite 解析、可替换资产覆盖和确定性占位图标。在哪里：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs` 与共享资产 `Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset`。怎么复用：为全部正式资源提供稳定 Sprite 解析、可替换资产覆盖和确定性占位图标，供矿点、资源栏、仓库、背包、配方、科技与生产 UI 共享。不能负责什么：只负责资源 ID 到图标的表现映射，不拥有资源定义、数量或矿点真值；消费者必须使用同一目录资产或确定性 fallback，不得各自生成第二套资源身份和颜色语义。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`GrayboxSceneContractTests`。代码名：`ResourceIconCatalog3D`。
+
+### 三维资源矿点标识与图标标记（仅限场景）
+
+能解决什么：把 `WorldMapModel` 的真实资源节点投影为带稳定 ID 和共享资源图标的可回收场景标记。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs` 与 `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`。怎么复用：在 GrayboxPrototype3D 中以世界坐标生成稳定矿点 ID，并把 WorldMapModel 的真实资源节点投影为复用共享资源图标的可回收标记。不能负责什么：只属于当前 3D 世界表现与对象复用层；不创建资源节点、不决定节点类型、储量、采矿合法性或枯竭规则，所有真值必须继续来自 WorldMapModel。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxResourceNodeIdentity3D`、`GrayboxResourceNodeMarker3D`。
 
 ### 二维视觉槽位（复用前审查）
 

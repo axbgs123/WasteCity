@@ -772,6 +772,16 @@ namespace WasteCity.Tests
                     FindButton("Catalog.Card." + expected.Definition.Id.Value),
                     Is.Not.Null,
                     expected.Definition.Id.Value);
+                Image costIcon = FindTransform(
+                        "Catalog.Card." + expected.Definition.Id.Value +
+                        ".Cost.Icon")
+                    .GetComponent<Image>();
+                Assert.That(costIcon, Is.Not.Null, expected.Definition.Id.Value);
+                Assert.That(
+                    costIcon.sprite,
+                    Is.SameAs(ResourceIconCatalog3D.Resolve(
+                        expected.Definition.CostId)),
+                    expected.Definition.Id.Value);
             }
         }
 
@@ -1037,7 +1047,8 @@ namespace WasteCity.Tests
                 city,
                 world,
                 placement,
-                BuildingPlacementFailure.InsufficientMaterials);
+                BuildingPlacementFailure.InsufficientMaterials,
+                requirePrimary: true);
             Assert.That(
                 placement.CurrentEvaluation.Failures,
                 Does.Contain(BuildingPlacementFailure.InsufficientMaterials));
@@ -1048,6 +1059,12 @@ namespace WasteCity.Tests
             yield return ClickMouse(
                 MouseButton.Left,
                 mouse.position.ReadValue());
+            Text shortage = FindTransform("Placement.Status.Text")
+                .GetComponent<Text>();
+            Assert.That(shortage, Is.Not.Null);
+            Assert.That(shortage.text,
+                Does.Contain(
+                    "无法建造城墙：缺少石料 2（拥有 0，需要 2）"));
             Assert.That(session.Instances, Has.Count.EqualTo(1));
             Assert.That(interaction.State, Is.EqualTo(
                 GrayboxBuildingInteractionState.Previewing));
@@ -1435,6 +1452,52 @@ namespace WasteCity.Tests
                 Screen.width * .5f,
                 Screen.height * .5f));
             AssertFailure(placement, BuildingPlacementFailure.MissingReference);
+        }
+
+        [UnityTest]
+        public IEnumerator BUG0006_RealRRotatesSquarePreviewWithoutMovingItsAnchor()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<GrayboxBuildingInteractionModel3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            modifier.AddResource(ResourceIds.Alloy, 1000);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            interaction.Select(BuildingCatalog.Housing);
+            yield return MoveToAnyGroundPreview(city, world);
+
+            int anchorX = placement.CurrentHit.X;
+            int anchorY = placement.CurrentHit.Y;
+            GrayboxVisualSlot preview = FindSlot(
+                "building.preview." + BuildingCatalog.Housing.Id.Value);
+            GameObject previewRoot = preview.gameObject;
+
+            for (var turn = 1; turn <= 4; turn++)
+            {
+                yield return TapKey(Key.R);
+                Assert.That(placement.CurrentHit.X, Is.EqualTo(anchorX));
+                Assert.That(placement.CurrentHit.Y, Is.EqualTo(anchorY));
+                GrayboxVisualSlot rotated = FindSlot(
+                    "building.preview." + BuildingCatalog.Housing.Id.Value);
+                Assert.That(rotated.gameObject, Is.SameAs(previewRoot));
+                Assert.That(
+                    Mathf.DeltaAngle(
+                        rotated.transform.eulerAngles.y,
+                        turn % 4 * 90f),
+                    Is.EqualTo(0f).Within(.01f));
+            }
         }
 
         [UnityTest]
@@ -1837,7 +1900,8 @@ namespace WasteCity.Tests
             GrayboxMobileCityController3D city,
             GrayboxWorldView3D world,
             GrayboxBuildingPlacementController3D placement,
-            BuildingPlacementFailure failure)
+            BuildingPlacementFailure failure,
+            bool requirePrimary = false)
         {
             Assert.That(
                 world.TryWorldToCell(
@@ -1859,7 +1923,9 @@ namespace WasteCity.Tests
                     corner + new Vector3(.5f, 0f, .5f)));
                 if (placement.CurrentHit.Site == BuildingSite.Ground &&
                     placement.CurrentEvaluation.Failures != null &&
-                    placement.CurrentEvaluation.Failures.Contains(failure))
+                    placement.CurrentEvaluation.Failures.Contains(failure) &&
+                    (!requirePrimary ||
+                     placement.CurrentEvaluation.PrimaryFailure == failure))
                     yield break;
             }
             Assert.Fail("No real ground preview exposed " + failure + ".");

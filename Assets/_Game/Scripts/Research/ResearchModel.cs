@@ -203,6 +203,26 @@ namespace WasteCity.Research
             float ratio=Math.Max(0f,Math.Min(1f,inheritedProgressRatio));
             Active = definition; Remaining = Math.Max(.001f,definition.Duration*(1f-ratio)); return true;
         }
+        public bool Start(
+            ResearchDefinition definition,
+            CityResourceStorageModel cityStorage,
+            float inheritedProgressRatio = 0f)
+        {
+            if (Active != null || definition == null || cityStorage == null ||
+                completed.Contains(definition.Id) ||
+                definition.RequiredResearchIds.Any(required =>
+                    !completed.Any(id => id.Value == required)) ||
+                !cityStorage.TryCommitBatch(
+                    definition.Costs,
+                    Array.Empty<ResourceAmount>()))
+            {
+                return false;
+            }
+            float ratio = Math.Max(0f, Math.Min(1f, inheritedProgressRatio));
+            Active = definition;
+            Remaining = Math.Max(.001f, definition.Duration * (1f - ratio));
+            return true;
+        }
         public bool Tick(float delta)
         {
             if (Active == null) return false; Remaining -= Math.Max(0f, delta); if (Remaining > 0.0001f) return false;
@@ -244,6 +264,29 @@ namespace WasteCity.Research
                     inventory,
                     capacity,
                     activeWarehouseCount,
+                    refund))
+            {
+                return false;
+            }
+            Active = null;
+            Remaining = 0f;
+            return true;
+        }
+
+        internal bool TryCancel(
+            CityResourceStorageModel cityStorage,
+            float refundRatio)
+        {
+            if (Active == null || cityStorage == null) return false;
+            ResourceAmount[] refund = Active.Costs
+                .Select(value => new ResourceAmount(
+                    value.ResourceId,
+                    (int)Math.Floor(
+                        value.Amount * Math.Max(0f, refundRatio))))
+                .Where(value => value.Amount > 0)
+                .ToArray();
+            if (refund.Length > 0 && !cityStorage.TryCommitBatch(
+                    Array.Empty<ResourceAmount>(),
                     refund))
             {
                 return false;
