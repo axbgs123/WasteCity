@@ -92,6 +92,10 @@
 
 能解决什么：协调当前三维建造过程，并持有会话唯一的城市与真实仓库聚合模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel 以同步仓库完成、联网、撤离迁移和正式城市库存。不能负责什么：不替代领域建造、物流距离或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingSession3D`。
 
+### 三维建筑共享运行与物流资格（推荐复用）
+
+能解决什么：让生产与防御从同一建筑生命周期事实分别判断状态保留、本地运行和物流连接。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingOperationalAccess3D.cs`。怎么复用：用于从同一建筑生命周期事实分别判断会话状态保留、本地运行和物流连接。不能负责什么：只组合已完成、玩家所有、撤离锁定、建筑站点、城市模式与既有范围规则；不持有库存、生产或防御状态，不复制放置合法性。改后跑哪组测试：`GrayboxProductionRuntimeTests`、`GrayboxFirstDefenseRuntimeTests`。代码名：`GrayboxBuildingOperationalAccess3D`。
+
 ### 三维建筑世界视图（仅限场景）
 
 能解决什么：在当前场景显示建筑、半透明放置预览和稳定前向标记。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs` 与 `Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat`。怎么复用：在场景内显示建筑与半透明放置预览，并用稳定前向标记同步四向旋转、旋转后占地和模型朝向。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现，不作为纯领域模型复用；不得自行决定锚点、旋转合法性、成本或资源节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
@@ -113,6 +117,10 @@
 ### 三维生产可观察化视图（仅限场景）
 
 能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成、科技树、真实仓库内容和共享材料图标，并把点击转换为命令事件。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树、真实仓库内容与共享资源图标，并把 UGUI 操作发布为命令事件。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；图标必须复用 ResourceIconCatalog3D，视图不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`。
+
+### 三维首版防御场景接线与表现（仅限场景）
+
+能解决什么：把首版防御规则时钟、全局暂停、HUD、真实选择输入、敌塔表现池和 tracer 接入默认三维场景。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`。怎么复用：用于在 GrayboxPrototype3D 中连接规则时钟、全局暂停、HUD、真实选择输入、敌塔表现池与 tracer。不能负责什么：仅限当前正式 3D 场景适配；UI 只读快照，表现对象不持有目标、伤害、耗弹或波次真值，不接入冻结 2D。改后跑哪组测试：`GrayboxDefenseControllerTests`、`GrayboxDefenseObservabilityTests`、`GrayboxDefensePresentationTests`、`GrayboxDefenseRuntimeInputTests`。代码名：`GrayboxDefenseController3D`、`GrayboxDefenseHud3D`、`GrayboxDefenseHudView3D`、`GrayboxDefenseWorldView3D`。
 
 ### 三维灰盒显示设置边界（复用前审查）
 
@@ -219,6 +227,18 @@
 ### 三维首版科技运行时（推荐复用）
 
 能解决什么：在当前 3D 会话中统一提交科技启动、不同城市形态下的推进、研究站失效暂停和取消退款。在哪里：`Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`。怎么复用：组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款。不能负责什么：只拥有当前 3D 会话的研究规则适配；调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实。它不处理 Unity 输入、UI、关注度、战斗效果或 schema 30 存档。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchRuntime`。
+
+### 首版防御战斗模型（推荐复用）
+
+能解决什么：以确定性规则时间处理机枪塔索敌射击、啃噬者生命和城市核心受击。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs`。怎么复用：用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击。不能负责什么：只拥有首版战斗实体规则状态；不读取 Unity 场景、不推进教学波、不访问城市库存，tracer 不持有命中、伤害或耗弹真值。改后跑哪组测试：`FirstDefenseLoopTests`。代码名：`MachineGunTurretCombatModel`、`DefenseEnemyCombatModel`、`CityCoreCombatModel`。
+
+### 首版教学防御波运行时（推荐复用）
+
+能解决什么：推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs`。怎么复用：用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。不能负责什么：只拥有首个教学波与城市核心会话状态；不处理建筑发现、城市库存、Unity 时间、表现对象或正式失败结算。改后跑哪组测试：`FirstDefenseWaveRuntimeTests`。代码名：`DefenseEnemyRuntimeSnapshot`、`DefenseRuntimeSnapshot`、`TutorialDefenseRuntimeModel`。
+
+### 三维首版防御运行时（复用前审查）
+
+能解决什么：按稳定建筑实例同步机枪塔与本地弹药，并用固定步组合教学波和战斗模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`。怎么复用：用于按稳定建筑实例同步机枪塔、补给本地弹药，并以固定 0.1 秒步长组合教学波与战斗模型。不能负责什么：只桥接正式 3D 建筑会话、城市仓储和首版防御领域；不复制物流范围、建筑资格或库存事务，不进入 schema 30。改后跑哪组测试：`GrayboxFirstDefenseRuntimeTests`、`GrayboxDefenseSnapshotStabilityTests`。代码名：`GrayboxDefenseTowerStatus3D`、`GrayboxDefenseTowerRuntimeState3D`、`GrayboxDefenseTowerSnapshot3D`、`GrayboxDefenseEnemySnapshot3D`、`GrayboxDefenseRuntimeSnapshot3D`、`GrayboxDefenseRuntime3D`。
 
 ### 人口模型（推荐复用）
 

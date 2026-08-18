@@ -173,7 +173,11 @@ namespace WasteCity.Editor
             public GrayboxDirectControlCoordinator DirectControl;
             public GrayboxWorldView3D World;
             public GrayboxLeaderController3D Leader;
+            public GrayboxBuildingWorldView3D BuildingPresentation;
+            public Material SharedMaterial;
             public GrayboxProductionController3D Production;
+            public GrayboxDefenseWorldView3D DefenseWorldView;
+            public GrayboxDefenseController3D DefenseController;
             public GrayboxBuildingInputRouter3D BuildingInput;
             public GrayboxDeveloperModifierBootstrap3D Developer;
         }
@@ -798,6 +802,9 @@ namespace WasteCity.Editor
         {
             GameObject root = RequireRoot(scene, "GrayboxPrototype3D");
             Transform building = EnsureChild(root.transform, "GrayboxBuilding");
+            Transform systems = RequireChild(
+                root.transform,
+                "GrayboxSystems");
             Transform sessionTransform =
                 EnsureChild(building, "BuildingSession");
             GrayboxBuildingSession3D session =
@@ -881,6 +888,24 @@ namespace WasteCity.Editor
             GrayboxProductionController3D production =
                 EnsureComponent<GrayboxProductionController3D>(
                     productionTransform);
+            Transform defenseViewTransform = EnsureChild(
+                building,
+                "DefenseWorldView");
+            Transform defenseEnemyRoot = EnsureChild(
+                defenseViewTransform,
+                "EnemyRoot");
+            Transform defenseTowerRoot = EnsureChild(
+                defenseViewTransform,
+                "TowerRoot");
+            GrayboxDefenseWorldView3D defenseWorldView =
+                EnsureComponent<GrayboxDefenseWorldView3D>(
+                    defenseViewTransform);
+            Transform defenseControllerTransform = EnsureChild(
+                systems,
+                "GrayboxDefenseController");
+            GrayboxDefenseController3D defenseController =
+                EnsureComponent<GrayboxDefenseController3D>(
+                    defenseControllerTransform);
             Transform evacuationTransform =
                 EnsureChild(building, "Evacuation");
             GrayboxEvacuationController3D evacuation =
@@ -941,6 +966,11 @@ namespace WasteCity.Editor
                 ("city", city),
                 ("worldView", world));
             SetReferences(
+                defenseWorldView,
+                ("enemyRoot", defenseEnemyRoot),
+                ("towerRoot", defenseTowerRoot),
+                ("sharedMaterial", material));
+            SetReferences(
                 evacuation,
                 ("session", session),
                 ("city", city),
@@ -965,9 +995,21 @@ namespace WasteCity.Editor
                 ("inputInterceptor", buildingInput));
 
             EditorSceneManager.MarkSceneDirty(scene);
+            if (RequireSingle<GrayboxDefenseWorldView3D>(scene) !=
+                defenseWorldView)
+            {
+                throw new InvalidOperationException(
+                    "The graybox scene defense world view is not unique.");
+            }
+            if (RequireSingle<GrayboxDefenseController3D>(scene) !=
+                defenseController)
+            {
+                throw new InvalidOperationException(
+                    "The graybox scene defense controller is not unique.");
+            }
             return new BuildingContractReferences
             {
-                Systems = RequireChild(root.transform, "GrayboxSystems"),
+                Systems = systems,
                 Ui = ui,
                 BuildingCanvas = canvas,
                 EventSystem = eventSystem,
@@ -976,7 +1018,11 @@ namespace WasteCity.Editor
                 DirectControl = directControl,
                 World = world,
                 Leader = leader,
+                BuildingPresentation = presentation,
+                SharedMaterial = material,
                 Production = production,
+                DefenseWorldView = defenseWorldView,
+                DefenseController = defenseController,
                 BuildingInput = buildingInput,
                 Developer = developer
             };
@@ -1014,6 +1060,11 @@ namespace WasteCity.Editor
             operationsRaycaster.enabled = true;
             GrayboxOperationsView3D operationsView =
                 EnsureComponent<GrayboxOperationsView3D>(
+                    operationsTransform);
+            RemoveMissingMonoBehavioursFromExactObject(
+                operationsTransform.gameObject);
+            GrayboxDefenseHud3D defenseHud =
+                EnsureComponent<GrayboxDefenseHud3D>(
                     operationsTransform);
             Transform operationsControllerTransform = EnsureChild(
                 buildingReferences.Systems,
@@ -1064,6 +1115,19 @@ namespace WasteCity.Editor
                 ("canvas", operationsCanvas),
                 ("resourceIconCatalog", resourceIconCatalog));
             SetReferences(
+                defenseHud,
+                ("canvas", operationsCanvas),
+                ("eventSystem", buildingReferences.EventSystem));
+            SetReferences(
+                buildingReferences.DefenseController,
+                ("session", buildingReferences.Session),
+                ("city", buildingReferences.City),
+                ("world", buildingReferences.World),
+                ("buildingPresentation",
+                    buildingReferences.BuildingPresentation),
+                ("worldView", buildingReferences.DefenseWorldView),
+                ("hud", defenseHud));
+            SetReferences(
                 operationsController,
                 ("session", buildingReferences.Session),
                 ("production", buildingReferences.Production),
@@ -1075,17 +1139,25 @@ namespace WasteCity.Editor
             SetReferences(
                 buildingReferences.BuildingInput,
                 ("productionPresentation",
-                    RequireSingle<GrayboxBuildingWorldView3D>(scene)),
-                ("operations", operationsController));
+                    buildingReferences.BuildingPresentation),
+                ("operations", operationsController),
+                ("defense", buildingReferences.DefenseController));
             SetReferences(
                 coordinator,
                 ("buildingInput", buildingReferences.BuildingInput),
                 ("systemMenu", controller),
                 ("developer", buildingReferences.Developer),
-                ("operations", operationsController));
+                ("operations", operationsController),
+                ("defense", buildingReferences.DefenseController));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
+
+            if (RequireSingle<GrayboxDefenseHud3D>(scene) != defenseHud)
+            {
+                throw new InvalidOperationException(
+                    "The graybox scene defense HUD is not unique.");
+            }
 
             EditorSceneManager.MarkSceneDirty(scene);
         }
@@ -2328,6 +2400,28 @@ namespace WasteCity.Editor
                         $"{missingScriptCount} missing script(s).");
                 }
             }
+        }
+
+        private static void RemoveMissingMonoBehavioursFromExactObject(
+            GameObject owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            if (GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(
+                    owner) == 0)
+            {
+                return;
+            }
+
+            GameObjectUtility.RemoveMonoBehavioursWithMissingScript(owner);
+            if (GameObjectUtility.GetMonoBehavioursWithMissingScriptCount(
+                    owner) != 0)
+            {
+                throw new InvalidOperationException(
+                    "Failed to remove missing MonoBehaviour components " +
+                    "from " + owner.name + ".");
+            }
+            EditorUtility.SetDirty(owner);
         }
 
         private static T RequireComponent<T>(GameObject owner)

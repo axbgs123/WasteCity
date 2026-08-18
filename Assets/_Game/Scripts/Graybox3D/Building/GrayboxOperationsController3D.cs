@@ -1639,6 +1639,8 @@ namespace WasteCity.Graybox3D.Building
                 return "个人背包";
             if (attribution.Kind == ResourceChangeAttributionKind.Research)
                 return "科技研究";
+            if (attribution.Kind == ResourceChangeAttributionKind.Defense)
+                return "机枪塔";
             return "其他变动";
         }
 

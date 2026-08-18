@@ -22,6 +22,8 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxBuildingWorldView3D productionPresentation;
         [SerializeField]
         private GrayboxOperationsController3D operations;
+        [SerializeField]
+        private GrayboxDefenseController3D defense;
 
         public bool LastEscapeConsumed { get; private set; }
         public bool HasKeyboardFocus =>
@@ -33,6 +35,12 @@ namespace WasteCity.Graybox3D.Building
         {
             productionPresentation = presentation;
             this.operations = operations;
+        }
+
+        public void ConfigureDefense(
+            GrayboxDefenseController3D defense)
+        {
+            this.defense = defense;
         }
 
         public bool TryCloseForOperations()
@@ -75,6 +83,25 @@ namespace WasteCity.Graybox3D.Building
             this.construction = construction;
             this.evacuation = evacuation;
             this.developer = developer;
+        }
+
+        public void Configure(
+            GrayboxBuildingMenuView3D menu,
+            GrayboxBuildingInteractionModel3D interaction,
+            GrayboxBuildingPlacementController3D placement,
+            GrayboxConstructionController3D construction,
+            GrayboxEvacuationController3D evacuation,
+            GrayboxDeveloperModifierBootstrap3D developer,
+            GrayboxDefenseController3D defense)
+        {
+            Configure(
+                menu,
+                interaction,
+                placement,
+                construction,
+                evacuation,
+                developer);
+            this.defense = defense;
         }
 
         public GrayboxInputSuppression ProcessCurrentInput()
@@ -208,15 +235,25 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxBuildingInteractionState.Inactive &&
                 mouse != null &&
                 mouse.leftButton.wasPressedThisFrame &&
-                Camera.main != null &&
-                productionPresentation != null &&
-                productionPresentation.TryPickInstance(
-                    Camera.main.ScreenPointToRay(pointerPosition),
-                    out string selectedStableId) &&
-                operations != null &&
-                operations.TryOpenBuildingDetail(selectedStableId))
+                Camera.main != null)
             {
-                buildInputOwnedThisFrame = true;
+                Ray pointerRay =
+                    Camera.main.ScreenPointToRay(pointerPosition);
+                if (defense != null && defense.TrySelect(pointerRay))
+                {
+                    operations?.ClosePanels();
+                    buildInputOwnedThisFrame = true;
+                }
+                else if (productionPresentation != null &&
+                         productionPresentation.TryPickInstance(
+                             pointerRay,
+                             out string selectedStableId) &&
+                         operations != null &&
+                         operations.TryOpenBuildingDetail(selectedStableId))
+                {
+                    defense?.CloseSelection();
+                    buildInputOwnedThisFrame = true;
+                }
             }
 
             if (!paused &&
@@ -277,6 +314,8 @@ namespace WasteCity.Graybox3D.Building
 
             if (keyboard.bKey.wasPressedThisFrame)
             {
+                if (defense != null && defense.HasSelection)
+                    defense.CloseSelection();
                 interaction.ToggleCatalog();
                 owned = true;
             }

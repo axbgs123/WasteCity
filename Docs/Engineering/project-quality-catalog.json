@@ -187,7 +187,8 @@
         "IDEA-0009",
         "IDEA-0010",
         "BUG-0006",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -235,7 +236,8 @@
         "IDEA-0010",
         "IDEA-0011",
         "BUG-0006",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -288,7 +290,8 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0011",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -322,7 +325,8 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -334,10 +338,14 @@
       "ChineseName": "战斗与路线",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Combat/**",
+        "Assets/_Game/Scripts/Defense/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Combat/**",
+        "Assets/_Game/Scripts/Defense/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
       "FailureLocationSummary": "先检查战斗规则、路线内容、单位状态和事件接线",
@@ -346,8 +354,15 @@
         "Assets/_Game/Tests/EditMode/BossEncounterTests.cs",
         "Assets/_Game/Tests/EditMode/EnemyCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/EnemyQualityTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/InfectionModelTests.cs",
         "Assets/_Game/Tests/EditMode/InfectionSpreadRulesTests.cs",
         "Assets/_Game/Tests/EditMode/MindControlTests.cs",
@@ -359,18 +374,21 @@
         "Assets/_Game/Tests/EditMode/RouteDefenseTowerTests.cs",
         "Assets/_Game/Tests/EditMode/SwordIntentTests.cs",
         "Assets/_Game/Tests/EditMode/TechnologyOverloadTests.cs",
-        "Assets/_Game/Tests/EditMode/WaveDirectorTests.cs"
+        "Assets/_Game/Tests/EditMode/WaveDirectorTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ],
       "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
       ],
-      "MinimumVerification": "FocusedEditMode"
+      "MinimumVerification": "FocusedPlayMode"
     },
     {
       "Id": "persistence-migration",
@@ -482,7 +500,8 @@
       ],
       "RequirementIds": [
         "BUG-0005",
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0013"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1606,6 +1625,125 @@
       ]
     },
     {
+      "Id": "first-defense-combat-models",
+      "ChineseName": "首版防御战斗模型",
+      "TypeNames": [
+        "MachineGunTurretCombatModel",
+        "DefenseEnemyCombatModel",
+        "CityCoreCombatModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击。",
+      "BoundarySummary": "只拥有首版战斗实体规则状态；不读取 Unity 场景、不推进教学波、不访问城市库存，tracer 不持有命中、伤害或耗弹真值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013"
+      ]
+    },
+    {
+      "Id": "tutorial-defense-runtime",
+      "ChineseName": "首版教学防御波运行时",
+      "TypeNames": [
+        "DefenseEnemyRuntimeSnapshot",
+        "DefenseRuntimeSnapshot",
+        "TutorialDefenseRuntimeModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。",
+      "BoundarySummary": "只拥有首个教学波与城市核心会话状态；不处理建筑发现、城市库存、Unity 时间、表现对象或正式失败结算。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013"
+      ]
+    },
+    {
+      "Id": "graybox-building-operational-access-3d",
+      "ChineseName": "三维建筑共享运行与物流资格",
+      "TypeNames": [
+        "GrayboxBuildingOperationalAccess3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingOperationalAccess3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用于从同一建筑生命周期事实分别判断会话状态保留、本地运行和物流连接。",
+      "BoundarySummary": "只组合已完成、玩家所有、撤离锁定、建筑站点、城市模式与既有范围规则；不持有库存、生产或防御状态，不复制放置合法性。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013"
+      ]
+    },
+    {
+      "Id": "graybox-defense-runtime-3d",
+      "ChineseName": "三维首版防御运行时",
+      "TypeNames": [
+        "GrayboxDefenseTowerRuntimeState3D",
+        "GrayboxDefenseTowerSnapshot3D",
+        "GrayboxDefenseEnemySnapshot3D",
+        "GrayboxDefenseRuntimeSnapshot3D",
+        "GrayboxDefenseRuntime3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "用于按稳定建筑实例同步机枪塔、补给本地弹药，并以固定 0.1 秒步长组合教学波与战斗模型。",
+      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域；不复制物流范围、建筑资格或库存事务，不进入 schema 30。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013"
+      ]
+    },
+    {
+      "Id": "graybox-defense-scene-presentation-3d",
+      "ChineseName": "三维首版防御场景接线与表现",
+      "TypeNames": [
+        "GrayboxDefenseController3D",
+        "GrayboxDefenseHud3D",
+        "GrayboxDefenseHudView3D",
+        "GrayboxDefenseWorldView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "用于在 GrayboxPrototype3D 中连接规则时钟、全局暂停、HUD、真实选择输入、敌塔表现池与 tracer。",
+      "BoundarySummary": "仅限当前正式 3D 场景适配；UI 只读快照，表现对象不持有目标、伤害、耗弹或波次真值，不接入冻结 2D。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013"
+      ]
+    },
+    {
       "Id": "resource-icon-catalog-3d",
       "ChineseName": "三维共享资源图标目录",
       "TypeNames": [
@@ -1991,6 +2129,17 @@
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
+      ]
+    },
+    {
+      "Id": "graybox-defense-hud",
+      "ChineseName": "灰盒首版防御 HUD",
+      "OwnerTypeName": "GrayboxDefenseHudView3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "系统菜单优先；防御 HUD 只发布选择与暂停命令并阻挡界面点击穿透，世界选择由正式输入主循环处理。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ]
     },
     {

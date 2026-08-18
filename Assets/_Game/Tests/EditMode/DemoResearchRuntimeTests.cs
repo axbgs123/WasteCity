@@ -104,14 +104,14 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void RootStartsCompletedOnlyTwoPlayableNodesCanStartAndPreviewsNeverSpend()
+        public void RootStartsCompletedFirstThreePlayableNodesCanStartAndPreviewsNeverSpend()
         {
             var model = new ResearchModel();
             var runtime = new DemoResearchRuntime(model);
             var city = new ResourceInventory(500);
             city.Add(ResourceIds.Iron, 10);
-            city.Add(ResourceIds.Alloy, 22);
-            city.Add(ResourceIds.Biomass, 9);
+            city.Add(ResourceIds.Alloy, 52);
+            city.Add(ResourceIds.Biomass, 30);
 
             Assert.That(
                 model.IsCompleted(new StableId(ScrapProcessing)),
@@ -146,19 +146,35 @@ namespace WasteCity.Tests
                 AmmunitionAssembly,
                 city,
                 hasEligibleResearchStation: true), Is.True);
-            Assert.That(city.Get(ResourceIds.Alloy), Is.EqualTo(12));
+            Assert.That(city.Get(ResourceIds.Alloy), Is.EqualTo(42));
             Assert.That(runtime.Tick(
                 30f,
                 CityMode.Fortress,
                 globallyPaused: false,
                 hasEligibleResearchStation: true), Is.True);
 
-            int alloyBefore = city.Get(ResourceIds.Alloy);
-            int biomassBefore = city.Get(ResourceIds.Biomass);
             Assert.That(runtime.TryStart(
                 AutomatedDefense,
                 city,
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(city.Get(ResourceIds.Alloy), Is.EqualTo(30));
+            Assert.That(city.Get(ResourceIds.Biomass), Is.EqualTo(20));
+            Assert.That(runtime.Tick(
+                34f,
+                CityMode.Fortress,
+                globallyPaused: false,
                 hasEligibleResearchStation: true), Is.False);
+            Assert.That(runtime.Tick(
+                1f,
+                CityMode.Fortress,
+                globallyPaused: false,
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(
+                model.IsCompleted(new StableId(AutomatedDefense)),
+                Is.True);
+
+            int alloyBefore = city.Get(ResourceIds.Alloy);
+            int biomassBefore = city.Get(ResourceIds.Biomass);
             Assert.That(runtime.TryStart(
                 ReinforcedStructures,
                 city,
@@ -400,13 +416,16 @@ namespace WasteCity.Tests
             Assert.That(city.Get(ResourceIds.Water), Is.Zero);
 
             model = new ResearchModel();
-            model.Restore(new[] { AmmunitionAssembly }, null, 0f);
+            model.Restore(
+                new[] { AmmunitionAssembly, AutomatedDefense },
+                null,
+                0f);
             runtime = new DemoResearchRuntime(model);
             city = new ResourceInventory(500);
-            city.Add(ResourceIds.Alloy, 12);
+            city.Add(ResourceIds.Alloy, 20);
             city.Add(ResourceIds.Biomass, 10);
             ResearchDefinition preview =
-                DemoResearchCatalog.Find(AutomatedDefense);
+                DemoResearchCatalog.Find(ReinforcedStructures);
             Assert.That(model.Start(preview, city), Is.True);
             remaining = model.Remaining;
 

@@ -123,7 +123,7 @@ namespace WasteCity.Graybox3D.Building
                         cityStorage);
                 }
 
-                if (!CanRetainProductionState(instance) ||
+                if (!GrayboxBuildingOperationalAccess3D.CanRetainState(instance) ||
                     !FormalProductionDefinitionCatalog.TryGetByBuildingId(
                         instance.Placement.Definition.Id.Value,
                         out FormalProductionDefinition definition) ||
@@ -148,9 +148,13 @@ namespace WasteCity.Graybox3D.Building
                     stateById.Add(instance.StableInstanceId, state);
                 }
 
-                bool canRun = CanRunLocally(instance, cityMode);
+                bool canRun =
+                    GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                        instance,
+                        cityMode);
                 state.SetLogisticsConnected(
-                    canRun && IsLogisticsConnected(
+                    canRun &&
+                    GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
                         instance,
                         cityMode,
                         cityX,
@@ -211,8 +215,10 @@ namespace WasteCity.Graybox3D.Building
             retainedWarehouseIds.Add(instance.StableInstanceId);
             bool connected =
                 GrayboxProductionEligibility3D.IsActiveWarehouse(instance) &&
-                CanRunLocally(instance, cityMode) &&
-                IsLogisticsConnected(
+                GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                    instance,
+                    cityMode) &&
+                GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
                     instance,
                     cityMode,
                     cityX,
@@ -325,50 +331,5 @@ namespace WasteCity.Graybox3D.Building
                 string.IsNullOrEmpty(item) ? 0 : item.GetHashCode());
         }
 
-        private static bool CanRetainProductionState(
-            GrayboxBuildingInstance3D instance)
-        {
-            return instance.State == GrayboxBuildingInstanceState.Completed &&
-                instance.IsPlayerOwned &&
-                instance.Placement?.Definition != null;
-        }
-
-        private static bool CanRunLocally(
-            GrayboxBuildingInstance3D instance,
-            CityMode cityMode)
-        {
-            if (instance.IsEvacuationLocked) return false;
-            return instance.Placement.Site == BuildingSite.Ground ||
-                BuildingMobilityRules.CanOperate(
-                    instance.Placement.Definition,
-                    instance.Placement.Site,
-                    cityMode);
-        }
-
-        private static bool IsLogisticsConnected(
-            GrayboxBuildingInstance3D instance,
-            CityMode cityMode,
-            int cityX,
-            int cityY,
-            int groundRadius)
-        {
-            PlacedBuilding placement = instance.Placement;
-            if (placement.Site == BuildingSite.InnerCity)
-                return true;
-            if (placement.Site != BuildingSite.Ground ||
-                cityMode != CityMode.Fortress)
-            {
-                return false;
-            }
-
-            return BuildingRangeRules.IsGroundFootprintInRange(
-                placement.Definition,
-                placement.X,
-                placement.Y,
-                placement.Orientation,
-                cityX,
-                cityY,
-                groundRadius);
-        }
     }
 }

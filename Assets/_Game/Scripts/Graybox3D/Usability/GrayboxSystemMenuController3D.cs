@@ -28,6 +28,8 @@ namespace WasteCity.Graybox3D.Usability
         public GrayboxSystemMenuPage3D Page { get; private set; } =
             GrayboxSystemMenuPage3D.Main;
         public GrayboxDisplaySettingsModel3D Settings => settings;
+        public bool IsTacticalPaused =>
+            speed != null && speed.IsPaused(GamePauseReason.User);
 
         public void Configure(
             GameSpeedModel speed,
@@ -76,6 +78,15 @@ namespace WasteCity.Graybox3D.Usability
         public void Continue()
         {
             Close();
+        }
+
+        public void ToggleTacticalPause()
+        {
+            EnsureRuntimeServices();
+            speed.SetPaused(
+                GamePauseReason.User,
+                !speed.IsPaused(GamePauseReason.User));
+            ApplyEffectiveSpeed();
         }
 
         public void Close()

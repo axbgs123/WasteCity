@@ -505,9 +505,23 @@ namespace WasteCity.Tests
                         definition.Id.Value);
                 }
             }
-            Assert.That(RequireText(
+            string automatedDefenseState = RequireText(
                     "Research.Node." +
                     DemoResearchCatalog.AutomatedDefenseId +
+                    ".State")
+                .text;
+            Assert.That(automatedDefenseState, Does.Contain("前置"));
+            Assert.That(
+                automatedDefenseState,
+                Does.Not.Contain("本阶段未开放"));
+            Assert.That(RequireText(
+                    "Research.Node." +
+                    DemoResearchCatalog.ReinforcedStructuresId +
+                    ".State").text,
+                Does.Contain("本阶段未开放"));
+            Assert.That(RequireText(
+                    "Research.Node." +
+                    DemoResearchCatalog.LegacyAnalysisId +
                     ".State").text,
                 Does.Contain("本阶段未开放"));
             Assert.That(RequireText(

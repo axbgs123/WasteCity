@@ -36,9 +36,16 @@ namespace WasteCity.Tests
         public void TearDown()
         {
             for (var index = createdObjects.Count - 1; index >= 0; index--)
+            {
+                EventSystem eventSystem = createdObjects[index] == null
+                    ? null
+                    : createdObjects[index].GetComponent<EventSystem>();
+                if (eventSystem != null && EventSystem.current == eventSystem)
+                    InvokeLifecycle(eventSystem, "OnDisable");
                 if (createdObjects[index] != null)
                     UnityEngine.Object.DestroyImmediate(
                         createdObjects[index]);
+            }
             createdObjects.Clear();
             if (testKeyboard != null && testKeyboard.added)
                 InputSystem.RemoveDevice(testKeyboard);
@@ -450,6 +457,40 @@ namespace WasteCity.Tests
             Assert.That(Time.timeScale, Is.Zero);
         }
 
+        [Test]
+        public void IDEA0013_TacticalAndSystemMenuPauseReasonsStackOnOneSpeedModel()
+        {
+            MenuFixture fixture = CreateMenuControllerFixture();
+            fixture.Speed.Set(2f);
+
+            fixture.Controller.ToggleTacticalPause();
+            Assert.That(fixture.Controller.IsTacticalPaused, Is.True);
+            Assert.That(
+                fixture.Speed.IsPaused(GamePauseReason.User),
+                Is.True);
+            Assert.That(Time.timeScale, Is.Zero);
+
+            fixture.Controller.Open();
+            Assert.That(
+                fixture.Speed.IsPaused(GamePauseReason.SystemMenu),
+                Is.True);
+            fixture.Controller.Continue();
+
+            Assert.That(
+                fixture.Speed.IsPaused(GamePauseReason.SystemMenu),
+                Is.False);
+            Assert.That(fixture.Controller.IsTacticalPaused, Is.True);
+            Assert.That(fixture.Speed.RequestedSpeed, Is.EqualTo(2f));
+            Assert.That(Time.timeScale, Is.Zero);
+
+            fixture.Controller.ToggleTacticalPause();
+            Assert.That(fixture.Controller.IsTacticalPaused, Is.False);
+            Assert.That(
+                fixture.Speed.IsPaused(GamePauseReason.User),
+                Is.False);
+            Assert.That(Time.timeScale, Is.EqualTo(2f));
+        }
+
         [TestCase("OnDisable")]
         [TestCase("OnDestroy")]
         public void IDEA0007_ControllerTeardownReleasesOnlyOwnedPause(
@@ -782,6 +823,77 @@ namespace WasteCity.Tests
             Assert.That(Time.timeScale, Is.EqualTo(2f));
         }
 
+        [Test]
+        public void IDEA0013_SelectedButtonDoesNotBlockSpaceTacticalPause()
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            EventSystem eventSystem =
+                ConfigureCoordinatorKeyboardFocus(fixture);
+            GameObject buttonObject = CreateObject(
+                "SelectedButton",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Button));
+            eventSystem.SetSelectedGameObject(buttonObject);
+            Assert.That(fixture.Building.HasKeyboardFocus, Is.True);
+
+            GrayboxInputSuppression suppression = PressCoordinatorKey(
+                fixture.Coordinator,
+                Key.Space);
+
+            Assert.That(fixture.Menu.IsTacticalPaused, Is.True);
+            Assert.That(Time.timeScale, Is.Zero);
+            Assert.That(
+                fixture.Coordinator.BuildingInputInvocationCount,
+                Is.Zero);
+            AssertSuppressAll(suppression);
+        }
+
+        [Test]
+        public void IDEA0013_ActiveInputFieldProtectsSpaceFromTacticalPause()
+        {
+            CoordinatorFixture fixture = CreateCoordinatorFixture();
+            EventSystem eventSystem =
+                ConfigureCoordinatorKeyboardFocus(fixture);
+            GameObject inputObject = CreateObject(
+                "SelectedInputField",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(InputField));
+            InputField input = inputObject.GetComponent<InputField>();
+            GameObject textObject = CreateObject(
+                "SelectedInputField.Text",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Text));
+            textObject.transform.SetParent(inputObject.transform, false);
+            Text text = textObject.GetComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>(
+                "LegacyRuntime.ttf");
+            input.textComponent = text;
+            eventSystem.SetSelectedGameObject(inputObject);
+            Assert.That(input.IsActive(), Is.True);
+            Assert.That(input.IsInteractable(), Is.True);
+            Assert.That(fixture.Building.HasKeyboardFocus, Is.True);
+
+            GrayboxInputSuppression suppression = PressCoordinatorKey(
+                fixture.Coordinator,
+                Key.Space);
+
+            Assert.That(fixture.Menu.IsTacticalPaused, Is.False);
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(
+                fixture.Coordinator.BuildingInputInvocationCount,
+                Is.EqualTo(1u));
+            Assert.That(suppression.Move, Is.True);
+            Assert.That(suppression.Deployment, Is.True);
+            Assert.That(suppression.Destination, Is.False);
+            Assert.That(suppression.CameraDrag, Is.False);
+            Assert.That(suppression.Home, Is.True);
+        }
+
         private CoordinatorFixture CreateCoordinatorFixture(
             IGrayboxDevelopmentPanelControl3D development = null)
         {
@@ -802,6 +914,30 @@ namespace WasteCity.Tests
                 menuFixture.Controller,
                 menuFixture.Speed,
                 menuFixture.Exit);
+        }
+
+        private EventSystem ConfigureCoordinatorKeyboardFocus(
+            CoordinatorFixture fixture)
+        {
+            EventSystem eventSystem = CreateObject(
+                    "CoordinatorEventSystem",
+                    typeof(EventSystem))
+                .GetComponent<EventSystem>();
+            InvokeLifecycle(eventSystem, "OnEnable");
+            EventSystem.current = eventSystem;
+            GrayboxBuildingMenuView3D menu = CreateObject(
+                    "CoordinatorBuildingMenu")
+                .AddComponent<GrayboxBuildingMenuView3D>();
+            SetPrivateField(menu, "eventSystem", eventSystem);
+            SetPrivateField(menu, "inputGuard", new GrayboxUiInputGuard3D());
+            fixture.Building.Configure(
+                menu,
+                interaction: null,
+                placement: null,
+                construction: null,
+                evacuation: null,
+                developer: null);
+            return eventSystem;
         }
 
         private GrayboxInputSuppression PressCoordinatorKey(
@@ -916,6 +1052,18 @@ namespace WasteCity.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(method, Is.Not.Null, methodName);
             method.Invoke(behaviour, null);
+        }
+
+        private static void SetPrivateField(
+            object owner,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(owner, value);
         }
 
         private static Button FindButton(Transform root, string name)

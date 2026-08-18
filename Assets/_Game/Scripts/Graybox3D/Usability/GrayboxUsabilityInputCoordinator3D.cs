@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 using WasteCity.Graybox3D.Building;
 
 namespace WasteCity.Graybox3D.Usability
@@ -23,6 +25,8 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxDeveloperModifierBootstrap3D developer;
         [SerializeField]
         private GrayboxOperationsController3D operations;
+        [SerializeField]
+        private GrayboxDefenseController3D defense;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
 
@@ -56,6 +60,22 @@ namespace WasteCity.Graybox3D.Usability
         public void Configure(
             GrayboxBuildingInputRouter3D buildingInput,
             GrayboxSystemMenuController3D systemMenu,
+            GrayboxDeveloperModifierBootstrap3D developer,
+            GrayboxOperationsController3D operations,
+            GrayboxDefenseController3D defense)
+        {
+            Configure(
+                buildingInput,
+                systemMenu,
+                developer,
+                operations);
+            this.defense = defense;
+            buildingInput.ConfigureDefense(defense);
+        }
+
+        public void Configure(
+            GrayboxBuildingInputRouter3D buildingInput,
+            GrayboxSystemMenuController3D systemMenu,
             IGrayboxDevelopmentPanelControl3D developmentPanel)
         {
             this.buildingInput = buildingInput ??
@@ -80,6 +100,16 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
+            bool tacticalPausePressed = keyboard != null &&
+                keyboard.spaceKey.wasPressedThisFrame;
+            if (tacticalPausePressed &&
+                systemMenu != null &&
+                !HasActiveTextInputFocus())
+            {
+                systemMenu.ToggleTacticalPause();
+                return SuppressAll();
+            }
+
             if (buildingInput != null && buildingInput.HasKeyboardFocus)
             {
                 unchecked { BuildingInputInvocationCount++; }
@@ -92,6 +122,19 @@ namespace WasteCity.Graybox3D.Usability
                 keyboard.tKey.wasPressedThisFrame;
             bool buildingPressed = keyboard != null &&
                 keyboard.bKey.wasPressedThisFrame;
+
+            if ((inventoryPressed || researchPressed || buildingPressed) &&
+                defense != null && defense.HasSelection)
+            {
+                defense.CloseSelection();
+            }
+
+            if (escapePressed &&
+                defense != null && defense.HasSelection)
+            {
+                defense.CloseSelection();
+                return SuppressAll();
+            }
 
             if (operations != null &&
                 (inventoryPressed || researchPressed))
@@ -160,6 +203,7 @@ namespace WasteCity.Graybox3D.Usability
             systemMenu = null;
             developer = null;
             operations = null;
+            defense = null;
             developmentPanel = null;
         }
 
@@ -194,6 +238,20 @@ namespace WasteCity.Graybox3D.Usability
             if (developmentPanel == null && developer != null)
                 developmentPanel =
                     new DevelopmentPanelAdapter(developer);
+        }
+
+        private static bool HasActiveTextInputFocus()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            GameObject selected = eventSystem == null
+                ? null
+                : eventSystem.currentSelectedGameObject;
+            if (selected == null || !selected.activeInHierarchy)
+                return false;
+            InputField input = selected.GetComponentInParent<InputField>();
+            return input != null &&
+                   input.IsActive() &&
+                   input.IsInteractable();
         }
 
         private static GrayboxInputSuppression SuppressAll()

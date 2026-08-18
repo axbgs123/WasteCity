@@ -9,6 +9,7 @@ namespace WasteCity.Economy
         Production,
         Backpack,
         Research,
+        Defense,
     }
 
     public readonly struct ResourceChangeAttribution

@@ -831,6 +831,103 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0013_SceneHasOneSerializedDefenseContractWithoutMissingScripts()
+        {
+            Scene scene =
+                EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = GameObject.Find("GrayboxPrototype3D");
+            Transform building = RequiredChild(root, "GrayboxBuilding");
+            Transform defenseTransform = RequiredChild(
+                building.gameObject,
+                "DefenseWorldView");
+            Transform enemyRoot = RequiredChild(
+                defenseTransform.gameObject,
+                "EnemyRoot");
+            Transform towerRoot = RequiredChild(
+                defenseTransform.gameObject,
+                "TowerRoot");
+            GrayboxDefenseWorldView3D worldView =
+                defenseTransform.GetComponent<GrayboxDefenseWorldView3D>();
+            Transform systems = RequiredChild(root, "GrayboxSystems");
+            GrayboxDefenseController3D controller =
+                RequiredComponent<GrayboxDefenseController3D>(
+                    systems,
+                    "GrayboxDefenseController");
+            Transform ui = RequiredChild(root, "GrayboxUI");
+            Transform operationsTransform = RequiredChild(
+                ui.gameObject,
+                "ProductionObservabilityCanvas");
+            Canvas operationsCanvas =
+                operationsTransform.GetComponent<Canvas>();
+            GrayboxDefenseHud3D hud =
+                operationsTransform.GetComponent<GrayboxDefenseHud3D>();
+            EventSystem eventSystem =
+                Object.FindObjectOfType<EventSystem>(true);
+            GrayboxBuildingInputRouter3D buildingInput =
+                Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Object.FindObjectOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true);
+            Material material =
+                AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
+
+            Assert.That(scene.path, Is.EqualTo(ScenePath));
+            Assert.That(worldView, Is.Not.Null);
+            Assert.That(hud, Is.Not.Null);
+            Assert.That(operationsCanvas, Is.Not.Null);
+            Assert.That(eventSystem, Is.Not.Null);
+            Assert.That(material, Is.Not.Null);
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxDefenseController3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxDefenseWorldView3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxDefenseHud3D>(true),
+                Has.Length.EqualTo(1));
+
+            AssertReference(worldView, "enemyRoot", enemyRoot);
+            AssertReference(worldView, "towerRoot", towerRoot);
+            AssertReference(worldView, "sharedMaterial", material);
+            AssertReference(
+                controller,
+                "session",
+                Object.FindObjectOfType<GrayboxBuildingSession3D>(true));
+            AssertReference(
+                controller,
+                "city",
+                Object.FindObjectOfType<
+                    GrayboxMobileCityController3D>(true));
+            AssertReference(
+                controller,
+                "world",
+                Object.FindObjectOfType<GrayboxWorldView3D>(true));
+            AssertReference(
+                controller,
+                "buildingPresentation",
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>(true));
+            AssertReference(controller, "worldView", worldView);
+            AssertReference(controller, "hud", hud);
+            AssertReference(hud, "canvas", operationsCanvas);
+            AssertReference(hud, "eventSystem", eventSystem);
+            AssertReference(buildingInput, "defense", controller);
+            AssertReference(coordinator, "defense", controller);
+
+            foreach (GameObject sceneRoot in scene.GetRootGameObjects())
+            foreach (Transform transform in
+                     sceneRoot.GetComponentsInChildren<Transform>(true))
+            {
+                Assert.That(
+                    GameObjectUtility
+                        .GetMonoBehavioursWithMissingScriptCount(
+                            transform.gameObject),
+                    Is.Zero,
+                    transform.gameObject.name);
+            }
+        }
+
+        [Test]
         public void IDEA0007_AuthoringUsesDedicatedIdempotentUsabilityContract()
         {
             string source = File.ReadAllText(

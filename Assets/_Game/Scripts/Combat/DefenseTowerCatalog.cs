@@ -14,6 +14,8 @@ namespace WasteCity.Combat
     }
     public static class DefenseTowerCatalog
     {
+        public const int MachineGunAmmunitionCapacity = 30;
+
         private static readonly DefenseTowerDefinition[] All=
         {
             new DefenseTowerDefinition("core.building.machine-gun-turret",DamageType.Physical,20,10,ResourceIds.Ammunition,3),

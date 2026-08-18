@@ -210,7 +210,7 @@ namespace WasteCity.Tests
                 "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
                 "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
-                "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
+                "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
@@ -890,6 +890,147 @@ namespace WasteCity.Tests
             }, demoRuntime.RequiredTestFiles);
             CollectionAssert.AreEqual(new[] { "IDEA-0011" },
                 demoRuntime.RequirementIds);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0013DefenseOwnershipReuseAndHud()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup combat = FindFeature(catalog, "combat-routes");
+
+            CollectionAssert.Contains(combat.SourceGlobs,
+                "Assets/_Game/Scripts/Defense/**");
+            CollectionAssert.Contains(combat.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs");
+            CollectionAssert.Contains(combat.ScenePaths,
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+            CollectionAssert.Contains(combat.RequirementIds, "IDEA-0013");
+            Assert.That(combat.MinimumVerification,
+                Is.EqualTo(ProjectVerificationLevel.FocusedPlayMode));
+
+            foreach (string featureId in new[]
+            {
+                "building-construction-evacuation",
+                "ui-input",
+                "economy-production-logistics",
+                "research-population",
+                "scene-editor-build-performance",
+            })
+                CollectionAssert.Contains(
+                    FindFeature(catalog, featureId).RequirementIds,
+                    "IDEA-0013",
+                    featureId);
+
+            AssertDefenseReuse(
+                FindReuse(catalog, "first-defense-combat-models"),
+                "combat-routes",
+                ProjectReuseLevel.Recommended,
+                new[] { "MachineGunTurretCombatModel", "DefenseEnemyCombatModel", "CityCoreCombatModel" },
+                new[] { "Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs" },
+                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs" });
+            AssertDefenseReuse(
+                FindReuse(catalog, "tutorial-defense-runtime"),
+                "combat-routes",
+                ProjectReuseLevel.Recommended,
+                new[] { "DefenseEnemyRuntimeSnapshot", "DefenseRuntimeSnapshot", "TutorialDefenseRuntimeModel" },
+                new[] { "Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs" },
+                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs" });
+            AssertDefenseReuse(
+                FindReuse(catalog, "graybox-building-operational-access-3d"),
+                "building-construction-evacuation",
+                ProjectReuseLevel.Recommended,
+                new[] { "GrayboxBuildingOperationalAccess3D" },
+                new[] { "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingOperationalAccess3D.cs" },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
+                });
+            AssertDefenseReuse(
+                FindReuse(catalog, "graybox-defense-runtime-3d"),
+                "combat-routes",
+                ProjectReuseLevel.ReviewBeforeReuse,
+                new[]
+                {
+                    "GrayboxDefenseTowerRuntimeState3D",
+                    "GrayboxDefenseTowerSnapshot3D",
+                    "GrayboxDefenseEnemySnapshot3D",
+                    "GrayboxDefenseRuntimeSnapshot3D",
+                    "GrayboxDefenseRuntime3D",
+                },
+                new[] { "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs" },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
+                });
+            AssertDefenseReuse(
+                FindReuse(catalog, "graybox-defense-scene-presentation-3d"),
+                "ui-input",
+                ProjectReuseLevel.SceneOnly,
+                new[]
+                {
+                    "GrayboxDefenseController3D",
+                    "GrayboxDefenseHud3D",
+                    "GrayboxDefenseHudView3D",
+                    "GrayboxDefenseWorldView3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs",
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs",
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs",
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+                    "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+                });
+
+            ProjectUiEntry hud = FindUi(catalog, "graybox-defense-hud");
+            Assert.That(hud.OwnerTypeName, Is.EqualTo("GrayboxDefenseHudView3D"));
+            Assert.That(hud.SceneId, Is.EqualTo("graybox-prototype-3d"));
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+            }, hud.RequiredTestFiles);
+        }
+
+        private static void AssertDefenseReuse(
+            ProjectReuseEntry entry,
+            string featureGroupId,
+            ProjectReuseLevel reuseLevel,
+            string[] typeNames,
+            string[] assetPaths,
+            string[] requiredTestFiles)
+        {
+            Assert.That(entry.FeatureGroupId, Is.EqualTo(featureGroupId));
+            Assert.That(entry.ReuseLevel, Is.EqualTo(reuseLevel));
+            CollectionAssert.AreEqual(typeNames, entry.TypeNames);
+            CollectionAssert.AreEqual(assetPaths, entry.AssetPaths);
+            CollectionAssert.AreEqual(requiredTestFiles, entry.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0013" }, entry.RequirementIds);
         }
 
         private static void AssertReuseContract(

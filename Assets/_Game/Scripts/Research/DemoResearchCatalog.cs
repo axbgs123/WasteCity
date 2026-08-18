@@ -107,6 +107,10 @@ namespace WasteCity.Research
                 string.Equals(
                     id,
                     AmmunitionAssemblyId,
+                    StringComparison.Ordinal) ||
+                string.Equals(
+                    id,
+                    AutomatedDefenseId,
                     StringComparison.Ordinal))
             {
                 return DemoResearchReleaseState.Researchable;
