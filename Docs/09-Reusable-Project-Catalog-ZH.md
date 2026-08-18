@@ -106,6 +106,14 @@
 
 能解决什么：显示建筑菜单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：用于显示建筑菜单。先检查当前界面与场景绑定。不能负责什么：不保存建筑数据。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`。代码名：`GrayboxBuildingMenuView3D`。
 
+### 三维生产可观察化控制器（仅限场景）
+
+能解决什么：把当前 3D 会话的背包、应急合成、六节点研究、资源状态栏和面板命令接到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏和面板命令，并把真实输入提交到正式模型。只能通过场景 authoring 绑定既有正式模型和输入路由。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
+
+### 三维生产可观察化视图（仅限场景）
+
+能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成和科技树，并把点击转换为命令事件。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树，并把 UGUI 操作发布为命令事件。只能在 `GrayboxPrototype3D` 的既有 UGUI 层级和输入优先级内接线。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。改后跑哪组测试：`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`。
+
 ### 三维灰盒显示设置边界（复用前审查）
 
 能解决什么：把显示设置规则、偏好存储和 Unity 平台应用拆成可测试边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsModel3D.cs` 和 `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`。怎么复用：在三维灰盒中以 IGrayboxDisplaySettingsStore 和 IGrayboxDisplaySettingsPlatform 分离可测试的显示设置模型、偏好存储和 Unity 平台应用边界。不能负责什么：PlayerPrefs 只保存独立显示偏好，明确位于正式存档 schema 30 之外；跨项目复用前需复核键名、版本和平台能力。改后跑哪组测试：`GrayboxUsabilityTests`。代码名：`GrayboxDisplaySettingsModel3D`、`PlayerPrefsGrayboxDisplaySettingsStore3D`、`UnityGrayboxDisplaySettingsPlatform3D`。
@@ -130,7 +138,7 @@
 
 ### 资源库存（推荐复用）
 
-能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。旧 2D 继续按既有方式使用；正式 3D 城市库存接入时通过 `ResourceDefinitionCatalog.CreateFormalCityInventory` 创建，并由 `ResourceCapacityPolicy` 和 `ResourceTransaction` 约束正式写入。不能负责什么：不驱动生产周期。它也不提供资源显示定义、背包槽位、原子多资源事务、仓库有效容量或降容保留超额；`AddCapacity` 降容会裁切数量，`TrySpend` 在启用债务额度后可产生负数，因此正式 3D 新功能不得直接使用这两个行为实现容量变化或生产扣款。改后跑哪组测试：`FoundationTests`。代码名：`ResourceInventory`。
+能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。旧 2D 继续按既有方式使用；正式 3D 城市库存接入时通过 `ResourceDefinitionCatalog.CreateFormalCityInventory` 创建，并由 `ResourceCapacityPolicy` 和 `ResourceTransaction` 约束正式写入；资源状态栏等观察者订阅账本的实际数量变化通知，生产、背包和研究调用方可用只在事务作用域内生效的稳定归因标记说明来源或去向，数量仍以账本为唯一真值。不能负责什么：不驱动生产周期。它也不提供资源显示定义、背包槽位、原子多资源事务、仓库有效容量或降容保留超额；变化与归因通知不拥有 UI 状态，也不替代资源事务，`AddCapacity` 降容会裁切数量，`TrySpend` 在启用债务额度后可产生负数，因此正式 3D 新功能不得直接使用这两个行为实现容量变化或生产扣款。改后跑哪组测试：`FoundationTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
 
 ### 城市资源容量策略（推荐复用）
 
@@ -138,7 +146,7 @@
 
 ### 原子资源事务（推荐复用）
 
-能解决什么：在城市账本、建筑账本和玩家背包之间提供多输入扣除、输出预检及守恒转移基础，并统一返回完成、部分完成或失败状态。在哪里：`Assets/_Game/Scripts/Economy/ResourceTransaction.cs`。怎么复用：聚合同资源请求，预检输入与输出，并执行批量提交和允许部分接收的原子转移。生产、研究、合成和人工转移后续接入时必须调用事务入口，不得在 UI 或控制器中自行拼接 `TrySpend`、`Add`、`Remove`；当前已覆盖账本批事务和背包单资源双向转移，背包合成的多输入预留、产出与取消返还仍待后续 TDD。正式事务只允许使用已有非负余额，不借用旧债务额度。不能负责什么：只处理资源数量与容量提交；不决定物流连接、交互距离、建筑资格、配方周期或界面状态。也不统计仓库数量。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceAmount`、`ResourceTransferResult`、`ResourceTransaction`。
+能解决什么：在城市账本、建筑账本和玩家背包之间提供多输入扣除、输出预检及守恒转移基础，并统一返回完成、部分完成或失败状态。在哪里：`Assets/_Game/Scripts/Economy/ResourceTransaction.cs`。怎么复用：聚合同资源请求，预检输入与输出，并执行批量提交和允许部分接收的原子转移。生产、研究和人工转移必须使用事务入口，不得在 UI 或控制器中自行拼接 `TrySpend`、`Add`、`Remove`；当前已覆盖账本批事务和背包单资源双向转移。背包合成的多输入预留、产出与取消返还已由 `CraftingQueueModel` 通过槽位快照和完整回滚实现，并由 `CraftingQueueModelTests` 保护。正式事务只允许使用已有非负余额，不借用旧债务额度。不能负责什么：只处理资源数量与容量提交；不决定物流连接、交互距离、建筑资格、配方周期或界面状态。也不统计仓库数量。改后跑哪组测试：`ResourceTransactionAndCapacityTests`。代码名：`ResourceAmount`、`ResourceTransferResult`、`ResourceTransaction`。
 
 ### 玩家背包模型（推荐复用）
 
@@ -152,17 +160,21 @@
 
 能解决什么：维护最多 20 次执行的 FIFO 应急合成队列，保证入队预留、顺序推进、产出阻塞和取消返还不丢失资源。在哪里：`Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`。怎么复用：管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还。界面应把左 1、右 5 和 Shift 最大请求转换为模型命令，不自行扣除材料或推进时间。不能负责什么：只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；不访问城市或建筑库存，不自动合成前置材料，不解释鼠标手势，也不进入 schema 30 存档。改后跑哪组测试：`CraftingQueueModelTests`。代码名：`CraftingQueueModel`。
 
+### 手工资源访问规则（推荐复用）
+
+能解决什么：统一判断当前直接控制对象是否可以手工访问城市库存或某座建筑库存。在哪里：`Assets/_Game/Scripts/Economy/ManualResourceAccessRules.cs`。怎么复用：按当前直接控制目标、领袖招募、两格欧氏距离、footprint 和建筑生命周期事实评估城市或建筑库存的手工访问资格。调用方应在每次资源操作提交前重新传入当前权威事实。不能负责什么：只返回纯访问判定；不查找场景对象、不解析旋转尺寸、不执行资源转移，也不缓存资格。调用方必须在每次提交时传入当前事实和权威 footprint。改后跑哪组测试：`ManualResourceAccessRulesTests`。代码名：`ManualResourceAccessRules`。
+
 ### 正式机器生产定义目录（推荐复用）
 
 能解决什么：集中提供采矿、冶炼和装配三条正式机器配方的稳定 ID、依次为 `3`、`6`、`6` 秒的周期、输入输出和内部库存容量。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`。怎么复用：提供采矿、冶炼和装配三条正式机器配方的稳定标识、周期、输入输出与内部容量。生产状态、研究解锁和后续 UI 必须引用目录条目，不得复制配方数值。不能负责什么：只定义机器生产静态配置；不保存建筑实例状态，不推进周期，也不判断物流连接。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionDefinition`、`FormalProductionDefinitionCatalog`。
 
 ### 逐建筑生产状态（推荐复用）
 
-能解决什么：为每个稳定建筑实例保存独立输入/输出缓存、已取得的输入批次、周期进度、玩家暂停和单一停工原因。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。场景适配器后续应按 `GrayboxBuildingInstance3D.StableInstanceId` 持有并清理这些会话状态。不能负责什么：只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。当前默认 3D 场景尚未接入。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
+能解决什么：为每个稳定建筑实例保存独立输入/输出缓存、已取得的输入批次、周期进度、玩家暂停和单一停工原因。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。默认 3D 场景已由 `GrayboxProductionRuntime3D` 按 `GrayboxBuildingInstance3D.StableInstanceId` 持有并清理这些会话状态；其他场景适配器应复用同一所有权方式。不能负责什么：只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
 
 ### 正式生产与物流模拟（推荐复用）
 
-能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。调用方必须提供当前世界模型、正式城市账本、容量策略、有效仓库数和已经由权威规则派生的物流连接。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。它不替代 `BuildingRangeRules`、`BuildingResourceNodeCompatibilityRules` 或 `WorldMapModel`；当前仍是纯领域层，尚未接入默认 3D 场景。旧 `ProductionModel`、`ResourceExtractionProcess` 和允许建筑链式中继的 `LogisticsNetworkModel` 不得作为本轮正式 3D 运行真值。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionSimulation`。
+能解决什么：在一个由调用方确定的物流步内，先按稳定实例 ID 卸载旧输出、补足输入，再推进各建筑独立周期，并在采矿完成时调用 `WorldMapModel.Harvest`。在哪里：`Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`。怎么复用：按稳定实例顺序执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。调用方必须提供当前世界模型、正式城市账本、容量策略、有效仓库数和已经由权威规则派生的物流连接。不能负责什么：不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格和连接状态。它不替代 `BuildingRangeRules`、`BuildingResourceNodeCompatibilityRules` 或 `WorldMapModel`；默认 3D 场景只通过 `GrayboxProductionClock3D` 和运行时适配器调用这一纯领域层，不把场景职责移入模拟。旧 `ProductionModel`、`ResourceExtractionProcess` 和允许建筑链式中继的 `LogisticsNetworkModel` 不得作为本轮正式 3D 运行真值。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`FormalProductionSimulation`。
 
 ### 三维生产建筑资格（复用前审查）
 
@@ -175,6 +187,10 @@
 ### 三维生产固定时钟（复用前审查）
 
 能解决什么：让不同帧率下的三维生产保持同一固定步结果，并在暂停期间不积累追赶时间。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`。怎么复用：用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。不能负责什么：只拥有会话级余量并组合运行时、模拟和容量策略；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionClockTests`。代码名：`GrayboxProductionClock3D`。
+
+### 三维生产可观察化只读边界（推荐复用）
+
+能解决什么：向资源状态栏和生产面板提供按稳定实例 ID 排序、内容变化后才换版的不可变生产详情，并把暂停、输入补给和输出提取收口到生产命令门面。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs` 和 `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`。怎么复用：发布按稳定实例 ID 排序的不可变生产详情、有效仓库数和城市每资源容量；仓库资格变化进入内容哈希并产生新 revision。通过命令门面提交暂停和缓存转移时，输出入城容量由命令所有者按权威运行时仓库数派生，不接受 UI 传入的仓库数量。不能负责什么：快照只读，不暴露 BuildingProductionState 或可变库存；命令只按 stable ID 调用既有 ResourceTransaction 原子提交。访问距离、物流和建筑生命周期资格仍由当前 3D 场景适配器在每次提交前基于权威事实重新验证；本边界不复制资格规则、不接入冻结 2D，也不进入 schema 30。改后跑哪组测试：`GrayboxProductionObservabilityFacadeTests`。代码名：`ProductionBuildingObservability`、`ProductionObservabilitySnapshot`、`GrayboxProductionCommandFacade3D`。
 
 ### 三维生产场景控制器（仅限场景）
 

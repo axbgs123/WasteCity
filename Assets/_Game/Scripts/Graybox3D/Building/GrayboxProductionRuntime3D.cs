@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
+using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -94,11 +95,7 @@ namespace WasteCity.Graybox3D.Building
                     stateById.Add(instance.StableInstanceId, state);
                 }
 
-                bool canRun = !instance.IsEvacuationLocked &&
-                    BuildingMobilityRules.CanOperate(
-                        instance.Placement.Definition,
-                        instance.Placement.Site,
-                        cityMode);
+                bool canRun = CanRunLocally(instance, cityMode);
                 state.SetLogisticsConnected(
                     canRun && IsLogisticsConnected(
                         instance,
@@ -130,12 +127,107 @@ namespace WasteCity.Graybox3D.Building
                 stateById.TryGetValue(stableInstanceId, out state);
         }
 
+        public ProductionObservabilitySnapshot CaptureObservability(
+            ulong revision,
+            WorldMapModel world)
+        {
+            return ProductionObservabilitySnapshot.Capture(
+                revision,
+                readOnlyStates,
+                world,
+                ActiveWarehouseCount);
+        }
+
+        public ulong ComputeObservabilityContentHash(WorldMapModel world)
+        {
+            ulong value = 1469598103934665603ul;
+            Mix(ref value, ActiveWarehouseCount);
+            Mix(ref value, states.Count);
+            for (var index = 0; index < states.Count; index++)
+            {
+                BuildingProductionState state = states[index];
+                FormalProductionDefinition definition = state.Definition;
+                string outputResourceId =
+                    ProductionObservabilitySnapshot.ResolveOutputResourceId(
+                        state,
+                        world);
+                Mix(ref value, state.StableInstanceId);
+                Mix(ref value, definition.Id);
+                Mix(ref value, definition.BuildingId);
+                Mix(ref value, definition.DurationSeconds.GetHashCode());
+                Mix(ref value, definition.InputResourceId);
+                Mix(ref value, definition.InputAmount);
+                Mix(ref value, definition.OutputAmount);
+                Mix(ref value, definition.InputCapacity);
+                Mix(ref value, definition.OutputCapacity);
+                Mix(ref value, outputResourceId);
+                Mix(ref value, string.IsNullOrEmpty(definition.InputResourceId)
+                    ? 0
+                    : state.Input.Get(definition.InputResourceId));
+                Mix(ref value, string.IsNullOrEmpty(outputResourceId)
+                    ? 0
+                    : state.Output.Get(outputResourceId));
+                Mix(ref value, state.ProgressSeconds.GetHashCode());
+                Mix(ref value, state.HasReservedInputs);
+                Mix(ref value, state.IsLogisticsConnected);
+                Mix(ref value, state.IsPlayerPaused);
+                Mix(ref value, (int)state.StopReason);
+                Mix(ref value, state.BoundResourceNodeId);
+                Mix(ref value, state.BoundNodeX);
+                Mix(ref value, state.BoundNodeY);
+                if (definition.UsesBoundResourceNode && world != null &&
+                    state.BoundNodeX >= 0 && state.BoundNodeY >= 0 &&
+                    state.BoundNodeX < world.Width &&
+                    state.BoundNodeY < world.Height)
+                {
+                    WorldCell cell = world.Get(
+                        state.BoundNodeX,
+                        state.BoundNodeY);
+                    Mix(ref value, cell.ResourceId);
+                    Mix(ref value, Math.Max(0, cell.ResourceAmount));
+                }
+            }
+            return value;
+        }
+
+        private static void Mix(ref ulong value, bool item)
+        {
+            Mix(ref value, item ? 1 : 0);
+        }
+
+        private static void Mix(ref ulong value, int item)
+        {
+            unchecked
+            {
+                value ^= (uint)item;
+                value *= 1099511628211ul;
+            }
+        }
+
+        private static void Mix(ref ulong value, string item)
+        {
+            Mix(ref value,
+                string.IsNullOrEmpty(item) ? 0 : item.GetHashCode());
+        }
+
         private static bool CanRetainProductionState(
             GrayboxBuildingInstance3D instance)
         {
             return instance.State == GrayboxBuildingInstanceState.Completed &&
                 instance.IsPlayerOwned &&
                 instance.Placement?.Definition != null;
+        }
+
+        private static bool CanRunLocally(
+            GrayboxBuildingInstance3D instance,
+            CityMode cityMode)
+        {
+            if (instance.IsEvacuationLocked) return false;
+            return instance.Placement.Site == BuildingSite.Ground ||
+                BuildingMobilityRules.CanOperate(
+                    instance.Placement.Definition,
+                    instance.Placement.Site,
+                    cityMode);
         }
 
         private static bool IsLogisticsConnected(

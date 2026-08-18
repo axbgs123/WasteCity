@@ -85,7 +85,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void GroundLogisticsRequiresFortressAndEveryFootprintCellInRange()
+        public void GroundProductionKeepsRunningLocallyWhenCityLeavesLogisticsRange()
         {
             GrayboxBuildingInstance3D inside = CreateInstance(
                 "building.instance.000003",
@@ -127,7 +127,8 @@ namespace WasteCity.Tests
 
             Assert.That(insideState.IsLogisticsConnected, Is.False);
             Assert.That(outsideState.IsLogisticsConnected, Is.False);
-            Assert.That(runtime.RunnableStates, Is.Empty);
+            Assert.That(runtime.RunnableStates, Does.Contain(insideState));
+            Assert.That(runtime.RunnableStates, Does.Contain(outsideState));
         }
 
         [Test]
@@ -154,6 +155,32 @@ namespace WasteCity.Tests
                 out BuildingProductionState state), Is.True);
             Assert.That(state.IsLogisticsConnected, Is.True);
             Assert.That(runtime.RunnableStates, Is.EqualTo(new[] { state }));
+        }
+
+        [Test]
+        public void InnerCityProductionStillUsesMobilityRulesDuringTransition()
+        {
+            GrayboxBuildingInstance3D assembler = CreateInstance(
+                "building.instance.000005.transition",
+                BuildingCatalog.Assembler,
+                BuildingSite.InnerCity,
+                1,
+                1);
+            Complete(assembler);
+            var runtime = new GrayboxProductionRuntime3D();
+
+            runtime.Synchronize(
+                new[] { assembler },
+                CityMode.Deploying,
+                cityX: 40,
+                cityY: 30,
+                groundRadius: BuildingRangeRules.InitialGroundRadius);
+
+            Assert.That(runtime.TryGetState(
+                assembler.StableInstanceId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(state.IsLogisticsConnected, Is.False);
+            Assert.That(runtime.RunnableStates, Is.Empty);
         }
 
         [Test]

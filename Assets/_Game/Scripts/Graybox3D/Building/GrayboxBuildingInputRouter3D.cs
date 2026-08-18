@@ -18,8 +18,48 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxEvacuationController3D evacuation;
         [SerializeField]
         private GrayboxDeveloperModifierBootstrap3D developer;
+        [SerializeField]
+        private GrayboxBuildingWorldView3D productionPresentation;
+        [SerializeField]
+        private GrayboxOperationsController3D operations;
 
         public bool LastEscapeConsumed { get; private set; }
+        public bool HasKeyboardFocus =>
+            menu != null && menu.HasKeyboardFocus();
+
+        public void ConfigureProductionDetails(
+            GrayboxBuildingWorldView3D presentation,
+            GrayboxOperationsController3D operations)
+        {
+            productionPresentation = presentation;
+            this.operations = operations;
+        }
+
+        public bool TryCloseForOperations()
+        {
+            if (interaction == null ||
+                interaction.State ==
+                    GrayboxBuildingInteractionState.CancelConfirmation ||
+                (evacuation != null &&
+                 (evacuation.IsManifestOpen || evacuation.IsProcessing)))
+            {
+                return false;
+            }
+
+            if (interaction.State ==
+                GrayboxBuildingInteractionState.CatalogOpen)
+            {
+                interaction.CloseCatalog();
+            }
+            if (interaction.State ==
+                GrayboxBuildingInteractionState.Previewing)
+            {
+                interaction.CancelPreview();
+                placement?.HidePreview();
+            }
+            return interaction.State ==
+                GrayboxBuildingInteractionState.Inactive;
+        }
 
         public void Configure(
             GrayboxBuildingMenuView3D menu,
@@ -160,6 +200,23 @@ namespace WasteCity.Graybox3D.Building
                     mouse != null &&
                     mouse.leftButton.wasPressedThisFrame)
                     placement?.ConfirmCurrentPlacement(out _);
+            }
+
+            if (!pointerOverUi && !previewing &&
+                interaction != null &&
+                interaction.State ==
+                    GrayboxBuildingInteractionState.Inactive &&
+                mouse != null &&
+                mouse.leftButton.wasPressedThisFrame &&
+                Camera.main != null &&
+                productionPresentation != null &&
+                productionPresentation.TryPickInstance(
+                    Camera.main.ScreenPointToRay(pointerPosition),
+                    out string selectedStableId) &&
+                operations != null &&
+                operations.TryOpenProductionDetail(selectedStableId))
+            {
+                buildInputOwnedThisFrame = true;
             }
 
             if (!paused &&

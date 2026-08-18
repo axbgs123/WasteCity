@@ -104,6 +104,17 @@ namespace WasteCity.Tests
                 Is.EqualTo(cityIronBefore - 20));
             Assert.That(fixture.Controller.Clock.AccumulatorSeconds,
                 Is.Zero.Within(.0001f));
+            Assert.That(fixture.Controller.Snapshot,
+                Is.SameAs(fixture.Controller.Clock.Snapshot));
+            Assert.That(fixture.Controller.Revision,
+                Is.EqualTo(fixture.Controller.Snapshot.Revision));
+            Assert.That(fixture.Controller.Commands,
+                Is.SameAs(fixture.Controller.Clock.Commands));
+            Assert.That(fixture.Controller.Snapshot.TryGet(
+                smelter.StableInstanceId,
+                out ProductionBuildingObservability details), Is.True);
+            Assert.That(details.ProgressSeconds,
+                Is.EqualTo(state.ProgressSeconds).Within(.0001f));
         }
 
         private RuntimeFixture CreateGeneratedRuntime()

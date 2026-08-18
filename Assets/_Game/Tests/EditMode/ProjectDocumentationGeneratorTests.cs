@@ -446,6 +446,13 @@ namespace WasteCity.Tests
 
         private static ProjectVerificationSnapshot VerificationFixture()
         {
+            string evidenceRoot = FixtureRoot();
+            string editModeResults = WriteTestRunEvidence(evidenceRoot, "editmode.xml", 1121, 1121);
+            string playModeResults = WriteTestRunEvidence(evidenceRoot, "playmode.xml", 82, 82);
+            string compileLog = WriteCommandEvidence(evidenceRoot, "compile.log");
+            string releaseBuildLog = WriteCommandEvidence(evidenceRoot, "build-release-3d.log");
+            string developmentBuildLog = WriteCommandEvidence(evidenceRoot, "build-development-3d.log");
+            string legacyBuildLog = WriteCommandEvidence(evidenceRoot, "build-legacy-2d.log");
             return new ProjectVerificationSnapshot
             {
                 VerifiedCommitSha = "81b2f47d1688a72a7ddba36a2ffa04b1025e40f9",
@@ -453,22 +460,40 @@ namespace WasteCity.Tests
                 EditMode = new ProjectTestRunSummary
                 {
                     Total = 1121, Passed = 1121, Failed = 0, Skipped = 0,
-                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-editmode-v2.xml",
+                    XmlPath = editModeResults,
                 },
                 PlayMode = new ProjectTestRunSummary
                 {
                     Total = 82, Passed = 82, Failed = 0, Skipped = 0,
-                    XmlPath = "/tmp/wastecity-sparse-map/task-05-full-playmode.xml",
+                    XmlPath = playModeResults,
                 },
-                Compile = new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-compile.log" },
+                Compile = new ProjectCommandResult { Passed = true, EvidencePath = compileLog },
                 Builds = new[]
                 {
-                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-release-3d.log" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-development-3d.log" },
-                    new ProjectCommandResult { Passed = true, EvidencePath = "/tmp/wastecity-sparse-map/task-05-build-legacy-2d.log" },
+                    new ProjectCommandResult { Passed = true, EvidencePath = releaseBuildLog },
+                    new ProjectCommandResult { Passed = true, EvidencePath = developmentBuildLog },
+                    new ProjectCommandResult { Passed = true, EvidencePath = legacyBuildLog },
                 },
                 HumanPlaytestStatus = "等待用户复验",
             };
+        }
+
+        private static string WriteTestRunEvidence(string root, string fileName, int total, int passed)
+        {
+            string path = Path.Combine(root, fileName);
+            string xml = string.Format(
+                "<test-run total=\"{0}\" passed=\"{1}\" failed=\"0\" skipped=\"0\" result=\"Passed\" />\n",
+                total,
+                passed);
+            File.WriteAllText(path, xml, new UTF8Encoding(false));
+            return path;
+        }
+
+        private static string WriteCommandEvidence(string root, string fileName)
+        {
+            string path = Path.Combine(root, fileName);
+            File.WriteAllText(path, "fixture passed\n", new UTF8Encoding(false));
+            return path;
         }
 
         private static ProjectQualityCatalog CatalogFixture()

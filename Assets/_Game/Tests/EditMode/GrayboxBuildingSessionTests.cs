@@ -126,6 +126,33 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CompletedResearchAdvancesCatalogAndPlacementRevisions()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var runtime = new DemoResearchRuntime(session.Research);
+            session.Inventory.Set(ResourceIds.Iron, 10);
+            uint catalogBefore = session.CatalogRevision;
+            uint placementBefore = session.PlacementRevision;
+
+            Assert.That(runtime.TryStart(
+                DemoResearchCatalog.BasicMetallurgyId,
+                session.Inventory,
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(runtime.Tick(
+                20f,
+                CityMode.Fortress,
+                globallyPaused: false,
+                hasEligibleResearchStation: true), Is.True);
+
+            Assert.That(session.IsResearchCompleted(
+                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+            Assert.That(session.CatalogRevision,
+                Is.EqualTo(unchecked(catalogBefore + 1u)));
+            Assert.That(session.PlacementRevision,
+                Is.EqualTo(unchecked(placementBefore + 1u)));
+        }
+
+        [Test]
         public void CatalogRevision_AdvancesOnlyForCommittedCatalogProjectionChanges()
         {
             GrayboxBuildingSession3D session = CreateSession();

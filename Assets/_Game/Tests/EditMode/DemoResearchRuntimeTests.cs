@@ -208,6 +208,12 @@ namespace WasteCity.Tests
             float expectedRemaining)
         {
             DemoResearchRuntime runtime = StartBasic(out ResearchModel model);
+            float expectedMultiplier = cityMode == CityMode.Fortress
+                ? 1f
+                : .5f;
+
+            Assert.That(DemoResearchRuntime.SpeedMultiplier(cityMode),
+                Is.EqualTo(expectedMultiplier));
 
             Assert.That(runtime.Tick(
                 10f,

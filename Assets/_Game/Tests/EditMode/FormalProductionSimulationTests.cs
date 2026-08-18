@@ -221,6 +221,19 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void DepletedMiningNodeTakesPriorityOverFullOutput()
+        {
+            WorldMapModel world = SingleNode(ResourceIds.Iron, amount: 0);
+            BuildingProductionState state = Mine("mine.001", connected: false);
+            state.Output.Add(ResourceIds.Iron, 20);
+
+            Tick(new FormalProductionSimulation(), state, .1f, world: world);
+
+            Assert.That(state.StopReason,
+                Is.EqualTo(ProductionStopReason.Depleted));
+        }
+
+        [Test]
         public void MiningCompletionDoesNotHarvestWhenItsReservedOutputSpaceWasFilled()
         {
             WorldMapModel world = SingleNode(ResourceIds.Iron, amount: 2);

@@ -37,12 +37,16 @@ namespace WasteCity.Economy
             BoundNodeY = boundNodeY;
             Input = new ResourceInventory(definition.InputCapacity);
             Output = new ResourceInventory(definition.OutputCapacity);
+            InputCapacityPolicy = new ResourceCapacityPolicy(
+                definition.InputCapacity,
+                0);
         }
 
         public string StableInstanceId { get; }
         public FormalProductionDefinition Definition { get; }
         public ResourceInventory Input { get; }
         public ResourceInventory Output { get; }
+        public ResourceCapacityPolicy InputCapacityPolicy { get; }
         public string BoundResourceNodeId { get; }
         public int BoundNodeX { get; }
         public int BoundNodeY { get; }
@@ -65,6 +69,8 @@ namespace WasteCity.Economy
             IsPlayerPaused = paused;
             if (paused)
                 StopReason = ProductionStopReason.PlayerPaused;
+            else if (StopReason == ProductionStopReason.PlayerPaused)
+                StopReason = ProductionStopReason.None;
         }
 
         internal void BeginCycle()

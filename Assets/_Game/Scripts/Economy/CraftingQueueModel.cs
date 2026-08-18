@@ -30,8 +30,18 @@ namespace WasteCity.Economy
         }
 
         public int QueuedExecutionCount => queue.Count;
+        public string ActiveRecipeId => queue.Count > 0
+            ? queue[0].Id
+            : null;
         public float ActiveProgressSeconds => activeProgressSeconds;
         public CraftingQueueBlockReason BlockReason { get; private set; }
+
+        public string QueuedRecipeIdAt(int executionIndex)
+        {
+            return executionIndex >= 0 && executionIndex < queue.Count
+                ? queue[executionIndex].Id
+                : null;
+        }
 
         public bool TryEnqueue(string recipeId, int executionCount)
         {
@@ -53,20 +63,18 @@ namespace WasteCity.Economy
             if (!TryGetUnlockedManualRecipe(recipeId, out var definition))
                 return 0;
 
-            int availableExecutions =
-                MaximumQueuedExecutions - queue.Count;
-            for (int index = 0; index < definition.Inputs.Count; index++)
-            {
-                ResourceAmount input = definition.Inputs[index];
-                int held = BackpackAmount(input.ResourceId);
-                availableExecutions = Math.Min(
-                    availableExecutions,
-                    held / input.Amount);
-            }
+            int availableExecutions = AvailableExecutions(definition);
 
             return availableExecutions > 0 &&
                 TryEnqueue(recipeId, availableExecutions)
                 ? availableExecutions
+                : 0;
+        }
+
+        public int MaximumEnqueueable(string recipeId)
+        {
+            return TryGetUnlockedManualRecipe(recipeId, out var definition)
+                ? AvailableExecutions(definition)
                 : 0;
         }
 
@@ -189,6 +197,20 @@ namespace WasteCity.Economy
                 }
             }
             return total >= int.MaxValue ? int.MaxValue : (int)total;
+        }
+
+        private int AvailableExecutions(ResourceRecipeDefinition definition)
+        {
+            int availableExecutions =
+                MaximumQueuedExecutions - queue.Count;
+            for (int index = 0; index < definition.Inputs.Count; index++)
+            {
+                ResourceAmount input = definition.Inputs[index];
+                availableExecutions = Math.Min(
+                    availableExecutions,
+                    BackpackAmount(input.ResourceId) / input.Amount);
+            }
+            return Math.Max(0, availableExecutions);
         }
     }
 }

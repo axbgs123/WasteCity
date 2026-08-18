@@ -374,6 +374,88 @@ namespace WasteCity.Economy
             return CompletedOrPartial(requestedAmount, acceptable);
         }
 
+        public static ResourceTransferResult TransferFromBackpackSlot(
+            PlayerBackpackModel source,
+            int sourceSlotIndex,
+            ResourceInventory target,
+            ResourceCapacityPolicy targetCapacity,
+            int activeTargetWarehouseCount,
+            int requestedAmount)
+        {
+            if (source == null || target == null || targetCapacity == null ||
+                sourceSlotIndex < 0 || sourceSlotIndex >= source.SlotCount ||
+                requestedAmount <= 0)
+            {
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.InvalidRequest);
+            }
+
+            BackpackSlot slot = source.GetSlot(sourceSlotIndex);
+            if (!ResourceCapacityPolicy.IsRegisteredResource(slot.ResourceId))
+            {
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.SourceEmpty);
+            }
+
+            int candidate = Math.Min(requestedAmount, slot.Amount);
+            int acceptable = targetCapacity.GetAcceptableAmount(
+                target,
+                slot.ResourceId,
+                candidate,
+                activeTargetWarehouseCount);
+            if (acceptable == 0)
+            {
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.TargetFull);
+            }
+
+            BackpackSlot[] sourceBefore = source.CaptureSlots();
+            int targetBefore = target.Get(slot.ResourceId);
+            try
+            {
+                if (source.RemoveFromSlot(sourceSlotIndex, acceptable) != acceptable)
+                {
+                    source.RestoreSlots(sourceBefore);
+                    return new ResourceTransferResult(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                }
+
+                int added = targetCapacity.Add(
+                    target,
+                    slot.ResourceId,
+                    acceptable,
+                    activeTargetWarehouseCount);
+                if (added != acceptable)
+                {
+                    target.Restore(slot.ResourceId, targetBefore);
+                    source.RestoreSlots(sourceBefore);
+                    return new ResourceTransferResult(
+                        requestedAmount,
+                        0,
+                        ResourceTransferStatus.CommitFailed);
+                }
+            }
+            catch
+            {
+                target.Restore(slot.ResourceId, targetBefore);
+                source.RestoreSlots(sourceBefore);
+                return new ResourceTransferResult(
+                    requestedAmount,
+                    0,
+                    ResourceTransferStatus.CommitFailed);
+            }
+
+            return CompletedOrPartial(requestedAmount, acceptable);
+        }
+
         private static bool TryAggregate(
             ResourceAmount[] amounts,
             out Dictionary<string, int> totals,

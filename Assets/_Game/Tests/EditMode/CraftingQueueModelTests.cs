@@ -18,6 +18,10 @@ namespace WasteCity.Tests
                 .ToArray();
 
             Assert.That(crafting, Has.Length.EqualTo(2));
+            Assert.That(ResourceRecipeCatalog.DisplayName(crafting[0].Id),
+                Is.EqualTo("应急合金"));
+            Assert.That(ResourceRecipeCatalog.DisplayName(crafting[1].Id),
+                Is.EqualTo("应急弹药"));
             AssertRecipe(
                 crafting[0],
                 "core.crafting.field-alloy",
@@ -243,6 +247,14 @@ namespace WasteCity.Tests
             var split = new CraftingQueueModel(splitBackpack, _ => true);
             EnqueueTwoDifferentRecipes(combined);
             EnqueueTwoDifferentRecipes(split);
+
+            Assert.That(combined.ActiveRecipeId,
+                Is.EqualTo(ResourceRecipeCatalog.FieldAlloyId));
+            Assert.That(combined.QueuedRecipeIdAt(0),
+                Is.EqualTo(ResourceRecipeCatalog.FieldAlloyId));
+            Assert.That(combined.QueuedRecipeIdAt(1),
+                Is.EqualTo(ResourceRecipeCatalog.FieldAmmunitionId));
+            Assert.That(combined.QueuedRecipeIdAt(2), Is.Null);
 
             combined.Tick(24f, globallyPaused: false);
             split.Tick(12f, globallyPaused: false);

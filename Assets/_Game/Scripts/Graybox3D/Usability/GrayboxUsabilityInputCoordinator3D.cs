@@ -21,6 +21,8 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxSystemMenuController3D systemMenu;
         [SerializeField]
         private GrayboxDeveloperModifierBootstrap3D developer;
+        [SerializeField]
+        private GrayboxOperationsController3D operations;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
 
@@ -31,6 +33,15 @@ namespace WasteCity.Graybox3D.Usability
             GrayboxSystemMenuController3D systemMenu,
             GrayboxDeveloperModifierBootstrap3D developer)
         {
+            Configure(buildingInput, systemMenu, developer, null);
+        }
+
+        public void Configure(
+            GrayboxBuildingInputRouter3D buildingInput,
+            GrayboxSystemMenuController3D systemMenu,
+            GrayboxDeveloperModifierBootstrap3D developer,
+            GrayboxOperationsController3D operations)
+        {
             if (developer == null)
                 throw new ArgumentNullException(nameof(developer));
             this.buildingInput = buildingInput ??
@@ -38,6 +49,7 @@ namespace WasteCity.Graybox3D.Usability
             this.systemMenu = systemMenu ??
                 throw new ArgumentNullException(nameof(systemMenu));
             this.developer = developer;
+            this.operations = operations;
             developmentPanel = new DevelopmentPanelAdapter(developer);
         }
 
@@ -51,6 +63,7 @@ namespace WasteCity.Graybox3D.Usability
             this.systemMenu = systemMenu ??
                 throw new ArgumentNullException(nameof(systemMenu));
             developer = null;
+            operations = null;
             this.developmentPanel = developmentPanel;
         }
 
@@ -65,6 +78,49 @@ namespace WasteCity.Graybox3D.Usability
                 if (escapePressed)
                     ProcessMenuEscape();
                 return SuppressAll();
+            }
+
+            if (buildingInput != null && buildingInput.HasKeyboardFocus)
+            {
+                unchecked { BuildingInputInvocationCount++; }
+                return buildingInput.ProcessCurrentInput();
+            }
+
+            bool inventoryPressed = keyboard != null &&
+                keyboard.eKey.wasPressedThisFrame;
+            bool researchPressed = keyboard != null &&
+                keyboard.tKey.wasPressedThisFrame;
+            bool buildingPressed = keyboard != null &&
+                keyboard.bKey.wasPressedThisFrame;
+
+            if (operations != null &&
+                (inventoryPressed || researchPressed))
+            {
+                if (buildingInput == null ||
+                    buildingInput.TryCloseForOperations())
+                {
+                    EnsureDevelopmentPanelAdapter();
+                    if (developmentPanel != null && developmentPanel.IsOpen)
+                        developmentPanel.Close();
+                    if (inventoryPressed)
+                        operations.ToggleInventory();
+                    else
+                        operations.ToggleResearch();
+                }
+                return SuppressAll();
+            }
+
+            if (operations != null && operations.IsAnyPanelOpen)
+            {
+                if (escapePressed)
+                {
+                    operations.ClosePanels();
+                    return SuppressAll();
+                }
+                if (buildingPressed)
+                    operations.ClosePanels();
+                else
+                    return SuppressAll();
             }
 
             GrayboxInputSuppression buildingSuppression = default;
@@ -103,6 +159,7 @@ namespace WasteCity.Graybox3D.Usability
             buildingInput = null;
             systemMenu = null;
             developer = null;
+            operations = null;
             developmentPanel = null;
         }
 
@@ -127,6 +184,7 @@ namespace WasteCity.Graybox3D.Usability
 
         private void CloseOwnedMenu()
         {
+            operations?.ClosePanels();
             if (systemMenu != null && systemMenu.IsOpen)
                 systemMenu.Close();
         }

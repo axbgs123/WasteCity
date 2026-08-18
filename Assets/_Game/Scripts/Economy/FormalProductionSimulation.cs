@@ -67,13 +67,19 @@ namespace WasteCity.Economy
                 int outputAmount = state.Output.Get(outputResourceId);
                 if (outputAmount > 0)
                 {
-                    ResourceTransaction.Transfer(
-                        state.Output,
-                        cityInventory,
-                        cityCapacity,
-                        activeWarehouseCount,
-                        outputResourceId,
-                        outputAmount);
+                    using (cityInventory.AttributeChanges(
+                               new ResourceChangeAttribution(
+                                   ResourceChangeAttributionKind.Production,
+                                   state.Definition.BuildingId)))
+                    {
+                        ResourceTransaction.Transfer(
+                            state.Output,
+                            cityInventory,
+                            cityCapacity,
+                            activeWarehouseCount,
+                            outputResourceId,
+                            outputAmount);
+                    }
                 }
             }
 
@@ -91,13 +97,19 @@ namespace WasteCity.Economy
             if (missing == 0)
                 return;
 
-            ResourceTransaction.Transfer(
-                cityInventory,
-                state.Input,
-                new ResourceCapacityPolicy(definition.InputCapacity, 0),
-                0,
-                definition.InputResourceId,
-                missing);
+            using (cityInventory.AttributeChanges(
+                       new ResourceChangeAttribution(
+                           ResourceChangeAttributionKind.Production,
+                           definition.BuildingId)))
+            {
+                ResourceTransaction.Transfer(
+                    cityInventory,
+                    state.Input,
+                    state.InputCapacityPolicy,
+                    0,
+                    definition.InputResourceId,
+                    missing);
+            }
         }
 
         private static void AdvanceProduction(
@@ -157,6 +169,13 @@ namespace WasteCity.Economy
                 return false;
             }
 
+            if (definition.UsesBoundResourceNode &&
+                !HasHarvestableCompatibleNode(state, world))
+            {
+                state.SetStopReason(ProductionStopReason.Depleted);
+                return false;
+            }
+
             if (state.Output.Get(outputResourceId) + definition.OutputAmount >
                 definition.OutputCapacity)
             {
@@ -166,12 +185,6 @@ namespace WasteCity.Economy
 
             if (definition.UsesBoundResourceNode)
             {
-                if (!HasHarvestableCompatibleNode(state, world))
-                {
-                    state.SetStopReason(ProductionStopReason.Depleted);
-                    return false;
-                }
-
                 state.BeginCycle();
                 return true;
             }

@@ -96,6 +96,18 @@ namespace WasteCity.Economy
             return amount - remaining;
         }
 
+        internal int RemoveFromSlot(int index, int amount)
+        {
+            if (!IsValidIndex(index) || amount <= 0 || IsEmpty(index))
+                return 0;
+
+            int removed = Math.Min(amounts[index], amount);
+            amounts[index] -= removed;
+            if (amounts[index] == 0)
+                resourceIds[index] = null;
+            return removed;
+        }
+
         internal BackpackSlot[] CaptureSlots()
         {
             var snapshot = new BackpackSlot[SlotCount];

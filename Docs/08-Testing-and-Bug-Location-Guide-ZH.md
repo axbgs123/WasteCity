@@ -20,6 +20,14 @@
 
 先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景。单功能检查优先看失败报告中的“只重跑这个失败”：报告实际会在“建议复跑”下给出一个可直接复制的单类筛选。若还没有失败报告，或要补跑相关类，就在[测试自动清单](Generated/Test-Inventory-ZH.md)的“精确测试文件与测试类”表找到对应类名，手动把一到数个类名用 `|` 连起来。该附录的“可复制的测试筛选命令”目前只有全部测试类的聚合筛选，不能当作单功能命令。建造、城市、UI、地形、美术、存档和冻结 2D 的最低检查并不相同；先跑单功能，再跑相关检查，最后才完整回归。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
 
+## IDEA-0011 生产与界面的检查边界
+
+`IDEA-0011` 的生产、背包、应急合成、六节点研究和资源状态栏已经实现待验证。排查规则或数据问题时，可从 `ResourceDefinitionCatalogTests`、`ResourceTransactionAndCapacityTests`、`FormalProductionSimulationTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`、`ManualResourceAccessRulesTests` 和 `ResourceInventoryChangeTests` 中选择最小相关类；排查 3D 生产适配与时间推进时，再看 `GrayboxProductionRuntimeTests` 和 `GrayboxProductionClockTests`；排查玩家操作、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`，真实建造生产链则由 `GrayboxBuildingRuntimeSceneTests` 覆盖。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
+
+不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。这能验证运行时生产闭环，但不能证明正式自然开局已经有石料获取路径。若试玩卡在这里，应记录为已知 bootstrap/数值边界，不要在测试里偷偷修改正式开局或建筑成本。
+
+本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。schema 必须保持 `30`，冻结 2D 只做回归，敌人、炮塔和弹丸不属于本轮测试通过所能证明的范围。
+
 ## 怎样读失败定位报告
 
 报告通常会给出失败测试、功能组、建议检查的文件、场景、需求编号和复跑入口。先确认失败能否复现，再看它属于哪一组；例如场景失败优先检查场景引用，界面失败优先检查输入顺序和相关组件，存档失败还要检查兼容边界。不要把“第一个被报告的文件”当作唯一原因，更不要在没有复现前推断结论。

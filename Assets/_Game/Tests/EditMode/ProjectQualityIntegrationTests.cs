@@ -491,7 +491,18 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(57));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(61));
+            ProjectReuseEntry resourceInventory = catalog.ReuseEntries.Single(
+                entry => string.Equals(
+                    entry.Id,
+                    "resource-inventory",
+                    StringComparison.Ordinal));
+            CollectionAssert.Contains(
+                resourceInventory.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs");
+            StringAssert.Contains(
+                "ResourceInventoryChangeTests",
+                ReuseEntryBody(content, resourceInventory));
 
             foreach (ProjectReuseEntry entry in catalog.ReuseEntries)
             {

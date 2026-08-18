@@ -17,6 +17,7 @@ using WasteCity.Content;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Research;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -231,7 +232,8 @@ namespace WasteCity.Tests
                 : city.transform.Find("InnerCityPlatform");
 
             Assert.That(session, Is.Not.Null);
-            Assert.That(session.DevelopmentFixtureEnabled, Is.True);
+            Assert.That(session.DevelopmentFixtureEnabled, Is.False,
+                "Committed GrayboxPrototype3D must boot with formal resources; developer grants remain explicit test setup only.");
             Assert.That(session.Inventory, Is.Not.Null);
             Assert.That(session.Research, Is.Not.Null);
             Assert.That(session.GroundGrid, Is.Not.Null);
@@ -426,6 +428,98 @@ namespace WasteCity.Tests
             Assert.That(
                 placement.CurrentEvaluation.PrimaryFailure,
                 Is.EqualTo(BuildingPlacementFailure.InsufficientMaterials));
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0011_RealInputBuildsTwoTwoOneProductionChain()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            Assert.That(modifier.UnlockResearch(
+                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+            Assert.That(modifier.UnlockResearch(
+                DemoResearchCatalog.AmmunitionAssemblyId), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 100), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 100), Is.True);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+
+            yield return TapKey(Key.B);
+            yield return TapKey(Key.Digit1);
+            for (var index = 0; index < 2; index++)
+            {
+                yield return MoveToCompatibleResourceNode(world, placement);
+                yield return ClickMouse(
+                    MouseButton.Left,
+                    mouse.position.ReadValue());
+                modifier.CompleteAllConstruction();
+                yield return null;
+            }
+
+            yield return TapKey(Key.Digit6);
+            for (var index = 0; index < 2; index++)
+            {
+                yield return MoveToValidGroundPreview(
+                    city,
+                    world,
+                    placement);
+                yield return ClickMouse(
+                    MouseButton.Left,
+                    mouse.position.ReadValue());
+                modifier.CompleteAllConstruction();
+                yield return null;
+            }
+
+            yield return TapKey(Key.Digit7);
+            yield return MoveToInnerCell(city, 3, 2);
+            Assert.That(placement.CurrentEvaluation.IsValid, Is.True,
+                placement.CurrentEvaluation.PrimaryFailure.ToString());
+            yield return ClickMouse(
+                MouseButton.Left,
+                mouse.position.ReadValue());
+            modifier.CompleteAllConstruction();
+            yield return TapKey(Key.Escape);
+
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.MiningStation.Id.Value), Is.EqualTo(2));
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.Smelter.Id.Value), Is.EqualTo(2));
+            Assert.That(session.CompletedBuildingCount(
+                BuildingCatalog.Assembler.Id.Value), Is.EqualTo(1));
+            Assert.That(modifier.SetResource(ResourceIds.Iron, 0), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 0), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Ammunition, 0), Is.True);
+
+            Time.timeScale = 20f;
+            float deadline = Time.realtimeSinceStartup + 4f;
+            while (session.Inventory.Get(ResourceIds.Ammunition) < 2 &&
+                   Time.realtimeSinceStartup < deadline)
+                yield return null;
+            Time.timeScale = 1f;
+
+            Assert.That(session.Inventory.Get(ResourceIds.Ammunition),
+                Is.GreaterThanOrEqualTo(2));
+            Text amount = Object.FindObjectsOfType<Text>(true)
+                .First(value => value.name ==
+                    "ResourceStatus.Item." + ResourceIds.Ammunition +
+                    ".Amount");
+            Assert.That(amount.transform.parent.gameObject.activeInHierarchy,
+                Is.True);
+            Assert.That(amount.text,
+                Does.Contain(session.Inventory.Get(ResourceIds.Ammunition)
+                    .ToString()));
         }
 
         [UnityTest]
@@ -731,6 +825,8 @@ namespace WasteCity.Tests
             yield return TapTextKey(Key.D, 'd');
             yield return TapTextKey(Key.B, 'b');
             yield return TapTextKey(Key.R, 'r');
+            yield return TapTextKey(Key.E, 'e');
+            yield return TapTextKey(Key.T, 't');
             yield return TapTextKey(Key.Digit1, '1');
             yield return TapTextKey(Key.Digit2, '2');
             yield return TapTextKey(Key.Digit3, '3');
@@ -760,6 +856,12 @@ namespace WasteCity.Tests
             Assert.That(cameraController.Mode, Is.EqualTo(cameraModeBefore));
             Assert.That(cameraController.CurrentTarget, Is.EqualTo(cameraTargetBefore));
             Assert.That(developer.IsPanelOpen, Is.EqualTo(developerBefore));
+            Assert.That(FindTransform("InventoryCraftingPanel").gameObject
+                    .activeSelf,
+                Is.False);
+            Assert.That(FindTransform("ResearchTreePanel").gameObject
+                    .activeSelf,
+                Is.False);
 
             yield return TapKey(Key.Escape);
             Assert.That(interaction.State, Is.EqualTo(
@@ -1722,6 +1824,7 @@ namespace WasteCity.Tests
                     continue;
                 yield return MoveToGroundCell(world, x, y);
                 if (placement.CurrentHit.Site == BuildingSite.Ground &&
+                    placement.CurrentEvaluation.IsValid &&
                     !string.IsNullOrEmpty(
                         placement.CurrentEvaluation
                             .CompatibleResourceNodeId))
@@ -1979,6 +2082,16 @@ namespace WasteCity.Tests
             for (var index = 0; index < inputs.Length; index++)
                 if (inputs[index].name == name)
                     return inputs[index];
+            return null;
+        }
+
+        private static Transform FindTransform(string name)
+        {
+            Transform[] values = Object.FindObjectsOfType<Transform>(true);
+            for (var index = 0; index < values.Length; index++)
+                if (values[index].name == name)
+                    return values[index];
+            Assert.Fail("Missing transform " + name + ".");
             return null;
         }
 

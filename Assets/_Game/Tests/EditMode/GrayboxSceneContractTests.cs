@@ -448,10 +448,10 @@ namespace WasteCity.Tests
             Assert.That(inputModule, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<Canvas>(true).Length,
-                Is.EqualTo(2));
+                Is.EqualTo(3));
             Assert.That(
                 Object.FindObjectsOfType<GraphicRaycaster>(true).Length,
-                Is.EqualTo(2));
+                Is.EqualTo(3));
             Assert.That(
                 Object.FindObjectsOfType<EventSystem>(true).Length,
                 Is.EqualTo(1));
@@ -572,7 +572,7 @@ namespace WasteCity.Tests
             Assert.That(
                 sessionData.FindProperty("developmentFixtureEnabled")
                     .boolValue,
-                Is.True);
+                Is.False);
             var developerData = new SerializedObject(developer);
             Assert.That(developerData.FindProperty("modifier"), Is.Null);
             Assert.That(developerData.FindProperty("panelRoot"), Is.Null);
@@ -680,6 +680,101 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxInputRouter>(true),
                 "inputInterceptor",
                 coordinator);
+        }
+
+        [Test]
+        public void IDEA0011_SceneHasSerializedOperationsUiContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = GameObject.Find("GrayboxPrototype3D");
+            Transform ui = RequiredChild(root, "GrayboxUI");
+            Canvas buildingCanvas = RequiredChild(
+                    ui.gameObject,
+                    "BuildingCanvas")
+                .GetComponent<Canvas>();
+            Transform operationsTransform = RequiredChild(
+                ui.gameObject,
+                "ProductionObservabilityCanvas");
+            Canvas operationsCanvas =
+                operationsTransform.GetComponent<Canvas>();
+            Canvas systemMenuCanvas = RequiredChild(
+                    ui.gameObject,
+                    "SystemMenuCanvas")
+                .GetComponent<Canvas>();
+            CanvasScaler scaler =
+                operationsTransform.GetComponent<CanvasScaler>();
+            GrayboxOperationsView3D view =
+                operationsTransform.GetComponent<GrayboxOperationsView3D>();
+            Transform systems = RequiredChild(root, "GrayboxSystems");
+            GrayboxOperationsController3D controller =
+                RequiredComponent<GrayboxOperationsController3D>(
+                    systems,
+                    "GrayboxOperationsController");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                RequiredComponent<GrayboxUsabilityInputCoordinator3D>(
+                    systems,
+                    "GrayboxUsabilityInputCoordinator");
+            GrayboxBuildingInputRouter3D buildingInput =
+                Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
+
+            Assert.That(operationsCanvas, Is.Not.Null);
+            Assert.That(operationsCanvas.renderMode,
+                Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+            Assert.That(operationsCanvas.sortingOrder,
+                Is.GreaterThan(buildingCanvas.sortingOrder));
+            Assert.That(operationsCanvas.sortingOrder,
+                Is.LessThan(systemMenuCanvas.sortingOrder));
+            Assert.That(
+                operationsTransform.GetComponent<GraphicRaycaster>(),
+                Is.Not.Null);
+            Assert.That(scaler.uiScaleMode,
+                Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize));
+            Assert.That(view, Is.Not.Null);
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxOperationsController3D>(true),
+                Has.Length.EqualTo(1));
+
+            AssertReference(view, "canvas", operationsCanvas);
+            AssertReference(
+                controller,
+                "session",
+                Object.FindObjectOfType<GrayboxBuildingSession3D>(true));
+            AssertReference(
+                controller,
+                "production",
+                Object.FindObjectOfType<
+                    GrayboxProductionController3D>(true));
+            AssertReference(
+                controller,
+                "city",
+                Object.FindObjectOfType<
+                    GrayboxMobileCityController3D>(true));
+            AssertReference(controller, "view", view);
+            AssertReference(
+                controller,
+                "directControl",
+                Object.FindObjectOfType<
+                    GrayboxDirectControlCoordinator>(true));
+            AssertReference(
+                controller,
+                "worldView",
+                Object.FindObjectOfType<GrayboxWorldView3D>(true));
+            AssertReference(
+                controller,
+                "leader",
+                Object.FindObjectOfType<GrayboxLeaderController3D>(true));
+            AssertReference(coordinator, "operations", controller);
+            AssertReference(
+                buildingInput,
+                "productionPresentation",
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>(true));
+            AssertReference(buildingInput, "operations", controller);
+            Assert.That(Object.FindObjectsOfType<EventSystem>(true),
+                Has.Length.EqualTo(1));
         }
 
         [Test]

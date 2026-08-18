@@ -430,6 +430,32 @@ namespace WasteCity.Tests
             Assert.That(Total(city, backpack, ResourceIds.Iron), Is.EqualTo(totalBefore));
         }
 
+        [Test]
+        public void TransferFromBackpackSlotRemovesOnlyTheSelectedStack()
+        {
+            var backpack = new PlayerBackpackModel();
+            var city = new ResourceInventory(1000);
+            var cityCapacity = new ResourceCapacityPolicy();
+            backpack.Add(ResourceIds.Iron, 150);
+
+            ResourceTransferResult result =
+                ResourceTransaction.TransferFromBackpackSlot(
+                    backpack,
+                    1,
+                    city,
+                    cityCapacity,
+                    0,
+                    50);
+
+            Assert.That(result.Status, Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(result.MovedAmount, Is.EqualTo(50));
+            Assert.That(backpack.GetSlot(0).ResourceId, Is.EqualTo(ResourceIds.Iron));
+            Assert.That(backpack.GetSlot(0).Amount, Is.EqualTo(100));
+            Assert.That(backpack.GetSlot(1).ResourceId, Is.Null);
+            Assert.That(backpack.GetSlot(1).Amount, Is.Zero);
+            Assert.That(city.Get(ResourceIds.Iron), Is.EqualTo(50));
+        }
+
         private static int Total(
             ResourceInventory first,
             ResourceInventory second,

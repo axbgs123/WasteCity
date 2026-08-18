@@ -138,18 +138,55 @@ namespace WasteCity.Tests
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
         }
 
+        [Test]
+        public void MobileGroundProductionConsumesOnlyItsLocalCache()
+        {
+            GrayboxBuildingInstance3D smelter = CompletedInstance(
+                "building.instance.000003",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            var city = new ResourceInventory(1000);
+            var clock = new GrayboxProductionClock3D();
+            Tick(clock, .1f, false, new[] { smelter }, city);
+            Assert.That(clock.Runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(state.Input.Add(ResourceIds.Iron, 2), Is.EqualTo(2));
+            city.Add(ResourceIds.Iron, 100);
+
+            Tick(
+                clock,
+                6.1f,
+                false,
+                new[] { smelter },
+                city,
+                CityMode.Mobile);
+
+            Assert.That(state.IsLogisticsConnected, Is.False);
+            Assert.That(clock.Runtime.RunnableStates, Does.Contain(state));
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
+            Assert.That(state.StopReason,
+                Is.EqualTo(ProductionStopReason.OutOfLogistics));
+            Assert.That(city.Get(ResourceIds.Iron), Is.EqualTo(100));
+            Assert.That(city.Get(ResourceIds.Alloy), Is.Zero);
+        }
+
         private static void Tick(
             GrayboxProductionClock3D clock,
             float deltaSeconds,
             bool paused,
             GrayboxBuildingInstance3D[] instances,
-            ResourceInventory city)
+            ResourceInventory city,
+            CityMode cityMode = CityMode.Fortress)
         {
             clock.Tick(
                 deltaSeconds,
                 paused,
                 instances,
-                CityMode.Fortress,
+                cityMode,
                 cityX: 10,
                 cityY: 10,
                 groundRadius: BuildingRangeRules.InitialGroundRadius,

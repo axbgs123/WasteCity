@@ -16,10 +16,25 @@ namespace WasteCity.Graybox3D.Building
         private readonly ResourceCapacityPolicy cityCapacity =
             new ResourceCapacityPolicy();
         private float accumulatorSeconds;
+        private ProductionObservabilitySnapshot snapshot =
+            ProductionObservabilitySnapshot.Empty;
+        private WorldMapModel latestWorld;
+        private ulong publishedContentHash;
+        private bool hasPublishedContentHash;
 
         public GrayboxProductionRuntime3D Runtime { get; } =
             new GrayboxProductionRuntime3D();
+        public GrayboxProductionCommandFacade3D Commands { get; }
+        public ProductionObservabilitySnapshot Snapshot => snapshot;
+        public ulong Revision => snapshot.Revision;
+        public uint ObservabilityCaptureCount { get; private set; }
         public float AccumulatorSeconds => accumulatorSeconds;
+        internal WorldMapModel LatestWorld => latestWorld;
+
+        public GrayboxProductionClock3D()
+        {
+            Commands = new GrayboxProductionCommandFacade3D(this);
+        }
 
         public void Tick(
             float deltaSeconds,
@@ -35,7 +50,9 @@ namespace WasteCity.Graybox3D.Building
             if (paused || cityInventory == null)
                 return;
 
+            latestWorld = world;
             accumulatorSeconds += Math.Max(0f, deltaSeconds);
+            bool stepped = false;
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
                 Runtime.Synchronize(
@@ -55,7 +72,28 @@ namespace WasteCity.Graybox3D.Building
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < StepEpsilon)
                     accumulatorSeconds = 0f;
+                stepped = true;
             }
+            if (stepped)
+                PublishObservabilityIfChanged();
+        }
+
+        internal void PublishObservabilityIfChanged()
+        {
+            ulong contentHash = Runtime.ComputeObservabilityContentHash(
+                latestWorld);
+            if (hasPublishedContentHash &&
+                contentHash == publishedContentHash)
+            {
+                return;
+            }
+
+            snapshot = Runtime.CaptureObservability(
+                Revision + 1,
+                latestWorld);
+            publishedContentHash = contentHash;
+            hasPublishedContentHash = true;
+            unchecked { ObservabilityCaptureCount++; }
         }
     }
 }

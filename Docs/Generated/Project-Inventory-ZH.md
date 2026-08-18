@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`200c8e8ee645a5781f97ad44ef5f37117f8d7bb408e22473d8617b51c62fc18b`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`da61cac4cc27626fe3ac0904c5d9e4b9b5d08242a35f4ceda62a72649c04ac91`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -45,11 +45,15 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - 城市导航与部署（`city-navigation-deployment`）：
 - `Assets/_Game/Scripts/City/CityDeploymentModel.cs`
 - `Assets/_Game/Scripts/City/CityDeploymentRules.cs`
@@ -105,6 +109,7 @@
 - `Assets/_Game/Scripts/Economy/FormalEconomyController.cs`
 - `Assets/_Game/Scripts/Economy/FormalProductionDefinitionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/FormalProductionSimulation.cs`
+- `Assets/_Game/Scripts/Economy/ManualResourceAccessRules.cs`
 - `Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`
 - `Assets/_Game/Scripts/Economy/ProductionModel.cs`
 - `Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`
@@ -117,9 +122,11 @@
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/TechnologyProductionController.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - 基础时钟与会话（`foundation-clock`）：
 - `Assets/_Game/Scripts/Content/StableId.cs`
 - `Assets/_Game/Scripts/Core/FormalGameBootstrap.cs`
@@ -236,6 +243,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`
@@ -298,6 +307,8 @@
 - `WasteCity.Graybox3D.Building.GrayboxConstructionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxOperationsController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxOperationsView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxProductionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `WasteCity.Graybox3D.GrayboxCameraController3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `WasteCity.Graybox3D.GrayboxDirectControlCoordinator`：`Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs`

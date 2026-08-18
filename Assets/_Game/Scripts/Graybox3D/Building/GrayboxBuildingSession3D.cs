@@ -123,6 +123,8 @@ namespace WasteCity.Graybox3D.Building
         {
             if (developmentFixtureEnabled)
                 ConfigureDevelopmentFixture();
+            else
+                ConfigureFormalSession();
         }
 
         public void Configure(bool developmentFixtureEnabled)
@@ -132,14 +134,30 @@ namespace WasteCity.Graybox3D.Building
 
         public void ConfigureDevelopmentFixture()
         {
-            Inventory = new ResourceInventory(ResourceCapacity);
-            Inventory.Set(ResourceIds.Iron, 30);
-            Inventory.Set(ResourceIds.EnergyCrystal, 10);
-            Inventory.Set(ResourceIds.Stone, 30);
-            Inventory.Set(ResourceIds.Biomass, 20);
-            Inventory.Set(ResourceIds.Water, 20);
-            Inventory.Set(ResourceIds.Alloy, 30);
+            var inventory = new ResourceInventory(ResourceCapacity);
+            inventory.Set(ResourceIds.Iron, 30);
+            inventory.Set(ResourceIds.EnergyCrystal, 10);
+            inventory.Set(ResourceIds.Stone, 30);
+            inventory.Set(ResourceIds.Biomass, 20);
+            inventory.Set(ResourceIds.Water, 20);
+            inventory.Set(ResourceIds.Alloy, 30);
+            ConfigureSession(inventory);
+        }
+
+        public void ConfigureFormalSession()
+        {
+            ConfigureSession(
+                ResourceDefinitionCatalog.CreateFormalCityInventory());
+        }
+
+        private void ConfigureSession(ResourceInventory inventory)
+        {
+            if (Research != null)
+                Research.Completed -= HandleResearchCompleted;
+            Inventory = inventory ??
+                throw new ArgumentNullException(nameof(inventory));
             Research = new ResearchModel();
+            Research.Completed += HandleResearchCompleted;
             GroundGrid = new BuildingGrid(
                 GrayboxWorldLayout3D.WorldWidth,
                 GrayboxWorldLayout3D.WorldHeight);
@@ -154,6 +172,19 @@ namespace WasteCity.Graybox3D.Building
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
+            AdvanceCatalogRevision();
+            AdvancePlacementRevision();
+        }
+
+        private void OnDestroy()
+        {
+            if (Research != null)
+                Research.Completed -= HandleResearchCompleted;
+        }
+
+        private void HandleResearchCompleted(ResearchDefinition definition)
+        {
+            if (definition == null) return;
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
         }

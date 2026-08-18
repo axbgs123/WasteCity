@@ -98,6 +98,17 @@ namespace WasteCity.Economy
                 byId.TryGetValue(recipeId, out definition);
         }
 
+        public static string DisplayName(string recipeId)
+        {
+            if (string.Equals(recipeId, FieldAlloyId,
+                    StringComparison.Ordinal))
+                return "应急合金";
+            if (string.Equals(recipeId, FieldAmmunitionId,
+                    StringComparison.Ordinal))
+                return "应急弹药";
+            return recipeId ?? string.Empty;
+        }
+
         private static ResourceRecipeDefinition FromMachine(
             FormalProductionDefinition definition)
         {

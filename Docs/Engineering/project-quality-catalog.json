@@ -198,6 +198,8 @@
         "Assets/_Game/Scripts/UI/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
@@ -217,6 +219,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/TitleMenuTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
@@ -226,7 +229,8 @@
         "DOC-0001",
         "IDEA-0007",
         "IDEA-0008",
-        "IDEA-0010"
+        "IDEA-0010",
+        "IDEA-0011"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -239,10 +243,12 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
         "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
@@ -255,12 +261,15 @@
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
+        "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
         "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
         "Assets/_Game/Tests/EditMode/ProductionTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs"
       ],
@@ -952,6 +961,47 @@
       ]
     },
     {
+      "Id": "graybox-operations-controller-3d",
+      "ChineseName": "三维生产可观察化控制器",
+      "TypeNames": [
+        "GrayboxOperationsController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏和面板命令，并把真实输入提交到正式模型。",
+      "BoundarySummary": "只属于当前 3D 场景的会话与 UI 适配；不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "graybox-operations-view-3d",
+      "ChineseName": "三维生产可观察化视图",
+      "TypeNames": [
+        "GrayboxOperationsView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树，并把 UGUI 操作发布为命令事件。",
+      "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
       "Id": "graybox-display-settings",
       "ChineseName": "三维灰盒显示设置边界",
       "TypeNames": [
@@ -1041,6 +1091,7 @@
       "Id": "resource-inventory",
       "ChineseName": "资源库存",
       "TypeNames": [
+        "ResourceChangeAttribution",
         "ResourceInventory"
       ],
       "AssetPaths": [
@@ -1051,10 +1102,12 @@
       "UseSummary": "用于管理资源数量。",
       "BoundarySummary": "不驱动生产周期。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/FoundationTests.cs"
+        "Assets/_Game/Tests/EditMode/FoundationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0011"
       ]
     },
     {
@@ -1155,6 +1208,26 @@
       "BoundarySummary": "不判定仓库所有权、完成状态或撤离资格，也不拥有资源账本。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "manual-resource-access-rules",
+      "ChineseName": "手工资源访问规则",
+      "TypeNames": [
+        "ManualResourceAccessRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ManualResourceAccessRules.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按当前直接控制目标、领袖招募、两格欧氏距离、footprint 和建筑生命周期事实评估城市或建筑库存的手工访问资格。",
+      "BoundarySummary": "只返回纯访问判定；不查找场景对象、不解析旋转尺寸、不执行资源转移，也不缓存资格。调用方必须在每次提交时传入当前事实和权威 footprint。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011"
@@ -1300,6 +1373,29 @@
       "BoundarySummary": "只拥有会话级余量并组合运行时、模拟和容量策略；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0011"
+      ]
+    },
+    {
+      "Id": "production-observability-boundary-3d",
+      "ChineseName": "三维生产可观察化只读边界",
+      "TypeNames": [
+        "ProductionBuildingObservability",
+        "ProductionObservabilitySnapshot",
+        "GrayboxProductionCommandFacade3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "发布按稳定实例 ID 排序的不可变生产详情、有效仓库数和城市每资源容量；仓库资格变化进入内容哈希并产生新 revision。通过命令门面提交暂停和缓存转移时，输出入城容量由命令所有者按权威运行时仓库数派生，不接受 UI 传入的仓库数量。",
+      "BoundarySummary": "快照只读，不暴露 BuildingProductionState 或可变库存；命令只按 stable ID 调用既有 ResourceTransaction 原子提交。访问距离、物流和建筑生命周期资格仍由当前 3D 场景适配器在每次提交前基于权威事实重新验证；本边界不复制资格规则、不接入冻结 2D，也不进入 schema 30。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011"

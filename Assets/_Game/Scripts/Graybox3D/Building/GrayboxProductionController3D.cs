@@ -11,6 +11,9 @@ namespace WasteCity.Graybox3D.Building
 
         public GrayboxProductionClock3D Clock { get; } =
             new GrayboxProductionClock3D();
+        public GrayboxProductionCommandFacade3D Commands => Clock.Commands;
+        public ProductionObservabilitySnapshot Snapshot => Clock.Snapshot;
+        public ulong Revision => Clock.Revision;
         public bool IsConfigured =>
             session != null && city != null && worldView != null;
 

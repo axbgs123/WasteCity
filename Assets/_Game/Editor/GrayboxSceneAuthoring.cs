@@ -164,6 +164,12 @@ namespace WasteCity.Editor
             public Transform Ui;
             public Canvas BuildingCanvas;
             public EventSystem EventSystem;
+            public GrayboxBuildingSession3D Session;
+            public GrayboxMobileCityController3D City;
+            public GrayboxDirectControlCoordinator DirectControl;
+            public GrayboxWorldView3D World;
+            public GrayboxLeaderController3D Leader;
+            public GrayboxProductionController3D Production;
             public GrayboxBuildingInputRouter3D BuildingInput;
             public GrayboxDeveloperModifierBootstrap3D Developer;
         }
@@ -726,7 +732,7 @@ namespace WasteCity.Editor
                 EnsureChild(building, "BuildingSession");
             GrayboxBuildingSession3D session =
                 EnsureComponent<GrayboxBuildingSession3D>(sessionTransform);
-            SetBool(session, "developmentFixtureEnabled", true);
+            SetBool(session, "developmentFixtureEnabled", false);
 
             Transform interactionTransform =
                 EnsureChild(building, "BuildingInteraction");
@@ -748,6 +754,10 @@ namespace WasteCity.Editor
                 RequireSingle<GrayboxMobileCityController3D>(scene);
             GrayboxWorldView3D world =
                 RequireSingle<GrayboxWorldView3D>(scene);
+            GrayboxDirectControlCoordinator directControl =
+                RequireSingle<GrayboxDirectControlCoordinator>(scene);
+            GrayboxLeaderController3D leader =
+                RequireSingle<GrayboxLeaderController3D>(scene);
             Camera camera = RequireSingle<Camera>(scene);
             BoxCollider innerSurface = EnsureInnerCityPlatform(
                 city.transform,
@@ -886,6 +896,12 @@ namespace WasteCity.Editor
                 Ui = ui,
                 BuildingCanvas = canvas,
                 EventSystem = eventSystem,
+                Session = session,
+                City = city,
+                DirectControl = directControl,
+                World = world,
+                Leader = leader,
+                Production = production,
                 BuildingInput = buildingInput,
                 Developer = developer
             };
@@ -897,6 +913,38 @@ namespace WasteCity.Editor
         {
             if (buildingReferences == null)
                 throw new ArgumentNullException(nameof(buildingReferences));
+
+            Transform operationsTransform = EnsureChild(
+                buildingReferences.Ui,
+                "ProductionObservabilityCanvas");
+            operationsTransform.gameObject.layer = 5;
+            Canvas operationsCanvas = EnsureComponent<Canvas>(
+                operationsTransform);
+            operationsTransform = operationsCanvas.transform;
+            operationsCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            operationsCanvas.sortingOrder =
+                buildingReferences.BuildingCanvas.sortingOrder + 50;
+            CanvasScaler operationsScaler =
+                EnsureComponent<CanvasScaler>(operationsTransform);
+            operationsScaler.uiScaleMode =
+                CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            operationsScaler.referenceResolution =
+                new Vector2(1600f, 900f);
+            operationsScaler.screenMatchMode =
+                CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            operationsScaler.matchWidthOrHeight = .5f;
+            GraphicRaycaster operationsRaycaster =
+                EnsureComponent<GraphicRaycaster>(operationsTransform);
+            operationsRaycaster.enabled = true;
+            GrayboxOperationsView3D operationsView =
+                EnsureComponent<GrayboxOperationsView3D>(
+                    operationsTransform);
+            Transform operationsControllerTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxOperationsController");
+            GrayboxOperationsController3D operationsController =
+                EnsureComponent<GrayboxOperationsController3D>(
+                    operationsControllerTransform);
 
             Transform systemMenuTransform = EnsureChild(
                 buildingReferences.Ui,
@@ -936,10 +984,28 @@ namespace WasteCity.Editor
                 ("controller", controller));
             SetReferences(controller, ("view", view));
             SetReferences(
+                operationsView,
+                ("canvas", operationsCanvas));
+            SetReferences(
+                operationsController,
+                ("session", buildingReferences.Session),
+                ("production", buildingReferences.Production),
+                ("city", buildingReferences.City),
+                ("view", operationsView),
+                ("directControl", buildingReferences.DirectControl),
+                ("worldView", buildingReferences.World),
+                ("leader", buildingReferences.Leader));
+            SetReferences(
+                buildingReferences.BuildingInput,
+                ("productionPresentation",
+                    RequireSingle<GrayboxBuildingWorldView3D>(scene)),
+                ("operations", operationsController));
+            SetReferences(
                 coordinator,
                 ("buildingInput", buildingReferences.BuildingInput),
                 ("systemMenu", controller),
-                ("developer", buildingReferences.Developer));
+                ("developer", buildingReferences.Developer),
+                ("operations", operationsController));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));

@@ -245,12 +245,19 @@ namespace WasteCity.Tests
                 "Assets/_Game/Scripts/Graybox3D/Usability/**");
             CollectionAssert.Contains(ui.SourceGlobs,
                 "Assets/_Game/Scripts/Graybox3D/Usability/WasteCity.Graybox3D.Usability.asmdef");
+            CollectionAssert.Contains(ui.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs");
+            CollectionAssert.Contains(ui.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs");
             CollectionAssert.Contains(ui.TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs");
             CollectionAssert.Contains(ui.TestFileGlobs,
                 "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs");
+            CollectionAssert.Contains(ui.TestFileGlobs,
+                "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs");
             CollectionAssert.Contains(ui.ScenePaths,
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
+            CollectionAssert.Contains(ui.RequirementIds, "IDEA-0011");
 
             ProjectReuseEntry compatibility = FindReuse(catalog,
                 "building-resource-node-compatibility-rules");
@@ -297,6 +304,46 @@ namespace WasteCity.Tests
                 Is.EqualTo(ProjectReuseLevel.SceneOnly));
             Assert.That(FindReuse(catalog, "graybox-system-menu-view").ReuseLevel,
                 Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            ProjectReuseEntry operationsController = FindReuse(catalog,
+                "graybox-operations-controller-3d");
+            Assert.That(operationsController.FeatureGroupId,
+                Is.EqualTo("ui-input"));
+            Assert.That(operationsController.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            CollectionAssert.AreEqual(
+                new[] { "GrayboxOperationsController3D" },
+                operationsController.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs",
+            }, operationsController.AssetPaths);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
+            }, operationsController.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0011" },
+                operationsController.RequirementIds);
+
+            ProjectReuseEntry operationsView = FindReuse(catalog,
+                "graybox-operations-view-3d");
+            Assert.That(operationsView.FeatureGroupId,
+                Is.EqualTo("ui-input"));
+            Assert.That(operationsView.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            CollectionAssert.AreEqual(
+                new[] { "GrayboxOperationsView3D" },
+                operationsView.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
+            }, operationsView.AssetPaths);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
+            }, operationsView.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0011" },
+                operationsView.RequirementIds);
 
             ProjectUiEntry systemMenu = FindUi(catalog, "graybox-system-menu");
             Assert.That(systemMenu.OwnerTypeName,
@@ -327,24 +374,45 @@ namespace WasteCity.Tests
             {
                 "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
                 "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+                "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
                 "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
                 "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+                "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
                 "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
             }, economy.TestFileGlobs);
             CollectionAssert.IsSubsetOf(new[]
             {
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs",
             }, economy.SourceGlobs);
             CollectionAssert.Contains(economy.RequirementIds, "IDEA-0011");
             CollectionAssert.Contains(economy.ScenePaths,
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
 
+            AssertReuseContract(
+                FindReuse(catalog, "resource-inventory"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ResourceInventory.cs",
+                },
+                new[]
+                {
+                    "ResourceInventory",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FoundationTests.cs",
+                    "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
+                },
+                new[] { "DOC-0001", "IDEA-0011" });
             AssertReuseContract(
                 FindReuse(catalog, "resource-definition-catalog"),
                 new[]
@@ -403,6 +471,20 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+                });
+            AssertReuseContract(
+                FindReuse(catalog, "manual-resource-access-rules"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Economy/ManualResourceAccessRules.cs",
+                },
+                new[]
+                {
+                    "ManualResourceAccessRules",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
                 });
             AssertReuseContract(
                 FindReuse(catalog, "resource-capacity-policy"),
@@ -522,6 +604,24 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
                 });
             AssertReuseContract(
+                FindReuse(catalog, "production-observability-boundary-3d"),
+                new[]
+                {
+                    "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs",
+                    "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
+                },
+                new[]
+                {
+                    "ProductionBuildingObservability",
+                    "ProductionObservabilitySnapshot",
+                    "GrayboxProductionCommandFacade3D",
+                },
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
+                },
+                new[] { "IDEA-0011" });
+            AssertReuseContract(
                 FindReuse(catalog, "graybox-production-controller-3d"),
                 new[]
                 {
@@ -545,6 +645,9 @@ namespace WasteCity.Tests
             Assert.That(FindReuse(catalog,
                     "graybox-production-clock-3d").ReuseLevel,
                 Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            Assert.That(FindReuse(catalog,
+                    "production-observability-boundary-3d").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
             Assert.That(FindReuse(catalog,
                     "graybox-production-controller-3d").ReuseLevel,
                 Is.EqualTo(ProjectReuseLevel.SceneOnly));
@@ -609,7 +712,8 @@ namespace WasteCity.Tests
             ProjectReuseEntry entry,
             string[] expectedAssetPaths,
             string[] expectedTypeNames,
-            string[] expectedRequiredTestFiles)
+            string[] expectedRequiredTestFiles,
+            string[] expectedRequirementIds = null)
         {
             Assert.That(entry.FeatureGroupId,
                 Is.EqualTo("economy-production-logistics"));
@@ -619,7 +723,7 @@ namespace WasteCity.Tests
                 expectedRequiredTestFiles,
                 entry.RequiredTestFiles);
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0011" },
+                expectedRequirementIds ?? new[] { "IDEA-0011" },
                 entry.RequirementIds);
         }
 

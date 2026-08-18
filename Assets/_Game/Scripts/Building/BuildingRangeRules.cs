@@ -5,6 +5,9 @@ namespace WasteCity.Building
     public static class BuildingRangeRules
     {
         public const int InitialGroundRadius = 8;
+        public const int CityGroundFootprintRadius = 1;
+        public const int CityGroundFootprintSize =
+            CityGroundFootprintRadius * 2 + 1;
         private const int FormationReinforcementGroundRadius = 12;
         private const int OrbitalSupplyGroundRadius = 24;
         private const int InnerGridWidth = 8;
@@ -23,6 +26,18 @@ namespace WasteCity.Building
                    Math.Max(
                        Math.Abs((long)cellX - cityX),
                    Math.Abs((long)cellY - cityY)) <= radius;
+        }
+
+        public static bool DoesGroundCellOverlapCity(
+            int cityX,
+            int cityY,
+            int cellX,
+            int cellY)
+        {
+            return Math.Abs((long)cellX - cityX) <=
+                       CityGroundFootprintRadius &&
+                   Math.Abs((long)cellY - cityY) <=
+                       CityGroundFootprintRadius;
         }
 
         public static bool IsGroundFootprintInRange(

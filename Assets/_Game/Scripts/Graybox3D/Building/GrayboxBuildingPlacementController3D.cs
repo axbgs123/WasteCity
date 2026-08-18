@@ -379,8 +379,11 @@ namespace WasteCity.Graybox3D.Building
                     if (cell.Traversal == WorldTraversalKind.Ruins)
                         obstacleFree = false;
                     if (cityMapped &&
-                        Math.Abs(x - cityX) <= 1 &&
-                        Math.Abs(y - cityY) <= 1)
+                        BuildingRangeRules.DoesGroundCellOverlapCity(
+                            cityX,
+                            cityY,
+                            x,
+                            y))
                         touchesCity = true;
                     if (!compatibleNode.IsValid &&
                         cell.HasResource &&

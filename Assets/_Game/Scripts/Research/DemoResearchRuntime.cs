@@ -23,6 +23,11 @@ namespace WasteCity.Research
             return definition != null && Model.IsCompleted(definition.Id);
         }
 
+        public static float SpeedMultiplier(CityMode cityMode)
+        {
+            return cityMode == CityMode.Fortress ? 1f : .5f;
+        }
+
         public bool TryStart(
             string researchId,
             ResourceInventory cityInventory,
@@ -50,8 +55,8 @@ namespace WasteCity.Research
                 return false;
             }
 
-            float multiplier = cityMode == CityMode.Fortress ? 1f : .5f;
-            return Model.Tick(Math.Max(0f, deltaSeconds) * multiplier);
+            return Model.Tick(
+                Math.Max(0f, deltaSeconds) * SpeedMultiplier(cityMode));
         }
 
         public bool TryCancel(
