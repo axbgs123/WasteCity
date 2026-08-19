@@ -99,7 +99,7 @@ WASTECITY_GUI_PROFILER_RESULT=/tmp/wastecity-idea0014-gui-summary.json \
 
 定位失败时按所有权排查：正式时间、转换取消和战斗收起先查 `CityDeploymentModel`、`CityDeploymentRules` 与 `GrayboxMobileCityController3D`；退款和处置先查 `BuildingEvacuationRules`；容量不足、部分写入或重复退款先查 `CityResourceStorageModel` 与 `GrayboxBuildingSession3D`；生产缓存、研究进度或塔内弹药丢失先查对应运行时和 `IsEvacuationLocked`；清单、冻结批次、稳定队列或重试先查 `GrayboxEvacuationController3D`；按钮、暂停透传和点击穿透先查 `GrayboxBuildingInputRouter3D`、`GrayboxUsabilityInputCoordinator3D` 与 `GrayboxBuildingMenuView3D`；场景引用先查 `GrayboxSceneContractTests` 和 `GrayboxSceneAuthoring`；性能再查正式 Marker、混合探针、GUI 原始捕获和汇总 JSON。
 
-schema 继续保持 `30`；冻结 2D `FormalPrototype` 没有接入本功能。正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。Task 11 的日常完整 EditMode、完整 PlayMode、项目质量门、四个正式构建和 `RecordVerification` 仍未完成；用户试玩和真实 Windows 10 与 Windows 11 的视觉、GPU、显存、内存验收也必须由实际执行结果确认。
+schema 继续保持 `30`；冻结 2D `FormalPrototype` 没有接入新 UI 或新功能，只同步复用共享稳定建筑目录的研究站首轮门槛并由 legacy 回归保护。正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。Task 11 的日常完整 EditMode、完整 PlayMode、项目质量门和四个正式构建已经通过，验证记录按最终实现提交生成；用户试玩和真实 Windows 10 与 Windows 11 的视觉、GPU、显存、内存验收仍必须由实际执行结果确认。
 
 ## 怎样读失败定位报告
 
