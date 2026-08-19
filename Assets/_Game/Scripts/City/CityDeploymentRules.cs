@@ -13,6 +13,9 @@ namespace WasteCity.City
 
     public static class CityDeploymentRules
     {
+        public const float FormalDeployDurationSeconds = 5f;
+        public const float FormalPackDurationSeconds = 8f;
+
         public static CityDeploymentFailure Validate(
             WorldMapModel map,
             int centerX,

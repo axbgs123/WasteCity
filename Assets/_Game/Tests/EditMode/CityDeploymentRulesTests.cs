@@ -8,6 +8,17 @@ namespace WasteCity.Tests
     public sealed class CityDeploymentRulesTests
     {
         [Test]
+        public void FormalDeploymentDurationsAreCentralizedAtFiveAndEightSeconds()
+        {
+            Assert.That(
+                CityDeploymentRules.FormalDeployDurationSeconds,
+                Is.EqualTo(5f));
+            Assert.That(
+                CityDeploymentRules.FormalPackDurationSeconds,
+                Is.EqualTo(8f));
+        }
+
+        [Test]
         public void ThreeByThreeDeploymentRejectsBlockedCell()
         {
             WorldCell open = Open();

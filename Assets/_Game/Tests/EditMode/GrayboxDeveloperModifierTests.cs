@@ -839,12 +839,18 @@ namespace WasteCity.Tests
             Assert.That(fixture.Session.ConstructionMultiplier, Is.EqualTo(10f));
             GrayboxBuildingInstance3D next = Begin(
                 fixture.Session, 14, 10, fixture.Presentation);
+            float expectedRemaining =
+                next.Progress.Remaining -
+                .1f * fixture.Session.ProductivityMultiplier *
+                fixture.Session.DevelopmentRuleTimeMultiplier;
             fixture.Session.TickConstruction(
                 .1f,
                 CityMode.Fortress,
                 false,
                 fixture.Presentation);
-            Assert.That(next.Progress.Remaining, Is.EqualTo(1f));
+            Assert.That(
+                next.Progress.Remaining,
+                Is.EqualTo(expectedRemaining).Within(.0001f));
             Assert.That(next.State,
                 Is.EqualTo(GrayboxBuildingInstanceState.UnderConstruction));
         }

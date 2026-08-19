@@ -6,6 +6,7 @@ using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
+using WasteCity.Population;
 using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
@@ -82,10 +83,13 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxBuildingSession3D :
         MonoBehaviour,
-        IGrayboxBuildingCatalogContext3D
+        IGrayboxBuildingCatalogContext3D,
+        IGrayboxRuleTimeSource3D
     {
         public const int ResourceCapacity = 5000;
         private const int DevelopmentPopulation = 200;
+        private const int FormalPopulation = 100;
+        private const int FormalPopulationCapacity = 150;
         private const int InnerGridWidth = 8;
         private const int InnerGridHeight = 6;
         private const int DevelopmentGroundBuildRadius = 8;
@@ -107,6 +111,7 @@ namespace WasteCity.Graybox3D.Building
         private int nextStableInstanceOrdinal;
         private uint catalogRevision;
         private uint placementRevision;
+        private PopulationModel population;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -114,9 +119,18 @@ namespace WasteCity.Graybox3D.Building
         public ResearchModel Research { get; private set; }
         public BuildingGrid GroundGrid { get; private set; }
         public BuildingGrid InnerGrid { get; private set; }
-        public int Population { get; private set; }
+        public int Population => population?.Current ?? FormalPopulation;
+        public int PopulationCapacity =>
+            population?.Capacity ?? FormalPopulationCapacity;
+        public float ProductivityMultiplier =>
+            population?.ProductivityMultiplier ?? 1f;
         public int GroundBuildRadius { get; private set; }
-        public float ConstructionMultiplier { get; private set; }
+        public float ConstructionMultiplier => DevelopmentRuleTimeMultiplier;
+        public float DevelopmentRuleTimeMultiplier { get; private set; }
+        public GrayboxRuleTimeContext3D RuleTimeContext =>
+            new GrayboxRuleTimeContext3D(
+                ProductivityMultiplier,
+                DevelopmentRuleTimeMultiplier);
         public uint CatalogRevision => catalogRevision;
         public uint PlacementRevision => placementRevision;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
@@ -151,19 +165,27 @@ namespace WasteCity.Graybox3D.Building
             inventory.Set(ResourceIds.Biomass, 20);
             inventory.Set(ResourceIds.Water, 20);
             inventory.Set(ResourceIds.Alloy, 30);
-            ConfigureSession(inventory, ResourceCapacity);
+            ConfigureSession(
+                inventory,
+                ResourceCapacity,
+                DevelopmentPopulation,
+                FormalPopulationCapacity);
         }
 
         public void ConfigureFormalSession()
         {
             ConfigureSession(
                 ResourceDefinitionCatalog.CreateFormalCityInventory(),
-                ResourceCapacityPolicy.FormalBaseCapacityPerResource);
+                ResourceCapacityPolicy.FormalBaseCapacityPerResource,
+                FormalPopulation,
+                FormalPopulationCapacity);
         }
 
         private void ConfigureSession(
             ResourceInventory inventory,
-            int coreCapacityPerResource)
+            int coreCapacityPerResource,
+            int initialPopulation,
+            int initialPopulationCapacity)
         {
             if (Research != null)
                 Research.Completed -= HandleResearchCompleted;
@@ -179,9 +201,11 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxWorldLayout3D.WorldWidth,
                 GrayboxWorldLayout3D.WorldHeight);
             InnerGrid = new BuildingGrid(InnerGridWidth, InnerGridHeight);
-            Population = DevelopmentPopulation;
+            population = new PopulationModel(
+                initialPopulation,
+                initialPopulationCapacity);
             GroundBuildRadius = DevelopmentGroundBuildRadius;
-            ConstructionMultiplier = 1f;
+            DevelopmentRuleTimeMultiplier = 1f;
             contactedRoutes.Clear();
             instances = new List<GrayboxBuildingInstance3D>();
             evacuationLocks.Clear();
@@ -376,7 +400,7 @@ namespace WasteCity.Graybox3D.Building
                 float remainingBefore = instance.Progress.Remaining;
                 bool completed = instance.Progress.Tick(
                     unscaledDeltaTime,
-                    ConstructionMultiplier);
+                    RuleTimeContext.EffectiveMultiplier);
                 if (instance.Progress.Remaining >= remainingBefore) continue;
                 if (completed) instance.Complete();
                 try
@@ -734,9 +758,9 @@ namespace WasteCity.Graybox3D.Building
         public void SetPopulationForDevelopment(int value)
         {
             EnsureConfigured();
-            int population = Math.Max(0, value);
-            if (Population == population) return;
-            Population = population;
+            int nextPopulation = Math.Max(0, value);
+            if (Population == nextPopulation) return;
+            population.Restore(nextPopulation, PopulationCapacity);
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
         }
@@ -744,7 +768,7 @@ namespace WasteCity.Graybox3D.Building
         public void SetConstructionMultiplierForDevelopment(float value)
         {
             EnsureConfigured();
-            ConstructionMultiplier = Math.Max(0f, value);
+            DevelopmentRuleTimeMultiplier = Math.Max(0f, value);
         }
 
         public void CompleteAllConstructionForDevelopment(

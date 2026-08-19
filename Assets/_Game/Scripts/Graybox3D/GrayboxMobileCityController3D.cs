@@ -5,6 +5,55 @@ using WasteCity.World;
 
 namespace WasteCity.Graybox3D
 {
+    public readonly struct GrayboxRuleTimeContext3D
+    {
+        public GrayboxRuleTimeContext3D(
+            float productivityMultiplier,
+            float developmentRuleTimeMultiplier)
+        {
+            ProductivityMultiplier = Normalize(productivityMultiplier);
+            DevelopmentRuleTimeMultiplier = Normalize(
+                developmentRuleTimeMultiplier);
+        }
+
+        public float ProductivityMultiplier { get; }
+        public float DevelopmentRuleTimeMultiplier { get; }
+
+        public float EffectiveMultiplier
+        {
+            get
+            {
+                double value =
+                    (double)ProductivityMultiplier *
+                    DevelopmentRuleTimeMultiplier;
+                return value >= float.MaxValue
+                    ? float.MaxValue
+                    : (float)value;
+            }
+        }
+
+        public float Advance(float deltaSeconds)
+        {
+            float delta = Normalize(deltaSeconds);
+            double value = (double)delta * EffectiveMultiplier;
+            return value >= float.MaxValue
+                ? float.MaxValue
+                : (float)value;
+        }
+
+        private static float Normalize(float value)
+        {
+            return value < 0f || float.IsNaN(value) || float.IsInfinity(value)
+                ? 0f
+                : value;
+        }
+    }
+
+    public interface IGrayboxRuleTimeSource3D
+    {
+        GrayboxRuleTimeContext3D RuleTimeContext { get; }
+    }
+
     public sealed class GrayboxMobileCityController3D : MonoBehaviour
     {
         private const float ArrivalTolerance = .08f;
@@ -27,6 +76,7 @@ namespace WasteCity.Graybox3D
         [SerializeField] private GrayboxWorldView3D worldView;
         [SerializeField] private Rigidbody body;
         [SerializeField] private BoxCollider bodyCollider;
+        [SerializeField] private MonoBehaviour ruleTimeSourceBehaviour;
 
         private Vector2 manualInput;
         private CityDeploymentModel deployment;
@@ -39,6 +89,7 @@ namespace WasteCity.Graybox3D
         private Vector3 colliderBaseCenter;
         private bool presentationCaptured;
         private MaterialPropertyBlock visualBlock;
+        private IGrayboxRuleTimeSource3D configuredRuleTimeSource;
 
         public CityDeploymentModel Deployment
         {
@@ -95,6 +146,14 @@ namespace WasteCity.Graybox3D
             }
 
             UpdatePresentation();
+        }
+
+        public void ConfigureRuleTimeSource(
+            IGrayboxRuleTimeSource3D ruleTimeSource)
+        {
+            configuredRuleTimeSource = ruleTimeSource;
+            if (ruleTimeSource is MonoBehaviour behaviour)
+                ruleTimeSourceBehaviour = behaviour;
         }
 
         public void ApplyManualInput(Vector2 input)
@@ -187,6 +246,18 @@ namespace WasteCity.Graybox3D
                 return started;
             }
 
+            if (Mode == CityMode.Deploying || Mode == CityMode.Packing)
+            {
+                LastDeploymentFailure = CityDeploymentFailure.None;
+                bool cancelled = deployment.Toggle();
+                failureReason = cancelled
+                    ? string.Empty
+                    : "无法取消城市形态转换";
+                LastFailureReason = failureReason;
+                UpdatePresentation();
+                return cancelled;
+            }
+
             LastDeploymentFailure = CityDeploymentFailure.None;
             failureReason = "城市形态转换进行中";
             LastFailureReason = failureReason;
@@ -258,7 +329,7 @@ namespace WasteCity.Graybox3D
         public void TickDeployment(float deltaTime)
         {
             EnsureDeployment();
-            deployment.Tick(deltaTime);
+            deployment.Tick(ResolveRuleTimeContext().Advance(deltaTime));
             UpdatePresentation();
         }
 
@@ -308,7 +379,19 @@ namespace WasteCity.Graybox3D
         private void EnsureDeployment()
         {
             if (deployment == null)
-                deployment = new CityDeploymentModel(3f, 5f);
+                deployment = new CityDeploymentModel(
+                    CityDeploymentRules.FormalDeployDurationSeconds,
+                    CityDeploymentRules.FormalPackDurationSeconds);
+        }
+
+        private GrayboxRuleTimeContext3D ResolveRuleTimeContext()
+        {
+            IGrayboxRuleTimeSource3D source =
+                configuredRuleTimeSource ??
+                ruleTimeSourceBehaviour as IGrayboxRuleTimeSource3D;
+            return source == null
+                ? new GrayboxRuleTimeContext3D(1f, 1f)
+                : source.RuleTimeContext;
         }
 
         private CityDeploymentFailure ResolveDeploymentFailure()

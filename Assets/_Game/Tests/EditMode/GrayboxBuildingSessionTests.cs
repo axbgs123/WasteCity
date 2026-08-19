@@ -797,15 +797,24 @@ namespace WasteCity.Tests
                 10,
                 10,
                 presentation);
+            float ruleTimePerSecond =
+                session.ProductivityMultiplier *
+                session.DevelopmentRuleTimeMultiplier;
 
             session.TickConstruction(1f, CityMode.Mobile, false, presentation);
             Assert.That(presentation.Updated, Is.EqualTo(new[] { inner }));
-            Assert.That(inner.Progress.Remaining, Is.EqualTo(4f));
+            Assert.That(
+                inner.Progress.Remaining,
+                Is.EqualTo(5f - ruleTimePerSecond));
             Assert.That(ground.Progress.Remaining, Is.EqualTo(2f));
 
             session.TickConstruction(1f, CityMode.Fortress, false, presentation);
-            Assert.That(inner.Progress.Remaining, Is.EqualTo(3f));
-            Assert.That(ground.Progress.Remaining, Is.EqualTo(1f));
+            Assert.That(
+                inner.Progress.Remaining,
+                Is.EqualTo(5f - 2f * ruleTimePerSecond));
+            Assert.That(
+                ground.Progress.Remaining,
+                Is.EqualTo(2f - ruleTimePerSecond));
         }
 
         [Test]
@@ -1043,12 +1052,11 @@ namespace WasteCity.Tests
             Assert.That(presentation.Updated, Is.EqualTo(new[] { instance }));
         }
 
-        [TestCase(1f, 9.95f)]
-        [TestCase(10f, 9.5f)]
-        [TestCase(100f, 5f)]
+        [TestCase(1f)]
+        [TestCase(10f)]
+        [TestCase(100f)]
         public void TickConstruction_UsesDevelopmentMultiplier(
-            float multiplier,
-            float expectedRemaining)
+            float multiplier)
         {
             GrayboxBuildingSession3D session = CreateSession();
             var presentation = new RecordingPresentation();
@@ -1064,6 +1072,10 @@ namespace WasteCity.Tests
 
             session.TickConstruction(.05f, CityMode.Fortress, false, presentation);
 
+            float expectedRemaining =
+                BuildingCatalog.ResearchStation.BuildSeconds -
+                .05f * session.ProductivityMultiplier *
+                session.DevelopmentRuleTimeMultiplier;
             Assert.That(
                 instance.Progress.Remaining,
                 Is.EqualTo(expectedRemaining).Within(.0001f));

@@ -355,7 +355,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void TickDeployment_UsesThreeSecondDeployAndFiveSecondPack()
+        public void TickDeployment_UsesFiveSecondDeployAndEightSecondPack()
         {
             ControllerFixture fixture = CreateFixture(
                 FilledMap(5, 5, OpenCell()),
@@ -368,7 +368,7 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Controller.Mode,
                 Is.EqualTo(CityMode.Deploying));
-            fixture.Controller.TickDeployment(2.99f);
+            fixture.Controller.TickDeployment(4.99f);
             Assert.That(
                 fixture.Controller.Mode,
                 Is.EqualTo(CityMode.Deploying));
@@ -383,7 +383,7 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Controller.Mode,
                 Is.EqualTo(CityMode.Packing));
-            fixture.Controller.TickDeployment(4.99f);
+            fixture.Controller.TickDeployment(7.99f);
             Assert.That(
                 fixture.Controller.Mode,
                 Is.EqualTo(CityMode.Packing));
@@ -408,13 +408,13 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Controller.TryToggleDeployment(out _),
                 Is.True);
-            fixture.Controller.TickDeployment(1.5f);
+            fixture.Controller.TickDeployment(2.5f);
             AssertPresentation(
                 fixture,
                 new Vector3(3f, 1.25f, 2.5f),
                 "core.city.mobile");
 
-            fixture.Controller.TickDeployment(1.5f);
+            fixture.Controller.TickDeployment(2.5f);
             AssertPresentation(
                 fixture,
                 new Vector3(3f, 1.5f, 3f),
@@ -423,17 +423,134 @@ namespace WasteCity.Tests
             Assert.That(
                 fixture.Controller.TryToggleDeployment(out _),
                 Is.True);
-            fixture.Controller.TickDeployment(2.5f);
+            fixture.Controller.TickDeployment(4f);
             AssertPresentation(
                 fixture,
                 new Vector3(3f, 1.25f, 2.5f),
                 "core.city.mobile");
 
-            fixture.Controller.TickDeployment(2.5f);
+            fixture.Controller.TickDeployment(4f);
             AssertPresentation(
                 fixture,
                 new Vector3(3f, 1f, 2f),
                 "core.city.mobile");
+        }
+
+        [Test]
+        public void TryToggleDeployment_CancelsTransitionsAndDiscardsProgress()
+        {
+            ControllerFixture fixture = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            fixture.Controller.TickDeployment(2f);
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            Assert.That(fixture.Controller.Mode, Is.EqualTo(CityMode.Mobile));
+            Assert.That(fixture.Controller.Deployment.Remaining, Is.Zero);
+
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            fixture.Controller.TickDeployment(4.99f);
+            Assert.That(
+                fixture.Controller.Mode,
+                Is.EqualTo(CityMode.Deploying),
+                "A cancelled deployment must restart from the full duration.");
+            fixture.Controller.TickDeployment(.01f);
+            Assert.That(fixture.Controller.Mode, Is.EqualTo(CityMode.Fortress));
+
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            fixture.Controller.TickDeployment(3f);
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            Assert.That(fixture.Controller.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(fixture.Controller.Deployment.Remaining, Is.Zero);
+
+            Assert.That(
+                fixture.Controller.TryToggleDeployment(out _),
+                Is.True);
+            fixture.Controller.TickDeployment(7.99f);
+            Assert.That(
+                fixture.Controller.Mode,
+                Is.EqualTo(CityMode.Packing),
+                "A cancelled packing transition must restart in full.");
+            fixture.Controller.TickDeployment(.01f);
+            Assert.That(fixture.Controller.Mode, Is.EqualTo(CityMode.Mobile));
+        }
+
+        [Test]
+        public void TickDeployment_IsPausedByZeroDeltaAndFramePartitionInvariant()
+        {
+            ControllerFixture whole = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            ControllerFixture split = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            Assert.That(whole.Controller.TryToggleDeployment(out _), Is.True);
+            Assert.That(split.Controller.TryToggleDeployment(out _), Is.True);
+
+            whole.Controller.TickDeployment(0f);
+            Assert.That(whole.Controller.Mode, Is.EqualTo(CityMode.Deploying));
+            Assert.That(whole.Controller.Deployment.Remaining, Is.EqualTo(5f));
+
+            whole.Controller.TickDeployment(5f);
+            for (int index = 0; index < 50; index++)
+                split.Controller.TickDeployment(.1f);
+
+            Assert.That(split.Controller.Mode, Is.EqualTo(whole.Controller.Mode));
+            Assert.That(
+                split.Controller.Deployment.Remaining,
+                Is.EqualTo(whole.Controller.Deployment.Remaining)
+                    .Within(.0001f));
+            Assert.That(
+                split.Controller.Deployment.Progress,
+                Is.EqualTo(whole.Controller.Deployment.Progress)
+                    .Within(.0001f));
+        }
+
+        [Test]
+        public void TickDeployment_CombinesGameplayAndDevelopmentRuleTime()
+        {
+            ControllerFixture fixture = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            fixture.Controller.ConfigureRuleTimeSource(
+                new FixedRuleTimeSource(1f, 10f));
+            Assert.That(fixture.Controller.TryToggleDeployment(out _), Is.True);
+
+            fixture.Controller.TickDeployment(.5f);
+
+            Assert.That(
+                fixture.Controller.Mode,
+                Is.EqualTo(CityMode.Fortress),
+                "0.5s × 1.0 gameplay productivity × 10x development rule time must advance 5 base seconds.");
+        }
+
+        private sealed class FixedRuleTimeSource : IGrayboxRuleTimeSource3D
+        {
+            public FixedRuleTimeSource(
+                float productivityMultiplier,
+                float developmentRuleTimeMultiplier)
+            {
+                RuleTimeContext = new GrayboxRuleTimeContext3D(
+                    productivityMultiplier,
+                    developmentRuleTimeMultiplier);
+            }
+
+            public GrayboxRuleTimeContext3D RuleTimeContext { get; }
         }
 
         private ControllerFixture CreateFixture(
