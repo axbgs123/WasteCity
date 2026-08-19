@@ -16,6 +16,7 @@ using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
+using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.World;
@@ -2666,6 +2667,124 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Menu_EvacuationObservabilityConsumesImmutableViewsAndExposesRetry()
+        {
+            Assembly assembly = typeof(GrayboxBuildingMenuView3D).Assembly;
+            Type manifestType = RequireEvacuationViewType(
+                assembly,
+                "EvacuationManifestViewModel");
+            Type queueType = RequireEvacuationViewType(
+                assembly,
+                "EvacuationQueueViewModel");
+            Type menuType = typeof(GrayboxBuildingMenuView3D);
+
+            RequirePublicInstanceMethod(
+                menuType,
+                "ShowEvacuationManifest",
+                manifestType);
+            RequirePublicInstanceMethod(
+                menuType,
+                "ShowEvacuationQueue",
+                queueType);
+            EventInfo retry = menuType.GetEvent(
+                "EvacuationRetryRequested",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(retry, Is.Not.Null,
+                "Blocked evacuation must expose a UI retry command rather " +
+                "than direct session access.");
+            Assert.That(retry.EventHandlerType, Is.EqualTo(typeof(Action)));
+            RequireReadOnlyMenuProperty(
+                menuType,
+                "EvacuationRenderedRevision",
+                typeof(ulong));
+
+            string source = File.ReadAllText(Path.Combine(
+                Application.dataPath,
+                "_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxBuildingMenuView3D.cs"));
+            Assert.That(source, Does.Not.Contain("CityResourceStorageModel"),
+                "The view receives storage projections; it must not own city " +
+                "storage truth.");
+            Assert.That(source, Does.Not.Contain("GrayboxDefenseRuntime3D"),
+                "The view receives combat projections; it must not own defense " +
+                "runtime truth.");
+            Assert.That(source, Does.Not.Contain("ConstructionRefundRules"),
+                "The view formats projected refunds and never recomputes them.");
+            Assert.That(source, Does.Contain("lastEvacuationViewRevision"),
+                "Unchanged revisions must retain evacuation rows and listeners.");
+        }
+
+        [Test]
+        public void Menu_EvacuationManifestScrollKeepsThreeItemActionsAndBlockedRetryPointerReachable()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            EvacuationManifestViewModel manifest =
+                CreateEvacuationManifestViewForUi(
+                    "evacuation-ui-item-001",
+                    "evacuation-ui-item-002",
+                    "evacuation-ui-item-003");
+            var requestedIds = new List<string>();
+            var confirmedCount = 0;
+            var retryCount = 0;
+            fixture.Menu.EvacuationItemTreatmentRequested +=
+                (stableId, treatment) =>
+                {
+                    if (treatment == BuildingEvacuationTreatment.QuickDismantle)
+                        requestedIds.Add(stableId);
+                };
+            fixture.Menu.EvacuationConfirmationRequested +=
+                () => confirmedCount++;
+            fixture.Menu.EvacuationRetryRequested += () => retryCount++;
+
+            fixture.Menu.ShowEvacuationManifest(manifest);
+            ScrollRect scroll = FindEvacuationScroll(fixture);
+            Assert.That(scroll, Is.Not.Null,
+                "A 640×480 manifest with three detailed items must use a " +
+                "real scroll viewport rather than push actions off-screen.");
+            Assert.That(scroll.viewport, Is.Not.Null);
+            Assert.That(scroll.content, Is.Not.Null);
+            Assert.That(scroll.viewport.GetComponent<RectMask2D>(), Is.Not.Null);
+
+            scroll.StopMovement();
+            scroll.verticalNormalizedPosition = 1f;
+            scroll.Rebuild(CanvasUpdate.PostLayout);
+            ForceCanvasLayout(fixture.Canvas);
+            Button firstQuick = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Evacuation.Item.evacuation-ui-item-001.QuickDismantle");
+            AssertButtonInsideViewport(fixture, scroll, firstQuick);
+            PointerClick(fixture, firstQuick);
+
+            Button lastQuick = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Evacuation.Item.evacuation-ui-item-003.QuickDismantle");
+            Button confirm = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Evacuation.Confirm");
+            ScrollButtonIntoViewport(fixture, scroll, lastQuick);
+            AssertButtonInsideViewport(fixture, scroll, lastQuick);
+            AssertButtonOnScreen(fixture, confirm);
+            PointerClick(fixture, lastQuick);
+            PointerClick(fixture, confirm);
+
+            Assert.That(requestedIds, Is.EqualTo(new[]
+            {
+                "evacuation-ui-item-001",
+                "evacuation-ui-item-003"
+            }));
+            Assert.That(confirmedCount, Is.EqualTo(1));
+
+            fixture.Menu.ShowEvacuationQueue(
+                CreateBlockedEvacuationQueueViewForUi());
+            Button retry = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Evacuation.Retry");
+            AssertButtonOnScreen(fixture, retry);
+            PointerClick(fixture, retry);
+            Assert.That(retryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void Menu_RealPointerDispatchReachesEveryConstructionAction()
         {
             UiFixture fixture = CreateMenuFixture();
@@ -3127,19 +3246,22 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void ConstructionController_TickDelegatesExactlyTheRequestedDelta()
+        public void ConstructionController_TickUsesFormalEffectiveRuleTime()
         {
             ControllerFixture fixture = CreateControllerFixture();
             GrayboxBuildingInstance3D instance = BeginInnerConstruction(
                 fixture.Session,
                 fixture.Presentation);
             float before = instance.Progress.Remaining;
+            Assert.That(fixture.Session.ProductivityMultiplier,
+                Is.EqualTo(1.25f));
 
             fixture.Controller.TickConstruction(.75f);
 
             Assert.That(
                 before - instance.Progress.Remaining,
-                Is.EqualTo(.75f).Within(.0001f));
+                Is.EqualTo(.75f * fixture.Session.ProductivityMultiplier)
+                    .Within(.0001f));
         }
 
         [Test]
@@ -4222,6 +4344,62 @@ namespace WasteCity.Tests
                 "viewport " + bottomViewport + " last " + last);
         }
 
+        private static ScrollRect FindEvacuationScroll(UiFixture fixture)
+        {
+            Transform evacuation = FindTransform(
+                fixture.Canvas.transform,
+                "Evacuation");
+            return evacuation == null
+                ? null
+                : evacuation.GetComponentInChildren<ScrollRect>(true);
+        }
+
+        private static void AssertButtonInsideViewport(
+            UiFixture fixture,
+            ScrollRect scroll,
+            Button button)
+        {
+            Assert.That(button, Is.Not.Null);
+            Rect viewport = ScreenRect(fixture, scroll.viewport);
+            Rect target = ScreenRect(
+                fixture,
+                (RectTransform)button.transform);
+            Assert.That(RectContains(viewport, target), Is.True,
+                "viewport " + viewport + " button " + target);
+        }
+
+        private static void ScrollButtonIntoViewport(
+            UiFixture fixture,
+            ScrollRect scroll,
+            Button button)
+        {
+            for (var step = 0; step <= 20; step++)
+            {
+                scroll.verticalNormalizedPosition = 1f - step / 20f;
+                scroll.Rebuild(CanvasUpdate.PostLayout);
+                ForceCanvasLayout(fixture.Canvas);
+                if (RectContains(
+                        ScreenRect(fixture, scroll.viewport),
+                        ScreenRect(
+                            fixture,
+                            (RectTransform)button.transform)))
+                    return;
+            }
+        }
+
+        private static void AssertButtonOnScreen(
+            UiFixture fixture,
+            Button button)
+        {
+            Assert.That(button, Is.Not.Null);
+            Rect target = ScreenRect(
+                fixture,
+                (RectTransform)button.transform);
+            AssertReadable(target);
+            Assert.That(RectContains(fixture.UiCamera.pixelRect, target), Is.True,
+                "screen " + fixture.UiCamera.pixelRect + " button " + target);
+        }
+
         private static float OverlapArea(Rect left, Rect right)
         {
             float width = Mathf.Max(
@@ -4368,8 +4546,137 @@ namespace WasteCity.Tests
                 "BuildDetails",
                 System.Reflection.BindingFlags.Static |
                 System.Reflection.BindingFlags.NonPublic).Invoke(
+                    null,
+                    new object[] { item });
+        }
+
+        private static Type RequireEvacuationViewType(
+            Assembly assembly,
+            string typeName)
+        {
+            Type type = assembly.GetType(
+                "WasteCity.Graybox3D.Building." + typeName,
+                false);
+            Assert.That(type, Is.Not.Null,
+                "Task 6 requires immutable evacuation view type " + typeName +
+                ".");
+            Assert.That(type.IsClass, Is.True);
+            return type;
+        }
+
+        private static EvacuationManifestViewModel
+            CreateEvacuationManifestViewForUi(params string[] stableIds)
+        {
+            var items = new EvacuationManifestItemViewModel[stableIds.Length];
+            for (var index = 0; index < stableIds.Length; index++)
+            {
+                items[index] = CreateEvacuationManifestItemViewForUi(
+                    stableIds[index]);
+            }
+            ConstructorInfo constructor = typeof(EvacuationManifestViewModel)
+                .GetConstructors(
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Single(value => value.GetParameters().Length == 7);
+            return (EvacuationManifestViewModel)constructor.Invoke(
+                new object[]
+                {
+                    4101ul,
+                    false,
+                    1f,
+                    true,
+                    string.Empty,
+                    items,
+                    Array.Empty<ResourceAmount>()
+                });
+        }
+
+        private static EvacuationManifestItemViewModel
+            CreateEvacuationManifestItemViewForUi(string stableId)
+        {
+            ConstructorInfo constructor = typeof(EvacuationManifestItemViewModel)
+                .GetConstructors(
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Single(value => value.GetParameters().Length == 18);
+            return (EvacuationManifestItemViewModel)constructor.Invoke(
+                new object[]
+                {
+                    stableId,
+                    "测试建筑",
+                    BuildingMenuCategory.Production,
+                    GrayboxBuildingInstanceState.Completed,
+                    1d,
+                    BuildingEvacuationTreatment.QuickDismantle,
+                    Array.Empty<ResourceAmount>(),
+                    0f,
+                    0f,
+                    Array.Empty<ResourceAmount>(),
+                    Array.Empty<ResourceAmount>(),
+                    Array.Empty<ResourceAmount>(),
+                    0,
+                    Array.Empty<ResourceAmount>(),
+                    Array.Empty<ResourceAmount>(),
+                    true,
+                    Array.Empty<ResourceAmount>(),
+                    string.Empty
+                });
+        }
+
+        private static EvacuationQueueViewModel
+            CreateBlockedEvacuationQueueViewForUi()
+        {
+            ConstructorInfo constructor = typeof(EvacuationQueueViewModel)
+                .GetConstructors(
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Single(value => value.GetParameters().Length == 15);
+            return (EvacuationQueueViewModel)constructor.Invoke(
+                new object[]
+                {
+                    4102ul,
+                    "evacuation.ui.blocked",
+                    false,
+                    1f,
+                    1,
+                    3,
+                    "evacuation-ui-item-003",
+                    0f,
+                    0f,
+                    false,
+                    true,
+                    true,
+                    "城市仓储容量不足",
+                    "按 E 腾出容量后重新检查",
+                    new[] { new ResourceAmount(ResourceIds.Alloy, 1) }
+                });
+        }
+
+        private static void RequirePublicInstanceMethod(
+            Type owner,
+            string name,
+            Type parameterType)
+        {
+            MethodInfo method = owner.GetMethod(
+                name,
+                BindingFlags.Instance | BindingFlags.Public,
                 null,
-                new object[] { item });
+                new[] { parameterType },
+                null);
+            Assert.That(method, Is.Not.Null,
+                owner.Name + "." + name + "(" + parameterType.Name + ")");
+            Assert.That(method.ReturnType, Is.EqualTo(typeof(void)));
+        }
+
+        private static void RequireReadOnlyMenuProperty(
+            Type owner,
+            string name,
+            Type expectedType)
+        {
+            PropertyInfo property = owner.GetProperty(
+                name,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, owner.Name + "." + name);
+            Assert.That(property.PropertyType, Is.EqualTo(expectedType));
+            Assert.That(property.CanRead, Is.True);
+            Assert.That(property.CanWrite, Is.False);
         }
 
         private static void RegisterHeadlessEditModeRaycaster(

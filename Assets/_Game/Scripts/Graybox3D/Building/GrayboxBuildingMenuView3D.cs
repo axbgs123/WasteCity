@@ -13,6 +13,14 @@ namespace WasteCity.Graybox3D.Building
 {
     public sealed class GrayboxBuildingMenuView3D : MonoBehaviour
     {
+        private enum EvacuationViewMode
+        {
+            None,
+            Legacy,
+            Manifest,
+            Queue
+        }
+
         private static readonly Color PanelColor =
             new Color(.08f, .1f, .11f, .92f);
         private static readonly Color ButtonColor =
@@ -53,6 +61,8 @@ namespace WasteCity.Graybox3D.Building
         private bool hasCatalogRevision;
         private uint lastCatalogRevision;
         private bool constructionCancellationBlocked;
+        private ulong lastEvacuationViewRevision;
+        private EvacuationViewMode lastEvacuationViewMode;
         private Button cancelConstructionButton;
         private Button confirmCancellationButton;
         private Button rejectCancellationButton;
@@ -78,6 +88,8 @@ namespace WasteCity.Graybox3D.Building
             constructionCancellationBlocked;
         public string SearchText => searchText;
         public string DeploymentFailureMessage { get; private set; }
+        public ulong EvacuationRenderedRevision =>
+            lastEvacuationViewRevision;
 
         public event Action CancelSelectedConstructionRequested;
         public event Action<bool>
@@ -89,6 +101,7 @@ namespace WasteCity.Graybox3D.Building
         public event Action<BuildingEvacuationTreatment>
             EvacuationAllTreatmentRequested;
         public event Action EvacuationConfirmationRequested;
+        public event Action EvacuationRetryRequested;
 
         private void Awake()
         {
@@ -145,6 +158,8 @@ namespace WasteCity.Graybox3D.Building
             EvacuationCategoryTreatmentRequested = null;
             EvacuationAllTreatmentRequested = null;
             EvacuationConfirmationRequested = null;
+            EvacuationRetryRequested = null;
+            ResetEvacuationRenderCache();
             canvas = null;
             eventSystem = null;
             session = null;
@@ -384,6 +399,8 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(instances));
             if (!IsConfigured) return;
 
+            lastEvacuationViewMode = EvacuationViewMode.Legacy;
+            lastEvacuationViewRevision = 0;
             ClearChildren(evacuationRoot);
             CreateLabel(
                 evacuationRoot,
@@ -407,8 +424,152 @@ namespace WasteCity.Graybox3D.Building
             evacuationRoot.gameObject.SetActive(true);
         }
 
+        public void ShowEvacuationManifest(
+            EvacuationManifestViewModel view)
+        {
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (HasRenderedEvacuationView(
+                    EvacuationViewMode.Manifest,
+                    view.Revision))
+            {
+                return;
+            }
+            if (!IsConfigured) return;
+
+            ClearChildren(evacuationRoot);
+            CreateLabel(
+                evacuationRoot,
+                "Evacuation.Title",
+                "撤离处理 · " + (view.IsInCombat ? "战斗" : "和平"));
+            CreateEvacuationSummary(view);
+            RectTransform scrollContent =
+                CreateEvacuationManifestScrollContent();
+            for (var index = 0; index < view.Items.Count; index++)
+            {
+                EvacuationManifestItemViewModel item = view.Items[index];
+                if (item != null)
+                {
+                    CreateEvacuationManifestItem(
+                        scrollContent,
+                        item,
+                        view.IsInCombat);
+                }
+            }
+            foreach (BuildingMenuCategory value in Enum.GetValues(
+                         typeof(BuildingMenuCategory)))
+            {
+                CreateEvacuationCategory(scrollContent, value);
+            }
+            CreateEvacuationAll(scrollContent);
+            Button confirm = CreateButton(
+                evacuationRoot,
+                "Evacuation.Confirm",
+                "确认撤离",
+                () => EvacuationConfirmationRequested?.Invoke());
+            confirm.interactable = view.CanConfirm;
+            evacuationRoot.gameObject.SetActive(true);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(evacuationRoot);
+            ScrollRect scroll = scrollContent.GetComponentInParent<ScrollRect>();
+            if (scroll != null)
+            {
+                scroll.verticalNormalizedPosition = 1f;
+                scroll.Rebuild(CanvasUpdate.PostLayout);
+            }
+            RememberEvacuationView(
+                EvacuationViewMode.Manifest,
+                view.Revision);
+        }
+
+        public void ShowEvacuationQueue(EvacuationQueueViewModel view)
+        {
+            if (view == null) throw new ArgumentNullException(nameof(view));
+            if (HasRenderedEvacuationView(
+                    EvacuationViewMode.Queue,
+                    view.Revision))
+            {
+                return;
+            }
+            if (!IsConfigured) return;
+
+            ClearChildren(evacuationRoot);
+            CreateLabel(
+                evacuationRoot,
+                "Evacuation.Title",
+                "撤离队列 · " +
+                (view.BatchIsInCombat ? "战斗批次" : "和平批次"));
+            Text batch = CreateLabel(
+                evacuationRoot,
+                "Evacuation.Queue.Batch",
+                "批次 " + ValueOrDash(view.BatchId) +
+                " · 生产率 ×" +
+                view.BatchProductivityMultiplier.ToString("0.##"));
+            ConfigureEvacuationInfoLabel(batch, 34f);
+            Text progress = CreateLabel(
+                evacuationRoot,
+                "Evacuation.Queue.Progress",
+                "进度 " + view.CompletedCount + "/" + view.TotalCount +
+                " · 当前 " + ValueOrDash(view.CurrentStableInstanceId));
+            ConfigureEvacuationInfoLabel(progress, 42f);
+            Text remaining = CreateLabel(
+                evacuationRoot,
+                "Evacuation.Queue.Remaining",
+                "剩余：基础 " + FormatSeconds(view.RemainingBaseSeconds) +
+                " / 实际 " + FormatSeconds(view.RemainingActualSeconds) +
+                (view.IsPaused ? " · 已暂停" : string.Empty));
+            ConfigureEvacuationInfoLabel(remaining, 42f);
+
+            if (view.IsBlocked)
+            {
+                string failure = string.IsNullOrWhiteSpace(
+                        view.LastFailureReason)
+                    ? "城市容量不足"
+                    : view.LastFailureReason;
+                Text blocked = CreateLabel(
+                    evacuationRoot,
+                    "Evacuation.Queue.Blocked",
+                    "队列受阻：" + failure + "\n容量缺口：" +
+                    FormatResourceAmounts(view.CapacityShortfalls));
+                ConfigureEvacuationInfoLabel(blocked, 66f);
+
+                string hint = "按 E 腾出城市容量";
+                if (!string.IsNullOrWhiteSpace(view.CapacityHint) &&
+                    !string.Equals(
+                        view.CapacityHint,
+                        hint,
+                        StringComparison.Ordinal))
+                {
+                    hint += "\n" + view.CapacityHint;
+                }
+                Text capacityHint = CreateLabel(
+                    evacuationRoot,
+                    "Evacuation.Queue.CapacityHint",
+                    hint);
+                ConfigureEvacuationInfoLabel(capacityHint, 52f);
+                Button retry = CreateButton(
+                    evacuationRoot,
+                    "Evacuation.Retry",
+                    "重试撤离",
+                    () => EvacuationRetryRequested?.Invoke());
+                retry.interactable = view.CanRetry;
+            }
+            else if (!string.IsNullOrWhiteSpace(view.LastFailureReason))
+            {
+                Text failure = CreateLabel(
+                    evacuationRoot,
+                    "Evacuation.Queue.Failure",
+                    "最近失败：" + view.LastFailureReason);
+                ConfigureEvacuationInfoLabel(failure, 42f);
+            }
+
+            evacuationRoot.gameObject.SetActive(true);
+            RememberEvacuationView(
+                EvacuationViewMode.Queue,
+                view.Revision);
+        }
+
         public void HideEvacuation()
         {
+            ResetEvacuationRenderCache();
             if (evacuationRoot == null) return;
             ClearChildren(evacuationRoot);
             evacuationRoot.gameObject.SetActive(false);
@@ -457,6 +618,7 @@ namespace WasteCity.Graybox3D.Building
         private void RebuildUi()
         {
             if (!HasSerializedUiReferences) return;
+            ResetEvacuationRenderCache();
             if (uiRoot != null)
             {
                 uiRoot.name = "GrayboxBuildingUi.Retired";
@@ -667,17 +829,22 @@ namespace WasteCity.Graybox3D.Building
             SetConstructionCancellationBlocked(
                 constructionCancellationBlocked);
 
+            float evacuationPanelHeight = Mathf.Min(
+                720f,
+                Mathf.Max(0f, canvas.pixelRect.height - 24f));
             evacuationRoot = CreatePanel(
                 uiRoot,
                 "Evacuation",
                 new Vector2(0f, .5f),
                 new Vector2(0f, .5f),
                 new Vector2(8f, 0f),
-                new Vector2(390f, 440f));
+                new Vector2(560f, evacuationPanelHeight));
             var evacuationLayout =
                 evacuationRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             evacuationLayout.spacing = 3f;
             evacuationLayout.padding = new RectOffset(6, 6, 6, 6);
+            evacuationLayout.childForceExpandWidth = true;
+            evacuationLayout.childForceExpandHeight = false;
             evacuationRoot.gameObject.SetActive(false);
 
             placementStatusRoot = CreatePanel(
@@ -1030,11 +1197,174 @@ namespace WasteCity.Graybox3D.Building
                     treatment));
         }
 
+        private void CreateEvacuationSummary(
+            EvacuationManifestViewModel view)
+        {
+            string status = view.CanConfirm
+                ? "可确认"
+                : "暂不可确认";
+            string details = "环境：" +
+                (view.IsInCombat ? "战斗" : "和平") +
+                " · 生产率 ×" +
+                view.ProductivityMultiplier.ToString("0.##") +
+                " · " + status;
+            if (view.CapacityShortfalls.Count > 0)
+            {
+                details += "\n批次容量缺口：" +
+                    FormatResourceAmounts(view.CapacityShortfalls);
+            }
+            if (!string.IsNullOrWhiteSpace(view.FailureReason))
+                details += "\n失败：" + view.FailureReason;
+            Text summary = CreateLabel(
+                evacuationRoot,
+                "Evacuation.Summary",
+                details);
+            ConfigureEvacuationInfoLabel(
+                summary,
+                view.CapacityShortfalls.Count > 0 ||
+                !string.IsNullOrWhiteSpace(view.FailureReason)
+                    ? 62f
+                    : 38f);
+        }
+
+        private RectTransform CreateEvacuationManifestScrollContent()
+        {
+            RectTransform scrollRoot = CreateRect(
+                evacuationRoot,
+                "Evacuation.Scroll");
+            scrollRoot.sizeDelta = new Vector2(548f, 180f);
+            SetLayout(scrollRoot, 548f, 180f, 1f, 1f);
+            Image scrollBackground =
+                scrollRoot.gameObject.AddComponent<Image>();
+            scrollBackground.color = new Color(1f, 1f, 1f, .025f);
+
+            var scroll = scrollRoot.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.inertia = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 32f;
+
+            RectTransform viewport = CreateRect(
+                scrollRoot,
+                "Evacuation.Scroll.Viewport");
+            Stretch(viewport);
+            Image viewportGraphic =
+                viewport.gameObject.AddComponent<Image>();
+            viewportGraphic.color = new Color(1f, 1f, 1f, .01f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            RectTransform content = CreateRect(
+                viewport,
+                "Evacuation.Scroll.Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            var contentLayout =
+                content.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 3f;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll.viewport = viewport;
+            scroll.content = content;
+            scroll.verticalNormalizedPosition = 1f;
+            return content;
+        }
+
+        private void CreateEvacuationManifestItem(
+            RectTransform parent,
+            EvacuationManifestItemViewModel item,
+            bool isInCombat)
+        {
+            string prefix = "Evacuation.Item." + item.StableInstanceId;
+            RectTransform row = CreateRect(parent, prefix);
+            SetLayout(row, 0f, 208f, 1f);
+            var layout =
+                row.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 2f;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            Text title = CreateLabel(
+                row,
+                "Label",
+                "建筑：" + ValueOrDash(item.BuildingName) +
+                " · " + CategoryLabel(item.Category) +
+                " · 状态：" + BuildingStateLabel(item.State) +
+                " · " + (isInCombat ? "战斗" : "和平"));
+            ConfigureEvacuationInfoLabel(title, 24f);
+
+            string treatment = "处理方式：" +
+                TreatmentLabel(item.Treatment) +
+                " · 退款：" +
+                FormatResourceAmounts(item.ExpectedRefunds) +
+                " · 基础/实际耗时：" +
+                FormatSeconds(item.BaseDismantleSeconds) + "/" +
+                FormatSeconds(item.DismantleSeconds) +
+                " · 未完成比例：" +
+                FormatPercent(item.RemainingRatio);
+            Text work = CreateLabel(row, "Work", treatment);
+            ConfigureEvacuationInfoLabel(work, 34f);
+
+            Text payload = CreateLabel(
+                row,
+                "Payload",
+                "输入：" + FormatResourceAmounts(item.Input) +
+                " · 预留：" +
+                FormatResourceAmounts(item.ReservedInput) +
+                " · 输出：" + FormatResourceAmounts(item.Output) +
+                " · 弹药：" + Math.Max(0, item.AmmunitionAmount));
+            ConfigureEvacuationInfoLabel(payload, 34f);
+
+            Text migration = CreateLabel(
+                row,
+                "Migration",
+                "仓库迁移：" +
+                FormatResourceAmounts(item.WarehouseContents) +
+                " · 遗弃损失：" +
+                FormatResourceAmounts(item.LostOnAbandon));
+            ConfigureEvacuationInfoLabel(migration, 34f);
+
+            string capacity = item.CanCommit
+                ? "容量：充足"
+                : "容量缺口：" +
+                  FormatResourceAmounts(item.CapacityShortfalls);
+            if (!string.IsNullOrWhiteSpace(item.FailureReason))
+                capacity += " · 失败：" + item.FailureReason;
+            Text capacityStatus = CreateLabel(
+                row,
+                "Capacity",
+                capacity);
+            ConfigureEvacuationInfoLabel(capacityStatus, 34f);
+
+            RectTransform actions = CreateRect(row, prefix + ".Actions");
+            ConfigureEvacuationRow(actions);
+            CreateTreatmentButtons(
+                actions,
+                selected => EvacuationItemTreatmentRequested?.Invoke(
+                    item.StableInstanceId,
+                    selected),
+                prefix + ".");
+        }
+
         private void CreateEvacuationCategory(
             BuildingMenuCategory value)
         {
+            CreateEvacuationCategory(evacuationRoot, value);
+        }
+
+        private void CreateEvacuationCategory(
+            RectTransform parent,
+            BuildingMenuCategory value)
+        {
             RectTransform row = CreateRect(
-                evacuationRoot,
+                parent,
                 "Evacuation.Category." + value);
             ConfigureEvacuationRow(row);
             Text label =
@@ -1051,8 +1381,13 @@ namespace WasteCity.Graybox3D.Building
 
         private void CreateEvacuationAll()
         {
+            CreateEvacuationAll(evacuationRoot);
+        }
+
+        private void CreateEvacuationAll(RectTransform parent)
+        {
             RectTransform row = CreateRect(
-                evacuationRoot,
+                parent,
                 "Evacuation.All");
             ConfigureEvacuationRow(row);
             Text label = CreateLabel(row, "Label", "全部");
@@ -1084,6 +1419,89 @@ namespace WasteCity.Graybox3D.Building
                     actualPrefix + captured,
                     TreatmentLabel(captured),
                     () => callback(captured));
+            }
+        }
+
+        private bool HasRenderedEvacuationView(
+            EvacuationViewMode mode,
+            ulong revision)
+        {
+            return lastEvacuationViewMode == mode &&
+                   lastEvacuationViewRevision == revision;
+        }
+
+        private void RememberEvacuationView(
+            EvacuationViewMode mode,
+            ulong revision)
+        {
+            lastEvacuationViewMode = mode;
+            lastEvacuationViewRevision = revision;
+        }
+
+        private void ResetEvacuationRenderCache()
+        {
+            lastEvacuationViewMode = EvacuationViewMode.None;
+            lastEvacuationViewRevision = 0;
+        }
+
+        private static void ConfigureEvacuationInfoLabel(
+            Text label,
+            float preferredHeight)
+        {
+            label.alignment = TextAnchor.MiddleLeft;
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+            SetLayout(
+                label.rectTransform,
+                0f,
+                preferredHeight,
+                1f);
+        }
+
+        private static string FormatResourceAmounts(
+            IReadOnlyList<ResourceAmount> values)
+        {
+            if (values == null || values.Count == 0) return "无";
+            string result = string.Empty;
+            for (var index = 0; index < values.Count; index++)
+            {
+                ResourceAmount value = values[index];
+                if (index > 0) result += "、";
+                result += ResourceName(value.ResourceId) + " " +
+                    value.Amount;
+            }
+            return result;
+        }
+
+        private static string FormatSeconds(float value)
+        {
+            return Math.Max(0f, value).ToString("0.#") + " 秒";
+        }
+
+        private static string FormatPercent(double value)
+        {
+            double safe = Math.Max(0d, Math.Min(1d, value));
+            return (safe * 100d).ToString("0.#") + "%";
+        }
+
+        private static string ValueOrDash(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "—" : value;
+        }
+
+        private static string BuildingStateLabel(
+            GrayboxBuildingInstanceState state)
+        {
+            switch (state)
+            {
+                case GrayboxBuildingInstanceState.UnderConstruction:
+                    return "施工中";
+                case GrayboxBuildingInstanceState.Completed:
+                    return "已完成";
+                case GrayboxBuildingInstanceState.AbandonedRuin:
+                    return "废弃遗迹";
+                default:
+                    return state.ToString();
             }
         }
 

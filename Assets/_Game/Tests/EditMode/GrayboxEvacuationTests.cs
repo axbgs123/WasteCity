@@ -11,7 +11,9 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Combat;
 using WasteCity.Content;
+using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
@@ -419,6 +421,223 @@ namespace WasteCity.Tests
                 "commit code rather than a failure-text helper.");
             Assert.That(source, Does.Not.Contain("IndexOf(\n                    \"容量\""),
                 "Task 5 must not classify Blocked by parsing localized text.");
+        }
+
+        [Test]
+        public void Controller_ManifestViewIsImmutableDetailedAndCachedByRevision()
+        {
+            Type itemType = RequireEvacuationViewType(
+                "EvacuationManifestItemViewModel");
+            Type manifestType = RequireEvacuationViewType(
+                "EvacuationManifestViewModel");
+            RequireManifestViewContract(manifestType, itemType);
+
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+
+            object first = CaptureEvacuationView(
+                fixture.Controller,
+                "CaptureManifestView",
+                manifestType);
+            object unchanged = CaptureEvacuationView(
+                fixture.Controller,
+                "CaptureManifestView",
+                manifestType);
+
+            Assert.That(unchanged, Is.SameAs(first),
+                "No relevant revision change may rebuild a manifest snapshot.");
+            Assert.That(ReadProperty(first, "IsInCombat"), Is.EqualTo(false));
+            Assert.That(ReadProperty(first, "CanConfirm"), Is.EqualTo(true));
+            object firstItem = ReadViewItems(first, "Items").Single();
+            Assert.That(ReadProperty(firstItem, "StableInstanceId"),
+                Is.EqualTo(wall.StableInstanceId));
+            Assert.That(ReadProperty(firstItem, "Treatment"),
+                Is.EqualTo(BuildingEvacuationTreatment.FullDismantle));
+
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.True);
+            object changed = CaptureEvacuationView(
+                fixture.Controller,
+                "CaptureManifestView",
+                manifestType);
+
+            Assert.That(changed, Is.Not.SameAs(first));
+            Assert.That(ReadProperty(firstItem, "Treatment"),
+                Is.EqualTo(BuildingEvacuationTreatment.FullDismantle),
+                "An already-published snapshot must never observe later " +
+                "assignment mutation.");
+            Assert.That(ReadProperty(
+                ReadViewItems(changed, "Items").Single(),
+                "Treatment"),
+                Is.EqualTo(BuildingEvacuationTreatment.QuickDismantle));
+        }
+
+        [Test]
+        public void Controller_ManifestViewRefreshesForInternalProductionOutputAndTowerAmmoWithoutStorageRevision()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            fixture.Session.UnlockAllResearchForDevelopment();
+            GrayboxBuildingInstance3D smelter = Begin(
+                fixture.Session, BuildingCatalog.Smelter, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Begin(
+                fixture.Session, BuildingCatalog.Assembler,
+                BuildingSite.InnerCity, 0, 0, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            GrayboxBuildingInstance3D turret = Begin(
+                fixture.Session, BuildingCatalog.MachineGunTurret,
+                BuildingSite.Ground, 14, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+
+            var production = new GrayboxProductionRuntime3D();
+            production.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                cityX: 10,
+                cityY: 10,
+                groundRadius: fixture.Session.GroundBuildRadius,
+                cityStorage: fixture.Session.CityStorage);
+            Assert.That(production.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState productionState), Is.True);
+            Assert.That(productionState.Output.Add(ResourceIds.Alloy, 3),
+                Is.EqualTo(3));
+
+            var defense = new GrayboxDefenseRuntime3D(10f, 10f, 20f, 10f);
+            defense.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                cityX: 10,
+                cityY: 10,
+                groundRadius: fixture.Session.GroundBuildRadius);
+            GrayboxDefenseTowerRuntimeState3D tower = defense.Towers.Single(
+                value => value.StableId == turret.StableInstanceId);
+            Assert.That(fixture.Session.CityStorage.AddToNetwork(
+                ResourceIds.Ammunition,
+                tower.Combat.AmmoCapacity),
+                Is.EqualTo(tower.Combat.AmmoCapacity));
+            Assert.That(tower.Combat.RefillFrom(fixture.Session.CityStorage),
+                Is.EqualTo(tower.Combat.AmmoCapacity));
+            ConfigureOperationalRuntimes(
+                fixture.Controller,
+                production,
+                defense);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.QuickDismantle), Is.EqualTo(2));
+            EvacuationManifestViewModel first =
+                fixture.Controller.CaptureManifestView();
+            EvacuationManifestItemViewModel firstSmelter = first.Items.Single(
+                item => item.StableInstanceId == smelter.StableInstanceId);
+            EvacuationManifestItemViewModel firstTurret = first.Items.Single(
+                item => item.StableInstanceId == turret.StableInstanceId);
+            Assert.That(firstSmelter.Output.Single(
+                amount => amount.ResourceId == ResourceIds.Alloy).Amount,
+                Is.EqualTo(3));
+            Assert.That(firstTurret.AmmunitionAmount,
+                Is.EqualTo(tower.Combat.AmmoCapacity));
+
+            ulong storageRevision = fixture.Session.CityStorage.Revision;
+            Assert.That(productionState.Output.Add(ResourceIds.Alloy, 1),
+                Is.EqualTo(1));
+            var target = new DefenseEnemyCombatModel(
+                "evacuation-manifest-ammo-target",
+                EnemyCatalog.Gnawer,
+                turret.Placement.X,
+                turret.Placement.Y);
+            Assert.That(tower.Combat.Tick(.1f, target, globallyPaused: false),
+                Is.GreaterThanOrEqualTo(0));
+            Assert.That(tower.Combat.Ammo,
+                Is.EqualTo(tower.Combat.AmmoCapacity - 1));
+            Assert.That(fixture.Session.CityStorage.Revision,
+                Is.EqualTo(storageRevision),
+                "The refresh must be driven by the production/defense owners, " +
+                "not an unrelated city-storage mutation.");
+
+            EvacuationManifestViewModel refreshed =
+                fixture.Controller.CaptureManifestView();
+            EvacuationManifestItemViewModel refreshedSmelter =
+                refreshed.Items.Single(
+                    item => item.StableInstanceId == smelter.StableInstanceId);
+            EvacuationManifestItemViewModel refreshedTurret =
+                refreshed.Items.Single(
+                    item => item.StableInstanceId == turret.StableInstanceId);
+
+            Assert.That(refreshed, Is.Not.SameAs(first));
+            Assert.That(firstSmelter.Output.Single(
+                amount => amount.ResourceId == ResourceIds.Alloy).Amount,
+                Is.EqualTo(3),
+                "Published manifest snapshots must remain immutable.");
+            Assert.That(firstTurret.AmmunitionAmount,
+                Is.EqualTo(tower.Combat.AmmoCapacity),
+                "Published manifest snapshots must remain immutable.");
+            Assert.That(refreshedSmelter.Output.Single(
+                amount => amount.ResourceId == ResourceIds.Alloy).Amount,
+                Is.EqualTo(4));
+            Assert.That(refreshedTurret.AmmunitionAmount,
+                Is.EqualTo(tower.Combat.AmmoCapacity - 1));
+        }
+
+        [Test]
+        public void Controller_QueueViewRetainsFrozenBlockedBatchAndRetryProjection()
+        {
+            Type queueType = RequireEvacuationViewType(
+                "EvacuationQueueViewModel");
+            RequireQueueViewContract(queueType);
+
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.Inventory.Set(
+                BuildingCatalog.Wall.CostId,
+                fixture.Session.CityStorage.CoreCapacityPerResource);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.Assign(
+                wall.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            BuildingEvacuationWork frozen = fixture.Controller.Work.Single();
+            fixture.Controller.Tick(
+                frozen.DismantleSeconds + 1f,
+                paused: false);
+
+            object blocked = CaptureEvacuationView(
+                fixture.Controller,
+                "CaptureQueueView",
+                queueType);
+            object unchanged = CaptureEvacuationView(
+                fixture.Controller,
+                "CaptureQueueView",
+                queueType);
+
+            Assert.That(unchanged, Is.SameAs(blocked),
+                "A blocked queue with no changed revision must reuse its " +
+                "published immutable snapshot.");
+            Assert.That(ReadProperty(blocked, "BatchId"), Is.Not.Empty);
+            Assert.That(ReadProperty(blocked, "BatchIsInCombat"),
+                Is.EqualTo(frozen.BatchContext.IsInCombat));
+            Assert.That(ReadProperty(blocked, "BatchProductivityMultiplier"),
+                Is.EqualTo(frozen.BatchContext.ProductivityMultiplier));
+            Assert.That(ReadProperty(blocked, "CurrentStableInstanceId"),
+                Is.EqualTo(wall.StableInstanceId));
+            Assert.That(ReadProperty(blocked, "IsBlocked"), Is.EqualTo(true));
+            Assert.That(ReadProperty(blocked, "CanRetry"), Is.EqualTo(true));
+            Assert.That(ReadProperty(blocked, "LastFailureReason"), Is.Not.Empty);
+            Assert.That(ReadProperty(blocked, "CapacityHint"), Does.Contain("E"));
+            Assert.That(ReadViewItems(blocked, "CapacityShortfalls"), Is.Not.Empty);
         }
 
         [Test]
@@ -1964,6 +2183,153 @@ namespace WasteCity.Tests
                     "Missing evacuation commit code: " + name);
             }
             return type;
+        }
+
+        private static Type RequireEvacuationViewType(string typeName)
+        {
+            Type type = typeof(GrayboxEvacuationController3D).Assembly.GetType(
+                "WasteCity.Graybox3D.Building." + typeName,
+                false);
+            Assert.That(type, Is.Not.Null,
+                "Task 6 requires the immutable evacuation view type: " +
+                typeName);
+            Assert.That(type.IsClass, Is.True);
+            return type;
+        }
+
+        private static void RequireManifestViewContract(
+            Type manifestType,
+            Type itemType)
+        {
+            RequireReadOnlyProperty(manifestType, "Revision", typeof(ulong));
+            RequireReadOnlyProperty(manifestType, "IsInCombat", typeof(bool));
+            RequireReadOnlyProperty(
+                manifestType, "ProductivityMultiplier", typeof(float));
+            RequireReadOnlyProperty(manifestType, "CanConfirm", typeof(bool));
+            RequireReadOnlyProperty(manifestType, "FailureReason", typeof(string));
+            RequireReadOnlyProperty(
+                manifestType,
+                "Items",
+                typeof(IReadOnlyList<>).MakeGenericType(itemType));
+            RequireReadOnlyProperty(
+                manifestType,
+                "CapacityShortfalls",
+                typeof(IReadOnlyList<ResourceAmount>));
+
+            RequireReadOnlyProperty(itemType, "StableInstanceId", typeof(string));
+            RequireReadOnlyProperty(itemType, "BuildingName", typeof(string));
+            RequireReadOnlyProperty(
+                itemType, "Category", typeof(BuildingMenuCategory));
+            RequireReadOnlyProperty(
+                itemType, "State", typeof(GrayboxBuildingInstanceState));
+            RequireReadOnlyProperty(itemType, "RemainingRatio", typeof(double));
+            RequireReadOnlyProperty(
+                itemType, "Treatment", typeof(BuildingEvacuationTreatment));
+            RequireReadOnlyProperty(
+                itemType, "ExpectedRefunds", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(
+                itemType, "BaseDismantleSeconds", typeof(float));
+            RequireReadOnlyProperty(
+                itemType, "DismantleSeconds", typeof(float));
+            RequireReadOnlyProperty(
+                itemType, "Input", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(
+                itemType, "ReservedInput", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(
+                itemType, "Output", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(itemType, "AmmunitionAmount", typeof(int));
+            RequireReadOnlyProperty(
+                itemType, "WarehouseContents", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(
+                itemType, "LostOnAbandon", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(itemType, "CanCommit", typeof(bool));
+            RequireReadOnlyProperty(
+                itemType, "CapacityShortfalls", typeof(IReadOnlyList<ResourceAmount>));
+            RequireReadOnlyProperty(itemType, "FailureReason", typeof(string));
+            AssertViewTypeDoesNotOwnRuntimeOrRules(manifestType);
+            AssertViewTypeDoesNotOwnRuntimeOrRules(itemType);
+        }
+
+        private static void RequireQueueViewContract(Type queueType)
+        {
+            RequireReadOnlyProperty(queueType, "Revision", typeof(ulong));
+            RequireReadOnlyProperty(queueType, "BatchId", typeof(string));
+            RequireReadOnlyProperty(
+                queueType, "BatchIsInCombat", typeof(bool));
+            RequireReadOnlyProperty(
+                queueType, "BatchProductivityMultiplier", typeof(float));
+            RequireReadOnlyProperty(queueType, "CompletedCount", typeof(int));
+            RequireReadOnlyProperty(queueType, "TotalCount", typeof(int));
+            RequireReadOnlyProperty(
+                queueType, "CurrentStableInstanceId", typeof(string));
+            RequireReadOnlyProperty(
+                queueType, "RemainingBaseSeconds", typeof(float));
+            RequireReadOnlyProperty(
+                queueType, "RemainingActualSeconds", typeof(float));
+            RequireReadOnlyProperty(queueType, "IsPaused", typeof(bool));
+            RequireReadOnlyProperty(queueType, "IsBlocked", typeof(bool));
+            RequireReadOnlyProperty(queueType, "CanRetry", typeof(bool));
+            RequireReadOnlyProperty(
+                queueType, "LastFailureReason", typeof(string));
+            RequireReadOnlyProperty(queueType, "CapacityHint", typeof(string));
+            RequireReadOnlyProperty(
+                queueType,
+                "CapacityShortfalls",
+                typeof(IReadOnlyList<ResourceAmount>));
+            AssertViewTypeDoesNotOwnRuntimeOrRules(queueType);
+        }
+
+        private static void AssertViewTypeDoesNotOwnRuntimeOrRules(Type type)
+        {
+            Type[] forbidden =
+            {
+                typeof(CityResourceStorageModel),
+                typeof(GrayboxDefenseRuntime3D),
+                typeof(ConstructionRefundRules)
+            };
+            foreach (MemberInfo member in type.GetMembers(
+                         BindingFlags.Instance | BindingFlags.Public |
+                         BindingFlags.NonPublic))
+            {
+                Type memberType = member is FieldInfo field
+                    ? field.FieldType
+                    : member is PropertyInfo property
+                        ? property.PropertyType
+                        : null;
+                if (memberType == null) continue;
+                Assert.That(Array.IndexOf(forbidden, memberType), Is.EqualTo(-1),
+                    type.Name + "." + member.Name +
+                    " must receive projected data, not own runtime/rule truth.");
+            }
+        }
+
+        private static object CaptureEvacuationView(
+            GrayboxEvacuationController3D controller,
+            string methodName,
+            Type expectedType)
+        {
+            MethodInfo method = typeof(GrayboxEvacuationController3D).GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                Type.EmptyTypes,
+                null);
+            Assert.That(method, Is.Not.Null,
+                "Task 6 requires controller snapshot command " + methodName +
+                "().");
+            Assert.That(method.ReturnType, Is.EqualTo(expectedType));
+            object view = method.Invoke(controller, null);
+            Assert.That(view, Is.Not.Null);
+            return view;
+        }
+
+        private static IEnumerable<object> ReadViewItems(
+            object view,
+            string propertyName)
+        {
+            object values = ReadProperty(view, propertyName);
+            Assert.That(values, Is.InstanceOf<IEnumerable>());
+            return ((IEnumerable)values).Cast<object>();
         }
 
         private static MethodInfo RequirePayloadCommitWithCode(Type codeType)
