@@ -107,6 +107,109 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Rules_FormalBatchContextContractIsImmutableAndRecordedInWork()
+        {
+            Type contextType = RequireEvacuationBatchContextType();
+            Assert.That(contextType.IsValueType, Is.True);
+            RequireReadOnlyProperty(contextType, "IsInCombat", typeof(bool));
+            RequireReadOnlyProperty(
+                contextType,
+                "ProductivityMultiplier",
+                typeof(float));
+            RequireReadOnlyProperty(
+                typeof(BuildingEvacuationWork),
+                "BatchContext",
+                contextType);
+            RequireReadOnlyProperty(
+                typeof(BuildingEvacuationWork),
+                "BaseDismantleSeconds",
+                typeof(float));
+            RequireBatchContextFactory(contextType);
+            RequireFormalWorkFactory(contextType);
+        }
+
+        [Test]
+        public void Rules_FormalContextsApplyApprovedCompletedTreatmentValues()
+        {
+            object peace = CreateBatchContext(false, 2f);
+            object combat = CreateBatchContext(true, 2f);
+            BuildingEvacuationWork peaceFull = CreateFormalWork(
+                "building.instance.formal-peace-full", 100, 18f, 1d,
+                BuildingEvacuationTreatment.FullDismantle, peace);
+            BuildingEvacuationWork combatFull = CreateFormalWork(
+                "building.instance.formal-combat-full", 100, 18f, 1d,
+                BuildingEvacuationTreatment.FullDismantle, combat);
+            BuildingEvacuationWork quick = CreateFormalWork(
+                "building.instance.formal-quick", 100, 18f, 1d,
+                BuildingEvacuationTreatment.QuickDismantle, combat);
+            BuildingEvacuationWork abandon = CreateFormalWork(
+                "building.instance.formal-abandon", 100, 18f, 1d,
+                BuildingEvacuationTreatment.Abandon, combat);
+
+            Assert.That(peaceFull.Refund, Is.EqualTo(80));
+            Assert.That(ReadFloat(peaceFull, "BaseDismantleSeconds"),
+                Is.EqualTo(9f));
+            Assert.That(peaceFull.DismantleSeconds, Is.EqualTo(4.5f));
+            Assert.That(combatFull.Refund, Is.EqualTo(60));
+            Assert.That(ReadFloat(combatFull, "BaseDismantleSeconds"),
+                Is.EqualTo(5f));
+            Assert.That(combatFull.DismantleSeconds, Is.EqualTo(2.5f));
+            Assert.That(quick.Refund, Is.EqualTo(50));
+            Assert.That(quick.DismantleSeconds, Is.Zero);
+            Assert.That(abandon.Refund, Is.Zero);
+            Assert.That(abandon.DismantleSeconds, Is.Zero);
+        }
+
+        [Test]
+        public void Rules_FormalIncompleteRefundUsesSharedDeterministicRounding()
+        {
+            object peace = CreateBatchContext(false, 1f);
+            object combat = CreateBatchContext(true, 1f);
+            BuildingEvacuationWork peaceFull = CreateFormalWork(
+                "building.instance.incomplete-peace", 25, 11f, .5d,
+                BuildingEvacuationTreatment.FullDismantle, peace);
+            BuildingEvacuationWork combatFull = CreateFormalWork(
+                "building.instance.incomplete-combat", 25, 11f, .5d,
+                BuildingEvacuationTreatment.FullDismantle, combat);
+            BuildingEvacuationWork repeat = CreateFormalWork(
+                "building.instance.incomplete-combat-repeat", 25, 11f, .5d,
+                BuildingEvacuationTreatment.FullDismantle, combat);
+            BuildingEvacuationWork quick = CreateFormalWork(
+                "building.instance.incomplete-quick", 25, 11f, .5d,
+                BuildingEvacuationTreatment.QuickDismantle, combat);
+
+            Assert.That(peaceFull.Refund, Is.EqualTo(10));
+            Assert.That(combatFull.Refund, Is.EqualTo(8),
+                "25 × 0.5 × 0.6 = 7.5 rounds away from zero.");
+            Assert.That(repeat.Refund, Is.EqualTo(combatFull.Refund));
+            Assert.That(quick.Refund, Is.EqualTo(6));
+        }
+
+        [Test]
+        public void Rules_WarningIsPeaceAndConfirmedWorkKeepsFrozenContext()
+        {
+            object warning = CreateBatchContext(false, 1.25f);
+            BuildingEvacuationWork warningPreview = CreateFormalWork(
+                "building.instance.warning-preview", 100, 10f, 1d,
+                BuildingEvacuationTreatment.FullDismantle, warning);
+            object confirmedCombat = CreateBatchContext(true, 2f);
+            BuildingEvacuationWork confirmed = CreateFormalWork(
+                "building.instance.confirmed-combat", 100, 20f, 1d,
+                BuildingEvacuationTreatment.FullDismantle, confirmedCombat);
+
+            _ = CreateBatchContext(false, 4f);
+            object frozen = ReadProperty(confirmed, "BatchContext");
+
+            Assert.That(warningPreview.Refund, Is.EqualTo(80));
+            Assert.That(warningPreview.DismantleSeconds, Is.EqualTo(4f));
+            Assert.That(confirmed.Refund, Is.EqualTo(60));
+            Assert.That(confirmed.DismantleSeconds, Is.EqualTo(2.5f));
+            Assert.That(ReadBool(frozen, "IsInCombat"), Is.True);
+            Assert.That(ReadFloat(frozen, "ProductivityMultiplier"),
+                Is.EqualTo(2f));
+        }
+
+        [Test]
         public void Session_LockingFullWorkRemovesCompletedPrerequisiteUntilRollback()
         {
             GrayboxBuildingSession3D session = CreateSession();
@@ -1157,6 +1260,118 @@ namespace WasteCity.Tests
                 else
                     Assert.That(value, Is.SameAs(replacement.Menu));
             }
+        }
+
+        private static Type RequireEvacuationBatchContextType()
+        {
+            Type type = typeof(BuildingEvacuationRules).Assembly.GetType(
+                "WasteCity.Building.EvacuationBatchContext",
+                false);
+            Assert.That(type, Is.Not.Null,
+                "IDEA-0014 requires an immutable EvacuationBatchContext " +
+                "in the pure rule assembly.");
+            return type;
+        }
+
+        private static MethodInfo RequireBatchContextFactory(Type contextType)
+        {
+            MethodInfo method = typeof(BuildingEvacuationRules).GetMethod(
+                "CreateBatchContext",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(bool), typeof(float) },
+                null);
+            Assert.That(method, Is.Not.Null,
+                "CreateBatchContext(bool, float) must freeze combat and " +
+                "formal productivity.");
+            Assert.That(method.ReturnType, Is.EqualTo(contextType));
+            return method;
+        }
+
+        private static MethodInfo RequireFormalWorkFactory(Type contextType)
+        {
+            MethodInfo method = typeof(BuildingEvacuationRules).GetMethod(
+                "Create",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    typeof(string), typeof(int), typeof(float), typeof(double),
+                    typeof(BuildingEvacuationTreatment), contextType
+                },
+                null);
+            Assert.That(method, Is.Not.Null,
+                "Create must accept the frozen EvacuationBatchContext.");
+            return method;
+        }
+
+        private static object CreateBatchContext(
+            bool isInCombat,
+            float productivityMultiplier)
+        {
+            Type contextType = RequireEvacuationBatchContextType();
+            return RequireBatchContextFactory(contextType).Invoke(
+                null,
+                new object[] { isInCombat, productivityMultiplier });
+        }
+
+        private static BuildingEvacuationWork CreateFormalWork(
+            string stableInstanceId,
+            int originalCost,
+            float originalBuildSeconds,
+            double remainingRatio,
+            BuildingEvacuationTreatment treatment,
+            object batchContext)
+        {
+            Assert.That(batchContext, Is.Not.Null);
+            object value = RequireFormalWorkFactory(batchContext.GetType()).Invoke(
+                null,
+                new object[]
+                {
+                    stableInstanceId, originalCost, originalBuildSeconds,
+                    remainingRatio, treatment, batchContext
+                });
+            Assert.That(value, Is.TypeOf<BuildingEvacuationWork>());
+            return (BuildingEvacuationWork)value;
+        }
+
+        private static PropertyInfo RequireReadOnlyProperty(
+            Type owner,
+            string name,
+            Type expectedType)
+        {
+            PropertyInfo property = owner.GetProperty(
+                name,
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null, owner.FullName + "." + name);
+            Assert.That(property.PropertyType, Is.EqualTo(expectedType));
+            Assert.That(property.CanRead, Is.True);
+            Assert.That(property.CanWrite, Is.False);
+            return property;
+        }
+
+        private static object ReadProperty(object owner, string name)
+        {
+            Assert.That(owner, Is.Not.Null);
+            PropertyInfo property = owner.GetType().GetProperty(
+                name,
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null,
+                owner.GetType().FullName + "." + name);
+            Assert.That(property.CanWrite, Is.False);
+            return property.GetValue(owner, null);
+        }
+
+        private static bool ReadBool(object owner, string name)
+        {
+            return (bool)RequireReadOnlyProperty(
+                owner.GetType(), name, typeof(bool)).GetValue(owner, null);
+        }
+
+        private static float ReadFloat(object owner, string name)
+        {
+            return (float)RequireReadOnlyProperty(
+                owner.GetType(), name, typeof(float)).GetValue(owner, null);
         }
 
         private static void AssertSerializedReferences(
