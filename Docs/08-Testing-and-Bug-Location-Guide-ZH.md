@@ -24,9 +24,17 @@
 
 `IDEA-0011` 的生产、背包、应急合成、六节点研究和资源状态栏已经实现待验证。排查规则或数据问题时，可从 `ResourceDefinitionCatalogTests`、`ResourceTransactionAndCapacityTests`、`FormalProductionSimulationTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`、`ManualResourceAccessRulesTests` 和 `ResourceInventoryChangeTests` 中选择最小相关类；排查 3D 生产适配与时间推进时，再看 `GrayboxProductionRuntimeTests` 和 `GrayboxProductionClockTests`；排查玩家操作、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`，真实建造生产链则由 `GrayboxBuildingRuntimeSceneTests` 覆盖。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
 
-不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。这能验证运行时生产闭环，但不能证明正式自然开局已经有石料获取路径。若试玩卡在这里，应记录为已知 bootstrap/数值边界，不要在测试里偷偷修改正式开局或建筑成本。
+不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。该测试只验证运行时生产闭环；自然开局的石料路径应由 `IDEA-0012` 的 seed `8128` 原始内容区可采石料节点及其场景测试单独证明。若试玩仍找不到或无法采集石料，应作为 `IDEA-0012` 回归记录，不要在测试里偷偷修改正式开局或建筑成本。
 
 本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。schema 必须保持 `30`，冻结 2D 只做回归，敌人、炮塔和弹丸不属于本轮测试通过所能证明的范围。
+
+## IDEA-0014 正式撤离与完整垂直切片检查边界
+
+`IDEA-0014` 必须先用纯规则失败测试固定 `5/8` 秒展开收起、转换取消、第一名敌人生成后的战斗状态、战斗收起 `-30%`、和平/战斗完整拆除、快速拆除、遗弃和确定性退款；再检查建筑内部库存、塔内弹药、仓库内容与退款能否在同一原子容量门下完整迁移或准确拒绝。不得用 UI 重新计算战斗状态、退款或容量缺口。
+
+相关运行时检查至少覆盖 `GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionLifecycleTests`、`GrayboxFirstDefenseRuntimeTests`、城市部署测试和建筑输入测试。玩家界面必须通过正式场景的真实 Input System 操作 `F`、撤离清单按钮和战术暂停；最终还要有一条连续完成“移动→展开→建成研究站→研究→建生产/防御建筑→生产→防御→撤离→恢复移动”的 PlayMode。测试夹具可以加速时间和提供确定性开局资源，但不能直接调用内部研究完成、建筑创建、防御触发或撤离提交来冒充完整玩家流程。
+
+性能检查应同时存在活跃生产、八名敌人、防御 HUD 和撤离 UI，并记录稳定帧与清单/队列创建的有界分配。schema 继续保持 `30`；正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。
 
 ## 怎样读失败定位报告
 
