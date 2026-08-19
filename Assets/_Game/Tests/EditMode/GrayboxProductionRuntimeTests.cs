@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using WasteCity.Building;
@@ -286,6 +288,134 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void EvacuationPayloadCaptureUsesStableIdAndDoesNotMutateProductionState()
+        {
+            const string stableId = "building.instance.evacuation.capture";
+            GrayboxProductionRuntime3D runtime =
+                RuntimeWithProductionPayload(stableId, out BuildingProductionState state);
+
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+
+            Assert.That(PayloadStableId(payload), Is.EqualTo(stableId));
+            Assert.That(PayloadAmount(payload, "Input", ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(PayloadAmount(payload, "ReservedInput", ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(PayloadAmount(payload, "Output", ResourceIds.Alloy), Is.EqualTo(3));
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.ProgressSeconds, Is.EqualTo(1f));
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(3));
+
+            state.Output.Add(ResourceIds.Alloy, 1);
+            Assert.That(
+                PayloadAmount(payload, "Output", ResourceIds.Alloy),
+                Is.EqualTo(3),
+                "A captured evacuation payload must remain an immutable snapshot.");
+        }
+
+        [TestCase(BuildingEvacuationTreatment.FullDismantle)]
+        [TestCase(BuildingEvacuationTreatment.QuickDismantle)]
+        public void SuccessfulDismantleMigrationFinalizesTheExactCapturedProductionPayload(
+            BuildingEvacuationTreatment treatment)
+        {
+            string stableId = "building.instance.evacuation." + treatment;
+            GrayboxProductionRuntime3D runtime =
+                RuntimeWithProductionPayload(stableId, out _);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            var destination = new ResourceInventory(100);
+
+            AddPayloadSection(destination, payload, "Input");
+            AddPayloadSection(destination, payload, "ReservedInput");
+            AddPayloadSection(destination, payload, "Output");
+            Assert.That(
+                TryFinalizeEvacuationPayload(runtime, stableId, payload),
+                Is.True);
+
+            Assert.That(destination.Get(ResourceIds.Iron), Is.EqualTo(4));
+            Assert.That(destination.Get(ResourceIds.Alloy), Is.EqualTo(3));
+            Assert.That(runtime.TryGetState(stableId, out _), Is.False);
+            Assert.That(runtime.TryGetState(stableId + ".other", out _), Is.True);
+        }
+
+        [Test]
+        public void StaleOrRejectedProductionPayloadCannotFinalizeCurrentState()
+        {
+            const string stableId = "building.instance.evacuation.stale";
+            GrayboxProductionRuntime3D runtime =
+                RuntimeWithProductionPayload(stableId, out BuildingProductionState state);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            state.Output.Add(ResourceIds.Alloy, 1);
+
+            Assert.That(
+                TryFinalizeEvacuationPayload(runtime, stableId, payload),
+                Is.False,
+                "A failed capacity commit or stale payload must not authorize cache clearing.");
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void CapacityRejectedProductionMigrationLeavesRuntimePayloadIntact()
+        {
+            const string stableId = "building.instance.evacuation.capacity";
+            GrayboxProductionRuntime3D runtime =
+                RuntimeWithProductionPayload(stableId, out BuildingProductionState state);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            var destination = new ResourceInventory(3);
+
+            bool committed = ResourceTransaction.TryCommitBatch(
+                new ResourceInventory(0),
+                Array.Empty<ResourceAmount>(),
+                destination,
+                new ResourceCapacityPolicy(3, 0),
+                0,
+                new[]
+                {
+                    new ResourceAmount(
+                        ResourceIds.Iron,
+                        PayloadAmount(payload, "Input", ResourceIds.Iron) +
+                        PayloadAmount(
+                            payload,
+                            "ReservedInput",
+                            ResourceIds.Iron)),
+                    new ResourceAmount(
+                        ResourceIds.Alloy,
+                        PayloadAmount(payload, "Output", ResourceIds.Alloy)),
+                });
+
+            Assert.That(committed, Is.False);
+            Assert.That(destination.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(destination.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(runtime.TryGetState(stableId, out _), Is.True);
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(3));
+        }
+
+        [Test]
+        public void AbandonExplicitlyDiscardsOrdinaryProductionPayload()
+        {
+            const string stableId = "building.instance.evacuation.abandon";
+            GrayboxProductionRuntime3D runtime =
+                RuntimeWithProductionPayload(stableId, out _);
+
+            Assert.That(
+                TryDiscardEvacuationPayload(runtime, stableId),
+                Is.True);
+
+            Assert.That(runtime.TryGetState(stableId, out _), Is.False);
+            Assert.That(runtime.TryGetState(stableId + ".other", out _), Is.True);
+        }
+
+        [Test]
         public void WarehouseCountUsesCompletedOwnedUnlockedEligibilityRegardlessOfLogisticsRange()
         {
             GrayboxBuildingInstance3D inside = CreateInstance(
@@ -377,6 +507,156 @@ namespace WasteCity.Tests
                 new ConstructionProgress(definition.BuildSeconds),
                 binding,
             });
+        }
+
+        private static GrayboxProductionRuntime3D RuntimeWithProductionPayload(
+            string stableId,
+            out BuildingProductionState state)
+        {
+            GrayboxBuildingInstance3D instance = CreateInstance(
+                stableId,
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            GrayboxBuildingInstance3D other = CreateInstance(
+                stableId + ".other",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                12,
+                10);
+            Complete(instance);
+            Complete(other);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { other, instance },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            Assert.That(runtime.TryGetState(stableId, out state), Is.True);
+            Assert.That(state.Input.Add(ResourceIds.Iron, 4), Is.EqualTo(4));
+            new FormalProductionSimulation().Tick(
+                new[] { state },
+                1f,
+                null,
+                new ResourceInventory(100),
+                new ResourceCapacityPolicy(),
+                0,
+                globallyPaused: false);
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.Output.Add(ResourceIds.Alloy, 3), Is.EqualTo(3));
+            return runtime;
+        }
+
+        private static bool TryCaptureEvacuationPayload(
+            GrayboxProductionRuntime3D runtime,
+            string stableId,
+            out object payload)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryCaptureEvacuationPayload",
+                2);
+            object[] arguments = { stableId, null };
+            bool result = (bool)method.Invoke(runtime, arguments);
+            payload = arguments[1];
+            return result;
+        }
+
+        private static bool TryFinalizeEvacuationPayload(
+            GrayboxProductionRuntime3D runtime,
+            string stableId,
+            object payload)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryFinalizeEvacuationPayload",
+                2);
+            return (bool)method.Invoke(runtime, new[] { (object)stableId, payload });
+        }
+
+        private static bool TryDiscardEvacuationPayload(
+            GrayboxProductionRuntime3D runtime,
+            string stableId)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryDiscardEvacuationPayload",
+                1);
+            return (bool)method.Invoke(runtime, new object[] { stableId });
+        }
+
+        private static MethodInfo FindRuntimeMethod(
+            object runtime,
+            string name,
+            int parameterCount)
+        {
+            MethodInfo method = runtime.GetType()
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .SingleOrDefault(candidate =>
+                    candidate.Name == name &&
+                    candidate.GetParameters().Length == parameterCount);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                $"Missing evacuation runtime API: {runtime.GetType().Name}.{name}");
+            return method;
+        }
+
+        private static string PayloadStableId(object payload)
+        {
+            Assert.That(payload, Is.Not.Null);
+            PropertyInfo property = payload.GetType().GetProperty(
+                "StableInstanceId",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, "Payload.StableInstanceId");
+            return (string)property.GetValue(payload);
+        }
+
+        private static int PayloadAmount(
+            object payload,
+            string sectionName,
+            string resourceId)
+        {
+            return PayloadSection(payload, sectionName)
+                .Where(amount => amount.ResourceId == resourceId)
+                .Sum(amount => amount.Amount);
+        }
+
+        private static IReadOnlyList<ResourceAmount> PayloadSection(
+            object payload,
+            string sectionName)
+        {
+            Assert.That(payload, Is.Not.Null);
+            PropertyInfo property = payload.GetType().GetProperty(
+                sectionName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, $"Payload.{sectionName}");
+            Assert.That(property.GetValue(payload), Is.InstanceOf<IEnumerable>());
+            var values = new List<ResourceAmount>();
+            foreach (object value in (IEnumerable)property.GetValue(payload))
+            {
+                Assert.That(value, Is.InstanceOf<ResourceAmount>());
+                values.Add((ResourceAmount)value);
+            }
+            return values;
+        }
+
+        private static void AddPayloadSection(
+            ResourceInventory destination,
+            object payload,
+            string sectionName)
+        {
+            IReadOnlyList<ResourceAmount> values =
+                PayloadSection(payload, sectionName);
+            for (int index = 0; index < values.Count; index++)
+            {
+                ResourceAmount amount = values[index];
+                Assert.That(
+                    destination.Add(amount.ResourceId, amount.Amount),
+                    Is.EqualTo(amount.Amount));
+            }
         }
 
         private static void Complete(GrayboxBuildingInstance3D instance)

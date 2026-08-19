@@ -586,6 +586,135 @@ namespace WasteCity.Tests
                 status: GrayboxDefenseTowerStatus3D.OutOfLogistics);
         }
 
+        [Test]
+        public void EvacuationPayloadCaptureUsesStableIdAndDoesNotMutateTowerAmmo()
+        {
+            const string stableId = "building.instance.turret-evacuation.capture";
+            GrayboxDefenseRuntime3D runtime =
+                RuntimeWithTowerAmmo(stableId, out GrayboxDefenseTowerRuntimeState3D state);
+
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+
+            Assert.That(PayloadStableId(payload), Is.EqualTo(stableId));
+            Assert.That(PayloadAmmunition(payload), Is.EqualTo(30));
+            Assert.That(state.Combat.Ammo, Is.EqualTo(30));
+
+            state.Combat.Tick(
+                .1f,
+                DurableLightEnemy("enemy.evacuation.capture", 0f, 0f),
+                globallyPaused: false);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(29));
+            Assert.That(
+                PayloadAmmunition(payload),
+                Is.EqualTo(30),
+                "A captured turret payload must remain an immutable snapshot.");
+        }
+
+        [TestCase(BuildingEvacuationTreatment.FullDismantle)]
+        [TestCase(BuildingEvacuationTreatment.QuickDismantle)]
+        public void SuccessfulDismantleMigrationFinalizesTheExactCapturedTowerAmmo(
+            BuildingEvacuationTreatment treatment)
+        {
+            string stableId = "building.instance.turret-evacuation." + treatment;
+            GrayboxDefenseRuntime3D runtime =
+                RuntimeWithTowerAmmo(stableId, out _);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            var destination = new ResourceInventory(100);
+
+            Assert.That(
+                destination.Add(
+                    ResourceIds.Ammunition,
+                    PayloadAmmunition(payload)),
+                Is.EqualTo(30));
+            Assert.That(
+                TryFinalizeEvacuationPayload(runtime, stableId, payload),
+                Is.True);
+
+            Assert.That(destination.Get(ResourceIds.Ammunition), Is.EqualTo(30));
+            Assert.That(
+                runtime.Towers.Any(value => value.StableId == stableId),
+                Is.False);
+            Assert.That(
+                runtime.Towers.Any(value => value.StableId == stableId + ".other"),
+                Is.True);
+        }
+
+        [Test]
+        public void StaleOrRejectedTowerPayloadCannotFinalizeCurrentState()
+        {
+            const string stableId = "building.instance.turret-evacuation.stale";
+            GrayboxDefenseRuntime3D runtime =
+                RuntimeWithTowerAmmo(stableId, out GrayboxDefenseTowerRuntimeState3D state);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            state.Combat.Tick(
+                .1f,
+                DurableLightEnemy("enemy.evacuation.stale", 0f, 0f),
+                globallyPaused: false);
+
+            Assert.That(
+                TryFinalizeEvacuationPayload(runtime, stableId, payload),
+                Is.False,
+                "A failed capacity commit or stale payload must not authorize ammunition clearing.");
+            Assert.That(state.Combat.Ammo, Is.EqualTo(29));
+        }
+
+        [Test]
+        public void CapacityRejectedTowerMigrationLeavesRuntimeAmmunitionIntact()
+        {
+            const string stableId = "building.instance.turret-evacuation.capacity";
+            GrayboxDefenseRuntime3D runtime =
+                RuntimeWithTowerAmmo(stableId, out GrayboxDefenseTowerRuntimeState3D state);
+            Assert.That(
+                TryCaptureEvacuationPayload(runtime, stableId, out object payload),
+                Is.True);
+            var destination = new ResourceInventory(29);
+
+            bool committed = ResourceTransaction.TryCommitBatch(
+                new ResourceInventory(0),
+                Array.Empty<ResourceAmount>(),
+                destination,
+                new ResourceCapacityPolicy(29, 0),
+                0,
+                new[]
+                {
+                    new ResourceAmount(
+                        ResourceIds.Ammunition,
+                        PayloadAmmunition(payload)),
+                });
+
+            Assert.That(committed, Is.False);
+            Assert.That(destination.Get(ResourceIds.Ammunition), Is.Zero);
+            Assert.That(
+                runtime.Towers.Any(value => value.StableId == stableId),
+                Is.True);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(30));
+        }
+
+        [Test]
+        public void AbandonExplicitlyDiscardsTowerAmmunition()
+        {
+            const string stableId = "building.instance.turret-evacuation.abandon";
+            GrayboxDefenseRuntime3D runtime =
+                RuntimeWithTowerAmmo(stableId, out _);
+
+            Assert.That(
+                TryDiscardEvacuationPayload(runtime, stableId),
+                Is.True);
+
+            Assert.That(
+                runtime.Towers.Any(value => value.StableId == stableId),
+                Is.False);
+            Assert.That(
+                runtime.Towers.Any(value => value.StableId == stableId + ".other"),
+                Is.True);
+        }
+
         private static GrayboxDefenseRuntime3D Runtime()
         {
             return new GrayboxDefenseRuntime3D(
@@ -600,6 +729,107 @@ namespace WasteCity.Tests
             var inventory = new ResourceInventory(500);
             inventory.Add(ResourceIds.Ammunition, amount);
             return new CityResourceStorageModel(inventory, 150);
+        }
+
+        private static GrayboxDefenseRuntime3D RuntimeWithTowerAmmo(
+            string stableId,
+            out GrayboxDefenseTowerRuntimeState3D state)
+        {
+            GrayboxBuildingInstance3D turret = CompletedTurret(
+                stableId,
+                x: 0,
+                y: 0);
+            GrayboxBuildingInstance3D other = CompletedTurret(
+                stableId + ".other",
+                x: 1,
+                y: 0);
+            GrayboxDefenseRuntime3D runtime = Runtime();
+            Synchronize(runtime, new[] { other, turret });
+            using (CityResourceStorageModel storage = StorageWithAmmo(80))
+                runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            state = runtime.Towers.Single(value => value.StableId == stableId);
+            Assert.That(state.StableId, Is.EqualTo(stableId));
+            Assert.That(state.Combat.Ammo, Is.EqualTo(30));
+            Assert.That(
+                runtime.Towers.Single(value => value.StableId == stableId + ".other")
+                    .Combat.Ammo,
+                Is.EqualTo(30));
+            return runtime;
+        }
+
+        private static bool TryCaptureEvacuationPayload(
+            GrayboxDefenseRuntime3D runtime,
+            string stableId,
+            out object payload)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryCaptureEvacuationPayload",
+                2);
+            object[] arguments = { stableId, null };
+            bool result = (bool)method.Invoke(runtime, arguments);
+            payload = arguments[1];
+            return result;
+        }
+
+        private static bool TryFinalizeEvacuationPayload(
+            GrayboxDefenseRuntime3D runtime,
+            string stableId,
+            object payload)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryFinalizeEvacuationPayload",
+                2);
+            return (bool)method.Invoke(runtime, new[] { (object)stableId, payload });
+        }
+
+        private static bool TryDiscardEvacuationPayload(
+            GrayboxDefenseRuntime3D runtime,
+            string stableId)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryDiscardEvacuationPayload",
+                1);
+            return (bool)method.Invoke(runtime, new object[] { stableId });
+        }
+
+        private static MethodInfo FindRuntimeMethod(
+            object runtime,
+            string name,
+            int parameterCount)
+        {
+            MethodInfo method = runtime.GetType()
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .SingleOrDefault(candidate =>
+                    candidate.Name == name &&
+                    candidate.GetParameters().Length == parameterCount);
+            Assert.That(
+                method,
+                Is.Not.Null,
+                $"Missing evacuation runtime API: {runtime.GetType().Name}.{name}");
+            return method;
+        }
+
+        private static string PayloadStableId(object payload)
+        {
+            Assert.That(payload, Is.Not.Null);
+            PropertyInfo property = payload.GetType().GetProperty(
+                "StableInstanceId",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, "Payload.StableInstanceId");
+            return (string)property.GetValue(payload);
+        }
+
+        private static int PayloadAmmunition(object payload)
+        {
+            Assert.That(payload, Is.Not.Null);
+            PropertyInfo property = payload.GetType().GetProperty(
+                "AmmunitionAmount",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, "Payload.AmmunitionAmount");
+            return (int)property.GetValue(payload);
         }
 
         private static void AssertEquivalentRuntime(

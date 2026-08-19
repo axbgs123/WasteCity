@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using WasteCity.Economy;
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace WasteCity.Tests
 {
@@ -257,6 +259,194 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void EvacuationPlanAggregatesSourceContentsAndRefundWithExactShortfall()
+        {
+            var core = new ResourceInventory(1000);
+            core.Add(ResourceIds.Alloy, 10);
+            var storage = new CityResourceStorageModel(core, 10);
+            Assert.That(storage.TryRegisterWarehouse("warehouse.source"),
+                Is.True);
+            Assert.That(storage.TryRegisterWarehouse("warehouse.target"),
+                Is.True);
+            Assert.That(storage.AddToWarehouse(
+                "warehouse.source", ResourceIds.Iron, 5), Is.EqualTo(5));
+            Assert.That(storage.AddToWarehouse(
+                "warehouse.target", ResourceIds.Stone, 148), Is.EqualTo(148));
+            Assert.That(storage.TryGetWarehouseSnapshot(
+                "warehouse.target",
+                out WarehouseStorageSnapshot target), Is.True);
+            Assert.That(target.IsConnected, Is.True);
+            Assert.That(target.FilterResourceId, Is.Null);
+            Assert.That(target.FreeSpace, Is.EqualTo(2));
+
+            object plan = CreateEvacuationPlan(
+                storage,
+                "warehouse.source",
+                new[] { new ResourceAmount(ResourceIds.Alloy, 4) });
+
+            Assert.That(ReadPlanBool(plan, "CanCommit"), Is.False);
+            Assert.That(ReadPlanUlong(plan, "PreparedRevision"),
+                Is.EqualTo(storage.Revision));
+            Assert.That(InvokePlanAmount(
+                plan, "GetIncomingAmount", ResourceIds.Iron), Is.EqualTo(5));
+            Assert.That(InvokePlanAmount(
+                plan, "GetIncomingAmount", ResourceIds.Alloy), Is.EqualTo(4));
+            Assert.That(InvokePlanAmount(
+                plan, "GetShortfall", ResourceIds.Iron), Is.Zero);
+            Assert.That(InvokePlanAmount(
+                plan, "GetShortfall", ResourceIds.Alloy), Is.EqualTo(2));
+            Assert.That(ReadPlanInt(plan, "TotalShortfall"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void EvacuationPlanRejectsStaleRevisionAndRepreflightsLatestCapacity()
+        {
+            var core = new ResourceInventory(1000);
+            var storage = new CityResourceStorageModel(core, 10);
+            storage.TryRegisterWarehouse("warehouse.source");
+            storage.AddToWarehouse(
+                "warehouse.source", ResourceIds.Iron, 5);
+            object plan = CreateEvacuationPlan(
+                storage,
+                "warehouse.source",
+                new[] { new ResourceAmount(ResourceIds.Alloy, 4) });
+            Assert.That(ReadPlanBool(plan, "CanCommit"), Is.True);
+
+            Assert.That(storage.AddToNetwork(ResourceIds.Alloy, 10),
+                Is.EqualTo(10));
+            ulong revisionAfterCapacityChange = storage.Revision;
+
+            Assert.That(TryCommitEvacuationPlan(
+                storage, plan, out string status), Is.False);
+            Assert.That(status, Is.EqualTo("StalePlan"));
+            Assert.That(storage.Revision, Is.EqualTo(revisionAfterCapacityChange));
+            Assert.That(storage.ContainsWarehouse("warehouse.source"), Is.True);
+            Assert.That(storage.GetWarehouseAmount(
+                "warehouse.source", ResourceIds.Iron), Is.EqualTo(5));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Alloy), Is.EqualTo(10));
+
+            object refreshed = CreateEvacuationPlan(
+                storage,
+                "warehouse.source",
+                new[] { new ResourceAmount(ResourceIds.Alloy, 4) });
+            Assert.That(ReadPlanBool(refreshed, "CanCommit"), Is.False);
+            Assert.That(InvokePlanAmount(
+                refreshed, "GetShortfall", ResourceIds.Alloy), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void EvacuationPlanCommitsMigrationPayloadAndRemovalExactlyOnce()
+        {
+            var core = new ResourceInventory(1000);
+            var storage = new CityResourceStorageModel(core, 10);
+            storage.TryRegisterWarehouse("warehouse.source");
+            storage.TryRegisterWarehouse("warehouse.target");
+            storage.AddToWarehouse(
+                "warehouse.source", ResourceIds.Iron, 5);
+            object plan = CreateEvacuationPlan(
+                storage,
+                "warehouse.source",
+                new[] { new ResourceAmount(ResourceIds.Alloy, 4) });
+            Assert.That(ReadPlanBool(plan, "CanCommit"), Is.True);
+            ulong revisionBeforeCommit = storage.Revision;
+
+            Assert.That(TryCommitEvacuationPlan(
+                storage, plan, out string firstStatus), Is.True);
+            Assert.That(firstStatus, Is.EqualTo("Completed"));
+            Assert.That(storage.Revision,
+                Is.EqualTo(revisionBeforeCommit + 1),
+                "Migration, payload write, and source removal are one commit.");
+            Assert.That(storage.ContainsWarehouse("warehouse.source"), Is.False);
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Iron), Is.EqualTo(5));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Alloy), Is.EqualTo(4));
+
+            ulong committedRevision = storage.Revision;
+            Assert.That(TryCommitEvacuationPlan(
+                storage, plan, out string secondStatus), Is.False);
+            Assert.That(secondStatus, Is.EqualTo("AlreadyCommitted"));
+            Assert.That(storage.Revision, Is.EqualTo(committedRevision));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Iron), Is.EqualTo(5));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Alloy), Is.EqualTo(4));
+            Assert.That(storage.ContainsWarehouse("warehouse.source"), Is.False);
+        }
+
+        [Test]
+        public void EmptyEvacuationPlanIsInvalidAndCannotAdvanceRevision()
+        {
+            var core = new ResourceInventory(1000);
+            var storage = new CityResourceStorageModel(core, 10);
+            object plan = CreateEvacuationPlan(
+                storage,
+                null,
+                Array.Empty<ResourceAmount>());
+            ulong revisionBefore = storage.Revision;
+
+            Assert.That(ReadPlanBool(plan, "CanCommit"), Is.False);
+            Assert.That(TryCommitEvacuationPlan(
+                storage, plan, out string status), Is.False);
+            Assert.That(status, Is.EqualTo("Invalid"));
+            Assert.That(storage.Revision, Is.EqualTo(revisionBefore));
+        }
+
+        [Test]
+        public void EvacuationCommitSurvivesNotificationFailureAndContinuesObservers()
+        {
+            var core = new ResourceInventory(1000);
+            var storage = new CityResourceStorageModel(core, 10);
+            Assert.That(storage.TryRegisterWarehouse("warehouse.source"),
+                Is.True);
+            Assert.That(storage.TryRegisterWarehouse("warehouse.target"),
+                Is.True);
+            Assert.That(storage.AddToWarehouse(
+                "warehouse.source", ResourceIds.Iron, 5), Is.EqualTo(5));
+            CityResourceEvacuationPlan plan = storage.CreateEvacuationPlan(
+                "warehouse.source",
+                new[] { new ResourceAmount(ResourceIds.Alloy, 4) });
+            Assert.That(plan.CanCommit, Is.True);
+            ulong revisionBeforeCommit = storage.Revision;
+            var observed = new List<RecordedChange>();
+            storage.AttributedChanged += (_, _, _) =>
+                throw new InvalidOperationException("observer failure");
+            storage.AttributedChanged += (resourceId, delta, attribution) =>
+                observed.Add(new RecordedChange(resourceId, delta, attribution));
+
+            bool committed = false;
+            CityResourceEvacuationCommitStatus status =
+                CityResourceEvacuationCommitStatus.Invalid;
+            Assert.DoesNotThrow(() =>
+            {
+                committed = storage.TryCommitEvacuationPlan(plan, out status);
+            });
+
+            Assert.That(committed, Is.True);
+            Assert.That(status,
+                Is.EqualTo(CityResourceEvacuationCommitStatus.Completed));
+            Assert.That(storage.Revision, Is.EqualTo(revisionBeforeCommit + 1));
+            Assert.That(storage.ContainsWarehouse("warehouse.source"), Is.False);
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Iron), Is.EqualTo(5));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Alloy), Is.EqualTo(4));
+            Assert.That(observed, Has.Some.Matches<RecordedChange>(change =>
+                change.ResourceId == ResourceIds.Alloy && change.Delta == 4));
+
+            PropertyInfo diagnostic = typeof(CityResourceStorageModel).GetProperty(
+                "LastNotificationFailure",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(diagnostic, Is.Not.Null,
+                "Observer failures require a readable diagnostic surface.");
+            Assert.That(diagnostic.CanRead, Is.True);
+            Assert.That(diagnostic.CanWrite, Is.False);
+            Assert.That(diagnostic.GetValue(storage), Is.Not.Null);
+
+            ulong committedRevision = storage.Revision;
+            Assert.That(storage.TryCommitEvacuationPlan(
+                plan,
+                out CityResourceEvacuationCommitStatus secondStatus), Is.False);
+            Assert.That(secondStatus,
+                Is.EqualTo(CityResourceEvacuationCommitStatus.AlreadyCommitted));
+            Assert.That(storage.Revision, Is.EqualTo(committedRevision));
+        }
+
+        [Test]
         public void AggregateChangesPublishActualNetworkDeltaAndAttribution()
         {
             ResourceInventory core = new ResourceInventory(1000);
@@ -310,6 +500,105 @@ namespace WasteCity.Tests
             return new CityResourceStorageModel(
                 new ResourceInventory(1000),
                 coreCapacityPerResource: 150);
+        }
+
+        private static Type RequireEvacuationPlanType()
+        {
+            Type type = typeof(CityResourceStorageModel).Assembly.GetType(
+                "WasteCity.Economy.CityResourceEvacuationPlan",
+                false);
+            Assert.That(type, Is.Not.Null,
+                "IDEA-0014 requires an immutable city-resource " +
+                "evacuation preflight plan.");
+            return type;
+        }
+
+        private static object CreateEvacuationPlan(
+            CityResourceStorageModel storage,
+            string sourceWarehouseId,
+            IReadOnlyList<ResourceAmount> additions)
+        {
+            Type planType = RequireEvacuationPlanType();
+            MethodInfo method = typeof(CityResourceStorageModel).GetMethod(
+                "CreateEvacuationPlan",
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                new[]
+                {
+                    typeof(string),
+                    typeof(IReadOnlyList<ResourceAmount>)
+                },
+                null);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method.ReturnType, Is.EqualTo(planType));
+            return method.Invoke(storage, new object[]
+            {
+                sourceWarehouseId,
+                additions
+            });
+        }
+
+        private static bool TryCommitEvacuationPlan(
+            CityResourceStorageModel storage,
+            object plan,
+            out string status)
+        {
+            Type statusType = typeof(CityResourceStorageModel).Assembly.GetType(
+                "WasteCity.Economy.CityResourceEvacuationCommitStatus",
+                false);
+            Assert.That(statusType, Is.Not.Null);
+            MethodInfo method = typeof(CityResourceStorageModel).GetMethod(
+                "TryCommitEvacuationPlan",
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                new[] { plan.GetType(), statusType.MakeByRefType() },
+                null);
+            Assert.That(method, Is.Not.Null);
+            var arguments = new[] { plan, Activator.CreateInstance(statusType) };
+            bool committed = (bool)method.Invoke(storage, arguments);
+            status = arguments[1].ToString();
+            return committed;
+        }
+
+        private static int InvokePlanAmount(
+            object plan,
+            string methodName,
+            string resourceId)
+        {
+            MethodInfo method = plan.GetType().GetMethod(
+                methodName,
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                new[] { typeof(string) },
+                null);
+            Assert.That(method, Is.Not.Null);
+            return (int)method.Invoke(plan, new object[] { resourceId });
+        }
+
+        private static object ReadPlanProperty(object plan, string name)
+        {
+            PropertyInfo property = plan.GetType().GetProperty(
+                name,
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null);
+            Assert.That(property.CanWrite, Is.False,
+                plan.GetType().FullName + "." + name + " must be immutable.");
+            return property.GetValue(plan, null);
+        }
+
+        private static bool ReadPlanBool(object plan, string name)
+        {
+            return (bool)ReadPlanProperty(plan, name);
+        }
+
+        private static int ReadPlanInt(object plan, string name)
+        {
+            return (int)ReadPlanProperty(plan, name);
+        }
+
+        private static ulong ReadPlanUlong(object plan, string name)
+        {
+            return (ulong)ReadPlanProperty(plan, name);
         }
 
         private readonly struct RecordedChange

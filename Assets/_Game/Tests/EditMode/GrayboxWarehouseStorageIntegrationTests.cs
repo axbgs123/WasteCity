@@ -282,8 +282,10 @@ namespace WasteCity.Tests
                 ResourceIds.Alloy), Is.EqualTo(2));
         }
 
-        [Test]
-        public void NonEmptyWarehouseEvacuationRejectsOnlyWhenMigrationCannotFit()
+        [TestCase(BuildingEvacuationTreatment.QuickDismantle)]
+        [TestCase(BuildingEvacuationTreatment.Abandon)]
+        public void NonEmptyWarehouseEvacuationRejectsOnlyWhenMigrationCannotFit(
+            BuildingEvacuationTreatment treatment)
         {
             GrayboxBuildingSession3D session = CreateSession();
             var presentation = new RecordingPresentation();
@@ -304,20 +306,28 @@ namespace WasteCity.Tests
                 warehouse.Placement.Definition.Cost,
                 warehouse.Progress.BaseDuration,
                 1d,
-                BuildingEvacuationTreatment.QuickDismantle);
+                treatment);
 
             Assert.That(session.TryCaptureEvacuationWork(
                 new[] { work }, out string failureReason), Is.True, failureReason);
+            ulong storageRevision = session.CityStorage.Revision;
+            uint catalogRevision = session.CatalogRevision;
+            uint placementRevision = session.PlacementRevision;
+            int gridCount = session.GroundGrid.Count;
             Assert.That(session.TryCommitEvacuation(
                 work,
                 presentation,
                 out _,
                 out failureReason), Is.False);
-            Assert.That(failureReason, Does.Contain("仓库未清空"));
+            Assert.That(failureReason, Does.Contain("容量"));
             Assert.That(session.Instances, Does.Contain(warehouse));
             Assert.That(session.CityStorage.GetWarehouseAmount(
                 warehouse.StableInstanceId,
                 ResourceIds.Alloy), Is.EqualTo(8));
+            Assert.That(session.CityStorage.Revision, Is.EqualTo(storageRevision));
+            Assert.That(session.CatalogRevision, Is.EqualTo(catalogRevision));
+            Assert.That(session.PlacementRevision, Is.EqualTo(placementRevision));
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(gridCount));
         }
 
         [Test]
@@ -402,8 +412,10 @@ namespace WasteCity.Tests
                 costId), Is.EqualTo(work.Refund));
         }
 
-        [Test]
-        public void WarehouseEvacuationPreservesContentsBeforePartialRefund()
+        [TestCase(BuildingEvacuationTreatment.QuickDismantle)]
+        [TestCase(BuildingEvacuationTreatment.FullDismantle)]
+        public void WarehouseEvacuationRejectsCombinedContentsAndRefundAtomically(
+            BuildingEvacuationTreatment treatment)
         {
             GrayboxBuildingSession3D session = CreateSession();
             var presentation = new RecordingPresentation();
@@ -439,27 +451,233 @@ namespace WasteCity.Tests
                 source.Placement.Definition.Cost,
                 source.Progress.BaseDuration,
                 1d,
-                BuildingEvacuationTreatment.QuickDismantle);
+                treatment);
 
             Assert.That(session.TryCaptureEvacuationWork(
                 new[] { work }, out string failureReason), Is.True, failureReason);
+            if (treatment == BuildingEvacuationTreatment.FullDismantle)
+            {
+                Assert.That(session.TryLockEvacuationWork(
+                    new[] { work }, out failureReason), Is.True, failureReason);
+            }
+            ulong storageRevision = session.CityStorage.Revision;
+            uint catalogRevision = session.CatalogRevision;
+            uint placementRevision = session.PlacementRevision;
+            int gridCount = session.GroundGrid.Count;
+            int coreIron = session.Inventory.Get(ResourceIds.Iron);
+            int coreRefund = session.Inventory.Get(
+                source.Placement.Definition.CostId);
+            int targetStone = session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone);
             Assert.That(session.TryCommitEvacuation(
                 work,
                 presentation,
                 out int acceptedRefund,
-                out failureReason), Is.True, failureReason);
+                out failureReason), Is.False);
 
-            Assert.That(acceptedRefund, Is.EqualTo(2));
+            Assert.That(acceptedRefund, Is.Zero);
+            Assert.That(failureReason, Does.Contain("容量"));
             Assert.That(session.CityStorage.ContainsWarehouse(
-                source.StableInstanceId), Is.False);
+                source.StableInstanceId), Is.True);
             Assert.That(session.CityStorage.GetWarehouseAmount(
-                targetId,
+                source.StableInstanceId,
                 ResourceIds.Iron), Is.EqualTo(5));
             Assert.That(session.CityStorage.GetWarehouseAmount(
-                targetId,
-                source.Placement.Definition.CostId), Is.EqualTo(2));
+                targetId, ResourceIds.Iron), Is.Zero);
             Assert.That(session.CityStorage.GetWarehouseFreeSpace(targetId),
-                Is.Zero);
+                Is.EqualTo(7));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone), Is.EqualTo(targetStone));
+            Assert.That(session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(coreIron));
+            Assert.That(session.Inventory.Get(
+                source.Placement.Definition.CostId), Is.EqualTo(coreRefund));
+            Assert.That(session.CityStorage.Revision, Is.EqualTo(storageRevision));
+            Assert.That(session.CatalogRevision, Is.EqualTo(catalogRevision));
+            Assert.That(session.PlacementRevision, Is.EqualTo(placementRevision));
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(gridCount));
+            Assert.That(session.Instances, Does.Contain(source));
+        }
+
+        [Test]
+        public void EvacuationPayloadContentsAndRefundFailAsOneAtomicPreflight()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D source = BeginWarehouse(
+                session,
+                presentation);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+            Assert.That(session.CityStorage.TrySetWarehouseConnected(
+                source.StableInstanceId,
+                connected: true), Is.True);
+            const int sourceContents = 5;
+            Assert.That(session.CityStorage.AddToWarehouse(
+                source.StableInstanceId,
+                ResourceIds.Iron,
+                sourceContents), Is.EqualTo(sourceContents));
+
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                source.StableInstanceId,
+                source.Placement.Definition.Cost,
+                source.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+            Assert.That(work.Refund, Is.GreaterThan(0));
+            var payload = new[]
+            {
+                new ResourceAmount(ResourceIds.Ammunition, 4)
+            };
+            int totalIncoming = sourceContents + work.Refund + payload[0].Amount;
+            int targetFreeSpace = totalIncoming - 1;
+            const string targetId = "building.instance.payload-target";
+            Assert.That(session.CityStorage.TryRegisterWarehouse(
+                targetId,
+                connected: true), Is.True);
+            Assert.That(session.CityStorage.AddToWarehouse(
+                targetId,
+                ResourceIds.Stone,
+                WarehouseStorageState.FormalCapacity - targetFreeSpace),
+                Is.EqualTo(
+                    WarehouseStorageState.FormalCapacity - targetFreeSpace));
+            Assert.That(session.CityStorage.GetWarehouseFreeSpace(targetId),
+                Is.EqualTo(targetFreeSpace));
+            session.Inventory.Set(
+                ResourceIds.Iron,
+                GrayboxBuildingSession3D.ResourceCapacity);
+            session.Inventory.Set(
+                source.Placement.Definition.CostId,
+                GrayboxBuildingSession3D.ResourceCapacity);
+            session.Inventory.Set(
+                ResourceIds.Ammunition,
+                GrayboxBuildingSession3D.ResourceCapacity);
+
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out string failureReason), Is.True, failureReason);
+            ulong storageRevision = session.CityStorage.Revision;
+            uint catalogRevision = session.CatalogRevision;
+            uint placementRevision = session.PlacementRevision;
+            int gridCount = session.GroundGrid.Count;
+            int coreIron = session.Inventory.Get(ResourceIds.Iron);
+            int coreAlloy = session.Inventory.Get(ResourceIds.Alloy);
+            int coreAmmunition = session.Inventory.Get(ResourceIds.Ammunition);
+            int targetStone = session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone);
+            int createCount = presentation.CreateCount;
+            int updateCount = presentation.UpdateCount;
+            int removeCount = presentation.RemoveCount;
+
+            MethodInfo method = typeof(GrayboxBuildingSession3D).GetMethod(
+                "TryCommitEvacuationWithPayload",
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                new[]
+                {
+                    typeof(BuildingEvacuationWork),
+                    typeof(IReadOnlyList<ResourceAmount>),
+                    typeof(IGrayboxBuildingPresentation3D),
+                    typeof(int).MakeByRefType(),
+                    typeof(string).MakeByRefType(),
+                },
+                null);
+            Assert.That(method, Is.Not.Null,
+                "Session evacuation must expose one atomic payload-aware " +
+                "commit entry point for production and defense internals.");
+            var arguments = new object[]
+            {
+                work,
+                payload,
+                presentation,
+                0,
+                null,
+            };
+
+            Assert.That((bool)method.Invoke(session, arguments), Is.False);
+            Assert.That((int)arguments[3], Is.Zero);
+            Assert.That((string)arguments[4], Does.Contain("容量"));
+            Assert.That(session.CityStorage.ContainsWarehouse(
+                source.StableInstanceId), Is.True);
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                source.StableInstanceId,
+                ResourceIds.Iron), Is.EqualTo(sourceContents));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone), Is.EqualTo(targetStone));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Ammunition), Is.Zero);
+            Assert.That(session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(coreIron));
+            Assert.That(session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(coreAlloy));
+            Assert.That(session.Inventory.Get(ResourceIds.Ammunition),
+                Is.EqualTo(coreAmmunition));
+            Assert.That(session.CityStorage.Revision, Is.EqualTo(storageRevision));
+            Assert.That(session.CatalogRevision, Is.EqualTo(catalogRevision));
+            Assert.That(session.PlacementRevision, Is.EqualTo(placementRevision));
+            Assert.That(session.GroundGrid.Count, Is.EqualTo(gridCount));
+            Assert.That(session.Instances, Does.Contain(source));
+            Assert.That(presentation.CreateCount, Is.EqualTo(createCount));
+            Assert.That(presentation.UpdateCount, Is.EqualTo(updateCount));
+            Assert.That(presentation.RemoveCount, Is.EqualTo(removeCount));
+        }
+
+        [Test]
+        public void AbandonDiscardsOrdinaryPayloadButMigratesWarehouseContents()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D source = BeginWarehouse(
+                session,
+                presentation);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+            Assert.That(session.CityStorage.TrySetWarehouseConnected(
+                source.StableInstanceId,
+                connected: true), Is.True);
+            Assert.That(session.CityStorage.AddToWarehouse(
+                source.StableInstanceId,
+                ResourceIds.Iron,
+                5), Is.EqualTo(5));
+            Assert.That(session.CityStorage.AddToNetwork(
+                ResourceIds.Ammunition,
+                7), Is.EqualTo(7));
+            int ammunitionBefore = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Ammunition);
+            var payload = new[]
+            {
+                new ResourceAmount(ResourceIds.Ammunition, 4)
+            };
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                source.StableInstanceId,
+                source.Placement.Definition.Cost,
+                source.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.Abandon);
+            int ironBeforeEvacuation = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Iron);
+
+            Assert.That(session.TryCaptureEvacuationWork(
+                new[] { work }, out string failureReason), Is.True, failureReason);
+            Assert.That(session.TryCommitEvacuationWithPayload(
+                work,
+                payload,
+                presentation,
+                out int acceptedRefund,
+                out failureReason), Is.True, failureReason);
+
+            Assert.That(acceptedRefund, Is.Zero);
+            Assert.That(session.CityStorage.GetNetworkAmount(
+                ResourceIds.Ammunition), Is.EqualTo(ammunitionBefore),
+                "Abandon discards ordinary production/defense payload.");
+            Assert.That(session.CityStorage.GetNetworkAmount(
+                ResourceIds.Iron), Is.EqualTo(ironBeforeEvacuation),
+                "Warehouse contents still migrate through the evacuation plan.");
+            Assert.That(session.CityStorage.ContainsWarehouse(
+                source.StableInstanceId), Is.False);
+            Assert.That(source.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(source.IsPlayerOwned, Is.False);
+            Assert.That(session.Instances, Does.Contain(source));
         }
 
         private GrayboxBuildingSession3D CreateSession()
@@ -553,13 +771,25 @@ namespace WasteCity.Tests
         private sealed class RecordingPresentation :
             IGrayboxBuildingPresentation3D
         {
+            public int CreateCount { get; private set; }
+            public int UpdateCount { get; private set; }
+            public int RemoveCount { get; private set; }
+
             public bool TryCreate(GrayboxBuildingInstance3D instance)
             {
+                CreateCount++;
                 return true;
             }
 
-            public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
-            public void Remove(GrayboxBuildingInstance3D instance) { }
+            public void UpdateInstance(GrayboxBuildingInstance3D instance)
+            {
+                UpdateCount++;
+            }
+
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
+                RemoveCount++;
+            }
         }
     }
 }

@@ -11,6 +11,83 @@ namespace WasteCity.Economy
         InsufficientNetworkSpace,
     }
 
+    public enum CityResourceEvacuationCommitStatus
+    {
+        Completed,
+        StalePlan,
+        AlreadyCommitted,
+        CapacityInsufficient,
+        Invalid,
+    }
+
+    public sealed class CityResourceEvacuationPlan
+    {
+        private readonly IReadOnlyDictionary<string, int> incoming;
+        private readonly IReadOnlyDictionary<string, int> shortfalls;
+
+        internal CityResourceEvacuationPlan(
+            CityResourceStorageModel owner,
+            object preparedStoragePlan,
+            string sourceWarehouseId,
+            ulong preparedRevision,
+            bool isValid,
+            IReadOnlyDictionary<string, int> incoming,
+            IReadOnlyDictionary<string, int> shortfalls)
+        {
+            Owner = owner;
+            PreparedStoragePlan = preparedStoragePlan;
+            SourceWarehouseId = sourceWarehouseId;
+            PreparedRevision = preparedRevision;
+            IsValid = isValid;
+            this.incoming = Copy(incoming);
+            this.shortfalls = Copy(shortfalls);
+            int total = 0;
+            foreach (KeyValuePair<string, int> item in this.shortfalls)
+                total += Math.Max(0, item.Value);
+            TotalShortfall = total;
+        }
+
+        public string SourceWarehouseId { get; }
+        public ulong PreparedRevision { get; }
+        public bool IsValid { get; }
+        public bool CanCommit => IsValid && TotalShortfall == 0;
+        public int TotalShortfall { get; }
+
+        internal CityResourceStorageModel Owner { get; }
+        internal object PreparedStoragePlan { get; }
+        internal bool committed;
+
+        public int GetIncomingAmount(string resourceId)
+        {
+            return Get(incoming, resourceId);
+        }
+
+        public int GetShortfall(string resourceId)
+        {
+            return Get(shortfalls, resourceId);
+        }
+
+        private static IReadOnlyDictionary<string, int> Copy(
+            IReadOnlyDictionary<string, int> source)
+        {
+            var copy = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (source != null)
+                foreach (KeyValuePair<string, int> item in source)
+                    copy.Add(item.Key, item.Value);
+            return new ReadOnlyDictionary<string, int>(copy);
+        }
+
+        private static int Get(
+            IReadOnlyDictionary<string, int> values,
+            string resourceId)
+        {
+            return !string.IsNullOrWhiteSpace(resourceId) &&
+                   values.TryGetValue(resourceId, out int amount)
+                ? amount
+                : 0;
+        }
+    }
+
     public readonly struct CityResourceChangeAttributionScope : IDisposable
     {
         private readonly CityResourceStorageModel owner;
@@ -40,6 +117,7 @@ namespace WasteCity.Economy
         private bool suppressCoreChange;
         private bool disposed;
         private ResourceChangeAttribution changeAttribution;
+        private Exception lastNotificationFailure;
         private readonly int[] networkBefore = new int[ResourceIds.All.Length];
 
         public CityResourceStorageModel(
@@ -60,6 +138,7 @@ namespace WasteCity.Economy
         public ulong Revision { get; private set; }
         public int CoreCapacityPerResource => coreCapacityPerResource;
         public int WarehouseCount => warehouses.Count;
+        public Exception LastNotificationFailure => lastNotificationFailure;
 
         public bool ContainsWarehouse(string stableInstanceId)
         {
@@ -108,24 +187,25 @@ namespace WasteCity.Economy
             string stableInstanceId,
             out WarehouseRemovalStatus status)
         {
-            return TryCreateRemovalPlan(
+            CityResourceEvacuationPlan plan = CreateEvacuationPlan(
                 stableInstanceId,
-                out _,
-                out status);
+                null);
+            status = RemovalStatus(plan);
+            return plan.CanCommit;
         }
 
         public bool TryRemoveWarehouseWithMigration(
             string stableInstanceId,
             out WarehouseRemovalStatus status)
         {
-            if (!TryCreateRemovalPlan(
-                    stableInstanceId,
-                    out StoragePlan plan,
-                    out status))
+            CityResourceEvacuationPlan plan = CreateEvacuationPlan(
+                stableInstanceId,
+                null);
+            if (!TryCommitEvacuationPlan(plan, out _))
             {
+                status = RemovalStatus(plan);
                 return false;
             }
-            Commit(plan, stableInstanceId);
             status = WarehouseRemovalStatus.Completed;
             return true;
         }
@@ -356,6 +436,145 @@ namespace WasteCity.Economy
             return true;
         }
 
+        public CityResourceEvacuationPlan CreateEvacuationPlan(
+            string sourceWarehouseId,
+            IReadOnlyList<ResourceAmount> additions)
+        {
+            bool removesWarehouse = !string.IsNullOrWhiteSpace(
+                sourceWarehouseId);
+            bool valid = TryAggregate(
+                additions,
+                out SortedDictionary<string, int> additionTotals);
+            if (!removesWarehouse && additionTotals.Count == 0)
+                valid = false;
+            StoragePlan storagePlan = CreatePlan();
+            var incoming = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+            var sourceIncoming = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+            var shortfalls = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+
+            if (removesWarehouse)
+            {
+                if (!TryGetWarehouse(
+                        sourceWarehouseId,
+                        out WarehouseStorageState _))
+                {
+                    valid = false;
+                }
+                else
+                {
+                    Dictionary<string, int> sourceAmounts =
+                        storagePlan.Warehouses[sourceWarehouseId];
+                    foreach (string resourceId in ResourceIds.All)
+                    {
+                        int amount = sourceAmounts.TryGetValue(
+                                resourceId,
+                                out int value)
+                            ? Math.Max(0, value)
+                            : 0;
+                        if (amount > 0)
+                        {
+                            sourceIncoming[resourceId] = amount;
+                            incoming[resourceId] = amount;
+                        }
+                    }
+                    sourceAmounts.Clear();
+                }
+            }
+
+            if (valid)
+            {
+                foreach (KeyValuePair<string, int> item in additionTotals)
+                {
+                    incoming.TryGetValue(item.Key, out int before);
+                    long total = (long)before + item.Value;
+                    if (total > int.MaxValue)
+                    {
+                        valid = false;
+                        break;
+                    }
+                    incoming[item.Key] = (int)total;
+                }
+            }
+
+            if (valid)
+            {
+                RouteEvacuationIncoming(
+                    storagePlan,
+                    additionTotals,
+                    sourceWarehouseId,
+                    shortfalls);
+                RouteEvacuationIncoming(
+                    storagePlan,
+                    sourceIncoming,
+                    sourceWarehouseId,
+                    shortfalls);
+            }
+
+            return new CityResourceEvacuationPlan(
+                this,
+                storagePlan,
+                removesWarehouse ? sourceWarehouseId : null,
+                Revision,
+                valid,
+                incoming,
+                shortfalls);
+        }
+
+        private static void RouteEvacuationIncoming(
+            StoragePlan storagePlan,
+            IReadOnlyDictionary<string, int> amounts,
+            string excludedWarehouseId,
+            IDictionary<string, int> shortfalls)
+        {
+            foreach (KeyValuePair<string, int> item in amounts)
+            {
+                int accepted = storagePlan.Add(
+                    item.Key,
+                    item.Value,
+                    excludedWarehouseId);
+                int shortfall = item.Value - accepted;
+                if (shortfall <= 0) continue;
+                shortfalls.TryGetValue(item.Key, out int before);
+                shortfalls[item.Key] = before + shortfall;
+            }
+        }
+
+        public bool TryCommitEvacuationPlan(
+            CityResourceEvacuationPlan plan,
+            out CityResourceEvacuationCommitStatus status)
+        {
+            if (plan == null || !ReferenceEquals(plan.Owner, this) ||
+                !plan.IsValid ||
+                !(plan.PreparedStoragePlan is StoragePlan storagePlan))
+            {
+                status = CityResourceEvacuationCommitStatus.Invalid;
+                return false;
+            }
+            if (plan.committed)
+            {
+                status = CityResourceEvacuationCommitStatus.AlreadyCommitted;
+                return false;
+            }
+            if (plan.PreparedRevision != Revision)
+            {
+                status = CityResourceEvacuationCommitStatus.StalePlan;
+                return false;
+            }
+            if (!plan.CanCommit)
+            {
+                status = CityResourceEvacuationCommitStatus.CapacityInsufficient;
+                return false;
+            }
+
+            Commit(storagePlan, plan.SourceWarehouseId);
+            plan.committed = true;
+            status = CityResourceEvacuationCommitStatus.Completed;
+            return true;
+        }
+
         public CityResourceStorageSnapshot CaptureSnapshot()
         {
             var core = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -423,6 +642,16 @@ namespace WasteCity.Economy
             return Math.Max(0, effectiveCapacity - coreInventory.Get(resourceId));
         }
 
+        private static WarehouseRemovalStatus RemovalStatus(
+            CityResourceEvacuationPlan plan)
+        {
+            return plan == null || !plan.IsValid
+                ? WarehouseRemovalStatus.NotFound
+                : plan.CanCommit
+                    ? WarehouseRemovalStatus.Completed
+                    : WarehouseRemovalStatus.InsufficientNetworkSpace;
+        }
+
         private bool TryGetWarehouse(
             string stableInstanceId,
             out WarehouseStorageState state)
@@ -446,48 +675,6 @@ namespace WasteCity.Economy
                 this,
                 core,
                 warehouseAmounts);
-        }
-
-        private bool TryCreateRemovalPlan(
-            string stableInstanceId,
-            out StoragePlan plan,
-            out WarehouseRemovalStatus status)
-        {
-            plan = null;
-            if (!TryGetWarehouse(
-                    stableInstanceId,
-                    out WarehouseStorageState source))
-            {
-                status = WarehouseRemovalStatus.NotFound;
-                return false;
-            }
-
-            plan = CreatePlan();
-            Dictionary<string, int> sourceAmounts =
-                plan.Warehouses[stableInstanceId];
-            var migration = new Dictionary<string, int>(
-                sourceAmounts,
-                StringComparer.Ordinal);
-            sourceAmounts.Clear();
-            foreach (string resourceId in ResourceIds.All)
-            {
-                int amount = migration.TryGetValue(
-                        resourceId,
-                        out int value)
-                    ? value
-                    : 0;
-                if (amount > 0 && plan.Add(
-                        resourceId,
-                        amount,
-                        stableInstanceId) != amount)
-                {
-                    plan = null;
-                    status = WarehouseRemovalStatus.InsufficientNetworkSpace;
-                    return false;
-                }
-            }
-            status = WarehouseRemovalStatus.Completed;
-            return true;
         }
 
         private void Commit(StoragePlan plan, string removedWarehouseId = null)
@@ -576,7 +763,7 @@ namespace WasteCity.Economy
         {
             if (suppressCoreChange || delta == 0) return;
             AdvanceRevision();
-            AttributedChanged?.Invoke(resourceId, delta, attribution);
+            NotifyAttributedChanged(resourceId, delta, attribution);
         }
 
         private void CaptureNetworkBefore()
@@ -598,10 +785,33 @@ namespace WasteCity.Economy
         private void PublishChange(string resourceId, int delta)
         {
             if (delta != 0)
-                AttributedChanged?.Invoke(
+                NotifyAttributedChanged(
                     resourceId,
                     delta,
                     changeAttribution);
+        }
+
+        private void NotifyAttributedChanged(
+            string resourceId,
+            int delta,
+            ResourceChangeAttribution attribution)
+        {
+            Action<string, int, ResourceChangeAttribution> handlers =
+                AttributedChanged;
+            if (handlers == null) return;
+            Delegate[] subscribers = handlers.GetInvocationList();
+            for (int index = 0; index < subscribers.Length; index++)
+            {
+                try
+                {
+                    ((Action<string, int, ResourceChangeAttribution>)
+                        subscribers[index])(resourceId, delta, attribution);
+                }
+                catch (Exception failure)
+                {
+                    lastNotificationFailure = failure;
+                }
+            }
         }
 
         private void AdvanceRevision()

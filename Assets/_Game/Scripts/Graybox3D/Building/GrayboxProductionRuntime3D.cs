@@ -8,6 +8,51 @@ using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public sealed class GrayboxProductionEvacuationPayload3D
+    {
+        private readonly ReadOnlyCollection<ResourceAmount> input;
+        private readonly ReadOnlyCollection<ResourceAmount> reservedInput;
+        private readonly ReadOnlyCollection<ResourceAmount> output;
+
+        internal GrayboxProductionEvacuationPayload3D(
+            BuildingProductionState sourceState,
+            ResourceAmount[] input,
+            ResourceAmount[] reservedInput,
+            ResourceAmount[] output)
+        {
+            SourceState = sourceState ??
+                throw new ArgumentNullException(nameof(sourceState));
+            StableInstanceId = sourceState.StableInstanceId;
+            DefinitionId = sourceState.Definition.Id;
+            ProgressSeconds = sourceState.ProgressSeconds;
+            HasReservedInputs = sourceState.HasReservedInputs;
+            IsPlayerPaused = sourceState.IsPlayerPaused;
+            BoundResourceNodeId = sourceState.BoundResourceNodeId;
+            BoundNodeX = sourceState.BoundNodeX;
+            BoundNodeY = sourceState.BoundNodeY;
+            this.input = Array.AsReadOnly(
+                input ?? Array.Empty<ResourceAmount>());
+            this.reservedInput = Array.AsReadOnly(
+                reservedInput ?? Array.Empty<ResourceAmount>());
+            this.output = Array.AsReadOnly(
+                output ?? Array.Empty<ResourceAmount>());
+        }
+
+        public string StableInstanceId { get; }
+        public IReadOnlyList<ResourceAmount> Input => input;
+        public IReadOnlyList<ResourceAmount> ReservedInput => reservedInput;
+        public IReadOnlyList<ResourceAmount> Output => output;
+
+        internal BuildingProductionState SourceState { get; }
+        internal string DefinitionId { get; }
+        internal float ProgressSeconds { get; }
+        internal bool HasReservedInputs { get; }
+        internal bool IsPlayerPaused { get; }
+        internal string BoundResourceNodeId { get; }
+        internal int BoundNodeX { get; }
+        internal int BoundNodeY { get; }
+    }
+
     public sealed class GrayboxProductionRuntime3D
     {
         private readonly Dictionary<string, BuildingProductionState> stateById =
@@ -248,6 +293,51 @@ namespace WasteCity.Graybox3D.Building
                 stateById.TryGetValue(stableInstanceId, out state);
         }
 
+        public bool TryCaptureEvacuationPayload(
+            string stableInstanceId,
+            out GrayboxProductionEvacuationPayload3D payload)
+        {
+            payload = null;
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out BuildingProductionState state))
+            {
+                return false;
+            }
+
+            payload = new GrayboxProductionEvacuationPayload3D(
+                state,
+                CaptureInventory(state.Input),
+                CaptureReservedInput(state),
+                CaptureInventory(state.Output));
+            return true;
+        }
+
+        public bool TryFinalizeEvacuationPayload(
+            string stableInstanceId,
+            GrayboxProductionEvacuationPayload3D payload)
+        {
+            if (!PayloadMatches(stableInstanceId, payload, out var state))
+                return false;
+            RemoveState(stableInstanceId, state);
+            return true;
+        }
+
+        public bool TryDiscardEvacuationPayload(string stableInstanceId)
+        {
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out BuildingProductionState state))
+            {
+                return false;
+            }
+
+            RemoveState(stableInstanceId, state);
+            return true;
+        }
+
         public ProductionObservabilitySnapshot CaptureObservability(
             ulong revision,
             WorldMapModel world)
@@ -309,6 +399,112 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             return value;
+        }
+
+        private static ResourceAmount[] CaptureInventory(
+            ResourceInventory inventory)
+        {
+            var values = new List<ResourceAmount>();
+            for (int index = 0; index < ResourceIds.All.Length; index++)
+            {
+                string resourceId = ResourceIds.All[index];
+                int amount = inventory.Get(resourceId);
+                if (amount > 0)
+                    values.Add(new ResourceAmount(resourceId, amount));
+            }
+            return values.ToArray();
+        }
+
+        private static ResourceAmount[] CaptureReservedInput(
+            BuildingProductionState state)
+        {
+            FormalProductionDefinition definition = state.Definition;
+            if (!state.HasReservedInputs ||
+                definition.UsesBoundResourceNode ||
+                string.IsNullOrWhiteSpace(definition.InputResourceId) ||
+                definition.InputAmount <= 0)
+            {
+                return Array.Empty<ResourceAmount>();
+            }
+
+            return new[]
+            {
+                new ResourceAmount(
+                    definition.InputResourceId,
+                    definition.InputAmount),
+            };
+        }
+
+        private bool PayloadMatches(
+            string stableInstanceId,
+            GrayboxProductionEvacuationPayload3D payload,
+            out BuildingProductionState state)
+        {
+            state = null;
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                payload == null ||
+                !string.Equals(
+                    stableInstanceId,
+                    payload.StableInstanceId,
+                    StringComparison.Ordinal) ||
+                !stateById.TryGetValue(stableInstanceId, out state) ||
+                !ReferenceEquals(state, payload.SourceState) ||
+                !string.Equals(
+                    state.Definition.Id,
+                    payload.DefinitionId,
+                    StringComparison.Ordinal) ||
+                state.ProgressSeconds != payload.ProgressSeconds ||
+                state.HasReservedInputs != payload.HasReservedInputs ||
+                state.IsPlayerPaused != payload.IsPlayerPaused ||
+                !string.Equals(
+                    state.BoundResourceNodeId,
+                    payload.BoundResourceNodeId,
+                    StringComparison.Ordinal) ||
+                state.BoundNodeX != payload.BoundNodeX ||
+                state.BoundNodeY != payload.BoundNodeY)
+            {
+                return false;
+            }
+
+            return AmountsEqual(
+                    CaptureInventory(state.Input),
+                    payload.Input) &&
+                AmountsEqual(
+                    CaptureReservedInput(state),
+                    payload.ReservedInput) &&
+                AmountsEqual(
+                    CaptureInventory(state.Output),
+                    payload.Output);
+        }
+
+        private static bool AmountsEqual(
+            IReadOnlyList<ResourceAmount> left,
+            IReadOnlyList<ResourceAmount> right)
+        {
+            if (left == null || right == null || left.Count != right.Count)
+                return false;
+            for (int index = 0; index < left.Count; index++)
+            {
+                if (!string.Equals(
+                        left[index].ResourceId,
+                        right[index].ResourceId,
+                        StringComparison.Ordinal) ||
+                    left[index].Amount != right[index].Amount)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void RemoveState(
+            string stableInstanceId,
+            BuildingProductionState state)
+        {
+            stateById.Remove(stableInstanceId);
+            retainedStateIds.Remove(stableInstanceId);
+            states.Remove(state);
+            runnableStates.Remove(state);
         }
 
         private static void Mix(ref ulong value, bool item)

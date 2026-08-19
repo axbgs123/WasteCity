@@ -634,6 +634,21 @@ namespace WasteCity.Graybox3D.Building
             out int acceptedRefund,
             out string failureReason)
         {
+            return TryCommitEvacuationWithPayload(
+                work,
+                Array.Empty<ResourceAmount>(),
+                presentation,
+                out acceptedRefund,
+                out failureReason);
+        }
+
+        public bool TryCommitEvacuationWithPayload(
+            BuildingEvacuationWork work,
+            IReadOnlyList<ResourceAmount> additionalPayload,
+            IGrayboxBuildingPresentation3D presentation,
+            out int acceptedRefund,
+            out string failureReason)
+        {
             if (presentation == null)
                 throw new ArgumentNullException(nameof(presentation));
             EnsureConfigured();
@@ -674,18 +689,35 @@ namespace WasteCity.Graybox3D.Building
                 failureReason = "撤离项目已锁定";
                 return false;
             }
-            if (!CanReleaseWarehouseStorage(instance))
+            if (!HasExpectedPlacementFootprint(instance))
             {
-                failureReason =
-                    "仓库未清空，且其余联网库存空间不足，请先清空仓库";
+                failureReason = "撤离占格状态无效";
+                return false;
+            }
+
+            CityResourceEvacuationPlan storagePlan =
+                CreateEvacuationStoragePlan(
+                    instance,
+                    work,
+                    additionalPayload);
+            if (storagePlan != null && !storagePlan.CanCommit)
+            {
+                failureReason = storagePlan.IsValid
+                    ? EvacuationCapacityFailure(storagePlan)
+                    : "撤离资源载荷无效";
                 return false;
             }
             if (work.Treatment == BuildingEvacuationTreatment.Abandon)
-                return TryAbandon(instance, presentation, out failureReason);
+                return TryAbandon(
+                    instance,
+                    presentation,
+                    storagePlan,
+                    out failureReason);
             return TryRemoveEvacuatedInstance(
                 instanceIndex,
                 work,
                 presentation,
+                storagePlan,
                 out acceptedRefund,
                 out failureReason);
         }
@@ -814,44 +846,31 @@ namespace WasteCity.Graybox3D.Building
         private bool TryAbandon(
             GrayboxBuildingInstance3D instance,
             IGrayboxBuildingPresentation3D presentation,
+            CityResourceEvacuationPlan storagePlan,
             out string failureReason)
         {
             bool wasCounted = IsCountedCompleted(instance);
-            bool playerOwned = instance.IsPlayerOwned;
-            GrayboxBuildingInstanceState state = instance.State;
-            instance.Abandon();
-            try
+            if (!TryCommitEvacuationStorage(
+                    storagePlan,
+                    out failureReason))
             {
-                presentation.UpdateInstance(instance);
-            }
-            catch (Exception operationFailure)
-            {
-                instance.RestoreEvacuationState(playerOwned, state);
-                try
-                {
-                    presentation.UpdateInstance(instance);
-                }
-                catch (Exception restoreFailure)
-                {
-                    throw new InvalidOperationException(
-                        "Failed to restore presentation after evacuation failure.",
-                        new AggregateException(operationFailure, restoreFailure));
-                }
-                throw;
-            }
-            if (!ReleaseWarehouseStorage(instance))
-            {
-                instance.RestoreEvacuationState(playerOwned, state);
-                presentation.UpdateInstance(instance);
-                failureReason =
-                    "仓库未清空，且其余联网库存空间不足，请先清空仓库";
                 return false;
             }
+
+            instance.Abandon();
             if (wasCounted) AdvanceCatalogRevision();
             AdvancePlacementRevision();
             evacuationSnapshots.Remove(instance.StableInstanceId);
             evacuationWarehouseConnectivity.Remove(instance.StableInstanceId);
             failureReason = string.Empty;
+            try
+            {
+                presentation.UpdateInstance(instance);
+            }
+            catch (Exception)
+            {
+                failureReason = "撤离已提交，但表现需重建";
+            }
             return true;
         }
 
@@ -859,6 +878,7 @@ namespace WasteCity.Graybox3D.Building
             int instanceIndex,
             in BuildingEvacuationWork work,
             IGrayboxBuildingPresentation3D presentation,
+            CityResourceEvacuationPlan storagePlan,
             out int acceptedRefund,
             out string failureReason)
         {
@@ -869,84 +889,60 @@ namespace WasteCity.Graybox3D.Building
             bool wasCounted = IsCountedCompleted(instance);
             acceptedRefund = 0;
             failureReason = string.Empty;
-            try { presentation.Remove(instance); }
-            catch (Exception removeFailure)
+            if (!TryCommitEvacuationStorage(
+                    storagePlan,
+                    out failureReason))
             {
-                Exception restoreFailure = TryRestorePresentation(
-                    presentation,
-                    instance);
-                if (restoreFailure != null)
-                    throw new InvalidOperationException(
-                        "Failed to restore presentation after evacuation failure.",
-                        new AggregateException(removeFailure, restoreFailure));
-                throw;
-            }
-            if (!grid.Remove(instance.Placement))
-            {
-                Exception restoreFailure = TryRestorePresentation(presentation, instance);
-                if (restoreFailure != null)
-                    throw new InvalidOperationException(
-                        "Failed to restore presentation after evacuation grid failure.",
-                        restoreFailure);
-                failureReason = "撤离占格移除失败";
                 return false;
             }
+            if (!grid.Remove(instance.Placement))
+                throw new InvalidOperationException(
+                    "Evacuation grid invariant failed after storage commit.");
 
-            try
-            {
-                if (!ReleaseWarehouseStorage(instance))
-                {
-                    grid.TryRestore(
-                        instance.Placement.Definition,
-                        instance.Placement.X,
-                        instance.Placement.Y,
-                        out _,
-                        instance.Placement.Site,
-                        instance.Placement.Orientation);
-                    Exception restoreFailure = TryRestorePresentation(
-                        presentation,
-                        instance);
-                    if (restoreFailure != null)
-                        throw new InvalidOperationException(
-                            "Failed to restore presentation after warehouse migration failed.",
-                            restoreFailure);
-                    failureReason =
-                        "仓库未清空，且其余联网库存空间不足，请先清空仓库";
-                    return false;
-                }
-                acceptedRefund = CityStorage.AddToNetwork(
-                    instance.Placement.Definition.CostId,
-                    work.Refund);
-                instance.SetEvacuationLocked(false);
-                instances.RemoveAt(instanceIndex);
-                evacuationLocks.Remove(work.StableInstanceId);
-                evacuationSnapshots.Remove(work.StableInstanceId);
-                evacuationWarehouseConnectivity.Remove(work.StableInstanceId);
-            }
-            catch
-            {
-                if (acceptedRefund > 0)
-                {
-                    CityStorage.TrySpendFromNetwork(
-                        instance.Placement.Definition.CostId,
-                        acceptedRefund);
-                }
-                grid.TryRestore(
-                    instance.Placement.Definition,
-                    instance.Placement.X,
-                    instance.Placement.Y,
-                    out _,
-                    instance.Placement.Site,
-                    instance.Placement.Orientation);
-                Exception restoreFailure = TryRestorePresentation(presentation, instance);
-                if (restoreFailure != null)
-                    throw new InvalidOperationException(
-                        "Failed to restore presentation after evacuation failure.",
-                        restoreFailure);
-                throw;
-            }
+            acceptedRefund = work.Refund;
+            instance.SetEvacuationLocked(false);
+            instances.RemoveAt(instanceIndex);
+            evacuationLocks.Remove(work.StableInstanceId);
+            evacuationSnapshots.Remove(work.StableInstanceId);
+            evacuationWarehouseConnectivity.Remove(work.StableInstanceId);
             if (wasCounted) AdvanceCatalogRevision();
             AdvancePlacementRevision();
+            try
+            {
+                presentation.Remove(instance);
+            }
+            catch (Exception)
+            {
+                failureReason = "撤离已提交，但表现需重建";
+            }
+            return true;
+        }
+
+        private bool HasExpectedPlacementFootprint(
+            GrayboxBuildingInstance3D instance)
+        {
+            if (instance?.Placement?.Definition == null) return false;
+            BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
+                ? InnerGrid
+                : GroundGrid;
+            int width = BuildingOrientationRules.Width(
+                instance.Placement.Definition,
+                instance.Placement.Orientation);
+            int height = BuildingOrientationRules.Height(
+                instance.Placement.Definition,
+                instance.Placement.Orientation);
+            for (var offsetX = 0; offsetX < width; offsetX++)
+            {
+                for (var offsetY = 0; offsetY < height; offsetY++)
+                {
+                    if (!grid.IsOccupied(
+                            instance.Placement.X + offsetX,
+                            instance.Placement.Y + offsetY))
+                    {
+                        return false;
+                    }
+                }
+            }
             return true;
         }
 
@@ -974,30 +970,63 @@ namespace WasteCity.Graybox3D.Building
                 connected: false);
         }
 
-        private bool CanReleaseWarehouseStorage(
-            GrayboxBuildingInstance3D instance)
+        private CityResourceEvacuationPlan CreateEvacuationStoragePlan(
+            GrayboxBuildingInstance3D instance,
+            in BuildingEvacuationWork work,
+            IReadOnlyList<ResourceAmount> additionalPayload)
         {
-            return !IsWarehouse(instance) ||
-                CityStorage == null ||
-                !CityStorage.TryGetWarehouseSnapshot(
-                    instance.StableInstanceId,
-                    out _) ||
-                CityStorage.CanRemoveWarehouseWithMigration(
-                    instance.StableInstanceId,
-                    out _);
+            bool removesWarehouse = IsWarehouse(instance) &&
+                CityStorage.ContainsWarehouse(instance.StableInstanceId);
+            bool includesRefund =
+                work.Treatment != BuildingEvacuationTreatment.Abandon &&
+                work.Refund > 0;
+            int payloadCount = work.Treatment ==
+                BuildingEvacuationTreatment.Abandon
+                    ? 0
+                    : additionalPayload?.Count ?? 0;
+            if (!removesWarehouse && !includesRefund && payloadCount == 0)
+                return null;
+
+            var additions = new List<ResourceAmount>(
+                payloadCount + (includesRefund ? 1 : 0));
+            for (int index = 0; index < payloadCount; index++)
+                additions.Add(additionalPayload[index]);
+            if (includesRefund)
+            {
+                additions.Add(new ResourceAmount(
+                    instance.Placement.Definition.CostId,
+                    work.Refund));
+            }
+            return CityStorage.CreateEvacuationPlan(
+                removesWarehouse ? instance.StableInstanceId : null,
+                additions);
         }
 
-        private bool ReleaseWarehouseStorage(
-            GrayboxBuildingInstance3D instance)
+        private bool TryCommitEvacuationStorage(
+            CityResourceEvacuationPlan plan,
+            out string failureReason)
         {
-            return !IsWarehouse(instance) ||
-                CityStorage == null ||
-                !CityStorage.TryGetWarehouseSnapshot(
-                    instance.StableInstanceId,
-                    out _) ||
-                CityStorage.TryRemoveWarehouseWithMigration(
-                    instance.StableInstanceId,
-                    out _);
+            failureReason = string.Empty;
+            if (plan == null) return true;
+            if (CityStorage.TryCommitEvacuationPlan(
+                    plan,
+                    out CityResourceEvacuationCommitStatus status))
+            {
+                return true;
+            }
+
+            failureReason = status ==
+                CityResourceEvacuationCommitStatus.CapacityInsufficient
+                    ? EvacuationCapacityFailure(plan)
+                    : "撤离仓储计划失效：" + status;
+            return false;
+        }
+
+        private static string EvacuationCapacityFailure(
+            CityResourceEvacuationPlan plan)
+        {
+            int total = plan?.TotalShortfall ?? 0;
+            return "城市仓储容量不足，还缺 " + total + " 格";
         }
 
         private static bool IsWarehouse(

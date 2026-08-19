@@ -35,6 +35,23 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxDefenseTowerStatus3D Status { get; internal set; }
     }
 
+    public sealed class GrayboxDefenseEvacuationPayload3D
+    {
+        internal GrayboxDefenseEvacuationPayload3D(
+            GrayboxDefenseTowerRuntimeState3D sourceState)
+        {
+            SourceState = sourceState ??
+                throw new ArgumentNullException(nameof(sourceState));
+            StableInstanceId = sourceState.StableId;
+            AmmunitionAmount = sourceState.Combat.Ammo;
+        }
+
+        public string StableInstanceId { get; }
+        public int AmmunitionAmount { get; }
+
+        internal GrayboxDefenseTowerRuntimeState3D SourceState { get; }
+    }
+
     public sealed class GrayboxDefenseTowerSnapshot3D
     {
         public GrayboxDefenseTowerSnapshot3D(
@@ -416,6 +433,60 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryCaptureEvacuationPayload(
+            string stableInstanceId,
+            out GrayboxDefenseEvacuationPayload3D payload)
+        {
+            payload = null;
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out GrayboxDefenseTowerRuntimeState3D state))
+            {
+                return false;
+            }
+
+            payload = new GrayboxDefenseEvacuationPayload3D(state);
+            return true;
+        }
+
+        public bool TryFinalizeEvacuationPayload(
+            string stableInstanceId,
+            GrayboxDefenseEvacuationPayload3D payload)
+        {
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                payload == null ||
+                !string.Equals(
+                    stableInstanceId,
+                    payload.StableInstanceId,
+                    StringComparison.Ordinal) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out GrayboxDefenseTowerRuntimeState3D state) ||
+                !ReferenceEquals(state, payload.SourceState) ||
+                state.Combat.Ammo != payload.AmmunitionAmount)
+            {
+                return false;
+            }
+
+            RemoveTowerState(stableInstanceId, state);
+            return true;
+        }
+
+        public bool TryDiscardEvacuationPayload(string stableInstanceId)
+        {
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out GrayboxDefenseTowerRuntimeState3D state))
+            {
+                return false;
+            }
+
+            RemoveTowerState(stableInstanceId, state);
+            return true;
+        }
+
         private void TickTower(
             GrayboxDefenseTowerRuntimeState3D state,
             CityResourceStorageModel cityStorage)
@@ -506,6 +577,17 @@ namespace WasteCity.Graybox3D.Building
                 tutorial.Core.CurrentHealth,
                 Array.AsReadOnly(towerSnapshots),
                 Array.AsReadOnly(enemySnapshots));
+        }
+
+        private void RemoveTowerState(
+            string stableInstanceId,
+            GrayboxDefenseTowerRuntimeState3D state)
+        {
+            stateById.Remove(stableInstanceId);
+            retainedIds.Remove(stableInstanceId);
+            runnableIds.Remove(stableInstanceId);
+            towers.Remove(state);
+            snapshotDirty = true;
         }
 
         private static bool IsMachineGunTurret(

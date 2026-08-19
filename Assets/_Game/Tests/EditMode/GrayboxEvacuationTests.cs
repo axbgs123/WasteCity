@@ -613,7 +613,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Controller_CancellationBlockTracksManifestFailureAndCompletion()
+        public void Controller_CancellationBlockReleasesAfterCommittedPresentationFailure()
         {
             EvacuationFixture fixture = CreateFixture(configureMenu: true);
             GrayboxBuildingInstance3D ground = Begin(
@@ -637,22 +637,14 @@ namespace WasteCity.Tests
                 fixture.Controller,
                 new FailingPresentation { ThrowRemove = true });
 
-            Assert.Throws<InvalidOperationException>(() =>
-                fixture.Controller.Tick(20f, false));
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
 
-            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
-            Assert.That(fixture.Controller.IsProcessing, Is.False);
-            AssertConstructionButtons(constructionButtons, false);
-            Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.True);
-            SetEvacuationPresentation(
-                fixture.Controller,
-                fixture.Presentation);
-            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
-            fixture.Controller.Tick(20f, false);
+            Assert.That(fixture.Session.Instances.Contains(ground), Is.False);
             Assert.That(fixture.Controller.IsManifestOpen, Is.False);
             Assert.That(fixture.Controller.IsProcessing, Is.False);
             AssertConstructionButtons(constructionButtons, true);
             Assert.That(fixture.Menu.ConstructionCancellationBlocked, Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
         }
 
         [TestCase("Configure")]
@@ -819,22 +811,60 @@ namespace WasteCity.Tests
                 Is.EqualTo(revisionBeforeConfirmation + 2));
             Assert.That(first.IsEvacuationLocked, Is.True);
             Assert.That(second.IsEvacuationLocked, Is.True);
-            SetEvacuationPresentation(
-                fixture.Controller,
-                new FailingPresentation { ThrowRemove = true });
+            BuildingEvacuationWork firstWork = fixture.Controller.Work.Single(
+                item => item.StableInstanceId == first.StableInstanceId);
+            BuildingEvacuationWork secondWork = fixture.Controller.Work.Single(
+                item => item.StableInstanceId == second.StableInstanceId);
+            int stoneBeforeCommit = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            ulong storageRevisionBefore = fixture.Session.CityStorage.Revision;
+            var presentation = new FailingPresentation { ThrowRemove = true };
+            SetEvacuationPresentation(fixture.Controller, presentation);
 
-            Assert.Throws<InvalidOperationException>(() =>
-                fixture.Controller.Tick(20f, false));
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
+
+            ulong storageRevisionAfterFirst =
+                fixture.Session.CityStorage.Revision;
+            Assert.That(fixture.Controller.IsProcessing, Is.True);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(fixture.Session.Instances.Contains(first), Is.False);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(10, 10), Is.False);
+            Assert.That(first.IsEvacuationLocked, Is.False);
+            AssertEvacuationWorkConsumed(
+                fixture.Session,
+                first.StableInstanceId);
+            Assert.That(fixture.Session.Instances.Contains(second), Is.True);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(12, 10), Is.True);
+            Assert.That(second.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId),
+                Is.EqualTo(stoneBeforeCommit + firstWork.Refund));
+            Assert.That(storageRevisionAfterFirst,
+                Is.GreaterThan(storageRevisionBefore));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(presentation.CreateCalls, Is.Zero);
+
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
 
             Assert.That(fixture.Controller.IsProcessing, Is.False);
-            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
-            Assert.That(first.IsEvacuationLocked, Is.False);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(fixture.Session.Instances.Contains(second), Is.False);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(12, 10), Is.False);
             Assert.That(second.IsEvacuationLocked, Is.False);
+            AssertEvacuationWorkConsumed(
+                fixture.Session,
+                second.StableInstanceId);
             Assert.That(fixture.Session.CompletedBuildingCount(
-                BuildingCatalog.Wall.Id.Value), Is.EqualTo(2));
-            Assert.That(fixture.Session.CatalogRevision,
-                Is.EqualTo(revisionBeforeConfirmation + 4));
-            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Fortress));
+                BuildingCatalog.Wall.Id.Value), Is.Zero);
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId),
+                Is.EqualTo(
+                    stoneBeforeCommit + firstWork.Refund + secondWork.Refund));
+            Assert.That(fixture.Session.CityStorage.Revision,
+                Is.GreaterThan(storageRevisionAfterFirst));
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(presentation.RemoveCalls, Is.EqualTo(2));
+            Assert.That(presentation.CreateCalls, Is.Zero);
         }
 
         [Test]
@@ -854,6 +884,13 @@ namespace WasteCity.Tests
             Assert.That(fixture.Controller.AssignAll(
                 BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
             Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+            BuildingEvacuationWork firstWork = fixture.Controller.Work.Single(
+                item => item.StableInstanceId == first.StableInstanceId);
+            BuildingEvacuationWork secondWork = fixture.Controller.Work.Single(
+                item => item.StableInstanceId == second.StableInstanceId);
+            int stoneBeforeCommit = fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            ulong storageRevisionBefore = fixture.Session.CityStorage.Revision;
             var presentation = new FailingPresentation
             {
                 ThrowRemove = true,
@@ -861,20 +898,48 @@ namespace WasteCity.Tests
             };
             SetEvacuationPresentation(fixture.Controller, presentation);
 
-            InvalidOperationException thrown =
-                Assert.Throws<InvalidOperationException>(() =>
-                    fixture.Controller.Tick(20f, false));
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
 
-            Assert.That(thrown.Message, Does.Contain("restore presentation"));
-            var compound = thrown.InnerException as AggregateException;
-            Assert.That(compound, Is.Not.Null);
-            Assert.That(compound.InnerExceptions,
-                Does.Contain(presentation.RemoveFailure));
-            Assert.That(compound.InnerExceptions,
-                Does.Contain(presentation.CreateFailure));
+            ulong storageRevisionAfterFirst =
+                fixture.Session.CityStorage.Revision;
             Assert.That(first.IsEvacuationLocked, Is.False);
+            Assert.That(fixture.Session.Instances.Contains(first), Is.False);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(10, 10), Is.False);
+            AssertEvacuationWorkConsumed(
+                fixture.Session,
+                first.StableInstanceId);
+            Assert.That(second.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Session.Instances.Contains(second), Is.True);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(12, 10), Is.True);
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId),
+                Is.EqualTo(stoneBeforeCommit + firstWork.Refund));
+            Assert.That(storageRevisionAfterFirst,
+                Is.GreaterThan(storageRevisionBefore));
+            Assert.That(fixture.Controller.IsProcessing, Is.True);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(presentation.CreateCalls, Is.Zero,
+                "Committed domain state must not call presentation.Create as rollback.");
+
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
+
             Assert.That(second.IsEvacuationLocked, Is.False);
-            Assert.That(fixture.Controller.IsManifestOpen, Is.True);
+            Assert.That(fixture.Session.Instances.Contains(second), Is.False);
+            Assert.That(fixture.Session.GroundGrid.IsOccupied(12, 10), Is.False);
+            AssertEvacuationWorkConsumed(
+                fixture.Session,
+                second.StableInstanceId);
+            Assert.That(fixture.Session.Inventory.Get(
+                BuildingCatalog.Wall.CostId),
+                Is.EqualTo(
+                    stoneBeforeCommit + firstWork.Refund + secondWork.Refund));
+            Assert.That(fixture.Session.CityStorage.Revision,
+                Is.GreaterThan(storageRevisionAfterFirst));
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+            Assert.That(fixture.Controller.IsManifestOpen, Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(presentation.RemoveCalls, Is.EqualTo(2));
+            Assert.That(presentation.CreateCalls, Is.Zero);
         }
 
         [Test]
@@ -930,7 +995,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Menu_UpdateRestoresDependentCardAfterControllerFailureCleanup()
+        public void Menu_UpdateKeepsDependentCardLockedAfterCommittedPresentationFailure()
         {
             EvacuationFixture fixture = CreateFixture(configureMenu: true);
             fixture.Session.UnlockResearchForDevelopment(
@@ -965,14 +1030,14 @@ namespace WasteCity.Tests
                 fixture.Controller,
                 new FailingPresentation { ThrowRemove = true });
 
-            Assert.Throws<InvalidOperationException>(() =>
-                fixture.Controller.Tick(20f, false));
+            Assert.DoesNotThrow(() => fixture.Controller.Tick(20f, false));
             InvokeMenuUpdate(fixture.Menu);
 
+            Assert.That(fixture.Session.Instances.Contains(smelter), Is.False);
             Assert.That(FindButton(
                 fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
-                Is.True);
+                Is.False);
         }
 
         [Test]
@@ -1007,7 +1072,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Session_PresentationFailureRetainsMutationUntilFailureCleanup()
+        public void Session_PresentationFailureKeepsCommittedEvacuation()
         {
             GrayboxBuildingSession3D session = CreateSession();
             var presentation = new FailingPresentation { ThrowRemove = true };
@@ -1020,14 +1085,26 @@ namespace WasteCity.Tests
                 BuildingEvacuationTreatment.QuickDismantle);
             Assert.That(session.TryCaptureEvacuationWork(new[] { work }, out _),
                 Is.True);
+            int stoneBeforeCommit = session.Inventory.Get(
+                BuildingCatalog.Wall.CostId);
+            bool committed = false;
+            int acceptedRefund = -1;
+            string failureReason = null;
 
-            Assert.Throws<InvalidOperationException>(() => session.TryCommitEvacuation(
-                work, presentation, out _, out _));
-            Assert.That(session.Instances.Contains(wall), Is.True);
-            session.RollbackEvacuationLocksAfterFailure(new[] { work });
-            Assert.That(session.TryCommitEvacuation(
-                work, presentation, out _, out string failure), Is.False);
-            Assert.That(failure, Is.Not.Empty);
+            Assert.DoesNotThrow(() => committed = session.TryCommitEvacuation(
+                work,
+                presentation,
+                out acceptedRefund,
+                out failureReason));
+
+            Assert.That(committed, Is.True);
+            Assert.That(acceptedRefund, Is.EqualTo(work.Refund));
+            Assert.That(failureReason,
+                Is.EqualTo("撤离已提交，但表现需重建"));
+            Assert.That(session.Inventory.Get(BuildingCatalog.Wall.CostId),
+                Is.EqualTo(stoneBeforeCommit + work.Refund));
+            Assert.That(session.Instances.Contains(wall), Is.False);
+            Assert.That(session.GroundGrid.IsOccupied(10, 10), Is.False);
         }
 
         private GrayboxBuildingSession3D CreateSession()
@@ -1497,18 +1574,22 @@ namespace WasteCity.Tests
         {
             public bool ThrowRemove { get; set; }
             public bool ThrowCreate { get; set; }
+            public int RemoveCalls { get; private set; }
+            public int CreateCalls { get; private set; }
             public InvalidOperationException RemoveFailure { get; } =
                 new InvalidOperationException("remove");
             public InvalidOperationException CreateFailure { get; } =
                 new InvalidOperationException("create");
             public bool TryCreate(GrayboxBuildingInstance3D instance)
             {
+                CreateCalls++;
                 if (ThrowCreate) throw CreateFailure;
                 return true;
             }
             public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
             public void Remove(GrayboxBuildingInstance3D instance)
             {
+                RemoveCalls++;
                 if (ThrowRemove) throw RemoveFailure;
             }
         }
