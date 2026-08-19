@@ -301,7 +301,7 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
-        public IEnumerator IDEA0007_ManifestEscapeCancelsButProcessingConsumes()
+        public IEnumerator IDEA0007_IDEA0014_ManifestEscapeCancelsButProcessingOpensSystemPause()
         {
             GrayboxBuildingSession3D session =
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();
@@ -325,7 +325,9 @@ namespace WasteCity.Tests
                 session,
                 city,
                 presentation);
-            modifier.AddResource(BuildingCatalog.Housing.CostId, 1000);
+            Assert.That(
+                modifier.SetResource(BuildingCatalog.Housing.CostId, 100),
+                Is.True);
             modifier.SetConstructionSpeed(
                 DevelopmentConstructionSpeed.Fast100);
             Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
@@ -340,6 +342,8 @@ namespace WasteCity.Tests
                 yield return null;
             Assert.That(ground.State,
                 Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True);
 
             yield return TapKey(Key.F);
             Assert.That(evacuation.IsManifestOpen, Is.True);
@@ -351,19 +355,37 @@ namespace WasteCity.Tests
             yield return ClickButton(
                 "Evacuation.Item." + ground.StableInstanceId +
                 ".FullDismantle");
+            EvacuationManifestViewModel manifestView =
+                evacuation.CaptureManifestView();
+            Assert.That(
+                manifestView.Items.Single().Treatment,
+                Is.EqualTo(BuildingEvacuationTreatment.FullDismantle));
+            Assert.That(
+                manifestView.CanConfirm,
+                Is.True,
+                manifestView.FailureReason);
+            Assert.That(
+                FindButton("Evacuation.Confirm").interactable,
+                Is.True);
             yield return ClickButton("Evacuation.Confirm");
             Assert.That(evacuation.IsProcessing, Is.True);
             yield return TapKey(Key.Escape);
             Assert.That(evacuation.IsProcessing, Is.True);
-            Assert.That(menu.IsOpen, Is.False);
-            Assert.That(ground.IsEvacuationLocked, Is.True);
-
-            menu.Open();
+            Assert.That(menu.IsOpen, Is.True);
             Assert.That(Time.timeScale, Is.Zero);
+            Assert.That(ground.IsEvacuationLocked, Is.True);
+            EvacuationQueueViewModel pausedQueue =
+                evacuation.CaptureQueueView();
+            Assert.That(pausedQueue.IsPaused, Is.True);
+            float remainingBeforePause = pausedQueue.RemainingActualSeconds;
+
             for (var frame = 0; frame < 10; frame++)
                 yield return null;
             Assert.That(evacuation.IsProcessing, Is.True);
             Assert.That(session.Instances.Contains(ground), Is.True);
+            Assert.That(
+                evacuation.CaptureQueueView().RemainingActualSeconds,
+                Is.EqualTo(remainingBeforePause).Within(.0001f));
             menu.Close();
         }
 
