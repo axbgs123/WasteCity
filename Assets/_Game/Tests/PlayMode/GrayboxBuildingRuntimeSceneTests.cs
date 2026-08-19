@@ -789,6 +789,75 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator LockedCatalogCard_RealPointerShowsPrimaryReasonAndRemainsUsable()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInteractionModel3D>();
+            Assert.That(session, Is.Not.Null);
+            Assert.That(interaction, Is.Not.Null);
+            Assert.That(session.Population, Is.EqualTo(100));
+
+            GrayboxBuildingCatalogItem3D item =
+                new GrayboxBuildingCatalogPresenter3D().Describe(
+                    session,
+                    BuildingCatalog.Smelter);
+            Assert.That(item.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(item.PrimaryLockReason, Is.Not.Null.And.Not.Empty);
+
+            yield return TapKey(Key.B);
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+            yield return ClickButton("Category.Production");
+
+            Button card = FindButton(
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
+            Assert.That(card, Is.Not.Null);
+            Assert.That(card.gameObject.activeInHierarchy, Is.True);
+            Assert.That(card.interactable, Is.True);
+            yield return ClickButton(card.name);
+
+            Transform status = FindTransform("Placement.Status");
+            Text statusText = FindTransform("Placement.Status.Text")
+                .GetComponent<Text>();
+            Assert.That(status.gameObject.activeInHierarchy, Is.True);
+            Assert.That(statusText, Is.Not.Null);
+            Assert.That(statusText.text, Does.Contain(item.Definition.Name));
+            Assert.That(statusText.text,
+                Does.Contain(item.PrimaryLockReason));
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+            Assert.That(interaction.Selected, Is.Null);
+
+            yield return TapKey(Key.Escape);
+            if (interaction.State ==
+                GrayboxBuildingInteractionState.CatalogOpen)
+                yield return TapKey(Key.Escape);
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+            Assert.That(status.gameObject.activeInHierarchy, Is.False);
+            Assert.That(statusText.text, Is.Empty);
+
+            yield return TapKey(Key.B);
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+            yield return ClickButton("Category.Basic");
+            Button housing = FindButton(
+                "Catalog.Card." + BuildingCatalog.Housing.Id.Value);
+            Assert.That(housing, Is.Not.Null);
+            Assert.That(housing.gameObject.activeInHierarchy, Is.True);
+            Assert.That(housing.interactable, Is.True);
+            yield return ClickButton(housing.name);
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Previewing));
+            Assert.That(interaction.Selected,
+                Is.SameAs(BuildingCatalog.Housing));
+        }
+
+        [UnityTest]
         public IEnumerator FocusedSearch_OwnsKeyboardThenZeroTogglesExactlyOnce()
         {
             GrayboxBuildingInteractionModel3D interaction =

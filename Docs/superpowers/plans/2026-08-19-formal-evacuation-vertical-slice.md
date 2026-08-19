@@ -304,6 +304,8 @@ EditMode 锁定输入优先级：`F` 继续是唯一展开/收起键；转换中
 
 夹具只允许在首次玩法输入前提供确定性初始资源、将测试会话人口确定性设为 `200`，以及设置规则时间加速。人口 `200` 只用于跨越研究站既有最低人口门槛；不得改变正式默认人口/上限 `100/150`、研究站门槛或人口生产力语义。仍不得直接解锁研究、直接完成建筑、直接注入产物或弹药、直接杀敌、直接切换城市模式，或直接调用撤离入口/提交。
 
+> **BUG-0007 superseded（2026-08-19）：** 上述“夹具人口 `200`”及“不得改变研究站门槛”是本计划初稿约束，现由 `BUG-0007` 取代。当前执行必须保持正式人口 `100`、不得调用开发人口修改，并采用首轮研究站人口门槛 `0`；冻结 2D 不接新 UI 或新功能，但共享稳定 `BuildingCatalog` 的研究站解锁配置同步修正并只做回归。schema 仍为 `30`。
+
 ```bash
 "$WASTECITY_UNITY_BIN" -batchmode -projectPath "$WASTECITY_PROJECT_ROOT" -runTests -testPlatform PlayMode -testFilter WasteCity.Tests.GrayboxFormalEvacuationVerticalSliceTests -testResults "$WASTECITY_EVIDENCE_ROOT/task-08-red.xml" -logFile "$WASTECITY_EVIDENCE_ROOT/task-08-red.log"
 ```

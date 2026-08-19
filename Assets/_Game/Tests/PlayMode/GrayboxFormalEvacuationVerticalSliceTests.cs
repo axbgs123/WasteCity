@@ -79,9 +79,9 @@ namespace WasteCity.Tests
                 city,
                 presentation);
 
-            // IDEA-0014 Task 8 authorization: one population adjustment and
-            // exact raw starting resources before the first gameplay input.
-            Assert.That(fixture.SetPopulation(200), Is.True);
+            // IDEA-0014 Task 8 authorization: exact raw starting resources
+            // before the first gameplay input. Population remains the formal
+            // natural-opening value and is not adjusted by the fixture.
             for (var index = 0; index < ResourceIds.All.Length; index++)
                 Assert.That(
                     fixture.SetResource(ResourceIds.All[index], 0),
@@ -93,7 +93,8 @@ namespace WasteCity.Tests
             Assert.That(fixture.SetResource(ResourceIds.Stone, 12), Is.True);
             Assert.That(fixture.SetResource(ResourceIds.Ammunition, 0), Is.True);
 
-            Assert.That(session.Population, Is.EqualTo(200));
+            Assert.That(session.Population, Is.EqualTo(100));
+            Assert.That(session.PopulationCapacity, Is.EqualTo(150));
             Assert.That(session.Inventory.Get(ResourceIds.Iron), Is.EqualTo(16));
             Assert.That(session.Inventory.Get(ResourceIds.Alloy), Is.EqualTo(48));
             Assert.That(session.Inventory.Get(ResourceIds.Biomass), Is.EqualTo(10));

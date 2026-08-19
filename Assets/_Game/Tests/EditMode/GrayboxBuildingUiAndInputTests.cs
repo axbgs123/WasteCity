@@ -2385,7 +2385,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Menu_LockedCardsAreDisabledAndExposePrimaryAndAllReasons()
+        public void Menu_LockedCardsAcceptFeedbackClicksAndExposeAllReasons()
         {
             UiFixture fixture = CreateMenuFixture();
             fixture.Interaction.ToggleCatalog();
@@ -2396,7 +2396,7 @@ namespace WasteCity.Tests
                 "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
             Assert.That(card, Is.Not.Null);
             Button button = card.GetComponent<Button>();
-            Assert.That(button.interactable, Is.False);
+            Assert.That(button.interactable, Is.True);
 
             GrayboxBuildingCatalogItem3D item =
                 new GrayboxBuildingCatalogPresenter3D().Describe(
@@ -2408,6 +2408,105 @@ namespace WasteCity.Tests
                 Assert.That(text, Does.Contain(reason));
             Assert.That(text, Does.Contain(
                 BuildingCatalog.Smelter.Cost.ToString()));
+        }
+
+        [Test]
+        public void Menu_LockedCatalogCardClickShowsStructuredPrimaryReason()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            GrayboxBuildingCatalogItem3D item =
+                new GrayboxBuildingCatalogPresenter3D().Describe(
+                    fixture.Session,
+                    BuildingCatalog.Smelter);
+            Button card = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
+
+            Assert.That(item.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(card, Is.Not.Null);
+            Assert.That(card.interactable, Is.True,
+                "Visible locked catalog cards must accept clicks for rejection feedback.");
+
+            card.onClick.Invoke();
+
+            Transform status = FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            Text statusText = FindComponent<Text>(
+                status,
+                "Placement.Status.Text");
+            Assert.That(fixture.Interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            Assert.That(statusText.text, Does.Contain(item.Definition.Name));
+            Assert.That(statusText.text, Does.Contain(item.PrimaryLockReason));
+        }
+
+        [Test]
+        public void Menu_StaleSelectionFailureYieldsToDeploymentAndClearsAfterStateExit()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Button card = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
+            Transform status = FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            Text statusText = FindComponent<Text>(
+                status,
+                "Placement.Status.Text");
+
+            card.onClick.Invoke();
+            fixture.Interaction.CloseCatalog();
+            fixture.Menu.ShowDeploymentFailure(
+                "展开失败：地面不稳定或有大型废墟");
+
+            Assert.That(fixture.Interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            Assert.That(statusText.text,
+                Is.EqualTo("展开失败：地面不稳定或有大型废墟"));
+
+            InvokeLifecycle(fixture.Menu, "Update");
+            fixture.Menu.ClearDeploymentFailure();
+
+            Assert.That(status.gameObject.activeSelf, Is.False);
+            Assert.That(statusText.text, Is.Empty);
+        }
+
+        [Test]
+        public void Menu_CatalogRevisionClearsObsoleteSelectionFailure()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            fixture.Interaction.ToggleCatalog();
+            fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Button card = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
+            Transform status = FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            Text statusText = FindComponent<Text>(
+                status,
+                "Placement.Status.Text");
+
+            card.onClick.Invoke();
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            fixture.Session.UnlockResearchForDevelopment(
+                BuildingCatalog.Smelter.RequiredResearchId);
+            InvokeLifecycle(fixture.Menu, "Update");
+
+            Assert.That(new GrayboxBuildingCatalogPresenter3D().Describe(
+                    fixture.Session,
+                    BuildingCatalog.Smelter).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+            Assert.That(status.gameObject.activeSelf, Is.False);
+            Assert.That(statusText.text, Is.Empty);
         }
 
         [Test]
@@ -2444,6 +2543,56 @@ namespace WasteCity.Tests
             Assert.That(fixture.Interaction.Selected, Is.SameAs(
                 BuildingCatalog.Housing));
             Assert.That(fixture.Menu.CatalogVisible, Is.False);
+        }
+
+        [Test]
+        public void Menu_LockedQuickbarButtonRemainsInteractiveForFeedback()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            Button smelter = FindComponent<Button>(
+                fixture.Canvas.transform,
+                "QuickbarSlot.5");
+            GrayboxBuildingCatalogItem3D item =
+                new GrayboxBuildingCatalogPresenter3D().Describe(
+                    fixture.Session,
+                    BuildingCatalog.Smelter);
+
+            Assert.That(item.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(smelter, Is.Not.Null);
+            Assert.That(smelter.interactable, Is.True,
+                "Locked quickbar entries must accept input so they can explain the primary lock reason.");
+        }
+
+        [Test]
+        public void Menu_RejectedQuickbarSelectionShowsStructuredLockReasonAboveBuildBar()
+        {
+            UiFixture fixture = CreateMenuFixture();
+            GrayboxBuildingCatalogItem3D item =
+                new GrayboxBuildingCatalogPresenter3D().Describe(
+                    fixture.Session,
+                    BuildingCatalog.Smelter);
+            fixture.Interaction.ToggleCatalog();
+
+            Assert.That(fixture.Menu.TrySelectQuickbarSlot(5), Is.False);
+
+            RectTransform quickbar = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Quickbar");
+            RectTransform status = (RectTransform)FindTransform(
+                fixture.Canvas.transform,
+                "Placement.Status");
+            Text statusText = FindComponent<Text>(
+                status,
+                "Placement.Status.Text");
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            Assert.That(statusText.text, Does.Contain(item.Definition.Name));
+            Assert.That(statusText.text, Does.Contain(item.PrimaryLockReason));
+            Assert.That(
+                status.anchoredPosition.y,
+                Is.GreaterThanOrEqualTo(
+                    quickbar.anchoredPosition.y + quickbar.sizeDelta.y),
+                "Rejected build feedback must remain directly above the unchanged build bar.");
         }
 
         [Test]
@@ -2535,17 +2684,30 @@ namespace WasteCity.Tests
         public void Menu_UpdateMakesResearchLockedCardInteractableWithoutExplicitRefresh()
         {
             UiFixture fixture = CreateMenuFixture();
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
             InvokeLifecycle(fixture.Menu, "Update");
             fixture.Interaction.ToggleCatalog();
             fixture.Menu.SetCategory(BuildingMenuCategory.Production);
             Button card = FindComponent<Button>(fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Smelter.Id.Value);
-            Assert.That(card.interactable, Is.False);
+            GrayboxBuildingCatalogItem3D locked = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Smelter);
+            Assert.That(locked.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(locked.PrimaryLockReason, Is.Not.Null.And.Not.Empty);
+            Assert.That(card.interactable, Is.True);
 
             fixture.Session.UnlockResearchForDevelopment(
                 BuildingCatalog.Smelter.RequiredResearchId);
             InvokeLifecycle(fixture.Menu, "Update");
 
+            GrayboxBuildingCatalogItem3D buildable = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Smelter);
+            Assert.That(buildable.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+            Assert.That(buildable.PrimaryLockReason, Is.Null.Or.Empty);
             Assert.That(FindComponent<Button>(fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Smelter.Id.Value).interactable,
                 Is.True);
@@ -2555,6 +2717,7 @@ namespace WasteCity.Tests
         public void Menu_UpdateMakesCompletedPrerequisiteDependentCardInteractable()
         {
             UiFixture fixture = CreateMenuFixture();
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
             fixture.Session.UnlockResearchForDevelopment(
                 BuildingCatalog.Smelter.RequiredResearchId);
             fixture.Session.UnlockResearchForDevelopment(
@@ -2564,7 +2727,13 @@ namespace WasteCity.Tests
             fixture.Menu.SetCategory(BuildingMenuCategory.Production);
             Button before = FindComponent<Button>(fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value);
-            Assert.That(before.interactable, Is.False);
+            GrayboxBuildingCatalogItem3D locked = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Assembler);
+            Assert.That(locked.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(locked.PrimaryLockReason, Is.Not.Null.And.Not.Empty);
+            Assert.That(before.interactable, Is.True);
 
             var presentation = new RecordingPresentation();
             BeginGroundConstruction(
@@ -2577,6 +2746,12 @@ namespace WasteCity.Tests
                 presentation);
             InvokeLifecycle(fixture.Menu, "Update");
 
+            GrayboxBuildingCatalogItem3D buildable = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Assembler);
+            Assert.That(buildable.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+            Assert.That(buildable.PrimaryLockReason, Is.Null.Or.Empty);
             Assert.That(FindComponent<Button>(fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
                 Is.True);
@@ -2596,7 +2771,7 @@ namespace WasteCity.Tests
                 fixture.Session,
                 BuildingCatalog.PowerPlant));
 
-            Assert.That(satisfied, Does.Contain("最低人口：200"));
+            Assert.That(satisfied, Does.Not.Contain("最低人口："));
             Assert.That(locked, Does.Contain("最低人口：1000"));
             Assert.That(locked, Does.Contain("锁定原因 "));
         }

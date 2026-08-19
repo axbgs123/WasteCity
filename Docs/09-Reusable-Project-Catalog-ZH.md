@@ -58,11 +58,11 @@
 
 ### 建筑目录（复用前审查）
 
-能解决什么：展示可见的建筑目录。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs`。怎么复用：用于展示建筑目录。先审查它与当前三维场景的关系再接入。不能负责什么：不提交建筑放置。改后跑哪组测试：`GrayboxBuildingCatalogTests`。代码名：`GrayboxBuildingCatalogPresenter3D`。
+能解决什么：展示可见的建筑目录。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs`。怎么复用：投影正式建筑目录的可见性、统一解锁结果与锁定原因，供快捷栏和分类列表读取。先审查它与当前三维场景的关系再接入。不能负责什么：不拥有建筑定义、不提交建筑放置，也不自行决定人口、研究或前置条件。改后跑哪组测试：`GrayboxBuildingCatalogTests`。代码名：`GrayboxBuildingCatalogPresenter3D`。
 
 ### 建筑网格（推荐复用）
 
-能解决什么：计算建筑可用格位。在哪里：`Assets/_Game/Scripts/Building/BuildingGrid.cs`。怎么复用：用于建筑格位计算。把格位计算集中在这里。不能负责什么：不负责输入路由。改后跑哪组测试：`BuildingGridTests`。代码名：`BuildingGrid`。
+能解决什么：计算建筑可用格位。在哪里：`Assets/_Game/Scripts/Building/BuildingGrid.cs`。怎么复用：提供建筑格位计算，并承载稳定 BuildingDefinition、BuildingCatalog 与首轮人口门槛配置真值。把格位计算集中在这里。不能负责什么：不负责输入路由或失败反馈，也不在视图层复制建筑解锁规则。改后跑哪组测试：`BuildingGridTests`、`BuildingUnlockTests`、`GrayboxBuildingCatalogTests`。代码名：`BuildingGrid`。
 
 ### 建筑移动规则（推荐复用）
 
@@ -120,7 +120,7 @@
 
 ### 三维建筑菜单视图（复用前审查）
 
-能解决什么：显示建筑目录、放置反馈，以及正式撤离清单、队列、内部物资后果和容量阻塞操作。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：显示建筑目录、旋转预览、资源缺口，以及正式撤离清单、稳定处理队列、内部物资后果和容量阻塞操作。不能负责什么：不保存建筑或库存数据，也不计算方向、退款、容量或战斗状态；全部读取控制器提供的不可变 view，图标统一复用 ResourceIconCatalog3D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`GrayboxBuildingMenuView3D`。
+能解决什么：显示建筑目录、放置反馈，以及正式撤离清单、队列、内部物资后果和容量阻塞操作。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：显示建筑目录、旋转预览，并把所有可见建筑的锁定原因与蓝图放置失败原因固定显示在未改变的建造栏上方；同时显示正式撤离清单、稳定处理队列、内部物资后果和容量阻塞操作。不能负责什么：不保存建筑或库存数据，也不计算方向、退款、容量或战斗状态；全部读取控制器提供的不可变 view，图标统一复用 ResourceIconCatalog3D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxBuildingRuntimeSceneTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`GrayboxBuildingMenuView3D`。
 
 ### 三维生产可观察化控制器（仅限场景）
 

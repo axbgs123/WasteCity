@@ -26,7 +26,33 @@
 
 不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。该测试只验证运行时生产闭环；自然开局的石料路径应由 `IDEA-0012` 的 seed `8128` 原始内容区可采石料节点及其场景测试单独证明。若试玩仍找不到或无法采集石料，应作为 `IDEA-0012` 回归记录，不要在测试里偷偷修改正式开局或建筑成本。
 
-本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。schema 必须保持 `30`，冻结 2D 只做回归，敌人、炮塔和弹丸不属于本轮测试通过所能证明的范围。
+本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。schema 必须保持 `30`；冻结 2D 不接新 UI 或新功能并只做回归，但共享稳定 `BuildingCatalog` 的首轮研究站人口门槛 `0` 会同步生效。敌人、炮塔和弹丸不属于本轮测试通过所能证明的范围。
+
+## BUG-0007 自然开局研究站与统一放置失败反馈
+
+先用失败测试固定两个真实问题：正式 3D 会话保持人口 `100`、不调用开发人口修改时，研究站当前被目录中的 `200` 人口门槛锁定；可见但锁定的目录卡或快捷栏当前不可点击，因此不会在固定建造反馈条显示原因。最小实现只把研究站首轮最低人口改为 `0`，保留 `PopulationRequired` 和其他建筑既有门槛；同时让所有可见锁定选择和全部蓝图放置失败读取统一解锁/放置评估，并显示到位置不变、背景不接收射线的 `Placement.Status`。隐藏内容不得因本修复提前显示，研究站成本和 schema `30` 不得改变。冻结 2D 不接新 UI 或新功能，但因复用共享稳定 `BuildingCatalog`，研究站解锁配置同步采用门槛 `0` 并只做回归验证。
+
+规则与界面聚焦入口：
+
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testFilter 'WasteCity.Tests.BuildingUnlockTests|WasteCity.Tests.GrayboxBuildingCatalogTests|WasteCity.Tests.BuildingPlacementEvaluationTests|WasteCity.Tests.GrayboxBuildingProjectionAndViewTests|WasteCity.Tests.GrayboxBuildingUiAndInputTests' \
+  -testResults /tmp/wastecity-bug0007-focused-editmode.xml \
+  -logFile /tmp/wastecity-bug0007-focused-editmode.log
+```
+
+真实场景必须通过正式 Input System 操作 `B`、目录或快捷栏、鼠标移动和世界点击；至少覆盖人口 `100` 时研究站可选择并开始施工、可见锁定建筑点击显示权威人口/研究/前置原因、各类蓝图失败继续显示同一反馈条，以及建造栏位置和世界点击不回退：
+
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform PlayMode \
+  -testFilter 'WasteCity.Tests.GrayboxBuildingRuntimeSceneTests|WasteCity.Tests.GrayboxFormalEvacuationVerticalSliceTests' \
+  -testResults /tmp/wastecity-bug0007-focused-playmode.xml \
+  -logFile /tmp/wastecity-bug0007-focused-playmode.log
+```
+
+定位时，研究站稳定门槛先查 `BuildingGrid.cs` 中的 `BuildingCatalog` 与 `BuildingUnlockModel`；蓝图失败顺序和真值查 `BuildingPlacementEvaluation`；可见性与锁定原因查 `GrayboxBuildingCatalogPresenter3D`；固定反馈、锁定点击与不拦射线查 `GrayboxBuildingMenuView3D`、`GrayboxBuildingInputRouter3D` 及对应真实输入测试。不要删除通用人口失败枚举，也不要用开发人口补丁让测试绕过正式开局。
 
 ## IDEA-0014 正式撤离与完整垂直切片检查边界
 
@@ -42,7 +68,7 @@
   -logFile /tmp/wastecity-idea0014-focused-editmode.log
 ```
 
-玩家界面通过正式场景的真实 Input System 操作 `F`、`B`、`T`、`Space`、世界点击和撤离 UGUI。`GrayboxFormalEvacuationVerticalSliceTests` 连续验证六段：驾驶并展开；建研究站并完成三项研究；建立生产链和机枪塔；真实生产、补弹和防御；敌人存活时打开并确认撤离；完成 Packing、返回 Mobile 并再次驾驶。夹具只可在首次玩法输入前设置确定性资源、人口 `200` 和规则时间加速，不能直接完成研究、创建建筑、注入产物或弹药、杀敌、切换模式或调用撤离入口/提交。相关真实输入组合入口为：
+玩家界面通过正式场景的真实 Input System 操作 `F`、`B`、`T`、`Space`、世界点击和撤离 UGUI。`GrayboxFormalEvacuationVerticalSliceTests` 连续验证六段：驾驶并展开；建研究站并完成三项研究；建立生产链和机枪塔；真实生产、补弹和防御；敌人存活时打开并确认撤离；完成 Packing、返回 Mobile 并再次驾驶。夹具必须保持正式人口 `100`、不得调用开发人口修改；只可在首次玩法输入前设置确定性资源和规则时间加速，不能直接完成研究、创建建筑、注入产物或弹药、杀敌、切换模式或调用撤离入口/提交。相关真实输入组合入口为：
 
 ```sh
 "$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \

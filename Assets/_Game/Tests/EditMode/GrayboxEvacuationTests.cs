@@ -1726,6 +1726,7 @@ namespace WasteCity.Tests
         public void Menu_UpdateKeepsDependentCardLockedAfterCommittedPresentationFailure()
         {
             EvacuationFixture fixture = CreateFixture(configureMenu: true);
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
             fixture.Session.UnlockResearchForDevelopment(
                 BuildingCatalog.Smelter.RequiredResearchId);
             fixture.Session.UnlockResearchForDevelopment(
@@ -1739,6 +1740,10 @@ namespace WasteCity.Tests
             InvokeMenuUpdate(fixture.Menu);
             fixture.Interaction.ToggleCatalog();
             fixture.Menu.SetCategory(BuildingMenuCategory.Production);
+            Assert.That(presenter.Describe(
+                    fixture.Session,
+                    BuildingCatalog.Assembler).Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
             Assert.That(FindButton(
                 fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
@@ -1750,10 +1755,17 @@ namespace WasteCity.Tests
                 BuildingEvacuationTreatment.FullDismantle), Is.True);
             Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
             InvokeMenuUpdate(fixture.Menu);
+            GrayboxBuildingCatalogItem3D queuedLocked = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Assembler);
+            Assert.That(queuedLocked.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(queuedLocked.PrimaryLockReason,
+                Is.Not.Null.And.Not.Empty);
             Assert.That(FindButton(
                 fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
-                Is.False);
+                Is.True);
             SetEvacuationPresentation(
                 fixture.Controller,
                 new FailingPresentation { ThrowRemove = true });
@@ -1762,10 +1774,17 @@ namespace WasteCity.Tests
             InvokeMenuUpdate(fixture.Menu);
 
             Assert.That(fixture.Session.Instances.Contains(smelter), Is.False);
+            GrayboxBuildingCatalogItem3D committedLocked = presenter.Describe(
+                fixture.Session,
+                BuildingCatalog.Assembler);
+            Assert.That(committedLocked.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(committedLocked.PrimaryLockReason,
+                Is.EqualTo(queuedLocked.PrimaryLockReason));
             Assert.That(FindButton(
                 fixture.Canvas.transform,
                 "Catalog.Card." + BuildingCatalog.Assembler.Id.Value).interactable,
-                Is.False);
+                Is.True);
         }
 
         [Test]

@@ -137,6 +137,37 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void FormalNaturalOpeningBuildsResearchStationButKeepsTierGateLocked()
+        {
+            var root = new GameObject("formal-natural-opening-catalog");
+            cleanup.Add(root);
+            GrayboxBuildingSession3D session =
+                root.AddComponent<GrayboxBuildingSession3D>();
+            session.ConfigureFormalSession();
+            session.SetRouteContact(ContentRoute.Technology, true);
+            var presenter = new GrayboxBuildingCatalogPresenter3D();
+
+            Assert.That(session.Population, Is.EqualTo(100));
+            Assert.That(session.PopulationCapacity, Is.EqualTo(150));
+
+            GrayboxBuildingCatalogItem3D researchStation =
+                presenter.Describe(session, BuildingCatalog.ResearchStation);
+            Assert.That(
+                researchStation.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Buildable));
+            Assert.That(researchStation.PrimaryLockReason, Is.Null);
+            Assert.That(researchStation.LockReasons, Is.Empty);
+
+            GrayboxBuildingCatalogItem3D powerPlant =
+                presenter.Describe(session, BuildingCatalog.PowerPlant);
+            Assert.That(
+                powerPlant.Visibility,
+                Is.EqualTo(BuildingCatalogVisibility.Locked));
+            Assert.That(powerPlant.LockReasons,
+                Does.Contain("需要人口 1000"));
+        }
+
+        [Test]
         public void Catalog_StoresTheStableIdClassificationOnlyInThePresenter()
         {
             string buildingDirectory = Path.Combine(

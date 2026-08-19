@@ -51,6 +51,9 @@ namespace WasteCity.Graybox3D.Building
         private BuildingMenuCategory? category;
         private ContentRoute? route;
         private string searchText = string.Empty;
+        private string selectionFailureMessage = string.Empty;
+        private GrayboxBuildingInteractionState selectionFailureState;
+        private uint selectionFailureCatalogRevision;
         private bool hasPlacementStatusCache;
         private GrayboxBuildingInteractionState lastPlacementState;
         private BuildingPlacementFailure lastPlacementFailure;
@@ -122,6 +125,15 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
+            if (!string.IsNullOrEmpty(selectionFailureMessage) &&
+                (interaction == null ||
+                 interaction.State != selectionFailureState ||
+                 session == null ||
+                 session.CatalogRevision !=
+                 selectionFailureCatalogRevision))
+            {
+                DiscardSelectionFailure();
+            }
             if (IsConfigured &&
                 (!hasCatalogRevision ||
                  session.CatalogRevision != lastCatalogRevision))
@@ -149,6 +161,9 @@ namespace WasteCity.Graybox3D.Building
             placementStatusText = null;
             miningGuidanceLegendRoot = null;
             searchField = null;
+            selectionFailureMessage = string.Empty;
+            selectionFailureState = default;
+            selectionFailureCatalogRevision = 0u;
             cancelConstructionButton = null;
             confirmCancellationButton = null;
             rejectCancellationButton = null;
@@ -283,6 +298,10 @@ namespace WasteCity.Graybox3D.Building
             this.eventSystem = eventSystem;
             this.session = session;
             this.interaction = interaction;
+            selectionFailureMessage = string.Empty;
+            selectionFailureState = default;
+            selectionFailureCatalogRevision = 0u;
+            hasPlacementStatusCache = false;
             hasCatalogRevision = false;
             EnsureRuntimeServices();
             if (isActiveAndEnabled)
@@ -339,8 +358,14 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxBuildingCatalogPresenter3D.Quickbar[zeroBasedIndex];
             GrayboxBuildingCatalogItem3D item =
                 presenter.Describe(session, definition);
-            if (item.Visibility != BuildingCatalogVisibility.Buildable)
+            if (item.Visibility == BuildingCatalogVisibility.Hidden)
                 return false;
+            if (item.Visibility == BuildingCatalogVisibility.Locked)
+            {
+                ShowSelectionFailure(definition, item.PrimaryLockReason);
+                return false;
+            }
+            ClearSelectionFailure();
             interaction.Select(item);
             SyncCatalogVisibility();
             RefreshQuickbar();
@@ -361,9 +386,17 @@ namespace WasteCity.Graybox3D.Building
                 if (!string.Equals(
                         item.Definition.Id.Value,
                         stableBuildingId,
-                        StringComparison.Ordinal) ||
-                    item.Visibility != BuildingCatalogVisibility.Buildable)
+                        StringComparison.Ordinal))
                     continue;
+                if (item.Visibility != BuildingCatalogVisibility.Buildable)
+                {
+                    if (item.Visibility == BuildingCatalogVisibility.Locked)
+                        ShowSelectionFailure(
+                            item.Definition,
+                            item.PrimaryLockReason);
+                    return false;
+                }
+                ClearSelectionFailure();
                 interaction.Select(item);
                 SyncCatalogVisibility();
                 RefreshQuickbar();
@@ -1004,7 +1037,7 @@ namespace WasteCity.Graybox3D.Building
                     text,
                     () => TrySelectQuickbarSlot(captured));
                 button.interactable =
-                    item.Visibility == BuildingCatalogVisibility.Buildable;
+                    item.Visibility != BuildingCatalogVisibility.Hidden;
                 button.image.color =
                     item.Visibility == BuildingCatalogVisibility.Locked
                         ? LockedColor
@@ -1031,10 +1064,11 @@ namespace WasteCity.Graybox3D.Building
                 string.Empty,
                 () => TrySelectCatalogItem(definition.Id.Value));
             card.interactable =
-                item.Visibility == BuildingCatalogVisibility.Buildable;
-            card.image.color = card.interactable
-                ? ButtonColor
-                : LockedColor;
+                item.Visibility != BuildingCatalogVisibility.Hidden;
+            card.image.color =
+                item.Visibility == BuildingCatalogVisibility.Buildable
+                    ? ButtonColor
+                    : LockedColor;
             RectTransform rect = card.GetComponent<RectTransform>();
             rect.sizeDelta = new Vector2(596f, 108f);
             SetLayout(rect, 596f, 108f, 0f);
@@ -1573,14 +1607,22 @@ namespace WasteCity.Graybox3D.Building
                 placement != null &&
                 !evaluation.IsValid &&
                 failure != BuildingPlacementFailure.None;
+            bool selectionFailureVisible =
+                !string.IsNullOrEmpty(selectionFailureMessage);
             bool deploymentFailureVisible =
                 !previewVisible &&
                 state == GrayboxBuildingInteractionState.Inactive &&
                 !string.IsNullOrEmpty(DeploymentFailureMessage);
             bool visible =
-                previewVisible || deploymentFailureVisible;
+                deploymentFailureVisible ||
+                selectionFailureVisible ||
+                previewVisible;
             placementStatusRoot.gameObject.SetActive(visible);
-            if (previewVisible)
+            if (deploymentFailureVisible)
+                placementStatusText.text = DeploymentFailureMessage;
+            else if (selectionFailureVisible)
+                placementStatusText.text = selectionFailureMessage;
+            else if (previewVisible)
             {
                 int width = BuildingOrientationRules.Width(
                     selected,
@@ -1602,10 +1644,38 @@ namespace WasteCity.Graybox3D.Building
                     ? summary + "\n" + failureMessage
                     : summary + "\n可以放置";
             }
-            else if (deploymentFailureVisible)
-                placementStatusText.text = DeploymentFailureMessage;
             else if (!string.IsNullOrEmpty(placementStatusText.text))
                 placementStatusText.text = string.Empty;
+        }
+
+        private void ShowSelectionFailure(
+            BuildingDefinition definition,
+            string primaryLockReason)
+        {
+            if (definition == null) return;
+            string reason = string.IsNullOrWhiteSpace(primaryLockReason)
+                ? "当前未解锁"
+                : primaryLockReason;
+            selectionFailureMessage = definition.Name + "：" + reason;
+            selectionFailureState = interaction.State;
+            selectionFailureCatalogRevision = session.CatalogRevision;
+            hasPlacementStatusCache = false;
+            RefreshPlacementStatus();
+        }
+
+        private void ClearSelectionFailure()
+        {
+            if (string.IsNullOrEmpty(selectionFailureMessage)) return;
+            DiscardSelectionFailure();
+            RefreshPlacementStatus();
+        }
+
+        private void DiscardSelectionFailure()
+        {
+            selectionFailureMessage = string.Empty;
+            selectionFailureState = default;
+            selectionFailureCatalogRevision = 0u;
+            hasPlacementStatusCache = false;
         }
 
         private static string OrientationName(BuildingOrientation orientation)
