@@ -456,6 +456,7 @@ namespace WasteCity.Tests
             GrayboxBuildingSession3D session =
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();
             GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(modifier.SetPopulation(200), Is.True);
             Assert.That(modifier.SetResource(ResourceIds.Iron, 100), Is.True);
             Assert.That(modifier.SetConstructionSpeed(
                 DevelopmentConstructionSpeed.Fast100), Is.True);

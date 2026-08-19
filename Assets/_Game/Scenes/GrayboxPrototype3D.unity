@@ -988,7 +988,7 @@ MonoBehaviour:
   worldView: {fileID: 962754566}
   body: {fileID: 505702831}
   bodyCollider: {fileID: 505702830}
-  ruleTimeSourceBehaviour: {fileID: 0}
+  ruleTimeSourceBehaviour: {fileID: 764810524}
 --- !u!65 &505702830
 BoxCollider:
   m_ObjectHideFlags: 0

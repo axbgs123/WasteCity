@@ -968,6 +968,65 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0014_SceneCityUsesTheUniqueBuildingSessionAsRuleTimeSource()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+            AssertUniqueCityRuleTimeSourceContract();
+        }
+
+        [Test]
+        public void IDEA0014_RuleTimeSourceAuthoringTwiceIsByteAndOwnerIdempotent()
+        {
+            const string temporaryScenePath =
+                "Assets/_Game/Scenes/__Task8RuleTimeAuthoring.unity";
+            string absoluteTemporaryPath = Path.Combine(
+                Application.dataPath,
+                "_Game/Scenes/__Task8RuleTimeAuthoring.unity");
+            AssetDatabase.DeleteAsset(temporaryScenePath);
+            Assert.That(
+                AssetDatabase.CopyAsset(ScenePath, temporaryScenePath),
+                Is.True);
+            try
+            {
+                EditorSceneManager.OpenScene(
+                    temporaryScenePath,
+                    OpenSceneMode.Single);
+                GrayboxMobileCityController3D city =
+                    Object.FindObjectOfType<
+                        GrayboxMobileCityController3D>(true);
+                Assert.That(city, Is.Not.Null);
+                var serializedCity = new SerializedObject(city);
+                serializedCity.FindProperty("ruleTimeSourceBehaviour")
+                    .objectReferenceValue = null;
+                serializedCity.ApplyModifiedPropertiesWithoutUndo();
+                Assert.That(EditorSceneManager.SaveOpenScenes(), Is.True);
+
+                InvokeAuthoringAtPath(temporaryScenePath);
+                AssertUniqueCityRuleTimeSourceContract();
+                byte[] firstBytes = File.ReadAllBytes(absoluteTemporaryPath);
+                string[] firstOwners = CaptureRuleTimeOwnerIds();
+
+                InvokeAuthoringAtPath(temporaryScenePath);
+
+                CollectionAssert.AreEqual(
+                    firstBytes,
+                    File.ReadAllBytes(absoluteTemporaryPath));
+                Assert.That(
+                    CaptureRuleTimeOwnerIds(),
+                    Is.EqualTo(firstOwners));
+                AssertUniqueCityRuleTimeSourceContract();
+            }
+            finally
+            {
+                EditorSceneManager.NewScene(
+                    NewSceneSetup.EmptyScene,
+                    NewSceneMode.Single);
+                AssetDatabase.DeleteAsset(temporaryScenePath);
+            }
+        }
+
+        [Test]
         public void IDEA0014_EvacuationAuthoringTwiceIsByteAndOwnerIdempotent()
         {
             const string temporaryScenePath =
@@ -1226,6 +1285,38 @@ namespace WasteCity.Tests
                 }
             }
             return count;
+        }
+
+        private static void AssertUniqueCityRuleTimeSourceContract()
+        {
+            GrayboxMobileCityController3D[] cities =
+                Object.FindObjectsOfType<GrayboxMobileCityController3D>(true);
+            GrayboxBuildingSession3D[] sessions =
+                Object.FindObjectsOfType<GrayboxBuildingSession3D>(true);
+
+            Assert.That(cities, Has.Length.EqualTo(1));
+            Assert.That(sessions, Has.Length.EqualTo(1));
+            AssertReference(
+                cities[0],
+                "ruleTimeSourceBehaviour",
+                sessions[0]);
+        }
+
+        private static string[] CaptureRuleTimeOwnerIds()
+        {
+            Component[] owners =
+            {
+                Object.FindObjectOfType<GrayboxMobileCityController3D>(true),
+                Object.FindObjectOfType<GrayboxBuildingSession3D>(true),
+            };
+            var ids = new string[owners.Length];
+            for (var index = 0; index < owners.Length; index++)
+            {
+                Assert.That(owners[index], Is.Not.Null, index.ToString());
+                ids[index] = GlobalObjectId.GetGlobalObjectIdSlow(
+                    owners[index]).ToString();
+            }
+            return ids;
         }
 
         private static void InvokeAuthoringAtPath(string scenePath)

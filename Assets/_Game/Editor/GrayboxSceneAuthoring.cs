@@ -928,6 +928,9 @@ namespace WasteCity.Editor
                 ("previewMaterial", previewMaterial),
                 ("city", city));
             SetReferences(
+                city,
+                ("ruleTimeSourceBehaviour", session));
+            SetReferences(
                 surfaceProjector,
                 ("controlledCamera", camera),
                 ("worldView", world),
