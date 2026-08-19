@@ -254,6 +254,15 @@ namespace WasteCity.Graybox3D.Building
         public IReadOnlyList<GrayboxDefenseTowerRuntimeState3D> Towers =>
             readOnlyTowers;
 
+        public bool TryGetTowerState(
+            string stableInstanceId,
+            out GrayboxDefenseTowerRuntimeState3D state)
+        {
+            state = null;
+            return !string.IsNullOrWhiteSpace(stableInstanceId) &&
+                stateById.TryGetValue(stableInstanceId, out state);
+        }
+
         public GrayboxDefenseRuntimeSnapshot3D Snapshot
         {
             get

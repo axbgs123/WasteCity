@@ -1,10 +1,88 @@
 using System;
+using Unity.Profiling;
 using UnityEngine;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public sealed class GrayboxFormalMixedProfilerHeartbeat3D : MonoBehaviour
+    {
+        private static readonly ProfilerMarker FrameMarker =
+            new ProfilerMarker("WasteCity.Formal.MixedWorkload.Frame");
+
+        private Action pulseAction;
+        private bool pulseRequested;
+        private bool pulseExecuting;
+
+        public int PulseCompletionCount { get; private set; }
+
+        public void Configure(Action pulseAction)
+        {
+            this.pulseAction = pulseAction ??
+                throw new ArgumentNullException(nameof(pulseAction));
+            ResetPulseTracking();
+        }
+
+        public void ResetPulseTracking()
+        {
+            if (pulseExecuting)
+                throw new InvalidOperationException(
+                    "Cannot reset the formal Profiler heartbeat during a pulse.");
+            pulseRequested = false;
+            PulseCompletionCount = 0;
+        }
+
+        public void RequestPulse()
+        {
+            if (pulseAction == null)
+                throw new InvalidOperationException(
+                    "Formal Profiler heartbeat is not configured.");
+            if (PulseCompletionCount == 0)
+                pulseRequested = true;
+        }
+
+        private void Update()
+        {
+            using (FrameMarker.Auto())
+            {
+                if (!pulseRequested || pulseExecuting ||
+                    PulseCompletionCount != 0)
+                    return;
+                pulseRequested = false;
+                pulseExecuting = true;
+                try
+                {
+                    pulseAction();
+                    PulseCompletionCount++;
+                }
+                finally
+                {
+                    pulseExecuting = false;
+                }
+            }
+        }
+
+        private void OnDisable()
+        {
+            ClearPulse();
+        }
+
+        private void OnDestroy()
+        {
+            ClearPulse();
+        }
+
+        private void ClearPulse()
+        {
+            pulseAction = null;
+            pulseRequested = false;
+        }
+    }
+
     public sealed class GrayboxProductionController3D : MonoBehaviour
     {
+        private static readonly ProfilerMarker TickMarker =
+            new ProfilerMarker("WasteCity.Formal.Production.Tick");
+
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxWorldView3D worldView;
@@ -32,31 +110,34 @@ namespace WasteCity.Graybox3D.Building
 
         public bool Tick(float deltaSeconds, bool paused)
         {
-            if (!IsConfigured ||
-                session.Inventory == null ||
-                session.CityStorage == null ||
-                session.Instances == null ||
-                worldView.Model == null ||
-                worldView.Coordinates == null ||
-                !worldView.Coordinates.TryWorldToCell(
-                    city.transform.position,
-                    out int cityX,
-                    out int cityY))
+            using (TickMarker.Auto())
             {
-                return false;
-            }
+                if (!IsConfigured ||
+                    session.Inventory == null ||
+                    session.CityStorage == null ||
+                    session.Instances == null ||
+                    worldView.Model == null ||
+                    worldView.Coordinates == null ||
+                    !worldView.Coordinates.TryWorldToCell(
+                        city.transform.position,
+                        out int cityX,
+                        out int cityY))
+                {
+                    return false;
+                }
 
-            Clock.Tick(
-                deltaSeconds,
-                paused,
-                session.Instances,
-                city.Mode,
-                cityX,
-                cityY,
-                session.GroundBuildRadius,
-                worldView.Model,
-                session.CityStorage);
-            return true;
+                Clock.Tick(
+                    deltaSeconds,
+                    paused,
+                    session.Instances,
+                    city.Mode,
+                    cityX,
+                    cityY,
+                    session.GroundBuildRadius,
+                    worldView.Model,
+                    session.CityStorage);
+                return true;
+            }
         }
 
         private void Update()

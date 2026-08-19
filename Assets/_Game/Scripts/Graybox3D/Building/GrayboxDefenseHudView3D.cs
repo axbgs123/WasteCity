@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -11,6 +12,8 @@ namespace WasteCity.Graybox3D.Building
 {
     public class GrayboxDefenseHudView3D : MonoBehaviour
     {
+        private static readonly ProfilerMarker ApplyMarker =
+            new ProfilerMarker("WasteCity.Formal.DefenseHud.Apply");
         private static readonly Color PanelColor =
             new Color(.06f, .09f, .12f, .9f);
         private static readonly Color ButtonColor =
@@ -62,43 +65,46 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseSelectionKind3D selectionKind,
             string stableId)
         {
-            LastSnapshot = snapshot;
-            RefreshCount++;
-            EnsureFallbackConfiguration();
-            selectedKind = selectionKind;
-            selectedStableId = stableId;
-            WarningVisible = snapshot != null &&
-                snapshot.WavePhase == WavePhase.Warning;
-
-            string summary = FormatSummary(snapshot);
-            string details = FormatSelection(
-                snapshot,
-                selectionKind,
-                stableId,
-                out bool visible,
-                out bool towerSelected,
-                out bool towerPaused);
-            IsSelectionVisible = visible;
-            TowerPauseButtonLabel = towerPaused
-                ? "恢复运行"
-                : "暂停运行";
-
-            if (SummaryText != null)
-                SummaryText.text = summary;
-            if (SelectionText != null)
-                SelectionText.text = details;
-            if (selectionGroup != null)
+            using (ApplyMarker.Auto())
             {
-                selectionGroup.alpha = visible ? 1f : 0f;
-                selectionGroup.interactable = visible;
-                selectionGroup.blocksRaycasts = visible;
+                LastSnapshot = snapshot;
+                RefreshCount++;
+                EnsureFallbackConfiguration();
+                selectedKind = selectionKind;
+                selectedStableId = stableId;
+                WarningVisible = snapshot != null &&
+                    snapshot.WavePhase == WavePhase.Warning;
+
+                string summary = FormatSummary(snapshot);
+                string details = FormatSelection(
+                    snapshot,
+                    selectionKind,
+                    stableId,
+                    out bool visible,
+                    out bool towerSelected,
+                    out bool towerPaused);
+                IsSelectionVisible = visible;
+                TowerPauseButtonLabel = towerPaused
+                    ? "恢复运行"
+                    : "暂停运行";
+
+                if (SummaryText != null)
+                    SummaryText.text = summary;
+                if (SelectionText != null)
+                    SelectionText.text = details;
+                if (selectionGroup != null)
+                {
+                    selectionGroup.alpha = visible ? 1f : 0f;
+                    selectionGroup.interactable = visible;
+                    selectionGroup.blocksRaycasts = visible;
+                }
+                if (towerPauseButton != null)
+                {
+                    towerPauseButton.interactable = towerSelected;
+                }
+                if (towerPauseButtonText != null)
+                    towerPauseButtonText.text = TowerPauseButtonLabel;
             }
-            if (towerPauseButton != null)
-            {
-                towerPauseButton.interactable = towerSelected;
-            }
-            if (towerPauseButtonText != null)
-                towerPauseButtonText.text = TowerPauseButtonLabel;
         }
 
         protected virtual void OnDestroy()

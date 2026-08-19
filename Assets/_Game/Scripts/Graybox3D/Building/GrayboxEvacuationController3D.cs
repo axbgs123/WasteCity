@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Unity.Profiling;
 using UnityEngine;
 using WasteCity.Building;
 using WasteCity.Economy;
@@ -186,6 +187,17 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxEvacuationController3D : MonoBehaviour
     {
+        private static readonly ProfilerMarker TickMarker =
+            new ProfilerMarker("WasteCity.Formal.Evacuation.Tick");
+        private static readonly ProfilerMarker ManifestViewBuildMarker =
+            new ProfilerMarker(
+                "WasteCity.Formal.Evacuation.ManifestView.Build");
+        private static readonly ProfilerMarker CapacityPreflightMarker =
+            new ProfilerMarker(
+                "WasteCity.Formal.Evacuation.CapacityPreflight");
+        private static readonly ProfilerMarker CommitMarker =
+            new ProfilerMarker("WasteCity.Formal.Evacuation.Commit");
+
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxBuildingWorldView3D presentation;
@@ -205,6 +217,9 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, BuildingEvacuationTreatment>(StringComparer.Ordinal);
         private readonly List<BuildingEvacuationWork> work =
             new List<BuildingEvacuationWork>();
+        private readonly Dictionary<string, BuildingEvacuationWork> workById =
+            new Dictionary<string, BuildingEvacuationWork>(
+                StringComparer.Ordinal);
         private readonly List<BuildingEvacuationWork> fullQueue =
             new List<BuildingEvacuationWork>();
         private readonly List<BuildingEvacuationWork> rollbackWork =
@@ -258,40 +273,43 @@ namespace WasteCity.Graybox3D.Building
                 return cachedManifestView;
             }
 
-            EvacuationBatchContext context = CurrentBatchContext();
-            var items = new List<EvacuationManifestItemViewModel>(
-                manifest.Count);
-            var totalShortfalls = new SortedDictionary<string, int>(
-                StringComparer.Ordinal);
-            bool canConfirm = IsManifestOpen && HasCompleteAssignments();
-            string failureReason = string.Empty;
-            for (var index = 0; index < manifest.Count; index++)
+            using (ManifestViewBuildMarker.Auto())
             {
-                EvacuationManifestItemViewModel item =
-                    CreateManifestItem(manifest[index]);
-                items.Add(item);
-                if (!item.CanCommit)
+                EvacuationBatchContext context = CurrentBatchContext();
+                var items = new List<EvacuationManifestItemViewModel>(
+                    manifest.Count);
+                var totalShortfalls = new SortedDictionary<string, int>(
+                    StringComparer.Ordinal);
+                bool canConfirm = IsManifestOpen && HasCompleteAssignments();
+                string failureReason = string.Empty;
+                for (var index = 0; index < manifest.Count; index++)
                 {
-                    canConfirm = false;
-                    if (string.IsNullOrEmpty(failureReason))
-                        failureReason = item.FailureReason;
+                    EvacuationManifestItemViewModel item =
+                        CreateManifestItem(manifest[index]);
+                    items.Add(item);
+                    if (!item.CanCommit)
+                    {
+                        canConfirm = false;
+                        if (string.IsNullOrEmpty(failureReason))
+                            failureReason = item.FailureReason;
+                    }
+                    AddAmounts(totalShortfalls, item.CapacityShortfalls);
                 }
-                AddAmounts(totalShortfalls, item.CapacityShortfalls);
-            }
-            if (!canConfirm && string.IsNullOrEmpty(failureReason))
-                failureReason = "请先为全部项目选择处理方式";
+                if (!canConfirm && string.IsNullOrEmpty(failureReason))
+                    failureReason = "请先为全部项目选择处理方式";
 
-            cachedManifestView = new EvacuationManifestViewModel(
-                NextViewRevision(),
-                context.IsInCombat,
-                context.ProductivityMultiplier,
-                canConfirm,
-                failureReason,
-                items,
-                ToAmounts(totalShortfalls));
-            cachedManifestSignature = signature;
-            hasManifestSignature = true;
-            return cachedManifestView;
+                cachedManifestView = new EvacuationManifestViewModel(
+                    NextViewRevision(),
+                    context.IsInCombat,
+                    context.ProductivityMultiplier,
+                    canConfirm,
+                    failureReason,
+                    items,
+                    ToAmounts(totalShortfalls));
+                cachedManifestSignature = signature;
+                hasManifestSignature = true;
+                return cachedManifestView;
+            }
         }
 
         public EvacuationQueueViewModel CaptureQueueView()
@@ -575,26 +593,26 @@ namespace WasteCity.Graybox3D.Building
 
         public void Tick(float unscaledDeltaTime, bool paused)
         {
-            queuePaused = paused;
-            if (IsManifestOpen && !IsProcessing)
+            using (TickMarker.Auto())
             {
-                RefreshManifestPreview();
-                menu.ShowEvacuationManifest(CaptureManifestView());
-            }
-            if (!IsProcessing || IsBlocked || paused ||
-                unscaledDeltaTime <= 0f)
-            {
+                queuePaused = paused;
+                if (IsManifestOpen && !IsProcessing)
+                    menu.ShowEvacuationManifest(CaptureManifestView());
+                if (!IsProcessing || IsBlocked || paused ||
+                    unscaledDeltaTime <= 0f)
+                {
+                    if (IsProcessing)
+                        menu.ShowEvacuationQueue(CaptureQueueView());
+                    return;
+                }
+                remainingSeconds -= unscaledDeltaTime *
+                    Math.Max(0f, session.DevelopmentRuleTimeMultiplier);
+                if (remainingSeconds <= 0f &&
+                    TryCommitCurrent() == CommitCurrentResult.Succeeded)
+                    AdvanceThroughImmediateWork();
                 if (IsProcessing)
                     menu.ShowEvacuationQueue(CaptureQueueView());
-                return;
             }
-            remainingSeconds -= unscaledDeltaTime *
-                Math.Max(0f, session.DevelopmentRuleTimeMultiplier);
-            if (remainingSeconds <= 0f &&
-                TryCommitCurrent() == CommitCurrentResult.Succeeded)
-                AdvanceThroughImmediateWork();
-            if (IsProcessing)
-                menu.ShowEvacuationQueue(CaptureQueueView());
         }
 
         public bool RetryBlockedWork()
@@ -651,6 +669,7 @@ namespace WasteCity.Graybox3D.Building
         private void BuildWork(EvacuationBatchContext context)
         {
             work.Clear();
+            workById.Clear();
             for (var index = 0; index < manifest.Count; index++)
             {
                 GrayboxBuildingInstance3D instance = manifest[index];
@@ -668,13 +687,15 @@ namespace WasteCity.Graybox3D.Building
                         ? instance.Progress.Remaining /
                           instance.Progress.BaseDuration
                         : 0d;
-                work.Add(BuildingEvacuationRules.Create(
+                BuildingEvacuationWork item = BuildingEvacuationRules.Create(
                     instance.StableInstanceId,
                     instance.Placement.Definition.Cost,
                     instance.Progress.BaseDuration,
                     remainingRatio,
                     treatment,
-                    context));
+                    context);
+                work.Add(item);
+                workById.Add(item.StableInstanceId, item);
             }
             work.Sort((left, right) => string.CompareOrdinal(
                 left.StableInstanceId,
@@ -729,6 +750,12 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private CommitCurrentResult TryCommitCurrent()
+        {
+            using (CommitMarker.Auto())
+                return TryCommitCurrentCore();
+        }
+
+        private CommitCurrentResult TryCommitCurrentCore()
         {
             if (!IsProcessing || fullQueueIndex < 0 ||
                 fullQueueIndex >= fullQueue.Count)
@@ -881,6 +908,7 @@ namespace WasteCity.Graybox3D.Building
         private void ClearWorkOnly()
         {
             work.Clear();
+            workById.Clear();
             fullQueue.Clear();
             rollbackWork.Clear();
             runtimePayloads.Clear();
@@ -988,18 +1016,9 @@ namespace WasteCity.Graybox3D.Building
             string stableInstanceId,
             out BuildingEvacuationWork result)
         {
-            for (var index = 0; index < work.Count; index++)
-            {
-                if (!string.Equals(
-                        work[index].StableInstanceId,
-                        stableInstanceId,
-                        StringComparison.Ordinal))
-                    continue;
-                result = work[index];
-                return true;
-            }
             result = default;
-            return false;
+            return !string.IsNullOrWhiteSpace(stableInstanceId) &&
+                workById.TryGetValue(stableInstanceId, out result);
         }
 
         private IReadOnlyList<ResourceAmount> CaptureWarehouseContents(
@@ -1022,6 +1041,18 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private CityResourceEvacuationPlan CreatePreviewStoragePlan(
+            GrayboxBuildingInstance3D instance,
+            in BuildingEvacuationWork itemWork,
+            RuntimePayloadCapture payload)
+        {
+            using (CapacityPreflightMarker.Auto())
+                return CreatePreviewStoragePlanCore(
+                    instance,
+                    itemWork,
+                    payload);
+        }
+
+        private CityResourceEvacuationPlan CreatePreviewStoragePlanCore(
             GrayboxBuildingInstance3D instance,
             in BuildingEvacuationWork itemWork,
             RuntimePayloadCapture payload)
@@ -1153,25 +1184,10 @@ namespace WasteCity.Graybox3D.Building
             string stableInstanceId)
         {
             BuildingProductionState productionState = null;
-            IReadOnlyList<BuildingProductionState> productionStates =
-                productionRuntime?.States;
-            if (productionStates != null)
-            {
-                for (var index = 0; index < productionStates.Count; index++)
-                {
-                    BuildingProductionState candidate =
-                        productionStates[index];
-                    if (!string.Equals(
-                            candidate.StableInstanceId,
-                            stableInstanceId,
-                            StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-                    productionState = candidate;
-                    break;
-                }
-            }
+            if (productionRuntime != null)
+                productionRuntime.TryGetState(
+                    stableInstanceId,
+                    out productionState);
 
             Mix(ref hash, productionState == null ? 0 : 1);
             if (productionState != null)
@@ -1199,25 +1215,10 @@ namespace WasteCity.Graybox3D.Building
             }
 
             GrayboxDefenseTowerRuntimeState3D defenseTower = null;
-            IReadOnlyList<GrayboxDefenseTowerRuntimeState3D> defenseTowers =
-                defenseRuntime?.Towers;
-            if (defenseTowers != null)
-            {
-                for (var index = 0; index < defenseTowers.Count; index++)
-                {
-                    GrayboxDefenseTowerRuntimeState3D candidate =
-                        defenseTowers[index];
-                    if (!string.Equals(
-                            candidate.StableId,
-                            stableInstanceId,
-                            StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-                    defenseTower = candidate;
-                    break;
-                }
-            }
+            if (defenseRuntime != null)
+                defenseRuntime.TryGetTowerState(
+                    stableInstanceId,
+                    out defenseTower);
 
             Mix(ref hash, defenseTower == null ? 0 : 1);
             if (defenseTower != null)

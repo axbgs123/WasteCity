@@ -11,6 +11,8 @@ using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using WasteCity.ArtIntegration3D;
 using WasteCity.Building;
 using WasteCity.City;
@@ -34,6 +36,14 @@ namespace WasteCity.Editor
             "WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT";
         private const string RuinsCliffResultEnvironmentVariable =
             "WASTECITY_RUINS_CLIFF_PERF_RESULT";
+        private const string FormalEvacuationMixedResultEnvironmentVariable =
+            "WASTECITY_FORMAL_EVACUATION_MIXED_PERF_RESULT";
+        private const string FormalEvacuationMixedGuiProfilerEnvironmentVariable =
+            "WASTECITY_FORMAL_EVACUATION_MIXED_GUI_PROFILER_RESULT";
+        private const string DefaultFormalEvacuationMixedGuiDirectoryName =
+            "wastecity-idea0014-task9-gui";
+        private const string DefaultFormalEvacuationMixedGuiFileName =
+            "task-09-gui-300frames.data";
         private const string GuiProfilerInputEnvironmentVariable =
             "WASTECITY_GUI_PROFILER_INPUT";
         private const string GuiProfilerResultEnvironmentVariable =
@@ -48,6 +58,24 @@ namespace WasteCity.Editor
         private const double FirstTerrainMaximumMedianMilliseconds = 250d;
         private const int RuinsCliffRunCount = 5;
         private const int RuinsCliffStableObservationCount = 300;
+        private const int FormalEvacuationMixedSampleCount = 300;
+        private const long FormalDefenseAllocationBudgetBytes = 64L * 1024L;
+        private const long FormalTransactionAllocationBaselineBytes =
+            64L * 1024L;
+        private const long FormalTransactionAllocationPerManifestItemBytes =
+            8L * 1024L;
+        private const string FormalMixedWorkloadFrameMarkerName =
+            "WasteCity.Formal.MixedWorkload.Frame";
+        private static readonly string[] FormalEvacuationMarkerNames =
+        {
+            "WasteCity.Formal.Production.Tick",
+            "WasteCity.Formal.Defense.Tick",
+            "WasteCity.Formal.DefenseHud.Apply",
+            "WasteCity.Formal.Evacuation.Tick",
+            "WasteCity.Formal.Evacuation.ManifestView.Build",
+            "WasteCity.Formal.Evacuation.CapacityPreflight",
+            "WasteCity.Formal.Evacuation.Commit"
+        };
         private const double
             RuinsCliffLayoutAndBatchingMaximumMedianMilliseconds = 100d;
         private const double
@@ -59,6 +87,27 @@ namespace WasteCity.Editor
             new ProfilerMarker("WasteCity.RuinsCliff.LayoutAndBatching");
         private static readonly ProfilerMarker RuinsCliffTotalInitializationMarker =
             new ProfilerMarker("WasteCity.RuinsCliff.TotalInitialization");
+        private static FormalEvacuationMixedFixture
+            liveFormalEvacuationMixedFixture;
+        private static bool formalMixedGuiCaptureActive;
+        private static bool formalMixedGuiCapturePulsed;
+        private static string formalMixedGuiCapturePath;
+
+        static GrayboxPerformanceProbe()
+        {
+            EditorApplication.playModeStateChanged -=
+                HandleFormalProfilerPlayModeStateChanged;
+            EditorApplication.playModeStateChanged +=
+                HandleFormalProfilerPlayModeStateChanged;
+            AssemblyReloadEvents.beforeAssemblyReload -=
+                CleanupFormalEvacuationMixedProfilerCapture;
+            AssemblyReloadEvents.beforeAssemblyReload +=
+                CleanupFormalEvacuationMixedProfilerCapture;
+            AssemblyReloadEvents.beforeAssemblyReload -=
+                CancelFormalEvacuationMixedGuiCapture;
+            AssemblyReloadEvents.beforeAssemblyReload +=
+                CancelFormalEvacuationMixedGuiCapture;
+        }
 
         [Serializable]
         private sealed class Result
@@ -190,6 +239,152 @@ namespace WasteCity.Editor
             public int frameOccurrences;
             public int sampleOccurrences;
             public long descendantGcAllocationBytes;
+        }
+
+        [Serializable]
+        private sealed class FormalEvacuationMixedPerformanceResult
+        {
+            public int sampleCount;
+            public int productionStateCount;
+            public int runnableProductionStateCount;
+            public int towerCount;
+            public int aliveEnemyCount;
+            public bool defenseHudVisible;
+            public int defenseHudRefreshCount;
+            public bool evacuationManifestVisible;
+            public bool evacuationInCombat;
+            public int evacuationManifestItemCount;
+            public int outerCityEvacuationItemCount;
+            public string[] productionStateIds;
+            public float[] productionProgressBefore;
+            public float[] productionProgressAfter;
+            public string[] productionStopReasonsBefore;
+            public string[] productionStopReasonsAfter;
+            public int[] productionStateAdvanceFrameCounts;
+            public int miningNodeAmountBefore;
+            public int miningNodeAmountAfter;
+            public int ironAmountBefore;
+            public int ironAmountAfter;
+            public int alloyAmountBefore;
+            public int alloyAmountAfter;
+            public int cityAmmunitionAmountBefore;
+            public int cityAmmunitionAmountAfter;
+            public int towerAmmunitionAmountBefore;
+            public int towerAmmunitionAmountAfter;
+            public int ammunitionAmountBefore;
+            public int ammunitionAmountAfter;
+            public int productionAdvancedStageCount;
+            public int stableAdapterUiObjectCount;
+            public int finalUiObjectCount;
+            public long stableAdapterManagedAllocationBytes;
+            public long stableAdapterProfiledAllocationBytes;
+            public long activeDefenseManagedAllocationBytes;
+            public long activeDefenseProfiledAllocationBytes;
+            public long activeDefenseMeasuredAllocationBytes;
+            public long activeDefenseAllocationBudgetBytes;
+            public long mixedFrameManagedAllocationBytes;
+            public long mixedFrameProfiledAllocationBytes;
+            public long transactionManagedAllocationBytes;
+            public long transactionProfiledAllocationBytes;
+            public long transactionMeasuredAllocationBytes;
+            public long transactionAllocationBaselineBytes;
+            public long transactionAllocationPerManifestItemBytes;
+            public long transactionAllocationBudgetBytes;
+            public int transactionCommittedItemCount;
+            public double[] mixedFrameMilliseconds;
+            public double mixedFrameAverageMilliseconds;
+            public double mixedFrameMedianMilliseconds;
+            public double mixedFrameMaximumMilliseconds;
+            public FormalProfilerMarkerResult[] markers;
+        }
+
+        [Serializable]
+        private sealed class FormalProfilerMarkerResult
+        {
+            public string name;
+            public long occurrenceCount;
+            public long totalNanoseconds;
+            public long maximumNanoseconds;
+        }
+
+        private readonly struct FormalTransactionAllocationMetrics
+        {
+            public FormalTransactionAllocationMetrics(
+                long currentThreadBytes,
+                long profiledBytes,
+                int manifestItemCount,
+                int committedItemCount)
+            {
+                CurrentThreadBytes = currentThreadBytes;
+                ProfiledBytes = profiledBytes;
+                MeasuredBytes = Math.Max(currentThreadBytes, profiledBytes);
+                ManifestItemCount = manifestItemCount;
+                CommittedItemCount = committedItemCount;
+                BudgetBytes = checked(
+                    FormalTransactionAllocationBaselineBytes +
+                    FormalTransactionAllocationPerManifestItemBytes *
+                    manifestItemCount);
+            }
+
+            public long CurrentThreadBytes { get; }
+            public long ProfiledBytes { get; }
+            public long MeasuredBytes { get; }
+            public int ManifestItemCount { get; }
+            public int CommittedItemCount { get; }
+            public long BudgetBytes { get; }
+        }
+
+        private sealed class FormalEvacuationMixedFixture
+        {
+            public GameObject Root;
+            public Material Material;
+            public GrayboxBuildingSession3D Session;
+            public WorldMapModel World;
+            public GrayboxProductionController3D ProductionController;
+            public GrayboxProductionRuntime3D Production;
+            public GrayboxDefenseController3D DefenseController;
+            public GrayboxDefenseRuntime3D Defense;
+            public GrayboxDefenseHudView3D Hud;
+            public GrayboxEvacuationController3D Evacuation;
+            public GrayboxBuildingMenuView3D Menu;
+            public GrayboxBuildingInputRouter3D Input;
+            public GrayboxFormalMixedProfilerHeartbeat3D Heartbeat;
+            public Canvas Canvas;
+
+            public int UiObjectCount => Canvas == null
+                ? 0
+                : Canvas.GetComponentsInChildren<Transform>(true).Length;
+
+            public void TickStableAdapters()
+            {
+                Input.ProcessCurrentInput();
+                Evacuation.Tick(0f, false);
+                Menu.ShowEvacuationManifest(
+                    Evacuation.CaptureManifestView());
+            }
+        }
+
+        private sealed class FormalFortressDeploymentRequest :
+            IGrayboxDeploymentRequest3D
+        {
+            public CityMode Mode => CityMode.Fortress;
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                failureReason = string.Empty;
+                return true;
+            }
+        }
+
+        private sealed class FormalNullBuildingPresentation :
+            IGrayboxBuildingPresentation3D
+        {
+            public static FormalNullBuildingPresentation Instance { get; } =
+                new FormalNullBuildingPresentation();
+
+            public bool TryCreate(GrayboxBuildingInstance3D instance) => true;
+            public void UpdateInstance(GrayboxBuildingInstance3D instance) { }
+            public void Remove(GrayboxBuildingInstance3D instance) { }
         }
 
         private readonly struct BuildingRunMetrics
@@ -1192,7 +1387,1368 @@ namespace WasteCity.Editor
             Debug.Log("First terrain runtime evidence result: " + resultPath);
         }
 
+        [MenuItem(
+            "WasteCity/Performance/Prepare Formal Evacuation Mixed Profiler")]
+        public static void PrepareFormalEvacuationMixedProfilerCapture()
+        {
+            if (!EditorApplication.isPlaying)
+                throw new InvalidOperationException(
+                    "Formal evacuation mixed Profiler preparation requires Play Mode.");
+
+            CleanupFormalEvacuationMixedProfilerCapture();
+            FormalEvacuationMixedFixture fixture =
+                CreateFormalEvacuationMixedFixture();
+            fixture.Root.name = "FormalEvacuationMixedProfiler.LiveFixture";
+            fixture.Root.hideFlags = HideFlags.DontSave;
+            liveFormalEvacuationMixedFixture = fixture;
+
+            EvacuationManifestViewModel manifest =
+                fixture.Evacuation.CaptureManifestView();
+            Debug.Log(
+                "Formal evacuation mixed Profiler fixture is live: " +
+                fixture.Production.States.Count +
+                " production states, " +
+                fixture.Defense.Snapshot.AliveEnemyCount +
+                " enemies, " + manifest.Items.Count +
+                " manifest items. Required capture order: warm up first; " +
+                "then start a capture of exactly 300 frames; while that " +
+                "window is recording run Pulse Formal Evacuation Transaction " +
+                "Markers exactly once; save the capture; finally run Cleanup " +
+                "Formal Evacuation Mixed Profiler.");
+        }
+
+        [MenuItem(
+            "WasteCity/Performance/Cleanup Formal Evacuation Mixed Profiler")]
+        public static void CleanupFormalEvacuationMixedProfilerCapture()
+        {
+            CancelFormalEvacuationMixedGuiCapture();
+            FormalEvacuationMixedFixture fixture =
+                liveFormalEvacuationMixedFixture;
+            liveFormalEvacuationMixedFixture = null;
+            if (fixture == null)
+                return;
+            if (fixture.Root != null)
+                UnityEngine.Object.DestroyImmediate(fixture.Root);
+            if (fixture.Material != null)
+                UnityEngine.Object.DestroyImmediate(fixture.Material);
+            Debug.Log("Formal evacuation mixed Profiler fixture cleaned up.");
+        }
+
+        [MenuItem(
+            "WasteCity/Performance/Capture Formal Evacuation Mixed 300 Frames")]
+        public static void CaptureFormalEvacuationMixedProfiler300Frames()
+        {
+            if (!EditorApplication.isPlaying ||
+                liveFormalEvacuationMixedFixture == null ||
+                liveFormalEvacuationMixedFixture.Root == null)
+                throw new InvalidOperationException(
+                    "Prepare the live formal evacuation mixed Profiler fixture in Play Mode first.");
+            if (formalMixedGuiCaptureActive)
+                throw new InvalidOperationException(
+                    "Formal evacuation mixed 300-frame capture is already running.");
+
+            string configured = Environment.GetEnvironmentVariable(
+                FormalEvacuationMixedGuiProfilerEnvironmentVariable);
+            string outputPath;
+            if (string.IsNullOrWhiteSpace(configured))
+            {
+                outputPath = Path.GetFullPath(Path.Combine(
+                    Path.GetTempPath(),
+                    DefaultFormalEvacuationMixedGuiDirectoryName,
+                    DefaultFormalEvacuationMixedGuiFileName));
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(outputPath));
+            }
+            else
+            {
+                outputPath = ResolveExternalPath(
+                    FormalEvacuationMixedGuiProfilerEnvironmentVariable,
+                    true);
+            }
+            DeleteIfPresent(outputPath);
+
+            liveFormalEvacuationMixedFixture.Heartbeat.ResetPulseTracking();
+            ProfilerDriver.enabled = false;
+            ProfilerDriver.ClearAllFrames();
+            formalMixedGuiCapturePath = outputPath;
+            formalMixedGuiCapturePulsed = false;
+            formalMixedGuiCaptureActive = true;
+            EditorApplication.update -= TickFormalEvacuationMixedGuiCapture;
+            EditorApplication.update += TickFormalEvacuationMixedGuiCapture;
+            ProfilerDriver.enabled = true;
+            Debug.Log(
+                "Formal evacuation mixed automatic Profiler capture started; " +
+                "it will record exactly 300 frames and pulse the isolated " +
+                "transaction once near frame 100: " + outputPath);
+        }
+
+        private static void TickFormalEvacuationMixedGuiCapture()
+        {
+            if (!formalMixedGuiCaptureActive)
+                return;
+            try
+            {
+                if (!EditorApplication.isPlaying ||
+                    liveFormalEvacuationMixedFixture == null ||
+                    liveFormalEvacuationMixedFixture.Root == null)
+                    throw new InvalidOperationException(
+                        "Play Mode or the live formal mixed fixture ended during capture.");
+
+                int frameCount = CurrentFormalProfilerFrameCount();
+                GrayboxFormalMixedProfilerHeartbeat3D heartbeat =
+                    liveFormalEvacuationMixedFixture.Heartbeat;
+                if (heartbeat.PulseCompletionCount > 1)
+                    throw new InvalidOperationException(
+                        "Formal mixed PlayMode heartbeat pulsed more than once.");
+                if (!formalMixedGuiCapturePulsed && frameCount >= 100)
+                {
+                    if (heartbeat.PulseCompletionCount == 0)
+                        heartbeat.RequestPulse();
+                    else
+                        formalMixedGuiCapturePulsed = true;
+                }
+                if (frameCount < FormalEvacuationMixedSampleCount)
+                    return;
+
+                ProfilerDriver.enabled = false;
+                frameCount = CurrentFormalProfilerFrameCount();
+                if (frameCount != FormalEvacuationMixedSampleCount ||
+                    !formalMixedGuiCapturePulsed ||
+                    heartbeat.PulseCompletionCount != 1)
+                    throw new InvalidOperationException(
+                        "Formal mixed GUI Profiler capture must stop at exactly " +
+                        "300 frames after one transaction pulse; found " +
+                        frameCount + ".");
+                ProfilerDriver.SaveProfile(formalMixedGuiCapturePath);
+                if (!File.Exists(formalMixedGuiCapturePath))
+                    throw new InvalidOperationException(
+                        "Formal mixed GUI Profiler data was not saved.");
+
+                string completedPath = formalMixedGuiCapturePath;
+                EndFormalEvacuationMixedGuiCapture();
+                Debug.Log(
+                    "Formal evacuation mixed automatic Profiler capture " +
+                    "completed by the PlayMode heartbeat: 300 frames, " +
+                    "transaction pulse exactly once, " +
+                    "saved to " + completedPath +
+                    ". The live fixture remains available for screenshots; " +
+                    "run Cleanup Formal Evacuation Mixed Profiler afterward.");
+            }
+            catch (Exception exception)
+            {
+                CancelFormalEvacuationMixedGuiCapture();
+                Debug.LogException(exception);
+            }
+        }
+
+        private static int CurrentFormalProfilerFrameCount()
+        {
+            int firstFrame = ProfilerDriver.firstFrameIndex;
+            int lastFrame = ProfilerDriver.lastFrameIndex;
+            return lastFrame >= firstFrame
+                ? lastFrame - firstFrame + 1
+                : 0;
+        }
+
+        private static void CancelFormalEvacuationMixedGuiCapture()
+        {
+            if (!formalMixedGuiCaptureActive)
+                return;
+            ProfilerDriver.enabled = false;
+            EndFormalEvacuationMixedGuiCapture();
+            Debug.Log(
+                "Formal evacuation mixed automatic Profiler capture cancelled; " +
+                "Profiler recording was disabled.");
+        }
+
+        private static void EndFormalEvacuationMixedGuiCapture()
+        {
+            EditorApplication.update -= TickFormalEvacuationMixedGuiCapture;
+            formalMixedGuiCaptureActive = false;
+            formalMixedGuiCapturePulsed = false;
+            formalMixedGuiCapturePath = null;
+        }
+
+        [MenuItem(
+            "WasteCity/Performance/Pulse Formal Evacuation Transaction Markers")]
+        public static void PulseFormalEvacuationTransactionalMarkersForProfiler()
+        {
+            if (!EditorApplication.isPlaying ||
+                liveFormalEvacuationMixedFixture == null)
+                throw new InvalidOperationException(
+                    "Prepare the live formal evacuation mixed Profiler fixture in Play Mode first.");
+
+            FormalEvacuationMixedFixture transactionFixture = null;
+            try
+            {
+                transactionFixture = CreateFormalEvacuationMixedFixture();
+                FormalTransactionAllocationMetrics transaction =
+                    ExecuteFormalQuickDismantleTransaction(
+                        transactionFixture);
+                Debug.Log(
+                    "Formal evacuation preflight/commit markers pulsed once " +
+                    "from an isolated fixture; this single-frame transaction " +
+                    "is not part of the stable per-frame GC window. " +
+                    "Measured allocation=" + transaction.MeasuredBytes +
+                    " B, linear budget=" + transaction.BudgetBytes +
+                    " B, committed=" + transaction.CommittedItemCount + ".");
+            }
+            finally
+            {
+                if (transactionFixture?.Root != null)
+                    UnityEngine.Object.DestroyImmediate(transactionFixture.Root);
+                if (transactionFixture?.Material != null)
+                    UnityEngine.Object.DestroyImmediate(
+                        transactionFixture.Material);
+            }
+        }
+
+        private static void HandleFormalProfilerPlayModeStateChanged(
+            PlayModeStateChange state)
+        {
+            if (state == PlayModeStateChange.ExitingPlayMode ||
+                state == PlayModeStateChange.EnteredEditMode)
+            {
+                CancelFormalEvacuationMixedGuiCapture();
+                CleanupFormalEvacuationMixedProfilerCapture();
+            }
+        }
+
+        public static void MeasureFormalEvacuationMixedPerformance()
+        {
+            string resultPath = ResolveFormalEvacuationMixedResultPath();
+            string temporaryPath = resultPath + ".tmp";
+            DeleteIfPresent(resultPath);
+            DeleteIfPresent(temporaryPath);
+            FormalEvacuationMixedFixture fixture = null;
+            ProfilerRecorder[] markerRecorders = null;
+            try
+            {
+                fixture = CreateFormalEvacuationMixedFixture();
+                EvacuationManifestViewModel manifest =
+                    fixture.Evacuation.CaptureManifestView();
+                int initialProductionStateCount =
+                    fixture.Production.States.Count;
+                int initialRunnableProductionStateCount =
+                    fixture.Production.RunnableStates.Count;
+                GrayboxDefenseRuntimeSnapshot3D initialDefense =
+                    fixture.Defense.Snapshot;
+                int outerCityItemCount = 0;
+                for (int index = 0;
+                     index < fixture.Session.Instances.Count;
+                     index++)
+                {
+                    if (fixture.Session.Instances[index].Placement.Site ==
+                        BuildingSite.Ground)
+                        outerCityItemCount++;
+                }
+                ValidateFormalEvacuationMixedFixture(
+                    fixture,
+                    manifest,
+                    initialDefense,
+                    outerCityItemCount);
+                CaptureFormalProductionStateEvidence(
+                    fixture,
+                    out string[] productionStateIds,
+                    out float[] productionProgressBefore,
+                    out string[] productionStopReasonsBefore);
+                int miningNodeAmountBefore =
+                    CaptureFormalMiningNodeAmount(fixture.World);
+                int ironAmountBefore = fixture.Session.GetCityResourceAmount(
+                    ResourceIds.Iron);
+                int alloyAmountBefore = fixture.Session.GetCityResourceAmount(
+                    ResourceIds.Alloy);
+                int cityAmmunitionAmountBefore =
+                    fixture.Session.GetCityResourceAmount(
+                        ResourceIds.Ammunition);
+                int towerAmmunitionAmountBefore =
+                    CaptureFormalTowerAmmunition(fixture.Defense);
+                int ammunitionAmountBefore = checked(
+                    cityAmmunitionAmountBefore +
+                    towerAmmunitionAmountBefore);
+
+                for (int warmup = 0; warmup < 12; warmup++)
+                    fixture.TickStableAdapters();
+                int stableUiObjectCount = fixture.UiObjectCount;
+
+                markerRecorders = StartFormalMarkerRecorders();
+                MeasureManagedAllocations(
+                    FormalEvacuationMixedSampleCount,
+                    fixture.TickStableAdapters,
+                    out long stableCurrentThreadBytes,
+                    out long stableProfiledBytes);
+
+                int defenseObservable = 0;
+                MeasureManagedAllocations(
+                    FormalEvacuationMixedSampleCount,
+                    () =>
+                    {
+                        fixture.Defense.Tick(
+                            .1f,
+                            false,
+                            fixture.Session.CityStorage);
+                        GrayboxDefenseRuntimeSnapshot3D snapshot =
+                            fixture.Defense.Snapshot;
+                        defenseObservable += snapshot.AliveEnemyCount;
+                        if (snapshot.Enemies.Count > 0)
+                            defenseObservable +=
+                                snapshot.Enemies[0].CurrentHealth;
+                    },
+                    out long defenseCurrentThreadBytes,
+                    out long defenseProfiledBytes);
+                long defenseMeasuredBytes = Math.Max(
+                    defenseCurrentThreadBytes,
+                    defenseProfiledBytes);
+                if (defenseObservable <= 0)
+                    throw new InvalidOperationException(
+                        "Formal active-defense observation was incomplete.");
+
+                var frameMilliseconds = new double[
+                    FormalEvacuationMixedSampleCount];
+                var productionProgressAtFrameStart = new float[
+                    productionStateIds.Length];
+                var productionStateAdvanceFrameCounts = new int[
+                    productionStateIds.Length];
+                ProfilerRecorder mixedGcRecorder = StartGcAllocationRecorder();
+                int mixedObservable = 0;
+                long mixedCurrentThreadBytes = 0L;
+                long mixedProfiledBytes = 0L;
+                try
+                {
+                    long mixedBefore = GC.GetAllocatedBytesForCurrentThread();
+                    for (int sample = 0;
+                         sample < FormalEvacuationMixedSampleCount;
+                         sample++)
+                    {
+                        long before = Stopwatch.GetTimestamp();
+                        for (int index = 0;
+                             index < productionStateIds.Length;
+                             index++)
+                        {
+                            BuildingProductionState state =
+                                fixture.Production.States[index];
+                            if (!string.Equals(
+                                    state.StableInstanceId,
+                                    productionStateIds[index],
+                                    StringComparison.Ordinal))
+                                throw new InvalidOperationException(
+                                    "Formal production state ordering changed during measurement.");
+                            productionProgressAtFrameStart[index] =
+                                state.ProgressSeconds;
+                        }
+                        if (!fixture.ProductionController.Tick(.1f, false))
+                            throw new InvalidOperationException(
+                                "Formal production controller rejected a mixed frame.");
+                        if (!fixture.DefenseController.Tick(.1f, false))
+                            throw new InvalidOperationException(
+                                "Formal defense controller rejected a mixed frame.");
+                        GrayboxDefenseRuntimeSnapshot3D defense =
+                            fixture.DefenseController.Snapshot;
+                        fixture.TickStableAdapters();
+                        for (int index = 0;
+                             index < productionStateIds.Length;
+                             index++)
+                        {
+                            BuildingProductionState state =
+                                fixture.Production.States[index];
+                            if (state.StopReason == ProductionStopReason.None &&
+                                Math.Abs(
+                                    state.ProgressSeconds -
+                                    productionProgressAtFrameStart[index]) >
+                                .000001f)
+                                productionStateAdvanceFrameCounts[index]++;
+                        }
+                        long after = Stopwatch.GetTimestamp();
+                        frameMilliseconds[sample] =
+                            (after - before) * 1000d / Stopwatch.Frequency;
+                        mixedObservable += defense.AliveEnemyCount;
+                        mixedObservable += fixture.Production.States.Count;
+                    }
+                    mixedCurrentThreadBytes =
+                        GC.GetAllocatedBytesForCurrentThread() - mixedBefore;
+                }
+                finally
+                {
+                    mixedGcRecorder.Stop();
+                    mixedProfiledBytes = SumGcAllocationBytes(
+                        mixedGcRecorder);
+                    mixedGcRecorder.Dispose();
+                }
+                if (mixedObservable <= 0)
+                    throw new InvalidOperationException(
+                        "Formal mixed-frame observation was incomplete.");
+                int finalStableUiObjectCount = fixture.UiObjectCount;
+                CaptureFormalProductionStateEvidence(
+                    fixture,
+                    out _,
+                    out float[] productionProgressAfter,
+                    out string[] productionStopReasonsAfter);
+                int miningNodeAmountAfter =
+                    CaptureFormalMiningNodeAmount(fixture.World);
+                int ironAmountAfter = fixture.Session.GetCityResourceAmount(
+                    ResourceIds.Iron);
+                int alloyAmountAfter = fixture.Session.GetCityResourceAmount(
+                    ResourceIds.Alloy);
+                int cityAmmunitionAmountAfter =
+                    fixture.Session.GetCityResourceAmount(
+                        ResourceIds.Ammunition);
+                int towerAmmunitionAmountAfter =
+                    CaptureFormalTowerAmmunition(fixture.Defense);
+                int ammunitionAmountAfter = checked(
+                    cityAmmunitionAmountAfter +
+                    towerAmmunitionAmountAfter);
+                int productionAdvancedStageCount = 0;
+                if (miningNodeAmountAfter < miningNodeAmountBefore)
+                    productionAdvancedStageCount++;
+                // The fixture starts with four alloy, which can yield at most
+                // four ammunition. Any larger total across city + tower proves
+                // that smelters supplied additional alloy to the assembler.
+                if (ammunitionAmountAfter - ammunitionAmountBefore > 4)
+                    productionAdvancedStageCount++;
+                // Any positive city + tower ammunition delta proves that the
+                // assembler itself completed at least one production cycle.
+                if (ammunitionAmountAfter > ammunitionAmountBefore)
+                    productionAdvancedStageCount++;
+
+                // Exercise the formal preflight and commit paths only after
+                // the stable manifest and active-frame samples are frozen.
+                FormalTransactionAllocationMetrics transaction =
+                    ExecuteFormalQuickDismantleTransaction(fixture);
+
+                FormalProfilerMarkerResult[] markerResults =
+                    StopAndReadFormalMarkerRecorders(markerRecorders);
+                markerRecorders = null;
+                double frameTotal = 0d;
+                double frameMaximum = 0d;
+                for (int index = 0; index < frameMilliseconds.Length; index++)
+                {
+                    frameTotal += frameMilliseconds[index];
+                    frameMaximum = Math.Max(
+                        frameMaximum,
+                        frameMilliseconds[index]);
+                }
+                var result = new FormalEvacuationMixedPerformanceResult
+                {
+                    sampleCount = FormalEvacuationMixedSampleCount,
+                    productionStateCount = initialProductionStateCount,
+                    runnableProductionStateCount =
+                        initialRunnableProductionStateCount,
+                    towerCount = initialDefense.Towers.Count,
+                    aliveEnemyCount = initialDefense.AliveEnemyCount,
+                    defenseHudVisible =
+                        fixture.Hud.SummaryRect != null &&
+                        fixture.Hud.SummaryRect.gameObject.activeInHierarchy,
+                    defenseHudRefreshCount = fixture.Hud.RefreshCount,
+                    evacuationManifestVisible = true,
+                    evacuationInCombat = manifest.IsInCombat,
+                    evacuationManifestItemCount = manifest.Items.Count,
+                    outerCityEvacuationItemCount = outerCityItemCount,
+                    productionStateIds = productionStateIds,
+                    productionProgressBefore = productionProgressBefore,
+                    productionProgressAfter = productionProgressAfter,
+                    productionStopReasonsBefore =
+                        productionStopReasonsBefore,
+                    productionStopReasonsAfter = productionStopReasonsAfter,
+                    productionStateAdvanceFrameCounts =
+                        productionStateAdvanceFrameCounts,
+                    miningNodeAmountBefore = miningNodeAmountBefore,
+                    miningNodeAmountAfter = miningNodeAmountAfter,
+                    ironAmountBefore = ironAmountBefore,
+                    ironAmountAfter = ironAmountAfter,
+                    alloyAmountBefore = alloyAmountBefore,
+                    alloyAmountAfter = alloyAmountAfter,
+                    cityAmmunitionAmountBefore =
+                        cityAmmunitionAmountBefore,
+                    cityAmmunitionAmountAfter = cityAmmunitionAmountAfter,
+                    towerAmmunitionAmountBefore =
+                        towerAmmunitionAmountBefore,
+                    towerAmmunitionAmountAfter = towerAmmunitionAmountAfter,
+                    ammunitionAmountBefore = ammunitionAmountBefore,
+                    ammunitionAmountAfter = ammunitionAmountAfter,
+                    productionAdvancedStageCount =
+                        productionAdvancedStageCount,
+                    stableAdapterUiObjectCount = stableUiObjectCount,
+                    finalUiObjectCount = finalStableUiObjectCount,
+                    stableAdapterManagedAllocationBytes =
+                        stableCurrentThreadBytes,
+                    stableAdapterProfiledAllocationBytes = stableProfiledBytes,
+                    activeDefenseManagedAllocationBytes =
+                        defenseCurrentThreadBytes,
+                    activeDefenseProfiledAllocationBytes = defenseProfiledBytes,
+                    activeDefenseMeasuredAllocationBytes = defenseMeasuredBytes,
+                    activeDefenseAllocationBudgetBytes =
+                        FormalDefenseAllocationBudgetBytes,
+                    mixedFrameManagedAllocationBytes = mixedCurrentThreadBytes,
+                    mixedFrameProfiledAllocationBytes = mixedProfiledBytes,
+                    transactionManagedAllocationBytes =
+                        transaction.CurrentThreadBytes,
+                    transactionProfiledAllocationBytes =
+                        transaction.ProfiledBytes,
+                    transactionMeasuredAllocationBytes =
+                        transaction.MeasuredBytes,
+                    transactionAllocationBaselineBytes =
+                        FormalTransactionAllocationBaselineBytes,
+                    transactionAllocationPerManifestItemBytes =
+                        FormalTransactionAllocationPerManifestItemBytes,
+                    transactionAllocationBudgetBytes =
+                        transaction.BudgetBytes,
+                    transactionCommittedItemCount =
+                        transaction.CommittedItemCount,
+                    mixedFrameMilliseconds = frameMilliseconds,
+                    mixedFrameAverageMilliseconds =
+                        frameTotal / frameMilliseconds.Length,
+                    mixedFrameMedianMilliseconds = Median(frameMilliseconds),
+                    mixedFrameMaximumMilliseconds = frameMaximum,
+                    markers = markerResults
+                };
+                Debug.Log(
+                    "Formal evacuation mixed performance candidate: " +
+                    JsonUtility.ToJson(result, true));
+                ValidateFormalEvacuationMixedResult(result);
+                File.WriteAllText(
+                    temporaryPath,
+                    JsonUtility.ToJson(result, true));
+                File.Move(temporaryPath, resultPath);
+                Debug.Log(
+                    "Formal evacuation mixed performance result: " +
+                    resultPath);
+            }
+            finally
+            {
+                if (markerRecorders != null)
+                    DisposeRecorders(markerRecorders);
+                if (fixture?.Root != null)
+                    UnityEngine.Object.DestroyImmediate(fixture.Root);
+                if (fixture?.Material != null)
+                    UnityEngine.Object.DestroyImmediate(fixture.Material);
+                DeleteIfPresent(temporaryPath);
+            }
+        }
+
+        private static FormalEvacuationMixedFixture
+            CreateFormalEvacuationMixedFixture()
+        {
+            var root = new GameObject("FormalEvacuationMixedProbe");
+            Material material = null;
+            try
+            {
+                GrayboxBuildingSession3D session = NewChild(
+                        root.transform,
+                        "Session")
+                    .gameObject.AddComponent<GrayboxBuildingSession3D>();
+                session.Configure(true);
+                session.ConfigureDevelopmentFixture();
+                session.UnlockAllResearchForDevelopment();
+                session.Inventory.Set(ResourceIds.Iron, 5000);
+                session.Inventory.Set(ResourceIds.Alloy, 5000);
+                session.Inventory.Set(ResourceIds.Stone, 5000);
+                session.Inventory.Set(ResourceIds.Ammunition, 5000);
+
+                WorldMapModel world = CreateFormalProductionWorld();
+                BuildFormalMixedPopulation(session);
+                // Prime both smelter input buffers so the 2:2:1 formal chain
+                // starts as an active mixed workload rather than allowing the
+                // stable-ID-first smelter to consume the entire startup buffer.
+                session.Inventory.Set(ResourceIds.Iron, 40);
+                session.Inventory.Set(ResourceIds.Alloy, 4);
+                session.Inventory.Set(ResourceIds.Ammunition, 0);
+                session.Inventory.Set(ResourceIds.Stone, 0);
+                Shader shader = Shader.Find("Hidden/InternalErrorShader");
+                if (shader == null)
+                    throw new InvalidOperationException(
+                        "Hidden/InternalErrorShader is unavailable.");
+                material = new Material(shader);
+                Transform worldRoot = NewChild(root.transform, "World");
+                GrayboxWorldView3D worldView = worldRoot.gameObject
+                    .AddComponent<GrayboxWorldView3D>();
+                worldView.Configure(
+                    NewChild(worldRoot, "Terrain"),
+                    NewChild(worldRoot, "Resources"),
+                    NewChild(worldRoot, "Obstacles"),
+                    material);
+                worldView.Generate(world);
+                Transform cityTransform = NewChild(root.transform, "City");
+                if (!worldView.Coordinates.TryCellToWorld(
+                        12,
+                        12,
+                        .5f,
+                        out Vector3 cityPosition))
+                    throw new InvalidOperationException(
+                        "Formal mixed city coordinate is unavailable.");
+                cityTransform.position = cityPosition;
+                Rigidbody cityBody = cityTransform.gameObject
+                    .AddComponent<Rigidbody>();
+                BoxCollider cityCollider = cityTransform.gameObject
+                    .AddComponent<BoxCollider>();
+                GrayboxMobileCityController3D city = cityTransform.gameObject
+                    .AddComponent<GrayboxMobileCityController3D>();
+                city.Configure(worldView, cityBody, cityCollider);
+                if (!city.RestoreDeploymentForDevelopment(CityMode.Fortress))
+                    throw new InvalidOperationException(
+                        "Formal mixed city could not enter Fortress mode.");
+                GrayboxProductionController3D productionController = NewChild(
+                        root.transform,
+                        "Production")
+                    .gameObject.AddComponent<GrayboxProductionController3D>();
+                productionController.Configure(session, city, worldView);
+                if (!productionController.Tick(.5f, false))
+                    throw new InvalidOperationException(
+                        "Formal mixed production setup failed.");
+                GrayboxProductionRuntime3D production =
+                    productionController.Clock.Runtime;
+
+                var defense = new GrayboxDefenseRuntime3D(
+                    12f,
+                    12f,
+                    1000f,
+                    12f);
+                defense.Synchronize(
+                    session.Instances,
+                    CityMode.Fortress,
+                    12,
+                    12,
+                    session.GroundBuildRadius);
+                defense.Tick(55f, false, session.CityStorage);
+
+                Canvas canvas = NewChild(root.transform, "Canvas")
+                    .gameObject.AddComponent<Canvas>();
+                EventSystem eventSystem = NewChild(
+                        root.transform,
+                        "EventSystem")
+                    .gameObject.AddComponent<EventSystem>();
+                GrayboxBuildingInteractionModel3D interaction = NewChild(
+                        root.transform,
+                        "Interaction")
+                    .gameObject.AddComponent<
+                        GrayboxBuildingInteractionModel3D>();
+                GrayboxBuildingMenuView3D menu = NewChild(
+                        root.transform,
+                        "BuildingMenu")
+                    .gameObject.AddComponent<GrayboxBuildingMenuView3D>();
+                menu.Configure(canvas, eventSystem, session, interaction);
+                GrayboxDefenseHudView3D hud = NewChild(
+                        root.transform,
+                        "DefenseHud")
+                    .gameObject.AddComponent<GrayboxDefenseHudView3D>();
+                hud.Configure(canvas, eventSystem);
+                hud.Apply(
+                    defense.Snapshot,
+                    GrayboxDefenseSelectionKind3D.None,
+                    null);
+                GrayboxBuildingWorldView3D buildingPresentation = NewChild(
+                        root.transform,
+                        "BuildingPresentation")
+                    .gameObject.AddComponent<GrayboxBuildingWorldView3D>();
+                buildingPresentation.Configure(
+                    NewChild(buildingPresentation.transform, "Instances"),
+                    NewChild(
+                        buildingPresentation.transform,
+                        "Infrastructure"),
+                    material,
+                    city);
+                GrayboxDefenseWorldView3D defenseWorldView = NewChild(
+                        root.transform,
+                        "DefenseWorld")
+                    .gameObject.AddComponent<GrayboxDefenseWorldView3D>();
+                defenseWorldView.Configure(
+                    NewChild(defenseWorldView.transform, "Enemies"),
+                    NewChild(defenseWorldView.transform, "Towers"),
+                    material,
+                    worldView.Coordinates);
+                GrayboxDefenseController3D defenseController = NewChild(
+                        root.transform,
+                        "Defense")
+                    .gameObject.AddComponent<GrayboxDefenseController3D>();
+                defenseController.Configure(
+                    session,
+                    city,
+                    worldView,
+                    buildingPresentation,
+                    defenseWorldView,
+                    hud);
+                SetPrivateInstanceField(
+                    defenseController,
+                    "runtime",
+                    defense);
+                SetPrivateInstanceField(
+                    defenseController,
+                    "snapshot",
+                    defense.Snapshot);
+
+                GrayboxEvacuationController3D evacuation = NewChild(
+                        root.transform,
+                        "Evacuation")
+                    .gameObject.AddComponent<GrayboxEvacuationController3D>();
+                evacuation.Configure(
+                    session,
+                    new FormalFortressDeploymentRequest(),
+                    FormalNullBuildingPresentation.Instance,
+                    menu);
+                evacuation.ConfigureOperationalRuntimes(production, defense);
+                if (!evacuation.TryHandleDeploymentRequest())
+                    throw new InvalidOperationException(
+                        "Formal mixed probe could not open evacuation.");
+                menu.ShowEvacuationManifest(
+                    evacuation.CaptureManifestView());
+
+                GrayboxBuildingInputRouter3D input = NewChild(
+                        root.transform,
+                        "BuildingInput")
+                    .gameObject.AddComponent<GrayboxBuildingInputRouter3D>();
+                input.Configure(
+                    menu,
+                    interaction,
+                    null,
+                    null,
+                    evacuation,
+                    null);
+                GrayboxFormalMixedProfilerHeartbeat3D heartbeat = NewChild(
+                        root.transform,
+                        "ProfilerHeartbeat")
+                    .gameObject.AddComponent<
+                        GrayboxFormalMixedProfilerHeartbeat3D>();
+                heartbeat.Configure(
+                    PulseFormalEvacuationTransactionalMarkersForProfiler);
+                return new FormalEvacuationMixedFixture
+                {
+                    Root = root,
+                    Material = material,
+                    Session = session,
+                    World = world,
+                    ProductionController = productionController,
+                    Production = production,
+                    DefenseController = defenseController,
+                    Defense = defense,
+                    Hud = hud,
+                    Evacuation = evacuation,
+                    Menu = menu,
+                    Input = input,
+                    Heartbeat = heartbeat,
+                    Canvas = canvas
+                };
+            }
+            catch
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+                if (material != null)
+                    UnityEngine.Object.DestroyImmediate(material);
+                throw;
+            }
+        }
+
+        private static WorldMapModel CreateFormalProductionWorld()
+        {
+            var cells = new WorldCell[24, 24];
+            var open = new WorldCell(
+                TerrainKind.Wasteland,
+                null,
+                0,
+                WorldTraversalKind.Open);
+            for (int x = 0; x < 24; x++)
+            for (int y = 0; y < 24; y++)
+                cells[x, y] = open;
+            cells[5, 9] = new WorldCell(
+                TerrainKind.Rocky,
+                ResourceIds.Iron,
+                1000);
+            cells[5, 13] = new WorldCell(
+                TerrainKind.Rocky,
+                ResourceIds.Iron,
+                1000);
+            return new WorldMapModel(cells);
+        }
+
+        private static int CaptureFormalMiningNodeAmount(WorldMapModel world)
+        {
+            return checked(
+                world.Get(5, 9).ResourceAmount +
+                world.Get(5, 13).ResourceAmount);
+        }
+
+        private static int CaptureFormalTowerAmmunition(
+            GrayboxDefenseRuntime3D defense)
+        {
+            int amount = 0;
+            for (int index = 0; index < defense.Towers.Count; index++)
+                amount = checked(
+                    amount + defense.Towers[index].Combat.Ammo);
+            return amount;
+        }
+
+        private static void CaptureFormalProductionStateEvidence(
+            FormalEvacuationMixedFixture fixture,
+            out string[] stableIds,
+            out float[] progress,
+            out string[] stopReasons)
+        {
+            int count = fixture.Production.States.Count;
+            stableIds = new string[count];
+            progress = new float[count];
+            stopReasons = new string[count];
+            for (int index = 0; index < count; index++)
+            {
+                BuildingProductionState state =
+                    fixture.Production.States[index];
+                stableIds[index] = state.StableInstanceId;
+                progress[index] = state.ProgressSeconds;
+                stopReasons[index] = state.StopReason.ToString();
+            }
+        }
+
+        private static void SetPrivateInstanceField(
+            object target,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null)
+                throw new MissingFieldException(
+                    target.GetType().FullName,
+                    fieldName);
+            field.SetValue(target, value);
+        }
+
+        private static FormalTransactionAllocationMetrics
+            ExecuteFormalQuickDismantleTransaction(
+            FormalEvacuationMixedFixture fixture)
+        {
+            ProfilerRecorder recorder = StartGcAllocationRecorder();
+            long currentThreadBytes = 0L;
+            long profiledBytes = 0L;
+            int committedItemCount = 0;
+            const int manifestItemCount = 16;
+            try
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int index = 0; index < ResourceIds.All.Length; index++)
+                    fixture.Session.Inventory.Set(ResourceIds.All[index], 0);
+
+                string warehouseId = null;
+                for (int index = 0;
+                     index < fixture.Session.Instances.Count;
+                     index++)
+                {
+                    GrayboxBuildingInstance3D instance =
+                        fixture.Session.Instances[index];
+                    if (instance.Placement.Definition.Id.Value ==
+                        BuildingCatalog.Warehouse.Id.Value)
+                    {
+                        warehouseId = instance.StableInstanceId;
+                        break;
+                    }
+                }
+                if (string.IsNullOrEmpty(warehouseId) ||
+                    fixture.Session.CityStorage.AddToWarehouse(
+                        warehouseId,
+                        ResourceIds.Biomass,
+                        3) != 3)
+                    throw new InvalidOperationException(
+                        "Formal transaction could not seed warehouse migration payload.");
+
+                if (fixture.Evacuation.AssignAll(
+                        BuildingEvacuationTreatment.QuickDismantle) !=
+                    manifestItemCount)
+                    throw new InvalidOperationException(
+                        "Formal transaction could not assign 16 quick dismantles.");
+                EvacuationManifestViewModel planned =
+                    fixture.Evacuation.CaptureManifestView();
+                int payloadItems = 0;
+                for (int index = 0; index < planned.Items.Count; index++)
+                {
+                    EvacuationManifestItemViewModel item = planned.Items[index];
+                    if (item.ExpectedRefunds.Count > 0 ||
+                        item.Input.Count > 0 ||
+                        item.ReservedInput.Count > 0 ||
+                        item.Output.Count > 0 ||
+                        item.AmmunitionAmount > 0 ||
+                        item.WarehouseContents.Count > 0)
+                        payloadItems++;
+                }
+                if (planned.Items.Count != manifestItemCount ||
+                    payloadItems <= 0 ||
+                    !planned.CanConfirm ||
+                    !fixture.Evacuation.ConfirmManifest())
+                    throw new InvalidOperationException(
+                        "Formal quick-dismantle preflight was empty or could not commit.");
+                for (int index = 0;
+                     index < fixture.Session.Instances.Count;
+                     index++)
+                {
+                    if (fixture.Session.Instances[index].Placement.Site ==
+                        BuildingSite.Ground)
+                        committedItemCount++;
+                }
+                committedItemCount = manifestItemCount - committedItemCount;
+                if (fixture.Evacuation.IsProcessing ||
+                    fixture.Evacuation.IsBlocked ||
+                    committedItemCount != manifestItemCount ||
+                    fixture.Session.HasPlayerOwnedGroundInstances)
+                    throw new InvalidOperationException(
+                        "Formal quick-dismantle transaction did not atomically commit all 16 outer-city items.");
+                currentThreadBytes =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+            }
+            finally
+            {
+                recorder.Stop();
+                profiledBytes = SumGcAllocationBytes(recorder);
+                recorder.Dispose();
+            }
+            return new FormalTransactionAllocationMetrics(
+                currentThreadBytes,
+                profiledBytes,
+                manifestItemCount,
+                committedItemCount);
+        }
+
+        private static void BuildFormalMixedPopulation(
+            GrayboxBuildingSession3D session)
+        {
+            BeginFormalMixedBuilding(
+                session,
+                BuildingCatalog.MiningStation,
+                BuildingSite.Ground,
+                5,
+                9,
+                new ResourceNodeBinding("world.resource-node.5.9", 5, 9));
+            BeginFormalMixedBuilding(
+                session,
+                BuildingCatalog.MiningStation,
+                BuildingSite.Ground,
+                5,
+                13,
+                new ResourceNodeBinding("world.resource-node.5.13", 5, 13));
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.Smelter,
+                BuildingSite.Ground, 8, 8);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.Smelter,
+                BuildingSite.Ground, 8, 14);
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.Assembler,
+                BuildingSite.InnerCity, 0, 0);
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.MachineGunTurret,
+                BuildingSite.Ground, 10, 12);
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.Warehouse,
+                BuildingSite.Ground, 14, 10);
+            BeginFormalMixedBuilding(
+                session, BuildingCatalog.ResearchStation,
+                BuildingSite.Ground, 14, 14);
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+
+            int[,] walls =
+            {
+                { 4, 6 }, { 6, 6 }, { 8, 6 }, { 10, 6 },
+                { 12, 6 }, { 14, 6 }, { 16, 6 }, { 18, 6 },
+                { 18, 8 }
+            };
+            for (int index = 0; index < walls.GetLength(0) - 1; index++)
+            {
+                BeginFormalMixedBuilding(
+                    session,
+                    BuildingCatalog.Wall,
+                    BuildingSite.Ground,
+                    walls[index, 0],
+                    walls[index, 1]);
+            }
+            session.CompleteAllConstructionForDevelopment(
+                FormalNullBuildingPresentation.Instance);
+            int finalWall = walls.GetLength(0) - 1;
+            BeginFormalMixedBuilding(
+                session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                walls[finalWall, 0],
+                walls[finalWall, 1]);
+        }
+
+        private static void BeginFormalMixedBuilding(
+            GrayboxBuildingSession3D session,
+            BuildingDefinition definition,
+            BuildingSite site,
+            int x,
+            int y,
+            ResourceNodeBinding resourceNode = default)
+        {
+            BuildingUnlockEvaluation unlock = BuildingUnlockModel.Evaluate(
+                definition,
+                session.Population,
+                session.IsResearchCompleted,
+                session.CompletedBuildingCount);
+            var request = new BuildingPlacementRequest(
+                definition,
+                site == BuildingSite.Ground
+                    ? session.GroundGrid
+                    : session.InnerGrid,
+                site,
+                BuildingOrientation.North,
+                x,
+                y,
+                12,
+                12,
+                session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                resourceNode,
+                true,
+                unlock,
+                true);
+            if (!session.TryBeginConstruction(
+                    request,
+                    FormalNullBuildingPresentation.Instance,
+                    out _,
+                    out BuildingPlacementEvaluation evaluation))
+            {
+                throw new InvalidOperationException(
+                    "Formal mixed placement failed for " +
+                    definition.Name + ": " + evaluation.PrimaryFailure);
+            }
+        }
+
+        private static void ValidateFormalEvacuationMixedFixture(
+            FormalEvacuationMixedFixture fixture,
+            EvacuationManifestViewModel manifest,
+            GrayboxDefenseRuntimeSnapshot3D defense,
+            int outerCityItemCount)
+        {
+            if (fixture.Production.States.Count != 5 ||
+                fixture.Production.RunnableStates.Count != 5)
+                throw new InvalidOperationException(
+                    "Formal mixed probe requires the canonical five-building production chain.");
+            if (defense.AliveEnemyCount != 8 || defense.Towers.Count != 1)
+                throw new InvalidOperationException(
+                    "Formal mixed probe requires one tower and eight live enemies.");
+            if (fixture.Hud.SummaryRect == null ||
+                !fixture.Hud.SummaryRect.gameObject.activeInHierarchy)
+                throw new InvalidOperationException(
+                    "Formal mixed probe requires the defense HUD to be visible.");
+            int mines = 0;
+            int smelters = 0;
+            int assemblers = 0;
+            int warehouses = 0;
+            int researchStations = 0;
+            int turrets = 0;
+            int completed = 0;
+            int underConstruction = 0;
+            for (int index = 0;
+                 index < fixture.Session.Instances.Count;
+                 index++)
+            {
+                GrayboxBuildingInstance3D instance =
+                    fixture.Session.Instances[index];
+                string definitionId =
+                    instance.Placement.Definition.Id.Value;
+                if (definitionId == BuildingCatalog.MiningStation.Id.Value)
+                    mines++;
+                else if (definitionId == BuildingCatalog.Smelter.Id.Value)
+                    smelters++;
+                else if (definitionId == BuildingCatalog.Assembler.Id.Value)
+                    assemblers++;
+                else if (definitionId == BuildingCatalog.Warehouse.Id.Value)
+                    warehouses++;
+                else if (definitionId ==
+                    BuildingCatalog.ResearchStation.Id.Value)
+                    researchStations++;
+                else if (definitionId ==
+                    BuildingCatalog.MachineGunTurret.Id.Value)
+                    turrets++;
+                if (instance.State ==
+                    GrayboxBuildingInstanceState.Completed)
+                    completed++;
+                else if (instance.State ==
+                    GrayboxBuildingInstanceState.UnderConstruction)
+                    underConstruction++;
+            }
+            if (mines != 2 || smelters != 2 || assemblers != 1 ||
+                warehouses != 1 || researchStations != 1 || turrets != 1)
+                throw new InvalidOperationException(
+                    "Formal mixed probe is missing a required production, warehouse, research, or defense category.");
+            if (completed != 16 || underConstruction != 1)
+                throw new InvalidOperationException(
+                    "Formal mixed probe requires 16 completed buildings and one under-construction wall.");
+            if (!fixture.Evacuation.IsManifestOpen ||
+                !fixture.Menu.EvacuationVisible ||
+                !manifest.IsInCombat ||
+                outerCityItemCount != 16 ||
+                manifest.Items.Count != 16)
+                throw new InvalidOperationException(
+                    "Formal mixed probe requires an in-combat manifest with exactly 16 outer-city items.");
+        }
+
+        private static void ValidateFormalEvacuationMixedResult(
+            FormalEvacuationMixedPerformanceResult result)
+        {
+            if (result.sampleCount != FormalEvacuationMixedSampleCount ||
+                result.mixedFrameMilliseconds == null ||
+                result.mixedFrameMilliseconds.Length !=
+                    FormalEvacuationMixedSampleCount)
+                throw new InvalidOperationException(
+                    "Formal mixed probe must record exactly 300 frames.");
+            if (result.stableAdapterManagedAllocationBytes != 0L ||
+                result.stableAdapterProfiledAllocationBytes != 0L)
+                throw new InvalidOperationException(
+                    "Stable formal input/evacuation/UI adapters allocated managed memory.");
+            if (result.activeDefenseMeasuredAllocationBytes >
+                FormalDefenseAllocationBudgetBytes)
+                throw new InvalidOperationException(
+                    "Active defense snapshots exceeded the 64 KB/300 sample budget: " +
+                    result.activeDefenseMeasuredAllocationBytes);
+            if (result.stableAdapterUiObjectCount != result.finalUiObjectCount)
+                throw new InvalidOperationException(
+                    "Formal mixed UI object count changed during stable observation.");
+            if (result.evacuationManifestItemCount != 16 ||
+                result.outerCityEvacuationItemCount != 16)
+                throw new InvalidOperationException(
+                    "Formal mixed result must preserve exactly 16 outer-city evacuation items.");
+            if (result.productionStateIds == null ||
+                result.productionProgressBefore == null ||
+                result.productionProgressAfter == null ||
+                result.productionStopReasonsBefore == null ||
+                result.productionStopReasonsAfter == null ||
+                result.productionStateAdvanceFrameCounts == null ||
+                result.productionStateIds.Length != 5 ||
+                result.productionProgressBefore.Length != 5 ||
+                result.productionProgressAfter.Length != 5 ||
+                result.productionStopReasonsBefore.Length != 5 ||
+                result.productionStopReasonsAfter.Length != 5 ||
+                result.productionStateAdvanceFrameCounts.Length != 5)
+                throw new InvalidOperationException(
+                    "Formal mixed result must record before/after evidence for all five production states.");
+            for (int index = 0;
+                 index < result.productionStopReasonsBefore.Length;
+                 index++)
+            {
+                ValidateFormalProductionStopReason(
+                    result.productionStopReasonsBefore[index]);
+                ValidateFormalProductionStopReason(
+                    result.productionStopReasonsAfter[index]);
+                if (result.productionStateAdvanceFrameCounts[index] <= 0)
+                    throw new InvalidOperationException(
+                        "Formal production state never advanced while active: " +
+                        result.productionStateIds[index]);
+            }
+            if (result.miningNodeAmountAfter >=
+                    result.miningNodeAmountBefore ||
+                result.ammunitionAmountAfter <=
+                    result.ammunitionAmountBefore + 4 ||
+                result.productionAdvancedStageCount != 3)
+                throw new InvalidOperationException(
+                    "Formal mixed workload did not advance mining, smelting, and assembly through the full chain.");
+            long expectedTransactionBudget = checked(
+                FormalTransactionAllocationBaselineBytes +
+                FormalTransactionAllocationPerManifestItemBytes *
+                result.evacuationManifestItemCount);
+            if (result.transactionAllocationBaselineBytes !=
+                    FormalTransactionAllocationBaselineBytes ||
+                result.transactionAllocationPerManifestItemBytes !=
+                    FormalTransactionAllocationPerManifestItemBytes ||
+                result.transactionAllocationBudgetBytes !=
+                    expectedTransactionBudget ||
+                result.transactionCommittedItemCount != 16 ||
+                result.transactionMeasuredAllocationBytes >
+                    expectedTransactionBudget)
+                throw new InvalidOperationException(
+                    "Formal evacuation transaction exceeded its linear allocation budget: " +
+                    result.transactionMeasuredAllocationBytes + "/" +
+                    expectedTransactionBudget + " B.");
+            if (result.markers == null ||
+                result.markers.Length != FormalEvacuationMarkerNames.Length)
+                throw new InvalidOperationException(
+                    "Formal mixed marker evidence is incomplete.");
+            for (int index = 0; index < result.markers.Length; index++)
+            {
+                if (!string.Equals(
+                        result.markers[index].name,
+                        FormalEvacuationMarkerNames[index],
+                        StringComparison.Ordinal) ||
+                    result.markers[index].occurrenceCount <= 0L)
+                {
+                    throw new InvalidOperationException(
+                        "Formal mixed marker was not observed: " +
+                        FormalEvacuationMarkerNames[index]);
+                }
+                if (string.Equals(
+                        result.markers[index].name,
+                        "WasteCity.Formal.Evacuation.Commit",
+                        StringComparison.Ordinal) &&
+                    result.markers[index].occurrenceCount != 16L)
+                    throw new InvalidOperationException(
+                        "Formal mixed probe must observe exactly 16 evacuation commits.");
+            }
+        }
+
+        private static void ValidateFormalProductionStopReason(string reason)
+        {
+            // MissingInput is a normal instantaneous boundary between recipe
+            // cycles. Every structural stop must fail this active-chain gate.
+            if (reason == ProductionStopReason.None.ToString() ||
+                reason == ProductionStopReason.MissingInput.ToString())
+                return;
+
+            throw new InvalidOperationException(
+                "Formal mixed production entered a structural stop state: " +
+                reason);
+        }
+
+        private static void MeasureManagedAllocations(
+            int sampleCount,
+            Action operation,
+            out long currentThreadBytes,
+            out long profiledBytes)
+        {
+            ProfilerRecorder recorder = StartGcAllocationRecorder();
+            currentThreadBytes = 0L;
+            profiledBytes = 0L;
+            try
+            {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int sample = 0; sample < sampleCount; sample++)
+                    operation();
+                currentThreadBytes =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+            }
+            finally
+            {
+                recorder.Stop();
+                profiledBytes = SumGcAllocationBytes(recorder);
+                recorder.Dispose();
+            }
+        }
+
+        private static ProfilerRecorder StartGcAllocationRecorder()
+        {
+            return ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                16384,
+                ProfilerRecorderOptions.StartImmediately |
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+        }
+
+        private static long SumGcAllocationBytes(ProfilerRecorder recorder)
+        {
+            long bytes = 0L;
+            for (int sample = 0; sample < recorder.Count; sample++)
+            {
+                ProfilerRecorderSample allocation = recorder.GetSample(sample);
+                bytes += allocation.Value * allocation.Count;
+            }
+            return bytes;
+        }
+
+        private static ProfilerRecorder[] StartFormalMarkerRecorders()
+        {
+            var recorders = new ProfilerRecorder[
+                FormalEvacuationMarkerNames.Length];
+            try
+            {
+                for (int index = 0; index < recorders.Length; index++)
+                {
+                    recorders[index] = ProfilerRecorder.StartNew(
+                        ProfilerCategory.Scripts,
+                        FormalEvacuationMarkerNames[index],
+                        4096,
+                        ProfilerRecorderOptions.StartImmediately |
+                        ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                        ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+                }
+                return recorders;
+            }
+            catch
+            {
+                DisposeRecorders(recorders);
+                throw;
+            }
+        }
+
+        private static FormalProfilerMarkerResult[]
+            StopAndReadFormalMarkerRecorders(ProfilerRecorder[] recorders)
+        {
+            var results = new FormalProfilerMarkerResult[recorders.Length];
+            for (int index = 0; index < recorders.Length; index++)
+            {
+                ProfilerRecorder recorder = recorders[index];
+                recorder.Stop();
+                long occurrences = 0L;
+                long totalNanoseconds = 0L;
+                long maximumNanoseconds = 0L;
+                for (int sample = 0; sample < recorder.Count; sample++)
+                {
+                    ProfilerRecorderSample value = recorder.GetSample(sample);
+                    occurrences += value.Count;
+                    totalNanoseconds += value.Value;
+                    maximumNanoseconds = Math.Max(
+                        maximumNanoseconds,
+                        value.Value);
+                }
+                results[index] = new FormalProfilerMarkerResult
+                {
+                    name = FormalEvacuationMarkerNames[index],
+                    occurrenceCount = occurrences,
+                    totalNanoseconds = totalNanoseconds,
+                    maximumNanoseconds = maximumNanoseconds
+                };
+                recorder.Dispose();
+                recorders[index] = default;
+            }
+            return results;
+        }
+
+        private static void DisposeRecorders(ProfilerRecorder[] recorders)
+        {
+            for (int index = 0; index < recorders.Length; index++)
+                recorders[index].Dispose();
+        }
+
+        private static string ResolveFormalEvacuationMixedResultPath()
+        {
+            string configured = Environment.GetEnvironmentVariable(
+                FormalEvacuationMixedResultEnvironmentVariable);
+            if (!string.IsNullOrWhiteSpace(configured))
+                return ResolveExternalPath(
+                    FormalEvacuationMixedResultEnvironmentVariable,
+                    true);
+            string resultPath = Path.GetFullPath(
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "wastecity-formal-evacuation-mixed-performance.json"));
+            string directory = Path.GetDirectoryName(resultPath);
+            if (string.IsNullOrEmpty(directory))
+                throw new InvalidOperationException(
+                    "Formal mixed performance result directory is unavailable.");
+            Directory.CreateDirectory(directory);
+            return resultPath;
+        }
+
         public static void SummarizeGuiProfilerCapture()
+        {
+            SummarizeGuiProfilerCaptureCore(false);
+        }
+
+        public static void SummarizeFormalEvacuationMixedGuiProfilerCapture()
+        {
+            SummarizeGuiProfilerCaptureCore(true);
+        }
+
+        private static void SummarizeGuiProfilerCaptureCore(
+            bool formalRequired)
         {
             string inputPath = ResolveExternalPath(
                 GuiProfilerInputEnvironmentVariable,
@@ -1237,7 +2793,31 @@ namespace WasteCity.Editor
                 NewMarkerResult(
                     "first-art-terrain-presenter",
                     "FirstArtTerrainRenderer3D.Update() [Invoke]",
-                    "FirstArtTerrainRenderer3D.LateUpdate() [Invoke]")
+                    "FirstArtTerrainRenderer3D.LateUpdate() [Invoke]"),
+                NewMarkerResult(
+                    "formal-mixed-workload-frame",
+                    FormalMixedWorkloadFrameMarkerName),
+                NewMarkerResult(
+                    "formal-production-tick",
+                    "WasteCity.Formal.Production.Tick"),
+                NewMarkerResult(
+                    "formal-defense-tick",
+                    "WasteCity.Formal.Defense.Tick"),
+                NewMarkerResult(
+                    "formal-defense-hud-apply",
+                    "WasteCity.Formal.DefenseHud.Apply"),
+                NewMarkerResult(
+                    "formal-evacuation-tick",
+                    "WasteCity.Formal.Evacuation.Tick"),
+                NewMarkerResult(
+                    "formal-evacuation-manifest-build",
+                    "WasteCity.Formal.Evacuation.ManifestView.Build"),
+                NewMarkerResult(
+                    "formal-evacuation-capacity-preflight",
+                    "WasteCity.Formal.Evacuation.CapacityPreflight"),
+                NewMarkerResult(
+                    "formal-evacuation-commit",
+                    "WasteCity.Formal.Evacuation.Commit")
             };
 
             double totalFrameMilliseconds = 0d;
@@ -1284,10 +2864,75 @@ namespace WasteCity.Editor
                 maximumFrameMilliseconds = maximumFrameMilliseconds,
                 adapterMarkers = markers
             };
+            ValidateFormalGuiProfilerWindow(result, formalRequired);
             File.WriteAllText(
                 resultPath,
                 JsonUtility.ToJson(result, true));
-            Debug.Log("GUI Profiler summary result: " + resultPath);
+            Debug.Log(
+                (formalRequired
+                    ? "Formal evacuation mixed GUI Profiler summary result: "
+                    : "GUI Profiler summary result: ") +
+                resultPath);
+        }
+
+        private static void ValidateFormalGuiProfilerWindow(
+            GuiProfilerResult result,
+            bool formalRequired)
+        {
+            int formalMarkerCount = 0;
+            GuiProfilerMarkerResult activation = null;
+            for (int index = 0; index < result.adapterMarkers.Length; index++)
+            {
+                GuiProfilerMarkerResult marker = result.adapterMarkers[index];
+                if (string.Equals(
+                        marker.label,
+                        "formal-mixed-workload-frame",
+                        StringComparison.Ordinal))
+                {
+                    activation = marker;
+                    continue;
+                }
+                if (!marker.label.StartsWith(
+                        "formal-",
+                        StringComparison.Ordinal))
+                    continue;
+                formalMarkerCount++;
+            }
+            if (activation == null || activation.sampleOccurrences <= 0)
+            {
+                if (formalRequired)
+                    throw new InvalidOperationException(
+                        "Formal mixed GUI capture is missing the PlayMode heartbeat activation marker.");
+                return;
+            }
+            if (result.frameCount != FormalEvacuationMixedSampleCount)
+                throw new InvalidOperationException(
+                    "Formal mixed GUI capture must contain exactly 300 frames.");
+            if (result.averageFrameMilliseconds > 16.67d)
+                throw new InvalidOperationException(
+                    "Formal mixed GUI capture exceeded 16.67 ms average frame time: " +
+                    result.averageFrameMilliseconds);
+            if (formalMarkerCount != FormalEvacuationMarkerNames.Length)
+                throw new InvalidOperationException(
+                    "Formal mixed GUI marker contract is incomplete.");
+            for (int index = 0; index < result.adapterMarkers.Length; index++)
+            {
+                GuiProfilerMarkerResult marker = result.adapterMarkers[index];
+                if (marker.label.StartsWith(
+                        "formal-",
+                        StringComparison.Ordinal) &&
+                    !string.Equals(
+                        marker.label,
+                        "formal-mixed-workload-frame",
+                        StringComparison.Ordinal) &&
+                    marker.sampleOccurrences <= 0)
+                    throw new InvalidOperationException(
+                        "Formal mixed GUI marker was not observed: " +
+                        marker.label);
+            }
+            if (activation.frameOccurrences != result.frameCount)
+                throw new InvalidOperationException(
+                    "Formal mixed workload activation marker must occur in every captured frame.");
         }
 
         private static GuiProfilerMarkerResult NewMarkerResult(

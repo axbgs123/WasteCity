@@ -480,6 +480,64 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Controller_ManifestWorkIndexMirrorsPreviewAndCleanup()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D first = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            GrayboxBuildingInstance3D second = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+            FieldInfo indexField = typeof(GrayboxEvacuationController3D)
+                .GetField(
+                    "workById",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(indexField, Is.Not.Null,
+                "Manifest work lookup requires a stable-id index.");
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.Assign(
+                first.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.True);
+            var index = (IDictionary)indexField.GetValue(fixture.Controller);
+            Assert.That(index.Count, Is.EqualTo(1));
+            Assert.That(index.Contains(first.StableInstanceId), Is.True);
+            Assert.That(index.Contains(second.StableInstanceId), Is.False);
+
+            Assert.That(fixture.Controller.Assign(
+                second.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(index.Count, Is.EqualTo(2));
+            Assert.That(index.Contains(first.StableInstanceId), Is.True);
+            Assert.That(index.Contains(second.StableInstanceId), Is.True);
+            Assert.That(fixture.Controller.Work, Has.Count.EqualTo(index.Count));
+
+            Assert.That(fixture.Controller.TryCancelManifest(), Is.True);
+            Assert.That(fixture.Controller.Work, Is.Empty);
+            Assert.That(index.Count, Is.Zero,
+                "Every work cleanup path must also clear the stable-id index.");
+        }
+
+        [Test]
+        public void Controller_ManifestWorkLookupUsesDictionaryWithoutListScan()
+        {
+            string source = File.ReadAllText(Path.Combine(
+                Application.dataPath,
+                "_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxEvacuationController3D.cs"));
+            string method = ExtractMethodBlock(
+                source,
+                "private bool TryFindWork(");
+
+            StringAssert.Contains("workById.TryGetValue", method);
+            StringAssert.DoesNotContain("for (", method,
+                "A manifest cache miss must not scan all evacuation work " +
+                "for every item.");
+            StringAssert.DoesNotContain("work.Count", method);
+        }
+
+        [Test]
         public void Controller_ManifestViewRefreshesForInternalProductionOutputAndTowerAmmoWithoutStorageRevision()
         {
             EvacuationFixture fixture = CreateFixture();
@@ -2467,6 +2525,25 @@ namespace WasteCity.Tests
                 owner.GetType().FullName + "." + name);
             Assert.That(property.CanWrite, Is.False);
             return property.GetValue(owner, null);
+        }
+
+        private static string ExtractMethodBlock(
+            string source,
+            string declaration)
+        {
+            int start = source.IndexOf(declaration, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), declaration);
+            int openingBrace = source.IndexOf('{', start);
+            Assert.That(openingBrace, Is.GreaterThanOrEqualTo(0));
+            var depth = 0;
+            for (int index = openingBrace; index < source.Length; index++)
+            {
+                if (source[index] == '{') depth++;
+                else if (source[index] == '}') depth--;
+                if (depth == 0)
+                    return source.Substring(start, index - start + 1);
+            }
+            throw new AssertionException("Unbalanced method: " + declaration);
         }
 
         private static bool ReadBool(object owner, string name)

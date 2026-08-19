@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 using WasteCity.Defense;
 
@@ -9,6 +10,8 @@ namespace WasteCity.Graybox3D.Building
     public sealed class GrayboxDefenseController3D : MonoBehaviour
     {
         private const float TutorialSpawnDistanceCells = 9f;
+        private static readonly ProfilerMarker TickMarker =
+            new ProfilerMarker("WasteCity.Formal.Defense.Tick");
 
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField] private GrayboxMobileCityController3D city;
@@ -71,39 +74,42 @@ namespace WasteCity.Graybox3D.Building
 
         public bool Tick(float deltaSeconds, bool paused)
         {
-            worldView?.SetSimulationPaused(paused);
-            if (!IsConfigured ||
-                session.CityStorage == null ||
-                session.Instances == null ||
-                world.Coordinates == null ||
-                !TryResolveCityPosition(
-                    out int cityX,
-                    out int cityY,
-                    out float logicalCoreX,
-                    out float logicalCoreZ))
+            using (TickMarker.Auto())
             {
-                return false;
-            }
+                worldView?.SetSimulationPaused(paused);
+                if (!IsConfigured ||
+                    session.CityStorage == null ||
+                    session.Instances == null ||
+                    world.Coordinates == null ||
+                    !TryResolveCityPosition(
+                        out int cityX,
+                        out int cityY,
+                        out float logicalCoreX,
+                        out float logicalCoreZ))
+                {
+                    return false;
+                }
 
-            if (!ReferenceEquals(boundCoordinates, world.Coordinates))
-            {
-                worldView.BindCoordinates(world.Coordinates);
-                boundCoordinates = world.Coordinates;
-                InvalidatePresentation();
+                if (!ReferenceEquals(boundCoordinates, world.Coordinates))
+                {
+                    worldView.BindCoordinates(world.Coordinates);
+                    boundCoordinates = world.Coordinates;
+                    InvalidatePresentation();
+                }
+                EnsureRuntime(logicalCoreX, logicalCoreZ);
+                runtime.SetCorePosition(logicalCoreX, logicalCoreZ);
+                runtime.Synchronize(
+                    session.Instances,
+                    city.Mode,
+                    cityX,
+                    cityY,
+                    session.GroundBuildRadius);
+                runtime.Tick(deltaSeconds, paused, session.CityStorage);
+                snapshot = runtime.Snapshot;
+                ValidateSelection();
+                ApplyPresentation();
+                return true;
             }
-            EnsureRuntime(logicalCoreX, logicalCoreZ);
-            runtime.SetCorePosition(logicalCoreX, logicalCoreZ);
-            runtime.Synchronize(
-                session.Instances,
-                city.Mode,
-                cityX,
-                cityY,
-                session.GroundBuildRadius);
-            runtime.Tick(deltaSeconds, paused, session.CityStorage);
-            snapshot = runtime.Snapshot;
-            ValidateSelection();
-            ApplyPresentation();
-            return true;
         }
 
         public bool TrySelect(Ray ray)
