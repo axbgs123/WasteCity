@@ -486,12 +486,126 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Idea0014Guides_PreserveSchemaFrozen2DAndExplainFocusedVerification()
+        {
+            string gdd = ReadGuide("Docs/01-Game-Design-Document-ZH.md");
+            string roadmap = ReadGuide("Docs/05-Formal-Development-Roadmap-ZH.md");
+            string changeControl = ReadGuide(
+                "Docs/06-User-Feedback-and-Change-Control-ZH.md");
+            string userGuide = ReadGuide(
+                "Docs/07-Project-Use-and-Development-Guide-ZH.md");
+            string bugGuide = ReadGuide(
+                "Docs/08-Testing-and-Bug-Location-Guide-ZH.md");
+            string reuseGuide = ReadGuide(
+                "Docs/09-Reusable-Project-Catalog-ZH.md");
+
+            StringAssert.Contains("| 基础展开时间 | 5 秒 |", gdd);
+            StringAssert.Contains("| 基础收起时间 | 8 秒 |", gdd);
+            StringAssert.Contains("收起推进速度降低 `30%`", gdd);
+            StringAssert.Contains("阶段 F1F：IDEA-0014", roadmap);
+            StringAssert.Contains(
+                "移动/寻路 → `F` 展开 → `B` 建成研究站",
+                roadmap);
+
+            string ideaRow = changeControl.Split(
+                    new[] { "\r\n", "\n" },
+                    StringSplitOptions.None)
+                .Single(line => line.StartsWith(
+                    "| `IDEA-0014` |",
+                    StringComparison.Ordinal));
+            StringAssert.Contains("| `已实现待验证` |", ideaRow);
+            StringAssert.DoesNotContain("| `开发中` |", ideaRow);
+            StringAssert.DoesNotContain("已验证", ideaRow);
+            StringAssert.DoesNotContain("已完成", ideaRow);
+
+            string deploymentSource = File.ReadAllText(Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scripts/Persistence/FormalSaveData.cs"));
+            StringAssert.Contains("schema=30", deploymentSource);
+            StringAssert.Contains("schema<=30", deploymentSource);
+            StringAssert.DoesNotContain("schema=31", deploymentSource);
+            foreach (KeyValuePair<string, string> document in
+                     new Dictionary<string, string>
+            {
+                { "GDD", gdd },
+                { "roadmap", roadmap },
+                { "change control", changeControl },
+                { "user guide", userGuide },
+                { "bug guide", bugGuide },
+            })
+                Assert.That(
+                    Regex.IsMatch(
+                        document.Value,
+                        @"schema[^\r\n。]{0,32}(?:`30`|30)"),
+                    Is.True,
+                    document.Key +
+                    " must state the IDEA-0014 schema 30 boundary");
+
+            string evacuationMeta = File.ReadAllText(Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs.meta"));
+            Match evacuationGuid = Regex.Match(
+                evacuationMeta,
+                @"(?m)^guid:\s*(?<guid>[0-9a-f]{32})\s*$");
+            Assert.That(evacuationGuid.Success, Is.True);
+            string grayboxScene = File.ReadAllText(Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity"));
+            string frozenScene = File.ReadAllText(Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scenes/FormalPrototype.unity"));
+            StringAssert.Contains(evacuationGuid.Groups["guid"].Value, grayboxScene);
+            StringAssert.DoesNotContain(evacuationGuid.Groups["guid"].Value, frozenScene);
+
+            StringAssert.Contains(
+                "GrayboxFormalEvacuationVerticalSliceTests",
+                userGuide);
+            StringAssert.Contains("六段", userGuide);
+            StringAssert.Contains("真实输入", userGuide);
+            StringAssert.Contains("冻结 2D", userGuide);
+
+            string evacuationChecks = MarkdownSectionBody(
+                bugGuide,
+                "## IDEA-0014 正式撤离与完整垂直切片检查边界",
+                "## 怎样读失败定位报告");
+            foreach (string term in new[]
+            {
+                "-testFilter",
+                "GrayboxEvacuationTests",
+                "GrayboxFormalEvacuationVerticalSliceTests",
+                "GrayboxFormalEvacuationPerformanceTests",
+                "MeasureFormalEvacuationMixedPerformance",
+                "SummarizeFormalEvacuationMixedGuiProfilerCapture",
+                "WASTECITY_FORMAL_EVACUATION_MIXED_PERF_RESULT",
+                "容量预检",
+                "内部物资",
+                "不可变",
+                "真实输入",
+            })
+                StringAssert.Contains(term, evacuationChecks);
+
+            foreach (string term in new[]
+            {
+                "CityDeploymentModel",
+                "BuildingEvacuationRules",
+                "GrayboxEvacuationController3D",
+                "部署状态",
+                "纯规则",
+                "原子",
+                "内部载荷",
+                "不可变",
+                "真实输入",
+            })
+                StringAssert.Contains(term, reuseGuide);
+        }
+
+        [Test]
         public void ReuseGuide_RendersEveryCommittedCatalogEntryWithExactFields()
         {
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(71));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(74));
             ProjectReuseEntry resourceInventory = catalog.ReuseEntries.Single(
                 entry => string.Equals(
                     entry.Id,

@@ -30,11 +30,50 @@
 
 ## IDEA-0014 正式撤离与完整垂直切片检查边界
 
-`IDEA-0014` 必须先用纯规则失败测试固定 `5/8` 秒展开收起、转换取消、第一名敌人生成后的战斗状态、战斗收起 `-30%`、和平/战斗完整拆除、快速拆除、遗弃和确定性退款；再检查建筑内部库存、塔内弹药、仓库内容与退款能否在同一原子容量门下完整迁移或准确拒绝。不得用 UI 重新计算战斗状态、退款或容量缺口。
+`IDEA-0014` 已按先失败后实现的顺序固定 5 秒展开、8 秒收起、转换取消、第一名敌人生成后的战斗状态、战斗收起 `-30%`、和平/战斗完整拆除、快速拆除、遗弃和确定性退款，并检查建筑内部库存等内部物资、塔内弹药、仓库内容与退款能否在同一原子容量门和容量预检下完整迁移或准确拒绝。清单和队列必须读取不可变视图。当前状态是“已实现待验证”；不得用 UI 重新计算战斗状态、退款或容量缺口，也不得把聚焦通过写成最终完整回归已经通过。
 
-相关运行时检查至少覆盖 `GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionLifecycleTests`、`GrayboxFirstDefenseRuntimeTests`、城市部署测试和建筑输入测试。玩家界面必须通过正式场景的真实 Input System 操作 `F`、撤离清单按钮和战术暂停；最终还要有一条连续完成“移动→展开→建成研究站→研究→建生产/防御建筑→生产→防御→撤离→恢复移动”的 PlayMode。测试夹具可以加速时间和提供确定性开局资源，但不能直接调用内部研究完成、建筑创建、防御触发或撤离提交来冒充完整玩家流程。
+相关运行时检查至少覆盖 `CityDeploymentRulesTests`、`GrayboxEvacuationTests`、`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionRuntimeTests`、`DemoResearchRuntimeTests`、`GrayboxFirstDefenseRuntimeTests`、性能和场景合同。可用下面的精确聚焦入口；测试命令不要加 `-quit`：
 
-性能检查应同时存在活跃生产、八名敌人、防御 HUD 和撤离 UI，并记录稳定帧与清单/队列创建的有界分配。schema 继续保持 `30`；正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform EditMode \
+  -testFilter 'WasteCity.Tests.CityDeploymentRulesTests|WasteCity.Tests.GrayboxEvacuationTests|WasteCity.Tests.CityResourceStorageModelTests|WasteCity.Tests.GrayboxWarehouseStorageIntegrationTests|WasteCity.Tests.GrayboxProductionRuntimeTests|WasteCity.Tests.DemoResearchRuntimeTests|WasteCity.Tests.GrayboxFirstDefenseRuntimeTests|WasteCity.Tests.GrayboxFormalEvacuationPerformanceTests|WasteCity.Tests.GrayboxSceneContractTests' \
+  -testResults /tmp/wastecity-idea0014-focused-editmode.xml \
+  -logFile /tmp/wastecity-idea0014-focused-editmode.log
+```
+
+玩家界面通过正式场景的真实 Input System 操作 `F`、`B`、`T`、`Space`、世界点击和撤离 UGUI。`GrayboxFormalEvacuationVerticalSliceTests` 连续验证六段：驾驶并展开；建研究站并完成三项研究；建立生产链和机枪塔；真实生产、补弹和防御；敌人存活时打开并确认撤离；完成 Packing、返回 Mobile 并再次驾驶。夹具只可在首次玩法输入前设置确定性资源、人口 `200` 和规则时间加速，不能直接完成研究、创建建筑、注入产物或弹药、杀敌、切换模式或调用撤离入口/提交。相关真实输入组合入口为：
+
+```sh
+"$UNITY_BIN" -batchmode -projectPath "$PROJECT_ROOT" \
+  -runTests -testPlatform PlayMode \
+  -testFilter 'WasteCity.Tests.GrayboxFormalEvacuationVerticalSliceTests|WasteCity.Tests.GrayboxBuildingRuntimeSceneTests|WasteCity.Tests.GrayboxProductionObservabilityRuntimeInputTests|WasteCity.Tests.GrayboxDefenseRuntimeInputTests' \
+  -testResults /tmp/wastecity-idea0014-focused-playmode.xml \
+  -logFile /tmp/wastecity-idea0014-focused-playmode.log
+```
+
+性能检查必须同时存在活跃生产、八名敌人、防御 HUD 和撤离 UI。外部探针输出路径由 `WASTECITY_FORMAL_EVACUATION_MIXED_PERF_RESULT` 指定，并通过以下正式入口记录 300 次稳定适配、活跃防御、事务预算和全部 Marker：
+
+```sh
+WASTECITY_FORMAL_EVACUATION_MIXED_PERF_RESULT=/tmp/wastecity-idea0014-performance.json \
+"$UNITY_BIN" -batchmode -nographics -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.GrayboxPerformanceProbe.MeasureFormalEvacuationMixedPerformance \
+  -logFile /tmp/wastecity-idea0014-performance.log
+```
+
+真实 GUI Profiler 仍须在锁定的 WasteCity Unity `2022.3.62f1` Editor PlayMode、`1920×1080`、关闭 Deep Profile、启用 CPU/Rendering/Memory 的条件下保存恰好 300 帧原始 `.data` 和三张模块截图。解析时必须使用专用入口，不能用旧的普通汇总冒充正式心跳捕获：
+
+```sh
+WASTECITY_GUI_PROFILER_INPUT=/tmp/wastecity-idea0014-gui-300frames.data \
+WASTECITY_GUI_PROFILER_RESULT=/tmp/wastecity-idea0014-gui-summary.json \
+"$UNITY_BIN" -batchmode -nographics -quit -projectPath "$PROJECT_ROOT" \
+  -executeMethod WasteCity.Editor.GrayboxPerformanceProbe.SummarizeFormalEvacuationMixedGuiProfilerCapture \
+  -logFile /tmp/wastecity-idea0014-gui-summary.log
+```
+
+定位失败时按所有权排查：正式时间、转换取消和战斗收起先查 `CityDeploymentModel`、`CityDeploymentRules` 与 `GrayboxMobileCityController3D`；退款和处置先查 `BuildingEvacuationRules`；容量不足、部分写入或重复退款先查 `CityResourceStorageModel` 与 `GrayboxBuildingSession3D`；生产缓存、研究进度或塔内弹药丢失先查对应运行时和 `IsEvacuationLocked`；清单、冻结批次、稳定队列或重试先查 `GrayboxEvacuationController3D`；按钮、暂停透传和点击穿透先查 `GrayboxBuildingInputRouter3D`、`GrayboxUsabilityInputCoordinator3D` 与 `GrayboxBuildingMenuView3D`；场景引用先查 `GrayboxSceneContractTests` 和 `GrayboxSceneAuthoring`；性能再查正式 Marker、混合探针、GUI 原始捕获和汇总 JSON。
+
+schema 继续保持 `30`；冻结 2D `FormalPrototype` 没有接入本功能。正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。Task 11 的日常完整 EditMode、完整 PlayMode、项目质量门、四个正式构建和 `RecordVerification` 仍未完成；用户试玩和真实 Windows 10 与 Windows 11 的视觉、GPU、显存、内存验收也必须由实际执行结果确认。
 
 ## 怎样读失败定位报告
 

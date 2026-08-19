@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`f53f8ec0e488123e66de7875108c0647bd4179c93b078bb096775e6f6ddd9779`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`61d66f98dcf8ceb6803dfcaa5d109b19fccc51c8046fb61275de57a7377d5fd3`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -331,6 +331,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxDefenseWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxFormalMixedProfilerHeartbeat3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxProductionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
@@ -396,11 +397,17 @@
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D`
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment`
 - `WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D`
+- `WasteCity.Editor.GrayboxPerformanceProbe.CaptureFormalEvacuationMixedProfiler300Frames`
+- `WasteCity.Editor.GrayboxPerformanceProbe.CleanupFormalEvacuationMixedProfilerCapture`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureBuildingPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFirstArtTerrainPerformance`
+- `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFormalEvacuationMixedPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureWorldGeneration`
+- `WasteCity.Editor.GrayboxPerformanceProbe.PrepareFormalEvacuationMixedProfilerCapture`
+- `WasteCity.Editor.GrayboxPerformanceProbe.PulseFormalEvacuationTransactionalMarkersForProfiler`
 - `WasteCity.Editor.GrayboxPerformanceProbe.RecordFirstArtTerrainRuntimeEvidence`
+- `WasteCity.Editor.GrayboxPerformanceProbe.SummarizeFormalEvacuationMixedGuiProfilerCapture`
 - `WasteCity.Editor.GrayboxPerformanceProbe.SummarizeGuiProfilerCapture`
 - `WasteCity.Editor.GrayboxSceneAuthoring.CaptureFoundationIdentity`
 - `WasteCity.Editor.GrayboxSceneAuthoring.Configure`

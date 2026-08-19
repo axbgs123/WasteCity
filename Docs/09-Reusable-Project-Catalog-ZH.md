@@ -42,6 +42,10 @@
 
 能解决什么：检查城市是否符合地形条件。在哪里：`Assets/_Game/Scripts/City/CityTerrainRules.cs`。怎么复用：用于校验城市地形条件。在行动前调用它校验地形。不能负责什么：不负责路径计算。改后跑哪组测试：`CityTerrainRulesTests`。代码名：`CityTerrainRules`。
 
+### 正式城市部署状态（推荐复用）
+
+能解决什么：统一保存正式城市的移动、展开中、要塞和收起中状态，以及转换取消和规则剩余时间。在哪里：`Assets/_Game/Scripts/City/CityDeploymentModel.cs`。怎么复用：作为正式部署状态所有者，维护 Mobile、Deploying、Fortress、Packing、转换取消、规则剩余时间和战斗收起倍率。不能负责什么：只拥有部署状态和规则时间；不判断地形合法性，不处理 Unity 输入或表现，也不进入 schema 30 或接入冻结 2D。改后跑哪组测试：`CityDeploymentRulesTests`、`GrayboxMobileCityController3DTests`。代码名：`CityDeploymentModel`。
+
 ### 城市部署规则（推荐复用）
 
 能解决什么：判定城市能否部署。在哪里：`Assets/_Game/Scripts/City/CityDeploymentRules.cs`。怎么复用：用于判定城市部署合法性。将合法性判断交给它。不能负责什么：不渲染部署预览。改后跑哪组测试：`CityDeploymentRulesTests`。代码名：`CityDeploymentRules`。
@@ -88,9 +92,17 @@
 
 能解决什么：计算取消施工时的退款。在哪里：`Assets/_Game/Scripts/Building/ConstructionRefundRules.cs`。怎么复用：用于计算施工退款。先审查资源写入边界后再调用。不能负责什么：不写入资源库存。改后跑哪组测试：`ConstructionProgressTests`。代码名：`ConstructionRefundRules`。
 
+### 正式撤离纯规则（推荐复用）
+
+能解决什么：根据单体、分类、全部或混合选择生成确定性的正式撤离工作，并冻结已确认批次的环境。在哪里：`Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs`。怎么复用：以纯规则创建单体、分类、全部或混合撤离 work，并在确认批次时冻结和平/战斗上下文、生产力、退款比例与基础耗时。不能负责什么：不读取场景、UI、城市库存或当前敌人；调用方提供权威上下文并负责原子容量预检。遗弃废墟不是前哨，本规则不进入 schema 30 或接入冻结 2D。改后跑哪组测试：`GrayboxEvacuationTests`。代码名：`EvacuationBatchContext`、`BuildingEvacuationWork`、`BuildingEvacuationRules`。
+
 ### 三维建筑会话（复用前审查）
 
-能解决什么：协调当前三维建造过程，并持有会话唯一的城市与真实仓库聚合模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel 以同步仓库完成、联网、撤离迁移和正式城市库存。不能负责什么：不替代领域建造、物流距离或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingSession3D`。
+能解决什么：协调当前三维建造过程、唯一城市仓储聚合模型和正式撤离提交边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；正式撤离时保存稳定 work 锁、组合退款与内部载荷预检，并只在原子提交成功后移除建筑。不能负责什么：不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingSession3D`。
+
+### 三维正式撤离协调与只读视图（仅限场景）
+
+能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。
 
 ### 三维建筑共享运行与物流资格（推荐复用）
 
@@ -104,11 +116,11 @@
 
 ### 三维建筑输入路由（复用前审查）
 
-能解决什么：把建筑界面的真实输入送到正确位置，并将 `R` 旋转应用到当前预览。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`。怎么复用：用于路由建筑界面输入。不能负责什么：不决定建筑放置规则。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingRuntimeSceneTests`。代码名：`GrayboxBuildingInputRouter3D`。
+能解决什么：把建造和撤离的正式输入送到正确界面，并在撤离期间保护模态优先级。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`。怎么复用：通过正式 Input System 路由建造与撤离输入，并在清单、处理和容量阻塞状态执行 F、Escape、E 与世界输入的模态优先级。不能负责什么：真实输入边界只发布界面命令；不决定建筑放置、退款、容量或战斗规则，不直接调用领域提交，也不接入冻结 2D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingRuntimeSceneTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`GrayboxBuildingInputRouter3D`。
 
 ### 三维建筑菜单视图（复用前审查）
 
-能解决什么：显示建筑菜单、旋转后预览状态、正式资源成本图标和逐项材料缺口。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：显示建筑目录、旋转后预览状态、正式资源成本图标和逐项材料缺口。不能负责什么：不保存建筑或库存数据；方向、占地与缺口必须读取控制器提供的权威预览和 ResourceShortfallRules 结果，图标统一复用 ResourceIconCatalog3D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingMenuView3D`。
+能解决什么：显示建筑目录、放置反馈，以及正式撤离清单、队列、内部物资后果和容量阻塞操作。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`。怎么复用：显示建筑目录、旋转预览、资源缺口，以及正式撤离清单、稳定处理队列、内部物资后果和容量阻塞操作。不能负责什么：不保存建筑或库存数据，也不计算方向、退款、容量或战斗状态；全部读取控制器提供的不可变 view，图标统一复用 ResourceIconCatalog3D。改后跑哪组测试：`GrayboxBuildingUiAndInputTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`GrayboxBuildingMenuView3D`。
 
 ### 三维生产可观察化控制器（仅限场景）
 
@@ -154,7 +166,7 @@
 
 ### 城市与真实仓库库存模型（推荐复用）
 
-能解决什么：提供正式 3D 城市库存的唯一聚合入口，并把城市核心库存与每座真实仓库组合成一个可观察的物流网络。在哪里：`Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`。怎么复用：作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、可接收空间、确定性存取、原子批事务、迁移删除、不可变快照和变化归因。不能负责什么：不决定建筑是否完成、玩家所有权、物流距离或交互资格；调用方必须先用既有建筑与物流规则提供权威连接状态。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`CityResourceChangeAttributionScope`、`CityResourceStorageModel`、`CityResourceStorageSnapshot`。
+能解决什么：提供正式 3D 城市库存唯一聚合入口，并以绑定版本的计划保证撤离容量预检和提交原子一致。在哪里：`Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`。怎么复用：作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取、不可变快照；撤离使用绑定 revision 的容量预检计划和单次原子提交，并明确 StalePlan 与 AlreadyCommitted。不能负责什么：不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须提供权威连接和完整内部载荷。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`CityResourceEvacuationPlan`、`CityResourceChangeAttributionScope`、`CityResourceStorageModel`、`CityResourceStorageSnapshot`。
 
 ### 单仓库共享容量状态（推荐复用）
 
@@ -202,7 +214,7 @@
 
 ### 三维生产运行时（复用前审查）
 
-能解决什么：让正式生产状态和真实仓库连接跟随当前三维建筑的完成、撤离、遗弃、移动资格与物流范围变化。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合、物流连接，并把真实仓库完成、断网和清理状态同步到 CityResourceStorageModel。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置、物流范围或节点兼容规则。改后跑哪组测试：`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionRuntime3D`。
+能解决什么：让正式生产状态和物流连接跟随三维建筑生命周期，并在撤离时完整保存或明确丢弃内部生产物资。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合和物流连接；撤离时由本运行时拥有并捕获 input、reserved input、output 内部载荷，匹配后完成迁移或在遗弃时明确丢弃。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不进入 schema 30，也不复制放置、物流范围或节点兼容规则。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionEvacuationPayload3D`、`GrayboxProductionRuntime3D`。
 
 ### 三维生产固定时钟（复用前审查）
 
@@ -238,7 +250,7 @@
 
 ### 三维首版防御运行时（复用前审查）
 
-能解决什么：按稳定建筑实例同步机枪塔与本地弹药，并用固定步组合教学波和战斗模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`。怎么复用：用于按稳定建筑实例同步机枪塔、补给本地弹药，并以固定 0.1 秒步长组合教学波与战斗模型。不能负责什么：只桥接正式 3D 建筑会话、城市仓储和首版防御领域；不复制物流范围、建筑资格或库存事务，不进入 schema 30。改后跑哪组测试：`GrayboxFirstDefenseRuntimeTests`、`GrayboxDefenseSnapshotStabilityTests`。代码名：`GrayboxDefenseTowerStatus3D`、`GrayboxDefenseTowerRuntimeState3D`、`GrayboxDefenseTowerSnapshot3D`、`GrayboxDefenseEnemySnapshot3D`、`GrayboxDefenseRuntimeSnapshot3D`、`GrayboxDefenseRuntime3D`。
+能解决什么：按稳定建筑实例同步机枪塔、塔内弹药和教学波，并在撤离时完整保存或明确丢弃塔内弹药。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`。怎么复用：按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时由本运行时拥有并捕获塔内弹药载荷，匹配后完成迁移或在遗弃时明确丢弃。不能负责什么：只桥接正式 3D 建筑会话、城市仓储和首版防御领域；撤离协调器不拥有塔内载荷，不复制物流范围、建筑资格或库存事务，不进入 schema 30。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFirstDefenseRuntimeTests`、`GrayboxDefenseSnapshotStabilityTests`。代码名：`GrayboxDefenseEvacuationPayload3D`、`GrayboxDefenseTowerRuntimeState3D`、`GrayboxDefenseTowerSnapshot3D`、`GrayboxDefenseEnemySnapshot3D`、`GrayboxDefenseRuntimeSnapshot3D`、`GrayboxDefenseRuntime3D`。
 
 ### 人口模型（推荐复用）
 
@@ -302,7 +314,7 @@
 
 ### 灰盒性能探针（仅限场景）
 
-能解决什么：采集灰盒性能数据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：用于采集灰盒性能数据。只在已定义的性能场景采样。不能负责什么：不作为发布版本逻辑。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxPerformanceProbe`。
+能解决什么：采集灰盒性能数据，并对生产、防御和撤离同时运行的正式混合负载留下可重复证据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：用于采集灰盒性能数据，并执行 IDEA-0014 活跃生产、八敌、防御 HUD、撤离 UI 的 300 稳定帧混合探针、GUI 捕获和正式汇总。不能负责什么：只用于可重复验证和正式 Marker 取证，不改变玩法真值、不作为发布版本逻辑，也不替代用户试玩或真实 Windows GPU、显存和内存验收。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`、`GrayboxFormalEvacuationPerformanceTests`。代码名：`GrayboxPerformanceProbe`。
 
 ## 冻结或禁止用于新功能的旧内容
 

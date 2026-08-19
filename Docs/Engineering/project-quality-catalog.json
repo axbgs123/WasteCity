@@ -109,7 +109,8 @@
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -172,10 +173,12 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -188,7 +191,8 @@
         "IDEA-0010",
         "BUG-0006",
         "IDEA-0012",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -223,6 +227,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/TitleMenuTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
@@ -237,7 +242,8 @@
         "IDEA-0011",
         "BUG-0006",
         "IDEA-0012",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -291,7 +297,8 @@
         "DOC-0001",
         "IDEA-0011",
         "IDEA-0012",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -326,7 +333,8 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0011",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -383,7 +391,8 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -484,6 +493,7 @@
       "FailureLocationSummary": "先检查编辑工具、场景生成、构建配置和性能边界",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs",
@@ -501,7 +511,8 @@
       "RequirementIds": [
         "BUG-0005",
         "DOC-0001",
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -710,6 +721,27 @@
       ]
     },
     {
+      "Id": "city-deployment-state",
+      "ChineseName": "正式城市部署状态",
+      "TypeNames": [
+        "CityDeploymentModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/City/CityDeploymentModel.cs"
+      ],
+      "FeatureGroupId": "city-navigation-deployment",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "作为正式部署状态所有者，维护 Mobile、Deploying、Fortress、Packing、转换取消、规则剩余时间和战斗收起倍率。",
+      "BoundarySummary": "只拥有部署状态和规则时间；不判断地形合法性，不处理 Unity 输入或表现，也不进入 schema 30 或接入冻结 2D。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CityDeploymentRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxMobileCityController3DTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0014"
+      ]
+    },
+    {
       "Id": "direct-control-rules",
       "ChineseName": "直接控制规则",
       "TypeNames": [
@@ -912,6 +944,28 @@
       ]
     },
     {
+      "Id": "building-evacuation-rules",
+      "ChineseName": "正式撤离纯规则",
+      "TypeNames": [
+        "EvacuationBatchContext",
+        "BuildingEvacuationWork",
+        "BuildingEvacuationRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingEvacuationRules.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "以纯规则创建单体、分类、全部或混合撤离 work，并在确认批次时冻结和平/战斗上下文、生产力、退款比例与基础耗时。",
+      "BoundarySummary": "不读取场景、UI、城市库存或当前敌人；调用方提供权威上下文并负责原子容量预检。遗弃废墟不是前哨，本规则不进入 schema 30 或接入冻结 2D。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0014"
+      ]
+    },
+    {
       "Id": "building-session-3d",
       "ChineseName": "三维建筑会话",
       "TypeNames": [
@@ -922,15 +976,17 @@
       ],
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel 以同步仓库完成、联网、撤离迁移和正式城市库存。",
-      "BoundarySummary": "不替代领域建造、物流距离或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。",
+      "UseSummary": "协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；正式撤离时保存稳定 work 锁、组合退款与内部载荷预检，并只在原子提交成功后移除建筑。",
+      "BoundarySummary": "不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0014"
       ]
     },
     {
@@ -944,15 +1000,17 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于路由建筑界面输入。",
-      "BoundarySummary": "不决定建筑放置规则。",
+      "UseSummary": "通过正式 Input System 路由建造与撤离输入，并在清单、处理和容量阻塞状态执行 F、Escape、E 与世界输入的模态优先级。",
+      "BoundarySummary": "真实输入边界只发布界面命令；不决定建筑放置、退款、容量或战斗规则，不直接调用领域提交，也不接入冻结 2D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
-        "BUG-0006"
+        "BUG-0006",
+        "IDEA-0014"
       ]
     },
     {
@@ -966,16 +1024,43 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "显示建筑目录、旋转后预览状态、正式资源成本图标和逐项材料缺口。",
-      "BoundarySummary": "不保存建筑或库存数据；方向、占地与缺口必须读取控制器提供的权威预览和 ResourceShortfallRules 结果，图标统一复用 ResourceIconCatalog3D。",
+      "UseSummary": "显示建筑目录、旋转预览、资源缺口，以及正式撤离清单、稳定处理队列、内部物资后果和容量阻塞操作。",
+      "BoundarySummary": "不保存建筑或库存数据，也不计算方向、退款、容量或战斗状态；全部读取控制器提供的不可变 view，图标统一复用 ResourceIconCatalog3D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "BUG-0006",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0014"
+      ]
+    },
+    {
+      "Id": "graybox-evacuation-runtime-3d",
+      "ChineseName": "三维正式撤离协调与只读视图",
+      "TypeNames": [
+        "EvacuationManifestItemViewModel",
+        "EvacuationManifestViewModel",
+        "EvacuationQueueViewModel",
+        "GrayboxEvacuationController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。",
+      "BoundarySummary": "只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0014"
       ]
     },
     {
@@ -1263,6 +1348,7 @@
       "Id": "city-resource-storage-model",
       "ChineseName": "城市与真实仓库库存模型",
       "TypeNames": [
+        "CityResourceEvacuationPlan",
         "CityResourceChangeAttributionScope",
         "CityResourceStorageModel",
         "CityResourceStorageSnapshot"
@@ -1272,14 +1358,16 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、可接收空间、确定性存取、原子批事务、迁移删除、不可变快照和变化归因。",
-      "BoundarySummary": "不决定建筑是否完成、玩家所有权、物流距离或交互资格；调用方必须先用既有建筑与物流规则提供权威连接状态。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
+      "UseSummary": "作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取、不可变快照；撤离使用绑定 revision 的容量预检计划和单次原子提交，并明确 StalePlan 与 AlreadyCommitted。",
+      "BoundarySummary": "不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须提供权威连接和完整内部载荷。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0014"
       ]
     },
     {
@@ -1455,6 +1543,7 @@
       "Id": "graybox-production-runtime-3d",
       "ChineseName": "三维生产运行时",
       "TypeNames": [
+        "GrayboxProductionEvacuationPayload3D",
         "GrayboxProductionRuntime3D"
       ],
       "AssetPaths": [
@@ -1462,16 +1551,18 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合、物流连接，并把真实仓库完成、断网和清理状态同步到 CityResourceStorageModel。",
-      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式领域状态；不推进时间，不执行事务，不进入 schema 30，也不复制放置、物流范围或节点兼容规则。",
+      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合和物流连接；撤离时由本运行时拥有并捕获 input、reserved input、output 内部载荷，匹配后完成迁移或在遗弃时明确丢弃。",
+      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不进入 schema 30，也不复制放置、物流范围或节点兼容规则。",
       "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0014"
       ]
     },
     {
@@ -1693,6 +1784,7 @@
       "Id": "graybox-defense-runtime-3d",
       "ChineseName": "三维首版防御运行时",
       "TypeNames": [
+        "GrayboxDefenseEvacuationPayload3D",
         "GrayboxDefenseTowerRuntimeState3D",
         "GrayboxDefenseTowerSnapshot3D",
         "GrayboxDefenseEnemySnapshot3D",
@@ -1704,14 +1796,16 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于按稳定建筑实例同步机枪塔、补给本地弹药，并以固定 0.1 秒步长组合教学波与战斗模型。",
-      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域；不复制物流范围、建筑资格或库存事务，不进入 schema 30。",
+      "UseSummary": "按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时由本运行时拥有并捕获塔内弹药载荷，匹配后完成迁移或在遗弃时明确丢弃。",
+      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域；撤离协调器不拥有塔内载荷，不复制物流范围、建筑资格或库存事务，不进入 schema 30。",
       "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0014"
       ]
     },
     {
@@ -2008,13 +2102,15 @@
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "用于采集灰盒性能数据。",
-      "BoundarySummary": "不作为发布版本逻辑。",
+      "UseSummary": "用于采集灰盒性能数据，并执行 IDEA-0014 活跃生产、八敌、防御 HUD、撤离 UI 的 300 稳定帧混合探针、GUI 捕获和正式汇总。",
+      "BoundarySummary": "只用于可重复验证和正式 Marker 取证，不改变玩法真值、不作为发布版本逻辑，也不替代用户试玩或真实 Windows GPU、显存和内存验收。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0014"
       ]
     },
     {
@@ -2084,7 +2180,7 @@
       "Id": "graybox-prototype-3d",
       "ChineseName": "三维灰盒原型",
       "Path": "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-      "Purpose": "用于三维运行、建造范围与采矿引导、系统菜单和场景合同验证。",
+      "Purpose": "用于三维运行、正式展开/收起、建造生产防御撤离、系统菜单和场景合同验证。",
       "EnabledInBuildSettings": true,
       "ExpectedBuildIndex": 0,
       "ReuseLevel": "SceneOnly"
@@ -2105,9 +2201,10 @@
       "ChineseName": "灰盒建筑菜单",
       "OwnerTypeName": "GrayboxBuildingMenuView3D",
       "SceneId": "graybox-prototype-3d",
-      "InputPrioritySummary": "建筑菜单先于世界点击处理输入。",
+      "InputPrioritySummary": "系统菜单优先于撤离清单和处理态；撤离态阻断建造与世界点击，保留 Space 战术暂停，容量阻塞时允许 E 腾出城市仓储容量。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ]
     },
     {
@@ -2139,7 +2236,8 @@
       "InputPrioritySummary": "系统菜单优先；防御 HUD 只发布选择与暂停命令并阻挡界面点击穿透，世界选择由正式输入主循环处理。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ]
     },
     {
@@ -2147,10 +2245,11 @@
       "ChineseName": "灰盒易用性输入协调器",
       "OwnerTypeName": "GrayboxUsabilityInputCoordinator3D",
       "SceneId": "graybox-prototype-3d",
-      "InputPrioritySummary": "先完成既有 Esc 取消链，再打开系统菜单；菜单打开时统一屏蔽世界输入。",
+      "InputPrioritySummary": "先完成撤离、背包、科技与建造的既有 Esc 取消链，再打开系统菜单；系统菜单统一屏蔽世界输入，撤离态仍允许 Space 战术暂停。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ]
     }
