@@ -284,9 +284,14 @@ EditMode 锁定输入优先级：`F` 继续是唯一展开/收起键；转换中
 
 - Create: `Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs`
 - Create: `Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs.meta`
+- Modify: `Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs`
+- Modify: `Assets/_Game/Editor/GrayboxSceneAuthoring.cs`
+- Modify through the official authoring command only: `Assets/_Game/Scenes/GrayboxPrototype3D.unity`
 - Modify only if a reusable fixture seam is required: `Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs`
 
 **RED**
+
+先增加场景合同断言，固定 `GrayboxMobileCityController3D.ruleTimeSourceBehaviour` 必须序列化指向场景中唯一的 `GrayboxBuildingSession3D`。该断言应先因当前空引用精确 RED；随后由 `GrayboxSceneAuthoring` 正式补齐引用，运行官方场景重写并验证连续两次生成幂等。此项 GREEN 完成前不得运行下述 E2E；E2E 不得在测试内调用 `ConfigureRuleTimeSource` 掩盖接线缺口。
 
 新增单一可读的六段场景用例并在每段保存明确断言：
 
@@ -297,13 +302,13 @@ EditMode 锁定输入优先级：`F` 继续是唯一展开/收起键；转换中
 5. 敌人仍存活时真实 `F`，通过真实 UGUI 分配地面资产、确认并完成原子撤离；
 6. 等待 `8s / productivity` 收起结束，再用真实移动/右键输入证明城市可继续行驶。
 
-夹具只允许在场景启动前提供确定性初始资源和规则时间加速；不得直接解锁研究、直接完成建筑、直接注入产物/弹药、直接杀敌、直接切换模式或直接调用撤离入口。
+夹具只允许在首次玩法输入前提供确定性初始资源、将测试会话人口确定性设为 `200`，以及设置规则时间加速。人口 `200` 只用于跨越研究站既有最低人口门槛；不得改变正式默认人口/上限 `100/150`、研究站门槛或人口生产力语义。仍不得直接解锁研究、直接完成建筑、直接注入产物或弹药、直接杀敌、直接切换城市模式，或直接调用撤离入口/提交。
 
 ```bash
 "$WASTECITY_UNITY_BIN" -batchmode -projectPath "$WASTECITY_PROJECT_ROOT" -runTests -testPlatform PlayMode -testFilter WasteCity.Tests.GrayboxFormalEvacuationVerticalSliceTests -testResults "$WASTECITY_EVIDENCE_ROOT/task-08-red.xml" -logFile "$WASTECITY_EVIDENCE_ROOT/task-08-red.log"
 ```
 
-预期 RED：测试沿真实链路在第一个尚未接通的撤离步骤失败，而不是夹具/场景加载失败。
+预期 RED 分两段：前置场景合同先精确失败于空的 `ruleTimeSourceBehaviour`；完成正式接线和幂等 GREEN 后，E2E 才沿真实链路在第一个尚未接通的撤离步骤失败，而不是夹具、场景加载或规则时间接线失败。
 
 **最小 GREEN**
 
