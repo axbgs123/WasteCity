@@ -548,6 +548,13 @@ namespace WasteCity.Graybox3D.Building
             for (int index = 0; index < towers.Count; index++)
             {
                 GrayboxDefenseTowerRuntimeState3D state = towers[index];
+                string visibleTargetId = state.CanRunLocally
+                    ? state.TargetId
+                    : null;
+                GrayboxDefenseTowerStatus3D visibleStatus =
+                    state.CanRunLocally
+                        ? state.Status
+                        : GrayboxDefenseTowerStatus3D.Unavailable;
                 towerSnapshots[index] = new GrayboxDefenseTowerSnapshot3D(
                     state.StableId,
                     state.Combat.Ammo,
@@ -556,8 +563,8 @@ namespace WasteCity.Graybox3D.Building
                     state.Combat.IsLogisticsConnected,
                     state.CanRunLocally,
                     state.Combat.IsPlayerPaused,
-                    state.TargetId,
-                    state.Status);
+                    visibleTargetId,
+                    visibleStatus);
             }
 
             IReadOnlyList<DefenseEnemyCombatModel> activeEnemies =
