@@ -1,8 +1,12 @@
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.City;
+using WasteCity.Combat;
 using WasteCity.Graybox3D;
+using WasteCity.Graybox3D.Building;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -537,6 +541,177 @@ namespace WasteCity.Tests
                 fixture.Controller.Mode,
                 Is.EqualTo(CityMode.Fortress),
                 "0.5s × 1.0 gameplay productivity × 10x development rule time must advance 5 base seconds.");
+        }
+
+        [Test]
+        public void Packing_ReadsAliveEnemyCountEachSegmentAndRecoversAfterCombat()
+        {
+            ControllerFixture fixture = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            GrayboxBuildingSession3D ruleTimeSource =
+                CreateFormalRuleTimeSession();
+            fixture.Controller.ConfigureRuleTimeSource(
+                ruleTimeSource);
+            GrayboxDefenseRuntimeSnapshot3D snapshot =
+                DefenseSnapshot(WavePhase.Warning, spawnedEnemyCount: 0);
+            ConfigureAliveEnemyCountSource(
+                fixture.Controller,
+                () => snapshot.AliveEnemyCount);
+            BeginPacking(fixture.Controller);
+
+            fixture.Controller.TickDeployment(.4f);
+
+            Assert.That(fixture.Controller.Deployment.Remaining,
+                Is.EqualTo(7f).Within(.0001f),
+                "Warning with no living enemy must use the full 1.25 × 2.0 rule-time advance.");
+
+            snapshot = DefenseSnapshot(
+                WavePhase.Active,
+                1,
+                Enemy("enemy.packing.1"));
+            fixture.Controller.TickDeployment(.4f);
+
+            Assert.That(fixture.Controller.Deployment.Remaining,
+                Is.EqualTo(6.3f).Within(.0001f),
+                "A live enemy must apply 0.7 after formal productivity and development rule time.");
+
+            snapshot = DefenseSnapshot(
+                WavePhase.Active,
+                spawnedEnemyCount: 1);
+            fixture.Controller.TickDeployment(.4f);
+
+            Assert.That(fixture.Controller.Deployment.Remaining,
+                Is.EqualTo(5.3f).Within(.0001f),
+                "The next Packing segment after the final enemy dies must immediately return to 1.0 combat scaling.");
+        }
+
+        [Test]
+        public void Packing_CombatZeroDeltaPausesAndLargeDeltaMatchesPartitions()
+        {
+            GrayboxDefenseRuntimeSnapshot3D combat = DefenseSnapshot(
+                WavePhase.Active,
+                1,
+                Enemy("enemy.partition.1"));
+            ControllerFixture whole = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            ControllerFixture split = CreateFixture(
+                FilledMap(5, 5, OpenCell()),
+                2,
+                2);
+            GrayboxBuildingSession3D ruleTimeSource =
+                CreateFormalRuleTimeSession();
+            whole.Controller.ConfigureRuleTimeSource(
+                ruleTimeSource);
+            split.Controller.ConfigureRuleTimeSource(
+                ruleTimeSource);
+            ConfigureAliveEnemyCountSource(
+                whole.Controller,
+                () => combat.AliveEnemyCount);
+            ConfigureAliveEnemyCountSource(
+                split.Controller,
+                () => combat.AliveEnemyCount);
+            BeginPacking(whole.Controller);
+            BeginPacking(split.Controller);
+
+            whole.Controller.TickDeployment(0f);
+
+            Assert.That(whole.Controller.Deployment.Remaining,
+                Is.EqualTo(8f).Within(.0001f),
+                "System or tactical pause supplies zero rule delta and must not advance Packing.");
+
+            whole.Controller.TickDeployment(4f);
+            for (int index = 0; index < 40; index++)
+                split.Controller.TickDeployment(.1f);
+
+            Assert.That(whole.Controller.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(split.Controller.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(whole.Controller.Deployment.Remaining,
+                Is.EqualTo(1f).Within(.0001f));
+            Assert.That(split.Controller.Deployment.Remaining,
+                Is.EqualTo(whole.Controller.Deployment.Remaining)
+                    .Within(.0001f));
+            Assert.That(split.Controller.Deployment.Progress,
+                Is.EqualTo(whole.Controller.Deployment.Progress)
+                    .Within(.0001f));
+        }
+
+        private static void ConfigureAliveEnemyCountSource(
+            GrayboxMobileCityController3D controller,
+            Func<int> source)
+        {
+            MethodInfo method = typeof(GrayboxMobileCityController3D)
+                .GetMethod(
+                    "ConfigureAliveEnemyCountSource",
+                    BindingFlags.Instance | BindingFlags.Public,
+                    null,
+                    new[]
+                    {
+                        typeof(Func<int>),
+                    },
+                    null);
+            Assert.That(method, Is.Not.Null,
+                "Packing requires a public narrow configuration seam that reads AliveEnemyCount from the current authoritative defense snapshot instead of storing a second enemy/combat bool.");
+            method.Invoke(controller, new object[] { source });
+        }
+
+        private static void BeginPacking(
+            GrayboxMobileCityController3D controller)
+        {
+            Assert.That(controller.TryToggleDeployment(out _), Is.True);
+            Assert.That(
+                controller.CompleteDeploymentTransitionForDevelopment(),
+                Is.True);
+            Assert.That(controller.Mode, Is.EqualTo(CityMode.Fortress));
+            Assert.That(controller.TryToggleDeployment(out _), Is.True);
+            Assert.That(controller.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
+        private static GrayboxDefenseRuntimeSnapshot3D DefenseSnapshot(
+            WavePhase wavePhase,
+            int spawnedEnemyCount,
+            params GrayboxDefenseEnemySnapshot3D[] enemies)
+        {
+            enemies = enemies ?? Array.Empty<GrayboxDefenseEnemySnapshot3D>();
+            return new GrayboxDefenseRuntimeSnapshot3D(
+                wavePhase == WavePhase.Idle ? 0 : 1,
+                wavePhase,
+                wavePhase == WavePhase.Warning ? 15f : 0f,
+                spawnedEnemyCount,
+                enemies.Length,
+                Math.Max(0, spawnedEnemyCount - enemies.Length),
+                2000,
+                2000,
+                Array.Empty<GrayboxDefenseTowerSnapshot3D>(),
+                enemies);
+        }
+
+        private static GrayboxDefenseEnemySnapshot3D Enemy(string stableId)
+        {
+            return new GrayboxDefenseEnemySnapshot3D(
+                stableId,
+                1,
+                4f,
+                2f,
+                100,
+                isAttackingCore: false);
+        }
+
+        private GrayboxBuildingSession3D CreateFormalRuleTimeSession()
+        {
+            var root = Track(new GameObject("FormalRuleTimeSession"));
+            GrayboxBuildingSession3D session =
+                root.AddComponent<GrayboxBuildingSession3D>();
+            session.SetPopulationForDevelopment(150);
+            session.SetConstructionMultiplierForDevelopment(2f);
+            Assert.That(session.ProductivityMultiplier,
+                Is.EqualTo(1.25f).Within(.0001f));
+            Assert.That(session.DevelopmentRuleTimeMultiplier,
+                Is.EqualTo(2f).Within(.0001f));
+            return session;
         }
 
         private sealed class FixedRuleTimeSource : IGrayboxRuleTimeSource3D

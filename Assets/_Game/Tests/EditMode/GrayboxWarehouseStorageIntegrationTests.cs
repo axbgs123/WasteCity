@@ -680,6 +680,165 @@ namespace WasteCity.Tests
             Assert.That(session.Instances, Does.Contain(source));
         }
 
+        [Test]
+        public void ControllerCapacityBlockRetainsFrozenQueueAndRetriesCurrentWorkOnly()
+        {
+            GrayboxBuildingSession3D session = CreateSession();
+            var presentation = new RecordingPresentation();
+            GrayboxBuildingInstance3D earlyQuick = BeginBuilding(
+                session, BuildingCatalog.Wall, 10, 10, presentation);
+            GrayboxBuildingInstance3D earlyAbandon = BeginBuilding(
+                session, BuildingCatalog.Wall, 12, 10, presentation);
+            GrayboxBuildingInstance3D current = BeginBuilding(
+                session, BuildingCatalog.Warehouse, 14, 10, presentation);
+            GrayboxBuildingInstance3D later = BeginBuilding(
+                session, BuildingCatalog.Wall, 17, 10, presentation);
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(.1f, CityMode.Fortress, false, presentation);
+            Assert.That(session.CityStorage.TrySetWarehouseConnected(
+                current.StableInstanceId, connected: true), Is.True);
+            Assert.That(session.CityStorage.AddToWarehouse(
+                current.StableInstanceId,
+                ResourceIds.Alloy,
+                2), Is.EqualTo(2));
+            Assert.That(session.CityStorage.AddToWarehouse(
+                current.StableInstanceId,
+                ResourceIds.Ammunition,
+                3), Is.EqualTo(3));
+
+            BuildingEvacuationWork quickWork = BuildingEvacuationRules.Create(
+                earlyQuick.StableInstanceId,
+                earlyQuick.Placement.Definition.Cost,
+                earlyQuick.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.QuickDismantle);
+            BuildingEvacuationWork currentWork = BuildingEvacuationRules.Create(
+                current.StableInstanceId,
+                current.Placement.Definition.Cost,
+                current.Progress.BaseDuration,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle);
+            int currentIncoming = 5 + currentWork.Refund;
+            int initialTargetFree = currentIncoming - 1 + quickWork.Refund;
+            const string targetId = "000000.controller-block-target";
+            Assert.That(session.CityStorage.TryRegisterWarehouse(
+                targetId, connected: true), Is.True);
+            Assert.That(session.CityStorage.AddToWarehouse(
+                targetId,
+                ResourceIds.Stone,
+                WarehouseStorageState.FormalCapacity - initialTargetFree),
+                Is.EqualTo(
+                    WarehouseStorageState.FormalCapacity - initialTargetFree));
+            session.Inventory.Set(
+                ResourceIds.Alloy,
+                GrayboxBuildingSession3D.ResourceCapacity);
+            session.Inventory.Set(
+                ResourceIds.Ammunition,
+                GrayboxBuildingSession3D.ResourceCapacity);
+
+            GrayboxEvacuationController3D controller =
+                CreateEvacuationController(session, presentation);
+            Assert.That(controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(controller.Assign(
+                earlyQuick.StableInstanceId,
+                BuildingEvacuationTreatment.QuickDismantle), Is.True);
+            Assert.That(controller.Assign(
+                earlyAbandon.StableInstanceId,
+                BuildingEvacuationTreatment.Abandon), Is.True);
+            Assert.That(controller.Assign(
+                current.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(controller.Assign(
+                later.StableInstanceId,
+                BuildingEvacuationTreatment.FullDismantle), Is.True);
+            Assert.That(controller.ConfirmManifest(), Is.True);
+            Assert.That(ContainsReference(session.Instances, earlyQuick),
+                Is.False);
+            Assert.That(earlyAbandon.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(current.IsEvacuationLocked, Is.True);
+            Assert.That(later.IsEvacuationLocked, Is.True);
+            BuildingEvacuationWork[] frozenWork = CopyWork(controller.Work);
+            BuildingEvacuationWork frozenCurrent = FindWork(
+                frozenWork, current.StableInstanceId);
+            EvacuationBatchContext frozenContext = frozenCurrent.BatchContext;
+            int stoneAfterEarlyCommit = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Stone);
+            ulong storageRevisionBeforeBlock = session.CityStorage.Revision;
+            uint catalogRevisionBeforeBlock = session.CatalogRevision;
+            uint placementRevisionBeforeBlock = session.PlacementRevision;
+            int gridCountBeforeBlock = session.GroundGrid.Count;
+            int sourceAlloyBeforeBlock = session.CityStorage.GetWarehouseAmount(
+                current.StableInstanceId, ResourceIds.Alloy);
+            int sourceAmmoBeforeBlock = session.CityStorage.GetWarehouseAmount(
+                current.StableInstanceId, ResourceIds.Ammunition);
+            int targetStoneBeforeBlock = session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone);
+            int removeCountBeforeBlock = presentation.RemoveCount;
+            int updateCountBeforeBlock = presentation.UpdateCount;
+
+            controller.Tick(frozenCurrent.DismantleSeconds + 1f, paused: false);
+
+            Assert.That(ReadControllerBool(controller, "IsBlocked"), Is.True);
+            Assert.That(ReadControllerString(controller, "BlockedReason"),
+                Does.Contain("容量"));
+            Assert.That(controller.IsManifestOpen, Is.False,
+                "Capacity blocking must not rebuild an editable manifest.");
+            Assert.That(controller.Work, Is.EqualTo(frozenWork));
+            Assert.That(FindWork(controller.Work, current.StableInstanceId)
+                .BatchContext, Is.EqualTo(frozenContext));
+            Assert.That(current.IsEvacuationLocked, Is.True);
+            Assert.That(later.IsEvacuationLocked, Is.True);
+            Assert.That(ContainsReference(session.Instances, earlyQuick),
+                Is.False);
+            Assert.That(earlyAbandon.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.AbandonedRuin));
+            Assert.That(session.CityStorage.Revision,
+                Is.EqualTo(storageRevisionBeforeBlock));
+            Assert.That(session.CatalogRevision,
+                Is.EqualTo(catalogRevisionBeforeBlock));
+            Assert.That(session.PlacementRevision,
+                Is.EqualTo(placementRevisionBeforeBlock));
+            Assert.That(session.GroundGrid.Count,
+                Is.EqualTo(gridCountBeforeBlock));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                current.StableInstanceId, ResourceIds.Alloy),
+                Is.EqualTo(sourceAlloyBeforeBlock));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                current.StableInstanceId, ResourceIds.Ammunition),
+                Is.EqualTo(sourceAmmoBeforeBlock));
+            Assert.That(session.CityStorage.GetWarehouseAmount(
+                targetId, ResourceIds.Stone), Is.EqualTo(targetStoneBeforeBlock));
+            Assert.That(presentation.RemoveCount, Is.EqualTo(removeCountBeforeBlock));
+            Assert.That(presentation.UpdateCount, Is.EqualTo(updateCountBeforeBlock));
+
+            Assert.That(session.CityStorage.TrySpendFromWarehouse(
+                targetId, ResourceIds.Stone, 1), Is.True,
+                "The player moves one city resource out to free capacity.");
+            int stoneBeforeRetry = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Stone);
+            Assert.That(stoneBeforeRetry, Is.EqualTo(stoneAfterEarlyCommit - 1));
+            Assert.That(InvokeRetryBlockedWork(controller), Is.True);
+
+            Assert.That(ReadControllerBool(controller, "IsBlocked"), Is.False);
+            Assert.That(ContainsReference(session.Instances, current),
+                Is.False);
+            Assert.That(session.CityStorage.ContainsWarehouse(
+                current.StableInstanceId), Is.False);
+            Assert.That(later.IsEvacuationLocked, Is.True);
+            Assert.That(session.CityStorage.GetNetworkAmount(ResourceIds.Stone),
+                Is.EqualTo(stoneBeforeRetry),
+                "Retry must not repeat the already committed Quick refund.");
+            ulong revisionAfterRetry = session.CityStorage.Revision;
+            int alloyAfterRetry = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Alloy);
+            Assert.That(InvokeRetryBlockedWork(controller), Is.False);
+            Assert.That(session.CityStorage.Revision,
+                Is.EqualTo(revisionAfterRetry));
+            Assert.That(session.CityStorage.GetNetworkAmount(ResourceIds.Alloy),
+                Is.EqualTo(alloyAfterRetry));
+        }
+
         private GrayboxBuildingSession3D CreateSession()
         {
             var root = new GameObject("WarehouseStorageIntegration.Session");
@@ -694,7 +853,21 @@ namespace WasteCity.Tests
             GrayboxBuildingSession3D session,
             IGrayboxBuildingPresentation3D presentation)
         {
-            BuildingDefinition definition = BuildingCatalog.Warehouse;
+            return BeginBuilding(
+                session,
+                BuildingCatalog.Warehouse,
+                10,
+                10,
+                presentation);
+        }
+
+        private static GrayboxBuildingInstance3D BeginBuilding(
+            GrayboxBuildingSession3D session,
+            BuildingDefinition definition,
+            int x,
+            int y,
+            IGrayboxBuildingPresentation3D presentation)
+        {
             BuildingUnlockEvaluation unlock = BuildingUnlockModel.Evaluate(
                 definition,
                 session.Population,
@@ -705,8 +878,8 @@ namespace WasteCity.Tests
                 session.GroundGrid,
                 BuildingSite.Ground,
                 BuildingOrientation.North,
-                10,
-                10,
+                x,
+                y,
                 12,
                 12,
                 session.GroundBuildRadius,
@@ -727,6 +900,94 @@ namespace WasteCity.Tests
                 Is.True,
                 evaluation.PrimaryFailure.ToString());
             return instance;
+        }
+
+        private GrayboxEvacuationController3D CreateEvacuationController(
+            GrayboxBuildingSession3D session,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            var menuObject = new GameObject("WarehouseStorageIntegration.Menu");
+            roots.Add(menuObject);
+            var menu = menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            var controllerObject = new GameObject(
+                "WarehouseStorageIntegration.EvacuationController");
+            roots.Add(controllerObject);
+            var controller = controllerObject.AddComponent<
+                GrayboxEvacuationController3D>();
+            controller.Configure(
+                session,
+                new DeploymentRequestStub(),
+                presentation,
+                menu);
+            return controller;
+        }
+
+        private static BuildingEvacuationWork[] CopyWork(
+            IReadOnlyList<BuildingEvacuationWork> source)
+        {
+            var copy = new BuildingEvacuationWork[source.Count];
+            for (int index = 0; index < source.Count; index++)
+                copy[index] = source[index];
+            return copy;
+        }
+
+        private static bool ContainsReference(
+            IReadOnlyList<GrayboxBuildingInstance3D> source,
+            GrayboxBuildingInstance3D expected)
+        {
+            for (int index = 0; index < source.Count; index++)
+                if (object.ReferenceEquals(source[index], expected)) return true;
+            return false;
+        }
+
+        private static BuildingEvacuationWork FindWork(
+            IReadOnlyList<BuildingEvacuationWork> source,
+            string stableInstanceId)
+        {
+            for (int index = 0; index < source.Count; index++)
+                if (source[index].StableInstanceId == stableInstanceId)
+                    return source[index];
+            Assert.Fail("Missing evacuation work: " + stableInstanceId);
+            return default;
+        }
+
+        private static bool ReadControllerBool(
+            GrayboxEvacuationController3D controller,
+            string propertyName)
+        {
+            PropertyInfo property = typeof(GrayboxEvacuationController3D)
+                .GetProperty(propertyName, BindingFlags.Public |
+                    BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null, propertyName);
+            Assert.That(property.GetSetMethod(nonPublic: false), Is.Null,
+                propertyName + " must not expose a public setter.");
+            return (bool)property.GetValue(controller);
+        }
+
+        private static string ReadControllerString(
+            GrayboxEvacuationController3D controller,
+            string propertyName)
+        {
+            PropertyInfo property = typeof(GrayboxEvacuationController3D)
+                .GetProperty(propertyName, BindingFlags.Public |
+                    BindingFlags.Instance);
+            Assert.That(property, Is.Not.Null, propertyName);
+            Assert.That(property.GetSetMethod(nonPublic: false), Is.Null,
+                propertyName + " must not expose a public setter.");
+            return (string)property.GetValue(controller);
+        }
+
+        private static bool InvokeRetryBlockedWork(
+            GrayboxEvacuationController3D controller)
+        {
+            MethodInfo method = typeof(GrayboxEvacuationController3D).GetMethod(
+                "RetryBlockedWork",
+                BindingFlags.Public | BindingFlags.Instance,
+                null,
+                System.Type.EmptyTypes,
+                null);
+            Assert.That(method, Is.Not.Null, "RetryBlockedWork()");
+            return (bool)method.Invoke(controller, null);
         }
 
         private static GrayboxBuildingInstance3D CompletedInstance(
@@ -789,6 +1050,19 @@ namespace WasteCity.Tests
             public void Remove(GrayboxBuildingInstance3D instance)
             {
                 RemoveCount++;
+            }
+        }
+
+        private sealed class DeploymentRequestStub :
+            IGrayboxDeploymentRequest3D
+        {
+            public CityMode Mode { get; private set; } = CityMode.Fortress;
+
+            public bool TryToggleDeployment(out string failureReason)
+            {
+                failureReason = string.Empty;
+                Mode = CityMode.Packing;
+                return true;
             }
         }
     }

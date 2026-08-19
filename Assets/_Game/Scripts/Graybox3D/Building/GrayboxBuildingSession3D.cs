@@ -18,6 +18,13 @@ namespace WasteCity.Graybox3D.Building
         AbandonedRuin
     }
 
+    public enum GrayboxEvacuationCommitCode3D
+    {
+        Completed,
+        CapacityInsufficient,
+        Invalid
+    }
+
     public sealed class GrayboxBuildingInstance3D
     {
         internal GrayboxBuildingInstance3D(
@@ -475,23 +482,25 @@ namespace WasteCity.Graybox3D.Building
         }
 
         public bool TryLockEvacuationWork(
-            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork,
+            IReadOnlyList<BuildingEvacuationWork> evacuationWork,
             out string failureReason)
         {
             EnsureConfigured();
             failureReason = string.Empty;
-            if (fullDismantleWork == null || fullDismantleWork.Count == 0)
+            if (evacuationWork == null || evacuationWork.Count == 0)
             {
-                failureReason = "完整拆除队列为空";
+                failureReason = "撤离锁定队列为空";
                 return false;
             }
 
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            for (var index = 0; index < fullDismantleWork.Count; index++)
+            for (var index = 0; index < evacuationWork.Count; index++)
             {
-                BuildingEvacuationWork work = fullDismantleWork[index];
+                BuildingEvacuationWork work = evacuationWork[index];
                 int instanceIndex = FindInstanceIndex(work.StableInstanceId);
-                if (work.Treatment != BuildingEvacuationTreatment.FullDismantle ||
+                if (work.Treatment == BuildingEvacuationTreatment.Unassigned ||
+                    !Enum.IsDefined(typeof(BuildingEvacuationTreatment),
+                        work.Treatment) ||
                     !seen.Add(work.StableInstanceId) || instanceIndex < 0 ||
                     !IsEligibleGroundInstance(instances[instanceIndex]) ||
                     instances[instanceIndex].IsEvacuationLocked ||
@@ -501,7 +510,7 @@ namespace WasteCity.Graybox3D.Building
                         out BuildingEvacuationWork captured) ||
                     !captured.Equals(work))
                 {
-                    failureReason = "完整拆除项目无效";
+                    failureReason = "撤离锁定项目无效";
                     return false;
                 }
             }
@@ -509,9 +518,9 @@ namespace WasteCity.Graybox3D.Building
             var changedCompleted = new List<GrayboxBuildingInstance3D>();
             try
             {
-                for (var index = 0; index < fullDismantleWork.Count; index++)
+                for (var index = 0; index < evacuationWork.Count; index++)
                 {
-                    BuildingEvacuationWork work = fullDismantleWork[index];
+                    BuildingEvacuationWork work = evacuationWork[index];
                     GrayboxBuildingInstance3D instance =
                         instances[FindInstanceIndex(work.StableInstanceId)];
                     bool countedBefore = IsCountedCompleted(instance);
@@ -534,9 +543,9 @@ namespace WasteCity.Graybox3D.Building
             }
             catch
             {
-                for (var index = 0; index < fullDismantleWork.Count; index++)
+                for (var index = 0; index < evacuationWork.Count; index++)
                 {
-                    BuildingEvacuationWork work = fullDismantleWork[index];
+                    BuildingEvacuationWork work = evacuationWork[index];
                     if (!evacuationLocks.Remove(work.StableInstanceId)) continue;
                     int instanceIndex = FindInstanceIndex(work.StableInstanceId);
                     if (instanceIndex >= 0)
@@ -577,7 +586,8 @@ namespace WasteCity.Graybox3D.Building
                         instance.Placement.Definition.Cost,
                         instance.Progress.BaseDuration,
                         EvacuationRemainingRatio(instance),
-                        work.Treatment);
+                        work.Treatment,
+                        work.BatchContext);
                 if (work.Treatment == BuildingEvacuationTreatment.Unassigned ||
                     !Enum.IsDefined(typeof(BuildingEvacuationTreatment),
                         work.Treatment) ||
@@ -599,14 +609,14 @@ namespace WasteCity.Graybox3D.Building
         }
 
         public void RollbackEvacuationLocksAfterFailure(
-            IReadOnlyList<BuildingEvacuationWork> fullDismantleWork)
+            IReadOnlyList<BuildingEvacuationWork> evacuationWork)
         {
-            if (fullDismantleWork == null) return;
+            if (evacuationWork == null) return;
             EnsureConfigured();
             var placementChanged = false;
-            for (var index = 0; index < fullDismantleWork.Count; index++)
+            for (var index = 0; index < evacuationWork.Count; index++)
             {
-                BuildingEvacuationWork work = fullDismantleWork[index];
+                BuildingEvacuationWork work = evacuationWork[index];
                 if (!evacuationSnapshots.TryGetValue(
                         work.StableInstanceId,
                         out BuildingEvacuationWork captured) ||
@@ -649,11 +659,29 @@ namespace WasteCity.Graybox3D.Building
             out int acceptedRefund,
             out string failureReason)
         {
+            return TryCommitEvacuationWithPayload(
+                work,
+                additionalPayload,
+                presentation,
+                out acceptedRefund,
+                out failureReason,
+                out _);
+        }
+
+        public bool TryCommitEvacuationWithPayload(
+            BuildingEvacuationWork work,
+            IReadOnlyList<ResourceAmount> additionalPayload,
+            IGrayboxBuildingPresentation3D presentation,
+            out int acceptedRefund,
+            out string failureReason,
+            out GrayboxEvacuationCommitCode3D commitCode)
+        {
             if (presentation == null)
                 throw new ArgumentNullException(nameof(presentation));
             EnsureConfigured();
             acceptedRefund = 0;
             failureReason = string.Empty;
+            commitCode = GrayboxEvacuationCommitCode3D.Invalid;
             int instanceIndex = FindInstanceIndex(work.StableInstanceId);
             if (instanceIndex < 0 ||
                 work.Treatment == BuildingEvacuationTreatment.Unassigned ||
@@ -674,19 +702,23 @@ namespace WasteCity.Graybox3D.Building
                 failureReason = "撤离快照不匹配";
                 return false;
             }
-            if (work.Treatment == BuildingEvacuationTreatment.FullDismantle &&
-                (!evacuationLocks.TryGetValue(
-                    work.StableInstanceId,
-                    out BuildingEvacuationWork captured) ||
-                 !captured.Equals(work)))
+            bool hasLock = evacuationLocks.TryGetValue(
+                work.StableInstanceId,
+                out BuildingEvacuationWork captured);
+            bool hasMatchingLock = instance.IsEvacuationLocked &&
+                hasLock && captured.Equals(work);
+            bool requiresLock = work.Treatment ==
+                BuildingEvacuationTreatment.FullDismantle;
+            if (requiresLock && !hasMatchingLock)
             {
                 failureReason = "完整拆除快照不匹配";
                 return false;
             }
-            if (instance.IsEvacuationLocked &&
-                work.Treatment != BuildingEvacuationTreatment.FullDismantle)
+            if (!requiresLock &&
+                (instance.IsEvacuationLocked || hasLock) &&
+                !hasMatchingLock)
             {
-                failureReason = "撤离项目已锁定";
+                failureReason = "撤离锁定快照不匹配";
                 return false;
             }
             if (!HasExpectedPlacementFootprint(instance))
@@ -702,9 +734,16 @@ namespace WasteCity.Graybox3D.Building
                     additionalPayload);
             if (storagePlan != null && !storagePlan.CanCommit)
             {
-                failureReason = storagePlan.IsValid
-                    ? EvacuationCapacityFailure(storagePlan)
-                    : "撤离资源载荷无效";
+                if (storagePlan.IsValid)
+                {
+                    commitCode =
+                        GrayboxEvacuationCommitCode3D.CapacityInsufficient;
+                    failureReason = EvacuationCapacityFailure(storagePlan);
+                }
+                else
+                {
+                    failureReason = "撤离资源载荷无效";
+                }
                 return false;
             }
             if (work.Treatment == BuildingEvacuationTreatment.Abandon)
@@ -712,14 +751,16 @@ namespace WasteCity.Graybox3D.Building
                     instance,
                     presentation,
                     storagePlan,
-                    out failureReason);
+                    out failureReason,
+                    out commitCode);
             return TryRemoveEvacuatedInstance(
                 instanceIndex,
                 work,
                 presentation,
                 storagePlan,
                 out acceptedRefund,
-                out failureReason);
+                out failureReason,
+                out commitCode);
         }
 
         public bool IsResearchCompleted(string id)
@@ -847,17 +888,21 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingInstance3D instance,
             IGrayboxBuildingPresentation3D presentation,
             CityResourceEvacuationPlan storagePlan,
-            out string failureReason)
+            out string failureReason,
+            out GrayboxEvacuationCommitCode3D commitCode)
         {
             bool wasCounted = IsCountedCompleted(instance);
             if (!TryCommitEvacuationStorage(
                     storagePlan,
-                    out failureReason))
+                    out failureReason,
+                    out commitCode))
             {
                 return false;
             }
 
+            instance.SetEvacuationLocked(false);
             instance.Abandon();
+            evacuationLocks.Remove(instance.StableInstanceId);
             if (wasCounted) AdvanceCatalogRevision();
             AdvancePlacementRevision();
             evacuationSnapshots.Remove(instance.StableInstanceId);
@@ -880,7 +925,8 @@ namespace WasteCity.Graybox3D.Building
             IGrayboxBuildingPresentation3D presentation,
             CityResourceEvacuationPlan storagePlan,
             out int acceptedRefund,
-            out string failureReason)
+            out string failureReason,
+            out GrayboxEvacuationCommitCode3D commitCode)
         {
             GrayboxBuildingInstance3D instance = instances[instanceIndex];
             BuildingGrid grid = instance.Placement.Site == BuildingSite.InnerCity
@@ -891,7 +937,8 @@ namespace WasteCity.Graybox3D.Building
             failureReason = string.Empty;
             if (!TryCommitEvacuationStorage(
                     storagePlan,
-                    out failureReason))
+                    out failureReason,
+                    out commitCode))
             {
                 return false;
             }
@@ -1004,21 +1051,35 @@ namespace WasteCity.Graybox3D.Building
 
         private bool TryCommitEvacuationStorage(
             CityResourceEvacuationPlan plan,
-            out string failureReason)
+            out string failureReason,
+            out GrayboxEvacuationCommitCode3D commitCode)
         {
             failureReason = string.Empty;
-            if (plan == null) return true;
+            commitCode = GrayboxEvacuationCommitCode3D.Invalid;
+            if (plan == null)
+            {
+                commitCode = GrayboxEvacuationCommitCode3D.Completed;
+                return true;
+            }
             if (CityStorage.TryCommitEvacuationPlan(
                     plan,
                     out CityResourceEvacuationCommitStatus status))
             {
+                commitCode = GrayboxEvacuationCommitCode3D.Completed;
                 return true;
             }
 
-            failureReason = status ==
-                CityResourceEvacuationCommitStatus.CapacityInsufficient
-                    ? EvacuationCapacityFailure(plan)
-                    : "撤离仓储计划失效：" + status;
+            if (status ==
+                CityResourceEvacuationCommitStatus.CapacityInsufficient)
+            {
+                commitCode =
+                    GrayboxEvacuationCommitCode3D.CapacityInsufficient;
+                failureReason = EvacuationCapacityFailure(plan);
+            }
+            else
+            {
+                failureReason = "撤离仓储计划失效：" + status;
+            }
             return false;
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.Economy;
 using WasteCity.Graybox3D;
 
 namespace WasteCity.Graybox3D.Building
@@ -21,6 +22,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxBuildingMenuView3D menu;
         private IGrayboxBuildingPresentation3D evacuationPresentation;
         private IGrayboxDeploymentRequest3D deploymentRequest;
+        private GrayboxProductionRuntime3D productionRuntime;
+        private GrayboxDefenseRuntime3D defenseRuntime;
 
         private readonly List<GrayboxBuildingInstance3D> manifest =
             new List<GrayboxBuildingInstance3D>();
@@ -34,10 +37,16 @@ namespace WasteCity.Graybox3D.Building
             new List<BuildingEvacuationWork>();
         private readonly List<BuildingEvacuationWork> cleanupRollbackSnapshot =
             new List<BuildingEvacuationWork>();
+        private readonly Dictionary<string, RuntimePayloadCapture>
+            runtimePayloads =
+                new Dictionary<string, RuntimePayloadCapture>(
+                    StringComparer.Ordinal);
         private readonly ReadOnlyCollection<BuildingEvacuationWork> readOnlyWork;
         private int cleanupRollbackInvocationCount;
         private int cleanupMenuReleaseInvocationCount;
         private bool ownsConstructionCancellation;
+        private bool isBlocked;
+        private string blockedReason = string.Empty;
         private int fullQueueIndex;
         private float remainingSeconds;
 
@@ -48,7 +57,24 @@ namespace WasteCity.Graybox3D.Building
 
         public bool IsManifestOpen { get; private set; }
         public bool IsProcessing { get; private set; }
+        public bool IsBlocked => isBlocked;
+        public string BlockedReason => blockedReason;
         public IReadOnlyList<BuildingEvacuationWork> Work => readOnlyWork;
+
+        public void ConfigureOperationalRuntimes(
+            GrayboxProductionRuntime3D productionRuntime,
+            GrayboxDefenseRuntime3D defenseRuntime)
+        {
+            if (productionRuntime == null)
+                throw new ArgumentNullException(nameof(productionRuntime));
+            if (defenseRuntime == null)
+                throw new ArgumentNullException(nameof(defenseRuntime));
+            if (IsManifestOpen || IsProcessing)
+                throw new InvalidOperationException(
+                    "Cannot replace evacuation runtime owners during a batch.");
+            this.productionRuntime = productionRuntime;
+            this.defenseRuntime = defenseRuntime;
+        }
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -127,9 +153,7 @@ namespace WasteCity.Graybox3D.Building
 
             session.CopyPlayerOwnedGroundInstances(manifest);
             assignments.Clear();
-            work.Clear();
-            fullQueue.Clear();
-            rollbackWork.Clear();
+            ClearWorkOnly();
             IsManifestOpen = true;
             ownsConstructionCancellation = true;
             menu.SetConstructionCancellationBlocked(true);
@@ -162,6 +186,7 @@ namespace WasteCity.Graybox3D.Building
                         stableInstanceId, StringComparison.Ordinal))
                     continue;
                 assignments[stableInstanceId] = treatment;
+                RefreshManifestPreview();
                 return true;
             }
             return false;
@@ -184,6 +209,7 @@ namespace WasteCity.Graybox3D.Building
                 assignments[instance.StableInstanceId] = treatment;
                 count++;
             }
+            if (count > 0) RefreshManifestPreview();
             return count;
         }
 
@@ -194,47 +220,32 @@ namespace WasteCity.Graybox3D.Building
                 return 0;
             for (var index = 0; index < manifest.Count; index++)
                 assignments[manifest[index].StableInstanceId] = treatment;
+            RefreshManifestPreview();
             return manifest.Count;
         }
 
         public bool ConfirmManifest()
         {
             if (!IsManifestOpen || IsProcessing) return false;
-            work.Clear();
-            fullQueue.Clear();
-            rollbackWork.Clear();
-            for (var index = 0; index < manifest.Count; index++)
-            {
-                GrayboxBuildingInstance3D instance = manifest[index];
-                if (!assignments.TryGetValue(instance.StableInstanceId,
-                        out BuildingEvacuationTreatment treatment) ||
-                    treatment == BuildingEvacuationTreatment.Unassigned)
-                    return false;
-                double remainingRatio = instance.State ==
-                    GrayboxBuildingInstanceState.Completed
-                    ? 1d
-                    : instance.Progress.Remaining /
-                      instance.Progress.BaseDuration;
-                work.Add(BuildingEvacuationRules.Create(
-                    instance.StableInstanceId,
-                    instance.Placement.Definition.Cost,
-                    instance.Progress.BaseDuration,
-                    remainingRatio,
-                    treatment));
-            }
-            IReadOnlyList<BuildingEvacuationWork> sorted =
-                BuildingEvacuationRules.CreateStableFullDismantleQueue(work);
+            if (!HasCompleteAssignments()) return false;
+            EvacuationBatchContext frozenContext = CurrentBatchContext();
+            BuildWork(frozenContext);
             if (!session.TryCaptureEvacuationWork(work, out _))
             {
                 ClearWorkOnly();
                 return false;
             }
-            for (var index = 0; index < sorted.Count; index++)
-                fullQueue.Add(sorted[index]);
             for (var index = 0; index < work.Count; index++)
                 rollbackWork.Add(work[index]);
-            if (fullQueue.Count > 0 &&
-                !session.TryLockEvacuationWork(fullQueue, out _))
+            for (var index = 0; index < work.Count; index++)
+                if (work[index].Treatment !=
+                    BuildingEvacuationTreatment.FullDismantle)
+                    fullQueue.Add(work[index]);
+            for (var index = 0; index < work.Count; index++)
+                if (work[index].Treatment ==
+                    BuildingEvacuationTreatment.FullDismantle)
+                    fullQueue.Add(work[index]);
+            if (!session.TryLockEvacuationWork(work, out _))
             {
                 session.RollbackEvacuationLocksAfterFailure(rollbackWork);
                 ClearWorkOnly();
@@ -243,19 +254,7 @@ namespace WasteCity.Graybox3D.Building
 
             try
             {
-                for (var index = 0; index < work.Count; index++)
-                {
-                    BuildingEvacuationWork item = work[index];
-                    if (item.Treatment == BuildingEvacuationTreatment.FullDismantle)
-                        continue;
-                    if (!session.TryCommitEvacuation(
-                            item, EvacuationPresentation, out _, out _))
-                    {
-                        FailProcessing();
-                        return false;
-                    }
-                    rollbackWork.Remove(item);
-                }
+                CaptureRuntimePayloads();
             }
             catch
             {
@@ -264,44 +263,249 @@ namespace WasteCity.Graybox3D.Building
             }
 
             IsManifestOpen = false;
-            menu.HideEvacuation();
-            if (fullQueue.Count == 0)
-                return FinishIfResolved();
             IsProcessing = true;
+            isBlocked = false;
+            blockedReason = string.Empty;
+            menu.HideEvacuation();
             fullQueueIndex = 0;
-            remainingSeconds = fullQueue[0].DismantleSeconds;
-            return true;
+            remainingSeconds = 0f;
+            return AdvanceThroughImmediateWork();
         }
 
         public void Tick(float unscaledDeltaTime, bool paused)
         {
-            if (!IsProcessing || paused || unscaledDeltaTime <= 0f) return;
-            remainingSeconds -= unscaledDeltaTime;
+            if (IsManifestOpen && !IsProcessing)
+                RefreshManifestPreview();
+            if (!IsProcessing || IsBlocked || paused ||
+                unscaledDeltaTime <= 0f)
+                return;
+            remainingSeconds -= unscaledDeltaTime *
+                Math.Max(0f, session.DevelopmentRuleTimeMultiplier);
             if (remainingSeconds > 0f) return;
+            if (TryCommitCurrent() != CommitCurrentResult.Succeeded) return;
+            AdvanceThroughImmediateWork();
+        }
+
+        public bool RetryBlockedWork()
+        {
+            if (!IsProcessing || !IsBlocked ||
+                fullQueueIndex < 0 || fullQueueIndex >= fullQueue.Count)
+                return false;
+            isBlocked = false;
+            blockedReason = string.Empty;
+            CommitCurrentResult result = TryCommitCurrent();
+            if (result != CommitCurrentResult.Succeeded)
+                return false;
+            AdvanceThroughImmediateWork();
+            return true;
+        }
+
+        private void RefreshManifestPreview()
+        {
+            if (!IsManifestOpen || IsProcessing) return;
+            BuildWork(CurrentBatchContext());
+        }
+
+        private bool HasCompleteAssignments()
+        {
+            if (manifest.Count == 0) return false;
+            for (var index = 0; index < manifest.Count; index++)
+            {
+                if (!assignments.TryGetValue(
+                        manifest[index].StableInstanceId,
+                        out BuildingEvacuationTreatment treatment) ||
+                    treatment == BuildingEvacuationTreatment.Unassigned)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private EvacuationBatchContext CurrentBatchContext()
+        {
+            bool isInCombat = defenseRuntime != null &&
+                defenseRuntime.Snapshot.AliveEnemyCount > 0;
+            return BuildingEvacuationRules.CreateBatchContext(
+                isInCombat,
+                session.ProductivityMultiplier);
+        }
+
+        private void BuildWork(EvacuationBatchContext context)
+        {
+            work.Clear();
+            for (var index = 0; index < manifest.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = manifest[index];
+                if (!assignments.TryGetValue(
+                        instance.StableInstanceId,
+                        out BuildingEvacuationTreatment treatment) ||
+                    treatment == BuildingEvacuationTreatment.Unassigned)
+                {
+                    continue;
+                }
+                double remainingRatio = instance.State ==
+                    GrayboxBuildingInstanceState.Completed
+                    ? 1d
+                    : instance.Progress.BaseDuration > 0f
+                        ? instance.Progress.Remaining /
+                          instance.Progress.BaseDuration
+                        : 0d;
+                work.Add(BuildingEvacuationRules.Create(
+                    instance.StableInstanceId,
+                    instance.Placement.Definition.Cost,
+                    instance.Progress.BaseDuration,
+                    remainingRatio,
+                    treatment,
+                    context));
+            }
+            work.Sort((left, right) => string.CompareOrdinal(
+                left.StableInstanceId,
+                right.StableInstanceId));
+        }
+
+        private void CaptureRuntimePayloads()
+        {
+            runtimePayloads.Clear();
+            for (var index = 0; index < work.Count; index++)
+            {
+                string stableInstanceId = work[index].StableInstanceId;
+                GrayboxProductionEvacuationPayload3D productionPayload = null;
+                GrayboxDefenseEvacuationPayload3D defensePayload = null;
+                productionRuntime?.TryCaptureEvacuationPayload(
+                    stableInstanceId,
+                    out productionPayload);
+                defenseRuntime?.TryCaptureEvacuationPayload(
+                    stableInstanceId,
+                    out defensePayload);
+                if (productionPayload == null && defensePayload == null)
+                    continue;
+                runtimePayloads.Add(
+                    stableInstanceId,
+                    RuntimePayloadCapture.Create(
+                        productionPayload,
+                        defensePayload));
+            }
+        }
+
+        private bool AdvanceThroughImmediateWork()
+        {
+            while (IsProcessing && fullQueueIndex < fullQueue.Count)
+            {
+                BuildingEvacuationWork current = fullQueue[fullQueueIndex];
+                if (current.Treatment ==
+                    BuildingEvacuationTreatment.FullDismantle)
+                {
+                    remainingSeconds = current.DismantleSeconds;
+                    return true;
+                }
+                CommitCurrentResult result = TryCommitCurrent();
+                if (result == CommitCurrentResult.Succeeded)
+                    continue;
+                return result == CommitCurrentResult.Blocked;
+            }
+
+            if (!IsProcessing) return false;
+            IsProcessing = false;
+            return FinishIfResolved();
+        }
+
+        private CommitCurrentResult TryCommitCurrent()
+        {
+            if (!IsProcessing || fullQueueIndex < 0 ||
+                fullQueueIndex >= fullQueue.Count)
+                return CommitCurrentResult.Failed;
             BuildingEvacuationWork current = fullQueue[fullQueueIndex];
+            IReadOnlyList<ResourceAmount> payload =
+                Array.Empty<ResourceAmount>();
+            if (runtimePayloads.TryGetValue(
+                    current.StableInstanceId,
+                    out RuntimePayloadCapture capture))
+            {
+                payload = capture.Resources;
+            }
+
+            bool committed;
+            string failureReason;
+            GrayboxEvacuationCommitCode3D commitCode;
             try
             {
-                if (!session.TryCommitEvacuation(
-                        current, EvacuationPresentation, out _, out _))
-                {
-                    FailProcessing();
-                    return;
-                }
+                committed = session.TryCommitEvacuationWithPayload(
+                    current,
+                    payload,
+                    EvacuationPresentation,
+                    out _,
+                    out failureReason,
+                    out commitCode);
             }
             catch
             {
                 FailProcessing();
                 throw;
             }
-            rollbackWork.Remove(current);
-            fullQueueIndex++;
-            if (fullQueueIndex < fullQueue.Count)
+            if (!committed)
             {
-                remainingSeconds = fullQueue[fullQueueIndex].DismantleSeconds;
-                return;
+                if (commitCode ==
+                    GrayboxEvacuationCommitCode3D.CapacityInsufficient)
+                {
+                    isBlocked = true;
+                    blockedReason = failureReason;
+                    remainingSeconds = 0f;
+                    return CommitCurrentResult.Blocked;
+                }
+                FailProcessing();
+                return CommitCurrentResult.Failed;
             }
-            IsProcessing = false;
-            FinishIfResolved();
+
+            rollbackWork.Remove(current);
+            try
+            {
+                FinalizeRuntimePayload(current, capture);
+            }
+            catch
+            {
+                FailProcessing();
+                throw;
+            }
+            runtimePayloads.Remove(current.StableInstanceId);
+            isBlocked = false;
+            blockedReason = string.Empty;
+            fullQueueIndex++;
+            remainingSeconds = 0f;
+            return CommitCurrentResult.Succeeded;
+        }
+
+        private void FinalizeRuntimePayload(
+            in BuildingEvacuationWork current,
+            RuntimePayloadCapture capture)
+        {
+            if (capture == null) return;
+            bool abandon = current.Treatment ==
+                BuildingEvacuationTreatment.Abandon;
+            if (capture.Production != null)
+            {
+                bool completed = abandon
+                    ? productionRuntime.TryDiscardEvacuationPayload(
+                        current.StableInstanceId)
+                    : productionRuntime.TryFinalizeEvacuationPayload(
+                        current.StableInstanceId,
+                        capture.Production);
+                if (!completed)
+                    throw new InvalidOperationException(
+                        "Production evacuation payload changed after capture.");
+            }
+            if (capture.Defense != null)
+            {
+                bool completed = abandon
+                    ? defenseRuntime.TryDiscardEvacuationPayload(
+                        current.StableInstanceId)
+                    : defenseRuntime.TryFinalizeEvacuationPayload(
+                        current.StableInstanceId,
+                        capture.Defense);
+                if (!completed)
+                    throw new InvalidOperationException(
+                        "Defense evacuation payload changed after capture.");
+            }
         }
 
         private bool FinishIfResolved()
@@ -328,6 +532,8 @@ namespace WasteCity.Graybox3D.Building
         {
             session.RollbackEvacuationLocksAfterFailure(rollbackWork);
             IsProcessing = false;
+            isBlocked = false;
+            blockedReason = string.Empty;
             IsManifestOpen = true;
             fullQueueIndex = 0;
             remainingSeconds = 0f;
@@ -341,6 +547,8 @@ namespace WasteCity.Graybox3D.Building
         {
             IsManifestOpen = false;
             IsProcessing = false;
+            isBlocked = false;
+            blockedReason = string.Empty;
             ownsConstructionCancellation = false;
             manifest.Clear();
             assignments.Clear();
@@ -354,6 +562,7 @@ namespace WasteCity.Graybox3D.Building
             work.Clear();
             fullQueue.Clear();
             rollbackWork.Clear();
+            runtimePayloads.Clear();
         }
 
         private bool IsConfigured =>
@@ -461,6 +670,8 @@ namespace WasteCity.Graybox3D.Building
                     city = null;
                     presentation = null;
                     menu = null;
+                    productionRuntime = null;
+                    defenseRuntime = null;
                 }
             }
         }
@@ -480,6 +691,92 @@ namespace WasteCity.Graybox3D.Building
             cleanupMenuReleaseInvocationCount++;
             oldMenu.HideEvacuation();
             oldMenu.SetConstructionCancellationBlocked(false);
+        }
+
+        private enum CommitCurrentResult
+        {
+            Succeeded,
+            Blocked,
+            Failed
+        }
+
+        private sealed class RuntimePayloadCapture
+        {
+            private RuntimePayloadCapture(
+                GrayboxProductionEvacuationPayload3D production,
+                GrayboxDefenseEvacuationPayload3D defense,
+                IReadOnlyList<ResourceAmount> resources)
+            {
+                Production = production;
+                Defense = defense;
+                Resources = resources;
+            }
+
+            public GrayboxProductionEvacuationPayload3D Production { get; }
+            public GrayboxDefenseEvacuationPayload3D Defense { get; }
+            public IReadOnlyList<ResourceAmount> Resources { get; }
+
+            public static RuntimePayloadCapture Create(
+                GrayboxProductionEvacuationPayload3D production,
+                GrayboxDefenseEvacuationPayload3D defense)
+            {
+                var totals = new Dictionary<string, int>(
+                    StringComparer.Ordinal);
+                if (production != null)
+                {
+                    Add(totals, production.Input);
+                    Add(totals, production.ReservedInput);
+                    Add(totals, production.Output);
+                }
+                if (defense != null && defense.AmmunitionAmount > 0)
+                {
+                    Add(
+                        totals,
+                        ResourceIds.Ammunition,
+                        defense.AmmunitionAmount);
+                }
+
+                var resourceIds = new List<string>(totals.Keys);
+                resourceIds.Sort(StringComparer.Ordinal);
+                var resources = new List<ResourceAmount>(resourceIds.Count);
+                for (var index = 0; index < resourceIds.Count; index++)
+                {
+                    string resourceId = resourceIds[index];
+                    resources.Add(new ResourceAmount(
+                        resourceId,
+                        totals[resourceId]));
+                }
+                return new RuntimePayloadCapture(
+                    production,
+                    defense,
+                    new ReadOnlyCollection<ResourceAmount>(resources));
+            }
+
+            private static void Add(
+                IDictionary<string, int> totals,
+                IReadOnlyList<ResourceAmount> amounts)
+            {
+                if (amounts == null) return;
+                for (var index = 0; index < amounts.Count; index++)
+                {
+                    ResourceAmount amount = amounts[index];
+                    Add(totals, amount.ResourceId, amount.Amount);
+                }
+            }
+
+            private static void Add(
+                IDictionary<string, int> totals,
+                string resourceId,
+                int amount)
+            {
+                if (string.IsNullOrWhiteSpace(resourceId) || amount <= 0)
+                    return;
+                totals.TryGetValue(resourceId, out int current);
+                long sum = (long)current + amount;
+                totals[resourceId] = sum >= int.MaxValue
+                    ? int.MaxValue
+                    : (int)sum;
+            }
         }
 
         private sealed class CityDeploymentRequestAdapter :

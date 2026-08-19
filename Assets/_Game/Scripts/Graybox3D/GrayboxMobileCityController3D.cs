@@ -57,6 +57,7 @@ namespace WasteCity.Graybox3D
     public sealed class GrayboxMobileCityController3D : MonoBehaviour
     {
         private const float ArrivalTolerance = .08f;
+        private const float CombatPackingAdvanceMultiplier = .7f;
         private const string CityStableId = "core.city.mobile";
 
         private static readonly Vector3 MobileSize =
@@ -90,6 +91,7 @@ namespace WasteCity.Graybox3D
         private bool presentationCaptured;
         private MaterialPropertyBlock visualBlock;
         private IGrayboxRuleTimeSource3D configuredRuleTimeSource;
+        private Func<int> aliveEnemyCountSource;
 
         public CityDeploymentModel Deployment
         {
@@ -154,6 +156,12 @@ namespace WasteCity.Graybox3D
             configuredRuleTimeSource = ruleTimeSource;
             if (ruleTimeSource is MonoBehaviour behaviour)
                 ruleTimeSourceBehaviour = behaviour;
+        }
+
+        public void ConfigureAliveEnemyCountSource(
+            Func<int> source)
+        {
+            aliveEnemyCountSource = source;
         }
 
         public void ApplyManualInput(Vector2 input)
@@ -329,7 +337,16 @@ namespace WasteCity.Graybox3D
         public void TickDeployment(float deltaTime)
         {
             EnsureDeployment();
-            deployment.Tick(ResolveRuleTimeContext().Advance(deltaTime));
+            int aliveEnemyCount = Math.Max(
+                0,
+                aliveEnemyCountSource?.Invoke() ?? 0);
+            float advance = ResolveRuleTimeContext().Advance(deltaTime);
+            if (Mode == CityMode.Packing &&
+                aliveEnemyCount > 0)
+            {
+                advance *= CombatPackingAdvanceMultiplier;
+            }
+            deployment.Tick(advance);
             UpdatePresentation();
         }
 
