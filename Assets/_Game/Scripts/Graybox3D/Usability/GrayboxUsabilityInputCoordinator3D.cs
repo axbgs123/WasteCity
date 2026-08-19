@@ -139,7 +139,16 @@ namespace WasteCity.Graybox3D.Usability
             if (operations != null &&
                 (inventoryPressed || researchPressed))
             {
-                if (buildingInput == null ||
+                if (inventoryPressed &&
+                    buildingInput != null &&
+                    buildingInput.AllowsInventoryDuringEvacuation)
+                {
+                    EnsureDevelopmentPanelAdapter();
+                    if (developmentPanel != null && developmentPanel.IsOpen)
+                        developmentPanel.Close();
+                    operations.ToggleInventory();
+                }
+                else if (buildingInput == null ||
                     buildingInput.TryCloseForOperations())
                 {
                     EnsureDevelopmentPanelAdapter();
@@ -160,6 +169,9 @@ namespace WasteCity.Graybox3D.Usability
                     operations.ClosePanels();
                     return SuppressAll();
                 }
+                if (buildingInput != null &&
+                    buildingInput.AllowsInventoryDuringEvacuation)
+                    return SuppressAll();
                 if (buildingPressed)
                     operations.ClosePanels();
                 else
@@ -175,7 +187,8 @@ namespace WasteCity.Graybox3D.Usability
 
             if (!escapePressed ||
                 buildingInput == null ||
-                buildingInput.LastEscapeConsumed ||
+                (buildingInput.LastEscapeConsumed &&
+                 !buildingInput.LastEscapeRequestsSystemMenu) ||
                 systemMenu == null)
                 return buildingSuppression;
 

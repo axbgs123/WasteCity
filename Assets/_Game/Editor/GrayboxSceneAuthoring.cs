@@ -975,7 +975,9 @@ namespace WasteCity.Editor
                 ("session", session),
                 ("city", city),
                 ("presentation", presentation),
-                ("menu", menu));
+                ("menu", menu),
+                ("production", production),
+                ("defense", defenseController));
             SetReferences(
                 developer,
                 ("session", session),

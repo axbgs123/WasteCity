@@ -26,8 +26,13 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxDefenseController3D defense;
 
         public bool LastEscapeConsumed { get; private set; }
+        public bool LastEscapeRequestsSystemMenu { get; private set; }
         public bool HasKeyboardFocus =>
             menu != null && menu.HasKeyboardFocus();
+        public bool AllowsInventoryDuringEvacuation =>
+            evacuation != null &&
+            evacuation.IsProcessing &&
+            evacuation.IsBlocked;
 
         public void ConfigureProductionDetails(
             GrayboxBuildingWorldView3D presentation,
@@ -107,6 +112,7 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxInputSuppression ProcessCurrentInput()
         {
             LastEscapeConsumed = false;
+            LastEscapeRequestsSystemMenu = false;
             try
             {
                 return ProcessCurrentInputCore();
@@ -187,9 +193,16 @@ namespace WasteCity.Graybox3D.Building
                 if (keyboard != null &&
                     keyboard.escapeKey.wasPressedThisFrame)
                 {
-                    LastEscapeConsumed =
-                        evacuation.IsProcessing ||
-                        evacuation.TryCancelManifest();
+                    if (evacuation.IsProcessing)
+                    {
+                        LastEscapeConsumed = true;
+                        LastEscapeRequestsSystemMenu = true;
+                    }
+                    else
+                    {
+                        LastEscapeConsumed =
+                            evacuation.TryCancelManifest();
+                    }
                 }
                 return SuppressAll();
             }

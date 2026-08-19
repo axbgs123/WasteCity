@@ -928,6 +928,93 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0014_SceneHasOneExplicitEvacuationRuntimeAndInputContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GrayboxEvacuationController3D[] evacuations =
+                Object.FindObjectsOfType<GrayboxEvacuationController3D>(true);
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>(true);
+            GrayboxDefenseController3D defense =
+                Object.FindObjectOfType<GrayboxDefenseController3D>(true);
+            GrayboxBuildingInputRouter3D buildingInput =
+                Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>(true);
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Object.FindObjectOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true);
+
+            Assert.That(evacuations, Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxBuildingMenuView3D>(true),
+                Has.Length.EqualTo(1));
+            Assert.That(production, Is.Not.Null);
+            Assert.That(defense, Is.Not.Null);
+            Assert.That(buildingInput, Is.Not.Null);
+            Assert.That(operations, Is.Not.Null);
+            Assert.That(coordinator, Is.Not.Null);
+
+            GrayboxEvacuationController3D evacuation = evacuations[0];
+            AssertReference(evacuation, "production", production);
+            AssertReference(evacuation, "defense", defense);
+            AssertReference(buildingInput, "evacuation", evacuation);
+            AssertReference(coordinator, "operations", operations);
+            Assert.That(
+                CountSerializedReferencesTo(evacuation),
+                Is.EqualTo(1),
+                "Only the formal building input router may own the " +
+                "serialized evacuation command reference.");
+        }
+
+        [Test]
+        public void IDEA0014_EvacuationAuthoringTwiceIsByteAndOwnerIdempotent()
+        {
+            const string temporaryScenePath =
+                "Assets/_Game/Scenes/__Task7EvacuationAuthoring.unity";
+            string absoluteTemporaryPath = Path.Combine(
+                Application.dataPath,
+                "_Game/Scenes/__Task7EvacuationAuthoring.unity");
+            AssetDatabase.DeleteAsset(temporaryScenePath);
+            Assert.That(
+                AssetDatabase.CopyAsset(ScenePath, temporaryScenePath),
+                Is.True);
+            try
+            {
+                InvokeAuthoringAtPath(temporaryScenePath);
+                byte[] firstBytes = File.ReadAllBytes(absoluteTemporaryPath);
+                string[] firstOwners = CaptureEvacuationOwnerIds();
+
+                InvokeAuthoringAtPath(temporaryScenePath);
+
+                CollectionAssert.AreEqual(
+                    firstBytes,
+                    File.ReadAllBytes(absoluteTemporaryPath));
+                Assert.That(
+                    CaptureEvacuationOwnerIds(),
+                    Is.EqualTo(firstOwners));
+                Assert.That(
+                    Object.FindObjectsOfType<
+                        GrayboxEvacuationController3D>(true),
+                    Has.Length.EqualTo(1));
+                Assert.That(
+                    Object.FindObjectsOfType<
+                        GrayboxUsabilityInputCoordinator3D>(true),
+                    Has.Length.EqualTo(1));
+                Assert.That(
+                    Object.FindObjectsOfType<EventSystem>(true),
+                    Has.Length.EqualTo(1));
+            }
+            finally
+            {
+                EditorSceneManager.NewScene(
+                    NewSceneSetup.EmptyScene,
+                    NewSceneMode.Single);
+                AssetDatabase.DeleteAsset(temporaryScenePath);
+            }
+        }
+
+        [Test]
         public void IDEA0007_AuthoringUsesDedicatedIdempotentUsabilityContract()
         {
             string source = File.ReadAllText(
@@ -1113,6 +1200,71 @@ namespace WasteCity.Tests
                 property.objectReferenceValue,
                 Is.SameAs(expected),
                 $"{owner.GetType().Name}.{propertyName}");
+        }
+
+        private static int CountSerializedReferencesTo(Object target)
+        {
+            var count = 0;
+            MonoBehaviour[] owners =
+                Object.FindObjectsOfType<MonoBehaviour>(true);
+            for (var ownerIndex = 0;
+                 ownerIndex < owners.Length;
+                 ownerIndex++)
+            {
+                var serialized = new SerializedObject(owners[ownerIndex]);
+                SerializedProperty property = serialized.GetIterator();
+                bool enterChildren = true;
+                while (property.NextVisible(enterChildren))
+                {
+                    enterChildren = false;
+                    if (property.propertyType ==
+                            SerializedPropertyType.ObjectReference &&
+                        property.objectReferenceValue == target)
+                    {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        private static void InvokeAuthoringAtPath(string scenePath)
+        {
+            Type authoring = Type.GetType(
+                "WasteCity.Editor.GrayboxSceneAuthoring, WasteCity.Editor");
+            Assert.That(authoring, Is.Not.Null);
+            MethodInfo configure = authoring.GetMethod(
+                "ConfigureSceneAtPath",
+                BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.That(configure, Is.Not.Null);
+            configure.Invoke(null, new object[] { scenePath, false, null });
+        }
+
+        private static string[] CaptureEvacuationOwnerIds()
+        {
+            Component[] owners =
+            {
+                Object.FindObjectOfType<
+                    GrayboxEvacuationController3D>(true),
+                Object.FindObjectOfType<
+                    GrayboxBuildingInputRouter3D>(true),
+                Object.FindObjectOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true),
+                Object.FindObjectOfType<
+                    GrayboxOperationsController3D>(true),
+                Object.FindObjectOfType<
+                    GrayboxProductionController3D>(true),
+                Object.FindObjectOfType<
+                    GrayboxDefenseController3D>(true),
+            };
+            var ids = new string[owners.Length];
+            for (var index = 0; index < owners.Length; index++)
+            {
+                Assert.That(owners[index], Is.Not.Null, index.ToString());
+                ids[index] = GlobalObjectId.GetGlobalObjectIdSlow(
+                    owners[index]).ToString();
+            }
+            return ids;
         }
 
         private static string ExtractBuildSettingsAssignment(

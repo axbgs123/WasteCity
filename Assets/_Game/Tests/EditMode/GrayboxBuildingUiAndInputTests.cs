@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -16,9 +17,11 @@ using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
+using WasteCity.Core;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -680,6 +683,313 @@ namespace WasteCity.Tests
                 "Task9ManifestProcessingToggleCalls=" +
                 deployment.ToggleCalls);
             Assert.That(deployment.ToggleCalls, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0014_EvacuationModalOwnsGameplayChannelsButSpaceStillPauses()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            GrayboxSystemMenuController3D systemMenu =
+                Create<GrayboxSystemMenuController3D>(
+                    "Task7SystemMenu");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Create<GrayboxUsabilityInputCoordinator3D>(
+                    "Task7InputCoordinator");
+            coordinator.Configure(
+                fixture.Router,
+                systemMenu,
+                fixture.Developer);
+
+            PressCoordinatorKey(coordinator, Key.F);
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
+            foreach (Key owned in new[] { Key.B, Key.E, Key.T })
+                AssertSuppressAll(PressCoordinatorKey(coordinator, owned));
+            AssertSuppressAll(
+                PressMouse(fixture.Router, MouseButton.Left));
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
+
+            GrayboxInputSuppression paused =
+                PressCoordinatorKey(coordinator, Key.Space);
+            Assert.That(systemMenu.IsTacticalPaused, Is.True);
+            Assert.That(Time.timeScale, Is.Zero);
+            AssertSuppressAll(paused);
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.True);
+
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            EvacuationQueueViewModel beforePause =
+                fixture.Evacuation.CaptureQueueView();
+            fixture.Evacuation.Tick(
+                2f,
+                paused: Time.timeScale <= 0f);
+            EvacuationQueueViewModel afterPause =
+                fixture.Evacuation.CaptureQueueView();
+            Assert.That(
+                afterPause.RemainingActualSeconds,
+                Is.EqualTo(beforePause.RemainingActualSeconds));
+        }
+
+        [Test]
+        public void IDEA0014_BlockedEOpensInventoryWithoutReplacingFrozenBatch()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            SetPrivateField(fixture.Evacuation, "isBlocked", true);
+            SetPrivateField(
+                fixture.Evacuation,
+                "blockedReason",
+                "城市仓储容量不足");
+
+            GrayboxOperationsController3D operations =
+                CreateInputOperations(fixture);
+            GrayboxSystemMenuController3D systemMenu =
+                Create<GrayboxSystemMenuController3D>(
+                    "Task7BlockedSystemMenu");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Create<GrayboxUsabilityInputCoordinator3D>(
+                    "Task7BlockedInputCoordinator");
+            coordinator.Configure(
+                fixture.Router,
+                systemMenu,
+                fixture.Developer,
+                operations);
+            EvacuationQueueViewModel frozen =
+                fixture.Evacuation.CaptureQueueView();
+
+            PressCoordinatorKey(coordinator, Key.E);
+
+            Assert.That(operations.IsAnyPanelOpen, Is.True,
+                "Blocked permits only the existing inventory capacity UI.");
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True);
+            Assert.That(fixture.Evacuation.IsBlocked, Is.True);
+            Assert.That(
+                fixture.Evacuation.CaptureQueueView(),
+                Is.SameAs(frozen),
+                "Opening inventory must retain the same frozen batch.");
+
+            PressCoordinatorKey(coordinator, Key.E);
+            Assert.That(operations.IsAnyPanelOpen, Is.False);
+            Assert.That(
+                fixture.Evacuation.CaptureQueueView(),
+                Is.SameAs(frozen),
+                "Closing inventory returns to the same frozen batch.");
+        }
+
+        [Test]
+        public void IDEA0014_BlockedInventoryKeepsEvacuationGameplayChannelsOwned()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            Assert.That(
+                fixture.Evacuation.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            SetPrivateField(fixture.Evacuation, "isBlocked", true);
+            SetPrivateField(
+                fixture.Evacuation,
+                "blockedReason",
+                "城市仓储容量不足");
+
+            GrayboxOperationsController3D operations =
+                CreateInputOperations(
+                    fixture,
+                    out GrayboxOperationsView3D operationsView);
+            GrayboxSystemMenuController3D systemMenu =
+                Create<GrayboxSystemMenuController3D>(
+                    "Task7BlockedOwnershipSystemMenu");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Create<GrayboxUsabilityInputCoordinator3D>(
+                    "Task7BlockedOwnershipCoordinator");
+            coordinator.Configure(
+                fixture.Router,
+                systemMenu,
+                fixture.Developer,
+                operations);
+            EvacuationQueueViewModel frozen =
+                fixture.Evacuation.CaptureQueueView();
+
+            PressCoordinatorKey(coordinator, Key.E);
+            Assert.That(operationsView.IsInventoryOpen, Is.True);
+
+            foreach (Key owned in new[] { Key.T, Key.F })
+            {
+                AssertSuppressAll(PressCoordinatorKey(coordinator, owned));
+                Assert.That(
+                    operationsView.IsInventoryOpen,
+                    Is.True,
+                    owned.ToString());
+                Assert.That(
+                    fixture.Evacuation.CaptureQueueView(),
+                    Is.SameAs(frozen),
+                    owned.ToString());
+            }
+
+            AssertSuppressAll(
+                PressCoordinatorMouse(coordinator, MouseButton.Left));
+            Assert.That(
+                operationsView.IsInventoryOpen,
+                Is.True,
+                "world click");
+            Assert.That(
+                fixture.Evacuation.CaptureQueueView(),
+                Is.SameAs(frozen),
+                "world click");
+
+            AssertSuppressAll(PressCoordinatorKey(coordinator, Key.B));
+            Assert.That(
+                operationsView.IsInventoryOpen,
+                Is.True,
+                "Blocked evacuation must consume B instead of closing inventory.");
+            Assert.That(
+                fixture.Evacuation.CaptureQueueView(),
+                Is.SameAs(frozen),
+                "B must preserve the frozen evacuation batch.");
+
+            PressCoordinatorKey(coordinator, Key.E);
+            Assert.That(operationsView.IsInventoryOpen, Is.False);
+            Assert.That(
+                fixture.Evacuation.CaptureQueueView(),
+                Is.SameAs(frozen));
+        }
+
+        [Test]
+        public void IDEA0014_EvacuationAliveEnemySourceFollowsEnableLifecycle()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            GrayboxDefenseController3D defense =
+                Create<GrayboxDefenseController3D>(
+                    "Task7AliveEnemySourceDefense");
+
+            fixture.Evacuation.enabled = false;
+            var serialized = new SerializedObject(fixture.Evacuation);
+            SerializedProperty defenseReference =
+                serialized.FindProperty("defense");
+            Assert.That(defenseReference, Is.Not.Null);
+            defenseReference.objectReferenceValue = defense;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            fixture.Evacuation.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.Presentation,
+                fixture.Ui.Menu);
+
+            fixture.Evacuation.enabled = true;
+            Assert.That(
+                ReadPrivateField<Func<int>>(
+                    fixture.City,
+                    "aliveEnemyCountSource"),
+                Is.Not.Null,
+                "Enabled evacuation installs the formal defense source.");
+
+            InvokePrivateLifecycle(fixture.Evacuation, "OnDisable");
+            Assert.That(
+                ReadPrivateField<Func<int>>(
+                    fixture.City,
+                    "aliveEnemyCountSource"),
+                Is.Null,
+                "Disabled owner must release the city packing dependency.");
+
+            InvokePrivateLifecycle(fixture.Evacuation, "OnEnable");
+            Assert.That(
+                ReadPrivateField<Func<int>>(
+                    fixture.City,
+                    "aliveEnemyCountSource"),
+                Is.Not.Null,
+                "Re-enabled evacuation restores the formal defense source.");
+        }
+
+        [Test]
+        public void IDEA0014_EscapeCancelsManifestButProcessingOpensSystemPause()
+        {
+            InputRouterFixture fixture = CreateInputRouterFixture();
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            GrayboxBuildingInstance3D ground = BeginGroundConstruction(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                20,
+                15,
+                fixture.Presentation);
+            GrayboxSystemMenuController3D systemMenu =
+                Create<GrayboxSystemMenuController3D>(
+                    "Task7EscapeSystemMenu");
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Create<GrayboxUsabilityInputCoordinator3D>(
+                    "Task7EscapeInputCoordinator");
+            coordinator.Configure(
+                fixture.Router,
+                systemMenu,
+                fixture.Developer);
+
+            PressCoordinatorKey(coordinator, Key.F);
+            PressCoordinatorKey(coordinator, Key.Escape);
+            Assert.That(fixture.Evacuation.IsManifestOpen, Is.False);
+            Assert.That(systemMenu.IsOpen, Is.False,
+                "Manifest Escape cancels the editable manifest itself.");
+
+            PressCoordinatorKey(coordinator, Key.F);
+            Assert.That(
+                fixture.Evacuation.Assign(
+                    ground.StableInstanceId,
+                    BuildingEvacuationTreatment.FullDismantle),
+                Is.True);
+            Assert.That(fixture.Evacuation.ConfirmManifest(), Is.True);
+            EvacuationQueueViewModel frozen =
+                fixture.Evacuation.CaptureQueueView();
+
+            PressCoordinatorKey(coordinator, Key.Escape);
+
+            Assert.That(fixture.Evacuation.IsProcessing, Is.True,
+                "A confirmed batch cannot be canceled by Escape.");
+            Assert.That(systemMenu.IsOpen, Is.True,
+                "Processing Escape opens the existing system menu.");
+            Assert.That(Time.timeScale, Is.Zero);
+            fixture.Evacuation.Tick(
+                2f,
+                paused: Time.timeScale <= 0f);
+            EvacuationQueueViewModel paused =
+                fixture.Evacuation.CaptureQueueView();
+            Assert.That(paused.BatchId, Is.EqualTo(frozen.BatchId));
+            Assert.That(
+                paused.RemainingActualSeconds,
+                Is.EqualTo(frozen.RemainingActualSeconds),
+                "System pause freezes dismantle rule time.");
         }
 
         [Test]
@@ -3634,6 +3944,131 @@ namespace WasteCity.Tests
                 new KeyboardState());
             InputSystem.Update();
             return suppression;
+        }
+
+        private GrayboxInputSuppression PressCoordinatorKey(
+            GrayboxUsabilityInputCoordinator3D coordinator,
+            Key key)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState(key));
+            InputSystem.Update();
+            Assert.That(testKeyboard[key].wasPressedThisFrame, Is.True);
+            GrayboxInputSuppression suppression =
+                coordinator.ProcessCurrentInput();
+            InputSystem.QueueStateEvent(
+                testKeyboard,
+                new KeyboardState());
+            InputSystem.Update();
+            return suppression;
+        }
+
+        private GrayboxInputSuppression PressCoordinatorMouse(
+            GrayboxUsabilityInputCoordinator3D coordinator,
+            MouseButton button)
+        {
+            EnsureInputDevices();
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = testPointer
+                }.WithButton(button));
+            InputSystem.Update();
+            Assert.That(Mouse.current, Is.SameAs(testMouse));
+            Assert.That(
+                ButtonFor(testMouse, button).wasPressedThisFrame,
+                Is.True,
+                button.ToString());
+            GrayboxInputSuppression suppression =
+                coordinator.ProcessCurrentInput();
+            InputSystem.QueueStateEvent(
+                testMouse,
+                new MouseState
+                {
+                    position = testPointer
+                });
+            InputSystem.Update();
+            return suppression;
+        }
+
+        private GrayboxOperationsController3D CreateInputOperations(
+            InputRouterFixture fixture)
+        {
+            return CreateInputOperations(fixture, out _);
+        }
+
+        private GrayboxOperationsController3D CreateInputOperations(
+            InputRouterFixture fixture,
+            out GrayboxOperationsView3D view)
+        {
+            Canvas canvas = Create<Canvas>("Task7OperationsCanvas");
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            view =
+                canvas.gameObject.AddComponent<GrayboxOperationsView3D>();
+            view.Configure(canvas);
+            GrayboxProductionController3D production =
+                Create<GrayboxProductionController3D>(
+                    "Task7ProductionController");
+            production.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World);
+            GrayboxOperationsController3D operations =
+                Create<GrayboxOperationsController3D>(
+                    "Task7OperationsController");
+            operations.Configure(
+                fixture.Session,
+                production,
+                fixture.City,
+                view);
+            return operations;
+        }
+
+        private static void AssertSuppressAll(
+            GrayboxInputSuppression suppression)
+        {
+            Assert.That(suppression.Move, Is.True);
+            Assert.That(suppression.Deployment, Is.True);
+            Assert.That(suppression.Destination, Is.True);
+            Assert.That(suppression.CameraDrag, Is.True);
+            Assert.That(suppression.Home, Is.True);
+        }
+
+        private static void SetPrivateField(
+            object owner,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(owner, value);
+        }
+
+        private static T ReadPrivateField<T>(
+            object owner,
+            string fieldName)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            return (T)field.GetValue(owner);
+        }
+
+        private static void InvokePrivateLifecycle(
+            object owner,
+            string methodName)
+        {
+            MethodInfo method = owner.GetType().GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, methodName);
+            method.Invoke(owner, null);
         }
 
         private void PressKeyThroughBaseRouter(

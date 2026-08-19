@@ -17,6 +17,7 @@ using WasteCity.Content;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 using WasteCity.World;
 
@@ -281,7 +282,8 @@ namespace WasteCity.Tests
             yield return TapKey(Key.F);
             Assert.That(city.Mode, Is.EqualTo(CityMode.Deploying));
 
-            float deadline = Time.realtimeSinceStartup + 4f;
+            float deadline = Time.realtimeSinceStartup +
+                CityDeploymentRules.FormalDeployDurationSeconds + 1f;
             while (city.Mode == CityMode.Deploying &&
                    Time.realtimeSinceStartup < deadline)
                 yield return null;
@@ -548,7 +550,7 @@ namespace WasteCity.Tests
                 city,
                 presentation);
             Assert.That(
-                modifier.AddResource(ResourceIds.Alloy, 1000),
+                modifier.SetResource(ResourceIds.Alloy, 100),
                 Is.True,
                 requirement + " fixture resources");
             Assert.That(
@@ -621,7 +623,8 @@ namespace WasteCity.Tests
                 city.Mode,
                 Is.EqualTo(CityMode.Deploying),
                 requirement + " virtual F begins deployment");
-            float deploymentDeadline = Time.realtimeSinceStartup + 4f;
+            float deploymentDeadline = Time.realtimeSinceStartup +
+                CityDeploymentRules.FormalDeployDurationSeconds + 1f;
             while (city.Mode == CityMode.Deploying &&
                    Time.realtimeSinceStartup < deploymentDeadline)
                 yield return null;
@@ -1526,7 +1529,11 @@ namespace WasteCity.Tests
                 city,
                 presentation);
             for (var index = 0; index < ResourceIds.All.Length; index++)
-                modifier.AddResource(ResourceIds.All[index], 1000);
+                Assert.That(
+                    modifier.SetResource(ResourceIds.All[index], 100),
+                    Is.True,
+                    "Mix evacuation fixture resource " +
+                    ResourceIds.All[index]);
             modifier.SetConstructionSpeed(
                 DevelopmentConstructionSpeed.Fast100);
 
@@ -1619,7 +1626,10 @@ namespace WasteCity.Tests
                 Is.True);
 
             Time.timeScale = 1f;
-            float deadline = Time.realtimeSinceStartup + 6f;
+            float deadline = Time.realtimeSinceStartup +
+                evacuation.Work.Where(value => value.Treatment ==
+                    BuildingEvacuationTreatment.FullDismantle)
+                    .Sum(value => value.DismantleSeconds) + 1f;
             while (evacuation.IsProcessing &&
                    Time.realtimeSinceStartup < deadline)
                 yield return null;
@@ -1704,8 +1714,8 @@ namespace WasteCity.Tests
 
             yield return TapKey(Key.F);
             Assert.That(evacuation.IsManifestOpen, Is.True);
-            yield return ClickButton("Evacuation.All.FullDismantle");
-            yield return ClickButton("Evacuation.Confirm");
+            yield return SubmitButton("Evacuation.All.FullDismantle");
+            yield return SubmitButton("Evacuation.Confirm");
             Assert.That(evacuation.IsManifestOpen, Is.False);
             Assert.That(evacuation.IsProcessing, Is.True);
             float evacuationDeadline = Time.realtimeSinceStartup + 6f;
@@ -1717,6 +1727,164 @@ namespace WasteCity.Tests
             Assert.That(
                 city.Mode,
                 Is.EqualTo(CityMode.Packing).Or.EqualTo(CityMode.Mobile));
+        }
+
+        [UnityTest]
+        public IEnumerator
+            VirtualInput_EvacuationBlockedCapacityOpensInventoryAndRetries()
+        {
+            const string requirement =
+                "TASK7 evacuation real input and blocked capacity";
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxBuildingInteractionModel3D interaction =
+                Object.FindObjectOfType<
+                    GrayboxBuildingInteractionModel3D>();
+            GrayboxBuildingPlacementController3D placement =
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxEvacuationController3D evacuation =
+                Object.FindObjectOfType<GrayboxEvacuationController3D>();
+            GrayboxOperationsView3D operations =
+                Object.FindObjectOfType<GrayboxOperationsView3D>();
+            GrayboxSystemMenuController3D systemMenu =
+                Object.FindObjectOfType<GrayboxSystemMenuController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            Assert.That(session, Is.Not.Null, requirement + " session");
+            Assert.That(interaction, Is.Not.Null,
+                requirement + " interaction");
+            Assert.That(placement, Is.Not.Null,
+                requirement + " placement");
+            Assert.That(evacuation, Is.Not.Null,
+                requirement + " evacuation");
+            Assert.That(operations, Is.Not.Null,
+                requirement + " operations UI");
+            Assert.That(systemMenu, Is.Not.Null,
+                requirement + " tactical pause");
+            var modifier = new GrayboxDeveloperModifier3D(
+                session,
+                city,
+                presentation);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True,
+                requirement + " Fortress fixture");
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Fast100), Is.True,
+                requirement + " construction fixture");
+            Assert.That(modifier.AddResource(ResourceIds.Stone, 1000),
+                Is.True, requirement + " wall fixture resource");
+            Assert.That(modifier.AddResource(ResourceIds.Alloy, 1000),
+                Is.True, requirement + " preview fixture resource");
+
+            interaction.Select(BuildingCatalog.Wall);
+            yield return MoveToValidGroundPreview(city, world, placement);
+            yield return ClickMouse(MouseButton.Left,
+                mouse.position.ReadValue());
+            Assert.That(session.Instances, Has.Count.EqualTo(1),
+                requirement + " wall placement");
+            GrayboxBuildingInstance3D wall = session.Instances[0];
+            yield return WaitForCompletion(wall, 2f);
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 0), Is.True,
+                requirement + " clears capacity before manifest preflight");
+
+            interaction.Select(BuildingCatalog.Housing);
+            yield return MoveToValidGroundPreview(city, world, placement);
+            Vector2 worldBuildPosition = mouse.position.ReadValue();
+
+            yield return TapKey(Key.F);
+            Assert.That(evacuation.IsManifestOpen, Is.True,
+                requirement + " real F opens evacuation");
+            EvacuationManifestViewModel initialManifest =
+                evacuation.CaptureManifestView();
+            Assert.That(initialManifest.CanConfirm, Is.False,
+                requirement + " new manifest starts incomplete");
+
+            yield return TapKey(Key.Space);
+            Assert.That(systemMenu.IsTacticalPaused, Is.True,
+                requirement + " Space still pauses while manifest is open");
+            yield return TapKey(Key.Space);
+            Assert.That(systemMenu.IsTacticalPaused, Is.False,
+                requirement + " Space resumes while manifest is open");
+
+            yield return ClickMouse(MouseButton.Left, worldBuildPosition);
+            Assert.That(session.Instances, Is.EqualTo(new[] { wall }),
+                requirement + " manifest world click does not place preview");
+
+            yield return SubmitButton("Evacuation.All.FullDismantle");
+            EvacuationManifestViewModel assignedManifest =
+                evacuation.CaptureManifestView();
+            Assert.That(assignedManifest.CanConfirm, Is.True,
+                requirement + " All full dismantle submit must complete " +
+                "manifest assignments; failure=" +
+                assignedManifest.FailureReason + " treatments=" +
+                string.Join(", ", assignedManifest.Items.Select(item =>
+                    item.StableInstanceId + "=" + item.Treatment +
+                    ":" + item.FailureReason)));
+            yield return SubmitButton("Evacuation.Confirm");
+            Assert.That(evacuation.IsProcessing, Is.True,
+                requirement + " real UGUI treatment begins processing");
+            Assert.That(modifier.SetResource(
+                ResourceIds.Stone,
+                session.CityStorage.GetNetworkCapacityLimit(
+                    ResourceIds.Stone)),
+                Is.True,
+                requirement + " fills capacity after confirmation");
+
+            yield return ClickMouse(MouseButton.Left, worldBuildPosition);
+            Assert.That(session.Instances, Is.EqualTo(new[] { wall }),
+                requirement + " processing world click does not place preview");
+
+            float blockedDeadline = Time.realtimeSinceStartup + 4f;
+            while (!evacuation.IsBlocked &&
+                   Time.realtimeSinceStartup < blockedDeadline)
+                yield return null;
+            Assert.That(evacuation.IsBlocked, Is.True,
+                requirement + " full dismantle blocks on capacity");
+            EvacuationQueueViewModel blockedQueue =
+                evacuation.CaptureQueueView();
+            Assert.That(blockedQueue.CanRetry, Is.True,
+                requirement + " blocked queue exposes retry");
+            Assert.That(blockedQueue.BatchId, Is.Not.Empty,
+                requirement + " blocked queue has stable batch");
+
+            yield return TapKey(Key.E);
+            Assert.That(operations.IsInventoryOpen, Is.True,
+                requirement + " real E opens inventory during blocked queue");
+            Assert.That(FindButton("Inventory.City." + ResourceIds.Stone),
+                Is.Not.Null,
+                requirement + " city inventory is visible from blocked queue");
+
+            QueueKeyboard(Key.LeftShift);
+            yield return null;
+            yield return ClickButton("Inventory.City." + ResourceIds.Stone);
+            QueueKeyboard();
+            yield return null;
+            Assert.That(session.GetCityResourceAmount(ResourceIds.Stone),
+                Is.EqualTo(0),
+                requirement + " real shift-click frees city capacity");
+
+            yield return ClickButton("InventoryCrafting.Close");
+            Assert.That(operations.IsInventoryOpen, Is.False,
+                requirement + " real UGUI inventory close");
+            EvacuationQueueViewModel queueAfterInventory =
+                evacuation.CaptureQueueView();
+            Assert.That(queueAfterInventory.BatchId,
+                Is.EqualTo(blockedQueue.BatchId),
+                requirement + " inventory close preserves evacuation batch");
+            Assert.That(queueAfterInventory.IsBlocked, Is.True,
+                requirement + " inventory close preserves blocked work");
+
+            yield return ClickButton("Evacuation.Retry");
+            Assert.That(evacuation.IsProcessing, Is.False,
+                requirement + " real UGUI retry resolves freed capacity");
+            Assert.That(session.Instances.Contains(wall), Is.False,
+                requirement + " retry completes full dismantle");
+            Assert.That(session.Instances, Is.Empty,
+                requirement + " suppressed preview never leaked into world");
         }
 
         private IEnumerator MoveToValidGroundPreview(

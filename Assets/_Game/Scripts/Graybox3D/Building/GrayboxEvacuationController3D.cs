@@ -190,10 +190,14 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxBuildingWorldView3D presentation;
         [SerializeField] private GrayboxBuildingMenuView3D menu;
+        [SerializeField] private GrayboxProductionController3D production;
+        [SerializeField] private GrayboxDefenseController3D defense;
         private IGrayboxBuildingPresentation3D evacuationPresentation;
         private IGrayboxDeploymentRequest3D deploymentRequest;
         private GrayboxProductionRuntime3D productionRuntime;
         private GrayboxDefenseRuntime3D defenseRuntime;
+        private Func<int> aliveEnemyCountSource;
+        private GrayboxMobileCityController3D aliveEnemyCountSourceCity;
 
         private readonly List<GrayboxBuildingInstance3D> manifest =
             new List<GrayboxBuildingInstance3D>();
@@ -243,6 +247,7 @@ namespace WasteCity.Graybox3D.Building
 
         public EvacuationManifestViewModel CaptureManifestView()
         {
+            EnsureOperationalRuntimeBindings();
             if (IsManifestOpen && !IsProcessing)
                 RefreshManifestPreview();
             ulong signature = ManifestViewSignature();
@@ -415,6 +420,7 @@ namespace WasteCity.Graybox3D.Building
             nextBatchOrdinal = 0;
             InvalidateViewCaches();
             menu.SetConstructionCancellationBlocked(false);
+            EnsureOperationalRuntimeBindings();
             if (isActiveAndEnabled) SubscribeMenu();
         }
 
@@ -634,6 +640,7 @@ namespace WasteCity.Graybox3D.Building
 
         private EvacuationBatchContext CurrentBatchContext()
         {
+            EnsureOperationalRuntimeBindings();
             bool isInCombat = defenseRuntime != null &&
                 defenseRuntime.Snapshot.AliveEnemyCount > 0;
             return BuildingEvacuationRules.CreateBatchContext(
@@ -676,6 +683,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void CaptureRuntimePayloads()
         {
+            EnsureOperationalRuntimeBindings();
             runtimePayloads.Clear();
             for (var index = 0; index < work.Count; index++)
             {
@@ -1287,6 +1295,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void OnDisable()
         {
+            UnbindAliveEnemyCountSource();
             CleanupController(false);
         }
 
@@ -1348,11 +1357,46 @@ namespace WasteCity.Graybox3D.Building
 
         private void RestoreSerializedRuntimeDependencies()
         {
+            EnsureOperationalRuntimeBindings();
             if (session == null || city == null || presentation == null ||
                 menu == null)
                 return;
             deploymentRequest = new CityDeploymentRequestAdapter(city);
             evacuationPresentation = presentation;
+        }
+
+        private void EnsureOperationalRuntimeBindings()
+        {
+            if (productionRuntime == null && production != null)
+                productionRuntime = production.Clock.Runtime;
+            if (defenseRuntime == null && defense != null)
+                defenseRuntime = defense.Runtime;
+            BindAliveEnemyCountSource();
+        }
+
+        private void BindAliveEnemyCountSource()
+        {
+            if (city == null || defense == null ||
+                ReferenceEquals(aliveEnemyCountSourceCity, city))
+                return;
+            if (aliveEnemyCountSource == null)
+                aliveEnemyCountSource = CaptureAliveEnemyCount;
+            if (aliveEnemyCountSourceCity != null)
+                aliveEnemyCountSourceCity.ConfigureAliveEnemyCountSource(null);
+            city.ConfigureAliveEnemyCountSource(aliveEnemyCountSource);
+            aliveEnemyCountSourceCity = city;
+        }
+
+        private int CaptureAliveEnemyCount()
+        {
+            return Math.Max(0, defense?.Snapshot?.AliveEnemyCount ?? 0);
+        }
+
+        private void UnbindAliveEnemyCountSource()
+        {
+            if (aliveEnemyCountSourceCity == null) return;
+            aliveEnemyCountSourceCity.ConfigureAliveEnemyCountSource(null);
+            aliveEnemyCountSourceCity = null;
         }
 
         private void CleanupController(bool clearSerializedDependencies)
@@ -1375,6 +1419,7 @@ namespace WasteCity.Graybox3D.Building
                 evacuationPresentation = null;
                 if (clearSerializedDependencies)
                 {
+                    UnbindAliveEnemyCountSource();
                     session = null;
                     city = null;
                     presentation = null;

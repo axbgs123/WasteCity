@@ -988,6 +988,7 @@ MonoBehaviour:
   worldView: {fileID: 962754566}
   body: {fileID: 505702831}
   bodyCollider: {fileID: 505702830}
+  ruleTimeSourceBehaviour: {fileID: 0}
 --- !u!65 &505702830
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2047,6 +2048,8 @@ MonoBehaviour:
   city: {fileID: 505702829}
   presentation: {fileID: 1545501225}
   menu: {fileID: 438030069}
+  production: {fileID: 740990735}
+  defense: {fileID: 293867046}
 --- !u!4 &1361780018
 Transform:
   m_ObjectHideFlags: 0
