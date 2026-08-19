@@ -34,7 +34,8 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius)
         {
-            if (!CanRetainState(instance)) return false;
+            if (!CanRetainState(instance) || instance.IsEvacuationLocked)
+                return false;
 
             PlacedBuilding placement = instance.Placement;
             if (placement.Site == BuildingSite.InnerCity)

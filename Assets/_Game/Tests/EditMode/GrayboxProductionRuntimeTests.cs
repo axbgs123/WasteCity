@@ -249,6 +249,117 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void FullDismantleLockFreezesLogisticsAndCycleUntilUnlockWhileManifestPreviewDoesNot()
+        {
+            const string stableId = "building.instance.production-lock";
+            GrayboxProductionRuntime3D runtime = RuntimeWithActiveSmelter(
+                stableId,
+                out GrayboxBuildingInstance3D smelter,
+                out BuildingProductionState state);
+            var cityInventory = new ResourceInventory(100);
+            cityInventory.Add(ResourceIds.Iron, 10);
+            using var cityStorage = new CityResourceStorageModel(
+                cityInventory,
+                100);
+            var simulation = new FormalProductionSimulation();
+
+            Assert.That(smelter.IsEvacuationLocked, Is.False,
+                "Opening the manifest without confirming must not lock production.");
+            runtime.Synchronize(
+                new[] { smelter },
+                CityMode.Mobile,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius,
+                cityStorage);
+            simulation.Tick(
+                runtime.RunnableStates,
+                1f,
+                null,
+                cityStorage,
+                globallyPaused: false);
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+            Assert.That(state.HasReservedInputs, Is.True);
+
+            int inputBeforeLock = state.Input.Get(ResourceIds.Iron);
+            int outputBeforeLock = state.Output.Get(ResourceIds.Alloy);
+            float progressBeforeLock = state.ProgressSeconds;
+            int cityIronBeforeLock =
+                cityStorage.GetNetworkAmount(ResourceIds.Iron);
+            int cityAlloyBeforeLock =
+                cityStorage.GetNetworkAmount(ResourceIds.Alloy);
+            ulong storageRevisionBeforeLock = cityStorage.Revision;
+            SetEvacuationLocked(smelter, true);
+
+            Assert.That(
+                GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
+                    smelter,
+                    CityMode.Fortress,
+                    10,
+                    10,
+                    BuildingRangeRules.InitialGroundRadius),
+                Is.False,
+                "The shared access rule must reject logistics immediately when a full-dismantle lock is acquired.");
+            runtime.Synchronize(
+                new[] { smelter },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius,
+                cityStorage);
+            Assert.That(runtime.TryGetState(stableId, out BuildingProductionState locked), Is.True);
+            Assert.That(locked, Is.SameAs(state));
+            Assert.That(runtime.States, Is.EqualTo(new[] { state }));
+            Assert.That(runtime.RunnableStates, Is.Empty);
+
+            simulation.Tick(
+                runtime.RunnableStates,
+                10f,
+                null,
+                cityStorage,
+                globallyPaused: false);
+
+            Assert.That(state.Input.Get(ResourceIds.Iron),
+                Is.EqualTo(inputBeforeLock));
+            Assert.That(state.Output.Get(ResourceIds.Alloy),
+                Is.EqualTo(outputBeforeLock));
+            Assert.That(state.ProgressSeconds, Is.EqualTo(progressBeforeLock));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(cityStorage.GetNetworkAmount(ResourceIds.Iron),
+                Is.EqualTo(cityIronBeforeLock));
+            Assert.That(cityStorage.GetNetworkAmount(ResourceIds.Alloy),
+                Is.EqualTo(cityAlloyBeforeLock));
+            Assert.That(cityStorage.Revision,
+                Is.EqualTo(storageRevisionBeforeLock));
+
+            SetEvacuationLocked(smelter, false);
+            runtime.Synchronize(
+                new[] { smelter },
+                CityMode.Mobile,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius,
+                cityStorage);
+            Assert.That(runtime.TryGetState(stableId, out BuildingProductionState restored), Is.True);
+            Assert.That(restored, Is.SameAs(state));
+            simulation.Tick(
+                runtime.RunnableStates,
+                1f,
+                null,
+                cityStorage,
+                globallyPaused: false);
+
+            Assert.That(state.ProgressSeconds,
+                Is.EqualTo(progressBeforeLock + 1f));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.Input.Get(ResourceIds.Iron),
+                Is.EqualTo(inputBeforeLock),
+                "Unlocking must not rebuild the cycle or deduct its reserved input twice.");
+            Assert.That(state.Output.Get(ResourceIds.Alloy),
+                Is.EqualTo(outputBeforeLock));
+        }
+
+        [Test]
         public void AbandonedOrRemovedInstancesDiscardTheirProductionState()
         {
             GrayboxBuildingInstance3D abandoned = CreateInstance(
@@ -545,6 +656,41 @@ namespace WasteCity.Tests
                 0,
                 globallyPaused: false);
             Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.Output.Add(ResourceIds.Alloy, 3), Is.EqualTo(3));
+            return runtime;
+        }
+
+        private static GrayboxProductionRuntime3D RuntimeWithActiveSmelter(
+            string stableId,
+            out GrayboxBuildingInstance3D instance,
+            out BuildingProductionState state)
+        {
+            instance = CreateInstance(
+                stableId,
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            Complete(instance);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { instance },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            Assert.That(runtime.TryGetState(stableId, out state), Is.True);
+            Assert.That(state.Input.Add(ResourceIds.Iron, 4), Is.EqualTo(4));
+            new FormalProductionSimulation().Tick(
+                new[] { state },
+                1f,
+                null,
+                new ResourceInventory(100),
+                new ResourceCapacityPolicy(),
+                0,
+                globallyPaused: false);
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.ProgressSeconds, Is.EqualTo(1f));
             Assert.That(state.Output.Add(ResourceIds.Alloy, 3), Is.EqualTo(3));
             return runtime;
         }

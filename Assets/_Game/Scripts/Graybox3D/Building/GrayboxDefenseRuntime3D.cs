@@ -342,13 +342,18 @@ namespace WasteCity.Graybox3D.Building
                 state.CanRunLocally = canRun;
                 if (!canRun)
                 {
-                    if (state.TargetId != null ||
-                        state.Status != GrayboxDefenseTowerStatus3D.Unavailable)
+                    if (!instance.IsEvacuationLocked)
                     {
-                        snapshotChanged = true;
+                        if (state.TargetId != null ||
+                            state.Status !=
+                            GrayboxDefenseTowerStatus3D.Unavailable)
+                        {
+                            snapshotChanged = true;
+                        }
+                        state.TargetId = null;
+                        state.Status =
+                            GrayboxDefenseTowerStatus3D.Unavailable;
                     }
-                    state.TargetId = null;
-                    state.Status = GrayboxDefenseTowerStatus3D.Unavailable;
                 }
                 else if (state.Status ==
                          GrayboxDefenseTowerStatus3D.Unavailable)

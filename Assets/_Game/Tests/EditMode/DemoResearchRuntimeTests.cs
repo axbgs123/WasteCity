@@ -301,6 +301,148 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void LastResearchStationEvacuationLockFreezesAndRollbackResumesWithoutRefund()
+        {
+            var root = new GameObject("research-evacuation-lock-test");
+            try
+            {
+                GrayboxBuildingSession3D session =
+                    CreateDevelopmentSession(root);
+                GrayboxBuildingInstance3D station =
+                    CompleteResearchStation(session, 10, 10);
+                var runtime = new DemoResearchRuntime(session.Research);
+                Assert.That(runtime.TryStart(
+                    BasicMetallurgy,
+                    session.Inventory,
+                    hasEligibleResearchStation: true), Is.True);
+                ResearchDefinition active = session.Research.Active;
+                int ironAfterInvestment =
+                    session.Inventory.Get(ResourceIds.Iron);
+
+                Assert.That(runtime.Tick(
+                    5f,
+                    CityMode.Fortress,
+                    globallyPaused: false,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                float remainingBeforeManifest = session.Research.Remaining;
+                BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                    station.StableInstanceId,
+                    station.Placement.Definition.Cost,
+                    station.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.FullDismantle);
+
+                Assert.That(station.IsEvacuationLocked, Is.False);
+                Assert.That(runtime.Tick(
+                    1f,
+                    CityMode.Fortress,
+                    globallyPaused: false,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                Assert.That(session.Research.Remaining,
+                    Is.EqualTo(remainingBeforeManifest - 1f).Within(.0001f));
+                Assert.That(session.TryCaptureEvacuationWork(
+                    new[] { work }, out string captureFailure),
+                    Is.True,
+                    captureFailure);
+                Assert.That(session.TryLockEvacuationWork(
+                    new[] { work }, out string lockFailure),
+                    Is.True,
+                    lockFailure);
+                float remainingAtLock = session.Research.Remaining;
+
+                Assert.That(HasEligibleResearchStation(session), Is.False);
+                Assert.That(runtime.Tick(
+                    100f,
+                    CityMode.Fortress,
+                    globallyPaused: false,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                Assert.That(session.Research.Active, Is.SameAs(active));
+                Assert.That(session.Research.Remaining,
+                    Is.EqualTo(remainingAtLock).Within(.0001f));
+                Assert.That(session.Inventory.Get(ResourceIds.Iron),
+                    Is.EqualTo(ironAfterInvestment));
+
+                session.RollbackEvacuationLocksAfterFailure(new[] { work });
+
+                Assert.That(HasEligibleResearchStation(session), Is.True);
+                Assert.That(runtime.Tick(
+                    1f,
+                    CityMode.Fortress,
+                    globallyPaused: false,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                Assert.That(session.Research.Active, Is.SameAs(active));
+                Assert.That(session.Research.Remaining,
+                    Is.EqualTo(remainingAtLock - 1f).Within(.0001f));
+                Assert.That(session.Inventory.Get(ResourceIds.Iron),
+                    Is.EqualTo(ironAfterInvestment));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void AnotherUnlockedResearchStationContinuesWhilePauseSignalStillFreezes()
+        {
+            var root = new GameObject("research-evacuation-eligibility-test");
+            try
+            {
+                GrayboxBuildingSession3D session =
+                    CreateDevelopmentSession(root);
+                GrayboxBuildingInstance3D lockedStation =
+                    CompleteResearchStation(session, 10, 10);
+                CompleteResearchStation(session, 13, 10);
+                var runtime = new DemoResearchRuntime(session.Research);
+                Assert.That(runtime.TryStart(
+                    BasicMetallurgy,
+                    session.Inventory,
+                    hasEligibleResearchStation: true), Is.True);
+                BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                    lockedStation.StableInstanceId,
+                    lockedStation.Placement.Definition.Cost,
+                    lockedStation.Progress.BaseDuration,
+                    1d,
+                    BuildingEvacuationTreatment.FullDismantle);
+                Assert.That(session.TryCaptureEvacuationWork(
+                    new[] { work }, out string captureFailure),
+                    Is.True,
+                    captureFailure);
+                Assert.That(session.TryLockEvacuationWork(
+                    new[] { work }, out string lockFailure),
+                    Is.True,
+                    lockFailure);
+
+                Assert.That(HasEligibleResearchStation(session), Is.True);
+                Assert.That(runtime.Tick(
+                    1f,
+                    CityMode.Fortress,
+                    globallyPaused: false,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                Assert.That(session.Research.Remaining,
+                    Is.EqualTo(19f).Within(.0001f));
+
+                Assert.That(runtime.Tick(
+                    100f,
+                    CityMode.Fortress,
+                    globallyPaused: true,
+                    hasEligibleResearchStation:
+                        HasEligibleResearchStation(session)), Is.False);
+                Assert.That(session.Research.Remaining,
+                    Is.EqualTo(19f).Within(.0001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void CancelRefundsEightyPercentAndFailsAtomicallyWhenCapacityIsInsufficient()
         {
             var model = new ResearchModel();
@@ -480,6 +622,92 @@ namespace WasteCity.Tests
                 city,
                 hasEligibleResearchStation: true), Is.True);
             return runtime;
+        }
+
+        private static GrayboxBuildingSession3D CreateDevelopmentSession(
+            GameObject root)
+        {
+            GrayboxBuildingSession3D session =
+                root.AddComponent<GrayboxBuildingSession3D>();
+            session.Configure(true);
+            session.ConfigureDevelopmentFixture();
+            return session;
+        }
+
+        private static GrayboxBuildingInstance3D CompleteResearchStation(
+            GrayboxBuildingSession3D session,
+            int x,
+            int y)
+        {
+            var presentation = new PassiveBuildingPresentation();
+            BuildingDefinition definition = BuildingCatalog.ResearchStation;
+            BuildingUnlockEvaluation unlock = BuildingUnlockModel.Evaluate(
+                definition,
+                session.Population,
+                session.IsResearchCompleted,
+                session.CompletedBuildingCount);
+            var request = new BuildingPlacementRequest(
+                definition,
+                session.GroundGrid,
+                BuildingSite.Ground,
+                BuildingOrientation.North,
+                x,
+                y,
+                12,
+                12,
+                session.GroundBuildRadius,
+                CityMode.Fortress,
+                true,
+                false,
+                true,
+                true,
+                true,
+                null,
+                true,
+                unlock,
+                session.Inventory.CanSpend(
+                    definition.CostId,
+                    definition.Cost));
+            Assert.That(session.TryBeginConstruction(
+                request,
+                presentation,
+                out GrayboxBuildingInstance3D instance,
+                out BuildingPlacementEvaluation evaluation),
+                Is.True,
+                evaluation.PrimaryFailure.ToString());
+            session.SetConstructionMultiplierForDevelopment(100f);
+            session.TickConstruction(
+                .1f,
+                CityMode.Fortress,
+                paused: false,
+                presentation: presentation);
+            Assert.That(instance.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            return instance;
+        }
+
+        private static bool HasEligibleResearchStation(
+            GrayboxBuildingSession3D session)
+        {
+            return session.CompletedBuildingCount(
+                BuildingCatalog.ResearchStation.Id.Value) > 0;
+        }
+
+        private sealed class PassiveBuildingPresentation :
+            IGrayboxBuildingPresentation3D
+        {
+            public bool TryCreate(GrayboxBuildingInstance3D instance)
+            {
+                return true;
+            }
+
+            public void UpdateInstance(GrayboxBuildingInstance3D instance)
+            {
+            }
+
+            public void Remove(GrayboxBuildingInstance3D instance)
+            {
+            }
         }
 
         private static void AssertDefinition(

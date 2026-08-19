@@ -302,6 +302,195 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void EvacuationLockFreezesAndUnlockResumesExactTowerCombatState()
+        {
+            GrayboxBuildingInstance3D turret = CompletedTurret(
+                "building.instance.turret-evacuation-lock-runtime",
+                x: 0,
+                y: 0);
+            using CityResourceStorageModel storage = StorageWithAmmo(40);
+            GrayboxDefenseRuntime3D runtime = Runtime();
+            Synchronize(runtime, new[] { turret });
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: true), Is.True);
+            runtime.Tick(20f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: false), Is.True);
+            runtime.Tick(1f, globallyPaused: false, cityStorage: storage);
+
+            GrayboxDefenseTowerRuntimeState3D state = runtime.Towers.Single();
+            Assert.That(state.TargetId, Is.Not.Null);
+            Assert.That(state.Status,
+                Is.EqualTo(GrayboxDefenseTowerStatus3D.Firing));
+            state.Combat.Tick(
+                3f,
+                DurableLightEnemy(
+                    "enemy.evacuation-lock.prepare-cache",
+                    x: 0f,
+                    z: 0f),
+                globallyPaused: false);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(29));
+            int ammoBeforeLock = state.Combat.Ammo;
+            int cityAmmoBeforeLock = storage.GetNetworkAmount(
+                ResourceIds.Ammunition);
+            int enemyHealthBeforeLock =
+                runtime.Snapshot.Enemies.Single().CurrentHealth;
+            float activeSecondsBeforeLock = ActiveAmmunitionSeconds(state);
+            string targetBeforeLock = state.TargetId;
+            GrayboxDefenseTowerStatus3D statusBeforeLock = state.Status;
+            Assert.That(activeSecondsBeforeLock, Is.GreaterThan(0f));
+
+            SetEvacuationLocked(turret, true);
+            Synchronize(runtime, new[] { turret });
+            Assert.That(turret.IsEvacuationLocked, Is.True);
+            Assert.That(runtime.Towers.Single(), Is.SameAs(state));
+            Assert.That(state.CanRunLocally, Is.False);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(ammoBeforeLock));
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(activeSecondsBeforeLock).Within(.0001f));
+            Assert.That(state.TargetId, Is.EqualTo(targetBeforeLock),
+                "Evacuation lock freezes target state instead of clearing it.");
+            Assert.That(state.Status, Is.EqualTo(statusBeforeLock));
+
+            runtime.Tick(1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(ammoBeforeLock));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(cityAmmoBeforeLock));
+            Assert.That(runtime.Snapshot.Enemies.Single().CurrentHealth,
+                Is.EqualTo(enemyHealthBeforeLock));
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(activeSecondsBeforeLock).Within(.0001f));
+            Assert.That(state.TargetId, Is.EqualTo(targetBeforeLock));
+            Assert.That(state.Status, Is.EqualTo(statusBeforeLock));
+
+            SetEvacuationLocked(turret, false);
+            Synchronize(runtime, new[] { turret });
+            Assert.That(turret.IsEvacuationLocked, Is.False);
+            Assert.That(runtime.Towers.Single(), Is.SameAs(state));
+            Assert.That(state.CanRunLocally, Is.True);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(ammoBeforeLock));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(cityAmmoBeforeLock));
+            Assert.That(state.TargetId, Is.EqualTo(targetBeforeLock));
+            Assert.That(state.Status, Is.EqualTo(statusBeforeLock));
+
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(ammoBeforeLock + 1));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(cityAmmoBeforeLock - 1));
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(activeSecondsBeforeLock - .1f).Within(.0001f));
+            Assert.That(runtime.Snapshot.Enemies.Single().CurrentHealth,
+                Is.LessThan(enemyHealthBeforeLock));
+            Assert.That(state.TargetId, Is.EqualTo(targetBeforeLock));
+            Assert.That(state.Status,
+                Is.EqualTo(GrayboxDefenseTowerStatus3D.Firing));
+
+            int cityAmmoAfterResume = storage.GetNetworkAmount(
+                ResourceIds.Ammunition);
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(ammoBeforeLock + 1));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(cityAmmoAfterResume),
+                "Resume must not duplicate the one missing-round refill.");
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(activeSecondsBeforeLock - .2f).Within(.0001f));
+        }
+
+        [Test]
+        public void UnlockedEvacuationChecklistDoesNotAffectTowerOperation()
+        {
+            GrayboxBuildingInstance3D turret = CompletedTurret(
+                "building.instance.turret-evacuation-unconfirmed",
+                x: 0,
+                y: 0);
+            using CityResourceStorageModel storage = StorageWithAmmo(40);
+            GrayboxDefenseRuntime3D runtime = Runtime();
+            Synchronize(runtime, new[] { turret });
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: true), Is.True);
+            runtime.Tick(20f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: false), Is.True);
+            int healthBefore = runtime.Snapshot.Enemies.Single().CurrentHealth;
+
+            Assert.That(turret.IsEvacuationLocked, Is.False,
+                "An unconfirmed checklist must not invent another runtime flag.");
+            Synchronize(runtime, new[] { turret });
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+
+            Assert.That(runtime.Snapshot.Enemies.Single().CurrentHealth,
+                Is.LessThan(healthBefore));
+            Assert.That(runtime.Snapshot.Towers.Single().Status,
+                Is.EqualTo(GrayboxDefenseTowerStatus3D.Firing));
+        }
+
+        [Test]
+        public void GlobalAndPlayerTacticalPauseFreezeTowerCombatProgress()
+        {
+            GrayboxBuildingInstance3D turret = CompletedTurret(
+                "building.instance.turret-approved-pauses",
+                x: 0,
+                y: 0);
+            using CityResourceStorageModel storage = StorageWithAmmo(40);
+            GrayboxDefenseRuntime3D runtime = Runtime();
+            Synchronize(runtime, new[] { turret });
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: true), Is.True);
+            runtime.Tick(20f, globallyPaused: false, cityStorage: storage);
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: false), Is.True);
+            runtime.Tick(.1f, globallyPaused: false, cityStorage: storage);
+            GrayboxDefenseTowerRuntimeState3D state = runtime.Towers.Single();
+
+            int globalAmmo = state.Combat.Ammo;
+            int globalCityAmmo = storage.GetNetworkAmount(
+                ResourceIds.Ammunition);
+            int globalEnemyHealth =
+                runtime.Snapshot.Enemies.Single().CurrentHealth;
+            float globalActiveSeconds = ActiveAmmunitionSeconds(state);
+            string globalTargetId = state.TargetId;
+            runtime.Tick(1f, globallyPaused: true, cityStorage: storage);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(globalAmmo));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(globalCityAmmo));
+            Assert.That(runtime.Snapshot.Enemies.Single().CurrentHealth,
+                Is.EqualTo(globalEnemyHealth));
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(globalActiveSeconds).Within(.0001f));
+            Assert.That(state.TargetId, Is.EqualTo(globalTargetId));
+
+            Assert.That(runtime.TrySetPlayerPaused(
+                turret.StableInstanceId,
+                paused: true), Is.True);
+            int tacticalAmmo = state.Combat.Ammo;
+            int tacticalCityAmmo = storage.GetNetworkAmount(
+                ResourceIds.Ammunition);
+            int tacticalEnemyHealth =
+                runtime.Snapshot.Enemies.Single().CurrentHealth;
+            float tacticalActiveSeconds = ActiveAmmunitionSeconds(state);
+            runtime.Tick(1f, globallyPaused: false, cityStorage: storage);
+            Assert.That(state.Combat.Ammo, Is.EqualTo(tacticalAmmo));
+            Assert.That(storage.GetNetworkAmount(ResourceIds.Ammunition),
+                Is.EqualTo(tacticalCityAmmo));
+            Assert.That(runtime.Snapshot.Enemies.Single().CurrentHealth,
+                Is.EqualTo(tacticalEnemyHealth));
+            Assert.That(ActiveAmmunitionSeconds(state),
+                Is.EqualTo(tacticalActiveSeconds).Within(.0001f));
+            Assert.That(state.Status,
+                Is.EqualTo(GrayboxDefenseTowerStatus3D.PlayerPaused));
+        }
+
+        [Test]
         public void ConnectedTowerRefillsWithDefenseAttributionAndIdlesOnInternalAmmo()
         {
             GrayboxBuildingInstance3D turret = CompletedTurret(
@@ -1019,6 +1208,16 @@ namespace WasteCity.Tests
             bool locked)
         {
             Invoke(instance, "SetEvacuationLocked", locked);
+        }
+
+        private static float ActiveAmmunitionSeconds(
+            GrayboxDefenseTowerRuntimeState3D state)
+        {
+            FieldInfo field = typeof(MachineGunTurretCombatModel).GetField(
+                "activeAmmunitionSeconds",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            return (float)field.GetValue(state.Combat);
         }
 
         private static void Abandon(GrayboxBuildingInstance3D instance)
