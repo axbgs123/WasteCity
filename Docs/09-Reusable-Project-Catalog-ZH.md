@@ -116,6 +116,10 @@
 
 能解决什么：在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`。怎么复用：在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射，保留配置签名、冻结出生点、波次计数与时钟余量、塔弹药租约、活动敌人和核心状态，并把恢复委托给运行时的零写入预检与单次提交。不能负责什么：只负责防御领域快照与 FormalThreeD DTO 映射及精确配置签名兼容；不拥有文件 IO、场景搜索、规则 tick、城市库存、目标选择、UI 或表现对象。FormalSaveValidator 只验证结构与高价值语义；目标、状态文案和 tracer 等派生状态不入档。改后跑哪组测试：`GrayboxFormalSaveDefenseTests`。代码名：`GrayboxDefenseSaveAdapter3D`。
 
+### 三维冻结撤离存档适配器（复用前审查）
+
+能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：从显式提供的 `GrayboxEvacuationController3D` 捕获确定性 DTO；恢复时先验证冻结 work 与队列顺序、未提交队列后缀、建筑会话锁、生产与防御载荷所有权、聚合资源和稳定阻塞码，再生成绑定 controller generation 与 session revision 的一次性计划并提交。未知建筑定义占位可保留无法解释的聚合资源载荷，已知普通建筑不得伪造无运行时所有者的资源载荷。不能负责什么：只负责撤离持久状态、DTO 映射和两阶段恢复边界；不创建或重算撤离 work、退款、容量、生产、防御、物流和建筑资格，不拥有文件 IO、检查点、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。当前状态为已实现待验证，不代表人工试玩、真实 Windows 或全量回归已经完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
+
 ### 三维正式撤离协调与只读视图（仅限场景）
 
 能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。

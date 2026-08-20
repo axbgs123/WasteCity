@@ -990,6 +990,335 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Controller_PersistenceUsesNextUnusedOrdinalAcrossConsecutiveBatches()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(1));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+
+            GrayboxEvacuationPersistenceState3D first =
+                fixture.Controller.CaptureForPersistence();
+
+            Assert.That(first.ActiveBatchId,
+                Is.EqualTo("evacuation.batch.000001"));
+            Assert.That(first.NextBatchOrdinal, Is.EqualTo(2));
+            fixture.Controller.Tick(100f, paused: false);
+            fixture.City.Deployment.Restore(CityMode.Fortress, 0f);
+            Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                12, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(1));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+
+            GrayboxEvacuationPersistenceState3D second =
+                fixture.Controller.CaptureForPersistence();
+
+            Assert.That(second.ActiveBatchId,
+                Is.EqualTo("evacuation.batch.000002"));
+            Assert.That(second.ActiveBatchId, Is.Not.EqualTo(first.ActiveBatchId));
+            Assert.That(second.NextBatchOrdinal, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void Controller_PersistenceRestoresAndFinalizesFrozenProductionAndDefensePayloadOnce()
+        {
+            EvacuationFixture source = CreateFixture();
+            source.Session.UnlockAllResearchForDevelopment();
+            GrayboxBuildingInstance3D sourceSmelter = Begin(
+                source.Session, BuildingCatalog.Smelter, BuildingSite.Ground,
+                10, 10, source.Presentation);
+            source.Session.CompleteAllConstructionForDevelopment(
+                source.Presentation);
+            Begin(
+                source.Session, BuildingCatalog.Assembler,
+                BuildingSite.InnerCity, 0, 0, source.Presentation);
+            source.Session.CompleteAllConstructionForDevelopment(
+                source.Presentation);
+            GrayboxBuildingInstance3D sourceTurret = Begin(
+                source.Session, BuildingCatalog.MachineGunTurret,
+                BuildingSite.Ground, 14, 10, source.Presentation);
+            source.Session.CompleteAllConstructionForDevelopment(
+                source.Presentation);
+            var sourceProduction = new GrayboxProductionRuntime3D();
+            sourceProduction.Synchronize(
+                source.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                source.Session.GroundBuildRadius,
+                source.Session.CityStorage);
+            Assert.That(sourceProduction.TryGetState(
+                sourceSmelter.StableInstanceId,
+                out BuildingProductionState sourceProductionState), Is.True);
+            Assert.That(sourceProductionState.Input.Add(ResourceIds.Iron, 2),
+                Is.EqualTo(2));
+            Assert.That(sourceProductionState.Output.Add(ResourceIds.Alloy, 3),
+                Is.EqualTo(3));
+            var sourceDefense = new GrayboxDefenseRuntime3D(
+                10f, 10f, 20f, 10f);
+            sourceDefense.Synchronize(
+                source.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                source.Session.GroundBuildRadius);
+            source.Session.Inventory.Set(ResourceIds.Ammunition, 30);
+            sourceDefense.Tick(
+                .1f,
+                globallyPaused: false,
+                source.Session.CityStorage);
+            ConfigureOperationalRuntimes(
+                source.Controller,
+                sourceProduction,
+                sourceDefense);
+            Assert.That(source.Controller.TryHandleDeploymentRequest(), Is.True);
+            Assert.That(source.Controller.AssignAll(
+                BuildingEvacuationTreatment.FullDismantle), Is.EqualTo(2));
+            Assert.That(source.Controller.ConfirmManifest(), Is.True);
+
+            GrayboxEvacuationPersistenceState3D saved =
+                source.Controller.CaptureForPersistence();
+            GrayboxEvacuationPayloadPersistenceState3D smelterPayload =
+                saved.Payloads.Single(value =>
+                    value.StableInstanceId == sourceSmelter.StableInstanceId);
+            GrayboxEvacuationPayloadPersistenceState3D turretPayload =
+                saved.Payloads.Single(value =>
+                    value.StableInstanceId == sourceTurret.StableInstanceId);
+            Assert.That(smelterPayload.ProductionInput.Single(),
+                Is.EqualTo(new ResourceAmount(ResourceIds.Iron, 2)));
+            Assert.That(smelterPayload.ProductionOutput.Single(),
+                Is.EqualTo(new ResourceAmount(ResourceIds.Alloy, 3)));
+            Assert.That(smelterPayload.Resources,
+                Is.EquivalentTo(new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.Alloy, 3)
+                }));
+            Assert.That(turretPayload.HasDefensePayload, Is.True);
+            Assert.That(turretPayload.TowerAmmunitionAmount, Is.EqualTo(30));
+            Assert.That(turretPayload.Resources.Single(),
+                Is.EqualTo(new ResourceAmount(ResourceIds.Ammunition, 30)));
+
+            EvacuationFixture target = CreateFixture();
+            target.Session.UnlockAllResearchForDevelopment();
+            GrayboxBuildingInstance3D targetSmelter = Begin(
+                target.Session, BuildingCatalog.Smelter, BuildingSite.Ground,
+                10, 10, target.Presentation);
+            target.Session.CompleteAllConstructionForDevelopment(
+                target.Presentation);
+            Begin(
+                target.Session, BuildingCatalog.Assembler,
+                BuildingSite.InnerCity, 0, 0, target.Presentation);
+            target.Session.CompleteAllConstructionForDevelopment(
+                target.Presentation);
+            GrayboxBuildingInstance3D targetTurret = Begin(
+                target.Session, BuildingCatalog.MachineGunTurret,
+                BuildingSite.Ground, 14, 10, target.Presentation);
+            target.Session.CompleteAllConstructionForDevelopment(
+                target.Presentation);
+            var targetProduction = new GrayboxProductionRuntime3D();
+            targetProduction.Synchronize(
+                target.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                target.Session.GroundBuildRadius,
+                target.Session.CityStorage);
+            Assert.That(targetProduction.TryGetState(
+                targetSmelter.StableInstanceId,
+                out BuildingProductionState targetProductionState), Is.True);
+            targetProductionState.Input.Add(ResourceIds.Iron, 2);
+            targetProductionState.Output.Add(ResourceIds.Alloy, 3);
+            var targetDefense = new GrayboxDefenseRuntime3D(
+                10f, 10f, 20f, 10f);
+            targetDefense.Synchronize(
+                target.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                target.Session.GroundBuildRadius);
+            target.Session.Inventory.Set(ResourceIds.Ammunition, 30);
+            targetDefense.Tick(
+                .1f,
+                globallyPaused: false,
+                target.Session.CityStorage);
+            ConfigureOperationalRuntimes(
+                target.Controller,
+                targetProduction,
+                targetDefense);
+            int ironBefore = target.Session.Inventory.Get(ResourceIds.Iron);
+            int alloyBefore = target.Session.Inventory.Get(ResourceIds.Alloy);
+            int stoneBefore = target.Session.Inventory.Get(ResourceIds.Stone);
+            int ammunitionBefore =
+                target.Session.Inventory.Get(ResourceIds.Ammunition);
+
+            Assert.That(target.Controller.TryRestore(saved, out string error),
+                Is.True, error);
+            target.Controller.Tick(100f, paused: false);
+            target.Controller.Tick(100f, paused: false);
+
+            Assert.That(targetProduction.TryGetState(
+                targetSmelter.StableInstanceId, out _), Is.False);
+            Assert.That(targetDefense.Towers.Any(value =>
+                value.StableId == targetTurret.StableInstanceId), Is.False);
+            Assert.That(target.Session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(ironBefore + 2));
+            Assert.That(target.Session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(alloyBefore + 11));
+            Assert.That(target.Session.Inventory.Get(ResourceIds.Stone),
+                Is.EqualTo(stoneBefore + 5));
+            Assert.That(target.Session.Inventory.Get(ResourceIds.Ammunition),
+                Is.EqualTo(ammunitionBefore + 30));
+            int[] committedAmounts = ResourceIds.All.Select(
+                target.Session.Inventory.Get).ToArray();
+            target.Controller.Tick(100f, paused: false);
+            CollectionAssert.AreEqual(
+                committedAmounts,
+                ResourceIds.All.Select(
+                    target.Session.Inventory.Get).ToArray(),
+                "A restored batch must not finalize or refund twice.");
+        }
+
+        [Test]
+        public void Controller_PrepareRestoreRejectsPendingProductionOwnerWithoutPayloadWithoutMutation()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            fixture.Session.UnlockAllResearchForDevelopment();
+            GrayboxBuildingInstance3D smelter = Begin(
+                fixture.Session, BuildingCatalog.Smelter, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            var production = new GrayboxProductionRuntime3D();
+            production.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                fixture.Session.CityStorage);
+            Assert.That(production.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState productionState), Is.True);
+            productionState.Input.Add(ResourceIds.Iron, 2);
+            ConfigureOperationalRuntimes(
+                fixture.Controller,
+                production,
+                new GrayboxDefenseRuntime3D(10f, 10f, 20f, 10f));
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                smelter.StableInstanceId,
+                BuildingCatalog.Smelter.Cost,
+                BuildingCatalog.Smelter.BuildSeconds,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle,
+                BuildingEvacuationRules.CreateBatchContext(false, 1f));
+
+            Assert.That(fixture.Controller.TryPrepareRestore(
+                SinglePendingPersistence(
+                    work,
+                    Array.Empty<GrayboxEvacuationPayloadPersistenceState3D>()),
+                out GrayboxEvacuationRestorePlan3D plan,
+                out string error), Is.False);
+            Assert.That(plan, Is.Null);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(smelter.IsEvacuationLocked, Is.False);
+            Assert.That(productionState.Input.Get(ResourceIds.Iron),
+                Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Controller_PrepareRestoreRejectsOpaquePayloadForKnownOrdinaryBuilding()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                wall.StableInstanceId,
+                BuildingCatalog.Wall.Cost,
+                BuildingCatalog.Wall.BuildSeconds,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle,
+                BuildingEvacuationRules.CreateBatchContext(false, 1f));
+            var opaque = new GrayboxEvacuationPayloadPersistenceState3D(
+                wall.StableInstanceId,
+                Array.Empty<ResourceAmount>(),
+                Array.Empty<ResourceAmount>(),
+                Array.Empty<ResourceAmount>(),
+                false,
+                0,
+                new[] { new ResourceAmount(ResourceIds.Stone, 3) });
+
+            Assert.That(fixture.Controller.TryPrepareRestore(
+                SinglePendingPersistence(work, new[] { opaque }),
+                out GrayboxEvacuationRestorePlan3D plan,
+                out string error), Is.False);
+            Assert.That(plan, Is.Null);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(wall.IsEvacuationLocked, Is.False);
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+        }
+
+        [Test]
+        public void Controller_PrepareRestoreRejectsUnlistedExistingSessionLockWithoutMutation()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            GrayboxBuildingInstance3D wall = Begin(
+                fixture.Session, BuildingCatalog.Wall, BuildingSite.Ground,
+                10, 10, fixture.Presentation);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            BuildingEvacuationWork work = BuildingEvacuationRules.Create(
+                wall.StableInstanceId,
+                BuildingCatalog.Wall.Cost,
+                BuildingCatalog.Wall.BuildSeconds,
+                1d,
+                BuildingEvacuationTreatment.FullDismantle);
+            Assert.That(fixture.Session.TryCaptureEvacuationWork(
+                new[] { work }, out string captureError), Is.True, captureError);
+            Assert.That(fixture.Session.TryLockEvacuationWork(
+                new[] { work }, out string lockError), Is.True, lockError);
+            var empty = new GrayboxEvacuationPersistenceState3D(
+                1,
+                string.Empty,
+                false,
+                default,
+                Array.Empty<BuildingEvacuationWork>(),
+                Array.Empty<string>(),
+                0,
+                string.Empty,
+                0f,
+                false,
+                string.Empty,
+                string.Empty,
+                Array.Empty<GrayboxEvacuationPayloadPersistenceState3D>(),
+                Array.Empty<string>(),
+                Array.Empty<string>());
+
+            Assert.That(fixture.Controller.TryPrepareRestore(
+                empty,
+                out GrayboxEvacuationRestorePlan3D plan,
+                out string error), Is.False);
+            Assert.That(plan, Is.Null);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(wall.IsEvacuationLocked, Is.True);
+            Assert.That(fixture.Controller.IsProcessing, Is.False);
+        }
+
+        [Test]
         public void Controller_AtomicPayloadCommitFinalizesQuickAndDiscardsAbandonedRuntimeState()
         {
             EvacuationFixture fixture = CreateFixture();
@@ -1995,6 +2324,30 @@ namespace WasteCity.Tests
                 "Task 5 requires the evacuation controller to consume the " +
                 "authoritative production and defense runtime owners.");
             method.Invoke(controller, new object[] { production, defense });
+        }
+
+        private static GrayboxEvacuationPersistenceState3D
+            SinglePendingPersistence(
+                BuildingEvacuationWork work,
+                IReadOnlyList<GrayboxEvacuationPayloadPersistenceState3D>
+                    payloads)
+        {
+            return new GrayboxEvacuationPersistenceState3D(
+                2,
+                "evacuation.batch.000001",
+                true,
+                work.BatchContext,
+                new[] { work },
+                new[] { work.StableInstanceId },
+                0,
+                work.StableInstanceId,
+                work.DismantleSeconds,
+                false,
+                string.Empty,
+                string.Empty,
+                payloads,
+                new[] { work.StableInstanceId },
+                new[] { work.StableInstanceId });
         }
 
         private static bool ReadControllerBool(

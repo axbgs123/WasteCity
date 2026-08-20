@@ -187,6 +187,7 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxEvacuationController3D : MonoBehaviour
     {
+        public const string CapacityBlockedCode = "capacity-insufficient";
         private static readonly ProfilerMarker TickMarker =
             new ProfilerMarker("WasteCity.Formal.Evacuation.Tick");
         private static readonly ProfilerMarker ManifestViewBuildMarker =
@@ -235,6 +236,7 @@ namespace WasteCity.Graybox3D.Building
         private int cleanupMenuReleaseInvocationCount;
         private bool ownsConstructionCancellation;
         private bool isBlocked;
+        private string blockedCode = string.Empty;
         private string blockedReason = string.Empty;
         private int fullQueueIndex;
         private float remainingSeconds;
@@ -242,6 +244,7 @@ namespace WasteCity.Graybox3D.Building
         private ulong nextViewRevision;
         private ulong nextBatchOrdinal;
         private string activeBatchId = string.Empty;
+        private ulong persistenceGeneration;
         private EvacuationManifestViewModel cachedManifestView;
         private EvacuationQueueViewModel cachedQueueView;
         private ulong cachedManifestSignature;
@@ -435,7 +438,7 @@ namespace WasteCity.Graybox3D.Building
             this.evacuationPresentation = evacuationPresentation;
             this.menu = menu;
             ResetLocalState();
-            nextBatchOrdinal = 0;
+            nextBatchOrdinal = 1;
             InvalidateViewCaches();
             menu.SetConstructionCancellationBlocked(false);
             EnsureOperationalRuntimeBindings();
@@ -579,13 +582,15 @@ namespace WasteCity.Graybox3D.Building
             IsManifestOpen = false;
             IsProcessing = true;
             isBlocked = false;
+            blockedCode = string.Empty;
             blockedReason = string.Empty;
-            unchecked { nextBatchOrdinal++; }
             activeBatchId = "evacuation.batch." +
                 nextBatchOrdinal.ToString("D6", CultureInfo.InvariantCulture);
+            unchecked { nextBatchOrdinal++; }
             fullQueueIndex = 0;
             remainingSeconds = 0f;
             bool advanced = AdvanceThroughImmediateWork();
+            persistenceGeneration++;
             if (IsProcessing)
                 menu.ShowEvacuationQueue(CaptureQueueView());
             return advanced;
@@ -610,6 +615,7 @@ namespace WasteCity.Graybox3D.Building
                 if (remainingSeconds <= 0f &&
                     TryCommitCurrent() == CommitCurrentResult.Succeeded)
                     AdvanceThroughImmediateWork();
+                persistenceGeneration++;
                 if (IsProcessing)
                     menu.ShowEvacuationQueue(CaptureQueueView());
             }
@@ -620,7 +626,9 @@ namespace WasteCity.Graybox3D.Building
             if (!IsProcessing || !IsBlocked ||
                 fullQueueIndex < 0 || fullQueueIndex >= fullQueue.Count)
                 return false;
+            persistenceGeneration++;
             isBlocked = false;
+            blockedCode = string.Empty;
             blockedReason = string.Empty;
             CommitCurrentResult result = TryCommitCurrent();
             if (result != CommitCurrentResult.Succeeded)
@@ -736,6 +744,7 @@ namespace WasteCity.Graybox3D.Building
                     BuildingEvacuationTreatment.FullDismantle)
                 {
                     remainingSeconds = current.DismantleSeconds;
+                    persistenceGeneration++;
                     return true;
                 }
                 CommitCurrentResult result = TryCommitCurrent();
@@ -746,6 +755,7 @@ namespace WasteCity.Graybox3D.Building
 
             if (!IsProcessing) return false;
             IsProcessing = false;
+            persistenceGeneration++;
             return FinishIfResolved();
         }
 
@@ -794,8 +804,10 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxEvacuationCommitCode3D.CapacityInsufficient)
                 {
                     isBlocked = true;
+                    blockedCode = CapacityBlockedCode;
                     blockedReason = failureReason;
                     remainingSeconds = 0f;
+                    persistenceGeneration++;
                     return CommitCurrentResult.Blocked;
                 }
                 FailProcessing();
@@ -814,9 +826,11 @@ namespace WasteCity.Graybox3D.Building
             }
             runtimePayloads.Remove(current.StableInstanceId);
             isBlocked = false;
+            blockedCode = string.Empty;
             blockedReason = string.Empty;
             fullQueueIndex++;
             remainingSeconds = 0f;
+            persistenceGeneration++;
             return CommitCurrentResult.Succeeded;
         }
 
@@ -878,11 +892,13 @@ namespace WasteCity.Graybox3D.Building
             session.RollbackEvacuationLocksAfterFailure(rollbackWork);
             IsProcessing = false;
             isBlocked = false;
+            blockedCode = string.Empty;
             blockedReason = string.Empty;
             IsManifestOpen = true;
             fullQueueIndex = 0;
             remainingSeconds = 0f;
             ClearWorkOnly();
+            persistenceGeneration++;
             session.CopyPlayerOwnedGroundInstances(manifest);
             menu.SetConstructionCancellationBlocked(true);
             menu.ShowEvacuationManifest(CaptureManifestView());
@@ -893,6 +909,7 @@ namespace WasteCity.Graybox3D.Building
             IsManifestOpen = false;
             IsProcessing = false;
             isBlocked = false;
+            blockedCode = string.Empty;
             blockedReason = string.Empty;
             ownsConstructionCancellation = false;
             queuePaused = false;
@@ -903,6 +920,7 @@ namespace WasteCity.Graybox3D.Building
             fullQueueIndex = 0;
             remainingSeconds = 0f;
             InvalidateViewCaches();
+            persistenceGeneration++;
         }
 
         private void ClearWorkOnly()
@@ -1431,6 +1449,645 @@ namespace WasteCity.Graybox3D.Building
             }
         }
 
+        public GrayboxEvacuationPersistenceState3D CaptureForPersistence()
+        {
+            if (!IsProcessing)
+            {
+                return new GrayboxEvacuationPersistenceState3D(
+                    (long)nextBatchOrdinal,
+                    string.Empty,
+                    false,
+                    default,
+                    Array.Empty<BuildingEvacuationWork>(),
+                    Array.Empty<string>(),
+                    0,
+                    string.Empty,
+                    0f,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    Array.Empty<GrayboxEvacuationPayloadPersistenceState3D>(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>());
+            }
+
+            var queueIds = new string[fullQueue.Count];
+            for (var index = 0; index < fullQueue.Count; index++)
+                queueIds[index] = fullQueue[index].StableInstanceId;
+            var pendingIds = new string[fullQueue.Count - fullQueueIndex];
+            for (var index = fullQueueIndex; index < fullQueue.Count; index++)
+                pendingIds[index - fullQueueIndex] =
+                    fullQueue[index].StableInstanceId;
+            var payloadIds = new List<string>(runtimePayloads.Keys);
+            payloadIds.Sort(StringComparer.Ordinal);
+            var payloadStates =
+                new GrayboxEvacuationPayloadPersistenceState3D[
+                    payloadIds.Count];
+            for (var index = 0; index < payloadIds.Count; index++)
+            {
+                RuntimePayloadCapture payload =
+                    runtimePayloads[payloadIds[index]];
+                payloadStates[index] = payload.CaptureForPersistence(
+                    payloadIds[index]);
+            }
+            BuildingEvacuationWork current = fullQueue[fullQueueIndex];
+            return new GrayboxEvacuationPersistenceState3D(
+                (long)nextBatchOrdinal,
+                activeBatchId,
+                true,
+                work[0].BatchContext,
+                work,
+                queueIds,
+                fullQueueIndex,
+                current.StableInstanceId,
+                remainingSeconds,
+                isBlocked,
+                blockedCode,
+                isBlocked ? current.StableInstanceId : string.Empty,
+                payloadStates,
+                pendingIds,
+                pendingIds);
+        }
+
+        public bool TryPrepareRestore(
+            GrayboxEvacuationPersistenceState3D state,
+            out GrayboxEvacuationRestorePlan3D plan,
+            out string error)
+        {
+            plan = null;
+            error = string.Empty;
+            if (!IsConfigured || state == null)
+            {
+                error = "撤离控制器或持久状态未就绪";
+                return false;
+            }
+            if (IsProcessing || IsManifestOpen)
+            {
+                error = "撤离控制器已有活动事务";
+                return false;
+            }
+            if (state.NextBatchOrdinal <= 0 ||
+                float.IsNaN(state.RemainingSeconds) ||
+                float.IsInfinity(state.RemainingSeconds) ||
+                state.RemainingSeconds < 0f)
+            {
+                error = "撤离高水位或剩余时间无效";
+                return false;
+            }
+            if (!state.IsProcessing)
+            {
+                if (!string.IsNullOrEmpty(state.ActiveBatchId) ||
+                    state.Work.Count != 0 ||
+                    state.FullQueueStableInstanceIds.Count != 0 ||
+                    state.Payloads.Count != 0 ||
+                    state.LockedStableInstanceIds.Count != 0 ||
+                    state.PendingRollbackStableInstanceIds.Count != 0 ||
+                    state.IsBlocked)
+                {
+                    error = "未处理撤离状态包含活动事务";
+                    return false;
+                }
+                var emptyWork = Array.Empty<BuildingEvacuationWork>();
+                var emptyIds = Array.Empty<string>();
+                if (!session.TryPrepareEvacuationRestore(
+                        emptyWork,
+                        emptyIds,
+                        emptyIds,
+                        out GrayboxBuildingEvacuationRestorePlan3D emptySessionPlan,
+                        out error))
+                {
+                    return false;
+                }
+                plan = new GrayboxEvacuationRestorePlan3D(
+                    this,
+                    persistenceGeneration,
+                    state,
+                    emptyWork,
+                    emptyWork,
+                    emptyWork,
+                    new Dictionary<string, object>(StringComparer.Ordinal),
+                    emptySessionPlan);
+                return true;
+            }
+
+            if (state.Work.Count == 0 ||
+                state.Work.Count != state.FullQueueStableInstanceIds.Count ||
+                state.CurrentQueueIndex < 0 ||
+                state.CurrentQueueIndex >=
+                    state.FullQueueStableInstanceIds.Count ||
+                !string.Equals(
+                    state.CurrentStableInstanceId,
+                    state.FullQueueStableInstanceIds[state.CurrentQueueIndex],
+                    StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(state.ActiveBatchId))
+            {
+                error = "撤离批次、队列或当前项目无效";
+                return false;
+            }
+            const string batchPrefix = "evacuation.batch.";
+            if (!state.ActiveBatchId.StartsWith(
+                    batchPrefix,
+                    StringComparison.Ordinal) ||
+                !long.TryParse(
+                    state.ActiveBatchId.Substring(batchPrefix.Length),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out long activeBatchOrdinal) ||
+                activeBatchOrdinal <= 0 ||
+                state.NextBatchOrdinal <= activeBatchOrdinal)
+            {
+                error = "撤离批次 ID 或下一序号高水位无效";
+                return false;
+            }
+
+            var workByStableId =
+                new Dictionary<string, BuildingEvacuationWork>(
+                    StringComparer.Ordinal);
+            var preparedWork = new BuildingEvacuationWork[state.Work.Count];
+            for (var index = 0; index < state.Work.Count; index++)
+            {
+                BuildingEvacuationWork item = state.Work[index];
+                if (string.IsNullOrWhiteSpace(item.StableInstanceId) ||
+                    item.Treatment == BuildingEvacuationTreatment.Unassigned ||
+                    !Enum.IsDefined(
+                        typeof(BuildingEvacuationTreatment),
+                        item.Treatment) ||
+                    !workByStableId.TryAdd(item.StableInstanceId, item) ||
+                    !item.BatchContext.Equals(state.BatchContext))
+                {
+                    error = "冻结撤离项目为空、重复或上下文不一致";
+                    return false;
+                }
+                if (index > 0 && string.CompareOrdinal(
+                        state.Work[index - 1].StableInstanceId,
+                        item.StableInstanceId) >= 0)
+                {
+                    error = "冻结撤离项目必须按稳定 ID 排序";
+                    return false;
+                }
+                preparedWork[index] = item;
+            }
+
+            var preparedQueue =
+                new BuildingEvacuationWork[state.FullQueueStableInstanceIds.Count];
+            var queueIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0;
+                 index < state.FullQueueStableInstanceIds.Count;
+                 index++)
+            {
+                string stableId = state.FullQueueStableInstanceIds[index];
+                if (!queueIds.Add(stableId) ||
+                    !workByStableId.TryGetValue(
+                        stableId,
+                        out preparedQueue[index]))
+                {
+                    error = "撤离执行队列重复或缺少冻结项目";
+                    return false;
+                }
+            }
+            var expectedQueue = new List<string>(state.Work.Count);
+            for (var index = 0; index < state.Work.Count; index++)
+                if (state.Work[index].Treatment !=
+                    BuildingEvacuationTreatment.FullDismantle)
+                    expectedQueue.Add(state.Work[index].StableInstanceId);
+            for (var index = 0; index < state.Work.Count; index++)
+                if (state.Work[index].Treatment ==
+                    BuildingEvacuationTreatment.FullDismantle)
+                    expectedQueue.Add(state.Work[index].StableInstanceId);
+            for (var index = 0; index < expectedQueue.Count; index++)
+            {
+                if (!string.Equals(
+                        expectedQueue[index],
+                        state.FullQueueStableInstanceIds[index],
+                        StringComparison.Ordinal))
+                {
+                    error = "撤离执行队列不符合冻结稳定顺序";
+                    return false;
+                }
+            }
+
+            int pendingCount =
+                state.FullQueueStableInstanceIds.Count -
+                state.CurrentQueueIndex;
+            if (state.PendingRollbackStableInstanceIds.Count != pendingCount)
+            {
+                error = "待回滚撤离项目必须等于未提交队列后缀";
+                return false;
+            }
+            for (var index = 0; index < pendingCount; index++)
+            {
+                if (!string.Equals(
+                        state.PendingRollbackStableInstanceIds[index],
+                        state.FullQueueStableInstanceIds[
+                            state.CurrentQueueIndex + index],
+                        StringComparison.Ordinal))
+                {
+                    error = "待回滚撤离项目顺序与未提交队列不一致";
+                    return false;
+                }
+            }
+
+            var rollbackById = new Dictionary<string, BuildingEvacuationWork>(
+                StringComparer.Ordinal);
+            var preparedRollback = new BuildingEvacuationWork[
+                state.PendingRollbackStableInstanceIds.Count];
+            for (var index = 0;
+                 index < state.PendingRollbackStableInstanceIds.Count;
+                 index++)
+            {
+                string stableId =
+                    state.PendingRollbackStableInstanceIds[index];
+                if (!workByStableId.TryGetValue(
+                        stableId,
+                        out BuildingEvacuationWork item) ||
+                    !rollbackById.TryAdd(stableId, item))
+                {
+                    error = "待回滚撤离项目重复或缺少冻结项目";
+                    return false;
+                }
+                preparedRollback[index] = item;
+            }
+
+            var preparedPayloads = new Dictionary<string, object>(
+                StringComparer.Ordinal);
+            for (var index = 0; index < state.Payloads.Count; index++)
+            {
+                GrayboxEvacuationPayloadPersistenceState3D saved =
+                    state.Payloads[index];
+                if (saved == null ||
+                    !rollbackById.ContainsKey(saved.StableInstanceId) ||
+                    preparedPayloads.ContainsKey(saved.StableInstanceId) ||
+                    !TryPrepareRuntimePayload(
+                        saved,
+                        out RuntimePayloadCapture payload,
+                        out error))
+                {
+                    if (string.IsNullOrEmpty(error))
+                        error = "撤离运行时载荷重复或不属于未提交项目";
+                    return false;
+                }
+                preparedPayloads.Add(saved.StableInstanceId, payload);
+            }
+            for (var index = 0; index < preparedRollback.Length; index++)
+            {
+                string stableId = preparedRollback[index].StableInstanceId;
+                bool hasProductionOwner = productionRuntime != null &&
+                    productionRuntime.TryGetState(stableId, out _);
+                bool hasDefenseOwner = defenseRuntime != null &&
+                    defenseRuntime.TryGetTowerState(stableId, out _);
+                bool hasPayload = preparedPayloads.TryGetValue(
+                    stableId,
+                    out object savedPayload);
+                RuntimePayloadCapture capture = hasPayload
+                    ? (RuntimePayloadCapture)savedPayload
+                    : null;
+                if ((hasProductionOwner || hasDefenseOwner) && !hasPayload)
+                {
+                    error = "撤离运行时所有者缺少持久载荷";
+                    return false;
+                }
+                if (hasPayload &&
+                    (hasProductionOwner != (capture.Production != null) ||
+                     hasDefenseOwner != (capture.Defense != null)))
+                {
+                    error = "撤离运行时载荷与生产、防御所有者不一致";
+                    return false;
+                }
+                if (hasPayload && !hasProductionOwner &&
+                    !hasDefenseOwner && capture.Resources.Count > 0 &&
+                    (!TryFindSessionInstance(stableId, out var instance) ||
+                     IsKnownBuildingDefinition(instance)))
+                {
+                    error = "普通建筑不能恢复无所有者资源载荷";
+                    return false;
+                }
+            }
+            if (state.IsBlocked &&
+                (!string.Equals(
+                    state.BlockedCode,
+                    CapacityBlockedCode,
+                    StringComparison.Ordinal) ||
+                 !string.Equals(
+                    state.BlockedStableInstanceId,
+                    state.CurrentStableInstanceId,
+                    StringComparison.Ordinal) ||
+                 state.RemainingSeconds != 0f))
+            {
+                error = "撤离容量阻塞状态无效";
+                return false;
+            }
+            if (!state.IsBlocked &&
+                (!string.IsNullOrEmpty(state.BlockedCode) ||
+                 !string.IsNullOrEmpty(state.BlockedStableInstanceId)))
+            {
+                error = "未阻塞撤离状态含有阻塞身份";
+                return false;
+            }
+
+            if (!session.TryPrepareEvacuationRestore(
+                    preparedWork,
+                    state.LockedStableInstanceIds,
+                    state.PendingRollbackStableInstanceIds,
+                    out GrayboxBuildingEvacuationRestorePlan3D sessionPlan,
+                    out error))
+            {
+                return false;
+            }
+            plan = new GrayboxEvacuationRestorePlan3D(
+                this,
+                persistenceGeneration,
+                state,
+                preparedWork,
+                preparedQueue,
+                preparedRollback,
+                preparedPayloads,
+                sessionPlan);
+            return true;
+        }
+
+        public bool TryCommitRestore(
+            GrayboxEvacuationRestorePlan3D plan,
+            out string error)
+        {
+            error = string.Empty;
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "撤离恢复计划不属于当前控制器";
+                return false;
+            }
+            if (plan.Consumed)
+            {
+                error = "撤离恢复计划已经使用";
+                return false;
+            }
+            if (plan.ExpectedGeneration != persistenceGeneration ||
+                IsProcessing || IsManifestOpen)
+            {
+                error = "撤离控制器在提交恢复前发生变化";
+                return false;
+            }
+            if (plan.SessionPlan != null &&
+                !session.TryCommitEvacuationRestore(
+                    plan.SessionPlan,
+                    out error))
+            {
+                return false;
+            }
+
+            ClearWorkOnly();
+            for (var index = 0; index < plan.Work.Length; index++)
+            {
+                work.Add(plan.Work[index]);
+                workById.Add(
+                    plan.Work[index].StableInstanceId,
+                    plan.Work[index]);
+            }
+            fullQueue.AddRange(plan.FullQueue);
+            rollbackWork.AddRange(plan.RollbackWork);
+            foreach (KeyValuePair<string, object> item in plan.Payloads)
+                runtimePayloads.Add(
+                    item.Key,
+                    (RuntimePayloadCapture)item.Value);
+
+            GrayboxEvacuationPersistenceState3D state = plan.State;
+            nextBatchOrdinal = (ulong)state.NextBatchOrdinal;
+            activeBatchId = state.ActiveBatchId;
+            IsProcessing = state.IsProcessing;
+            fullQueueIndex = state.CurrentQueueIndex;
+            remainingSeconds = state.RemainingSeconds;
+            isBlocked = state.IsBlocked;
+            blockedCode = state.BlockedCode;
+            blockedReason = isBlocked ? "城市仓储容量不足" : string.Empty;
+            IsManifestOpen = false;
+            ownsConstructionCancellation = state.IsProcessing;
+            queuePaused = false;
+            InvalidateViewCaches();
+            menu.SetConstructionCancellationBlocked(state.IsProcessing);
+            if (state.IsProcessing)
+                menu.ShowEvacuationQueue(CaptureQueueView());
+            else
+                menu.HideEvacuation();
+            plan.Consumed = true;
+            persistenceGeneration++;
+            return true;
+        }
+
+        public bool TryRestore(
+            GrayboxEvacuationPersistenceState3D state,
+            out string error)
+        {
+            return TryPrepareRestore(state, out var plan, out error) &&
+                   TryCommitRestore(plan, out error);
+        }
+
+        private bool TryPrepareRuntimePayload(
+            GrayboxEvacuationPayloadPersistenceState3D saved,
+            out RuntimePayloadCapture payload,
+            out string error)
+        {
+            payload = null;
+            error = string.Empty;
+            bool isMissingDefinitionPlaceholder =
+                TryFindSessionInstance(
+                    saved.StableInstanceId,
+                    out GrayboxBuildingInstance3D instance) &&
+                !IsKnownBuildingDefinition(instance);
+            if (saved.TowerAmmunitionAmount < 0)
+            {
+                error = "撤离防御载荷弹药不能为负数";
+                return false;
+            }
+
+            GrayboxProductionEvacuationPayload3D productionPayload = null;
+            if (productionRuntime != null &&
+                productionRuntime.TryGetState(
+                    saved.StableInstanceId,
+                    out BuildingProductionState productionState))
+            {
+                ResourceAmount[] input = CopyAmounts(saved.ProductionInput);
+                ResourceAmount[] reserved = CopyAmounts(
+                    saved.ProductionReservedInput);
+                ResourceAmount[] output = CopyAmounts(saved.ProductionOutput);
+                if (!AmountsEqual(
+                        productionState.Input.CapturePositiveAmounts(),
+                        input) ||
+                    !AmountsEqual(productionState.ReservedInputs, reserved) ||
+                    !AmountsEqual(
+                        productionState.Output.CapturePositiveAmounts(),
+                        output))
+                {
+                    error = "撤离生产载荷与已恢复生产状态不一致";
+                    return false;
+                }
+                productionPayload = new GrayboxProductionEvacuationPayload3D(
+                    productionState,
+                    input,
+                    reserved,
+                    output);
+            }
+            else if (saved.ProductionInput.Count != 0 ||
+                     saved.ProductionReservedInput.Count != 0 ||
+                     saved.ProductionOutput.Count != 0)
+            {
+                if (!isMissingDefinitionPlaceholder)
+                {
+                    error = "撤离生产载荷缺少已恢复生产状态";
+                    return false;
+                }
+            }
+
+            GrayboxDefenseEvacuationPayload3D defensePayload = null;
+            if (saved.HasDefensePayload)
+            {
+                GrayboxDefenseTowerRuntimeState3D tower = null;
+                bool hasDefenseOwner = defenseRuntime != null &&
+                    defenseRuntime.TryGetTowerState(
+                        saved.StableInstanceId,
+                        out tower);
+                if (hasDefenseOwner &&
+                    tower.Combat.Ammo != saved.TowerAmmunitionAmount)
+                {
+                    error = "撤离防御载荷与已恢复炮塔状态不一致";
+                    return false;
+                }
+                if (hasDefenseOwner)
+                {
+                    defensePayload =
+                        new GrayboxDefenseEvacuationPayload3D(tower);
+                }
+                else if (!isMissingDefinitionPlaceholder)
+                {
+                    error = "撤离防御载荷缺少已恢复炮塔状态";
+                    return false;
+                }
+            }
+            else if (saved.TowerAmmunitionAmount != 0)
+            {
+                error = "无防御载荷时炮塔弹药必须为零";
+                return false;
+            }
+
+            payload = RuntimePayloadCapture.CreateForRestore(
+                productionPayload,
+                defensePayload,
+                saved.Resources);
+            bool hasProductionDetails = saved.ProductionInput.Count != 0 ||
+                saved.ProductionReservedInput.Count != 0 ||
+                saved.ProductionOutput.Count != 0;
+            if ((productionPayload != null || hasProductionDetails ||
+                 saved.HasDefensePayload) &&
+                !AggregatePayloadMatches(saved))
+            {
+                error = "撤离聚合资源载荷与生产、防御分项不一致";
+                payload = null;
+                return false;
+            }
+            return true;
+        }
+
+        private bool TryFindSessionInstance(
+            string stableInstanceId,
+            out GrayboxBuildingInstance3D instance)
+        {
+            IReadOnlyList<GrayboxBuildingInstance3D> instances =
+                session.Instances;
+            for (var index = 0; index < instances.Count; index++)
+            {
+                if (!string.Equals(
+                        instances[index].StableInstanceId,
+                        stableInstanceId,
+                        StringComparison.Ordinal))
+                    continue;
+                instance = instances[index];
+                return true;
+            }
+            instance = null;
+            return false;
+        }
+
+        private static bool IsKnownBuildingDefinition(
+            GrayboxBuildingInstance3D instance)
+        {
+            string definitionId = instance.Placement.Definition.Id.Value;
+            for (var index = 0; index < BuildingCatalog.All.Length; index++)
+            {
+                if (string.Equals(
+                        BuildingCatalog.All[index].Id.Value,
+                        definitionId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool AggregatePayloadMatches(
+            GrayboxEvacuationPayloadPersistenceState3D saved)
+        {
+            var expected = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+            AddAmounts(expected, saved.ProductionInput);
+            AddAmounts(expected, saved.ProductionReservedInput);
+            AddAmounts(expected, saved.ProductionOutput);
+            if (saved.HasDefensePayload && saved.TowerAmmunitionAmount > 0)
+            {
+                AddAmounts(
+                    expected,
+                    new[]
+                    {
+                        new ResourceAmount(
+                            ResourceIds.Ammunition,
+                            saved.TowerAmmunitionAmount)
+                    });
+            }
+            IReadOnlyList<ResourceAmount> actual = saved.Resources;
+            if (actual.Count != expected.Count) return false;
+            var index = 0;
+            foreach (KeyValuePair<string, int> item in expected)
+            {
+                if (!string.Equals(
+                        actual[index].ResourceId,
+                        item.Key,
+                        StringComparison.Ordinal) ||
+                    actual[index].Amount != item.Value)
+                {
+                    return false;
+                }
+                index++;
+            }
+            return true;
+        }
+
+        private static ResourceAmount[] CopyAmounts(
+            IReadOnlyList<ResourceAmount> source)
+        {
+            if (source == null || source.Count == 0)
+                return Array.Empty<ResourceAmount>();
+            var result = new ResourceAmount[source.Count];
+            for (var index = 0; index < source.Count; index++)
+                result[index] = source[index];
+            return result;
+        }
+
+        private static bool AmountsEqual(
+            IReadOnlyList<ResourceAmount> left,
+            IReadOnlyList<ResourceAmount> right)
+        {
+            if (left == null || right == null || left.Count != right.Count)
+                return false;
+            for (var index = 0; index < left.Count; index++)
+            {
+                if (!string.Equals(
+                        left[index].ResourceId,
+                        right[index].ResourceId,
+                        StringComparison.Ordinal) ||
+                    left[index].Amount != right[index].Amount)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private void RollbackCleanupWork(
             GrayboxBuildingSession3D oldSession)
         {
@@ -1457,7 +2114,7 @@ namespace WasteCity.Graybox3D.Building
 
         private sealed class RuntimePayloadCapture
         {
-            private RuntimePayloadCapture(
+            internal RuntimePayloadCapture(
                 GrayboxProductionEvacuationPayload3D production,
                 GrayboxDefenseEvacuationPayload3D defense,
                 IReadOnlyList<ResourceAmount> resources)
@@ -1471,9 +2128,33 @@ namespace WasteCity.Graybox3D.Building
             public GrayboxDefenseEvacuationPayload3D Defense { get; }
             public IReadOnlyList<ResourceAmount> Resources { get; }
 
-            public static RuntimePayloadCapture Create(
+            public GrayboxEvacuationPayloadPersistenceState3D
+                CaptureForPersistence(string stableInstanceId)
+            {
+                return new GrayboxEvacuationPayloadPersistenceState3D(
+                    stableInstanceId,
+                    Production?.Input,
+                    Production?.ReservedInput,
+                    Production?.Output,
+                    Defense != null,
+                    Defense?.AmmunitionAmount ?? 0,
+                    Resources);
+            }
+
+            public static RuntimePayloadCapture CreateForRestore(
                 GrayboxProductionEvacuationPayload3D production,
-                GrayboxDefenseEvacuationPayload3D defense)
+                GrayboxDefenseEvacuationPayload3D defense,
+                IReadOnlyList<ResourceAmount> resources)
+            {
+                return new RuntimePayloadCapture(
+                    production,
+                    defense,
+                    EvacuationManifestItemViewModel.CopyAmounts(resources));
+            }
+
+            public static RuntimePayloadCapture Create(
+               GrayboxProductionEvacuationPayload3D production,
+               GrayboxDefenseEvacuationPayload3D defense)
             {
                 var totals = new Dictionary<string, int>(
                     StringComparer.Ordinal);

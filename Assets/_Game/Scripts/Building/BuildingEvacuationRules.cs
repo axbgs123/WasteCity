@@ -131,6 +131,8 @@ namespace WasteCity.Building
 
     public static class BuildingEvacuationRules
     {
+        private const float RestoreTolerance = .0001f;
+
         public static EvacuationBatchContext CreateBatchContext(
             bool isInCombat,
             float productivityMultiplier)
@@ -206,6 +208,91 @@ namespace WasteCity.Building
                 batchContext);
         }
 
+        public static bool TryRestoreFrozenWork(
+            string stableInstanceId,
+            BuildingEvacuationTreatment treatment,
+            double remainingRatio,
+            float baseDismantleSeconds,
+            float dismantleSeconds,
+            int refund,
+            EvacuationBatchContext batchContext,
+            out BuildingEvacuationWork work,
+            out string error)
+        {
+            work = default;
+            error = string.Empty;
+            if (string.IsNullOrWhiteSpace(stableInstanceId))
+                return FailRestore("撤离建筑稳定 ID 不能为空", out error);
+            if (!Enum.IsDefined(typeof(BuildingEvacuationTreatment), treatment) ||
+                treatment == BuildingEvacuationTreatment.Unassigned)
+            {
+                return FailRestore("撤离处理方式无效", out error);
+            }
+            if (double.IsNaN(remainingRatio) ||
+                double.IsInfinity(remainingRatio) ||
+                remainingRatio < 0d || remainingRatio > 1d)
+            {
+                return FailRestore("撤离剩余比例无效", out error);
+            }
+            if (!IsFiniteNonNegative(baseDismantleSeconds) ||
+                !IsFiniteNonNegative(dismantleSeconds) || refund < 0)
+            {
+                return FailRestore("撤离耗时或退款无效", out error);
+            }
+            if (!IsFinitePositive(batchContext.ProductivityMultiplier))
+                return FailRestore("撤离批次生产力无效", out error);
+
+            switch (treatment)
+            {
+                case BuildingEvacuationTreatment.Abandon:
+                    if (baseDismantleSeconds != 0f ||
+                        dismantleSeconds != 0f || refund != 0)
+                    {
+                        return FailRestore(
+                            "遗弃项目不能包含拆除耗时或退款",
+                            out error);
+                    }
+                    break;
+                case BuildingEvacuationTreatment.QuickDismantle:
+                    if (baseDismantleSeconds != 0f ||
+                        dismantleSeconds != 0f)
+                    {
+                        return FailRestore(
+                            "快速拆除项目不能包含拆除耗时",
+                            out error);
+                    }
+                    break;
+                case BuildingEvacuationTreatment.FullDismantle:
+                    if (baseDismantleSeconds <= 0f ||
+                        dismantleSeconds <= 0f)
+                    {
+                        return FailRestore("完整拆除耗时必须大于零", out error);
+                    }
+                    float expected = baseDismantleSeconds /
+                        batchContext.ProductivityMultiplier;
+                    float tolerance = RestoreTolerance *
+                        Math.Max(1f, Math.Max(expected, dismantleSeconds));
+                    if (!IsFinitePositive(expected) ||
+                        Math.Abs(expected - dismantleSeconds) > tolerance)
+                    {
+                        return FailRestore(
+                            "完整拆除耗时与冻结批次上下文不一致",
+                            out error);
+                    }
+                    break;
+            }
+
+            work = new BuildingEvacuationWork(
+                stableInstanceId,
+                treatment,
+                remainingRatio,
+                baseDismantleSeconds,
+                dismantleSeconds,
+                refund,
+                batchContext);
+            return true;
+        }
+
         private static float EffectiveDismantleSeconds(
             float baseDismantleSeconds,
             float productivityMultiplier)
@@ -229,6 +316,24 @@ namespace WasteCity.Building
                 left.StableInstanceId,
                 right.StableInstanceId));
             return queue;
+        }
+
+        private static bool IsFiniteNonNegative(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value) &&
+                value >= 0f;
+        }
+
+        private static bool IsFinitePositive(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value) &&
+                value > 0f;
+        }
+
+        private static bool FailRestore(string message, out string error)
+        {
+            error = message;
+            return false;
         }
     }
 }

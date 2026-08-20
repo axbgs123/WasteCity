@@ -174,6 +174,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
@@ -421,7 +422,8 @@
         "Assets/_Game/Scripts/Persistence/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**"
@@ -434,6 +436,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
@@ -1107,6 +1110,31 @@
       ]
     },
     {
+      "Id": "graybox-evacuation-save-adapter-3d",
+      "ChineseName": "三维冻结撤离存档适配器",
+      "TypeNames": [
+        "GrayboxEvacuationPayloadPersistenceState3D",
+        "GrayboxEvacuationPersistenceState3D",
+        "GrayboxEvacuationRestorePlan3D",
+        "GrayboxEvacuationSaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。",
+      "BoundarySummary": "只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证，不代表人工、Windows 或全量验证已完成。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0014",
+        "IDEA-0015"
+      ]
+    },
+    {
       "Id": "building-input-router-3d",
       "ChineseName": "三维建筑输入路由",
       "TypeNames": [
@@ -1175,6 +1203,7 @@
       "BoundarySummary": "只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
       ],

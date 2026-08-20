@@ -66,6 +66,36 @@ namespace WasteCity.Graybox3D.Building
         public ResourceNodeBinding BoundResourceNode { get; }
     }
 
+    public sealed class GrayboxBuildingEvacuationRestorePlan3D
+    {
+        internal GrayboxBuildingEvacuationRestorePlan3D(
+            GrayboxBuildingSession3D owner,
+            uint catalogRevision,
+            uint placementRevision,
+            ulong storageRevision,
+            BuildingEvacuationWork[] pendingWork,
+            GrayboxBuildingInstance3D[] instances,
+            bool[] originalLocks)
+        {
+            Owner = owner;
+            CatalogRevision = catalogRevision;
+            PlacementRevision = placementRevision;
+            StorageRevision = storageRevision;
+            PendingWork = pendingWork;
+            Instances = instances;
+            OriginalLocks = originalLocks;
+        }
+
+        internal GrayboxBuildingSession3D Owner { get; }
+        internal uint CatalogRevision { get; }
+        internal uint PlacementRevision { get; }
+        internal ulong StorageRevision { get; }
+        internal BuildingEvacuationWork[] PendingWork { get; }
+        internal GrayboxBuildingInstance3D[] Instances { get; }
+        internal bool[] OriginalLocks { get; }
+        internal bool Consumed { get; set; }
+    }
+
     public sealed class GrayboxBuildingInstance3D
     {
         internal GrayboxBuildingInstance3D(
@@ -521,6 +551,210 @@ namespace WasteCity.Graybox3D.Building
             destination.Sort((left, right) => string.CompareOrdinal(
                 left.StableInstanceId,
                 right.StableInstanceId));
+        }
+
+        public bool TryPrepareEvacuationRestore(
+            IReadOnlyList<BuildingEvacuationWork> work,
+            IReadOnlyList<string> lockedIds,
+            IReadOnlyList<string> pendingRollbackIds,
+            out GrayboxBuildingEvacuationRestorePlan3D plan,
+            out string error)
+        {
+            EnsureConfigured();
+            plan = null;
+            error = string.Empty;
+            if (work == null || lockedIds == null ||
+                pendingRollbackIds == null)
+            {
+                error = "撤离恢复集合不能为空";
+                return false;
+            }
+            if (evacuationSnapshots.Count != 0 ||
+                evacuationLocks.Count != 0 ||
+                evacuationWarehouseConnectivity.Count != 0)
+            {
+                error = "建筑会话已有活动撤离事务";
+                return false;
+            }
+
+            var workById = new Dictionary<string, BuildingEvacuationWork>(
+                StringComparer.Ordinal);
+            for (var index = 0; index < work.Count; index++)
+            {
+                BuildingEvacuationWork item = work[index];
+                if (string.IsNullOrWhiteSpace(item.StableInstanceId) ||
+                    item.Treatment == BuildingEvacuationTreatment.Unassigned ||
+                    !Enum.IsDefined(
+                        typeof(BuildingEvacuationTreatment),
+                        item.Treatment) ||
+                    !workById.TryAdd(item.StableInstanceId, item))
+                {
+                    error = "冻结撤离项目为空、重复或无效";
+                    return false;
+                }
+            }
+
+            var locked = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < lockedIds.Count; index++)
+            {
+                if (string.IsNullOrWhiteSpace(lockedIds[index]) ||
+                    !locked.Add(lockedIds[index]) ||
+                    !workById.ContainsKey(lockedIds[index]))
+                {
+                    error = "撤离锁引用为空、重复或缺少冻结项目";
+                    return false;
+                }
+            }
+            for (var index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (instance.IsEvacuationLocked &&
+                    !locked.Contains(instance.StableInstanceId))
+                {
+                    error = "建筑会话包含未归属当前撤离批次的锁";
+                    return false;
+                }
+            }
+
+            var pending = new HashSet<string>(StringComparer.Ordinal);
+            var pendingWork = new BuildingEvacuationWork[
+                pendingRollbackIds.Count];
+            var pendingInstances = new GrayboxBuildingInstance3D[
+                pendingRollbackIds.Count];
+            var originalLocks = new bool[pendingRollbackIds.Count];
+            for (var index = 0; index < pendingRollbackIds.Count; index++)
+            {
+                string stableId = pendingRollbackIds[index];
+                int instanceIndex = FindInstanceIndex(stableId);
+                if (string.IsNullOrWhiteSpace(stableId) ||
+                    !pending.Add(stableId) || !locked.Contains(stableId) ||
+                    !workById.TryGetValue(
+                        stableId,
+                        out BuildingEvacuationWork item) ||
+                    instanceIndex < 0 ||
+                    !IsEligibleGroundInstance(instances[instanceIndex]))
+                {
+                    error = "待回滚撤离项目缺少建筑、锁或冻结项目";
+                    return false;
+                }
+                pendingWork[index] = item;
+                pendingInstances[index] = instances[instanceIndex];
+                originalLocks[index] = instances[instanceIndex]
+                    .IsEvacuationLocked;
+            }
+            if (locked.Count != pending.Count)
+            {
+                error = "撤离锁必须与待回滚项目完全一致";
+                return false;
+            }
+
+            plan = new GrayboxBuildingEvacuationRestorePlan3D(
+                this,
+                catalogRevision,
+                placementRevision,
+                CityStorage?.Revision ?? 0ul,
+                pendingWork,
+                pendingInstances,
+                originalLocks);
+            return true;
+        }
+
+        public bool TryCommitEvacuationRestore(
+            GrayboxBuildingEvacuationRestorePlan3D plan,
+            out string error)
+        {
+            EnsureConfigured();
+            error = string.Empty;
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "撤离恢复计划不属于当前建筑会话";
+                return false;
+            }
+            if (plan.Consumed)
+            {
+                error = "撤离恢复计划已经使用";
+                return false;
+            }
+            if (catalogRevision != plan.CatalogRevision ||
+                placementRevision != plan.PlacementRevision ||
+                (CityStorage?.Revision ?? 0ul) != plan.StorageRevision ||
+                evacuationSnapshots.Count != 0 ||
+                evacuationLocks.Count != 0 ||
+                evacuationWarehouseConnectivity.Count != 0)
+            {
+                error = "建筑或仓储状态在撤离恢复前发生变化";
+                return false;
+            }
+            for (var index = 0; index < plan.PendingWork.Length; index++)
+            {
+                GrayboxBuildingInstance3D instance = plan.Instances[index];
+                int instanceIndex = FindInstanceIndex(
+                    plan.PendingWork[index].StableInstanceId);
+                if (instanceIndex < 0 ||
+                    !ReferenceEquals(instances[instanceIndex], instance) ||
+                    instance.IsEvacuationLocked != plan.OriginalLocks[index] ||
+                    !IsEligibleGroundInstance(instance))
+                {
+                    error = "待恢复撤离建筑已经变化";
+                    return false;
+                }
+            }
+
+            var applied = 0;
+            var changedLockCount = 0;
+            try
+            {
+                for (var index = 0; index < plan.PendingWork.Length; index++)
+                {
+                    BuildingEvacuationWork item = plan.PendingWork[index];
+                    GrayboxBuildingInstance3D instance = plan.Instances[index];
+                    bool countedBefore = IsCountedCompleted(instance);
+                    evacuationSnapshots.Add(item.StableInstanceId, item);
+                    evacuationLocks.Add(item.StableInstanceId, item);
+                    if (!instance.IsEvacuationLocked)
+                    {
+                        instance.SetEvacuationLocked(true);
+                        if (countedBefore) changedLockCount++;
+                    }
+                    applied++;
+                    if (CityStorage != null &&
+                        CityStorage.TryGetWarehouseSnapshot(
+                            item.StableInstanceId,
+                            out WarehouseStorageSnapshot warehouse))
+                    {
+                        evacuationWarehouseConnectivity.Add(
+                            item.StableInstanceId,
+                            warehouse.IsConnected);
+                        if (!CityStorage.TrySetWarehouseConnected(
+                                item.StableInstanceId,
+                                connected: false))
+                        {
+                            throw new InvalidOperationException(
+                                "无法恢复撤离仓库断连状态");
+                        }
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                for (var index = applied - 1; index >= 0; index--)
+                {
+                    string stableId = plan.PendingWork[index].StableInstanceId;
+                    evacuationSnapshots.Remove(stableId);
+                    evacuationLocks.Remove(stableId);
+                    plan.Instances[index].SetEvacuationLocked(
+                        plan.OriginalLocks[index]);
+                    RestoreWarehouseConnectivity(stableId);
+                }
+                error = exception.Message;
+                return false;
+            }
+
+            for (var index = 0; index < changedLockCount; index++)
+                AdvanceCatalogRevision();
+            if (plan.PendingWork.Length > 0) AdvancePlacementRevision();
+            plan.Consumed = true;
+            return true;
         }
 
         public bool TryLockEvacuationWork(

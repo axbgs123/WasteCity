@@ -1125,11 +1125,6 @@ namespace WasteCity.Persistence
                 if (work.refund < 0)
                     return Invalid(FormalSaveValidationError.NegativeValue,
                         item + ".refund");
-                if (index >= evacuation.currentQueueIndex &&
-                    !buildingIds.Contains(work.stableInstanceId))
-                    return Invalid(
-                        FormalSaveValidationError.MissingStableReference,
-                        item + ".stableInstanceId");
             }
 
             var queueIds = new HashSet<string>(StringComparer.Ordinal);
@@ -1185,6 +1180,18 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.MissingStableReference,
                         path + ".currentStableInstanceId");
+                for (int index = evacuation.currentQueueIndex;
+                     index < evacuation.fullQueueStableInstanceIds.Length;
+                     index++)
+                {
+                    if (!buildingIds.Contains(
+                            evacuation.fullQueueStableInstanceIds[index]))
+                    {
+                        return Invalid(
+                            FormalSaveValidationError.MissingStableReference,
+                            path + ".fullQueueStableInstanceIds[" + index + "]");
+                    }
+                }
                 result = NonNegativeFinite(evacuation.remainingSeconds,
                     path + ".remainingSeconds");
                 if (result != null) return result;

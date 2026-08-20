@@ -421,9 +421,23 @@ namespace WasteCity.Tests
                     .stableInstanceId = "building.instance.999999",
                 "formal3D.defense.towers[0].stableInstanceId");
             AssertMissingBuildingReference(
-                envelope => envelope.formal3D.evacuation.work[0]
-                    .stableInstanceId = "building.instance.999999",
-                "formal3D.evacuation.work[0].stableInstanceId");
+                envelope =>
+                {
+                    const string missing = "building.instance.999999";
+                    envelope.formal3D.evacuation.work[0]
+                        .stableInstanceId = missing;
+                    envelope.formal3D.evacuation
+                        .fullQueueStableInstanceIds[0] = missing;
+                    envelope.formal3D.evacuation
+                        .currentStableInstanceId = missing;
+                    envelope.formal3D.evacuation
+                        .lockedStableInstanceIds[0] = missing;
+                    envelope.formal3D.evacuation
+                        .pendingRollbackStableInstanceIds[0] = missing;
+                    envelope.formal3D.evacuation.runtimePayloads[0]
+                        .stableInstanceId = missing;
+                },
+                "formal3D.evacuation.currentStableInstanceId");
             AssertMissingBuildingReference(
                 envelope => envelope.formal3D.evacuation
                     .lockedStableInstanceIds[0] =
@@ -658,6 +672,43 @@ namespace WasteCity.Tests
                     active.stableInstanceId,
                 };
             envelope.formal3D.evacuation.currentQueueIndex = 1;
+            RefreshHash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.True, result.Message);
+        }
+
+        [Test]
+        public void MixedEvacuationQueueMayOmitCommittedQuickBuilding()
+        {
+            FormalSaveEnvelope envelope = LoadValidEnvelope();
+            FormalThreeDEvacuationWorkSaveData activeFull =
+                envelope.formal3D.evacuation.work[0];
+            var committedQuick = new FormalThreeDEvacuationWorkSaveData
+            {
+                stableInstanceId = "building.instance.999999",
+                treatment = 3,
+                remainingRatio = 1d,
+                baseDismantleSeconds = 0f,
+                dismantleSeconds = 0f,
+                refund = 1,
+            };
+            envelope.formal3D.evacuation.work = new[]
+            {
+                activeFull,
+                committedQuick,
+            };
+            envelope.formal3D.evacuation.fullQueueStableInstanceIds =
+                new[]
+                {
+                    committedQuick.stableInstanceId,
+                    activeFull.stableInstanceId,
+                };
+            envelope.formal3D.evacuation.currentQueueIndex = 1;
+            envelope.formal3D.evacuation.currentStableInstanceId =
+                activeFull.stableInstanceId;
             RefreshHash(envelope);
 
             FormalSaveValidationResult result =
