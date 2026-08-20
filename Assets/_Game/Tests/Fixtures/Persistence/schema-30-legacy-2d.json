@@ -1,0 +1,12 @@
+{
+  "schema": 30,
+  "worldSeed": 8128,
+  "cityX": 4.5,
+  "cityY": -2.25,
+  "cityAutopilotActive": true,
+  "cityDestinationX": 17,
+  "cityDestinationY": 9,
+  "iron": 19,
+  "alloy": 12,
+  "ammunition": 7
+}

@@ -1,0 +1,14 @@
+{
+  "gameVersion": "0.2.0",
+  "saveSchemaVersion": 32,
+  "contentSources": [
+    "builtin:wastecity@0.2.0"
+  ],
+  "createdAt": "2026-08-20T01:02:03.0000000Z",
+  "updatedAt": "2026-08-20T04:05:06.0000000Z",
+  "runtimeKind": "formal-3d",
+  "formal3D": {
+    "sessionId": "fixture.future",
+    "worldSeed": 8128
+  }
+}

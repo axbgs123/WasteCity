@@ -1,0 +1,288 @@
+{
+  "gameVersion": "0.1.0",
+  "saveSchemaVersion": 31,
+  "contentSources": [
+    "builtin:wastecity@0.1.0"
+  ],
+  "createdAt": "2026-08-20T01:02:03.0000000Z",
+  "updatedAt": "2026-08-20T04:05:06.0000000Z",
+  "runtimeKind": "formal-3d",
+  "payloadHashSha256": "fixture-hash-not-validated-until-task-02",
+  "checkpoint": {
+    "sequence": 7,
+    "reasonId": "first-deployment-complete",
+    "ruleTimeSeconds": 123.5,
+    "completedMilestoneIds": [
+      "first-deployment-complete"
+    ]
+  },
+  "formal3D": {
+    "sessionId": "fixture.formal-3d",
+    "world": {
+      "worldDefinitionId": "core.world.formal-3d",
+      "worldGenerationVersion": 1,
+      "worldSeed": 8128,
+      "width": 64,
+      "height": 64,
+      "configurationSignature": "fixture.world.v1",
+      "resourceNodes": [
+        {
+          "stableNodeId": "resource.node.iron.000001",
+          "x": 12,
+          "y": 9,
+          "resourceId": "core.resource.iron",
+          "remainingAmount": 47,
+          "isDepleted": false
+        }
+      ],
+      "orphanResources": []
+    },
+    "city": {
+      "positionX": 8.5,
+      "positionZ": 11.25,
+      "cellX": 8,
+      "cellY": 11,
+      "autopilotActive": true,
+      "destinationX": 18,
+      "destinationY": 14,
+      "cityMode": 2,
+      "transitionReturnMode": 2,
+      "transitionRemainingSeconds": 0.0,
+      "population": 100,
+      "populationCapacity": 150
+    },
+    "buildings": {
+      "nextStableInstanceOrdinal": 4,
+      "instances": [
+        {
+          "stableInstanceId": "building.instance.000001",
+          "definitionId": "core.building.mining-station",
+          "site": 0,
+          "x": 12,
+          "y": 9,
+          "orientation": 0,
+          "state": 1,
+          "constructionRemainingSeconds": 0.0,
+          "isPlayerOwned": true,
+          "boundResourceNodeId": "resource.node.iron.000001",
+          "boundNodeX": 12,
+          "boundNodeY": 9,
+          "footprintWidth": 2,
+          "footprintHeight": 2,
+          "evacuationLockedCrossCheck": false
+        },
+        {
+          "stableInstanceId": "building.instance.000002",
+          "definitionId": "core.building.warehouse",
+          "site": 0,
+          "x": 9,
+          "y": 10,
+          "orientation": 1,
+          "state": 1,
+          "constructionRemainingSeconds": 0.0,
+          "isPlayerOwned": true,
+          "boundResourceNodeId": "",
+          "boundNodeX": -1,
+          "boundNodeY": -1,
+          "footprintWidth": 2,
+          "footprintHeight": 2,
+          "evacuationLockedCrossCheck": false
+        },
+        {
+          "stableInstanceId": "building.instance.000003",
+          "definitionId": "core.building.machine-gun-turret",
+          "site": 0,
+          "x": 14,
+          "y": 11,
+          "orientation": 2,
+          "state": 1,
+          "constructionRemainingSeconds": 0.0,
+          "isPlayerOwned": true,
+          "boundResourceNodeId": "",
+          "boundNodeX": -1,
+          "boundNodeY": -1,
+          "footprintWidth": 1,
+          "footprintHeight": 1,
+          "evacuationLockedCrossCheck": true
+        }
+      ]
+    },
+    "storage": {
+      "configurationSignature": "fixture.storage.v1",
+      "coreAmounts": [
+        { "resourceId": "technology.resource.ammunition", "amount": 12 },
+        { "resourceId": "core.resource.iron", "amount": 25 }
+      ],
+      "warehouses": [
+        {
+          "stableInstanceId": "building.instance.000002",
+          "filterResourceId": "core.resource.stone",
+          "amounts": [
+            { "resourceId": "core.resource.stone", "amount": 3 }
+          ]
+        }
+      ],
+      "orphanResources": []
+    },
+    "backpack": {
+      "slots": [
+        { "slotIndex": 0, "resourceId": "core.resource.iron", "amount": 20 },
+        { "slotIndex": 1, "resourceId": "technology.resource.alloy", "amount": 4 },
+        { "slotIndex": 2, "resourceId": "", "amount": 0 },
+        { "slotIndex": 3, "resourceId": "", "amount": 0 },
+        { "slotIndex": 4, "resourceId": "", "amount": 0 },
+        { "slotIndex": 5, "resourceId": "", "amount": 0 },
+        { "slotIndex": 6, "resourceId": "", "amount": 0 },
+        { "slotIndex": 7, "resourceId": "", "amount": 0 },
+        { "slotIndex": 8, "resourceId": "", "amount": 0 },
+        { "slotIndex": 9, "resourceId": "", "amount": 0 },
+        { "slotIndex": 10, "resourceId": "", "amount": 0 },
+        { "slotIndex": 11, "resourceId": "", "amount": 0 },
+        { "slotIndex": 12, "resourceId": "", "amount": 0 },
+        { "slotIndex": 13, "resourceId": "", "amount": 0 },
+        { "slotIndex": 14, "resourceId": "", "amount": 0 },
+        { "slotIndex": 15, "resourceId": "", "amount": 0 },
+        { "slotIndex": 16, "resourceId": "", "amount": 0 },
+        { "slotIndex": 17, "resourceId": "", "amount": 0 },
+        { "slotIndex": 18, "resourceId": "", "amount": 0 },
+        { "slotIndex": 19, "resourceId": "", "amount": 0 },
+        { "slotIndex": 20, "resourceId": "", "amount": 0 },
+        { "slotIndex": 21, "resourceId": "", "amount": 0 },
+        { "slotIndex": 22, "resourceId": "", "amount": 0 },
+        { "slotIndex": 23, "resourceId": "", "amount": 0 },
+        { "slotIndex": 24, "resourceId": "", "amount": 0 },
+        { "slotIndex": 25, "resourceId": "", "amount": 0 },
+        { "slotIndex": 26, "resourceId": "", "amount": 0 },
+        { "slotIndex": 27, "resourceId": "", "amount": 0 },
+        { "slotIndex": 28, "resourceId": "", "amount": 0 },
+        { "slotIndex": 29, "resourceId": "", "amount": 0 }
+      ]
+    },
+    "crafting": {
+      "nextQueueOrdinal": 2,
+      "activeProgressSeconds": 1.25,
+      "executions": [
+        {
+          "stableExecutionId": "craft.execution.000001",
+          "recipeId": "core.crafting.field-alloy",
+          "reservedInputs": [
+            { "resourceId": "core.resource.iron", "amount": 2 }
+          ]
+        }
+      ]
+    },
+    "research": {
+      "completedResearchIds": [
+        "core.research.scrap-processing",
+        "core.research.automated-machinery",
+        "core.research.precision-assembly",
+        "core.research.automated-defense"
+      ],
+      "activeResearchId": "",
+      "remainingSeconds": 0.0
+    },
+    "production": {
+      "states": [
+        {
+          "stableInstanceId": "building.instance.000001",
+          "definitionId": "core.production.extract-node-resource",
+          "inputAmounts": [],
+          "hasReservedInputs": false,
+          "reservedInputs": [],
+          "outputAmounts": [
+            { "resourceId": "core.resource.iron", "amount": 1 }
+          ],
+          "progressSeconds": 1.5,
+          "isPlayerPaused": false,
+          "boundResourceNodeId": "resource.node.iron.000001",
+          "boundNodeX": 12,
+          "boundNodeY": 9
+        }
+      ]
+    },
+    "defense": {
+      "tutorialTriggered": true,
+      "tutorialWaveTriggerCount": 1,
+      "wavePhase": 2,
+      "warningRemainingSeconds": 0.0,
+      "spawnClockSeconds": 1.0,
+      "fixedStepAccumulatorSeconds": 0.05,
+      "spawnedEnemyCount": 1,
+      "defeatedEnemyCount": 0,
+      "nextEnemyOrdinal": 1,
+      "randomState": "fixture.deterministic",
+      "coreCurrentHealth": 1985,
+      "towers": [
+        {
+          "stableInstanceId": "building.instance.000003",
+          "ammunitionAmount": 5,
+          "isPlayerPaused": false,
+          "activeAmmunitionSeconds": 0.4,
+          "damageRemainder": 0.25
+        }
+      ],
+      "enemies": [
+        {
+          "stableEnemyId": "core.enemy.gnawer.tutorial.000",
+          "archetypeId": "core.enemy.gnawer",
+          "spawnOrder": 0,
+          "positionX": 29.5,
+          "positionZ": 28.0,
+          "currentHealth": 60,
+          "movementRemainder": 0.0,
+          "attackDamageRemainder": 0.5
+        }
+      ]
+    },
+    "evacuation": {
+      "nextBatchOrdinal": 2,
+      "activeBatchId": "evacuation.batch.000001",
+      "isProcessing": true,
+      "batchContext": {
+        "isInCombat": true,
+        "productivityMultiplier": 1.0
+      },
+      "work": [
+        {
+          "stableInstanceId": "building.instance.000003",
+          "treatment": 2,
+          "remainingRatio": 1.0,
+          "baseDismantleSeconds": 5.0,
+          "dismantleSeconds": 5.0,
+          "refund": 5
+        }
+      ],
+      "fullQueueStableInstanceIds": [
+        "building.instance.000003"
+      ],
+      "currentQueueIndex": 0,
+      "currentStableInstanceId": "building.instance.000003",
+      "remainingSeconds": 3.25,
+      "isBlocked": false,
+      "blockedCode": "",
+      "blockedStableInstanceId": "",
+      "runtimePayloads": [
+        {
+          "stableInstanceId": "building.instance.000003",
+          "productionInputAmounts": [],
+          "productionReservedInputs": [],
+          "productionOutputAmounts": [],
+          "hasDefensePayload": true,
+          "towerAmmunitionAmount": 5,
+          "resourcePayload": [
+            { "resourceId": "technology.resource.ammunition", "amount": 5 }
+          ]
+        }
+      ],
+      "lockedStableInstanceIds": [
+        "building.instance.000003"
+      ],
+      "pendingRollbackStableInstanceIds": [
+        "building.instance.000003"
+      ]
+    },
+    "pause": {
+      "tacticalPaused": false
+    }
+  }
+}
