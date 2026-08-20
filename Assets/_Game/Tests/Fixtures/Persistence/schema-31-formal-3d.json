@@ -7,7 +7,7 @@
   "createdAt": "2026-08-20T01:02:03.0000000Z",
   "updatedAt": "2026-08-20T04:05:06.0000000Z",
   "runtimeKind": "formal-3d",
-  "payloadHashSha256": "73c7ab24bb70d1c431c4d0d9299b5eaa72f5dbdb39070b79006d345c1aacbe97",
+  "payloadHashSha256": "69c95352cf85f2e93e2266fa53900cf46d64c8fc638f09d3e707b1b76490bb7d",
   "checkpoint": {
     "sequence": 7,
     "reasonId": "first-deployment-complete",
@@ -201,6 +201,9 @@
       ]
     },
     "defense": {
+      "configurationSignature": "builtin:first-defense@1",
+      "spawnOriginX": 30.0,
+      "spawnOriginZ": 28.0,
       "tutorialTriggered": true,
       "tutorialWaveTriggerCount": 1,
       "wavePhase": 2,
@@ -210,7 +213,7 @@
       "spawnedEnemyCount": 1,
       "defeatedEnemyCount": 0,
       "nextEnemyOrdinal": 1,
-      "randomState": "fixture.deterministic",
+      "randomState": null,
       "coreCurrentHealth": 1985,
       "towers": [
         {

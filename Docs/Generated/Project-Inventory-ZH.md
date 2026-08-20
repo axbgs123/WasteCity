@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`460ffffdf40926f320ba0001cf07614b8aa706cd76a42c662984fe19393b484a`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`c75ae8d24c1b5e9551126e78dcf3b0f05d683c2aeee9882819f1a1740eb75f05`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -48,6 +48,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
@@ -116,6 +117,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - 经济生产与物流（`economy-production-logistics`）：
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
@@ -204,6 +206,7 @@
 - `Assets/_Game/Scripts/Leader/FormalLeaderController.cs`
 - `Assets/_Game/Scripts/Leader/LeaderModel.cs`
 - 持久化与迁移（`persistence-migration`）：
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`

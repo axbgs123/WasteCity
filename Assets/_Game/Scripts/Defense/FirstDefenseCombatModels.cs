@@ -6,6 +6,29 @@ using WasteCity.Economy;
 
 namespace WasteCity.Defense
 {
+    public readonly struct MachineGunTurretPersistenceState
+    {
+        public MachineGunTurretPersistenceState(
+            string stableId,
+            int ammunitionAmount,
+            bool isPlayerPaused,
+            float activeAmmunitionSeconds,
+            float damageRemainder)
+        {
+            StableId = stableId;
+            AmmunitionAmount = ammunitionAmount;
+            IsPlayerPaused = isPlayerPaused;
+            ActiveAmmunitionSeconds = activeAmmunitionSeconds;
+            DamageRemainder = damageRemainder;
+        }
+
+        public string StableId { get; }
+        public int AmmunitionAmount { get; }
+        public bool IsPlayerPaused { get; }
+        public float ActiveAmmunitionSeconds { get; }
+        public float DamageRemainder { get; }
+    }
+
     public sealed class MachineGunTurretCombatModel
     {
         private const float TimeEpsilon = .00001f;
@@ -45,6 +68,64 @@ namespace WasteCity.Defense
         public int Ammo { get; private set; }
         public bool IsLogisticsConnected { get; private set; } = true;
         public bool IsPlayerPaused { get; private set; }
+
+        public MachineGunTurretPersistenceState CaptureForPersistence()
+        {
+            return new MachineGunTurretPersistenceState(
+                StableId,
+                Ammo,
+                IsPlayerPaused,
+                activeAmmunitionSeconds,
+                damageRemainder);
+        }
+
+        public static bool TryCreateForPersistence(
+            MachineGunTurretPersistenceState state,
+            float x,
+            float z,
+            out MachineGunTurretCombatModel model,
+            out string error)
+        {
+            model = null;
+            error = null;
+            if (string.IsNullOrWhiteSpace(state.StableId))
+                return Fail("Turret stable ID is required.", out error);
+            if (!IsFinite(x) || !IsFinite(z))
+                return Fail("Turret position must be finite.", out error);
+            if (state.AmmunitionAmount < 0 ||
+                state.AmmunitionAmount >
+                DefenseTowerCatalog.MachineGunAmmunitionCapacity)
+            {
+                return Fail("Turret ammunition is outside capacity.", out error);
+            }
+            DefenseTowerDefinition turretDefinition = DefenseTowerCatalog.For(
+                BuildingCatalog.MachineGunTurret.Id.Value);
+            if (turretDefinition == null)
+                return Fail("The machine-gun turret definition is missing.", out error);
+            if (!IsFinite(state.ActiveAmmunitionSeconds) ||
+                state.ActiveAmmunitionSeconds < 0f ||
+                state.ActiveAmmunitionSeconds >
+                turretDefinition.SecondsPerConsumable)
+            {
+                return Fail("Turret ammunition lease is invalid.", out error);
+            }
+            if (!IsFinite(state.DamageRemainder) ||
+                state.DamageRemainder < 0f || state.DamageRemainder >= 1f)
+            {
+                return Fail("Turret damage remainder is invalid.", out error);
+            }
+
+            var restored = new MachineGunTurretCombatModel(
+                state.StableId,
+                x,
+                z,
+                state.AmmunitionAmount);
+            restored.IsPlayerPaused = state.IsPlayerPaused;
+            restored.activeAmmunitionSeconds = state.ActiveAmmunitionSeconds;
+            restored.damageRemainder = state.DamageRemainder;
+            model = restored;
+            return true;
+        }
 
         public void SetLogisticsConnected(bool connected)
         {
@@ -191,6 +272,49 @@ namespace WasteCity.Defense
             remainder = fraction;
             return whole;
         }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool Fail(string message, out string error)
+        {
+            error = message;
+            return false;
+        }
+    }
+
+    public readonly struct DefenseEnemyPersistenceState
+    {
+        public DefenseEnemyPersistenceState(
+            string stableId,
+            string archetypeId,
+            int spawnOrder,
+            float x,
+            float z,
+            int currentHealth,
+            float movementRemainder,
+            float attackDamageRemainder)
+        {
+            StableId = stableId;
+            ArchetypeId = archetypeId;
+            SpawnOrder = spawnOrder;
+            X = x;
+            Z = z;
+            CurrentHealth = currentHealth;
+            MovementRemainder = movementRemainder;
+            AttackDamageRemainder = attackDamageRemainder;
+        }
+
+        public string StableId { get; }
+        public string ArchetypeId { get; }
+        public int SpawnOrder { get; }
+        public float X { get; }
+        public float Z { get; }
+        public int CurrentHealth { get; }
+        public float MovementRemainder { get; }
+        public float AttackDamageRemainder { get; }
     }
 
     public sealed class DefenseEnemyCombatModel
@@ -235,6 +359,72 @@ namespace WasteCity.Defense
         public int MaximumHealth => health.Maximum;
         public int CurrentHealth => health.Current;
         public bool IsDead => health.IsDead;
+
+        public DefenseEnemyPersistenceState CaptureForPersistence()
+        {
+            return new DefenseEnemyPersistenceState(
+                StableId,
+                Definition.Id.Value,
+                SpawnOrder,
+                X,
+                Z,
+                CurrentHealth,
+                movementRemainder: 0f,
+                attackDamageRemainder: attackDamageRemainder);
+        }
+
+        public static bool TryCreateForPersistence(
+            DefenseEnemyPersistenceState state,
+            out DefenseEnemyCombatModel model,
+            out string error)
+        {
+            model = null;
+            error = null;
+            if (string.IsNullOrWhiteSpace(state.StableId))
+                return Fail("Enemy stable ID is required.", out error);
+            EnemyDefinition definition = null;
+            for (int index = 0; index < EnemyCatalog.All.Length; index++)
+            {
+                if (string.Equals(
+                    EnemyCatalog.All[index].Id.Value,
+                    state.ArchetypeId,
+                    StringComparison.Ordinal))
+                {
+                    definition = EnemyCatalog.All[index];
+                    break;
+                }
+            }
+            if (definition == null)
+                return Fail("Enemy archetype ID is unknown.", out error);
+            if (state.SpawnOrder < 0)
+                return Fail("Enemy spawn order cannot be negative.", out error);
+            if (!IsFinite(state.X) || !IsFinite(state.Z))
+                return Fail("Enemy position must be finite.", out error);
+            if (state.CurrentHealth <= 0 ||
+                state.CurrentHealth > definition.MaximumHealth)
+            {
+                return Fail("Active enemy health is invalid.", out error);
+            }
+            if (state.MovementRemainder != 0f)
+                return Fail("Enemy movement remainder must be zero.", out error);
+            if (!IsFinite(state.AttackDamageRemainder) ||
+                state.AttackDamageRemainder < 0f ||
+                state.AttackDamageRemainder >= 1f)
+            {
+                return Fail("Enemy attack remainder is invalid.", out error);
+            }
+
+            var restored = new DefenseEnemyCombatModel(
+                state.StableId,
+                definition,
+                state.X,
+                state.Z,
+                state.SpawnOrder);
+            restored.health.Restore(state.CurrentHealth);
+            restored.attackDamageRemainder = state.AttackDamageRemainder;
+            model = restored;
+            return true;
+        }
 
         public float MoveTowards(
             float targetX,
@@ -297,6 +487,17 @@ namespace WasteCity.Defense
         {
             return health.Apply(rawDamage, damageType, Definition.Armor);
         }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool Fail(string message, out string error)
+        {
+            error = message;
+            return false;
+        }
     }
 
     public sealed class CityCoreCombatModel
@@ -309,6 +510,25 @@ namespace WasteCity.Defense
         public int MaximumHealth => health.Maximum;
         public int CurrentHealth => health.Current;
         public bool IsDestroyed => health.IsDead;
+
+        public static bool TryCreateForPersistence(
+            int currentHealth,
+            out CityCoreCombatModel model,
+            out string error)
+        {
+            model = null;
+            error = null;
+            if (currentHealth < 0 || currentHealth > FormalMaximumHealth)
+            {
+                error = "City core health is outside the formal range.";
+                return false;
+            }
+
+            var restored = new CityCoreCombatModel();
+            restored.ApplyDamage(FormalMaximumHealth - currentHealth);
+            model = restored;
+            return true;
+        }
 
         internal int ApplyDamage(int rawDamage)
         {

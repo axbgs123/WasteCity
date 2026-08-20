@@ -5,7 +5,7 @@
   "createdAt": "2026-08-20T01:02:03.0000000Z",
   "updatedAt": "2026-08-20T04:05:06.0000000Z",
   "runtimeKind": "formal-3d",
-  "payloadHashSha256": "416e2970a111700d07c619b9ec264a903fc07871ca4e8abd6ec32ced1286412a",
+  "payloadHashSha256": "11b9a6ea7a2c450188174ff384bbb85c5fd02797826f2157a0b7a87eeee51b28",
   "checkpoint": {
     "sequence": 1,
     "reasonId": "test",
@@ -65,6 +65,9 @@
     "research": { "completedResearchIds": [], "activeResearchId": "", "remainingSeconds": 0.0 },
     "production": { "states": [] },
     "defense": {
+      "configurationSignature": "builtin:first-defense@1",
+      "spawnOriginX": 0.0,
+      "spawnOriginZ": 0.0,
       "tutorialTriggered": false,
       "tutorialWaveTriggerCount": 0,
       "wavePhase": 0,
@@ -73,8 +76,8 @@
       "fixedStepAccumulatorSeconds": 0.0,
       "spawnedEnemyCount": 0,
       "defeatedEnemyCount": 0,
-      "nextEnemyOrdinal": 1,
-      "randomState": "fixture.deterministic",
+      "nextEnemyOrdinal": 0,
+      "randomState": null,
       "coreCurrentHealth": 2000,
       "towers": [],
       "enemies": []

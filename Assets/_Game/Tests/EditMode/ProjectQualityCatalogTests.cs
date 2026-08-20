@@ -994,16 +994,18 @@ namespace WasteCity.Tests
                 FindReuse(catalog, "first-defense-combat-models"),
                 "combat-routes",
                 ProjectReuseLevel.Recommended,
-                new[] { "MachineGunTurretCombatModel", "DefenseEnemyCombatModel", "CityCoreCombatModel" },
+                new[] { "MachineGunTurretPersistenceState", "MachineGunTurretCombatModel", "DefenseEnemyPersistenceState", "DefenseEnemyCombatModel", "CityCoreCombatModel" },
                 new[] { "Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs" },
-                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs" });
+                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs", "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs" },
+                new[] { "IDEA-0013", "IDEA-0015" });
             AssertDefenseReuse(
                 FindReuse(catalog, "tutorial-defense-runtime"),
                 "combat-routes",
                 ProjectReuseLevel.Recommended,
-                new[] { "DefenseEnemyRuntimeSnapshot", "DefenseRuntimeSnapshot", "TutorialDefenseRuntimeModel" },
+                new[] { "DefenseEnemyRuntimeSnapshot", "DefenseRuntimeSnapshot", "TutorialDefensePersistenceState", "TutorialDefenseRuntimeModel" },
                 new[] { "Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs" },
-                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs" });
+                new[] { "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs", "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs" },
+                new[] { "IDEA-0013", "IDEA-0015" });
             AssertDefenseReuse(
                 FindReuse(catalog, "graybox-building-operational-access-3d"),
                 "building-construction-evacuation",
@@ -1026,6 +1028,8 @@ namespace WasteCity.Tests
                     "GrayboxDefenseTowerSnapshot3D",
                     "GrayboxDefenseEnemySnapshot3D",
                     "GrayboxDefenseRuntimeSnapshot3D",
+                    "GrayboxDefensePersistenceState3D",
+                    "GrayboxDefenseRestorePlan3D",
                     "GrayboxDefenseRuntime3D",
                 },
                 new[] { "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs" },
@@ -1034,8 +1038,17 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
                 },
-                new[] { "IDEA-0013", "IDEA-0014" });
+                new[] { "IDEA-0013", "IDEA-0014", "IDEA-0015" });
+            AssertDefenseReuse(
+                FindReuse(catalog, "graybox-defense-save-adapter-3d"),
+                "persistence-migration",
+                ProjectReuseLevel.ReviewBeforeReuse,
+                new[] { "GrayboxDefenseSaveAdapter3D" },
+                new[] { "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs" },
+                new[] { "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs" },
+                new[] { "IDEA-0013", "IDEA-0015" });
             AssertDefenseReuse(
                 FindReuse(catalog, "graybox-defense-scene-presentation-3d"),
                 "ui-input",

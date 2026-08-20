@@ -197,6 +197,9 @@ namespace WasteCity.Persistence.ThreeD
     [Serializable]
     public sealed class FormalThreeDDefenseSaveData
     {
+        public string configurationSignature;
+        public float spawnOriginX;
+        public float spawnOriginZ;
         public bool tutorialTriggered;
         public int tutorialWaveTriggerCount;
         public int wavePhase;

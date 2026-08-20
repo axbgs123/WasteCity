@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace WasteCity.Combat
@@ -11,6 +12,43 @@ namespace WasteCity.Combat
         public int[] pendingTriggers,scheduledTriggers;
     }
     public enum WavePhase { Idle, Warning, Spawning, Active }
+
+    internal sealed class WaveDirectorPersistenceState
+    {
+        private readonly ReadOnlyCollection<int> pendingTriggers;
+        private readonly ReadOnlyCollection<int> scheduledTriggers;
+
+        public WaveDirectorPersistenceState(
+            int currentTrigger,
+            WavePhase phase,
+            int nextSpawn,
+            int defeated,
+            float warningRemaining,
+            float spawnClock,
+            IEnumerable<int> pendingTriggers,
+            IEnumerable<int> scheduledTriggers)
+        {
+            CurrentTrigger = currentTrigger;
+            Phase = phase;
+            NextSpawn = nextSpawn;
+            Defeated = defeated;
+            WarningRemaining = warningRemaining;
+            SpawnClock = spawnClock;
+            this.pendingTriggers = Array.AsReadOnly(
+                (pendingTriggers ?? Enumerable.Empty<int>()).ToArray());
+            this.scheduledTriggers = Array.AsReadOnly(
+                (scheduledTriggers ?? Enumerable.Empty<int>()).ToArray());
+        }
+
+        public int CurrentTrigger { get; }
+        public WavePhase Phase { get; }
+        public int NextSpawn { get; }
+        public int Defeated { get; }
+        public float WarningRemaining { get; }
+        public float SpawnClock { get; }
+        public IReadOnlyList<int> PendingTriggers => pendingTriggers;
+        public IReadOnlyList<int> ScheduledTriggers => scheduledTriggers;
+    }
 
     public readonly struct WaveEntry
     {
@@ -53,6 +91,8 @@ namespace WasteCity.Combat
         public int SpawnedCount => nextSpawn;
         public int DefeatedCount => defeated;
         public int PendingWaveCount => pending.Count;
+        public float SpawnClock => spawnClock;
+        public int ScheduledWaveCount => scheduled.Count;
         public float WarningMultiplier { get; private set; } = 1f;
 
         public void SetWarningMultiplier(float multiplier) => WarningMultiplier = Math.Max(1f, multiplier);
@@ -85,6 +125,39 @@ namespace WasteCity.Combat
         }
 
         public WaveDirectorSnapshot Capture()=>new WaveDirectorSnapshot{currentTrigger=Current?.Trigger??-1,phase=(int)Phase,nextSpawn=nextSpawn,defeated=defeated,warningRemaining=WarningRemaining,spawnClock=spawnClock,pendingTriggers=pending.Select(value=>value.Trigger).ToArray(),scheduledTriggers=scheduled.ToArray()};
+
+        internal bool TryRestoreForPersistence(
+            WaveDirectorPersistenceState state,
+            out string error)
+        {
+            if (!TryValidatePersistenceState(
+                state,
+                out WaveDefinition current,
+                out WaveDefinition[] restoredPending,
+                out HashSet<int> restoredScheduled,
+                out error))
+            {
+                return false;
+            }
+
+            pending.Clear();
+            for (int index = 0; index < restoredPending.Length; index++)
+                pending.Enqueue(restoredPending[index]);
+            scheduled.Clear();
+            foreach (int trigger in restoredScheduled)
+                scheduled.Add(trigger);
+            Current = current;
+            sequence = current == null
+                ? new List<EnemyArchetype>()
+                : Interleave(current.Entries);
+            nextSpawn = state.NextSpawn;
+            defeated = state.Defeated;
+            WarningRemaining = state.WarningRemaining;
+            spawnClock = state.SpawnClock;
+            Phase = state.Phase;
+            return true;
+        }
+
         public void Restore(WaveDirectorSnapshot snapshot)
         {
             pending.Clear();scheduled.Clear();Current=null;sequence.Clear();nextSpawn=defeated=0;spawnClock=WarningRemaining=0;Phase=WavePhase.Idle;
@@ -106,6 +179,124 @@ namespace WasteCity.Combat
         {
             var result=new List<EnemyArchetype>();var remaining=entries.Select(value=>value.Count).ToArray();bool added;
             do{added=false;for(int i=0;i<entries.Count;i++)if(remaining[i]-->0){result.Add(entries[i].Archetype);added=true;}}while(added);return result;
+        }
+
+        private static bool TryValidatePersistenceState(
+            WaveDirectorPersistenceState state,
+            out WaveDefinition current,
+            out WaveDefinition[] restoredPending,
+            out HashSet<int> restoredScheduled,
+            out string error)
+        {
+            current = null;
+            restoredPending = null;
+            restoredScheduled = null;
+            error = null;
+            if (state == null)
+                return Fail("Wave persistence state is required.", out error);
+            if (!Enum.IsDefined(typeof(WavePhase), state.Phase))
+                return Fail("Wave phase is invalid.", out error);
+            if (!IsFiniteNonNegative(state.WarningRemaining) ||
+                !IsFiniteNonNegative(state.SpawnClock))
+            {
+                return Fail("Wave clocks must be finite and non-negative.", out error);
+            }
+            if (state.NextSpawn < 0 || state.Defeated < 0)
+                return Fail("Wave counters cannot be negative.", out error);
+
+            var scheduledSet = new HashSet<int>();
+            for (int index = 0; index < state.ScheduledTriggers.Count; index++)
+            {
+                int trigger = state.ScheduledTriggers[index];
+                if (WaveCatalog.ForTrigger(trigger) == null)
+                    return Fail("A scheduled wave trigger is unknown.", out error);
+                if (!scheduledSet.Add(trigger))
+                    return Fail("Scheduled wave triggers must be unique.", out error);
+            }
+
+            var pendingSet = new HashSet<int>();
+            var pendingDefinitions =
+                new WaveDefinition[state.PendingTriggers.Count];
+            for (int index = 0; index < state.PendingTriggers.Count; index++)
+            {
+                int trigger = state.PendingTriggers[index];
+                WaveDefinition definition = WaveCatalog.ForTrigger(trigger);
+                if (definition == null || !scheduledSet.Contains(trigger))
+                    return Fail("A pending wave is not scheduled.", out error);
+                if (!pendingSet.Add(trigger))
+                    return Fail("Pending wave triggers must be unique.", out error);
+                pendingDefinitions[index] = definition;
+            }
+
+            if (state.CurrentTrigger < 0)
+            {
+                if (state.CurrentTrigger != -1 || state.Phase != WavePhase.Idle ||
+                    state.PendingTriggers.Count != 0 ||
+                    state.WarningRemaining != 0f)
+                {
+                    return Fail("Idle wave state is inconsistent.", out error);
+                }
+            }
+            else
+            {
+                current = WaveCatalog.ForTrigger(state.CurrentTrigger);
+                if (current == null || !scheduledSet.Contains(state.CurrentTrigger))
+                    return Fail("Current wave is not scheduled.", out error);
+                if (pendingSet.Contains(state.CurrentTrigger))
+                    return Fail("Current wave cannot also be pending.", out error);
+                if (state.NextSpawn > current.TotalCount ||
+                    state.Defeated > state.NextSpawn)
+                {
+                    return Fail("Wave counters exceed the current wave.", out error);
+                }
+
+                float cadence = current.SpawnSeconds /
+                    Math.Max(1, current.TotalCount);
+                switch (state.Phase)
+                {
+                    case WavePhase.Warning:
+                        if (state.WarningRemaining <= 0f ||
+                            state.SpawnClock != 0f || state.NextSpawn != 0 ||
+                            state.Defeated != 0)
+                        {
+                            return Fail("Warning wave state is inconsistent.", out error);
+                        }
+                        break;
+                    case WavePhase.Spawning:
+                        if (state.WarningRemaining != 0f ||
+                            state.NextSpawn >= current.TotalCount ||
+                            state.SpawnClock >= cadence)
+                        {
+                            return Fail("Spawning wave state is inconsistent.", out error);
+                        }
+                        break;
+                    case WavePhase.Active:
+                        if (state.WarningRemaining != 0f ||
+                            state.NextSpawn != current.TotalCount)
+                        {
+                            return Fail("Active wave state is inconsistent.", out error);
+                        }
+                        break;
+                    default:
+                        return Fail("A current wave cannot be idle.", out error);
+                }
+            }
+
+            restoredPending = pendingDefinitions;
+            restoredScheduled = scheduledSet;
+            return true;
+        }
+
+        private static bool IsFiniteNonNegative(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value) &&
+                value >= 0f;
+        }
+
+        private static bool Fail(string message, out string error)
+        {
+            error = message;
+            return false;
         }
     }
 }

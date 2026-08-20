@@ -380,6 +380,7 @@
         "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
@@ -405,7 +406,8 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -418,7 +420,8 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**"
@@ -430,6 +433,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
@@ -1078,6 +1082,27 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs"
       ],
       "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-defense-save-adapter-3d",
+      "ChineseName": "三维首版防御存档适配器",
+      "TypeNames": [
+        "GrayboxDefenseSaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射，保留配置签名、冻结出生点、波次计数与时钟余量、塔弹药租约、活动敌人和核心状态，并把恢复委托给运行时的零写入预检与单次提交。",
+      "BoundarySummary": "只负责防御领域快照与 FormalThreeD DTO 映射及精确配置签名兼容；不拥有文件 IO、场景搜索、规则 tick、城市库存、目标选择、UI 或表现对象。FormalSaveValidator 只验证结构与高价值语义；目标、状态文案和 tracer 等派生状态不入档。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0013",
         "IDEA-0015"
       ]
     },
@@ -1845,7 +1870,9 @@
       "Id": "first-defense-combat-models",
       "ChineseName": "首版防御战斗模型",
       "TypeNames": [
+        "MachineGunTurretPersistenceState",
         "MachineGunTurretCombatModel",
+        "DefenseEnemyPersistenceState",
         "DefenseEnemyCombatModel",
         "CityCoreCombatModel"
       ],
@@ -1854,13 +1881,15 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击。",
-      "BoundarySummary": "只拥有首版战斗实体规则状态；不读取 Unity 场景、不推进教学波、不访问城市库存，tracer 不持有命中、伤害或耗弹真值。",
+      "UseSummary": "用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击，并通过受验证的持久化状态保留塔弹药、暂停、弹药租约与伤害余量，以及活动敌人的生命、位置和攻击余量。",
+      "BoundarySummary": "只拥有首版战斗实体规则与实体级持久化状态；不定义 schema DTO、不执行文件 IO、不推进教学波、不访问城市库存，tracer、目标和状态文案不持有命中、伤害或耗弹真值。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs"
+        "Assets/_Game/Tests/EditMode/FirstDefenseLoopTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0015"
       ]
     },
     {
@@ -1869,6 +1898,7 @@
       "TypeNames": [
         "DefenseEnemyRuntimeSnapshot",
         "DefenseRuntimeSnapshot",
+        "TutorialDefensePersistenceState",
         "TutorialDefenseRuntimeModel"
       ],
       "AssetPaths": [
@@ -1876,13 +1906,15 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。",
-      "BoundarySummary": "只拥有首个教学波与城市核心会话状态；不处理建筑发现、城市库存、Unity 时间、表现对象或正式失败结算。",
+      "UseSummary": "用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击，并通过受验证的持久化状态保留触发与波次阶段、警告和生成时钟、计数高水位、固定步余量、冻结出生点、活动敌人与核心生命。",
+      "BoundarySummary": "只拥有首个教学波与城市核心会话状态；不处理建筑发现、塔状态、配置签名、schema DTO、城市库存、Unity 时间、表现对象或正式失败结算。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0015"
       ]
     },
     {
@@ -1915,6 +1947,8 @@
         "GrayboxDefenseTowerSnapshot3D",
         "GrayboxDefenseEnemySnapshot3D",
         "GrayboxDefenseRuntimeSnapshot3D",
+        "GrayboxDefensePersistenceState3D",
+        "GrayboxDefenseRestorePlan3D",
         "GrayboxDefenseRuntime3D"
       ],
       "AssetPaths": [
@@ -1922,16 +1956,18 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时由本运行时拥有并捕获塔内弹药载荷，匹配后完成迁移或在遗弃时明确丢弃。",
-      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域；撤离协调器不拥有塔内载荷，不复制物流范围、建筑资格或库存事务，不进入 schema 30。",
+      "UseSummary": "按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时拥有并捕获塔内弹药载荷，持久化时确定性保留外层固定步余量与全部防御领域状态，并以运行时所有者、generation 和 fingerprint 绑定零写入预检及单次提交。",
+      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域，并拥有领域恢复事务；存档适配器负责 schema DTO 与配置签名，撤离协调器不拥有塔内载荷。本运行时不执行文件 IO 或场景搜索，不复制物流范围、建筑资格、库存事务、目标或表现状态，不进入 schema 30。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ]
     },
     {

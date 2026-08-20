@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using WasteCity.Combat;
@@ -183,6 +184,36 @@ namespace WasteCity.Tests
             Assert.That(runtime.Snapshot.SpawnedEnemyCount, Is.EqualTo(3));
             Assert.That(runtime.Snapshot.Enemies[0].X,
                 Is.EqualTo(2f).Within(PositionTolerance));
+        }
+
+        [Test]
+        public void RestoreRejectsActiveTutorialAfterCompletionThreshold()
+        {
+            var state = new TutorialDefensePersistenceState(
+                tutorialTriggered: true,
+                wavePhase: WavePhase.Active,
+                warningRemainingSeconds: 0f,
+                spawnClockSeconds: 0f,
+                spawnedEnemyCount: WaveCatalog.Tutorial.TotalCount,
+                defeatedEnemyCount: WaveCatalog.Tutorial.TotalCount,
+                nextEnemyOrdinal: WaveCatalog.Tutorial.TotalCount,
+                fixedStepAccumulatorSeconds: 0f,
+                spawnOriginX: 20f,
+                spawnOriginZ: 0f,
+                coreCurrentHealth: CityCoreCombatModel.FormalMaximumHealth,
+                enemies: Array.Empty<DefenseEnemyPersistenceState>());
+
+            bool restored = TutorialDefenseRuntimeModel.TryCreateForPersistence(
+                state,
+                coreX: 0f,
+                coreZ: 0f,
+                out TutorialDefenseRuntimeModel model,
+                out string error);
+
+            Assert.That(restored, Is.False,
+                "A tutorial wave at its completion threshold cannot remain Active.");
+            Assert.That(model, Is.Null);
+            Assert.That(error, Is.Not.Null.And.Not.Empty);
         }
 
         private static TutorialDefenseRuntimeModel CreateTriggeredRuntime()

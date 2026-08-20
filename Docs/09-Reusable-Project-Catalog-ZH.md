@@ -110,7 +110,11 @@
 
 ### 三维逐建筑生产存档适配器（复用前审查）
 
-能解决什么：在正式三维生产运行时的持久化快照与 schema 31 逐建筑生产 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`。怎么复用：从显式提供的 `GrayboxProductionRuntime3D` 捕获生产 DTO，恢复时把 DTO 转换为领域快照并委托运行时完成预检与单次提交。不能负责什么：只负责生产领域快照与 DTO 映射；不拥有文件 IO、场景搜索、生产 tick、物流、建筑放置或矿点兼容规则，也不复制这些系统的判断。改后跑哪组测试：`GrayboxFormalSaveProductionTests`。代码名：`GrayboxProductionSaveAdapter3D`。
+能解决什么：在正式三维生产运行时的持久化快照与 schema 31 逐建筑生产 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`。怎么复用：在 GrayboxProductionRuntime3D 的持久化快照边界与 schema 31 FormalThreeDProduction DTO 之间执行确定性映射，并把恢复委托给运行时的预检与单次提交。不能负责什么：只负责生产领域快照与 DTO 映射；不拥有文件 IO、场景搜索、生产 tick、物流、建筑放置或矿点兼容规则，也不复制这些系统的判断。改后跑哪组测试：`GrayboxFormalSaveProductionTests`。代码名：`GrayboxProductionSaveAdapter3D`。
+
+### 三维首版防御存档适配器（复用前审查）
+
+能解决什么：在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`。怎么复用：在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射，保留配置签名、冻结出生点、波次计数与时钟余量、塔弹药租约、活动敌人和核心状态，并把恢复委托给运行时的零写入预检与单次提交。不能负责什么：只负责防御领域快照与 FormalThreeD DTO 映射及精确配置签名兼容；不拥有文件 IO、场景搜索、规则 tick、城市库存、目标选择、UI 或表现对象。FormalSaveValidator 只验证结构与高价值语义；目标、状态文案和 tracer 等派生状态不入档。改后跑哪组测试：`GrayboxFormalSaveDefenseTests`。代码名：`GrayboxDefenseSaveAdapter3D`。
 
 ### 三维正式撤离协调与只读视图（仅限场景）
 
@@ -170,7 +174,7 @@
 
 ### 资源库存（推荐复用）
 
-能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并提供覆盖全部已记录资源的确定性正数量快照与受验证的原子全量替换。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量；正式 3D 只把它作为 `CityResourceStorageModel` 的城市核心 backing ledger，schema 31 恢复时可由调用方显式选择资产保守地保留超容量数量。不能负责什么：只负责资源账本的数量、容量和变更通知；不驱动生产周期，不决定配方、物流、建筑资格、存档兼容策略或界面行为，也不提供真实仓库共享容量。改后跑哪组测试：`FoundationTests`、`GrayboxFormalSaveProductionTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
+能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并提供覆盖全部已记录资源的确定性正数量快照与受验证的原子全量替换。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：按稳定资源 ID 管理资源数量，提供覆盖全部已记录资源的确定性正数量快照与受验证的原子全量替换；恢复时可由调用方显式选择资产保守地保留超容量数量。不能负责什么：只负责资源账本的数量、容量和变更通知；不驱动生产周期，不决定配方、物流、建筑资格、存档兼容策略或界面行为。改后跑哪组测试：`FoundationTests`、`GrayboxFormalSaveProductionTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
 
 ### 旧每资源城市容量策略（复用前审查）
 
@@ -214,7 +218,7 @@
 
 ### 逐建筑生产状态（推荐复用）
 
-能解决什么：为每个稳定建筑实例拥有独立输入、输出、真实周期预留输入、进度与玩家暂停，并支持 schema 31 原子恢复。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：默认 3D 场景由 `GrayboxProductionRuntime3D` 按稳定实例 ID 持有状态；恢复时先完整验证资源与当前配方语义，再原子替换单建筑状态。不能负责什么：只拥有单座建筑的生产状态，不自行读取场景或城市范围；物流连接与停工原因属于派生状态而不入档，玩家暂停入档并在恢复时据此重建 `PlayerPaused` 停工原因。改后跑哪组测试：`FormalProductionSimulationTests`、`GrayboxFormalSaveProductionTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
+能解决什么：为每个稳定建筑实例拥有独立输入、输出、真实周期预留输入、进度与玩家暂停，并支持 schema 31 原子恢复。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：按稳定建筑实例拥有输入、输出、真实周期预留输入、进度与玩家暂停；schema 31 恢复先完整验证资源和配方语义，再原子替换单建筑状态。不能负责什么：只拥有单座建筑的生产状态，不自行读取场景或城市范围。物流连接与停工原因属于派生状态而不入档；玩家暂停入档，并在恢复时据此重建 PlayerPaused 停工原因。改后跑哪组测试：`FormalProductionSimulationTests`、`GrayboxFormalSaveProductionTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
 
 ### 正式生产与物流模拟（推荐复用）
 
@@ -226,7 +230,7 @@
 
 ### 三维生产运行时（复用前审查）
 
-能解决什么：让正式生产状态与物流连接跟随三维建筑生命周期，并为 schema 31 提供确定性持久化快照和安全恢复边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步状态、可运行集合与物流连接；恢复采用绑定 owner、同步 generation 和内容 fingerprint 的 prepare/commit，未知配方保留为不可运行 orphan，正式定义或资源点绑定变化时同步替换状态，撤离载荷所有权保持不变。不能负责什么：只桥接 `GrayboxBuildingInstance3D` 与正式生产状态，不推进生产 tick、不执行城市事务，也不复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 属于派生状态，不写入存档。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFormalSaveProductionTests`、`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionEvacuationPayload3D`、`GrayboxProductionPersistenceState3D`、`GrayboxProductionRestorePlan3D`、`GrayboxProductionRuntime3D`。
+能解决什么：让正式生产状态与物流连接跟随三维建筑生命周期，并为 schema 31 提供确定性持久化快照和安全恢复边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合和物流连接；schema 31 提供确定性持久化快照，以及绑定 owner、同步 generation 与内容 fingerprint 的 prepare/commit 恢复。未知配方保留为不可运行 orphan，正式定义或资源点绑定变化时同步替换状态；撤离载荷所有权保持不变。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不得复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 仍由当前规则重建而不持久化。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFormalSaveProductionTests`、`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionEvacuationPayload3D`、`GrayboxProductionPersistenceState3D`、`GrayboxProductionRestorePlan3D`、`GrayboxProductionRuntime3D`。
 
 ### 三维生产固定时钟（复用前审查）
 
@@ -254,15 +258,15 @@
 
 ### 首版防御战斗模型（推荐复用）
 
-能解决什么：以确定性规则时间处理机枪塔索敌射击、啃噬者生命和城市核心受击。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs`。怎么复用：用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击。不能负责什么：只拥有首版战斗实体规则状态；不读取 Unity 场景、不推进教学波、不访问城市库存，tracer 不持有命中、伤害或耗弹真值。改后跑哪组测试：`FirstDefenseLoopTests`。代码名：`MachineGunTurretCombatModel`、`DefenseEnemyCombatModel`、`CityCoreCombatModel`。
+能解决什么：以确定性规则时间处理机枪塔索敌射击、啃噬者生命和城市核心受击，并保留实体级持久化状态。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs`。怎么复用：用于以确定性规则时间处理机枪塔索敌射击、啃噬者生命与城市核心受击，并通过受验证的持久化状态保留塔弹药、暂停、弹药租约与伤害余量，以及活动敌人的生命、位置和攻击余量。不能负责什么：只拥有首版战斗实体规则与实体级持久化状态；不定义 schema DTO、不执行文件 IO、不推进教学波、不访问城市库存，tracer、目标和状态文案不持有命中、伤害或耗弹真值。改后跑哪组测试：`FirstDefenseLoopTests`、`GrayboxFormalSaveDefenseTests`。代码名：`MachineGunTurretPersistenceState`、`MachineGunTurretCombatModel`、`DefenseEnemyPersistenceState`、`DefenseEnemyCombatModel`、`CityCoreCombatModel`。
 
 ### 首版教学防御波运行时（推荐复用）
 
-能解决什么：推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs`。怎么复用：用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击。不能负责什么：只拥有首个教学波与城市核心会话状态；不处理建筑发现、城市库存、Unity 时间、表现对象或正式失败结算。改后跑哪组测试：`FirstDefenseWaveRuntimeTests`。代码名：`DefenseEnemyRuntimeSnapshot`、`DefenseRuntimeSnapshot`、`TutorialDefenseRuntimeModel`。
+能解决什么：推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击，并保留教学波持久化状态。在哪里：`Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs`。怎么复用：用于推进十五秒预警、八只啃噬者四十秒分批生成、直达核心和核心受击，并通过受验证的持久化状态保留触发与波次阶段、警告和生成时钟、计数高水位、固定步余量、冻结出生点、活动敌人与核心生命。不能负责什么：只拥有首个教学波与城市核心会话状态；不处理建筑发现、塔状态、配置签名、schema DTO、城市库存、Unity 时间、表现对象或正式失败结算。改后跑哪组测试：`FirstDefenseWaveRuntimeTests`、`GrayboxFormalSaveDefenseTests`。代码名：`DefenseEnemyRuntimeSnapshot`、`DefenseRuntimeSnapshot`、`TutorialDefensePersistenceState`、`TutorialDefenseRuntimeModel`。
 
 ### 三维首版防御运行时（复用前审查）
 
-能解决什么：按稳定建筑实例同步机枪塔、塔内弹药和教学波，并在撤离时完整保存或明确丢弃塔内弹药。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`。怎么复用：按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时由本运行时拥有并捕获塔内弹药载荷，匹配后完成迁移或在遗弃时明确丢弃。不能负责什么：只桥接正式 3D 建筑会话、城市仓储和首版防御领域；撤离协调器不拥有塔内载荷，不复制物流范围、建筑资格或库存事务，不进入 schema 30。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFirstDefenseRuntimeTests`、`GrayboxDefenseSnapshotStabilityTests`。代码名：`GrayboxDefenseEvacuationPayload3D`、`GrayboxDefenseTowerRuntimeState3D`、`GrayboxDefenseTowerSnapshot3D`、`GrayboxDefenseEnemySnapshot3D`、`GrayboxDefenseRuntimeSnapshot3D`、`GrayboxDefenseRuntime3D`。
+能解决什么：按稳定建筑实例同步机枪塔、塔内弹药和教学波，并以事务式边界持久化防御领域状态。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`。怎么复用：按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时拥有并捕获塔内弹药载荷，持久化时确定性保留外层固定步余量与全部防御领域状态，并以运行时所有者、generation 和 fingerprint 绑定零写入预检及单次提交。不能负责什么：只桥接正式 3D 建筑会话、城市仓储和首版防御领域，并拥有领域恢复事务；存档适配器负责 schema DTO 与配置签名，撤离协调器不拥有塔内载荷。本运行时不执行文件 IO 或场景搜索，不复制物流范围、建筑资格、库存事务、目标或表现状态，不进入 schema 30。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFirstDefenseRuntimeTests`、`GrayboxDefenseSnapshotStabilityTests`、`GrayboxFormalSaveDefenseTests`。代码名：`GrayboxDefenseEvacuationPayload3D`、`GrayboxDefenseTowerRuntimeState3D`、`GrayboxDefenseTowerSnapshot3D`、`GrayboxDefenseEnemySnapshot3D`、`GrayboxDefenseRuntimeSnapshot3D`、`GrayboxDefensePersistenceState3D`、`GrayboxDefenseRestorePlan3D`、`GrayboxDefenseRuntime3D`。
 
 ### 人口模型（推荐复用）
 

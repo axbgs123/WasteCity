@@ -89,6 +89,46 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void DefenseConfigurationAndSpawnOriginRoundTripThroughJson()
+        {
+            FormalSaveDecodeResult decoded =
+                FormalSaveCodec.DecodeAny(
+                    ReadFixture("schema-31-formal-3d.json"));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalThreeDDefenseSaveData source =
+                decoded.Envelope.formal3D.defense;
+            typeof(FormalThreeDDefenseSaveData)
+                .GetField("spawnOriginX")
+                ?.SetValue(source, 30.5f);
+            typeof(FormalThreeDDefenseSaveData)
+                .GetField("spawnOriginZ")
+                ?.SetValue(source, 28.25f);
+            decoded.Envelope.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(
+                    decoded.Envelope.formal3D);
+
+            string encoded = FormalSaveCodec.EncodeEnvelope(
+                decoded.Envelope);
+            FormalSaveDecodeResult roundTrip =
+                FormalSaveCodec.DecodeAny(encoded);
+
+            Assert.That(roundTrip.Success, Is.True, roundTrip.Message);
+            FormalThreeDDefenseSaveData defense =
+                roundTrip.Envelope.formal3D.defense;
+            Assert.That(
+                ReadDefenseField<string>(
+                    defense,
+                    "configurationSignature"),
+                Is.EqualTo("builtin:first-defense@1"));
+            Assert.That(
+                ReadDefenseField<float>(defense, "spawnOriginX"),
+                Is.EqualTo(30.5f));
+            Assert.That(
+                ReadDefenseField<float>(defense, "spawnOriginZ"),
+                Is.EqualTo(28.25f));
+        }
+
+        [Test]
         public void RootSchemaMembersConflictEvenWhenEitherValueIsZero()
         {
             string schemaThirtyOne =
@@ -384,6 +424,19 @@ namespace WasteCity.Tests
             Assert.That(File.Exists(path), Is.True,
                 "Missing fixture: " + path);
             return File.ReadAllText(path);
+        }
+
+        private static T ReadDefenseField<T>(
+            FormalThreeDDefenseSaveData defense,
+            string fieldName)
+        {
+            var field = typeof(FormalThreeDDefenseSaveData).GetField(
+                fieldName);
+            Assert.That(
+                field,
+                Is.Not.Null,
+                "Schema 31 defense DTO is missing " + fieldName + ".");
+            return (T)field.GetValue(defense);
         }
 
         private static FormalSaveEnvelope CanonicalEnvelope(

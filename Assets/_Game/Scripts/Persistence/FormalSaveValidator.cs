@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using WasteCity.Building;
+using WasteCity.Combat;
+using WasteCity.Defense;
 using WasteCity.Persistence.ThreeD;
 
 namespace WasteCity.Persistence
@@ -21,6 +24,7 @@ namespace WasteCity.Persistence
         InvalidWorld,
         InvalidStableId,
         InvalidResearch,
+        InvalidDefense,
         InvalidEvacuation,
         DecodeFailure,
         UnsupportedFutureSchema,
@@ -737,12 +741,40 @@ namespace WasteCity.Persistence
             HashSet<string> buildingIds)
         {
             const string path = "formal3D.defense";
+            int tutorialEnemyCount = WaveCatalog.Tutorial.TotalCount;
+            int ammunitionCapacity =
+                DefenseTowerCatalog.MachineGunAmmunitionCapacity;
+            float ammunitionDurationSeconds = DefenseTowerCatalog.For(
+                BuildingCatalog.MachineGunTurret.Id.Value)
+                .SecondsPerConsumable;
+            const float fixedStepSeconds =
+                TutorialDefenseRuntimeModel.FormalFixedStepSeconds;
+            const int coreMaximumHealth =
+                CityCoreCombatModel.FormalMaximumHealth;
+            int tutorialCompletionDefeatCount = Math.Max(
+                1,
+                (int)Math.Ceiling(tutorialEnemyCount * .9f));
+            float tutorialSpawnCadenceSeconds =
+                WaveCatalog.Tutorial.SpawnSeconds /
+                Math.Max(1, tutorialEnemyCount);
             if (defense.towers == null)
                 return Invalid(FormalSaveValidationError.InvalidArray,
                     path + ".towers");
             if (defense.enemies == null)
                 return Invalid(FormalSaveValidationError.InvalidArray,
                     path + ".enemies");
+            if (string.IsNullOrWhiteSpace(defense.configurationSignature))
+                return Invalid(
+                    FormalSaveValidationError.MissingRequiredValue,
+                    path + ".configurationSignature");
+            FormalSaveValidationResult result = Finite(
+                defense.spawnOriginX,
+                path + ".spawnOriginX");
+            if (result != null) return result;
+            result = Finite(
+                defense.spawnOriginZ,
+                path + ".spawnOriginZ");
+            if (result != null) return result;
             if (defense.wavePhase < 0 || defense.wavePhase > 3)
                 return Invalid(FormalSaveValidationError.InvalidEnumValue,
                     path + ".wavePhase");
@@ -778,9 +810,147 @@ namespace WasteCity.Persistence
             };
             for (int index = 0; index < times.Length; index++)
             {
-                FormalSaveValidationResult result = NonNegativeFinite(
+                result = NonNegativeFinite(
                     times[index], path + "." + timeNames[index]);
                 if (result != null) return result;
+            }
+            if (defense.tutorialWaveTriggerCount > 1 ||
+                defense.tutorialTriggered !=
+                (defense.tutorialWaveTriggerCount == 1))
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".tutorialWaveTriggerCount");
+            }
+            if (!string.IsNullOrEmpty(defense.randomState))
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".randomState");
+            if (!defense.tutorialTriggered)
+            {
+                if (defense.wavePhase != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".wavePhase");
+                if (defense.spawnedEnemyCount != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".spawnedEnemyCount");
+                if (defense.defeatedEnemyCount != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".defeatedEnemyCount");
+                if (defense.nextEnemyOrdinal != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".nextEnemyOrdinal");
+                if (defense.enemies.Length != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".enemies");
+                if (defense.warningRemainingSeconds != 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".warningRemainingSeconds");
+                if (defense.spawnClockSeconds != 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".spawnClockSeconds");
+            }
+            else if (defense.wavePhase == 0 &&
+                (defense.spawnedEnemyCount != tutorialEnemyCount ||
+                 defense.defeatedEnemyCount != tutorialEnemyCount ||
+                 defense.enemies.Length != 0))
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".wavePhase");
+            }
+            else if (defense.wavePhase == 3 &&
+                defense.defeatedEnemyCount >=
+                tutorialCompletionDefeatCount)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".wavePhase");
+            }
+            if (defense.defeatedEnemyCount >
+                defense.spawnedEnemyCount)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".defeatedEnemyCount");
+            }
+            if (defense.spawnedEnemyCount > tutorialEnemyCount)
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".spawnedEnemyCount");
+            if (defense.enemies.Length !=
+                defense.spawnedEnemyCount -
+                defense.defeatedEnemyCount)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".enemies");
+            }
+            if (defense.fixedStepAccumulatorSeconds >= fixedStepSeconds)
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".fixedStepAccumulatorSeconds");
+            if (defense.coreCurrentHealth > coreMaximumHealth)
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".coreCurrentHealth");
+            if (defense.tutorialTriggered)
+            {
+                switch ((WavePhase)defense.wavePhase)
+                {
+                    case WavePhase.Idle:
+                        if (defense.warningRemainingSeconds != 0f)
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".warningRemainingSeconds");
+                        break;
+                    case WavePhase.Warning:
+                        if (defense.warningRemainingSeconds <= 0f ||
+                            defense.spawnClockSeconds != 0f ||
+                            defense.spawnedEnemyCount != 0 ||
+                            defense.defeatedEnemyCount != 0 ||
+                            defense.nextEnemyOrdinal != 0 ||
+                            defense.enemies.Length != 0)
+                        {
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".wavePhase");
+                        }
+                        break;
+                    case WavePhase.Spawning:
+                        if (defense.warningRemainingSeconds != 0f)
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".warningRemainingSeconds");
+                        if (defense.spawnedEnemyCount >= tutorialEnemyCount)
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".wavePhase");
+                        if (defense.spawnClockSeconds >=
+                            tutorialSpawnCadenceSeconds)
+                        {
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".spawnClockSeconds");
+                        }
+                        break;
+                    case WavePhase.Active:
+                        if (defense.warningRemainingSeconds != 0f ||
+                            defense.spawnedEnemyCount != tutorialEnemyCount)
+                        {
+                            return Invalid(
+                                FormalSaveValidationError.InvalidDefense,
+                                path + ".wavePhase");
+                        }
+                        break;
+                }
             }
             var towerIds = new HashSet<string>(StringComparer.Ordinal);
             for (int index = 0; index < defense.towers.Length; index++)
@@ -790,7 +960,7 @@ namespace WasteCity.Persistence
                 if (tower == null)
                     return Invalid(FormalSaveValidationError.InvalidArray,
                         item);
-                FormalSaveValidationResult result = AddReference(
+                result = AddReference(
                     towerIds,
                     buildingIds,
                     tower.stableInstanceId,
@@ -799,14 +969,30 @@ namespace WasteCity.Persistence
                 if (tower.ammunitionAmount < 0)
                     return Invalid(FormalSaveValidationError.NegativeValue,
                         item + ".ammunitionAmount");
+                if (tower.ammunitionAmount > ammunitionCapacity)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".ammunitionAmount");
                 result = NonNegativeFinite(tower.activeAmmunitionSeconds,
                     item + ".activeAmmunitionSeconds");
                 if (result != null) return result;
+                if (tower.activeAmmunitionSeconds >
+                    ammunitionDurationSeconds)
+                {
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".activeAmmunitionSeconds");
+                }
                 result = NonNegativeFinite(tower.damageRemainder,
                     item + ".damageRemainder");
                 if (result != null) return result;
+                if (tower.damageRemainder >= 1f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".damageRemainder");
             }
             var enemyIds = new HashSet<string>(StringComparer.Ordinal);
+            var spawnOrders = new HashSet<int>();
             int maxSpawn = -1;
             for (int index = 0; index < defense.enemies.Length; index++)
             {
@@ -815,7 +1001,7 @@ namespace WasteCity.Persistence
                 if (enemy == null)
                     return Invalid(FormalSaveValidationError.InvalidArray,
                         item);
-                FormalSaveValidationResult result = AddStableId(
+                result = AddStableId(
                     enemyIds,
                     enemy.stableEnemyId,
                     item + ".stableEnemyId");
@@ -823,13 +1009,37 @@ namespace WasteCity.Persistence
                 if (!IsStableId(enemy.archetypeId))
                     return Invalid(FormalSaveValidationError.InvalidStableId,
                         item + ".archetypeId");
+                if (!string.Equals(
+                        enemy.archetypeId,
+                        EnemyCatalog.Gnawer.Id.Value,
+                        StringComparison.Ordinal))
+                {
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".archetypeId");
+                }
                 if (enemy.spawnOrder < 0)
                     return Invalid(FormalSaveValidationError.NegativeValue,
+                        item + ".spawnOrder");
+                if (!spawnOrders.Add(enemy.spawnOrder))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
                         item + ".spawnOrder");
                 maxSpawn = Math.Max(maxSpawn, enemy.spawnOrder);
                 if (enemy.currentHealth < 0)
                     return Invalid(FormalSaveValidationError.NegativeValue,
                         item + ".currentHealth");
+                if (enemy.currentHealth == 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".currentHealth");
+                if (enemy.currentHealth >
+                    EnemyCatalog.Gnawer.MaximumHealth)
+                {
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".currentHealth");
+                }
                 result = Finite(enemy.positionX, item + ".positionX");
                 if (result != null) return result;
                 result = Finite(enemy.positionZ, item + ".positionZ");
@@ -837,11 +1047,20 @@ namespace WasteCity.Persistence
                 result = NonNegativeFinite(enemy.movementRemainder,
                     item + ".movementRemainder");
                 if (result != null) return result;
+                if (enemy.movementRemainder != 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".movementRemainder");
                 result = NonNegativeFinite(enemy.attackDamageRemainder,
                     item + ".attackDamageRemainder");
                 if (result != null) return result;
+                if (enemy.attackDamageRemainder >= 1f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        item + ".attackDamageRemainder");
             }
-            if (defense.nextEnemyOrdinal <= maxSpawn)
+            if (defense.nextEnemyOrdinal <= maxSpawn ||
+                defense.nextEnemyOrdinal < defense.spawnedEnemyCount)
                 return Invalid(
                     FormalSaveValidationError.InvalidHighWaterMark,
                     path + ".nextEnemyOrdinal");

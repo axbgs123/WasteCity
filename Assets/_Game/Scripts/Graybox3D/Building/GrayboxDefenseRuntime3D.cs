@@ -210,10 +210,69 @@ namespace WasteCity.Graybox3D.Building
         public IReadOnlyList<GrayboxDefenseEnemySnapshot3D> Enemies { get; }
     }
 
+    public sealed class GrayboxDefensePersistenceState3D
+    {
+        private readonly ReadOnlyCollection<MachineGunTurretPersistenceState>
+            towers;
+
+        public GrayboxDefensePersistenceState3D(
+            int tutorialWaveTriggerCount,
+            float fixedStepAccumulatorSeconds,
+            string randomState,
+            TutorialDefensePersistenceState tutorial,
+            MachineGunTurretPersistenceState[] towers)
+        {
+            TutorialWaveTriggerCount = tutorialWaveTriggerCount;
+            FixedStepAccumulatorSeconds = fixedStepAccumulatorSeconds;
+            RandomState = randomState;
+            Tutorial = tutorial ?? throw new ArgumentNullException(
+                nameof(tutorial));
+            this.towers = Array.AsReadOnly(
+                towers == null
+                    ? Array.Empty<MachineGunTurretPersistenceState>()
+                    : (MachineGunTurretPersistenceState[])towers.Clone());
+        }
+
+        public int TutorialWaveTriggerCount { get; }
+        public float FixedStepAccumulatorSeconds { get; }
+        public string RandomState { get; }
+        public TutorialDefensePersistenceState Tutorial { get; }
+        public IReadOnlyList<MachineGunTurretPersistenceState> Towers =>
+            towers;
+    }
+
+    public sealed class GrayboxDefenseRestorePlan3D
+    {
+        internal GrayboxDefenseRestorePlan3D(
+            GrayboxDefenseRuntime3D owner,
+            ulong expectedGeneration,
+            ulong expectedFingerprint,
+            GrayboxDefensePersistenceState3D snapshot,
+            TutorialDefenseRuntimeModel tutorial,
+            GrayboxDefenseTowerRuntimeState3D[] towers)
+        {
+            Owner = owner;
+            ExpectedGeneration = expectedGeneration;
+            ExpectedFingerprint = expectedFingerprint;
+            Snapshot = snapshot;
+            Tutorial = tutorial;
+            Towers = towers;
+        }
+
+        internal GrayboxDefenseRuntime3D Owner { get; }
+        internal ulong ExpectedGeneration { get; }
+        internal ulong ExpectedFingerprint { get; }
+        internal GrayboxDefensePersistenceState3D Snapshot { get; }
+        internal TutorialDefenseRuntimeModel Tutorial { get; }
+        internal GrayboxDefenseTowerRuntimeState3D[] Towers { get; }
+        internal bool Consumed { get; set; }
+    }
+
     public sealed class GrayboxDefenseRuntime3D
     {
         private const double StepSeconds = .1d;
-        private const float StepSecondsFloat = .1f;
+        private const float StepSecondsFloat =
+            TutorialDefenseRuntimeModel.FormalFixedStepSeconds;
         private const double StepEpsilon = .000001d;
 
         private readonly Dictionary<string, GrayboxDefenseTowerRuntimeState3D>
@@ -230,10 +289,15 @@ namespace WasteCity.Graybox3D.Building
             new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> runnableIds =
             new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> synchronizedLockById =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly List<string> removedIds = new List<string>();
-        private readonly TutorialDefenseRuntimeModel tutorial;
+        private TutorialDefenseRuntimeModel tutorial;
         private double accumulatorSeconds;
         private int tutorialWaveTriggerCount;
+        private float requestedCoreX;
+        private float requestedCoreZ;
+        private ulong persistenceGeneration;
         private GrayboxDefenseRuntimeSnapshot3D cachedSnapshot;
         private bool snapshotDirty = true;
 
@@ -249,6 +313,8 @@ namespace WasteCity.Graybox3D.Building
                 coreZ,
                 spawnX,
                 spawnZ);
+            requestedCoreX = coreX;
+            requestedCoreZ = coreZ;
         }
 
         public IReadOnlyList<GrayboxDefenseTowerRuntimeState3D> Towers =>
@@ -261,6 +327,226 @@ namespace WasteCity.Graybox3D.Building
             state = null;
             return !string.IsNullOrWhiteSpace(stableInstanceId) &&
                 stateById.TryGetValue(stableInstanceId, out state);
+        }
+
+        public GrayboxDefensePersistenceState3D CaptureForPersistence()
+        {
+            var capturedTowers = new MachineGunTurretPersistenceState[
+                stateById.Count];
+            var index = 0;
+            foreach (GrayboxDefenseTowerRuntimeState3D state in
+                     stateById.Values)
+            {
+                capturedTowers[index++] =
+                    state.Combat.CaptureForPersistence();
+            }
+            Array.Sort(capturedTowers, (left, right) => string.CompareOrdinal(
+                left.StableId,
+                right.StableId));
+            return new GrayboxDefensePersistenceState3D(
+                tutorialWaveTriggerCount,
+                (float)accumulatorSeconds,
+                randomState: null,
+                tutorial.CaptureForPersistence(),
+                capturedTowers);
+        }
+
+        public bool TryPrepareRestore(
+            GrayboxDefensePersistenceState3D snapshot,
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            out GrayboxDefenseRestorePlan3D plan,
+            out string error)
+        {
+            plan = null;
+            if (snapshot == null || snapshot.Tutorial == null ||
+                snapshot.Towers == null || instances == null)
+            {
+                error = "防御存档状态不能为空";
+                return false;
+            }
+            if (snapshot.TutorialWaveTriggerCount < 0 ||
+                snapshot.TutorialWaveTriggerCount > 1 ||
+                snapshot.TutorialWaveTriggerCount !=
+                    (snapshot.Tutorial.TutorialTriggered ? 1 : 0) ||
+                snapshot.Tutorial.FixedStepAccumulatorSeconds != 0f ||
+                !IsFinite(snapshot.FixedStepAccumulatorSeconds) ||
+                snapshot.FixedStepAccumulatorSeconds < 0f ||
+                snapshot.FixedStepAccumulatorSeconds >= StepSecondsFloat ||
+                !string.IsNullOrEmpty(snapshot.RandomState))
+            {
+                error = "防御触发、固定步余量或随机状态无效";
+                return false;
+            }
+
+            ulong expectedGeneration = persistenceGeneration;
+            ulong expectedFingerprint = ComputePersistenceFingerprint();
+            var eligibleInstances = new Dictionary<
+                string,
+                GrayboxBuildingInstance3D>(StringComparer.Ordinal);
+            var allInstanceIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (instance == null ||
+                    string.IsNullOrWhiteSpace(instance.StableInstanceId) ||
+                    !allInstanceIds.Add(instance.StableInstanceId))
+                {
+                    error = "建筑实例为空、ID 为空或重复";
+                    return false;
+                }
+                if (!GrayboxBuildingOperationalAccess3D.CanRetainState(
+                        instance) ||
+                    !IsMachineGunTurret(instance))
+                {
+                    continue;
+                }
+                eligibleInstances.Add(instance.StableInstanceId, instance);
+            }
+            if (eligibleInstances.Count != stateById.Count ||
+                snapshot.Towers.Count != stateById.Count)
+            {
+                error = "机枪塔存档必须与已同步的可保留实例一一对应";
+                return false;
+            }
+
+            var seenTowerIds = new HashSet<string>(StringComparer.Ordinal);
+            var preparedTowers = new GrayboxDefenseTowerRuntimeState3D[
+                snapshot.Towers.Count];
+            for (var index = 0; index < snapshot.Towers.Count; index++)
+            {
+                MachineGunTurretPersistenceState saved =
+                    snapshot.Towers[index];
+                if (string.IsNullOrWhiteSpace(saved.StableId) ||
+                    !seenTowerIds.Add(saved.StableId) ||
+                    !eligibleInstances.TryGetValue(
+                        saved.StableId,
+                        out GrayboxBuildingInstance3D instance) ||
+                    !TryGetSynchronizedInstance(
+                        saved.StableId,
+                        out GrayboxBuildingInstance3D synchronized) ||
+                    !ReferenceEquals(instance, synchronized) ||
+                    !synchronizedLockById.TryGetValue(
+                        saved.StableId,
+                        out bool synchronizedLock) ||
+                    synchronizedLock != instance.IsEvacuationLocked ||
+                    !stateById.TryGetValue(
+                        saved.StableId,
+                        out GrayboxDefenseTowerRuntimeState3D current) ||
+                    current.Combat.X != instance.Placement.X ||
+                    current.Combat.Z != instance.Placement.Y)
+                {
+                    error = "机枪塔存档身份或格位与已同步运行时不一致";
+                    return false;
+                }
+                if (!MachineGunTurretCombatModel.TryCreateForPersistence(
+                        saved,
+                        instance.Placement.X,
+                        instance.Placement.Y,
+                        out MachineGunTurretCombatModel combat,
+                        out error))
+                {
+                    return false;
+                }
+                combat.SetLogisticsConnected(
+                    current.Combat.IsLogisticsConnected);
+                var prepared = new GrayboxDefenseTowerRuntimeState3D(combat)
+                {
+                    CanRunLocally = current.CanRunLocally,
+                    TargetId = null,
+                    Status = combat.IsPlayerPaused
+                        ? GrayboxDefenseTowerStatus3D.PlayerPaused
+                        : current.CanRunLocally
+                            ? GrayboxDefenseTowerStatus3D.NoTarget
+                            : GrayboxDefenseTowerStatus3D.Unavailable,
+                };
+                preparedTowers[index] = prepared;
+            }
+            Array.Sort(preparedTowers, (left, right) => string.CompareOrdinal(
+                left.StableId,
+                right.StableId));
+
+            if (!TutorialDefenseRuntimeModel.TryCreateForPersistence(
+                    snapshot.Tutorial,
+                    requestedCoreX,
+                    requestedCoreZ,
+                    out TutorialDefenseRuntimeModel preparedTutorial,
+                    out error))
+            {
+                return false;
+            }
+            if (expectedGeneration != persistenceGeneration ||
+                expectedFingerprint != ComputePersistenceFingerprint())
+            {
+                error = "防御运行时在恢复预检期间发生变化";
+                return false;
+            }
+
+            plan = new GrayboxDefenseRestorePlan3D(
+                this,
+                expectedGeneration,
+                expectedFingerprint,
+                snapshot,
+                preparedTutorial,
+                preparedTowers);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryCommitRestore(
+            GrayboxDefenseRestorePlan3D plan,
+            out string error)
+        {
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "防御恢复计划不属于当前运行时";
+                return false;
+            }
+            if (plan.Consumed)
+            {
+                error = "防御恢复计划已经使用";
+                return false;
+            }
+            if (plan.ExpectedGeneration != persistenceGeneration ||
+                plan.ExpectedFingerprint != ComputePersistenceFingerprint())
+            {
+                error = "防御恢复计划已过期";
+                return false;
+            }
+
+            stateById.Clear();
+            towers.Clear();
+            for (var index = 0; index < plan.Towers.Length; index++)
+            {
+                GrayboxDefenseTowerRuntimeState3D state = plan.Towers[index];
+                stateById.Add(state.StableId, state);
+                towers.Add(state);
+            }
+            tutorial = plan.Tutorial;
+            tutorialWaveTriggerCount =
+                plan.Snapshot.TutorialWaveTriggerCount;
+            accumulatorSeconds = plan.Snapshot.FixedStepAccumulatorSeconds;
+            cachedSnapshot = null;
+            snapshotDirty = true;
+            plan.Consumed = true;
+            persistenceGeneration++;
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryRestore(
+            GrayboxDefensePersistenceState3D snapshot,
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            out string error)
+        {
+            if (!TryPrepareRestore(
+                    snapshot,
+                    instances,
+                    out GrayboxDefenseRestorePlan3D plan,
+                    out error))
+            {
+                return false;
+            }
+            return TryCommitRestore(plan, out error);
         }
 
         public GrayboxDefenseRuntimeSnapshot3D Snapshot
@@ -278,7 +564,10 @@ namespace WasteCity.Graybox3D.Building
 
         public void SetCorePosition(float x, float z)
         {
+            requestedCoreX = x;
+            requestedCoreZ = z;
             tutorial.SetCorePosition(x, z);
+            persistenceGeneration++;
         }
 
         public void Synchronize(
@@ -288,11 +577,13 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius)
         {
+            persistenceGeneration++;
             bool snapshotChanged = false;
             orderedInstances.Clear();
             towers.Clear();
             retainedIds.Clear();
             runnableIds.Clear();
+            synchronizedLockById.Clear();
 
             if (instances != null)
             {
@@ -376,6 +667,8 @@ namespace WasteCity.Graybox3D.Building
                 state.Combat.SetLogisticsConnected(connected);
                 if (canRun)
                     runnableIds.Add(instance.StableInstanceId);
+                synchronizedLockById[instance.StableInstanceId] =
+                    instance.IsEvacuationLocked;
                 towers.Add(state);
             }
 
@@ -403,14 +696,13 @@ namespace WasteCity.Graybox3D.Building
                 return;
 
             accumulatorSeconds += deltaSeconds;
+            persistenceGeneration++;
             bool advancedFixedStep = false;
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
                 for (int index = 0; index < towers.Count; index++)
                     TickTower(towers[index], cityStorage);
-                tutorial.Advance(
-                    StepSecondsFloat,
-                    globallyPaused: false);
+                tutorial.AdvanceFixedStep();
                 advancedFixedStep = true;
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < 0d &&
@@ -444,6 +736,7 @@ namespace WasteCity.Graybox3D.Building
                 ? GrayboxDefenseTowerStatus3D.PlayerPaused
                 : GrayboxDefenseTowerStatus3D.NoTarget;
             snapshotDirty = true;
+            persistenceGeneration++;
             return true;
         }
 
@@ -609,6 +902,145 @@ namespace WasteCity.Graybox3D.Building
             runnableIds.Remove(stableInstanceId);
             towers.Remove(state);
             snapshotDirty = true;
+            persistenceGeneration++;
+        }
+
+        private ulong ComputePersistenceFingerprint()
+        {
+            GrayboxDefensePersistenceState3D snapshot =
+                CaptureForPersistence();
+            ulong value = 1469598103934665603ul;
+            Mix(ref value, snapshot.TutorialWaveTriggerCount);
+            Mix(ref value, snapshot.FixedStepAccumulatorSeconds);
+            Mix(ref value, snapshot.RandomState);
+            MixTutorial(ref value, snapshot.Tutorial);
+            Mix(ref value, snapshot.Towers.Count);
+            for (var index = 0; index < snapshot.Towers.Count; index++)
+            {
+                MachineGunTurretPersistenceState tower =
+                    snapshot.Towers[index];
+                Mix(ref value, tower.StableId);
+                Mix(ref value, tower.AmmunitionAmount);
+                Mix(ref value, tower.IsPlayerPaused);
+                Mix(ref value, tower.ActiveAmmunitionSeconds);
+                Mix(ref value, tower.DamageRemainder);
+                if (stateById.TryGetValue(
+                        tower.StableId,
+                        out GrayboxDefenseTowerRuntimeState3D runtimeState))
+                {
+                    Mix(ref value, runtimeState.CanRunLocally);
+                    Mix(ref value,
+                        runtimeState.Combat.IsLogisticsConnected);
+                    Mix(ref value, runnableIds.Contains(tower.StableId));
+                }
+                if (TryGetSynchronizedInstance(
+                        tower.StableId,
+                        out GrayboxBuildingInstance3D instance))
+                {
+                    Mix(ref value, instance.IsEvacuationLocked);
+                    Mix(ref value, instance.IsPlayerOwned);
+                    Mix(ref value, (int)instance.State);
+                    Mix(ref value,
+                        instance.Placement.Definition.Id.Value);
+                    Mix(ref value, (int)instance.Placement.Site);
+                    Mix(ref value, instance.Placement.X);
+                    Mix(ref value, instance.Placement.Y);
+                    Mix(ref value,
+                        (int)instance.Placement.Orientation);
+                }
+            }
+            return value;
+        }
+
+        private bool TryGetSynchronizedInstance(
+            string stableInstanceId,
+            out GrayboxBuildingInstance3D instance)
+        {
+            for (var index = 0; index < orderedInstances.Count; index++)
+            {
+                GrayboxBuildingInstance3D candidate = orderedInstances[index];
+                if (!string.Equals(
+                        candidate.StableInstanceId,
+                        stableInstanceId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                instance = candidate;
+                return true;
+            }
+            instance = null;
+            return false;
+        }
+
+        private static void MixTutorial(
+            ref ulong value,
+            TutorialDefensePersistenceState tutorialState)
+        {
+            Mix(ref value, tutorialState.TutorialTriggered);
+            Mix(ref value, (int)tutorialState.WavePhase);
+            Mix(ref value, tutorialState.WarningRemainingSeconds);
+            Mix(ref value, tutorialState.SpawnClockSeconds);
+            Mix(ref value, tutorialState.SpawnedEnemyCount);
+            Mix(ref value, tutorialState.DefeatedEnemyCount);
+            Mix(ref value, tutorialState.NextEnemyOrdinal);
+            Mix(ref value, tutorialState.FixedStepAccumulatorSeconds);
+            Mix(ref value, tutorialState.SpawnOriginX);
+            Mix(ref value, tutorialState.SpawnOriginZ);
+            Mix(ref value, tutorialState.CoreCurrentHealth);
+            Mix(ref value, tutorialState.Enemies.Count);
+            for (var index = 0; index < tutorialState.Enemies.Count; index++)
+            {
+                DefenseEnemyPersistenceState enemy =
+                    tutorialState.Enemies[index];
+                Mix(ref value, enemy.StableId);
+                Mix(ref value, enemy.ArchetypeId);
+                Mix(ref value, enemy.SpawnOrder);
+                Mix(ref value, enemy.X);
+                Mix(ref value, enemy.Z);
+                Mix(ref value, enemy.CurrentHealth);
+                Mix(ref value, enemy.MovementRemainder);
+                Mix(ref value, enemy.AttackDamageRemainder);
+            }
+        }
+
+        private static void Mix(ref ulong value, string text)
+        {
+            if (text == null)
+            {
+                Mix(ref value, -1);
+                return;
+            }
+            Mix(ref value, text.Length);
+            for (var index = 0; index < text.Length; index++)
+            {
+                value ^= text[index];
+                value *= 1099511628211ul;
+            }
+        }
+
+        private static void Mix(ref ulong value, bool item)
+        {
+            Mix(ref value, item ? 1 : 0);
+        }
+
+        private static void Mix(ref ulong value, int item)
+        {
+            unchecked
+            {
+                value ^= (uint)item;
+                value *= 1099511628211ul;
+            }
+        }
+
+        private static void Mix(ref ulong value, float item)
+        {
+            Mix(ref value, item.GetHashCode());
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static bool IsMachineGunTurret(
