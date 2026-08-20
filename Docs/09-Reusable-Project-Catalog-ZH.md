@@ -104,6 +104,10 @@
 
 能解决什么：把正式三维建筑、双网格、城市核心账本与真实仓库映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`。怎么复用：从显式提供的当前建筑会话、建筑表现和当前 WorldMapModel 捕获并恢复 schema 31 的建筑实例、双网格、高水位、城市核心账本、真实仓库、过滤与孤立资源。不能负责什么：只映射领域真值与 FormalThreeD DTO；不拥有文件路径、codec、文件事务或恢复总协调，不使用场景发现，也不保存物流连接、容量配置、revision、UI 或表现对象。带资源节点绑定的恢复必须显式提供当前正式世界。改后跑哪组测试：`GrayboxFormalSaveBuildingStorageTests`。代码名：`GrayboxBuildingStorageSaveAdapter3D`。
 
+### 三维背包合成与科技存档适配器（复用前审查）
+
+能解决什么：把正式 3D 背包、应急合成队列与六节点科技状态映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`。怎么复用：从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 DemoResearchRuntime 捕获 schema 31 背包、合成与科技 DTO；恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。不能负责什么：只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。改后跑哪组测试：`GrayboxFormalSaveEconomyTests`、`PlayerBackpackModelTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`。代码名：`GrayboxEconomySaveAdapter3D`。
+
 ### 三维正式撤离协调与只读视图（仅限场景）
 
 能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。
@@ -186,7 +190,7 @@
 
 ### 玩家背包模型（推荐复用）
 
-能解决什么：维护会话级 30 格个人背包，包括同类稳定合并、每格正式栈上限、稳定扣除、拆半、逐个移动、整栈合并与交换。在哪里：`Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`。怎么复用：管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。背包 UI 只读取槽位快照，并通过模型或 `ResourceTransaction` 提交操作；资源栈上限继续来自资源定义目录。不能负责什么：只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。背包不进入当前 schema 30 存档。改后跑哪组测试：`PlayerBackpackModelTests`。代码名：`BackpackSlot`、`PlayerBackpackModel`。
+能解决什么：维护会话级 30 格个人背包，并为 schema 31 提供受验证的两阶段恢复边界。在哪里：`Assets/_Game/Scripts/Economy/PlayerBackpackModel.cs`。怎么复用：管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换；schema 31 通过深拷贝的固定索引 snapshot、零写入 prepare 和 owner-bound 单次 commit 恢复，按各资源正式栈上限验证并可显式保留配置变化后的超栈。不能负责什么：只拥有背包槽位状态；未知稳定资源保留在原槽且不可正常存取或移动。模型不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入、UI、文件 IO 或内容配置兼容决策；调用方必须显式决定是否允许超栈恢复。改后跑哪组测试：`PlayerBackpackModelTests`、`GrayboxFormalSaveEconomyTests`。代码名：`BackpackSlot`、`PlayerBackpackRestoreSlot`、`PlayerBackpackRestorePlan`、`PlayerBackpackModel`。
 
 ### 正式资源配方目录（推荐复用）
 
@@ -194,7 +198,7 @@
 
 ### 应急合成队列（推荐复用）
 
-能解决什么：维护最多 20 次执行的 FIFO 应急合成队列，保证入队预留、顺序推进、产出阻塞和取消返还不丢失资源。在哪里：`Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`。怎么复用：管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还。界面应把左 1、右 5 和 Shift 最大请求转换为模型命令，不自行扣除材料或推进时间。不能负责什么：只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；不访问城市或建筑库存，不自动合成前置材料，不解释鼠标手势，也不进入 schema 30 存档。改后跑哪组测试：`CraftingQueueModelTests`。代码名：`CraftingQueueModel`。
+能解决什么：维护最多 20 次执行的 FIFO 应急合成队列，并让 schema 31 精确保留执行身份、预留与历史高水位。在哪里：`Assets/_Game/Scripts/Economy/CraftingQueueModel.cs`。怎么复用：管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还；schema 31 公开捕获稳定执行 ID、预留输入、活动进度与 nextQueueOrdinal，并以绑定 revision/owner 的 prepare/commit 恢复。不能负责什么：只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；恢复不会再次扣除已预留输入，未知配方保留为 MissingContent 暂停项并允许取消退款。模型不访问城市或建筑库存，不解释鼠标手势，不拥有文件 IO，也不把当前队列最大 ID 当作历史高水位。改后跑哪组测试：`CraftingQueueModelTests`、`GrayboxFormalSaveEconomyTests`。代码名：`CraftingQueueRestoreEntry`、`CraftingQueueExecutionSnapshot`、`CraftingQueueRestorePlan`、`CraftingQueueModel`。
 
 ### 手工资源访问规则（推荐复用）
 
@@ -234,7 +238,7 @@
 
 ### 研究模型（推荐复用）
 
-能解决什么：管理研究状态。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：用于管理研究状态。把研究状态放在这里。不能负责什么：不展示研究界面。改后跑哪组测试：`ResearchTests`。代码名：`ResearchModel`。
+能解决什么：管理研究状态，并在 schema 31 恢复时区分已知科技与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。
 
 ### 三维首版科技目录（推荐复用）
 
@@ -242,7 +246,7 @@
 
 ### 三维首版科技运行时（推荐复用）
 
-能解决什么：在当前 3D 会话中统一提交科技启动、不同城市形态下的推进、研究站失效暂停和取消退款。在哪里：`Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`。怎么复用：组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款。不能负责什么：只拥有当前 3D 会话的研究规则适配；调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实。它不处理 Unity 输入、UI、关注度、战斗效果或 schema 30 存档。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchRuntime`。
+能解决什么：在当前 3D 会话中统一提交科技运行规则，并为 schema 31 提供六节点目录解析边界。在哪里：`Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`。怎么复用：组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款，并以该 release profile 显式解析 schema 31 的已知与未知科技恢复状态。不能负责什么：只拥有当前 3D 会话的研究规则适配；未知已完成科技不授予效果，未知活动科技暂停且可由持久化快照继续保留。调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实；它不处理 Unity 输入、UI、文件 IO、关注度或战斗效果。改后跑哪组测试：`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`DemoResearchRuntime`。
 
 ### 首版防御战斗模型（推荐复用）
 

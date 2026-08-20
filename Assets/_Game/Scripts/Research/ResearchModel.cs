@@ -185,30 +185,90 @@ namespace WasteCity.Research
         public static ResearchDefinition[] Starting=>All;
         public static ResearchDefinition Find(string id)=>All.FirstOrDefault(value=>value.Id.Value==id);
     }
+
+    public sealed class ResearchPersistenceSnapshot
+    {
+        internal ResearchPersistenceSnapshot(
+            string[] completedResearchIds,
+            string activeResearchId,
+            float remainingSeconds)
+        {
+            CompletedResearchIds = Array.AsReadOnly(
+                completedResearchIds ?? Array.Empty<string>());
+            ActiveResearchId = activeResearchId;
+            RemainingSeconds = remainingSeconds;
+        }
+
+        public IReadOnlyList<string> CompletedResearchIds { get; }
+        public string ActiveResearchId { get; }
+        public float RemainingSeconds { get; }
+    }
+
+    public sealed class ResearchRestorePlan
+    {
+        internal ResearchRestorePlan(
+            ResearchModel owner,
+            ulong preparedRevision,
+            StableId[] completed,
+            string[] orphanCompletedIds,
+            ResearchDefinition active,
+            string missingActiveResearchId,
+            float remainingSeconds)
+        {
+            Owner = owner;
+            PreparedRevision = preparedRevision;
+            Completed = completed;
+            OrphanCompletedIds = orphanCompletedIds;
+            Active = active;
+            MissingActiveResearchId = missingActiveResearchId;
+            RemainingSeconds = remainingSeconds;
+        }
+
+        internal ResearchModel Owner { get; }
+        internal ulong PreparedRevision { get; }
+        internal StableId[] Completed { get; }
+        internal string[] OrphanCompletedIds { get; }
+        internal ResearchDefinition Active { get; }
+        internal string MissingActiveResearchId { get; }
+        internal float RemainingSeconds { get; }
+        internal bool Committed { get; set; }
+    }
+
     public sealed class ResearchModel
     {
         private readonly HashSet<StableId> completed = new HashSet<StableId>();
+        private readonly SortedSet<string> orphanCompletedIds =
+            new SortedSet<string>(StringComparer.Ordinal);
+        private string missingActiveResearchId;
+        private ulong persistenceRevision;
         public ResearchDefinition Active { get; private set; }
         public float Remaining { get; private set; }
         public int CompletedCount => completed.Count;
+        public bool HasMissingActiveResearch =>
+            !string.IsNullOrEmpty(missingActiveResearchId);
+        public string MissingActiveResearchId => missingActiveResearchId;
         public event Action<ResearchDefinition> Completed;
         public bool Start(ResearchDefinition definition, ResourceInventory inventory, float inheritedProgressRatio = 0f)
         {
-            if (Active != null || definition == null || inventory == null ||
+            if (Active != null || HasMissingActiveResearch ||
+                definition == null || inventory == null ||
                 completed.Contains(definition.Id) ||
                 definition.RequiredResearchIds.Any(required =>
                     !completed.Any(id => id.Value == required)) ||
                 !TrySpendResearchCosts(inventory, definition.Costs))
                 return false;
             float ratio=Math.Max(0f,Math.Min(1f,inheritedProgressRatio));
-            Active = definition; Remaining = Math.Max(.001f,definition.Duration*(1f-ratio)); return true;
+            Active = definition; Remaining = Math.Max(.001f,definition.Duration*(1f-ratio));
+            persistenceRevision++;
+            return true;
         }
         public bool Start(
             ResearchDefinition definition,
             CityResourceStorageModel cityStorage,
             float inheritedProgressRatio = 0f)
         {
-            if (Active != null || definition == null || cityStorage == null ||
+            if (Active != null || HasMissingActiveResearch ||
+                definition == null || cityStorage == null ||
                 completed.Contains(definition.Id) ||
                 definition.RequiredResearchIds.Any(required =>
                     !completed.Any(id => id.Value == required)) ||
@@ -221,20 +281,191 @@ namespace WasteCity.Research
             float ratio = Math.Max(0f, Math.Min(1f, inheritedProgressRatio));
             Active = definition;
             Remaining = Math.Max(.001f, definition.Duration * (1f - ratio));
+            persistenceRevision++;
             return true;
         }
         public bool Tick(float delta)
         {
             if (Active == null) return false; Remaining -= Math.Max(0f, delta); if (Remaining > 0.0001f) return false;
-            ResearchDefinition finished = Active; completed.Add(finished.Id); Active = null; Remaining = 0f; Completed?.Invoke(finished); return true;
+            ResearchDefinition finished = Active; completed.Add(finished.Id); Active = null; Remaining = 0f; persistenceRevision++; Completed?.Invoke(finished); return true;
         }
         public bool IsCompleted(StableId id) => completed.Contains(id);
         public string[] CaptureCompleted()=>completed.Select(id=>id.Value)
             .OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        public ResearchPersistenceSnapshot CaptureForPersistence()
+        {
+            var ids = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (StableId id in completed) ids.Add(id.Value);
+            foreach (string id in orphanCompletedIds) ids.Add(id);
+            return new ResearchPersistenceSnapshot(
+                ids.ToArray(),
+                Active?.Id.Value ?? missingActiveResearchId,
+                Active != null || HasMissingActiveResearch ? Remaining : 0f);
+        }
+
+        public bool TryPrepareRestoreForPersistence(
+            IReadOnlyList<string> completedResearchIds,
+            string activeResearchId,
+            float remainingSeconds,
+            Func<string, ResearchDefinition> knownDefinitionResolver,
+            out ResearchRestorePlan plan,
+            out string error)
+        {
+            plan = null;
+            if (completedResearchIds == null ||
+                knownDefinitionResolver == null)
+            {
+                error = "科技恢复数据或目录解析器不能为空";
+                return false;
+            }
+            if (float.IsNaN(remainingSeconds) ||
+                float.IsInfinity(remainingSeconds) ||
+                remainingSeconds < 0f)
+            {
+                error = "活动科技剩余时间无效";
+                return false;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var known = new List<StableId>();
+            var unknown = new List<string>();
+            for (var index = 0; index < completedResearchIds.Count; index++)
+            {
+                string id = completedResearchIds[index];
+                if (!TryCreateStableId(id, out StableId stableId) ||
+                    !seen.Add(id))
+                {
+                    error = "已完成科技 ID 无效或重复";
+                    return false;
+                }
+                ResearchDefinition definition;
+                try
+                {
+                    definition = knownDefinitionResolver(id);
+                }
+                catch
+                {
+                    error = "科技目录解析失败";
+                    return false;
+                }
+                if (definition != null)
+                {
+                    if (!string.Equals(
+                            definition.Id.Value,
+                            id,
+                            StringComparison.Ordinal))
+                    {
+                        error = "科技目录返回了不匹配的定义";
+                        return false;
+                    }
+                    known.Add(stableId);
+                }
+                else
+                {
+                    unknown.Add(id);
+                }
+            }
+
+            ResearchDefinition active = null;
+            string missingActive = null;
+            if (string.IsNullOrEmpty(activeResearchId))
+            {
+                if (remainingSeconds != 0f)
+                {
+                    error = "没有活动科技时剩余时间必须为零";
+                    return false;
+                }
+            }
+            else
+            {
+                if (!TryCreateStableId(activeResearchId, out _) ||
+                    seen.Contains(activeResearchId))
+                {
+                    error = "活动科技 ID 无效或已经完成";
+                    return false;
+                }
+                try
+                {
+                    active = knownDefinitionResolver(activeResearchId);
+                }
+                catch
+                {
+                    error = "科技目录解析失败";
+                    return false;
+                }
+                if (active != null && !string.Equals(
+                        active.Id.Value,
+                        activeResearchId,
+                        StringComparison.Ordinal))
+                {
+                    error = "科技目录返回了不匹配的活动定义";
+                    return false;
+                }
+                if (active == null) missingActive = activeResearchId;
+            }
+
+            known.Sort((left, right) => string.CompareOrdinal(
+                left.Value,
+                right.Value));
+            unknown.Sort(StringComparer.Ordinal);
+            plan = new ResearchRestorePlan(
+                this,
+                persistenceRevision,
+                known.ToArray(),
+                unknown.ToArray(),
+                active,
+                missingActive,
+                remainingSeconds);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryCommitRestoreForPersistence(
+            ResearchRestorePlan plan,
+            out string error)
+        {
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "科技恢复计划不属于当前模型";
+                return false;
+            }
+            if (plan.Committed)
+            {
+                error = "科技恢复计划已经提交";
+                return false;
+            }
+            if (plan.PreparedRevision != persistenceRevision)
+            {
+                error = "科技状态已变化，请重新准备恢复计划";
+                return false;
+            }
+
+            completed.Clear();
+            for (var index = 0; index < plan.Completed.Length; index++)
+                completed.Add(plan.Completed[index]);
+            orphanCompletedIds.Clear();
+            for (var index = 0;
+                 index < plan.OrphanCompletedIds.Length;
+                 index++)
+            {
+                orphanCompletedIds.Add(plan.OrphanCompletedIds[index]);
+            }
+            Active = plan.Active;
+            missingActiveResearchId = plan.MissingActiveResearchId;
+            Remaining = plan.RemainingSeconds;
+            plan.Committed = true;
+            persistenceRevision++;
+            error = string.Empty;
+            return true;
+        }
+
         internal void GrantCompleted(ResearchDefinition definition)
         {
-            if (definition != null)
-                completed.Add(definition.Id);
+            if (definition != null && completed.Add(definition.Id))
+            {
+                orphanCompletedIds.Remove(definition.Id.Value);
+                persistenceRevision++;
+            }
         }
 
         public void GrantCompletedForDevelopment(
@@ -270,6 +501,7 @@ namespace WasteCity.Research
             }
             Active = null;
             Remaining = 0f;
+            persistenceRevision++;
             return true;
         }
 
@@ -293,6 +525,7 @@ namespace WasteCity.Research
             }
             Active = null;
             Remaining = 0f;
+            persistenceRevision++;
             return true;
         }
 
@@ -358,7 +591,24 @@ namespace WasteCity.Research
         public void Restore(string[] completedIds,string activeId,float remaining)
         {
             completed.Clear();if(completedIds!=null)foreach(string id in completedIds){var definition=ResearchCatalog.Find(id);if(definition!=null)completed.Add(definition.Id);}
-            Active=ResearchCatalog.Find(activeId);Remaining=Active==null?0f:Math.Max(0.001f,Math.Min(Active.Duration,remaining));
+            orphanCompletedIds.Clear();missingActiveResearchId=null;
+            Active=ResearchCatalog.Find(activeId);Remaining=Active==null?0f:Math.Max(0.001f,Math.Min(Active.Duration,remaining));persistenceRevision++;
+        }
+
+        private static bool TryCreateStableId(
+            string value,
+            out StableId stableId)
+        {
+            try
+            {
+                stableId = new StableId(value);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                stableId = default;
+                return false;
+            }
         }
     }
 }

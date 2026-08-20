@@ -261,6 +261,7 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
         "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
@@ -278,6 +279,7 @@
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
@@ -318,7 +320,8 @@
         "Assets/_Game/Scripts/Research/**",
         "Assets/_Game/Scripts/Population/**",
         "Assets/_Game/Scripts/Progression/**",
-        "Assets/_Game/Scripts/Narrative/**"
+        "Assets/_Game/Scripts/Narrative/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
@@ -327,6 +330,7 @@
       "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
         "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
@@ -340,7 +344,8 @@
         "DOC-0001",
         "IDEA-0011",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -409,7 +414,8 @@
       "Id": "persistence-migration",
       "ChineseName": "持久化与迁移",
       "SourceGlobs": [
-        "Assets/_Game/Scripts/Persistence/**"
+        "Assets/_Game/Scripts/Persistence/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**"
@@ -420,6 +426,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "ScenePaths": [
@@ -1028,6 +1035,29 @@
       ]
     },
     {
+      "Id": "graybox-economy-save-adapter-3d",
+      "ChineseName": "三维背包合成与科技存档适配器",
+      "TypeNames": [
+        "GrayboxEconomySaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 DemoResearchRuntime 捕获 schema 31 背包、合成与科技 DTO；恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。",
+      "BoundarySummary": "只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+        "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
       "Id": "building-input-router-3d",
       "ChineseName": "三维建筑输入路由",
       "TypeNames": [
@@ -1306,6 +1336,8 @@
       "ChineseName": "玩家背包模型",
       "TypeNames": [
         "BackpackSlot",
+        "PlayerBackpackRestoreSlot",
+        "PlayerBackpackRestorePlan",
         "PlayerBackpackModel"
       ],
       "AssetPaths": [
@@ -1313,13 +1345,15 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换。",
-      "BoundarySummary": "只拥有背包槽位状态；不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入和界面表现。",
+      "UseSummary": "管理三十格会话背包及稳定堆叠、拆分、逐个移动、整栈合并与交换；schema 31 通过深拷贝的固定索引 snapshot、零写入 prepare 和 owner-bound 单次 commit 恢复，按各资源正式栈上限验证并可显式保留配置变化后的超栈。",
+      "BoundarySummary": "只拥有背包槽位状态；未知稳定资源保留在原槽且不可正常存取或移动。模型不访问城市或建筑库存，不判定交互资格，不处理 Unity 输入、UI、文件 IO 或内容配置兼容决策；调用方必须显式决定是否允许超栈恢复。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs"
+        "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {
@@ -1347,6 +1381,9 @@
       "Id": "crafting-queue-model",
       "ChineseName": "应急合成队列",
       "TypeNames": [
+        "CraftingQueueRestoreEntry",
+        "CraftingQueueExecutionSnapshot",
+        "CraftingQueueRestorePlan",
         "CraftingQueueModel"
       ],
       "AssetPaths": [
@@ -1354,13 +1391,15 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还。",
-      "BoundarySummary": "只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；不访问城市或建筑库存，不自动合成前置材料，不解释鼠标手势，也不进入 schema 30 存档。",
+      "UseSummary": "管理最多 20 次执行的 FIFO 应急合成队列，在入队时原子预留背包输入，并处理暂停、产出阻塞和取消返还；schema 31 公开捕获稳定执行 ID、预留输入、活动进度与 nextQueueOrdinal，并以绑定 revision/owner 的 prepare/commit 恢复。",
+      "BoundarySummary": "只拥有当前会话的合成队列、预留材料、活动进度和阻塞原因；恢复不会再次扣除已预留输入，未知配方保留为 MissingContent 暂停项并允许取消退款。模型不访问城市或建筑库存，不解释鼠标手势，不拥有文件 IO，也不把当前队列最大 ID 当作历史高水位。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs"
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {
@@ -1686,6 +1725,8 @@
       "Id": "research-model",
       "ChineseName": "研究模型",
       "TypeNames": [
+        "ResearchPersistenceSnapshot",
+        "ResearchRestorePlan",
         "ResearchModel"
       ],
       "AssetPaths": [
@@ -1693,13 +1734,17 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用于管理研究状态。",
-      "BoundarySummary": "不展示研究界面。",
+      "UseSummary": "管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。",
+      "BoundarySummary": "未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/ResearchTests.cs"
+        "Assets/_Game/Tests/EditMode/ResearchTests.cs",
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {
@@ -1733,13 +1778,15 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款。",
-      "BoundarySummary": "只拥有当前 3D 会话的研究规则适配；调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实。它不处理 Unity 输入、UI、关注度、战斗效果或 schema 30 存档。",
+      "UseSummary": "组合统一研究模型与六节点 release profile，提交研究启动、模式倍率推进、研究站暂停和 80% 原子取消退款，并以该 release profile 显式解析 schema 31 的已知与未知科技恢复状态。",
+      "BoundarySummary": "只拥有当前 3D 会话的研究规则适配；未知已完成科技不授予效果，未知活动科技暂停且可由持久化快照继续保留。调用方仍须提供合格研究站、城市模式、全局暂停、城市库存与容量事实；它不处理 Unity 输入、UI、文件 IO、关注度或战斗效果。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {

@@ -440,12 +440,16 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "BackpackSlot",
+                    "PlayerBackpackRestoreSlot",
+                    "PlayerBackpackRestorePlan",
                     "PlayerBackpackModel",
                 },
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
-                });
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+                },
+                new[] { "IDEA-0011", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "resource-recipe-catalog"),
                 new[]
@@ -469,12 +473,17 @@ namespace WasteCity.Tests
                 },
                 new[]
                 {
+                    "CraftingQueueRestoreEntry",
+                    "CraftingQueueExecutionSnapshot",
+                    "CraftingQueueRestorePlan",
                     "CraftingQueueModel",
                 },
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
-                });
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+                },
+                new[] { "IDEA-0011", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "manual-resource-access-rules"),
                 new[]
@@ -896,8 +905,9 @@ namespace WasteCity.Tests
             CollectionAssert.AreEqual(new[]
             {
                 "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
             }, demoRuntime.RequiredTestFiles);
-            CollectionAssert.AreEqual(new[] { "IDEA-0011" },
+            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0015" },
                 demoRuntime.RequirementIds);
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Collections.Generic;
 using NUnit.Framework;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -365,12 +366,327 @@ namespace WasteCity.Tests
                 Is.EqualTo(1));
         }
 
+        [Test]
+        public void PersistentExecutionsOwnStableIdsReservationsAndHighWater()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Iron, 12);
+            var queue = new CraftingQueueModel(backpack, _ => true);
+
+            Assert.That(queue.TryEnqueue(
+                ResourceRecipeCatalog.FieldAlloyId,
+                2), Is.True);
+            CraftingQueueExecutionSnapshot[] first =
+                queue.CaptureExecutions();
+
+            Assert.That(first, Has.Length.EqualTo(2));
+            Assert.That(first[0].StableExecutionId,
+                Is.EqualTo("craft.execution.000001"));
+            Assert.That(first[1].StableExecutionId,
+                Is.EqualTo("craft.execution.000002"));
+            Assert.That(first[0].RecipeId,
+                Is.EqualTo(ResourceRecipeCatalog.FieldAlloyId));
+            Assert.That(first[0].ReservedInputs, Has.Count.EqualTo(1));
+            Assert.That(first[0].ReservedInputs[0].ResourceId,
+                Is.EqualTo(ResourceIds.Iron));
+            Assert.That(first[0].ReservedInputs[0].Amount, Is.EqualTo(4));
+            Assert.That(queue.NextQueueOrdinal, Is.EqualTo(3));
+
+            first[0] = null;
+            Assert.That(queue.CaptureExecutions()[0], Is.Not.Null,
+                "Capture must not expose the authoritative execution list.");
+            Assert.That(queue.TryCancelAt(0), Is.True);
+            Assert.That(queue.TryEnqueue(
+                ResourceRecipeCatalog.FieldAlloyId,
+                1), Is.True);
+            CraftingQueueExecutionSnapshot[] second =
+                queue.CaptureExecutions();
+            Assert.That(second[1].StableExecutionId,
+                Is.EqualTo("craft.execution.000003"));
+            Assert.That(queue.NextQueueOrdinal, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void PrepareIsZeroWriteAndCommitRestoresWithoutDeductingBackpack()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Stone, 9);
+            var queue = new CraftingQueueModel(backpack, _ => true);
+            var entries = new[]
+            {
+                Execution(
+                    "craft.execution.000007",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            };
+
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                restoredNextQueueOrdinal: 42,
+                restoredActiveProgressSeconds: 6f,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(queue.QueuedExecutionCount, Is.Zero);
+            Assert.That(queue.NextQueueOrdinal, Is.EqualTo(1));
+            Assert.That(BackpackAmount(backpack, ResourceIds.Stone),
+                Is.EqualTo(9));
+
+            Assert.That(queue.TryCommitRestore(plan, out error), Is.True,
+                error);
+            Assert.That(queue.QueuedExecutionCount, Is.EqualTo(1));
+            Assert.That(queue.ActiveProgressSeconds, Is.EqualTo(6f));
+            Assert.That(queue.NextQueueOrdinal, Is.EqualTo(42));
+            Assert.That(BackpackAmount(backpack, ResourceIds.Stone),
+                Is.EqualTo(9));
+            Assert.That(BackpackAmount(backpack, ResourceIds.Iron), Is.Zero,
+                "Restore must not reserve the same input a second time.");
+        }
+
+        [Test]
+        public void UnknownRecipeRestoresPausedAndCancelsItsSavedReservation()
+        {
+            var backpack = new PlayerBackpackModel();
+            var queue = new CraftingQueueModel(backpack, _ => true);
+            var entries = new[]
+            {
+                Execution(
+                    "craft.execution.000009",
+                    "mod.crafting.missing-recipe",
+                    new ResourceAmount(ResourceIds.Iron, 7)),
+                Execution(
+                    "craft.execution.000010",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            };
+
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                50,
+                3.5f,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(queue.TryCommitRestore(plan, out error), Is.True,
+                error);
+            Assert.That(queue.BlockReason,
+                Is.EqualTo(CraftingQueueBlockReason.MissingContent));
+
+            queue.Tick(100f, globallyPaused: false);
+            Assert.That(queue.ActiveProgressSeconds, Is.EqualTo(3.5f));
+            Assert.That(queue.QueuedExecutionCount, Is.EqualTo(2));
+            Assert.That(queue.TryCancelAt(0), Is.True);
+            Assert.That(BackpackAmount(backpack, ResourceIds.Iron),
+                Is.EqualTo(7));
+            Assert.That(queue.ActiveRecipeId,
+                Is.EqualTo(ResourceRecipeCatalog.FieldAlloyId));
+            Assert.That(queue.ActiveProgressSeconds, Is.Zero);
+            Assert.That(queue.BlockReason,
+                Is.EqualTo(CraftingQueueBlockReason.None));
+        }
+
+        [Test]
+        public void UnknownRecipeCancellationRefundsUnknownReservationIntoOrphanSlot()
+        {
+            const string unknownRecipeId = "mod.crafting.missing-recipe";
+            const string unknownResourceId = "mod.resource.dark-matter";
+            var backpack = new PlayerBackpackModel();
+            var queue = new CraftingQueueModel(backpack, _ => true);
+            var entries = new[]
+            {
+                Execution(
+                    "craft.execution.000011",
+                    unknownRecipeId,
+                    new ResourceAmount(unknownResourceId, 7)),
+            };
+
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                12,
+                1f,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(queue.TryCommitRestore(plan, out error), Is.True,
+                error);
+            Assert.That(queue.TryCancelAt(0), Is.True,
+                "A missing recipe must return its preserved unknown input.");
+            Assert.That(queue.QueuedExecutionCount, Is.Zero);
+            Assert.That(backpack.GetSlot(0).ResourceId,
+                Is.EqualTo(unknownResourceId));
+            Assert.That(backpack.GetSlot(0).Amount, Is.EqualTo(7));
+            Assert.That(backpack.Add(unknownResourceId, 1), Is.Zero);
+            Assert.That(backpack.Remove(unknownResourceId, 1), Is.Zero);
+            Assert.That(backpack.GetSlot(0).Amount, Is.EqualTo(7),
+                "Unknown refunded content remains an inert orphan stack.");
+        }
+
+        [Test]
+        public void RestoreValidationRejectsInvalidQueueWithoutMutation()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Iron, 4);
+            var queue = new CraftingQueueModel(backpack, _ => true);
+            Assert.That(queue.TryEnqueue(
+                ResourceRecipeCatalog.FieldAlloyId,
+                1), Is.True);
+            CraftingQueueExecutionSnapshot[] before =
+                queue.CaptureExecutions();
+            int highWaterBefore = queue.NextQueueOrdinal;
+
+            var tooMany = new List<CraftingQueueExecutionSnapshot>();
+            for (int index = 1;
+                 index <= CraftingQueueModel.MaximumQueuedExecutions + 1;
+                 index++)
+            {
+                tooMany.Add(Execution(
+                    $"craft.execution.{index:000000}",
+                    "mod.crafting.missing-recipe"));
+            }
+            AssertPrepareRejected(queue, tooMany, 30, 0f);
+            AssertPrepareRejected(queue, new[]
+            {
+                Execution("bad.execution.000001",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            }, 2, 0f);
+            AssertPrepareRejected(queue, new[]
+            {
+                Execution("craft.execution.000002",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+                Execution("craft.execution.000002",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            }, 3, 0f);
+            AssertPrepareRejected(queue, new[]
+            {
+                Execution("craft.execution.000002",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            }, 2, 0f);
+            AssertPrepareRejected(queue, new[]
+            {
+                Execution("craft.execution.000002",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, -1)),
+            }, 3, 0f);
+            AssertPrepareRejected(queue,
+                new CraftingQueueExecutionSnapshot[0], 3, 1f);
+            AssertPrepareRejected(queue, new[]
+            {
+                Execution("craft.execution.000002",
+                    FormalProductionDefinitionCatalog.Smelting.Id),
+            }, 3, 0f);
+
+            Assert.That(queue.NextQueueOrdinal, Is.EqualTo(highWaterBefore));
+            Assert.That(queue.CaptureExecutions()[0].StableExecutionId,
+                Is.EqualTo(before[0].StableExecutionId));
+            Assert.That(queue.QueuedExecutionCount, Is.EqualTo(1));
+            Assert.That(BackpackAmount(backpack, ResourceIds.Iron), Is.Zero);
+        }
+
+        [Test]
+        public void RestoreRecomputesOutputFullWithoutCompletingTheExecution()
+        {
+            var backpack = new PlayerBackpackModel();
+            Assert.That(backpack.Add(ResourceIds.Stone, 3000),
+                Is.EqualTo(3000));
+            var queue = new CraftingQueueModel(backpack, _ => true);
+            var entries = new[]
+            {
+                Execution(
+                    "craft.execution.000004",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            };
+
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                8,
+                12f,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(queue.TryCommitRestore(plan, out error), Is.True,
+                error);
+            Assert.That(queue.BlockReason,
+                Is.EqualTo(CraftingQueueBlockReason.OutputFull));
+            Assert.That(queue.QueuedExecutionCount, Is.EqualTo(1));
+            Assert.That(BackpackAmount(backpack, ResourceIds.Alloy), Is.Zero);
+
+            backpack.Remove(ResourceIds.Stone, 100);
+            queue.Tick(.1f, globallyPaused: false);
+            Assert.That(queue.QueuedExecutionCount, Is.Zero);
+            Assert.That(BackpackAmount(backpack, ResourceIds.Alloy),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RestoredKnownRecipeWaitsForItsCurrentResearchRequirement()
+        {
+            var researchCompleted = false;
+            var backpack = new PlayerBackpackModel();
+            var queue = new CraftingQueueModel(
+                backpack,
+                _ => researchCompleted);
+            var entries = new[]
+            {
+                Execution(
+                    "craft.execution.000005",
+                    ResourceRecipeCatalog.FieldAlloyId,
+                    new ResourceAmount(ResourceIds.Iron, 4)),
+            };
+
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                9,
+                2f,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(queue.TryCommitRestore(plan, out error), Is.True,
+                error);
+            Assert.That(queue.BlockReason,
+                Is.EqualTo(CraftingQueueBlockReason.ResearchRequired));
+            queue.Tick(5f, globallyPaused: false);
+            Assert.That(queue.ActiveProgressSeconds, Is.EqualTo(2f));
+
+            researchCompleted = true;
+            queue.Tick(5f, globallyPaused: false);
+            Assert.That(queue.ActiveProgressSeconds, Is.EqualTo(7f));
+            Assert.That(queue.BlockReason,
+                Is.EqualTo(CraftingQueueBlockReason.None));
+        }
+
         private static PlayerBackpackModel BackpackForTwoRecipes()
         {
             var backpack = new PlayerBackpackModel();
             backpack.Add(ResourceIds.Iron, 4);
             backpack.Add(ResourceIds.Alloy, 4);
             return backpack;
+        }
+
+        private static CraftingQueueExecutionSnapshot Execution(
+            string stableExecutionId,
+            string recipeId,
+            params ResourceAmount[] reservedInputs)
+        {
+            return new CraftingQueueExecutionSnapshot(
+                stableExecutionId,
+                recipeId,
+                reservedInputs);
+        }
+
+        private static void AssertPrepareRejected(
+            CraftingQueueModel queue,
+            IReadOnlyList<CraftingQueueExecutionSnapshot> entries,
+            int nextOrdinal,
+            float progress)
+        {
+            Assert.That(queue.TryPrepareRestore(
+                entries,
+                nextOrdinal,
+                progress,
+                out CraftingQueueRestorePlan plan,
+                out string error), Is.False);
+            Assert.That(plan, Is.Null);
+            Assert.That(error, Is.Not.Empty);
         }
 
         private static void EnqueueTwoDifferentRecipes(

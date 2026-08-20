@@ -584,6 +584,198 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void FormalRestorePreservesSortedKnownAndUnknownCompletedIds()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            string unknown = "mod.example.research";
+
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                new[]
+                {
+                    unknown,
+                    DemoResearchCatalog.ScrapProcessingId,
+                    DemoResearchCatalog.BasicMetallurgyId,
+                },
+                null,
+                0f,
+                out ResearchRestorePlan plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                plan, out string commitError), Is.True, commitError);
+
+            Assert.That(runtime.IsCompleted(
+                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+            Assert.That(runtime.IsCompleted(unknown), Is.False,
+                "Unknown completed content must not grant runtime effects.");
+            ResearchPersistenceSnapshot snapshot =
+                runtime.CaptureForPersistence();
+            Assert.That(snapshot.CompletedResearchIds, Is.EqualTo(new[]
+            {
+                DemoResearchCatalog.BasicMetallurgyId,
+                DemoResearchCatalog.ScrapProcessingId,
+                unknown,
+            }));
+            Assert.That(snapshot.ActiveResearchId, Is.Null);
+            Assert.That(snapshot.RemainingSeconds, Is.Zero);
+        }
+
+        [Test]
+        public void FormalKnownActiveRestoreUsesDemoObjectAndNeverChargesAgain()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            var city = new ResourceInventory(100);
+            city.Add(ResourceIds.Iron, 10);
+
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                new[] { DemoResearchCatalog.ScrapProcessingId },
+                DemoResearchCatalog.BasicMetallurgyId,
+                7.25f,
+                out ResearchRestorePlan plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                plan, out string commitError), Is.True, commitError);
+
+            Assert.That(model.Active, Is.SameAs(DemoResearchCatalog.Find(
+                DemoResearchCatalog.BasicMetallurgyId)));
+            Assert.That(model.Remaining, Is.EqualTo(7.25f));
+            Assert.That(city.Get(ResourceIds.Iron), Is.EqualTo(10),
+                "Persistence restore must not call Start or charge costs.");
+            Assert.That(runtime.Tick(
+                7.25f,
+                CityMode.Fortress,
+                globallyPaused: false,
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(runtime.IsCompleted(
+                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+        }
+
+        [Test]
+        public void FormalUnknownActiveIsObservableFrozenAndRoundTripsExactly()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            var city = new ResourceInventory(100);
+            city.Add(ResourceIds.Iron, 10);
+            const string unknown = "mod.example.active-research";
+
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                new[] { DemoResearchCatalog.ScrapProcessingId },
+                unknown,
+                13.75f,
+                out ResearchRestorePlan plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                plan, out string commitError), Is.True, commitError);
+
+            Assert.That(runtime.HasMissingActiveResearch, Is.True);
+            Assert.That(runtime.MissingActiveResearchId, Is.EqualTo(unknown));
+            Assert.That(runtime.MissingActiveRemainingSeconds,
+                Is.EqualTo(13.75f));
+            Assert.That(model.Active, Is.Null);
+            Assert.That(runtime.TryStart(
+                DemoResearchCatalog.BasicMetallurgyId,
+                city,
+                hasEligibleResearchStation: true), Is.False);
+            Assert.That(runtime.Tick(
+                100f,
+                CityMode.Fortress,
+                globallyPaused: false,
+                hasEligibleResearchStation: true), Is.False);
+            Assert.That(runtime.TryCancel(
+                city,
+                new ResourceCapacityPolicy(),
+                activeWarehouseCount: 0), Is.False);
+            Assert.That(city.Get(ResourceIds.Iron), Is.EqualTo(10));
+            Assert.That(runtime.MissingActiveRemainingSeconds,
+                Is.EqualTo(13.75f));
+            ResearchPersistenceSnapshot snapshot =
+                runtime.CaptureForPersistence();
+            Assert.That(snapshot.ActiveResearchId, Is.EqualTo(unknown));
+            Assert.That(snapshot.RemainingSeconds, Is.EqualTo(13.75f));
+        }
+
+        [Test]
+        public void FormalPrepareRejectsInvalidTruthWithoutMutation()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            ResearchPersistenceSnapshot before =
+                runtime.CaptureForPersistence();
+
+            AssertInvalidFormalRestore(
+                runtime,
+                new[] { "bad id" },
+                null,
+                0f);
+            AssertInvalidFormalRestore(
+                runtime,
+                new[]
+                {
+                    DemoResearchCatalog.ScrapProcessingId,
+                    DemoResearchCatalog.ScrapProcessingId,
+                },
+                null,
+                0f);
+            AssertInvalidFormalRestore(
+                runtime,
+                new[] { DemoResearchCatalog.BasicMetallurgyId },
+                DemoResearchCatalog.BasicMetallurgyId,
+                1f);
+            AssertInvalidFormalRestore(runtime, new string[0], null, 1f);
+            AssertInvalidFormalRestore(
+                runtime,
+                new string[0],
+                DemoResearchCatalog.BasicMetallurgyId,
+                float.NaN);
+
+            ResearchPersistenceSnapshot after =
+                runtime.CaptureForPersistence();
+            Assert.That(after.CompletedResearchIds,
+                Is.EqualTo(before.CompletedResearchIds));
+            Assert.That(after.ActiveResearchId,
+                Is.EqualTo(before.ActiveResearchId));
+            Assert.That(after.RemainingSeconds,
+                Is.EqualTo(before.RemainingSeconds));
+        }
+
+        [Test]
+        public void FormalRestorePlanRejectsStaleAndRepeatedCommit()
+        {
+            var model = new ResearchModel();
+            var runtime = new DemoResearchRuntime(model);
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                new[] { DemoResearchCatalog.ScrapProcessingId },
+                null,
+                0f,
+                out ResearchRestorePlan stale,
+                out string prepareError), Is.True, prepareError);
+
+            model.GrantCompletedForDevelopment(
+                DemoResearchCatalog.Find(
+                    DemoResearchCatalog.BasicMetallurgyId));
+
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                stale, out string staleError), Is.False);
+            Assert.That(staleError, Is.Not.Empty);
+            Assert.That(runtime.IsCompleted(
+                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                new[] { DemoResearchCatalog.ScrapProcessingId },
+                null,
+                0f,
+                out ResearchRestorePlan current,
+                out prepareError), Is.True, prepareError);
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                current, out string commitError), Is.True, commitError);
+            Assert.That(runtime.TryCommitRestoreForPersistence(
+                current, out string repeatedError), Is.False);
+            Assert.That(repeatedError, Is.Not.Empty);
+        }
+
+        [Test]
         public void DevelopmentUnlockPreservesDemoRootOnTheSharedSessionModel()
         {
             var root = new GameObject("Research Session Test");
@@ -622,6 +814,22 @@ namespace WasteCity.Tests
                 city,
                 hasEligibleResearchStation: true), Is.True);
             return runtime;
+        }
+
+        private static void AssertInvalidFormalRestore(
+            DemoResearchRuntime runtime,
+            IReadOnlyList<string> completed,
+            string active,
+            float remaining)
+        {
+            Assert.That(runtime.TryPrepareRestoreForPersistence(
+                completed,
+                active,
+                remaining,
+                out ResearchRestorePlan plan,
+                out string error), Is.False);
+            Assert.That(plan, Is.Null);
+            Assert.That(error, Is.Not.Empty);
         }
 
         private static GrayboxBuildingSession3D CreateDevelopmentSession(

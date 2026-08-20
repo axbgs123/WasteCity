@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using WasteCity.City;
 using WasteCity.Economy;
 
@@ -15,6 +16,40 @@ namespace WasteCity.Research
         }
 
         public ResearchModel Model { get; }
+        public bool HasMissingActiveResearch =>
+            Model.HasMissingActiveResearch;
+        public string MissingActiveResearchId =>
+            Model.MissingActiveResearchId;
+        public float MissingActiveRemainingSeconds =>
+            HasMissingActiveResearch ? Model.Remaining : 0f;
+
+        public ResearchPersistenceSnapshot CaptureForPersistence()
+        {
+            return Model.CaptureForPersistence();
+        }
+
+        public bool TryPrepareRestoreForPersistence(
+            IReadOnlyList<string> completedResearchIds,
+            string activeResearchId,
+            float remainingSeconds,
+            out ResearchRestorePlan plan,
+            out string error)
+        {
+            return Model.TryPrepareRestoreForPersistence(
+                completedResearchIds,
+                activeResearchId,
+                remainingSeconds,
+                DemoResearchCatalog.Find,
+                out plan,
+                out error);
+        }
+
+        public bool TryCommitRestoreForPersistence(
+            ResearchRestorePlan plan,
+            out string error)
+        {
+            return Model.TryCommitRestoreForPersistence(plan, out error);
+        }
 
         public bool IsCompleted(string researchId)
         {

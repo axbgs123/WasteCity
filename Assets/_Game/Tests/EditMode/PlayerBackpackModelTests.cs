@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using WasteCity.Economy;
 
@@ -260,6 +261,190 @@ namespace WasteCity.Tests
             Assert.That(TotalAll(backpack), Is.Zero);
             for (int index = 0; index < backpack.SlotCount; index++)
                 AssertEmpty(backpack, index);
+        }
+
+        [Test]
+        public void RestoreCaptureIsADeepOrderedThirtySlotSnapshot()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Iron, 125);
+
+            PlayerBackpackRestoreSlot[] snapshot =
+                backpack.CaptureRestoreSlots();
+
+            Assert.That(snapshot, Has.Length.EqualTo(30));
+            for (int index = 0; index < snapshot.Length; index++)
+                Assert.That(snapshot[index].SlotIndex, Is.EqualTo(index));
+            Assert.That(snapshot[0].ResourceId, Is.EqualTo(ResourceIds.Iron));
+            Assert.That(snapshot[0].Amount, Is.EqualTo(100));
+            snapshot[0] = new PlayerBackpackRestoreSlot(
+                0,
+                ResourceIds.Stone,
+                1);
+            AssertSlot(backpack, 0, ResourceIds.Iron, 100);
+        }
+
+        [Test]
+        public void PrepareIsZeroWriteAndCommitRestoresEverySlotExactlyOnce()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Stone, 7);
+            PlayerBackpackRestoreSlot[] restored = EmptyRestoreSlots();
+            restored[4] = new PlayerBackpackRestoreSlot(
+                4,
+                ResourceIds.Alloy,
+                23);
+
+            Assert.That(backpack.TryPrepareRestore(
+                restored,
+                allowOverStack: false,
+                out PlayerBackpackRestorePlan plan,
+                out string error), Is.True, error);
+            AssertSlot(backpack, 0, ResourceIds.Stone, 7);
+            Assert.That(plan.SlotCount, Is.EqualTo(30));
+
+            restored[4] = new PlayerBackpackRestoreSlot(
+                4,
+                ResourceIds.Iron,
+                99);
+            Assert.That(backpack.TryCommitRestore(plan, out error),
+                Is.True, error);
+            AssertEmpty(backpack, 0);
+            AssertSlot(backpack, 4, ResourceIds.Alloy, 23);
+            Assert.That(backpack.TryCommitRestore(plan, out _), Is.False);
+            AssertSlot(backpack, 4, ResourceIds.Alloy, 23);
+        }
+
+        [Test]
+        public void PrepareRejectsMalformedSlotsWithoutChangingTheBackpack()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Biomass, 9);
+            PlayerBackpackRestoreSlot[] wrongIndex = EmptyRestoreSlots();
+            wrongIndex[3] = new PlayerBackpackRestoreSlot(2, null, 0);
+            PlayerBackpackRestoreSlot[] negative = EmptyRestoreSlots();
+            negative[3] = new PlayerBackpackRestoreSlot(
+                3,
+                ResourceIds.Iron,
+                -1);
+            PlayerBackpackRestoreSlot[] mismatchedEmpty = EmptyRestoreSlots();
+            mismatchedEmpty[3] = new PlayerBackpackRestoreSlot(
+                3,
+                ResourceIds.Iron,
+                0);
+            PlayerBackpackRestoreSlot[] invalidId = EmptyRestoreSlots();
+            invalidId[3] = new PlayerBackpackRestoreSlot(
+                3,
+                "INVALID",
+                1);
+
+            AssertPrepareFails(backpack, null);
+            AssertPrepareFails(
+                backpack,
+                new List<PlayerBackpackRestoreSlot>());
+            AssertPrepareFails(backpack, wrongIndex);
+            AssertPrepareFails(backpack, negative);
+            AssertPrepareFails(backpack, mismatchedEmpty);
+            AssertPrepareFails(backpack, invalidId);
+            AssertSlot(backpack, 0, ResourceIds.Biomass, 9);
+        }
+
+        [Test]
+        public void RestoreUsesPerResourceStackLimitAndCanPreserveChangedConfigOverstack()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Stone, 6);
+            PlayerBackpackRestoreSlot[] restored = EmptyRestoreSlots();
+            restored[8] = new PlayerBackpackRestoreSlot(
+                8,
+                ResourceIds.Iron,
+                101);
+
+            Assert.That(backpack.TryPrepareRestore(
+                restored,
+                allowOverStack: false,
+                out _,
+                out _), Is.False);
+            AssertSlot(backpack, 0, ResourceIds.Stone, 6);
+            Assert.That(backpack.TryPrepareRestore(
+                restored,
+                allowOverStack: true,
+                out PlayerBackpackRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(backpack.TryCommitRestore(plan, out error),
+                Is.True, error);
+            AssertSlot(backpack, 8, ResourceIds.Iron, 101);
+        }
+
+        [Test]
+        public void UnknownStableResourceRemainsInItsSlotAndCannotBeUsedNormally()
+        {
+            const string unknownResourceId = "mod.resource.dark-matter";
+            var backpack = new PlayerBackpackModel();
+            PlayerBackpackRestoreSlot[] restored = EmptyRestoreSlots();
+            restored[5] = new PlayerBackpackRestoreSlot(
+                5,
+                unknownResourceId,
+                13);
+
+            Assert.That(backpack.TryPrepareRestore(
+                restored,
+                allowOverStack: false,
+                out PlayerBackpackRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(backpack.TryCommitRestore(plan, out error),
+                Is.True, error);
+
+            AssertSlot(backpack, 5, unknownResourceId, 13);
+            Assert.That(backpack.Add(unknownResourceId, 1), Is.Zero);
+            Assert.That(backpack.Remove(unknownResourceId, 1), Is.Zero);
+            Assert.That(backpack.SplitHalf(5, 6), Is.False);
+            Assert.That(backpack.MoveOne(5, 6), Is.False);
+            Assert.That(backpack.MoveWholeStack(5, 6), Is.False);
+            AssertSlot(backpack, 5, unknownResourceId, 13);
+        }
+
+        [Test]
+        public void RestorePlanIsBoundToItsOwner()
+        {
+            var source = new PlayerBackpackModel();
+            var other = new PlayerBackpackModel();
+            PlayerBackpackRestoreSlot[] restored = EmptyRestoreSlots();
+            restored[2] = new PlayerBackpackRestoreSlot(
+                2,
+                ResourceIds.Water,
+                4);
+            Assert.That(source.TryPrepareRestore(
+                restored,
+                allowOverStack: false,
+                out PlayerBackpackRestorePlan plan,
+                out string error), Is.True, error);
+
+            Assert.That(other.TryCommitRestore(plan, out _), Is.False);
+            AssertEmpty(other, 2);
+            Assert.That(source.TryCommitRestore(plan, out error),
+                Is.True, error);
+            AssertSlot(source, 2, ResourceIds.Water, 4);
+        }
+
+        private static PlayerBackpackRestoreSlot[] EmptyRestoreSlots()
+        {
+            var slots = new PlayerBackpackRestoreSlot[30];
+            for (int index = 0; index < slots.Length; index++)
+                slots[index] = new PlayerBackpackRestoreSlot(index, null, 0);
+            return slots;
+        }
+
+        private static void AssertPrepareFails(
+            PlayerBackpackModel backpack,
+            IReadOnlyList<PlayerBackpackRestoreSlot> slots)
+        {
+            Assert.That(backpack.TryPrepareRestore(
+                slots,
+                allowOverStack: false,
+                out _,
+                out _), Is.False);
+            AssertSlot(backpack, 0, ResourceIds.Biomass, 9);
         }
 
         private static int Total(PlayerBackpackModel backpack, string resourceId)
