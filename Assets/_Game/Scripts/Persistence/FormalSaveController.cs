@@ -1,4 +1,3 @@
-using System.IO;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using WasteCity.City;
@@ -34,10 +33,11 @@ namespace WasteCity.Persistence
         [SerializeField] TechnologyProductionController production;
         [SerializeField] FormalFriendlyUnitController friendlyUnits;
         [SerializeField] FormalTechnologyRouteController technology;
-        string SavePath => Path.Combine(Application.persistentDataPath,"formal-world.json");
-        public bool HasSave=>File.Exists(SavePath)||File.Exists(SavePath+".bak");
+        FormalSaveStore store;
+        FormalSaveStore Store=>store??(store=new FormalSaveStore(Application.persistentDataPath));
+        public bool HasSave=>Store.Probe(FormalSavePayloadKind.Legacy2D).CanContinue;
         void Update(){if(Keyboard.current==null)return;if(Keyboard.current.f5Key.wasPressedThisFrame)Save();if(Keyboard.current.f9Key.wasPressedThisFrame)Load();}
-        public void Save(){Directory.CreateDirectory(Application.persistentDataPath);if(File.Exists(SavePath))File.Copy(SavePath,SavePath+".bak",true);File.WriteAllText(SavePath,FormalSaveCodec.Encode(CaptureComplete()));}
+        public void Save(){Store.SaveLegacy(CaptureComplete());}
         public FormalSaveData Capture(){var i=economy.Inventory;var stats=statistics.Model;int hx=-1,hy=-1;buildings.TryGetGrid(localHaste.Target,out hx,out hy);return new FormalSaveData{worldSeed=8128,cityX=city.transform.position.x,cityY=city.transform.position.y,cityAutopilotActive=city.AutopilotActive,cityDestinationX=city.DestinationX,cityDestinationY=city.DestinationY,iron=i.Get(ResourceIds.Iron),energyCrystal=i.Get(ResourceIds.EnergyCrystal),stone=i.Get(ResourceIds.Stone),biomass=i.Get(ResourceIds.Biomass),water=i.Get(ResourceIds.Water),alloy=i.Get(ResourceIds.Alloy),ammunition=i.Get(ResourceIds.Ammunition),spiritIron=i.Get(ResourceIds.SpiritIron),flyingSword=i.Get(ResourceIds.FlyingSword),boneSteel=i.Get(ResourceIds.BoneSteel),biomassConcentrate=i.Get(ResourceIds.BiomassConcentrate),biologicalWeapon=i.Get(ResourceIds.BiologicalWeapon),resonanceMetal=i.Get(ResourceIds.ResonanceMetal),psionicAmplifier=i.Get(ResourceIds.PsionicAmplifier),elixir=i.Get(ResourceIds.Elixir),population=population.Model.Current,populationCapacity=population.Model.Capacity,observation=progression.Observation.Value,civilizationLevel=progression.Civilization.Level,cityHealth=cityHealth.Value.Current,legacyPathId=legacy.Model.Selected?.Id.Value,legacyLevel=legacy.Model.Level,buildings=buildings.CaptureSnapshots(),rescuedSites=rescueSites.Capture(),day=clock.Model.Day,secondsIntoDay=clock.Model.SecondsIntoDay,foresightFlashedDay=foresight.Model?.LastFlashedDay??0,hastePoolDay=localHaste.Model.PoolDay,hasteRemaining=localHaste.Model.Remaining,hasteActive=localHaste.Model.Active,hasteTargetX=hx,hasteTargetY=hy,spatialTemplate=spatialTemplate.Model.Capture(),worldResourceAmounts=worldView.Model.CaptureResourceAmounts(),worldRevealed=worldView.Model.CaptureRevealed(),territoryActivated=territory.Activated,territoryProgress=territory.Extraction.Progress,territoryLocalResources=territory.CaptureLocal(),completedResearchIds=research.Model.CaptureCompleted(),activeResearchId=research.Model.Active?.Id.Value,researchRemaining=research.Model.Remaining,productionProgress=production.CaptureProgress(),cityMode=(int)city.Deployment.Mode,deploymentRemaining=city.Deployment.Remaining,wave=combat.CaptureWave(),enemies=combat.CaptureEnemies(),guidanceStage=(int)guidance.Model.Stage,bossDefeated=progression.BossDefeated,advancementStage=(int)advancement.Model.Stage,advancementRemaining=advancement.Model.Remaining,leaderRecruited=leader.Model.Recruited,leaderInjured=leader.Model.Injured,leaderCooldown=leader.Model.Overload.CooldownRemaining,leaderBoost=leader.Model.Overload.BoostRemaining,leaderLockout=leader.Model.Overload.LockoutRemaining,leaderPositionSaved=leader.Model.Recruited,leaderX=leader.Position.x,leaderY=leader.Position.y,technologyOverloadCooldown=technology?.Model.CooldownRemaining??0f,technologyOverloadBoost=technology?.Model.BoostRemaining??0f,technologyOverloadLockout=technology?.Model.LockoutRemaining??0f,statsElapsed=stats.ElapsedSeconds,statsKills=stats.Kills,statsHighestObservation=stats.HighestObservation,statsProductionCycles=stats.ProductionCycles,statsBuildingLosses=stats.BuildingLosses,statsRescues=stats.Rescues,statsDelayedRescues=stats.DelayedRescues,statsRetreated=stats.RetreatedDuringBoss};}
         public FormalSaveData CaptureComplete()
         {
@@ -55,7 +55,7 @@ namespace WasteCity.Persistence
             data.controlledLosses=friendlyUnits.Commands.ControlledLosses;
             return data;
         }
-        public bool Load(){var d=Read(SavePath)??Read(SavePath+".bak");return d!=null&&ApplyComplete(d,false);}
+        public bool Load(){var result=Store.Load(FormalSavePayloadKind.Legacy2D);var d=result.Legacy2D;return result.Success&&d!=null&&ApplyComplete(d,false);}
         public bool ApplyComplete(FormalSaveData data,bool preserveObservation)
         {
             if(data==null)return false;
@@ -121,6 +121,5 @@ namespace WasteCity.Persistence
             if(d.schema>=19)statistics.Restore(d.statsElapsed,d.statsKills,d.statsHighestObservation,d.statsProductionCycles,d.statsBuildingLosses,d.statsRescues,d.statsDelayedRescues,d.statsRetreated);
             return true;
         }
-        static FormalSaveData Read(string path)=>File.Exists(path)?FormalSaveCodec.Decode(File.ReadAllText(path)):null;
     }
 }
