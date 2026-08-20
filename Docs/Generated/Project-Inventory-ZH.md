@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`8788e760674e8249bdf7cdd1599304a62e168ea31c147b4dcca6a1f5f282a485`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`460ffffdf40926f320ba0001cf07614b8aa706cd76a42c662984fe19393b484a`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -60,6 +60,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
@@ -146,6 +147,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - 基础时钟与会话（`foundation-clock`）：
 - `Assets/_Game/Scripts/Content/StableId.cs`
@@ -203,6 +205,7 @@
 - `Assets/_Game/Scripts/Leader/LeaderModel.cs`
 - 持久化与迁移（`persistence-migration`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveController.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveData.cs`

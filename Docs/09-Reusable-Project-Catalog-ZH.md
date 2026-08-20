@@ -108,6 +108,10 @@
 
 能解决什么：把正式 3D 背包、应急合成队列与六节点科技状态映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`。怎么复用：从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 DemoResearchRuntime 捕获 schema 31 背包、合成与科技 DTO；恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。不能负责什么：只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。改后跑哪组测试：`GrayboxFormalSaveEconomyTests`、`PlayerBackpackModelTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`。代码名：`GrayboxEconomySaveAdapter3D`。
 
+### 三维逐建筑生产存档适配器（复用前审查）
+
+能解决什么：在正式三维生产运行时的持久化快照与 schema 31 逐建筑生产 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`。怎么复用：从显式提供的 `GrayboxProductionRuntime3D` 捕获生产 DTO，恢复时把 DTO 转换为领域快照并委托运行时完成预检与单次提交。不能负责什么：只负责生产领域快照与 DTO 映射；不拥有文件 IO、场景搜索、生产 tick、物流、建筑放置或矿点兼容规则，也不复制这些系统的判断。改后跑哪组测试：`GrayboxFormalSaveProductionTests`。代码名：`GrayboxProductionSaveAdapter3D`。
+
 ### 三维正式撤离协调与只读视图（仅限场景）
 
 能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。
@@ -166,7 +170,7 @@
 
 ### 资源库存（推荐复用）
 
-能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并保留冻结 2D 所需的物理容量和债务行为。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量。正式 3D 只把它作为 `CityResourceStorageModel` 的城市核心 backing ledger。不能负责什么：不驱动生产周期。它也不提供真实仓库共享容量；正式 3D 新功能不得直接使用债务行为实现生产扣款。改后跑哪组测试：`FoundationTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
+能解决什么：作为兼容的底层资源数量账本，按稳定资源 ID 保存整数数量，并提供覆盖全部已记录资源的确定性正数量快照与受验证的原子全量替换。在哪里：`Assets/_Game/Scripts/Economy/ResourceInventory.cs`。怎么复用：用于管理资源数量；正式 3D 只把它作为 `CityResourceStorageModel` 的城市核心 backing ledger，schema 31 恢复时可由调用方显式选择资产保守地保留超容量数量。不能负责什么：只负责资源账本的数量、容量和变更通知；不驱动生产周期，不决定配方、物流、建筑资格、存档兼容策略或界面行为，也不提供真实仓库共享容量。改后跑哪组测试：`FoundationTests`、`GrayboxFormalSaveProductionTests`、`ResourceInventoryChangeTests`。代码名：`ResourceChangeAttribution`、`ResourceInventory`。
 
 ### 旧每资源城市容量策略（复用前审查）
 
@@ -210,7 +214,7 @@
 
 ### 逐建筑生产状态（推荐复用）
 
-能解决什么：为每个稳定建筑实例保存独立输入/输出缓存、已取得的输入批次、周期进度、玩家暂停和单一停工原因。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。默认 3D 场景已由 `GrayboxProductionRuntime3D` 按 `GrayboxBuildingInstance3D.StableInstanceId` 持有并清理这些会话状态；其他场景适配器应复用同一所有权方式。不能负责什么：只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。改后跑哪组测试：`FormalProductionSimulationTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
+能解决什么：为每个稳定建筑实例拥有独立输入、输出、真实周期预留输入、进度与玩家暂停，并支持 schema 31 原子恢复。在哪里：`Assets/_Game/Scripts/Economy/BuildingProductionState.cs`。怎么复用：默认 3D 场景由 `GrayboxProductionRuntime3D` 按稳定实例 ID 持有状态；恢复时先完整验证资源与当前配方语义，再原子替换单建筑状态。不能负责什么：只拥有单座建筑的生产状态，不自行读取场景或城市范围；物流连接与停工原因属于派生状态而不入档，玩家暂停入档并在恢复时据此重建 `PlayerPaused` 停工原因。改后跑哪组测试：`FormalProductionSimulationTests`、`GrayboxFormalSaveProductionTests`。代码名：`ProductionStopReason`、`BuildingProductionState`。
 
 ### 正式生产与物流模拟（推荐复用）
 
@@ -222,7 +226,7 @@
 
 ### 三维生产运行时（复用前审查）
 
-能解决什么：让正式生产状态和物流连接跟随三维建筑生命周期，并在撤离时完整保存或明确丢弃内部生产物资。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步生产状态、可运行集合和物流连接；撤离时由本运行时拥有并捕获 input、reserved input、output 内部载荷，匹配后完成迁移或在遗弃时明确丢弃。不能负责什么：只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不进入 schema 30，也不复制放置、物流范围或节点兼容规则。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionEvacuationPayload3D`、`GrayboxProductionRuntime3D`。
+能解决什么：让正式生产状态与物流连接跟随三维建筑生命周期，并为 schema 31 提供确定性持久化快照和安全恢复边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`。怎么复用：按稳定实例 ID 同步状态、可运行集合与物流连接；恢复采用绑定 owner、同步 generation 和内容 fingerprint 的 prepare/commit，未知配方保留为不可运行 orphan，正式定义或资源点绑定变化时同步替换状态，撤离载荷所有权保持不变。不能负责什么：只桥接 `GrayboxBuildingInstance3D` 与正式生产状态，不推进生产 tick、不执行城市事务，也不复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 属于派生状态，不写入存档。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFormalSaveProductionTests`、`GrayboxProductionRuntimeTests`、`GrayboxProductionLifecycleTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionEvacuationPayload3D`、`GrayboxProductionPersistenceState3D`、`GrayboxProductionRestorePlan3D`、`GrayboxProductionRuntime3D`。
 
 ### 三维生产固定时钟（复用前审查）
 

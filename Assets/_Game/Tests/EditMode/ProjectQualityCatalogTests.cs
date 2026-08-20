@@ -381,6 +381,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
                 "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
                 "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
@@ -389,6 +390,7 @@ namespace WasteCity.Tests
             CollectionAssert.IsSubsetOf(new[]
             {
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
@@ -413,9 +415,10 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/FoundationTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
                     "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
                 },
-                new[] { "DOC-0001", "IDEA-0011" });
+                new[] { "DOC-0001", "IDEA-0011", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "resource-definition-catalog"),
                 new[]
@@ -557,7 +560,9 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
-                });
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
+                },
+                new[] { "IDEA-0011", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "formal-production-simulation"),
                 new[]
@@ -598,16 +603,44 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "GrayboxProductionEvacuationPayload3D",
+                    "GrayboxProductionPersistenceState3D",
+                    "GrayboxProductionRestorePlan3D",
                     "GrayboxProductionRuntime3D",
                 },
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 },
-                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0014" });
+                new[]
+                {
+                    "IDEA-0011",
+                    "IDEA-0012",
+                    "IDEA-0014",
+                    "IDEA-0015",
+                });
+            ProjectReuseEntry saveAdapter = FindReuse(
+                catalog,
+                "graybox-production-save-adapter-3d");
+            Assert.That(saveAdapter.FeatureGroupId,
+                Is.EqualTo("persistence-migration"));
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
+            }, saveAdapter.AssetPaths);
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxProductionSaveAdapter3D",
+            }, saveAdapter.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
+            }, saveAdapter.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0015" },
+                saveAdapter.RequirementIds);
             AssertReuseContract(
                 FindReuse(catalog, "graybox-production-clock-3d"),
                 new[]

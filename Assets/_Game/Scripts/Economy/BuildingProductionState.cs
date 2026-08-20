@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace WasteCity.Economy
 {
@@ -14,6 +16,10 @@ namespace WasteCity.Economy
 
     public sealed class BuildingProductionState
     {
+        private static readonly IReadOnlyList<ResourceAmount> EmptyAmounts =
+            Array.AsReadOnly(Array.Empty<ResourceAmount>());
+        private IReadOnlyList<ResourceAmount> reservedInputs = EmptyAmounts;
+
         public BuildingProductionState(
             string stableInstanceId,
             FormalProductionDefinition definition,
@@ -32,9 +38,10 @@ namespace WasteCity.Economy
             }
 
             StableInstanceId = stableInstanceId;
-            BoundResourceNodeId = boundResourceNodeId;
-            BoundNodeX = boundNodeX;
-            BoundNodeY = boundNodeY;
+            bool hasBinding = !string.IsNullOrWhiteSpace(boundResourceNodeId);
+            BoundResourceNodeId = hasBinding ? boundResourceNodeId : null;
+            BoundNodeX = hasBinding ? boundNodeX : -1;
+            BoundNodeY = hasBinding ? boundNodeY : -1;
             Input = new ResourceInventory(definition.InputCapacity);
             Output = new ResourceInventory(definition.OutputCapacity);
             InputCapacityPolicy = new ResourceCapacityPolicy(
@@ -55,6 +62,7 @@ namespace WasteCity.Economy
             1f,
             ProgressSeconds / Definition.DurationSeconds);
         public bool HasReservedInputs { get; private set; }
+        public IReadOnlyList<ResourceAmount> ReservedInputs => reservedInputs;
         public bool IsLogisticsConnected { get; private set; }
         public bool IsPlayerPaused { get; private set; }
         public ProductionStopReason StopReason { get; private set; }
@@ -76,6 +84,7 @@ namespace WasteCity.Economy
         internal void BeginCycle()
         {
             HasReservedInputs = true;
+            reservedInputs = CaptureDefinitionInputs();
             ProgressSeconds = 0f;
             StopReason = ProductionStopReason.None;
         }
@@ -90,12 +99,159 @@ namespace WasteCity.Economy
         internal void CompleteCycle()
         {
             HasReservedInputs = false;
+            reservedInputs = EmptyAmounts;
             ProgressSeconds = 0f;
+        }
+
+        public bool TryRestoreForPersistence(
+            IReadOnlyList<ResourceAmount> input,
+            bool hasReservedInputs,
+            IReadOnlyList<ResourceAmount> reservedInputs,
+            IReadOnlyList<ResourceAmount> output,
+            float progressSeconds,
+            bool isPlayerPaused,
+            out string error)
+        {
+            if (float.IsNaN(progressSeconds) ||
+                float.IsInfinity(progressSeconds) ||
+                progressSeconds < 0f ||
+                progressSeconds > Definition.DurationSeconds)
+            {
+                error = "Production progress must be finite and within the current cycle.";
+                return false;
+            }
+            if (reservedInputs == null)
+            {
+                error = "Reserved production inputs are required.";
+                return false;
+            }
+            if (!hasReservedInputs &&
+                (progressSeconds != 0f || reservedInputs.Count != 0))
+            {
+                error = "Inactive production cannot contain progress or reserved inputs.";
+                return false;
+            }
+            if (hasReservedInputs &&
+                !ValidateReservedInputs(reservedInputs, out error))
+            {
+                return false;
+            }
+
+            var inputValidation = new ResourceInventory(
+                Definition.InputCapacity);
+            if (!inputValidation.TryReplaceAll(
+                    input,
+                    allowOverCapacity: true,
+                    out error))
+            {
+                error = "Invalid production input inventory: " + error;
+                return false;
+            }
+            var outputValidation = new ResourceInventory(
+                Definition.OutputCapacity);
+            if (!outputValidation.TryReplaceAll(
+                    output,
+                    allowOverCapacity: true,
+                    out error))
+            {
+                error = "Invalid production output inventory: " + error;
+                return false;
+            }
+
+            ResourceAmount[] restoredInput =
+                inputValidation.CapturePositiveAmounts();
+            ResourceAmount[] restoredOutput =
+                outputValidation.CapturePositiveAmounts();
+            IReadOnlyList<ResourceAmount> restoredReserved =
+                CopyAsReadOnly(reservedInputs);
+
+            if (!Input.TryReplaceAll(
+                    restoredInput,
+                    allowOverCapacity: true,
+                    out error) ||
+                !Output.TryReplaceAll(
+                    restoredOutput,
+                    allowOverCapacity: true,
+                    out error))
+            {
+                error = "Could not apply validated production inventory: " + error;
+                return false;
+            }
+
+            HasReservedInputs = hasReservedInputs;
+            this.reservedInputs = restoredReserved;
+            ProgressSeconds = progressSeconds;
+            IsPlayerPaused = isPlayerPaused;
+            StopReason = isPlayerPaused
+                ? ProductionStopReason.PlayerPaused
+                : ProductionStopReason.None;
+            error = string.Empty;
+            return true;
         }
 
         internal void SetStopReason(ProductionStopReason reason)
         {
             StopReason = reason;
+        }
+
+        private IReadOnlyList<ResourceAmount> CaptureDefinitionInputs()
+        {
+            if (Definition.UsesBoundResourceNode ||
+                string.IsNullOrEmpty(Definition.InputResourceId) ||
+                Definition.InputAmount <= 0)
+            {
+                return EmptyAmounts;
+            }
+
+            return Array.AsReadOnly(new[]
+            {
+                new ResourceAmount(
+                    Definition.InputResourceId,
+                    Definition.InputAmount),
+            });
+        }
+
+        private bool ValidateReservedInputs(
+            IReadOnlyList<ResourceAmount> values,
+            out string error)
+        {
+            if (Definition.UsesBoundResourceNode)
+            {
+                if (values.Count == 0)
+                {
+                    error = string.Empty;
+                    return true;
+                }
+
+                error = "Extraction cycles cannot reserve material inputs.";
+                return false;
+            }
+
+            if (values.Count != 1 ||
+                !string.Equals(
+                    values[0].ResourceId,
+                    Definition.InputResourceId,
+                    StringComparison.Ordinal) ||
+                values[0].Amount != Definition.InputAmount)
+            {
+                error = "Reserved production inputs do not match the current recipe.";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static IReadOnlyList<ResourceAmount> CopyAsReadOnly(
+            IReadOnlyList<ResourceAmount> source)
+        {
+            if (source.Count == 0)
+                return EmptyAmounts;
+
+            var copy = new ResourceAmount[source.Count];
+            for (var index = 0; index < source.Count; index++)
+                copy[index] = source[index];
+            return new ReadOnlyCollection<ResourceAmount>(copy);
         }
     }
 }

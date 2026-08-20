@@ -262,6 +262,7 @@
         "Assets/_Game/Scripts/Economy/**",
         "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
@@ -280,6 +281,7 @@
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
@@ -415,7 +417,8 @@
       "ChineseName": "持久化与迁移",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**"
@@ -427,6 +430,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "ScenePaths": [
@@ -1058,6 +1062,26 @@
       ]
     },
     {
+      "Id": "graybox-production-save-adapter-3d",
+      "ChineseName": "三维逐建筑生产存档适配器",
+      "TypeNames": [
+        "GrayboxProductionSaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在 GrayboxProductionRuntime3D 的持久化快照边界与 schema 31 FormalThreeDProduction DTO 之间执行确定性映射，并把恢复委托给运行时的预检与单次提交。",
+      "BoundarySummary": "只负责生产领域快照与 DTO 映射；不拥有文件 IO、场景搜索、生产 tick、物流、建筑放置或矿点兼容规则，也不复制这些系统的判断。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
       "Id": "building-input-router-3d",
       "ChineseName": "三维建筑输入路由",
       "TypeNames": [
@@ -1299,15 +1323,17 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用于管理资源数量。",
-      "BoundarySummary": "不驱动生产周期。",
+      "UseSummary": "按稳定资源 ID 管理资源数量，提供覆盖全部已记录资源的确定性正数量快照与受验证的原子全量替换；恢复时可由调用方显式选择资产保守地保留超容量数量。",
+      "BoundarySummary": "只负责资源账本的数量、容量和变更通知；不驱动生产周期，不决定配方、物流、建筑资格、存档兼容策略或界面行为。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FoundationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {
@@ -1573,13 +1599,15 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "按稳定建筑实例保存输入输出缓存、已预留周期、进度、暂停和停工原因。",
-      "BoundarySummary": "只拥有单座建筑的会话级生产状态；不保存到 schema 30，不自行读取场景或城市范围。",
+      "UseSummary": "按稳定建筑实例拥有输入、输出、真实周期预留输入、进度与玩家暂停；schema 31 恢复先完整验证资源和配方语义，再原子替换单建筑状态。",
+      "BoundarySummary": "只拥有单座建筑的生产状态，不自行读取场景或城市范围。物流连接与停工原因属于派生状态而不入档；玩家暂停入档，并在恢复时据此重建 PlayerPaused 停工原因。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0015"
       ]
     },
     {
@@ -1630,6 +1658,8 @@
       "ChineseName": "三维生产运行时",
       "TypeNames": [
         "GrayboxProductionEvacuationPayload3D",
+        "GrayboxProductionPersistenceState3D",
+        "GrayboxProductionRestorePlan3D",
         "GrayboxProductionRuntime3D"
       ],
       "AssetPaths": [
@@ -1637,10 +1667,11 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合和物流连接；撤离时由本运行时拥有并捕获 input、reserved input、output 内部载荷，匹配后完成迁移或在遗弃时明确丢弃。",
-      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不进入 schema 30，也不复制放置、物流范围或节点兼容规则。",
+      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合和物流连接；schema 31 提供确定性持久化快照，以及绑定 owner、同步 generation 与内容 fingerprint 的 prepare/commit 恢复。未知配方保留为不可运行 orphan，正式定义或资源点绑定变化时同步替换状态；撤离载荷所有权保持不变。",
+      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不得复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 仍由当前规则重建而不持久化。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
@@ -1648,7 +1679,8 @@
       "RequirementIds": [
         "IDEA-0011",
         "IDEA-0012",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ]
     },
     {

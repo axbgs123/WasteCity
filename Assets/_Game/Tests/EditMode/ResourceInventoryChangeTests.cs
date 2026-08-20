@@ -86,6 +86,63 @@ namespace WasteCity.Tests
             }));
         }
 
+        [Test]
+        public void CapturePositiveAmountsReturnsAnOrdinalDeepCopy()
+        {
+            var inventory = new ResourceInventory(20);
+            inventory.Add(ResourceIds.Water, 3);
+            inventory.Add(ResourceIds.Iron, 5);
+
+            ResourceAmount[] captured = inventory.CapturePositiveAmounts();
+
+            CollectionAssert.AreEqual(
+                new[] { ResourceIds.Iron, ResourceIds.Water },
+                System.Array.ConvertAll(captured, item => item.ResourceId));
+            inventory.TrySpend(ResourceIds.Iron, 2);
+            Assert.That(captured[0].Amount, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void TryReplaceAllValidatesBeforeClearingAndRemovesOldKeys()
+        {
+            var inventory = new ResourceInventory(10);
+            inventory.Add(ResourceIds.Iron, 7);
+
+            Assert.That(inventory.TryReplaceAll(
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 4),
+                    new ResourceAmount(ResourceIds.Water, 3),
+                },
+                allowOverCapacity: false,
+                out _), Is.False);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.EqualTo(7));
+            Assert.That(inventory.Get(ResourceIds.Water), Is.Zero);
+
+            Assert.That(inventory.TryReplaceAll(
+                new[] { new ResourceAmount(ResourceIds.Water, 4) },
+                allowOverCapacity: false,
+                out string error), Is.True, error);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(inventory.Get(ResourceIds.Water), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void PreservedOverCapacityAmountRejectsFurtherAddsUntilSpentDown()
+        {
+            var inventory = new ResourceInventory(10);
+
+            Assert.That(inventory.TryReplaceAll(
+                new[] { new ResourceAmount(ResourceIds.Iron, 12) },
+                allowOverCapacity: true,
+                out string error), Is.True, error);
+            Assert.That(inventory.Add(ResourceIds.Iron, 1), Is.Zero);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.EqualTo(12));
+            Assert.That(inventory.TrySpend(ResourceIds.Iron, 3), Is.True);
+            Assert.That(inventory.Add(ResourceIds.Iron, 2), Is.EqualTo(1));
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.EqualTo(10));
+        }
+
         private static List<(string ResourceId, int Delta)> CaptureChanges(
             ResourceInventory inventory)
         {

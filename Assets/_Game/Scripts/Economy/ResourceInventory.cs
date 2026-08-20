@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using WasteCity.Content;
 
 namespace WasteCity.Economy
 {
@@ -62,7 +63,9 @@ namespace WasteCity.Economy
         {
             if (string.IsNullOrWhiteSpace(id) || amount <= 0) return 0;
             int before = Get(id);
-            int accepted = Math.Min(amount, capacityPerResource - before);
+            int accepted = Math.Min(
+                amount,
+                Math.Max(0, capacityPerResource - before));
             values[id] = before + accepted;
             PublishChange(id, accepted);
             return accepted;
@@ -101,6 +104,99 @@ namespace WasteCity.Economy
             PublishChange(id, values[id] - before);
         }
 
+        public ResourceAmount[] CapturePositiveAmounts()
+        {
+            var resourceIds = new List<string>();
+            foreach (KeyValuePair<string, int> item in values)
+            {
+                if (item.Value > 0)
+                    resourceIds.Add(item.Key);
+            }
+
+            resourceIds.Sort(StringComparer.Ordinal);
+            var result = new ResourceAmount[resourceIds.Count];
+            for (var index = 0; index < resourceIds.Count; index++)
+            {
+                string resourceId = resourceIds[index];
+                result[index] = new ResourceAmount(
+                    resourceId,
+                    values[resourceId]);
+            }
+
+            return result;
+        }
+
+        public bool TryReplaceAll(
+            IReadOnlyList<ResourceAmount> amounts,
+            bool allowOverCapacity,
+            out string error)
+        {
+            if (amounts == null)
+            {
+                error = "Resource amounts are required.";
+                return false;
+            }
+
+            var replacement = new Dictionary<string, int>(
+                amounts.Count,
+                StringComparer.Ordinal);
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                ResourceAmount amount = amounts[index];
+                if (!IsStableResourceId(amount.ResourceId))
+                {
+                    error = "Resource amount contains an invalid stable resource ID.";
+                    return false;
+                }
+                if (amount.Amount < 0)
+                {
+                    error = "Resource amounts cannot be negative.";
+                    return false;
+                }
+                if (!allowOverCapacity && amount.Amount > capacityPerResource)
+                {
+                    error = "Resource amount exceeds inventory capacity.";
+                    return false;
+                }
+                if (!replacement.TryAdd(amount.ResourceId, amount.Amount))
+                {
+                    error = "Resource amounts contain a duplicate resource ID.";
+                    return false;
+                }
+            }
+
+            var changedResourceIds = new HashSet<string>(
+                values.Keys,
+                StringComparer.Ordinal);
+            changedResourceIds.UnionWith(replacement.Keys);
+            var orderedChangedResourceIds = new List<string>(changedResourceIds);
+            orderedChangedResourceIds.Sort(StringComparer.Ordinal);
+
+            var deltas = new int[orderedChangedResourceIds.Count];
+            for (var index = 0; index < orderedChangedResourceIds.Count; index++)
+            {
+                string resourceId = orderedChangedResourceIds[index];
+                int before = Get(resourceId);
+                int after = replacement.TryGetValue(resourceId, out int value)
+                    ? value
+                    : 0;
+                deltas[index] = after - before;
+            }
+
+            values.Clear();
+            foreach (KeyValuePair<string, int> item in replacement)
+            {
+                if (item.Value > 0)
+                    values.Add(item.Key, item.Value);
+            }
+
+            for (var index = 0; index < orderedChangedResourceIds.Count; index++)
+                PublishChange(orderedChangedResourceIds[index], deltas[index]);
+
+            error = string.Empty;
+            return true;
+        }
+
         public ResourceChangeAttributionScope AttributeChanges(
             ResourceChangeAttribution attribution)
         {
@@ -120,6 +216,19 @@ namespace WasteCity.Economy
             if (delta == 0) return;
             Changed?.Invoke(id, delta);
             AttributedChanged?.Invoke(id, delta, changeAttribution);
+        }
+
+        private static bool IsStableResourceId(string resourceId)
+        {
+            try
+            {
+                _ = new StableId(resourceId);
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
         }
     }
 }

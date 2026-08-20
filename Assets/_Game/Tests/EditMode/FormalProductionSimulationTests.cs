@@ -78,6 +78,55 @@ namespace WasteCity.Tests
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
         }
 
+        [Test]
+        public void SmeltingOwnsAnImmutableSnapshotOfTheExactReservedInputs()
+        {
+            BuildingProductionState state = Smelter("smelter.reserved", connected: false);
+            state.Input.Add(ResourceIds.Iron, 2);
+
+            Tick(new FormalProductionSimulation(), state, .1f);
+
+            Assert.That(state.ReservedInputs, Has.Count.EqualTo(1));
+            Assert.That(state.ReservedInputs[0].ResourceId, Is.EqualTo(ResourceIds.Iron));
+            Assert.That(state.ReservedInputs[0].Amount, Is.EqualTo(2));
+            Assert.That(state.ReservedInputs, Is.Not.InstanceOf<ResourceAmount[]>());
+        }
+
+        [Test]
+        public void PersistenceRestoreIsAtomicAndDoesNotRestoreDerivedStopReason()
+        {
+            BuildingProductionState state = Smelter("smelter.restore", connected: true);
+            state.Input.Add(ResourceIds.Iron, 7);
+            state.SetPlayerPaused(true);
+
+            Assert.That(state.TryRestoreForPersistence(
+                new[] { new ResourceAmount(ResourceIds.Iron, 3) },
+                hasReservedInputs: true,
+                new[] { new ResourceAmount(ResourceIds.Iron, 2) },
+                new[] { new ResourceAmount(ResourceIds.Alloy, 1) },
+                progressSeconds: 2f,
+                isPlayerPaused: false,
+                out string error), Is.True, error);
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(3));
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
+            Assert.That(state.ReservedInputs[0].Amount, Is.EqualTo(2));
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+            Assert.That(state.IsPlayerPaused, Is.False);
+            Assert.That(state.IsLogisticsConnected, Is.True);
+            Assert.That(state.StopReason, Is.EqualTo(ProductionStopReason.None));
+
+            Assert.That(state.TryRestoreForPersistence(
+                new[] { new ResourceAmount(ResourceIds.Iron, 20) },
+                hasReservedInputs: false,
+                new ResourceAmount[0],
+                new ResourceAmount[0],
+                progressSeconds: 1f,
+                isPlayerPaused: false,
+                out _), Is.False);
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(3));
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+        }
+
         [TestCase(true, ProductionStopReason.OutOfLogistics)]
         [TestCase(false, ProductionStopReason.MissingInput)]
         public void DisconnectedCompletedCycleDistinguishesReachableCityInputFromTrueShortage(
