@@ -106,6 +106,8 @@ namespace WasteCity.Graybox3D
             deployment?.Mode ?? CityMode.Mobile;
         public bool AutopilotActive { get; private set; }
         public WorldGridPoint? Destination => destination;
+        public Vector3 WorldPosition =>
+            body == null ? transform.position : body.position;
         public CityDeploymentFailure LastDeploymentFailure
         {
             get;
@@ -370,11 +372,130 @@ namespace WasteCity.Graybox3D
             return true;
         }
 
+        public bool TryGetCurrentCell(out int cellX, out int cellY)
+        {
+            cellX = -1;
+            cellY = -1;
+            return NavigationReady &&
+                   worldView.Coordinates.TryWorldToCell(
+                       WorldPosition,
+                       out cellX,
+                       out cellY);
+        }
+
+        public bool TryRestoreForPersistence(
+            Vector3 position,
+            CityMode mode,
+            CityMode transitionReturnMode,
+            float transitionRemainingSeconds,
+            bool autopilotActive,
+            int destinationX,
+            int destinationY,
+            out string error)
+        {
+            EnsureDeployment();
+            if (!CanRestoreForPersistence(
+                    worldView == null ? null : worldView.Model,
+                    out error))
+                return false;
+            if (!IsFinite(position.x) || !IsFinite(position.y) ||
+                !IsFinite(position.z))
+            {
+                error = "城市位置无效";
+                return false;
+            }
+
+            var deploymentProbe = new CityDeploymentModel(
+                CityDeploymentRules.FormalDeployDurationSeconds,
+                CityDeploymentRules.FormalPackDurationSeconds);
+            if (!deploymentProbe.TryRestore(
+                    mode,
+                    transitionReturnMode,
+                    transitionRemainingSeconds,
+                    out error))
+                return false;
+            if (!worldView.Coordinates.TryWorldToCell(
+                    position,
+                    out int startX,
+                    out int startY))
+            {
+                error = "城市位置不在正式世界内";
+                return false;
+            }
+
+            WorldGridPoint[] restoredPath = Array.Empty<WorldGridPoint>();
+            if (autopilotActive)
+            {
+                if (mode != CityMode.Mobile)
+                {
+                    error = "只有移动态城市可以恢复自动驾驶";
+                    return false;
+                }
+                if (!CityPathfinder.TryFindPath(
+                        worldView.Model,
+                        startX,
+                        startY,
+                        destinationX,
+                        destinationY,
+                        out restoredPath) ||
+                    restoredPath.Length == 0)
+                {
+                    error = "存档中的自动驾驶目标不可达";
+                    return false;
+                }
+            }
+
+            body.position = position;
+            body.velocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
+            manualInput = Vector2.zero;
+            path = restoredPath;
+            waypointIndex = 0;
+            destination = autopilotActive
+                ? new WorldGridPoint(destinationX, destinationY)
+                : (WorldGridPoint?)null;
+            AutopilotActive = autopilotActive;
+            deployment.TryRestore(
+                mode,
+                transitionReturnMode,
+                transitionRemainingSeconds,
+                out _);
+            LastDeploymentFailure = CityDeploymentFailure.None;
+            LastFailureReason = string.Empty;
+            UpdatePresentation();
+            error = string.Empty;
+            return true;
+        }
+
+        public bool CanRestoreForPersistence(
+            WorldMapModel expectedCurrentWorld,
+            out string error)
+        {
+            if (!NavigationReady)
+            {
+                error = "城市导航尚未初始化";
+                return false;
+            }
+            if (expectedCurrentWorld == null ||
+                !ReferenceEquals(worldView.Model, expectedCurrentWorld))
+            {
+                error = "城市控制器与世界所有者不一致";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
         private bool NavigationReady =>
             worldView != null &&
             worldView.Model != null &&
             worldView.Coordinates != null &&
             body != null;
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
 
         private void Awake()
         {

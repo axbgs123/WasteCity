@@ -17,10 +17,32 @@ namespace WasteCity.World
         { Terrain = terrain; ResourceId = resourceId; ResourceAmount = amount; Traversal = traversal; }
     }
 
+    public readonly struct WorldOrphanResource
+    {
+        public WorldOrphanResource(
+            string resourceId,
+            int amount,
+            string ownerKind,
+            string ownerStableId)
+        {
+            ResourceId = resourceId;
+            Amount = amount;
+            OwnerKind = ownerKind;
+            OwnerStableId = ownerStableId;
+        }
+
+        public string ResourceId { get; }
+        public int Amount { get; }
+        public string OwnerKind { get; }
+        public string OwnerStableId { get; }
+    }
+
     public sealed class WorldMapModel
     {
         private readonly WorldCell[,] cells;
         private readonly bool[,] revealed;
+        private WorldOrphanResource[] orphanResources =
+            Array.Empty<WorldOrphanResource>();
         public int Width { get; }
         public int Height { get; }
         public int ResourceNodeCount { get; private set; }
@@ -92,6 +114,99 @@ namespace WasteCity.World
         {
             if(amounts==null||visibility==null||amounts.Length!=Width*Height||visibility.Length!=Width*Height)return false;
             for(int y=0;y<Height;y++)for(int x=0;x<Width;x++){int index=y*Width+x;var cell=cells[x,y];cells[x,y]=new WorldCell(cell.Terrain,cell.ResourceId,Math.Max(0,amounts[index]),cell.Traversal);revealed[x,y]=visibility[index];}return true;
+        }
+
+        public bool TryRestoreResourceAmounts(int[] amounts, out string error)
+        {
+            if (amounts == null)
+            {
+                error = "资源数量数据不能为空";
+                return false;
+            }
+
+            if (amounts.Length != Width * Height)
+            {
+                error = "资源数量长度必须与世界格位数量一致";
+                return false;
+            }
+
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    int amount = amounts[y * Width + x];
+                    if (amount < 0)
+                    {
+                        error = "资源数量不能为负数";
+                        return false;
+                    }
+
+                    if (!cells[x, y].HasResource && amount != 0)
+                    {
+                        error = "非资源格位的资源数量必须为零";
+                        return false;
+                    }
+                }
+            }
+
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    int index = y * Width + x;
+                    WorldCell cell = cells[x, y];
+                    cells[x, y] = new WorldCell(
+                        cell.Terrain,
+                        cell.ResourceId,
+                        amounts[index],
+                        cell.Traversal);
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        public WorldOrphanResource[] CaptureOrphanResources()
+        {
+            return (WorldOrphanResource[])orphanResources.Clone();
+        }
+
+        public bool TryRestoreOrphanResources(
+            WorldOrphanResource[] resources,
+            out string error)
+        {
+            if (resources == null)
+            {
+                error = "孤立资源数据不能为空";
+                return false;
+            }
+            var keys = new System.Collections.Generic.HashSet<string>(
+                StringComparer.Ordinal);
+            for (var index = 0; index < resources.Length; index++)
+            {
+                WorldOrphanResource resource = resources[index];
+                if (string.IsNullOrWhiteSpace(resource.ResourceId) ||
+                    string.IsNullOrWhiteSpace(resource.OwnerKind) ||
+                    string.IsNullOrWhiteSpace(resource.OwnerStableId) ||
+                    resource.Amount < 0)
+                {
+                    error = "孤立资源字段无效";
+                    return false;
+                }
+                string key = resource.OwnerKind + "\n" +
+                             resource.OwnerStableId + "\n" +
+                             resource.ResourceId;
+                if (!keys.Add(key))
+                {
+                    error = "孤立资源归属重复";
+                    return false;
+                }
+            }
+
+            orphanResources = (WorldOrphanResource[])resources.Clone();
+            error = string.Empty;
+            return true;
         }
 
         private static string RollResource(int roll, TerrainKind terrain)

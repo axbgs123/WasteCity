@@ -838,6 +838,45 @@ namespace WasteCity.Graybox3D.Building
             AdvancePlacementRevision();
         }
 
+        public bool TryRestorePopulation(
+            int current,
+            int capacity,
+            out string error)
+        {
+            if (!CanRestorePopulation(out error))
+                return false;
+            if (current < 0 || capacity < 0)
+            {
+                error = "人口和人口容量不能为负数";
+                return false;
+            }
+            if (Population == current && PopulationCapacity == capacity)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            population.Restore(current, capacity);
+            AdvanceCatalogRevision();
+            AdvancePlacementRevision();
+            error = string.Empty;
+            return true;
+        }
+
+        public bool CanRestorePopulation(out string error)
+        {
+            if (Inventory == null || Research == null ||
+                GroundGrid == null || InnerGrid == null ||
+                instances == null || CityStorage == null ||
+                population == null)
+            {
+                error = "建筑会话尚未完成正式初始化";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
         public void SetConstructionMultiplierForDevelopment(float value)
         {
             EnsureConfigured();

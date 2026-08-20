@@ -16,6 +16,7 @@ namespace WasteCity.Graybox3D
 
         public bool IsInitialized { get; private set; }
         public WorldMapModel World { get; private set; }
+        public int CurrentWorldSeed { get; private set; } = WorldSeedValue;
 
         public void Configure(
             GrayboxUrpScope renderScope,
@@ -57,7 +58,66 @@ namespace WasteCity.Graybox3D
             World = GrayboxWorldLayout3D.CreateDefault();
             worldView.Generate(World);
             TryPresentTerrain();
+            CurrentWorldSeed = WorldSeedValue;
             IsInitialized = true;
+            return true;
+        }
+
+        public bool TryRestoreWorld(
+            WorldMapModel model,
+            out string error)
+        {
+            return TryRestoreWorld(model, CurrentWorldSeed, out error);
+        }
+
+        public bool TryRestoreWorld(
+            WorldMapModel model,
+            int worldSeed,
+            out string error)
+        {
+            if (model == null)
+            {
+                error = "恢复世界不能为空";
+                return false;
+            }
+            if (model.Width != WorldWidth || model.Height != WorldHeight)
+            {
+                error = "存档世界尺寸与正式世界不一致";
+                return false;
+            }
+            if (worldView == null)
+            {
+                error = "世界表现尚未配置";
+                return false;
+            }
+
+            try
+            {
+                worldView.ClearGenerated();
+                worldView.Generate(model);
+                TryPresentTerrain();
+                worldView.RefreshResourceNodeMarkers();
+                World = model;
+                CurrentWorldSeed = worldSeed;
+                IsInitialized = true;
+                error = string.Empty;
+                return true;
+            }
+            catch (System.Exception exception)
+            {
+                error = "恢复世界表现失败：" + exception.Message;
+                return false;
+            }
+        }
+
+        public bool CanRestoreWorld(out string error)
+        {
+            if (worldView == null)
+            {
+                error = "世界表现尚未配置";
+                return false;
+            }
+            error = string.Empty;
             return true;
         }
 
