@@ -55,7 +55,8 @@ namespace WasteCity.Persistence
             FormalSaveDecodeError error,
             string message,
             FormalSaveData legacy2D,
-            FormalSaveEnvelope envelope)
+            FormalSaveEnvelope envelope,
+            string sourceJson)
         {
             Success = success;
             PayloadKind = payloadKind;
@@ -63,6 +64,7 @@ namespace WasteCity.Persistence
             Message = message ?? string.Empty;
             Legacy2D = legacy2D;
             Envelope = envelope;
+            SourceJson = sourceJson;
         }
 
         public bool Success { get; }
@@ -71,8 +73,11 @@ namespace WasteCity.Persistence
         public string Message { get; }
         public FormalSaveData Legacy2D { get; }
         public FormalSaveEnvelope Envelope { get; }
+        internal string SourceJson { get; }
 
-        internal static FormalSaveDecodeResult Legacy(FormalSaveData data)
+        internal static FormalSaveDecodeResult Legacy(
+            FormalSaveData data,
+            string sourceJson)
         {
             return new FormalSaveDecodeResult(
                 true,
@@ -80,11 +85,13 @@ namespace WasteCity.Persistence
                 FormalSaveDecodeError.None,
                 string.Empty,
                 data,
-                null);
+                null,
+                sourceJson);
         }
 
         internal static FormalSaveDecodeResult ThreeD(
-            FormalSaveEnvelope envelope)
+            FormalSaveEnvelope envelope,
+            string sourceJson)
         {
             return new FormalSaveDecodeResult(
                 true,
@@ -92,7 +99,8 @@ namespace WasteCity.Persistence
                 FormalSaveDecodeError.None,
                 string.Empty,
                 null,
-                envelope);
+                envelope,
+                sourceJson);
         }
 
         internal static FormalSaveDecodeResult Failed(
@@ -104,6 +112,7 @@ namespace WasteCity.Persistence
                 FormalSavePayloadKind.None,
                 error,
                 message,
+                null,
                 null,
                 null);
         }

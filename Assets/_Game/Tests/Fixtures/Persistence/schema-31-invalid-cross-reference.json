@@ -1,0 +1,101 @@
+{
+  "gameVersion": "0.1.0",
+  "saveSchemaVersion": 31,
+  "contentSources": ["builtin:wastecity@0.1.0"],
+  "createdAt": "2026-08-20T01:02:03.0000000Z",
+  "updatedAt": "2026-08-20T04:05:06.0000000Z",
+  "runtimeKind": "formal-3d",
+  "payloadHashSha256": "416e2970a111700d07c619b9ec264a903fc07871ca4e8abd6ec32ced1286412a",
+  "checkpoint": {
+    "sequence": 1,
+    "reasonId": "test",
+    "ruleTimeSeconds": 0.0,
+    "completedMilestoneIds": []
+  },
+  "formal3D": {
+    "sessionId": "fixture.invalid-cross-reference",
+    "world": {
+      "worldDefinitionId": "core.world.formal-3d",
+      "worldGenerationVersion": 1,
+      "worldSeed": 8128,
+      "width": 64,
+      "height": 64,
+      "configurationSignature": "fixture.world.v1",
+      "resourceNodes": [],
+      "orphanResources": []
+    },
+    "city": {
+      "positionX": 0.0,
+      "positionZ": 0.0,
+      "cellX": 0,
+      "cellY": 0,
+      "autopilotActive": false,
+      "destinationX": -1,
+      "destinationY": -1,
+      "cityMode": 0,
+      "transitionReturnMode": 0,
+      "transitionRemainingSeconds": 0.0,
+      "population": 100,
+      "populationCapacity": 150
+    },
+    "buildings": { "nextStableInstanceOrdinal": 1, "instances": [] },
+    "storage": {
+      "configurationSignature": "fixture.storage.v1",
+      "coreAmounts": [],
+      "warehouses": [
+        {
+          "stableInstanceId": "building.instance.999999",
+          "filterResourceId": "",
+          "amounts": []
+        }
+      ],
+      "orphanResources": []
+    },
+    "backpack": {
+      "slots": [
+        {"slotIndex":0,"resourceId":"","amount":0},{"slotIndex":1,"resourceId":"","amount":0},{"slotIndex":2,"resourceId":"","amount":0},{"slotIndex":3,"resourceId":"","amount":0},{"slotIndex":4,"resourceId":"","amount":0},
+        {"slotIndex":5,"resourceId":"","amount":0},{"slotIndex":6,"resourceId":"","amount":0},{"slotIndex":7,"resourceId":"","amount":0},{"slotIndex":8,"resourceId":"","amount":0},{"slotIndex":9,"resourceId":"","amount":0},
+        {"slotIndex":10,"resourceId":"","amount":0},{"slotIndex":11,"resourceId":"","amount":0},{"slotIndex":12,"resourceId":"","amount":0},{"slotIndex":13,"resourceId":"","amount":0},{"slotIndex":14,"resourceId":"","amount":0},
+        {"slotIndex":15,"resourceId":"","amount":0},{"slotIndex":16,"resourceId":"","amount":0},{"slotIndex":17,"resourceId":"","amount":0},{"slotIndex":18,"resourceId":"","amount":0},{"slotIndex":19,"resourceId":"","amount":0},
+        {"slotIndex":20,"resourceId":"","amount":0},{"slotIndex":21,"resourceId":"","amount":0},{"slotIndex":22,"resourceId":"","amount":0},{"slotIndex":23,"resourceId":"","amount":0},{"slotIndex":24,"resourceId":"","amount":0},
+        {"slotIndex":25,"resourceId":"","amount":0},{"slotIndex":26,"resourceId":"","amount":0},{"slotIndex":27,"resourceId":"","amount":0},{"slotIndex":28,"resourceId":"","amount":0},{"slotIndex":29,"resourceId":"","amount":0}
+      ]
+    },
+    "crafting": { "nextQueueOrdinal": 1, "activeProgressSeconds": 0.0, "executions": [] },
+    "research": { "completedResearchIds": [], "activeResearchId": "", "remainingSeconds": 0.0 },
+    "production": { "states": [] },
+    "defense": {
+      "tutorialTriggered": false,
+      "tutorialWaveTriggerCount": 0,
+      "wavePhase": 0,
+      "warningRemainingSeconds": 0.0,
+      "spawnClockSeconds": 0.0,
+      "fixedStepAccumulatorSeconds": 0.0,
+      "spawnedEnemyCount": 0,
+      "defeatedEnemyCount": 0,
+      "nextEnemyOrdinal": 1,
+      "randomState": "fixture.deterministic",
+      "coreCurrentHealth": 2000,
+      "towers": [],
+      "enemies": []
+    },
+    "evacuation": {
+      "nextBatchOrdinal": 1,
+      "activeBatchId": "",
+      "isProcessing": false,
+      "batchContext": { "isInCombat": false, "productivityMultiplier": 1.0 },
+      "work": [],
+      "fullQueueStableInstanceIds": [],
+      "currentQueueIndex": 0,
+      "currentStableInstanceId": "",
+      "remainingSeconds": 0.0,
+      "isBlocked": false,
+      "blockedCode": "",
+      "blockedStableInstanceId": "",
+      "runtimePayloads": [],
+      "lockedStableInstanceIds": [],
+      "pendingRollbackStableInstanceIds": []
+    },
+    "pause": { "tacticalPaused": false }
+  }
+}

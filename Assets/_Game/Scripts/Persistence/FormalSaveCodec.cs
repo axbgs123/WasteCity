@@ -1,6 +1,9 @@
 using System;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
+using WasteCity.Persistence.ThreeD;
 
 namespace WasteCity.Persistence
 {
@@ -52,6 +55,22 @@ namespace WasteCity.Persistence
                 formal3D = envelope.formal3D,
             };
             return JsonUtility.ToJson(normalized, false);
+        }
+
+        public static string ComputePayloadHashSha256(
+            FormalThreeDSaveData payload)
+        {
+            if (payload == null) return null;
+            byte[] bytes = Encoding.UTF8.GetBytes(
+                JsonUtility.ToJson(payload, false));
+            using (SHA256 hash = SHA256.Create())
+            {
+                byte[] digest = hash.ComputeHash(bytes);
+                var builder = new StringBuilder(digest.Length * 2);
+                for (int index = 0; index < digest.Length; index++)
+                    builder.Append(digest[index].ToString("x2"));
+                return builder.ToString();
+            }
         }
 
         public static FormalSaveDecodeResult DecodeEnvelope(string json)
@@ -118,7 +137,7 @@ namespace WasteCity.Persistence
                     ? FormalSaveDecodeResult.Failed(
                         FormalSaveDecodeError.MalformedJson,
                         "旧版存档内容已损坏")
-                    : FormalSaveDecodeResult.Legacy(legacy);
+                    : FormalSaveDecodeResult.Legacy(legacy, json);
             }
             if (hasEnvelopeSchema && probe.saveSchemaVersion ==
                 FormalSaveEnvelope.CurrentSchemaVersion)
@@ -157,7 +176,7 @@ namespace WasteCity.Persistence
                         FormalSaveDecodeError.PayloadKindMismatch,
                         "存档类型与数据不一致");
                 }
-                return FormalSaveDecodeResult.ThreeD(envelope);
+                return FormalSaveDecodeResult.ThreeD(envelope, json);
             }
 
             if (probe.schema == FormalSaveEnvelope.CurrentSchemaVersion ||

@@ -7,7 +7,7 @@
   "createdAt": "2026-08-20T01:02:03.0000000Z",
   "updatedAt": "2026-08-20T04:05:06.0000000Z",
   "runtimeKind": "formal-3d",
-  "payloadHashSha256": "fixture-hash-not-validated-until-task-02",
+  "payloadHashSha256": "73c7ab24bb70d1c431c4d0d9299b5eaa72f5dbdb39070b79006d345c1aacbe97",
   "checkpoint": {
     "sequence": 7,
     "reasonId": "first-deployment-complete",

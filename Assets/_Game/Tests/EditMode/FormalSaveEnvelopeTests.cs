@@ -358,6 +358,20 @@ namespace WasteCity.Tests
                 Is.EqualTo(FormalSaveDecodeError.PayloadKindMismatch));
         }
 
+        [Test]
+        public void DecodeAnyLeavesSemanticValidationToValidator()
+        {
+            FormalSaveDecodeResult result = FormalSaveCodec.DecodeAny(
+                ReadFixture("schema-31-invalid-cross-reference.json"));
+
+            Assert.That(result.Success, Is.True, result.Message);
+            Assert.That(result.PayloadKind,
+                Is.EqualTo(FormalSavePayloadKind.Formal3D));
+            Assert.That(
+                FormalSaveValidator.ValidateDecoded(result).IsValid,
+                Is.False);
+        }
+
         private static string ReadFixture(string fileName)
         {
             string projectRoot = Path.GetFullPath(Path.Combine(
