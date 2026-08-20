@@ -56,7 +56,7 @@
 
 ## IDEA-0014 正式撤离与完整垂直切片检查边界
 
-`IDEA-0014` 已按先失败后实现的顺序固定 5 秒展开、8 秒收起、转换取消、第一名敌人生成后的战斗状态、战斗收起 `-30%`、和平/战斗完整拆除、快速拆除、遗弃和确定性退款，并检查建筑内部库存等内部物资、塔内弹药、仓库内容与退款能否在同一原子容量门和容量预检下完整迁移或准确拒绝。清单和队列必须读取不可变视图。当前状态是“已实现待验证”；不得用 UI 重新计算战斗状态、退款或容量缺口，也不得把聚焦通过写成最终完整回归已经通过。
+`IDEA-0014` 已按先失败后实现的顺序固定 5 秒展开、8 秒收起、转换取消、第一名敌人生成后的战斗状态、战斗收起 `-30%`、和平/战斗完整拆除、快速拆除、遗弃和确定性退款，并检查建筑内部库存等内部物资、塔内弹药、仓库内容与退款能否在同一原子容量门和容量预检下完整迁移或准确拒绝。清单和队列必须读取不可变视图。该阶段的日常 EditMode `1787/1787`、完整 PlayMode `112/112`、项目质量门、四个正式构建和验证记录已经完成；当前仍为“已实现待验证”，因为用户试玩和真实 Windows 验收尚未完成。不得用 UI 重新计算战斗状态、退款或容量缺口，也不得把这些自动化与构建证据写成用户已经验证。
 
 相关运行时检查至少覆盖 `CityDeploymentRulesTests`、`GrayboxEvacuationTests`、`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionRuntimeTests`、`DemoResearchRuntimeTests`、`GrayboxFirstDefenseRuntimeTests`、性能和场景合同。可用下面的精确聚焦入口；测试命令不要加 `-quit`：
 
@@ -99,7 +99,24 @@ WASTECITY_GUI_PROFILER_RESULT=/tmp/wastecity-idea0014-gui-summary.json \
 
 定位失败时按所有权排查：正式时间、转换取消和战斗收起先查 `CityDeploymentModel`、`CityDeploymentRules` 与 `GrayboxMobileCityController3D`；退款和处置先查 `BuildingEvacuationRules`；容量不足、部分写入或重复退款先查 `CityResourceStorageModel` 与 `GrayboxBuildingSession3D`；生产缓存、研究进度或塔内弹药丢失先查对应运行时和 `IsEvacuationLocked`；清单、冻结批次、稳定队列或重试先查 `GrayboxEvacuationController3D`；按钮、暂停透传和点击穿透先查 `GrayboxBuildingInputRouter3D`、`GrayboxUsabilityInputCoordinator3D` 与 `GrayboxBuildingMenuView3D`；场景引用先查 `GrayboxSceneContractTests` 和 `GrayboxSceneAuthoring`；性能再查正式 Marker、混合探针、GUI 原始捕获和汇总 JSON。
 
-schema 继续保持 `30`；冻结 2D `FormalPrototype` 没有接入新 UI 或新功能，只同步复用共享稳定建筑目录的研究站首轮门槛并由 legacy 回归保护。正式 3D 存档、前哨、迷雾、新敌人和新炮塔都不属于本里程碑测试通过能够证明的范围。Task 11 的日常完整 EditMode、完整 PlayMode、项目质量门和四个正式构建已经通过，验证记录按最终实现提交生成；用户试玩和真实 Windows 10 与 Windows 11 的视觉、GPU、显存、内存验收仍必须由实际执行结果确认。
+`IDEA-0014` 的实现与验证基线继续保持 schema `30`；冻结 2D `FormalPrototype` 没有接入新 UI 或新功能，只同步复用共享稳定建筑目录的研究站首轮门槛并由 legacy 回归保护。正式 3D 存档不属于 `IDEA-0014` 测试通过能够证明的范围，现已由后续 `IDEA-0015` 单独批准并开始开发；当前不能宣称 schema `31`、退出保存或重开恢复已经实现。用户试玩和真实 Windows 10 与 Windows 11 的视觉、GPU、显存、内存验收仍必须由实际执行结果确认。
+
+## IDEA-0015 正式 3D 存档与 schema 31 检查边界
+
+`IDEA-0015` 已批准、当前处于开发中，但尚未实现或验证。正式设计使用一个统一 Store/Coordinator 和独立的 3D payload；schema `1–30` 继续表示旧 2D 存档，必须按原语义可读，3D 入口绝不能把它们静默解释成 3D。测试中的“已有代码”“局部 GREEN”“能编码 JSON”都不足以把本阶段写成已实现，更不能把它写成用户已验证。
+
+严格按以下顺序建立 RED，再做最小实现：
+
+1. 存档 envelope 与语义校验：覆盖 `gameVersion`、`saveSchemaVersion`、`contentSources`、`createdAt`、`updatedAt`，拒绝空白、损坏、零值、未来 schema、缺失或重复实例 ID、非法枚举/范围和错误数组长度；未知内容定义 ID 必须保留为缺失内容占位或孤立数据，不得静默删除；提交 schema `30` 与 schema `31` 的正式回归 fixture，不再只依赖测试内联 JSON；
+2. 迁移与旧档边界：每次结构变化增加新的单向迁移且不回改旧迁移；迁移前备份，失败保留原档并显示可理解错误；旧 ID 改名维护显式映射。schema `1–30` fixture 必须继续由旧 2D decoder 读取，但不得自动进入 3D Restore；
+3. 文件事务：使用隔离临时目录和可注入文件边界检查临时写入、刷新、原子替换、主档与备份回退、权限不足、写入中断和迁移失败。测试不得读写玩家真实 `Application.persistentDataPath` 存档；任何失败都不得损坏既有主档或备份；
+4. 领域状态：至少覆盖世界 seed 与资源节点余量，城市位置、部署状态和剩余时间，人口，建筑稳定实例 ID、下一序号、位置、方向、施工和所有权，城市核心与真实仓库内容/过滤，背包槽位、合成队列与预留输入，研究，生产内部缓存/进度/暂停，防御波次/敌人/核心/塔内状态。物流连接、停工原因、容量、UI 与表现等派生状态应在加载后重算，不保存第二份真值；
+5. 活动流程：必须能保存和恢复 Deploying、Packing、教学战斗以及已经确认并进入处理的撤离批次，覆盖冻结 work、锁、内部载荷、队列当前位置、剩余时间、阻塞与重试，防止资源丢失、复制或重复提交。未确认的撤离菜单、选择、悬停、建造预览和其他 UI 状态不保存；
+6. 正式场景和真实输入：通过正式 Input System 验证退出保存、重开恢复、主档损坏后的备份回退和可见错误；捕获—加载—再次捕获必须保持权威状态等价，跨保存点继续模拟在不同帧分块下仍确定。
+
+聚焦验证通过后，仍必须运行日常完整 EditMode、完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个正式构建、官方文档生成/验证和 `RecordVerification`。真实 Windows 机器还要实际检查路径、权限、首次启动和退出保存；macOS 自动化或生成 Windows 产物不能代替这个门。
+
+schema `31` 的完整自动化、四构建和验证记录全部通过前，`FormalPrototype`、2D 专属控制器和 legacy 2D 构建入口不得删除。全部通过后，才可在单独、可回退的变更中退役这些 2D 专属入口；共享规则以及 schema `1–30` decoder、既有迁移和正式 fixture 必须保留并继续进入存档回归。若退役步骤尚未实际完成，也不能把 2D 入口写成已经删除。
 
 ## 怎样读失败定位报告
 
