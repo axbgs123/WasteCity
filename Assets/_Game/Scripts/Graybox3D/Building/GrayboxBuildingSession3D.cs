@@ -25,6 +25,47 @@ namespace WasteCity.Graybox3D.Building
         Invalid
     }
 
+    public readonly struct GrayboxBuildingRestoreEntry3D
+    {
+        public GrayboxBuildingRestoreEntry3D(
+            string stableInstanceId,
+            BuildingDefinition definition,
+            BuildingSite site,
+            int x,
+            int y,
+            BuildingOrientation orientation,
+            GrayboxBuildingInstanceState state,
+            float constructionRemainingSeconds,
+            bool isPlayerOwned,
+            bool isEvacuationLocked,
+            ResourceNodeBinding boundResourceNode)
+        {
+            StableInstanceId = stableInstanceId;
+            Definition = definition;
+            Site = site;
+            X = x;
+            Y = y;
+            Orientation = orientation;
+            State = state;
+            ConstructionRemainingSeconds = constructionRemainingSeconds;
+            IsPlayerOwned = isPlayerOwned;
+            IsEvacuationLocked = isEvacuationLocked;
+            BoundResourceNode = boundResourceNode;
+        }
+
+        public string StableInstanceId { get; }
+        public BuildingDefinition Definition { get; }
+        public BuildingSite Site { get; }
+        public int X { get; }
+        public int Y { get; }
+        public BuildingOrientation Orientation { get; }
+        public GrayboxBuildingInstanceState State { get; }
+        public float ConstructionRemainingSeconds { get; }
+        public bool IsPlayerOwned { get; }
+        public bool IsEvacuationLocked { get; }
+        public ResourceNodeBinding BoundResourceNode { get; }
+    }
+
     public sealed class GrayboxBuildingInstance3D
     {
         internal GrayboxBuildingInstance3D(
@@ -140,6 +181,7 @@ namespace WasteCity.Graybox3D.Building
                 DevelopmentRuleTimeMultiplier);
         public uint CatalogRevision => catalogRevision;
         public uint PlacementRevision => placementRevision;
+        public int NextStableInstanceOrdinal => nextStableInstanceOrdinal;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
 
@@ -877,6 +919,176 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool CanRestoreBuildings(out string error)
+        {
+            if (Inventory == null || Research == null ||
+                GroundGrid == null || InnerGrid == null ||
+                instances == null || CityStorage == null)
+            {
+                error = "建筑会话尚未完成正式初始化";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryRestoreBuildings(
+            IReadOnlyList<GrayboxBuildingRestoreEntry3D> entries,
+            int restoredNextStableInstanceOrdinal,
+            IGrayboxBuildingPresentation3D presentation,
+            out string error)
+        {
+            if (!CanRestoreBuildings(out error)) return false;
+            if (entries == null)
+            {
+                error = "建筑恢复数据不能为空";
+                return false;
+            }
+            if (presentation == null)
+            {
+                error = "建筑表现不能为空";
+                return false;
+            }
+            if (restoredNextStableInstanceOrdinal <= 0 ||
+                restoredNextStableInstanceOrdinal > 999999)
+            {
+                error = "建筑稳定实例高水位无效";
+                return false;
+            }
+
+            var restoredGroundGrid = new BuildingGrid(
+                GrayboxWorldLayout3D.WorldWidth,
+                GrayboxWorldLayout3D.WorldHeight);
+            var restoredInnerGrid = new BuildingGrid(
+                InnerGridWidth,
+                InnerGridHeight);
+            var restoredInstances =
+                new List<GrayboxBuildingInstance3D>(entries.Count);
+            var stableIds = new HashSet<string>(StringComparer.Ordinal);
+            var maximumOrdinal = 0;
+
+            for (var index = 0; index < entries.Count; index++)
+            {
+                GrayboxBuildingRestoreEntry3D entry = entries[index];
+                if (!TryParseStableInstanceOrdinal(
+                        entry.StableInstanceId,
+                        out int ordinal) ||
+                    !stableIds.Add(entry.StableInstanceId))
+                {
+                    error = "建筑稳定实例 ID 为空、重复或格式无效";
+                    return false;
+                }
+                maximumOrdinal = Math.Max(maximumOrdinal, ordinal);
+                if (entry.Definition == null)
+                {
+                    error = "建筑定义不能为空";
+                    return false;
+                }
+                if (!Enum.IsDefined(typeof(BuildingSite), entry.Site) ||
+                    !Enum.IsDefined(
+                        typeof(BuildingOrientation),
+                        entry.Orientation) ||
+                    !Enum.IsDefined(
+                        typeof(GrayboxBuildingInstanceState),
+                        entry.State))
+                {
+                    error = "建筑站点、方向或状态无效";
+                    return false;
+                }
+                float remaining = entry.ConstructionRemainingSeconds;
+                if (float.IsNaN(remaining) || float.IsInfinity(remaining) ||
+                    remaining < 0f ||
+                    remaining > entry.Definition.BuildSeconds)
+                {
+                    error = "建筑施工剩余时间无效";
+                    return false;
+                }
+                if ((entry.State ==
+                         GrayboxBuildingInstanceState.UnderConstruction &&
+                     remaining <= 0f) ||
+                    (entry.State == GrayboxBuildingInstanceState.Completed &&
+                     remaining != 0f))
+                {
+                    error = "建筑状态与施工剩余时间不一致";
+                    return false;
+                }
+                bool isRuin = entry.State ==
+                    GrayboxBuildingInstanceState.AbandonedRuin;
+                if (isRuin && entry.IsPlayerOwned)
+                {
+                    error = "建筑状态与玩家所有权不一致";
+                    return false;
+                }
+                if (entry.IsEvacuationLocked &&
+                    (!entry.IsPlayerOwned ||
+                     entry.Site != BuildingSite.Ground || isRuin))
+                {
+                    error = "建筑撤离锁状态无效";
+                    return false;
+                }
+
+                BuildingGrid restoredGrid =
+                    entry.Site == BuildingSite.InnerCity
+                        ? restoredInnerGrid
+                        : restoredGroundGrid;
+                if (!restoredGrid.TryRestore(
+                        entry.Definition,
+                        entry.X,
+                        entry.Y,
+                        out PlacedBuilding placement,
+                        entry.Site,
+                        entry.Orientation))
+                {
+                    error = "建筑占格越界、重叠或站点不兼容";
+                    return false;
+                }
+
+                var progress = new ConstructionProgress(
+                    entry.Definition.BuildSeconds);
+                progress.Restore(remaining);
+                var candidate = new GrayboxBuildingInstance3D(
+                    entry.StableInstanceId,
+                    placement,
+                    progress,
+                    entry.BoundResourceNode);
+                candidate.RestoreEvacuationState(
+                    entry.IsPlayerOwned,
+                    entry.State);
+                candidate.SetEvacuationLocked(entry.IsEvacuationLocked);
+                restoredInstances.Add(candidate);
+            }
+
+            if (restoredNextStableInstanceOrdinal <= maximumOrdinal)
+            {
+                error = "建筑稳定实例高水位必须大于全部现有实例序号";
+                return false;
+            }
+
+            restoredInstances.Sort((left, right) => string.CompareOrdinal(
+                left.StableInstanceId,
+                right.StableInstanceId));
+            if (!TryReplacePresentation(
+                    instances,
+                    restoredInstances,
+                    presentation,
+                    out error))
+                return false;
+
+            GroundGrid = restoredGroundGrid;
+            InnerGrid = restoredInnerGrid;
+            instances = restoredInstances;
+            readOnlyInstances =
+                new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
+            nextStableInstanceOrdinal = restoredNextStableInstanceOrdinal;
+            evacuationLocks.Clear();
+            evacuationSnapshots.Clear();
+            evacuationWarehouseConnectivity.Clear();
+            AdvanceCatalogRevision();
+            AdvancePlacementRevision();
+            error = string.Empty;
+            return true;
+        }
+
         public void SetConstructionMultiplierForDevelopment(float value)
         {
             EnsureConfigured();
@@ -1270,6 +1482,107 @@ namespace WasteCity.Graybox3D.Building
                     developmentRoute = default(DevelopmentRoute);
                     return false;
             }
+        }
+
+        private static bool TryParseStableInstanceOrdinal(
+            string stableInstanceId,
+            out int ordinal)
+        {
+            const string prefix = "building.instance.";
+            ordinal = 0;
+            if (string.IsNullOrEmpty(stableInstanceId) ||
+                stableInstanceId.Length != prefix.Length + 6 ||
+                !stableInstanceId.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+            for (var index = prefix.Length;
+                 index < stableInstanceId.Length;
+                 index++)
+            {
+                char digit = stableInstanceId[index];
+                if (digit < '0' || digit > '9') return false;
+                ordinal = ordinal * 10 + digit - '0';
+            }
+            return ordinal > 0;
+        }
+
+        private static bool TryReplacePresentation(
+            IReadOnlyList<GrayboxBuildingInstance3D> currentInstances,
+            IReadOnlyList<GrayboxBuildingInstance3D> restoredInstances,
+            IGrayboxBuildingPresentation3D presentation,
+            out string error)
+        {
+            try
+            {
+                for (var index = 0; index < currentInstances.Count; index++)
+                    presentation.Remove(currentInstances[index]);
+            }
+            catch
+            {
+                RestorePresentationSet(currentInstances, presentation);
+                error = "无法清理现有建筑表现";
+                return false;
+            }
+
+            var attemptedRestoredCount = 0;
+            try
+            {
+                for (var index = 0; index < restoredInstances.Count; index++)
+                {
+                    attemptedRestoredCount = index + 1;
+                    if (!presentation.TryCreate(restoredInstances[index]))
+                    {
+                        CleanupPresentationSet(
+                            restoredInstances,
+                            attemptedRestoredCount,
+                            presentation);
+                        RestorePresentationSet(currentInstances, presentation);
+                        error = "无法重建建筑表现";
+                        return false;
+                    }
+                }
+            }
+            catch
+            {
+                CleanupPresentationSet(
+                    restoredInstances,
+                    attemptedRestoredCount,
+                    presentation);
+                RestorePresentationSet(currentInstances, presentation);
+                error = "重建建筑表现时发生错误";
+                return false;
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static void CleanupPresentationSet(
+            IReadOnlyList<GrayboxBuildingInstance3D> candidates,
+            int count,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            for (var index = Math.Min(count, candidates.Count) - 1;
+                 index >= 0;
+                 index--)
+            {
+                try
+                {
+                    presentation.Remove(candidates[index]);
+                }
+                catch
+                {
+                    // The authoritative model has not changed; the outer
+                    // restore flow can rebuild derived presentation again.
+                }
+            }
+        }
+
+        private static void RestorePresentationSet(
+            IReadOnlyList<GrayboxBuildingInstance3D> candidates,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            for (var index = 0; index < candidates.Count; index++)
+                TryRestorePresentation(presentation, candidates[index]);
         }
 
         private static string CreateStableInstanceId(int ordinal)

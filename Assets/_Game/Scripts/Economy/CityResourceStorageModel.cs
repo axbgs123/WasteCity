@@ -107,6 +107,89 @@ namespace WasteCity.Economy
         }
     }
 
+    public sealed class CityWarehouseRestoreEntry
+    {
+        private readonly IReadOnlyList<ResourceAmount> amounts;
+
+        public CityWarehouseRestoreEntry(
+            string stableInstanceId,
+            string filterResourceId,
+            IReadOnlyList<ResourceAmount> amounts,
+            bool preserveWhenDisconnected = false)
+        {
+            StableInstanceId = stableInstanceId;
+            FilterResourceId = filterResourceId;
+            PreserveWhenDisconnected = preserveWhenDisconnected;
+            if (amounts == null)
+            {
+                this.amounts = null;
+            }
+            else
+            {
+                var copy = new ResourceAmount[amounts.Count];
+                for (int index = 0; index < amounts.Count; index++)
+                    copy[index] = amounts[index];
+                this.amounts = Array.AsReadOnly(copy);
+            }
+        }
+
+        public string StableInstanceId { get; }
+        public string FilterResourceId { get; }
+        public IReadOnlyList<ResourceAmount> Amounts => amounts;
+        public bool PreserveWhenDisconnected { get; }
+    }
+
+    public readonly struct CityStorageOrphanResource
+    {
+        public const string CoreOwnerKind = "city-core";
+        public const string CoreOwnerStableId = "city.core";
+        public const string WarehouseOwnerKind = "warehouse";
+
+        public CityStorageOrphanResource(
+            string resourceId,
+            int amount,
+            string ownerKind,
+            string ownerStableId)
+        {
+            ResourceId = resourceId;
+            Amount = amount;
+            OwnerKind = ownerKind;
+            OwnerStableId = ownerStableId;
+        }
+
+        public string ResourceId { get; }
+        public int Amount { get; }
+        public string OwnerKind { get; }
+        public string OwnerStableId { get; }
+    }
+
+    public sealed class CityResourceStorageRestorePlan
+    {
+        internal CityResourceStorageRestorePlan(
+            CityResourceStorageModel owner,
+            ulong preparedRevision,
+            Dictionary<string, int> coreAmounts,
+            SortedDictionary<string, WarehouseStorageState> warehouses,
+            CityStorageOrphanResource[] orphanResources)
+        {
+            Owner = owner;
+            PreparedRevision = preparedRevision;
+            CoreAmounts = coreAmounts;
+            Warehouses = warehouses;
+            OrphanResources = orphanResources;
+        }
+
+        public ulong PreparedRevision { get; }
+        public int WarehouseCount => Warehouses.Count;
+
+        internal CityResourceStorageModel Owner { get; }
+        internal Dictionary<string, int> CoreAmounts { get; }
+        internal SortedDictionary<string, WarehouseStorageState> Warehouses
+            { get; }
+        internal CityStorageOrphanResource[] OrphanResources { get; }
+        internal bool committed;
+    }
+
     public sealed class CityResourceStorageModel : IDisposable
     {
         private readonly ResourceInventory coreInventory;
@@ -119,6 +202,8 @@ namespace WasteCity.Economy
         private ResourceChangeAttribution changeAttribution;
         private Exception lastNotificationFailure;
         private readonly int[] networkBefore = new int[ResourceIds.All.Length];
+        private CityStorageOrphanResource[] orphanResources =
+            Array.Empty<CityStorageOrphanResource>();
 
         public CityResourceStorageModel(
             ResourceInventory coreInventory,
@@ -174,7 +259,7 @@ namespace WasteCity.Economy
         public bool TryRemoveWarehouse(string stableInstanceId)
         {
             if (!TryGetWarehouse(stableInstanceId, out WarehouseStorageState state) ||
-                state.TotalAmount > 0)
+                state.TotalAmount > 0 || state.PreserveWhenDisconnected)
             {
                 return false;
             }
@@ -234,8 +319,34 @@ namespace WasteCity.Economy
         {
             if (!TryGetWarehouse(stableInstanceId, out WarehouseStorageState state))
                 return false;
+            string normalized = string.IsNullOrWhiteSpace(resourceId)
+                ? null
+                : resourceId;
+            if (normalized != null)
+            {
+                for (int index = 0; index < orphanResources.Length; index++)
+                {
+                    CityStorageOrphanResource orphan = orphanResources[index];
+                    if (orphan.Amount > 0 &&
+                        string.Equals(
+                            orphan.OwnerKind,
+                            CityStorageOrphanResource.WarehouseOwnerKind,
+                            StringComparison.Ordinal) &&
+                        string.Equals(
+                            orphan.OwnerStableId,
+                            stableInstanceId,
+                            StringComparison.Ordinal) &&
+                        !string.Equals(
+                            orphan.ResourceId,
+                            normalized,
+                            StringComparison.Ordinal))
+                    {
+                        return false;
+                    }
+                }
+            }
             string before = state.FilterResourceId;
-            if (!state.TrySetFilter(resourceId)) return false;
+            if (!state.TrySetFilter(normalized)) return false;
             if (!string.Equals(
                     before,
                     state.FilterResourceId,
@@ -459,7 +570,11 @@ namespace WasteCity.Economy
             {
                 if (!TryGetWarehouse(
                         sourceWarehouseId,
-                        out WarehouseStorageState _))
+                        out WarehouseStorageState sourceWarehouse))
+                {
+                    valid = false;
+                }
+                else if (sourceWarehouse.OrphanAmount > 0)
                 {
                     valid = false;
                 }
@@ -600,6 +715,262 @@ namespace WasteCity.Economy
                 network,
                 acceptable,
                 warehouseSnapshots);
+        }
+
+        public CityStorageOrphanResource[] CaptureOrphanResources()
+        {
+            return (CityStorageOrphanResource[])orphanResources.Clone();
+        }
+
+        public bool TryPrepareRestore(
+            IReadOnlyList<ResourceAmount> coreAmounts,
+            IReadOnlyList<CityWarehouseRestoreEntry> warehouseEntries,
+            IReadOnlyList<CityStorageOrphanResource> orphanEntries,
+            bool allowOverCapacity,
+            out CityResourceStorageRestorePlan plan,
+            out string error)
+        {
+            plan = null;
+            if (coreAmounts == null || warehouseEntries == null ||
+                orphanEntries == null)
+            {
+                error = "城市仓储恢复数据不完整";
+                return false;
+            }
+
+            var restoredCore = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string resourceId in ResourceIds.All)
+                restoredCore.Add(resourceId, 0);
+            var seenCore = new HashSet<string>(StringComparer.Ordinal);
+            int effectiveCoreCapacity = Math.Min(
+                coreCapacityPerResource,
+                coreInventory.CapacityPerResource);
+            for (int index = 0; index < coreAmounts.Count; index++)
+            {
+                ResourceAmount amount = coreAmounts[index];
+                if (!ResourceCapacityPolicy.IsRegisteredResource(
+                        amount.ResourceId) ||
+                    amount.Amount < 0 ||
+                    !seenCore.Add(amount.ResourceId))
+                {
+                    error = "城市核心资源记录无效或重复";
+                    return false;
+                }
+                if ((!allowOverCapacity &&
+                     amount.Amount > effectiveCoreCapacity) ||
+                    amount.Amount > coreInventory.CapacityPerResource)
+                {
+                    error = "城市核心资源超过当前容量";
+                    return false;
+                }
+                restoredCore[amount.ResourceId] = amount.Amount;
+            }
+
+            var entriesById =
+                new SortedDictionary<string, CityWarehouseRestoreEntry>(
+                    StringComparer.Ordinal);
+            var amountsByWarehouse =
+                new SortedDictionary<string, Dictionary<string, int>>(
+                    StringComparer.Ordinal);
+            for (int index = 0; index < warehouseEntries.Count; index++)
+            {
+                CityWarehouseRestoreEntry entry = warehouseEntries[index];
+                if (entry == null ||
+                    string.IsNullOrWhiteSpace(entry.StableInstanceId) ||
+                    entry.Amounts == null ||
+                    entriesById.ContainsKey(entry.StableInstanceId))
+                {
+                    error = "仓库恢复记录无效或重复";
+                    return false;
+                }
+
+                var restoredAmounts = new Dictionary<string, int>(
+                    StringComparer.Ordinal);
+                for (int amountIndex = 0;
+                     amountIndex < entry.Amounts.Count;
+                     amountIndex++)
+                {
+                    ResourceAmount amount = entry.Amounts[amountIndex];
+                    if (!ResourceCapacityPolicy.IsRegisteredResource(
+                            amount.ResourceId) ||
+                        amount.Amount < 0 ||
+                        restoredAmounts.ContainsKey(amount.ResourceId))
+                    {
+                        error = "仓库资源记录无效或重复";
+                        return false;
+                    }
+                    restoredAmounts.Add(amount.ResourceId, amount.Amount);
+                }
+                entriesById.Add(entry.StableInstanceId, entry);
+                amountsByWarehouse.Add(
+                    entry.StableInstanceId,
+                    restoredAmounts);
+            }
+
+            var restoredOrphans = new CityStorageOrphanResource[
+                orphanEntries.Count];
+            var orphanKeys = new HashSet<string>(StringComparer.Ordinal);
+            var orphanTotalsByWarehouse = new Dictionary<string, long>(
+                StringComparer.Ordinal);
+            for (int index = 0; index < orphanEntries.Count; index++)
+            {
+                CityStorageOrphanResource orphan = orphanEntries[index];
+                if (string.IsNullOrWhiteSpace(orphan.ResourceId) ||
+                    string.IsNullOrWhiteSpace(orphan.OwnerKind) ||
+                    string.IsNullOrWhiteSpace(orphan.OwnerStableId) ||
+                    orphan.Amount < 0)
+                {
+                    error = "孤立资源记录无效";
+                    return false;
+                }
+                string orphanKey = orphan.OwnerKind + "\n" +
+                    orphan.OwnerStableId + "\n" + orphan.ResourceId;
+                if (!orphanKeys.Add(orphanKey))
+                {
+                    error = "孤立资源记录重复";
+                    return false;
+                }
+
+                if (string.Equals(
+                        orphan.OwnerKind,
+                        CityStorageOrphanResource.WarehouseOwnerKind,
+                        StringComparison.Ordinal))
+                {
+                    if (!entriesById.TryGetValue(
+                            orphan.OwnerStableId,
+                            out CityWarehouseRestoreEntry warehouseEntry))
+                    {
+                        error = "孤立资源引用的仓库不存在";
+                        return false;
+                    }
+                    if (amountsByWarehouse[orphan.OwnerStableId].ContainsKey(
+                            orphan.ResourceId))
+                    {
+                        error = "仓库资源同时出现在正式与孤立记录中";
+                        return false;
+                    }
+                    if (orphan.Amount > 0 &&
+                        !string.IsNullOrWhiteSpace(
+                            warehouseEntry.FilterResourceId) &&
+                        !string.Equals(
+                            warehouseEntry.FilterResourceId,
+                            orphan.ResourceId,
+                            StringComparison.Ordinal))
+                    {
+                        error = "仓库过滤与孤立内容不兼容";
+                        return false;
+                    }
+                    orphanTotalsByWarehouse.TryGetValue(
+                        orphan.OwnerStableId,
+                        out long orphanTotal);
+                    orphanTotal += orphan.Amount;
+                    if (orphanTotal > int.MaxValue)
+                    {
+                        error = "仓库孤立资源总量溢出";
+                        return false;
+                    }
+                    orphanTotalsByWarehouse[orphan.OwnerStableId] = orphanTotal;
+                }
+                else if (string.Equals(
+                             orphan.OwnerKind,
+                             CityStorageOrphanResource.CoreOwnerKind,
+                             StringComparison.Ordinal) &&
+                         string.Equals(
+                             orphan.OwnerStableId,
+                             CityStorageOrphanResource.CoreOwnerStableId,
+                             StringComparison.Ordinal) &&
+                         seenCore.Contains(orphan.ResourceId))
+                {
+                    error = "城市核心资源同时出现在正式与孤立记录中";
+                    return false;
+                }
+                restoredOrphans[index] = orphan;
+            }
+
+            var restoredWarehouses =
+                new SortedDictionary<string, WarehouseStorageState>(
+                    StringComparer.Ordinal);
+            foreach (KeyValuePair<string, CityWarehouseRestoreEntry> item in
+                     entriesById)
+            {
+                CityWarehouseRestoreEntry entry = item.Value;
+                int orphanAmount = orphanTotalsByWarehouse.TryGetValue(
+                        item.Key,
+                        out long total)
+                    ? (int)total
+                    : 0;
+                var restored = new WarehouseStorageState(
+                    item.Key,
+                    connected: false,
+                    WarehouseStorageState.FormalCapacity,
+                    entry.PreserveWhenDisconnected);
+                if (!restored.TryRestore(
+                        entry.FilterResourceId,
+                        amountsByWarehouse[item.Key],
+                        orphanAmount,
+                        allowOverCapacity,
+                        entry.PreserveWhenDisconnected,
+                        out error))
+                {
+                    return false;
+                }
+                restoredWarehouses.Add(item.Key, restored);
+            }
+
+            plan = new CityResourceStorageRestorePlan(
+                this,
+                Revision,
+                restoredCore,
+                restoredWarehouses,
+                restoredOrphans);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryCommitRestore(
+            CityResourceStorageRestorePlan plan,
+            out string error)
+        {
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "城市仓储恢复计划不属于当前会话";
+                return false;
+            }
+            if (plan.committed)
+            {
+                error = "城市仓储恢复计划已经提交";
+                return false;
+            }
+            if (plan.PreparedRevision != Revision)
+            {
+                error = "城市仓储已变化，请重新准备恢复计划";
+                return false;
+            }
+
+            CaptureNetworkBefore();
+            suppressCoreChange = true;
+            try
+            {
+                foreach (string resourceId in ResourceIds.All)
+                    coreInventory.Restore(
+                        resourceId,
+                        plan.CoreAmounts[resourceId]);
+            }
+            finally
+            {
+                suppressCoreChange = false;
+            }
+            warehouses.Clear();
+            foreach (KeyValuePair<string, WarehouseStorageState> item in
+                     plan.Warehouses)
+                warehouses.Add(item.Key, item.Value);
+            orphanResources = (CityStorageOrphanResource[])
+                plan.OrphanResources.Clone();
+            plan.committed = true;
+            AdvanceRevision();
+            PublishNetworkChanges();
+            error = string.Empty;
+            return true;
         }
 
         public CityResourceChangeAttributionScope AttributeChanges(
@@ -917,10 +1288,10 @@ namespace WasteCity.Economy
                         continue;
                     }
                     Dictionary<string, int> values = Warehouses[item.Key];
-                    int used = Total(values);
+                    long used = (long)Total(values) + state.OrphanAmount;
                     int accepted = Math.Min(
                         remaining,
-                        Math.Max(0, state.Capacity - used));
+                        (int)Math.Max(0L, state.Capacity - used));
                     if (accepted <= 0) continue;
                     values[resourceId] = Get(values, resourceId) + accepted;
                     remaining -= accepted;

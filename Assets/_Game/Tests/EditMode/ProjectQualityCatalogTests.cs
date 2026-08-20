@@ -716,18 +716,22 @@ namespace WasteCity.Tests
                 },
                 new[]
                 {
+                    "CityResourceStorageRestorePlan",
                     "CityResourceEvacuationPlan",
                     "CityResourceChangeAttributionScope",
                     "CityResourceStorageModel",
                     "CityResourceStorageSnapshot",
+                    "CityStorageOrphanResource",
+                    "CityWarehouseRestoreEntry",
                 },
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 },
-                new[] { "IDEA-0012", "IDEA-0014" });
+                new[] { "IDEA-0012", "IDEA-0014", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "warehouse-storage-state"),
                 new[]
@@ -742,9 +746,10 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 },
-                new[] { "IDEA-0012" });
+                new[] { "IDEA-0012", "IDEA-0015" });
             AssertReuseContract(
                 FindReuse(catalog, "resource-shortfall-rules"),
                 new[]

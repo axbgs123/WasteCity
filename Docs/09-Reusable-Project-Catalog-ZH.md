@@ -98,7 +98,11 @@
 
 ### 三维建筑会话（复用前审查）
 
-能解决什么：协调当前三维建造过程、唯一城市仓储聚合模型和正式撤离提交边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；正式撤离时保存稳定 work 锁、组合退款与内部载荷预检，并只在原子提交成功后移除建筑。不能负责什么：不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingSession3D`。
+能解决什么：协调当前三维建造、schema 31 批量恢复和正式撤离提交边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；schema 31 恢复时先在临时双网格验证稳定实例、方向、占格、资源点绑定与 nextStableInstanceOrdinal 高水位，再统一替换实例和表现。正式撤离仍只在原子仓储提交成功后移除建筑。不能负责什么：不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；不从场景搜索建筑、不重新支付建造成本，也不从当前实例推导并复用历史高水位。仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有；schema 31 只保存权威建筑状态，连接和表现仍为派生状态。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxEvacuationTests`、`GrayboxFormalSaveBuildingStorageTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingRestoreEntry3D`、`GrayboxBuildingSession3D`。
+
+### 三维建筑与仓储存档适配器（复用前审查）
+
+能解决什么：把正式三维建筑、双网格、城市核心账本与真实仓库映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`。怎么复用：从显式提供的当前建筑会话、建筑表现和当前 WorldMapModel 捕获并恢复 schema 31 的建筑实例、双网格、高水位、城市核心账本、真实仓库、过滤与孤立资源。不能负责什么：只映射领域真值与 FormalThreeD DTO；不拥有文件路径、codec、文件事务或恢复总协调，不使用场景发现，也不保存物流连接、容量配置、revision、UI 或表现对象。带资源节点绑定的恢复必须显式提供当前正式世界。改后跑哪组测试：`GrayboxFormalSaveBuildingStorageTests`。代码名：`GrayboxBuildingStorageSaveAdapter3D`。
 
 ### 三维正式撤离协调与只读视图（仅限场景）
 
@@ -166,11 +170,11 @@
 
 ### 城市与真实仓库库存模型（推荐复用）
 
-能解决什么：提供正式 3D 城市库存唯一聚合入口，并以绑定版本的计划保证撤离容量预检和提交原子一致。在哪里：`Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`。怎么复用：作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取、不可变快照；撤离使用绑定 revision 的容量预检计划和单次原子提交，并明确 StalePlan 与 AlreadyCommitted。不能负责什么：不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须提供权威连接和完整内部载荷。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxEvacuationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`CityResourceEvacuationPlan`、`CityResourceChangeAttributionScope`、`CityResourceStorageModel`、`CityResourceStorageSnapshot`。
+能解决什么：提供正式 3D 城市库存唯一聚合入口，并让撤离与 schema 31 恢复共享原子计划边界。在哪里：`Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs`。怎么复用：作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取和不可变快照；撤离及 schema 31 恢复都使用绑定 owner/revision 的预检计划和单次原子提交。恢复可深拷贝保留未知孤立资源，并在配置签名变化时保留超额资产为只出不进。不能负责什么：不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须先验证仓库与建筑实例的交叉引用，并在恢复后由正式运行时重算连接。容量、连接、聚合快照和 revision 不入档；本模型不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxEvacuationTests`、`GrayboxFormalSaveBuildingStorageTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`CityResourceStorageRestorePlan`、`CityResourceEvacuationPlan`、`CityResourceChangeAttributionScope`、`CityResourceStorageModel`、`CityResourceStorageSnapshot`、`CityStorageOrphanResource`、`CityWarehouseRestoreEntry`。
 
 ### 单仓库共享容量状态（推荐复用）
 
-能解决什么：保存一座仓库的真实内容、150 共享总容量、联网状态和可选单资源过滤。在哪里：`Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`。怎么复用：按稳定建筑实例 ID 保存一座仓库的 150 共享总容量、真实内容、联网状态与可选单资源过滤，并发布不可变快照。不能负责什么：只拥有单仓库会话状态，不聚合城市库存、不计算物流范围、不执行建筑生命周期；正式调用必须由 CityResourceStorageModel 统一编排，不能绕过聚合模型直接充当城市账本。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`WarehouseStorageState`、`WarehouseStorageSnapshot`。
+能解决什么：保存一座仓库的真实内容、150 共享总容量、过滤和兼容恢复状态。在哪里：`Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`。怎么复用：按稳定建筑实例 ID 保存一座仓库的 150 共享总容量、真实内容、联网状态与可选单资源过滤，并发布不可变快照；schema 31 恢复可保留未知过滤和占用共享空间的孤立资源，配置变化造成的超额状态保持只出不进。不能负责什么：只拥有单仓库会话状态，不聚合城市库存、不计算物流范围、不执行建筑生命周期；恢复仓库先保持断开，连接由正式运行时重算。孤立资源占用容量但不可作为已知资源消费；正式调用必须由 CityResourceStorageModel 统一编排。改后跑哪组测试：`CityResourceStorageModelTests`、`GrayboxFormalSaveBuildingStorageTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`WarehouseStorageState`、`WarehouseStorageSnapshot`。
 
 ### 资源缺口规则（推荐复用）
 

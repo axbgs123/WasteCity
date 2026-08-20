@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`354d65b06df8004a29b44c1fb89ab2b5169b71d51906c763c262150dbb718c23`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`a61863a49578721dd43b8f981d78a34788a8de8a2709cdc06d1763989b9bc205`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -40,6 +40,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingOperationalAccess3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingPlacementController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
@@ -59,6 +60,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - 城市导航与部署（`city-navigation-deployment`）：
 - `Assets/_Game/Scripts/City/CityDeploymentModel.cs`
@@ -198,8 +200,14 @@
 - `Assets/_Game/Scripts/Leader/FormalLeaderController.cs`
 - `Assets/_Game/Scripts/Leader/LeaderModel.cs`
 - 持久化与迁移（`persistence-migration`）：
+- `Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveController.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveData.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveEnvelope.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveFileTransaction.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveStore.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs`
+- `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs`
 - 展示与美术整合（`presentation-art-integration`）：
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`

@@ -173,6 +173,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
@@ -193,7 +194,8 @@
         "BUG-0007",
         "IDEA-0012",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -301,7 +303,8 @@
         "IDEA-0011",
         "IDEA-0012",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -413,13 +416,18 @@
       ],
       "FailureLocationSummary": "先检查存档格式、迁移步骤和读写边界",
       "TestFileGlobs": [
-        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0015"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -976,6 +984,7 @@
       "Id": "building-session-3d",
       "ChineseName": "三维建筑会话",
       "TypeNames": [
+        "GrayboxBuildingRestoreEntry3D",
         "GrayboxBuildingSession3D"
       ],
       "AssetPaths": [
@@ -983,17 +992,39 @@
       ],
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；正式撤离时保存稳定 work 锁、组合退款与内部载荷预检，并只在原子提交成功后移除建筑。",
-      "BoundarySummary": "不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有，不进入 schema 30。",
+      "UseSummary": "协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；schema 31 恢复时先在临时双网格验证稳定实例、方向、占格、资源点绑定与 nextStableInstanceOrdinal 高水位，再统一替换实例和表现。正式撤离仍只在原子仓储提交成功后移除建筑。",
+      "BoundarySummary": "不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；不从场景搜索建筑、不重新支付建造成本，也不从当前实例推导并复用历史高水位。仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有；schema 31 只保存权威建筑状态，连接和表现仍为派生状态。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0012",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-building-storage-save-adapter-3d",
+      "ChineseName": "三维建筑与仓储存档适配器",
+      "TypeNames": [
+        "GrayboxBuildingStorageSaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从显式提供的当前建筑会话、建筑表现和当前 WorldMapModel 捕获并恢复 schema 31 的建筑实例、双网格、高水位、城市核心账本、真实仓库、过滤与孤立资源。",
+      "BoundarySummary": "只映射领域真值与 FormalThreeD DTO；不拥有文件路径、codec、文件事务或恢复总协调，不使用场景发现，也不保存物流连接、容量配置、revision、UI 或表现对象。带资源节点绑定的恢复必须显式提供当前正式世界。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
       ]
     },
     {
@@ -1357,26 +1388,31 @@
       "Id": "city-resource-storage-model",
       "ChineseName": "城市与真实仓库库存模型",
       "TypeNames": [
+        "CityResourceStorageRestorePlan",
         "CityResourceEvacuationPlan",
         "CityResourceChangeAttributionScope",
         "CityResourceStorageModel",
-        "CityResourceStorageSnapshot"
+        "CityResourceStorageSnapshot",
+        "CityStorageOrphanResource",
+        "CityWarehouseRestoreEntry"
       ],
       "AssetPaths": [
         "Assets/_Game/Scripts/Economy/CityResourceStorageModel.cs"
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取、不可变快照；撤离使用绑定 revision 的容量预检计划和单次原子提交，并明确 StalePlan 与 AlreadyCommitted。",
-      "BoundarySummary": "不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须提供权威连接和完整内部载荷。它不进入 schema 30，也不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
+      "UseSummary": "作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取和不可变快照；撤离及 schema 31 恢复都使用绑定 owner/revision 的预检计划和单次原子提交。恢复可深拷贝保留未知孤立资源，并在配置签名变化时保留超额资产为只出不进。",
+      "BoundarySummary": "不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须先验证仓库与建筑实例的交叉引用，并在恢复后由正式运行时重算连接。容量、连接、聚合快照和 revision 不入档；本模型不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0012",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0015"
       ]
     },
     {
@@ -1391,14 +1427,16 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "按稳定建筑实例 ID 保存一座仓库的 150 共享总容量、真实内容、联网状态与可选单资源过滤，并发布不可变快照。",
-      "BoundarySummary": "只拥有单仓库会话状态，不聚合城市库存、不计算物流范围、不执行建筑生命周期；正式调用必须由 CityResourceStorageModel 统一编排，不能绕过聚合模型直接充当城市账本。",
+      "UseSummary": "按稳定建筑实例 ID 保存一座仓库的 150 共享总容量、真实内容、联网状态与可选单资源过滤，并发布不可变快照；schema 31 恢复可保留未知过滤和占用共享空间的孤立资源，配置变化造成的超额状态保持只出不进。",
+      "BoundarySummary": "只拥有单仓库会话状态，不聚合城市库存、不计算物流范围、不执行建筑生命周期；恢复仓库先保持断开，连接由正式运行时重算。孤立资源占用容量但不可作为已知资源消费；正式调用必须由 CityResourceStorageModel 统一编排。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0015"
       ]
     },
     {

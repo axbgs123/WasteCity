@@ -10,11 +10,13 @@ namespace WasteCity.Economy
 
         private readonly Dictionary<string, int> amounts =
             new Dictionary<string, int>(StringComparer.Ordinal);
+        private int orphanAmount;
 
         internal WarehouseStorageState(
             string stableInstanceId,
             bool connected,
-            int capacity = FormalCapacity)
+            int capacity = FormalCapacity,
+            bool preserveWhenDisconnected = false)
         {
             if (string.IsNullOrWhiteSpace(stableInstanceId))
                 throw new ArgumentException(
@@ -23,6 +25,7 @@ namespace WasteCity.Economy
             StableInstanceId = stableInstanceId;
             IsConnected = connected;
             Capacity = Math.Max(0, capacity);
+            PreserveWhenDisconnected = preserveWhenDisconnected;
         }
 
         public string StableInstanceId { get; }
@@ -31,6 +34,8 @@ namespace WasteCity.Economy
         public int FreeSpace => Math.Max(0, Capacity - TotalAmount);
         public string FilterResourceId { get; private set; }
         public bool IsConnected { get; private set; }
+        internal int OrphanAmount => orphanAmount;
+        internal bool PreserveWhenDisconnected { get; private set; }
 
         public int Get(string resourceId)
         {
@@ -113,6 +118,72 @@ namespace WasteCity.Economy
             return true;
         }
 
+        internal bool TryRestore(
+            string filterResourceId,
+            IReadOnlyDictionary<string, int> values,
+            int restoredOrphanAmount,
+            bool allowOverCapacity,
+            bool preserveWhenDisconnected,
+            out string error)
+        {
+            if (restoredOrphanAmount < 0)
+            {
+                error = "仓库孤立资源数量不能为负数";
+                return false;
+            }
+
+            string normalizedFilter = string.IsNullOrWhiteSpace(filterResourceId)
+                ? null
+                : filterResourceId;
+            var replacement = new Dictionary<string, int>(StringComparer.Ordinal);
+            long total = restoredOrphanAmount;
+            if (values != null)
+            {
+                foreach (KeyValuePair<string, int> item in values)
+                {
+                    if (!ResourceCapacityPolicy.IsRegisteredResource(item.Key) ||
+                        item.Value < 0)
+                    {
+                        error = "仓库资源记录无效";
+                        return false;
+                    }
+                    if (item.Value == 0) continue;
+                    if (normalizedFilter != null &&
+                        !string.Equals(
+                            normalizedFilter,
+                            item.Key,
+                            StringComparison.Ordinal))
+                    {
+                        error = "仓库过滤与已有内容不兼容";
+                        return false;
+                    }
+                    replacement.Add(item.Key, item.Value);
+                    total += item.Value;
+                    if (total > int.MaxValue)
+                    {
+                        error = "仓库资源总量溢出";
+                        return false;
+                    }
+                }
+            }
+            if (!allowOverCapacity && total > Capacity)
+            {
+                error = "仓库内容超过当前共享容量";
+                return false;
+            }
+
+            amounts.Clear();
+            foreach (KeyValuePair<string, int> item in replacement)
+                amounts.Add(item.Key, item.Value);
+            orphanAmount = restoredOrphanAmount;
+            TotalAmount = (int)total;
+            FilterResourceId = normalizedFilter;
+            IsConnected = false;
+            PreserveWhenDisconnected = preserveWhenDisconnected;
+            error = string.Empty;
+            return true;
+        }
+
         internal bool SetConnected(bool connected)
         {
             if (IsConnected == connected) return false;
@@ -143,7 +214,7 @@ namespace WasteCity.Economy
             if (!changed) return false;
 
             amounts.Clear();
-            TotalAmount = 0;
+            TotalAmount = orphanAmount;
             if (values == null) return true;
             foreach (string resourceId in ResourceIds.All)
             {
@@ -155,9 +226,6 @@ namespace WasteCity.Economy
                 amounts.Add(resourceId, amount);
                 TotalAmount += amount;
             }
-            if (TotalAmount > Capacity)
-                throw new InvalidOperationException(
-                    "Warehouse contents exceed shared capacity.");
             return true;
         }
 
@@ -168,6 +236,8 @@ namespace WasteCity.Economy
                 Capacity,
                 FilterResourceId,
                 IsConnected,
+                orphanAmount,
+                PreserveWhenDisconnected,
                 amounts);
         }
     }
@@ -181,14 +251,18 @@ namespace WasteCity.Economy
             int capacity,
             string filterResourceId,
             bool isConnected,
+            int orphanAmount,
+            bool preserveWhenDisconnected,
             IReadOnlyDictionary<string, int> source)
         {
             StableInstanceId = stableInstanceId;
             Capacity = Math.Max(0, capacity);
             FilterResourceId = filterResourceId;
             IsConnected = isConnected;
+            OrphanAmount = Math.Max(0, orphanAmount);
+            PreserveWhenDisconnected = preserveWhenDisconnected;
             var copy = new Dictionary<string, int>(StringComparer.Ordinal);
-            TotalAmount = 0;
+            TotalAmount = OrphanAmount;
             if (source != null)
             {
                 foreach (KeyValuePair<string, int> item in source)
@@ -207,6 +281,8 @@ namespace WasteCity.Economy
         public int FreeSpace => Math.Max(0, Capacity - TotalAmount);
         public string FilterResourceId { get; }
         public bool IsConnected { get; }
+        public int OrphanAmount { get; }
+        public bool PreserveWhenDisconnected { get; }
         public IReadOnlyDictionary<string, int> Amounts => amounts;
 
         public int Get(string resourceId)
