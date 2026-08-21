@@ -190,6 +190,7 @@ namespace WasteCity.Graybox3D.Building
         private uint catalogRevision;
         private uint placementRevision;
         private PopulationModel population;
+        private float checkpointRuleTimeSeconds;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -212,6 +213,7 @@ namespace WasteCity.Graybox3D.Building
         public uint CatalogRevision => catalogRevision;
         public uint PlacementRevision => placementRevision;
         public int NextStableInstanceOrdinal => nextStableInstanceOrdinal;
+        public float CheckpointRuleTimeSeconds => checkpointRuleTimeSeconds;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
 
@@ -293,8 +295,25 @@ namespace WasteCity.Graybox3D.Building
             readOnlyInstances =
                 new ReadOnlyCollection<GrayboxBuildingInstance3D>(instances);
             nextStableInstanceOrdinal = 1;
+            checkpointRuleTimeSeconds = 0f;
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
+        }
+
+        public bool TryRestoreCheckpointRuleTime(
+            float ruleTimeSeconds,
+            out string error)
+        {
+            if (float.IsNaN(ruleTimeSeconds) ||
+                float.IsInfinity(ruleTimeSeconds) ||
+                ruleTimeSeconds < 0f)
+            {
+                error = "检查点规则时间必须是非负有限数";
+                return false;
+            }
+            checkpointRuleTimeSeconds = ruleTimeSeconds;
+            error = string.Empty;
+            return true;
         }
 
         private void OnDestroy()
@@ -464,6 +483,13 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(presentation));
             EnsureConfigured();
             if (paused || unscaledDeltaTime <= 0f) return;
+
+            float ruleAdvance = RuleTimeContext.Advance(unscaledDeltaTime);
+            double nextRuleTime =
+                (double)checkpointRuleTimeSeconds + ruleAdvance;
+            checkpointRuleTimeSeconds = nextRuleTime >= float.MaxValue
+                ? float.MaxValue
+                : (float)nextRuleTime;
 
             for (var index = 0; index < instances.Count; index++)
             {

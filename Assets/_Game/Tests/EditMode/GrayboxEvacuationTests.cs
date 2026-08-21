@@ -17,6 +17,7 @@ using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Persistence;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -727,6 +728,58 @@ namespace WasteCity.Tests
             Assert.That(fixture.Session.HasPlayerOwnedGroundInstances, Is.False);
             Assert.That(fixture.Session.Instances, Has.Count.EqualTo(1));
             Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+        }
+
+        [Test]
+        public void Controller_ImmediateBatchQueuesOneFreshCheckpointSnapshot()
+        {
+            EvacuationFixture fixture = CreateFixture();
+            Begin(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                BuildingSite.Ground,
+                10,
+                10,
+                fixture.Presentation);
+            Begin(
+                fixture.Session,
+                BuildingCatalog.Housing,
+                BuildingSite.Ground,
+                12,
+                10,
+                fixture.Presentation);
+            var attempts = new List<FormalSaveCheckpointMetadata>();
+            var policy = new FormalSaveCheckpointPolicy(
+                metadata =>
+                {
+                    attempts.Add(metadata);
+                    return true;
+                },
+                () => 7f);
+            policy.Bind(
+                "evacuation",
+                listener => fixture.Controller.CheckpointCommitted += listener,
+                listener => fixture.Controller.CheckpointCommitted -= listener);
+
+            Assert.That(fixture.Controller.TryHandleDeploymentRequest(),
+                Is.True);
+            Assert.That(fixture.Controller.AssignAll(
+                BuildingEvacuationTreatment.QuickDismantle), Is.EqualTo(2));
+            Assert.That(fixture.Controller.ConfirmManifest(), Is.True);
+
+            Assert.That(attempts, Is.Empty,
+                "Committed events queue until the explicit frame boundary.");
+            Assert.That(fixture.Session.HasPlayerOwnedGroundInstances,
+                Is.False);
+            Assert.That(fixture.City.Mode, Is.EqualTo(CityMode.Packing));
+            Assert.That(policy.FlushPending(), Is.True);
+            Assert.That(attempts, Has.Count.EqualTo(1));
+            Assert.That(attempts[0].reasonId,
+                Is.EqualTo(
+                    FormalSaveCheckpointReasonIds.EvacuationWorkCommitted));
+            Assert.That(attempts[0].ruleTimeSeconds, Is.EqualTo(7f));
+            Assert.That(policy.FlushPending(), Is.False);
+            policy.Unbind();
         }
 
         [Test]

@@ -98,6 +98,55 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CheckpointEventsFollowRegistrationAndFirstActualSpawnOnce()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            GrayboxBuildingInstance3D turret =
+                CreateCompletedDefenseChain(fixture);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            var completedIds = new List<string>();
+            var combatIds = new List<string>();
+            fixture.Controller.FirstMachineGunCompleted +=
+                completedIds.Add;
+            fixture.Controller.TutorialCombatStarted += combatIds.Add;
+
+            fixture.Controller.Tick(.1f, paused: false);
+
+            CollectionAssert.AreEqual(
+                new[] { turret.StableInstanceId },
+                completedIds);
+            Assert.That(combatIds, Is.Empty,
+                "Tutorial warning is not active combat.");
+
+            fixture.Controller.Tick(20f, paused: false);
+
+            Assert.That(combatIds, Has.Count.EqualTo(1));
+            Assert.That(fixture.Controller.Snapshot.Enemies.Select(value =>
+                    value.StableId),
+                Does.Contain(combatIds[0]));
+
+            completedIds.Clear();
+            combatIds.Clear();
+            Assert.That(
+                fixture.Controller.TryRebuildAfterPersistenceRestore(
+                    out string error),
+                Is.True,
+                error);
+            fixture.Controller.Tick(.1f, paused: false);
+
+            Assert.That(completedIds, Is.Empty,
+                "Restore rebuild must not replay the turret milestone.");
+            Assert.That(combatIds, Is.Empty,
+                "Restore rebuild must not replay combat start.");
+        }
+
+        [Test]
         public void PersistencePauseBarrierDoesNotSynchronizeOrAdvanceRuntime()
         {
             RuntimeFixture fixture = CreateGeneratedRuntime();

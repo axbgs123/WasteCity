@@ -31,6 +31,8 @@ namespace WasteCity.Graybox3D.Building
         private string presentedStableId;
         private Func<bool> persistencePauseSource;
         private bool hudBound;
+        private bool firstMachineGunCheckpointPublished;
+        private bool tutorialCombatCheckpointPublished;
 
         public GrayboxDefenseRuntime3D Runtime => runtime;
         public GrayboxDefenseRuntimeSnapshot3D Snapshot => snapshot;
@@ -50,6 +52,9 @@ namespace WasteCity.Graybox3D.Building
             buildingPresentation != null &&
             worldView != null &&
             hud != null;
+
+        public event Action<string> FirstMachineGunCompleted;
+        public event Action<string> TutorialCombatStarted;
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -87,6 +92,10 @@ namespace WasteCity.Graybox3D.Building
                 bool effectivePaused = paused || IsPersistencePaused;
                 worldView?.SetSimulationPaused(effectivePaused);
                 if (effectivePaused) return true;
+                int previousTutorialWaveTriggerCount =
+                    snapshot?.TutorialWaveTriggerCount ?? 0;
+                int previousSpawnedEnemyCount =
+                    snapshot?.SpawnedEnemyCount ?? 0;
                 if (session?.CityStorage == null ||
                     !TrySynchronizeRuntime(out _))
                     return false;
@@ -95,6 +104,24 @@ namespace WasteCity.Graybox3D.Building
                     effectivePaused,
                     session.CityStorage);
                 snapshot = runtime.Snapshot;
+                if (!firstMachineGunCheckpointPublished &&
+                    previousTutorialWaveTriggerCount == 0 &&
+                    snapshot.TutorialWaveTriggerCount > 0 &&
+                    snapshot.Towers.Count > 0)
+                {
+                    firstMachineGunCheckpointPublished = true;
+                    FirstMachineGunCompleted?.Invoke(
+                        snapshot.Towers[0].StableId);
+                }
+                if (!tutorialCombatCheckpointPublished &&
+                    previousSpawnedEnemyCount == 0 &&
+                    snapshot.SpawnedEnemyCount > 0 &&
+                    snapshot.Enemies.Count > 0)
+                {
+                    tutorialCombatCheckpointPublished = true;
+                    TutorialCombatStarted?.Invoke(
+                        snapshot.Enemies[0].StableId);
+                }
                 ValidateSelection();
                 ApplyPresentation();
                 return true;
@@ -108,6 +135,10 @@ namespace WasteCity.Graybox3D.Building
                 if (!TrySynchronizeRuntime(out error))
                     return false;
                 snapshot = runtime.Snapshot;
+                firstMachineGunCheckpointPublished =
+                    snapshot.TutorialWaveTriggerCount > 0;
+                tutorialCombatCheckpointPublished =
+                    snapshot.SpawnedEnemyCount > 0;
                 ValidateSelection();
                 ApplyPresentation(force: true);
                 error = string.Empty;
@@ -198,6 +229,8 @@ namespace WasteCity.Graybox3D.Building
             presentedSnapshot = null;
             boundCoordinates = null;
             persistencePauseSource = null;
+            firstMachineGunCheckpointPublished = false;
+            tutorialCombatCheckpointPublished = false;
             selectedStableId = null;
             presentedStableId = null;
             selectedKind = GrayboxDefenseSelectionKind3D.None;

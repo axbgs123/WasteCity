@@ -7,6 +7,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
+using WasteCity.Persistence;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -263,6 +264,8 @@ namespace WasteCity.Graybox3D.Building
         public bool IsBlocked => isBlocked;
         public bool IsPersistencePaused =>
             persistencePauseSource != null && persistencePauseSource();
+
+        public event Action<string, string> CheckpointCommitted;
         public string BlockedReason => blockedReason;
         public IReadOnlyList<BuildingEvacuationWork> Work => readOnlyWork;
 
@@ -597,6 +600,9 @@ namespace WasteCity.Graybox3D.Building
             unchecked { nextBatchOrdinal++; }
             fullQueueIndex = 0;
             remainingSeconds = 0f;
+            CheckpointCommitted?.Invoke(
+                FormalSaveCheckpointReasonIds.EvacuationBatchConfirmed,
+                activeBatchId + "|confirmed");
             bool advanced = AdvanceThroughImmediateWork();
             persistenceGeneration++;
             if (IsProcessing)
@@ -838,6 +844,11 @@ namespace WasteCity.Graybox3D.Building
                     blockedReason = failureReason;
                     remainingSeconds = 0f;
                     persistenceGeneration++;
+                    CheckpointCommitted?.Invoke(
+                        FormalSaveCheckpointReasonIds.EvacuationWorkCommitted,
+                        WorkCheckpointIdentity(
+                            current.StableInstanceId,
+                            "capacity-blocked"));
                     return CommitCurrentResult.Blocked;
                 }
                 FailProcessing();
@@ -861,7 +872,20 @@ namespace WasteCity.Graybox3D.Building
             fullQueueIndex++;
             remainingSeconds = 0f;
             persistenceGeneration++;
+            CheckpointCommitted?.Invoke(
+                FormalSaveCheckpointReasonIds.EvacuationWorkCommitted,
+                WorkCheckpointIdentity(
+                    current.StableInstanceId,
+                    "committed"));
             return CommitCurrentResult.Succeeded;
+        }
+
+        private string WorkCheckpointIdentity(
+            string stableInstanceId,
+            string boundary)
+        {
+            return activeBatchId + "|work|" + stableInstanceId + "|" +
+                boundary;
         }
 
         private void FinalizeRuntimePayload(

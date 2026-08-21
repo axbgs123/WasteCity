@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
@@ -192,6 +193,9 @@ namespace WasteCity.Graybox3D.Building
         private readonly IFormalThreeDSaveDomain[] domains;
         private readonly IFormalThreeDDerivedStateRebuilder derivedState;
         private bool transactionActive;
+        private FormalSaveCheckpointPolicy checkpointPolicy;
+        private GrayboxDefenseController3D checkpointDefense;
+        private GrayboxBuildingSession3D checkpointSession;
 
         public GrayboxFormalSaveCoordinator3D(
             IReadOnlyList<IFormalThreeDSaveDomain> domains,
@@ -356,7 +360,135 @@ namespace WasteCity.Graybox3D.Building
 
         public bool IsTransactionPaused => transactionActive;
 
+        public FormalSaveCheckpointPolicy CheckpointPolicy =>
+            checkpointPolicy;
+        public GrayboxFormalSaveCoordinatorResult3D
+            LastCheckpointCaptureResult { get; private set; }
+        public FormalSaveStoreResult LastCheckpointStoreResult
+        {
+            get;
+            private set;
+        }
+
         public event Action RestoreCompleted;
+
+        public void ConfigureCheckpointPolicy(
+            FormalSaveCheckpointPolicy policy,
+            CityDeploymentModel deployment,
+            GrayboxBuildingSession3D session,
+            GrayboxDefenseController3D defense,
+            GrayboxEvacuationController3D evacuation)
+        {
+            if (policy == null)
+                throw new ArgumentNullException(nameof(policy));
+            if (deployment == null)
+                throw new ArgumentNullException(nameof(deployment));
+            if (session == null)
+                throw new ArgumentNullException(nameof(session));
+            if (defense == null)
+                throw new ArgumentNullException(nameof(defense));
+            if (evacuation == null)
+                throw new ArgumentNullException(nameof(evacuation));
+
+            UnbindCheckpointPolicy();
+            checkpointPolicy = policy;
+            checkpointDefense = defense;
+            checkpointSession = session;
+            try
+            {
+                policy.Bind(
+                    "city-deployment",
+                    listener =>
+                        deployment.CheckpointCommitted += listener,
+                    listener =>
+                        deployment.CheckpointCommitted -= listener);
+                policy.Bind(
+                    "evacuation",
+                    listener =>
+                        evacuation.CheckpointCommitted += listener,
+                    listener =>
+                        evacuation.CheckpointCommitted -= listener);
+                defense.FirstMachineGunCompleted +=
+                    HandleFirstMachineGunCompleted;
+                defense.TutorialCombatStarted +=
+                    HandleTutorialCombatStarted;
+            }
+            catch
+            {
+                UnbindCheckpointPolicy();
+                throw;
+            }
+        }
+
+        public void UnbindCheckpointPolicy()
+        {
+            if (checkpointDefense != null)
+            {
+                checkpointDefense.FirstMachineGunCompleted -=
+                    HandleFirstMachineGunCompleted;
+                checkpointDefense.TutorialCombatStarted -=
+                    HandleTutorialCombatStarted;
+            }
+            checkpointPolicy?.Unbind();
+            checkpointPolicy = null;
+            checkpointDefense = null;
+            checkpointSession = null;
+        }
+
+        public bool QueueNewGameReady(string stableSessionId)
+        {
+            return checkpointPolicy != null &&
+                !string.IsNullOrWhiteSpace(stableSessionId) &&
+                checkpointPolicy.QueueCheckpoint(
+                    FormalSaveCheckpointReasonIds.NewGameReady,
+                    stableSessionId + "|ready");
+        }
+
+        public bool FlushPendingCheckpoint()
+        {
+            return checkpointPolicy != null &&
+                checkpointPolicy.FlushPending();
+        }
+
+        public bool TryWriteCheckpoint(
+            FormalSaveStore store,
+            string sessionId,
+            string gameVersion,
+            IReadOnlyList<string> contentSources,
+            FormalSaveCheckpointMetadata checkpoint,
+            DateTime utcNow,
+            bool archiveLegacy2D = false)
+        {
+            if (store == null)
+                throw new ArgumentNullException(nameof(store));
+            LastCheckpointStoreResult = null;
+            LastCheckpointCaptureResult = CaptureEnvelope(
+                sessionId,
+                gameVersion,
+                contentSources,
+                checkpoint,
+                utcNow);
+            if (!LastCheckpointCaptureResult.Success)
+                return false;
+            LastCheckpointStoreResult = store.SaveEnvelope(
+                LastCheckpointCaptureResult.Envelope,
+                archiveLegacy2D);
+            return LastCheckpointStoreResult.Success;
+        }
+
+        private void HandleFirstMachineGunCompleted(string stableInstanceId)
+        {
+            checkpointPolicy?.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.FirstMachineGunComplete,
+                stableInstanceId);
+        }
+
+        private void HandleTutorialCombatStarted(string stableEnemyId)
+        {
+            checkpointPolicy?.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.TutorialCombatStarted,
+                stableEnemyId);
+        }
 
         public GrayboxFormalSaveCoordinatorResult3D RestoreEncoded(
             string encoded)
@@ -476,6 +608,7 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxFormalSaveCoordinatorCode3D.Busy,
                     "正式存档事务正在进行");
             transactionActive = true;
+            checkpointPolicy?.SetSuppressed(true);
             bool retainSafetyBarrier = false;
             try
             {
@@ -565,6 +698,10 @@ namespace WasteCity.Graybox3D.Building
                         true,
                         true);
                 }
+                checkpointPolicy?.TryRestoreBaseline(envelope.checkpoint);
+                checkpointSession?.TryRestoreCheckpointRuleTime(
+                    envelope.checkpoint.ruleTimeSeconds,
+                    out _);
                 try
                 {
                     RestoreCompleted?.Invoke();
@@ -584,7 +721,10 @@ namespace WasteCity.Graybox3D.Building
             finally
             {
                 if (!retainSafetyBarrier)
+                {
                     transactionActive = false;
+                    checkpointPolicy?.SetSuppressed(false);
+                }
             }
         }
 
