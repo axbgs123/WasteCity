@@ -57,11 +57,14 @@ namespace WasteCity.Tests
             keyboard.MakeCurrent();
             mouse.MakeCurrent();
 
+            GrayboxFormalPlayModeEntryFixture.BeginIsolatedStore();
             yield return SceneManager.LoadSceneAsync(
                 SceneName,
                 LoadSceneMode.Single);
             yield return null;
             yield return null;
+            yield return GrayboxFormalPlayModeEntryFixture
+                .StartNewProgressThroughRealUi(mouse);
         }
 
         [UnityTearDown]
@@ -74,6 +77,12 @@ namespace WasteCity.Tests
             }
             finally
             {
+                try
+                {
+                    GrayboxFormalPlayModeEntryFixture.CleanupIsolatedStore();
+                }
+                finally
+                {
                 try
                 {
                     if (keyboard != null && keyboard.added)
@@ -133,6 +142,9 @@ namespace WasteCity.Tests
                             }
                         }
                     }
+                }
+                    GrayboxFormalPlayModeEntryFixture
+                        .AssertRealSaveFilesUnchanged();
                 }
 
                 Assert.That(keyboard == null || !keyboard.added, Is.True);

@@ -61,9 +61,13 @@ namespace WasteCity.Tests
             keyboard.MakeCurrent();
             mouse.MakeCurrent();
 
+            GrayboxFormalPlayModeEntryFixture.BeginIsolatedStore();
             yield return SceneManager.LoadSceneAsync(
                 SceneName,
                 LoadSceneMode.Single);
+            yield return GrayboxFormalPlayModeEntryFixture
+                .StartNewProgressThroughRealUi(mouse);
+            Time.timeScale = RuleTimeScale;
 
             GrayboxBuildingSession3D session =
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();
@@ -122,6 +126,12 @@ namespace WasteCity.Tests
             {
                 try
                 {
+                    GrayboxFormalPlayModeEntryFixture.CleanupIsolatedStore();
+                }
+                finally
+                {
+                try
+                {
                     if (keyboard != null && keyboard.added)
                         InputSystem.RemoveDevice(keyboard);
                 }
@@ -141,6 +151,9 @@ namespace WasteCity.Tests
                             previousEditorInputBehavior;
                         Time.timeScale = previousTimeScale;
                     }
+                }
+                    GrayboxFormalPlayModeEntryFixture
+                        .AssertRealSaveFilesUnchanged();
                 }
             }
             yield return null;

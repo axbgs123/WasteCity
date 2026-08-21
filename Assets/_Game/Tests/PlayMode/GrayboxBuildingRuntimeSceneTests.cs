@@ -95,11 +95,14 @@ namespace WasteCity.Tests
             keyboard.MakeCurrent();
             mouse.MakeCurrent();
 
+            GrayboxFormalPlayModeEntryFixture.BeginIsolatedStore();
             yield return SceneManager.LoadSceneAsync(
                 SceneName,
                 LoadSceneMode.Single);
             yield return null;
             yield return null;
+            yield return GrayboxFormalPlayModeEntryFixture
+                .StartNewProgressThroughRealUi(mouse);
         }
 
         [UnityTearDown]
@@ -112,6 +115,12 @@ namespace WasteCity.Tests
             }
             finally
             {
+                try
+                {
+                    GrayboxFormalPlayModeEntryFixture.CleanupIsolatedStore();
+                }
+                finally
+                {
                 try
                 {
                     if (keyboard != null && keyboard.added)
@@ -180,6 +189,9 @@ namespace WasteCity.Tests
                             }
                         }
                     }
+                }
+                    GrayboxFormalPlayModeEntryFixture
+                        .AssertRealSaveFilesUnchanged();
                 }
 
                 Assert.That(keyboard == null || !keyboard.added, Is.True);
@@ -663,6 +675,9 @@ namespace WasteCity.Tests
                 Is.EqualTo(BuildingSite.Ground),
                 requirement + " Fortress Ground instance site");
             yield return WaitForCompletion(ground, 2f);
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True,
+                requirement + " restores normal evacuation rule time");
 
             yield return TapKey(Key.F);
             Assert.That(
@@ -1857,6 +1872,9 @@ namespace WasteCity.Tests
                 requirement + " wall placement");
             GrayboxBuildingInstance3D wall = session.Instances[0];
             yield return WaitForCompletion(wall, 2f);
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True,
+                requirement + " restores normal evacuation rule time");
             Assert.That(modifier.SetResource(ResourceIds.Stone, 0), Is.True,
                 requirement + " clears capacity before manifest preflight");
 

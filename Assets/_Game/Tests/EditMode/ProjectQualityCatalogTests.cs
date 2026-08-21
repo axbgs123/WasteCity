@@ -388,9 +388,17 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalPlayModeEntryFixture.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
             }, persistence.TestFileGlobs);
+            CollectionAssert.AreEqual(
+                new[] { "persistence-migration" },
+                catalog.FeatureGroups.Where(feature =>
+                    feature.TestFileGlobs.Contains(
+                        "Assets/_Game/Tests/PlayMode/" +
+                        "GrayboxFormalPlayModeEntryFixture.cs"))
+                    .Select(feature => feature.Id));
             CollectionAssert.IsSubsetOf(new[]
             {
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity",

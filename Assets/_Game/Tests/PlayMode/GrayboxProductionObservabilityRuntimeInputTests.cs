@@ -60,35 +60,53 @@ namespace WasteCity.Tests
             mouse = InputSystem.AddDevice<Mouse>();
             keyboard.MakeCurrent();
             mouse.MakeCurrent();
+            GrayboxFormalPlayModeEntryFixture.BeginIsolatedStore();
             yield return SceneManager.LoadSceneAsync(
                 SceneName,
                 LoadSceneMode.Single);
             yield return null;
             yield return null;
+            yield return GrayboxFormalPlayModeEntryFixture
+                .StartNewProgressThroughRealUi(mouse);
         }
 
         [UnityTearDown]
         public IEnumerator UnloadGrayboxScene()
         {
             Time.timeScale = 1f;
-            Scene graybox = SceneManager.GetSceneByName(SceneName);
-            if (graybox.IsValid() && graybox.isLoaded)
+            try
             {
-                Scene empty = SceneManager.CreateScene(
-                    "GrayboxProductionObservabilityRuntimeEmpty");
-                SceneManager.SetActiveScene(empty);
-                yield return SceneManager.UnloadSceneAsync(graybox);
+                Scene graybox = SceneManager.GetSceneByName(SceneName);
+                if (graybox.IsValid() && graybox.isLoaded)
+                {
+                    Scene empty = SceneManager.CreateScene(
+                        "GrayboxProductionObservabilityRuntimeEmpty");
+                    SceneManager.SetActiveScene(empty);
+                    yield return SceneManager.UnloadSceneAsync(graybox);
+                }
             }
-            if (keyboard != null && keyboard.added)
-                InputSystem.RemoveDevice(keyboard);
-            if (mouse != null && mouse.added)
-                InputSystem.RemoveDevice(mouse);
-            InputSystem.settings.updateMode = previousUpdateMode;
-            InputSystem.settings.backgroundBehavior =
-                previousBackgroundBehavior;
-            InputSystem.settings.editorInputBehaviorInPlayMode =
-                previousEditorInputBehavior;
-            Time.timeScale = previousTimeScale;
+            finally
+            {
+                try
+                {
+                    GrayboxFormalPlayModeEntryFixture.CleanupIsolatedStore();
+                }
+                finally
+                {
+                    if (keyboard != null && keyboard.added)
+                        InputSystem.RemoveDevice(keyboard);
+                    if (mouse != null && mouse.added)
+                        InputSystem.RemoveDevice(mouse);
+                    InputSystem.settings.updateMode = previousUpdateMode;
+                    InputSystem.settings.backgroundBehavior =
+                        previousBackgroundBehavior;
+                    InputSystem.settings.editorInputBehaviorInPlayMode =
+                        previousEditorInputBehavior;
+                    Time.timeScale = previousTimeScale;
+                    GrayboxFormalPlayModeEntryFixture
+                        .AssertRealSaveFilesUnchanged();
+                }
+            }
             yield return null;
         }
 

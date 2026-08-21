@@ -52,35 +52,53 @@ namespace WasteCity.Tests
             mouse = InputSystem.AddDevice<Mouse>();
             keyboard.MakeCurrent();
             mouse.MakeCurrent();
+            GrayboxFormalPlayModeEntryFixture.BeginIsolatedStore();
             yield return SceneManager.LoadSceneAsync(
                 SceneName,
                 LoadSceneMode.Single);
             yield return null;
             yield return null;
+            yield return GrayboxFormalPlayModeEntryFixture
+                .StartNewProgressThroughRealUi(mouse);
         }
 
         [UnityTearDown]
         public IEnumerator UnloadGrayboxScene()
         {
             Time.timeScale = 1f;
-            Scene graybox = SceneManager.GetSceneByName(SceneName);
-            if (graybox.IsValid() && graybox.isLoaded)
+            try
             {
-                Scene empty = SceneManager.CreateScene(
-                    "GrayboxUsabilityRuntimeEmpty");
-                SceneManager.SetActiveScene(empty);
-                yield return SceneManager.UnloadSceneAsync(graybox);
+                Scene graybox = SceneManager.GetSceneByName(SceneName);
+                if (graybox.IsValid() && graybox.isLoaded)
+                {
+                    Scene empty = SceneManager.CreateScene(
+                        "GrayboxUsabilityRuntimeEmpty");
+                    SceneManager.SetActiveScene(empty);
+                    yield return SceneManager.UnloadSceneAsync(graybox);
+                }
             }
-            if (keyboard != null && keyboard.added)
-                InputSystem.RemoveDevice(keyboard);
-            if (mouse != null && mouse.added)
-                InputSystem.RemoveDevice(mouse);
-            InputSystem.settings.updateMode = previousUpdateMode;
-            InputSystem.settings.backgroundBehavior =
-                previousBackgroundBehavior;
-            InputSystem.settings.editorInputBehaviorInPlayMode =
-                previousEditorInputBehavior;
-            Time.timeScale = previousTimeScale;
+            finally
+            {
+                try
+                {
+                    GrayboxFormalPlayModeEntryFixture.CleanupIsolatedStore();
+                }
+                finally
+                {
+                    if (keyboard != null && keyboard.added)
+                        InputSystem.RemoveDevice(keyboard);
+                    if (mouse != null && mouse.added)
+                        InputSystem.RemoveDevice(mouse);
+                    InputSystem.settings.updateMode = previousUpdateMode;
+                    InputSystem.settings.backgroundBehavior =
+                        previousBackgroundBehavior;
+                    InputSystem.settings.editorInputBehaviorInPlayMode =
+                        previousEditorInputBehavior;
+                    Time.timeScale = previousTimeScale;
+                    GrayboxFormalPlayModeEntryFixture
+                        .AssertRealSaveFilesUnchanged();
+                }
+            }
             yield return null;
         }
 
@@ -170,8 +188,6 @@ namespace WasteCity.Tests
                     GrayboxBuildingPlacementController3D>();
             GrayboxLeaderController3D leader =
                 Object.FindObjectOfType<GrayboxLeaderController3D>();
-            Vector3 cityBefore = city.transform.position;
-            Vector3 leaderBefore = leader.transform.position;
 
             yield return TapKey(Key.B);
             yield return TapKey(Key.Digit2);
@@ -190,6 +206,8 @@ namespace WasteCity.Tests
             yield return TapKey(Key.Escape);
             Assert.That(menu.IsOpen, Is.True);
             Assert.That(Time.timeScale, Is.Zero);
+            Vector3 cityBefore = city.transform.position;
+            Vector3 leaderBefore = leader.transform.position;
             float constructionRemaining =
                 construction.Progress.Remaining;
 
@@ -292,7 +310,13 @@ namespace WasteCity.Tests
             Assert.That(menu.Page,
                 Is.EqualTo(GrayboxSystemMenuPage3D.Main));
             yield return ClickButton("Main.Quit");
-            yield return ClickButton("Exit.Confirm");
+            Assert.That(
+                FindButton("Exit.QuitWithoutSaving").gameObject
+                    .activeInHierarchy,
+                Is.False,
+                "The destructive fallback stays hidden while the formal " +
+                "save path is healthy.");
+            yield return ClickButton("Exit.SaveAndQuit");
             Assert.That(exit.Count, Is.EqualTo(1));
             Assert.That(Application.isPlaying, Is.True);
             yield return ClickButton("Exit.Cancel");

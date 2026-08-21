@@ -452,6 +452,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalPlayModeEntryFixture.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs"
       ],
