@@ -5,7 +5,7 @@
 ## 固定环境
 
 - Unity：`2022.3.62f1`（revision `4af31df58517`）
-- 渲染：默认 `GrayboxPrototype3D` 使用场景作用域 URP；冻结的 `FormalPrototype` 保留 2D Renderer 作为回归基线
+- 渲染：唯一现役 `GrayboxPrototype3D` 使用场景作用域 URP；历史 2D `FormalPrototype` 已退役
 - 平台：Windows 10/11 64 位
 - 输入：Unity Input System
 - 版本控制：Git + Git LFS
@@ -34,21 +34,18 @@ git status
 3. 运行全部 EditMode 和 PlayMode 测试；
 4. 通过菜单或批处理调用 `WasteCity.Editor.FormalBuildTools.BuildWindows` 构建默认 3D 版本；
 5. 启动 `Builds/Windows/WasteCity.exe` 做独立运行冒烟；
-6. 如需冻结 2D 回归产物，调用 `WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D`，输出为 `Builds/Windows2D/WasteCity2D.exe`；
-7. 开发前执行 `git status`，不要覆盖未提交改动。
+6. 如需开发版本，调用 `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment`；macOS 构建调用 `WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D`；
+7. schema `1–30` 旧档兼容只由固定 fixtures、decoder 和验证测试保护，不再提供 2D Player 构建入口；
+8. 开发前执行 `git status`，不要覆盖未提交改动。
 
-当前自动化与构建基线（`8ce573a`）：
+当前自动化与构建基线：
 
 - 最新的 EditMode、PlayMode、编译、构建和人工试玩状态见[最新验证快照](Docs/Generated/Latest-Verification-ZH.md)；这里不手工维护会过期的测试数量。
 - Unity 无界面编译：0 错误；
-- 默认 3D Windows 构建和显式 2D 回归构建均成功，两个产物均为 `PE32+ executable (GUI) x86-64`；
-- 存档 schema：`30`；首个 3D 基础阶段仍不读写正式存档；
-- 统一友军集结点、随城回归、死亡统计和组织再生已经实现；
-- 血肉路线感染闭环已经实现：生物伤害叠层、持续伤害、满层传播、精神控制清除、稳定美术替换槽和存档恢复；
-- 科技路线过载与无人系统已经实现：2×攻速、能量伤害 +30%、过热停火、侦查无人机、自动维修机甲反馈和状态恢复；
-- 修仙路线剑意、御剑台与傀儡维护已经实现：飞剑命中叠层、20 层真实斩杀、御剑术射程升级、能晶断供休眠/补给恢复、稳定美术替换槽和状态恢复；
-- 灵能路线共鸣与集体意识单城效果已经实现：5 秒共鸣标记、最多 10 个目标、30% 灵能伤害同步、新研究继承 20% 进度、稳定美术替换槽和状态恢复；
-- 四路线终端建筑已经补齐：发电站、聚灵阵、代谢炉、意识网络均具有人口/研究门槛、物流生产、占位美术槽和存档恢复；当前能源币/灵石继续以能晶代理，精神力结晶以灵能增幅器代理；
+- Windows Release 3D、Windows Development 3D 和 macOS universal 3D 是三类现役构建；准确结果以最新验证快照为准；
+- 正式 3D 存档 schema 为 `31`；schema `1–30` 继续保持历史 2D 身份，不会被静默解释成 3D；
+- 现役 3D 流程覆盖移动、展开、建造、生产、物流、仓储、背包、应急合成、六节点科技树、首轮防御、撤离和正式存档；
+- 历史四路线、友军和旧 2D 场景控制器已经退役；仅保留仍被共享规则或 schema `1–30` 兼容回归需要的纯模型、稳定 ID、DTO 和固定样本，不代表这些历史系统已接入现役 3D；
 - 当前基线的 Direct3D 11 独立运行冒烟待真实 Windows 10/11 电脑补验。上一正式基线曾完成 12 秒冒烟；当前基线补验前不作为候选发布版。
 
 ## 仓库目录

@@ -21,7 +21,7 @@
         "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs"
       ],
       "ScenePaths": [
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
         "DOC-0001"
@@ -165,7 +165,6 @@
         "Assets/_Game/Tests/EditMode/BuildingOrientationAndRangeTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingPlacementEvaluationTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingResourceNodeCompatibilityRulesTests.cs",
-        "Assets/_Game/Tests/EditMode/BuildingRuntimeMobilityTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
         "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs",
@@ -225,13 +224,13 @@
       ],
       "FailureLocationSummary": "先检查焦点、输入优先级、界面组件和真实场景引用",
       "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/TitleMenuTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
-        "Assets/_Game/Tests/EditMode/TitleMenuTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
@@ -300,8 +299,7 @@
         "Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs"
       ],
       "ScenePaths": [
-        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -340,8 +338,7 @@
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
       ],
       "ScenePaths": [
-        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -380,6 +377,7 @@
         "Assets/_Game/Tests/EditMode/FirstDefenseWaveRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
@@ -401,8 +399,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ],
       "ScenePaths": [
-        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -457,8 +454,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs"
       ],
       "ScenePaths": [
-        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -518,7 +514,6 @@
         "Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs",
         "Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs",
         "Assets/_Game/Editor/FormalBuildTools.cs",
-        "Assets/_Game/Editor/FormalProjectSetup.cs",
         "Assets/_Game/Editor/GrayboxPerformanceProbe.cs",
         "Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs",
@@ -543,7 +538,6 @@
         "Assets/_Game/Tests/EditMode/GrayboxSceneBootstrapTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUrpScopeTests.cs",
-        "Assets/_Game/Tests/EditMode/SceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectDocumentationGeneratorTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs",
@@ -566,63 +560,44 @@
       "MinimumVerification": "WindowsBuilds"
     },
     {
-      "Id": "frozen-2d-regression",
-      "ChineseName": "冻结二维回归",
+      "Id": "legacy-rules-compatibility",
+      "ChineseName": "历史规则与存档兼容",
       "SourceGlobs": [
-        "Assets/_Game/Scripts/Legacy/**",
-        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
-        "Assets/_Game/Scripts/City/PlaceholderMobileCity.cs",
-        "Assets/_Game/Scripts/Combat/FormalCombatController.cs",
-        "Assets/_Game/Scripts/Combat/FormalFriendlyUnitController.cs",
-        "Assets/_Game/Scripts/Combat/FormalTechnologyRouteController.cs",
-        "Assets/_Game/Scripts/Combat/PlaceholderBehemoth.cs",
-        "Assets/_Game/Scripts/Combat/PlaceholderBossEncounter.cs",
-        "Assets/_Game/Scripts/Combat/PlaceholderEnemy.cs",
-        "Assets/_Game/Scripts/Combat/PlaceholderPuppet.cs",
-        "Assets/_Game/Scripts/Core/FormalGameClockController.cs",
-        "Assets/_Game/Scripts/Core/FormalSessionController.cs",
-        "Assets/_Game/Scripts/Core/FormalSessionStatisticsController.cs",
-        "Assets/_Game/Scripts/Economy/FormalEconomyController.cs",
-        "Assets/_Game/Scripts/Leader/FormalLeaderController.cs",
-        "Assets/_Game/Scripts/Narrative/FormalGuidanceController.cs",
-        "Assets/_Game/Scripts/Persistence/FormalSaveController.cs",
-        "Assets/_Game/Scripts/Population/FormalPopulationController.cs",
-        "Assets/_Game/Scripts/Progression/FormalAdvancementController.cs",
-        "Assets/_Game/Scripts/Progression/FormalProgressionController.cs",
-        "Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs",
-        "Assets/_Game/Scripts/UI/FormalTitleMenuController.cs",
-        "Assets/_Game/Scripts/World/FormalCameraController.cs",
-        "Assets/_Game/Scripts/World/FormalDroneController.cs",
-        "Assets/_Game/Scripts/World/PlaceholderWorldView.cs",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scripts/Legacy/ForesightFlashModel.cs",
+        "Assets/_Game/Scripts/Legacy/LegacyEffectModel.cs",
+        "Assets/_Game/Scripts/Legacy/LegacyPathCatalog.cs",
+        "Assets/_Game/Scripts/Legacy/LocalHasteModel.cs",
+        "Assets/_Game/Scripts/Legacy/RewindAnchorRules.cs",
+        "Assets/_Game/Scripts/Legacy/SpatialTemplateModel.cs",
+        "Assets/_Game/Scripts/Legacy/TerritoryResourceNetwork.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveData.cs",
+        "Assets/_Game/Scripts/Persistence/Legacy2D/**",
+        "Assets/_Game/Tests/Fixtures/Persistence/schema-01-legacy-2d.json",
+        "Assets/_Game/Tests/Fixtures/Persistence/schema-30-legacy-2d.json"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Legacy/**",
-        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
-        "Assets/_Game/Scenes/FormalPrototype.unity"
+        "Assets/_Game/Scripts/Persistence/Legacy2D/**"
       ],
-      "FailureLocationSummary": "先检查冻结二维基线、历史场景和回归约束",
+      "FailureLocationSummary": "先检查历史规则、schema 1–30 兼容与固定回归样本",
       "TestFileGlobs": [
-        "Assets/_Game/Tests/EditMode/FormalCameraControllerTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/GameClockAndForesightTests.cs",
         "Assets/_Game/Tests/EditMode/LegacyEffectTests.cs",
         "Assets/_Game/Tests/EditMode/LegacySelectionTests.cs",
         "Assets/_Game/Tests/EditMode/LocalHasteTests.cs",
-        "Assets/_Game/Tests/EditMode/PlaceholderMobileCityTests.cs",
         "Assets/_Game/Tests/EditMode/SpatialTemplateTests.cs",
         "Assets/_Game/Tests/EditMode/TerritoryNetworkTests.cs",
-        "Assets/_Game/Tests/PlayMode/RuntimeSceneTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs"
       ],
-      "ScenePaths": [
-        "Assets/_Game/Scenes/FormalPrototype.unity"
-      ],
+      "ScenePaths": [],
       "RequirementIds": [
         "DOC-0001"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
       ],
-      "MinimumVerification": "FullRegression"
+      "MinimumVerification": "FocusedEditMode"
     }
   ],
   "ReuseEntries": [
@@ -1141,7 +1116,7 @@
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。",
-      "BoundarySummary": "只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证，不代表人工、Windows 或全量验证已完成。",
+      "BoundarySummary": "只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入已经退役的 legacy 2D runtime。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证；Task 13 完整自动化与构建已通过，Task 14 退役后的完整自动化、质量门和三项 3D 构建也已通过，正式验证记录将在实现提交后生成，人工试玩和真实 Windows 验收仍未完成。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs"
@@ -2089,18 +2064,20 @@
       ]
     },
     {
-      "Id": "visual-slot-2d",
-      "ChineseName": "二维视觉槽位",
+      "Id": "visual-library-definition",
+      "ChineseName": "共享视觉定义库",
       "TypeNames": [
-        "VisualSlot"
+        "VisualLibrary",
+        "VisualDefinition"
       ],
       "AssetPaths": [
-        "Assets/_Game/Scripts/Presentation/VisualSlot.cs"
+        "Assets/_Game/Scripts/Presentation/VisualLibrary.cs",
+        "Assets/_Game/Scripts/Presentation/VisualDefinition.cs"
       ],
       "FeatureGroupId": "presentation-art-integration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于挂接二维视觉定义。",
-      "BoundarySummary": "不适配三维地形。",
+      "UseSummary": "用于按稳定内容 ID 保存和查询可替换的共享视觉定义。",
+      "BoundarySummary": "只拥有视觉定义与目录查询，不创建场景槽位、运行时 Provider 或第二套玩法身份；正式 3D 表现应通过自身展示适配器消费该边界。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
       ],
@@ -2289,8 +2266,8 @@
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于执行正式 Windows、冻结 2D 回归和 universal x86_64+arm64 macOS 构建，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线；带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。",
-      "BoundarySummary": "不修改游戏规则；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。冻结 2D 构建不得获得 3D 管线覆盖，普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。",
+      "UseSummary": "用于三类现役 3D 构建：Windows Release、Windows Development 和 universal x86_64+arm64 macOS；构建期间临时登记批准的 URP 管线，带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。",
+      "BoundarySummary": "不修改游戏规则，也不提供已退役的 2D 构建入口；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
       ],
@@ -2503,6 +2480,51 @@
       ]
     },
     {
+      "Id": "legacy-2d-save-compatibility-data",
+      "ChineseName": "历史二维存档兼容 DTO",
+      "TypeNames": [
+        "BuildingSnapshot",
+        "EnemySnapshot",
+        "FriendlyUnitSnapshot"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/Legacy2D/BuildingSnapshot.cs",
+        "Assets/_Game/Scripts/Persistence/Legacy2D/EnemySnapshot.cs",
+        "Assets/_Game/Scripts/Persistence/Legacy2D/FriendlyUnitSnapshot.cs"
+      ],
+      "FeatureGroupId": "legacy-rules-compatibility",
+      "ReuseLevel": "ProhibitedForNewWork",
+      "UseSummary": "保留 schema 1–30 历史存档中建筑、敌人和友军快照的原命名空间与 public 字段形状，供旧档解码和验证。",
+      "BoundarySummary": "只用于历史格式兼容，不是现役 3D 领域状态，不得新增玩法字段、运行时控制器或 schema 31 payload；变更必须保持 schema 1–30 固定夹具可读。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
+      "Id": "rewind-anchor-rules",
+      "ChineseName": "回溯锚点纯规则",
+      "TypeNames": [
+        "RewindAnchorRules"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Legacy/RewindAnchorRules.cs"
+      ],
+      "FeatureGroupId": "legacy-rules-compatibility",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "保留历史回溯锚点读取后观测值增加并封顶的确定性纯规则。",
+      "BoundarySummary": "不拥有输入、场景控制器、存档捕获或恢复应用，只允许作为历史规则兼容边界复用。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001"
+      ]
+    },
+    {
       "Id": "formal-save-data",
       "ChineseName": "正式存档数据",
       "TypeNames": [
@@ -2513,51 +2535,10 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "只用于读取和写回 legacy 2D schema 1–30 的历史 FormalSaveData 字段，并继续支撑冻结二维回归。",
-      "BoundarySummary": "这是 legacy 2D 身份，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何变更仍需兼容性评审。",
+      "UseSummary": "保留 legacy 2D schema 1–30 的历史字段形状，供统一 codec 解码、验证历史档并执行固定夹具兼容回归。",
+      "BoundarySummary": "这是只读兼容身份，不是现役运行时存档所有者，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何字段变更仍需兼容性评审。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
-      ],
-      "RequirementIds": [
-        "DOC-0001"
-      ]
-    },
-    {
-      "Id": "formal-prototype-frozen",
-      "ChineseName": "正式原型冻结场景",
-      "TypeNames": [
-        "FormalGameBootstrap"
-      ],
-      "AssetPaths": [
-        "Assets/_Game/Scenes/FormalPrototype.unity",
-        "Assets/_Game/Scripts/Core/FormalGameBootstrap.cs"
-      ],
-      "FeatureGroupId": "frozen-2d-regression",
-      "ReuseLevel": "FrozenRegression",
-      "UseSummary": "用于保留二维回归基线。",
-      "BoundarySummary": "不得作为新功能起点。",
-      "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/SceneContractTests.cs"
-      ],
-      "RequirementIds": [
-        "DOC-0001"
-      ]
-    },
-    {
-      "Id": "placeholder-building-controller-frozen",
-      "ChineseName": "占位建筑控制器",
-      "TypeNames": [
-        "PlaceholderBuildingController"
-      ],
-      "AssetPaths": [
-        "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs"
-      ],
-      "FeatureGroupId": "frozen-2d-regression",
-      "ReuseLevel": "ProhibitedForNewWork",
-      "UseSummary": "用于旧回归兼容验证。",
-      "BoundarySummary": "禁止新功能复用。",
-      "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001"
@@ -2573,15 +2554,6 @@
       "EnabledInBuildSettings": true,
       "ExpectedBuildIndex": 0,
       "ReuseLevel": "SceneOnly"
-    },
-    {
-      "Id": "formal-prototype",
-      "ChineseName": "正式二维原型",
-      "Path": "Assets/_Game/Scenes/FormalPrototype.unity",
-      "Purpose": "用于冻结二维回归。",
-      "EnabledInBuildSettings": true,
-      "ExpectedBuildIndex": 1,
-      "ReuseLevel": "FrozenRegression"
     }
   ],
   "UiEntries": [

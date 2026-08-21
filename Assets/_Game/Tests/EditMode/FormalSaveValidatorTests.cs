@@ -23,11 +23,14 @@ namespace WasteCity.Tests
                 Is.EqualTo(FormalSaveValidationError.None));
         }
 
-        [Test]
-        public void LegacyFixturesValidateAsFrozenTwoDWithoutThreeDPayload()
+        [TestCase("schema-01-legacy-2d.json", 1)]
+        [TestCase("schema-30-legacy-2d.json", 30)]
+        public void LegacyFixturesValidateAsHistoricalTwoDWithoutThreeDPayload(
+            string fixtureName,
+            int expectedSchema)
         {
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
-                ReadFixture("schema-30-legacy-2d.json"));
+                ReadFixture(fixtureName));
 
             FormalSaveValidationResult result =
                 FormalSaveValidator.ValidateDecoded(decoded);
@@ -36,6 +39,7 @@ namespace WasteCity.Tests
             Assert.That(result.PayloadKind,
                 Is.EqualTo(FormalSavePayloadKind.Legacy2D));
             Assert.That(decoded.Legacy2D, Is.Not.Null);
+            Assert.That(decoded.Legacy2D.schema, Is.EqualTo(expectedSchema));
             Assert.That(decoded.Envelope, Is.Null);
         }
 

@@ -26,7 +26,7 @@ namespace WasteCity.Tests
             "WasteCity.Editor.GrayboxRenderPipelineBuildScope";
         private const string GrayboxScenePath =
             "Assets/_Game/Scenes/GrayboxPrototype3D.unity";
-        private const string FormalScenePath =
+        private const string RetiredFormalScenePath =
             "Assets/_Game/Scenes/FormalPrototype.unity";
         private const string GrayboxPipelinePath =
             "Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset";
@@ -85,7 +85,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void BuildTools_ExposeDefault3DLegacy2DAndExplicit3DTargets()
+        public void BuildTools_ExposeOnlyFormal3DTargets()
         {
             Type buildTools = FindLoadedType(FormalBuildToolsTypeName);
             Assert.That(buildTools, Is.Not.Null);
@@ -103,7 +103,7 @@ namespace WasteCity.Tests
                 buildTools.GetMethod(
                     "BuildWindowsLegacy2D",
                     BindingFlags.Public | BindingFlags.Static),
-                Is.Not.Null);
+                Is.Null);
 
             string source = File.ReadAllText(
                 Path.Combine(
@@ -112,9 +112,6 @@ namespace WasteCity.Tests
             string default3D = ExtractMethodBlock(source, "BuildWindows");
             string explicitGraybox3D =
                 ExtractMethodBlock(source, "BuildWindowsGraybox3D");
-            string legacy2D =
-                ExtractMethodBlock(source, "BuildWindowsLegacy2D");
-
             StringAssert.Contains(
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
                 default3D);
@@ -139,16 +136,6 @@ namespace WasteCity.Tests
                 "BuildTarget.StandaloneWindows64",
                 explicitGraybox3D);
 
-            StringAssert.Contains(
-                "Assets/_Game/Scenes/FormalPrototype.unity",
-                legacy2D);
-            StringAssert.Contains(
-                "Builds/Windows2D/WasteCity2D.exe",
-                legacy2D);
-            StringAssert.DoesNotContain("GrayboxPrototype3D", legacy2D);
-            StringAssert.Contains(
-                "BuildTarget.StandaloneWindows64",
-                legacy2D);
             StringAssert.DoesNotContain(
                 "BuildOptions.Development",
                 default3D);
@@ -156,8 +143,14 @@ namespace WasteCity.Tests
                 "BuildOptions.Development",
                 explicitGraybox3D);
             StringAssert.DoesNotContain(
-                "BuildOptions.Development",
-                legacy2D);
+                "BuildWindowsLegacy2D",
+                source);
+            StringAssert.DoesNotContain(
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+                source);
+            StringAssert.DoesNotContain(
+                "Builds/Windows2D",
+                source);
         }
 
         [Test]
@@ -214,7 +207,7 @@ namespace WasteCity.Tests
                 source,
                 "BuildMacOSGraybox3D");
             StringAssert.Contains(GrayboxScenePath, macOS);
-            StringAssert.DoesNotContain(FormalScenePath, macOS);
+            StringAssert.DoesNotContain(RetiredFormalScenePath, macOS);
             StringAssert.Contains(
                 "Builds/macOS/WasteCity.app",
                 macOS);
@@ -332,7 +325,6 @@ namespace WasteCity.Tests
             string[] formalMethods =
             {
                 "WasteCity.Editor.FormalBuildTools.BuildWindows",
-                "WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D",
                 "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D",
                 "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment",
                 "WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D"
@@ -359,8 +351,23 @@ namespace WasteCity.Tests
                     new[]
                     {
                         "Unity",
+                        "-batchmode",
+                        "-quit",
                         "-executeMethod",
-                        formalMethods[4]
+                        "WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D"
+                    }
+                }),
+                Is.EqualTo(false),
+                "The retired legacy 2D entry must not arm formal-build restoration.");
+
+            Assert.That(
+                activation.Invoke(null, new object[]
+                {
+                    new[]
+                    {
+                        "Unity",
+                        "-executeMethod",
+                        formalMethods[3]
                     }
                 }),
                 Is.EqualTo(false),
@@ -484,7 +491,6 @@ namespace WasteCity.Tests
             foreach (string buildMethod in new[]
                      {
                          "BuildWindows",
-                         "BuildWindowsLegacy2D",
                          "BuildWindowsGraybox3D",
                          "BuildWindowsGraybox3DDevelopment",
                          "BuildMacOSGraybox3D"
@@ -724,13 +730,13 @@ namespace WasteCity.Tests
             Assert.That(
                 requires.Invoke(null, new object[]
                 {
-                    new[] { GrayboxScenePath, FormalScenePath }
+                    new[] { GrayboxScenePath, RetiredFormalScenePath }
                 }),
                 Is.EqualTo(true));
             Assert.That(
                 requires.Invoke(null, new object[]
                 {
-                    new[] { FormalScenePath }
+                    new[] { RetiredFormalScenePath }
                 }),
                 Is.EqualTo(false));
 
@@ -831,7 +837,7 @@ namespace WasteCity.Tests
                 Assert.That(
                     begin.Invoke(null, new object[]
                     {
-                        new[] { FormalScenePath }
+                        new[] { RetiredFormalScenePath }
                     }),
                     Is.EqualTo(false));
                 Assert.That(

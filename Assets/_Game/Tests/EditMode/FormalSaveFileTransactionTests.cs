@@ -56,20 +56,6 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void LegacyControllerUsesUnifiedStoreWithoutDirectFileWrites()
-        {
-            string source = File.ReadAllText(Path.Combine(
-                Application.dataPath,
-                "_Game/Scripts/Persistence/FormalSaveController.cs"));
-
-            Assert.That(source, Does.Contain("FormalSaveStore"));
-            Assert.That(source, Does.Not.Contain("File.WriteAllText"));
-            Assert.That(source, Does.Not.Contain("File.ReadAllText"));
-            Assert.That(source, Does.Not.Contain("File.Copy"));
-            Assert.That(source, Does.Not.Contain("File.Exists"));
-        }
-
-        [Test]
         public void TransactionUsesValidatedTemporaryBackupThenPrimaryOrder()
         {
             var fileSystem = new MemoryFileSystem();

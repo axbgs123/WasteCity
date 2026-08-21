@@ -127,34 +127,55 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
-        public IEnumerator IDEA0015_LegacySaveUsesExplicitNewGameConfirmation()
+        public IEnumerator IDEA0015_LegacySchemaOneAndThirtyUseExplicitCompatibilityFlow()
         {
-            WriteFixtureToPrimary("schema-30-legacy-2d.json");
-            yield return ReloadScene();
-            EntryProbe entry = RequireEntry();
+            foreach (string fixtureName in new[]
+                     {
+                         "schema-01-legacy-2d.json",
+                         "schema-30-legacy-2d.json",
+                     })
+            {
+                WriteFixtureToPrimary(fixtureName);
+                yield return ReloadScene();
+                EntryProbe entry = RequireEntry();
 
-            Assert.That(entry.CanContinue, Is.False);
-            Assert.That(entry.IsRuntimeReady, Is.False);
-            Assert.That(entry.FeedbackMessage,
-                Is.EqualTo(
-                    "检测到旧版 2D 存档，不能直接用于当前 3D 游戏"));
-            Assert.That(FindButton("Start.Continue").interactable, Is.False);
+                Assert.That(entry.CanContinue, Is.False, fixtureName);
+                Assert.That(entry.IsRuntimeReady, Is.False, fixtureName);
+                Assert.That(
+                    entry.FeedbackMessage,
+                    Is.EqualTo(
+                        "检测到旧版 2D 存档，不能直接用于当前 3D 游戏"),
+                    fixtureName);
+                Assert.That(
+                    FindButton("Start.Continue").interactable,
+                    Is.False,
+                    fixtureName);
 
-            yield return ClickButton("Start.NewGame");
-            Assert.That(entry.IsNewGameConfirmationOpen, Is.True);
-            Assert.That(entry.IsRuntimeReady, Is.False);
-            Assert.That(FindButton("Start.NewGameConfirm"), Is.Not.Null);
-            yield return ClickButton("Start.NewGameCancel");
-            Assert.That(entry.IsNewGameConfirmationOpen, Is.False);
-            Assert.That(entry.IsRuntimeReady, Is.False);
+                yield return ClickButton("Start.NewGame");
+                Assert.That(
+                    entry.IsNewGameConfirmationOpen,
+                    Is.True,
+                    fixtureName);
+                Assert.That(entry.IsRuntimeReady, Is.False, fixtureName);
+                Assert.That(
+                    FindButton("Start.NewGameConfirm"),
+                    Is.Not.Null,
+                    fixtureName);
+                yield return ClickButton("Start.NewGameCancel");
+                Assert.That(
+                    entry.IsNewGameConfirmationOpen,
+                    Is.False,
+                    fixtureName);
+                Assert.That(entry.IsRuntimeReady, Is.False, fixtureName);
 
-            yield return ClickButton("Start.NewGame");
-            yield return ClickButton("Start.NewGameConfirm");
-            Assert.That(
-                entry.IsStartPageOpen,
-                Is.False,
-                entry.FeedbackMessage);
-            Assert.That(entry.IsRuntimeReady, Is.True);
+                yield return ClickButton("Start.NewGame");
+                yield return ClickButton("Start.NewGameConfirm");
+                Assert.That(
+                    entry.IsStartPageOpen,
+                    Is.False,
+                    entry.FeedbackMessage);
+                Assert.That(entry.IsRuntimeReady, Is.True, fixtureName);
+            }
         }
 
         [UnityTest]

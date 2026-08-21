@@ -458,12 +458,12 @@ namespace WasteCity.Tests
                 "# 废土移动城市使用与开发入门", "## 这份说明适合谁看", new[]
                 {
                     "这份说明适合谁看", "游戏目前能做什么", "明确尚未完成的内容", "怎样打开默认 3D 游戏",
-                    "两个场景的区别", "主要按键和界面", "开发修改器只在开发版本出现", "想修改某个功能先看哪里",
+                    "当前 3D 场景与历史 2D 入口", "主要按键和界面", "开发修改器只在开发版本出现", "想修改某个功能先看哪里",
                     "新电脑交接最短路径", "出问题时先做什么", "技术清单链接",
                 }, "06-User-Feedback-and-Change-Control-ZH.md", "Generated/Project-Inventory-ZH.md");
             StringAssert.Contains("默认 3D", userGuide);
-            StringAssert.Contains("冻结 2D", userGuide);
-            StringAssert.Contains("不是新功能模板", userGuide);
+            StringAssert.Contains("已退役历史 2D", userGuide);
+            StringAssert.Contains("不删除共享纯规则", userGuide);
 
             AssertGuideContract(bugGuide, "Docs/08-Testing-and-Bug-Location-Guide-ZH.md",
                 "# 废土移动城市测试与 Bug 定位指南", "## 适合谁看", new[]
@@ -497,7 +497,7 @@ namespace WasteCity.Tests
                 "# 废土移动城市可复用项目目录", "## 适合谁看", new[]
                 {
                     "适合谁看", "五级复用说明", "内容与稳定编号", "世界、城市和坐标", "建造与撤离", "UI 与输入",
-                    "资源、研究、人口、战斗和存档", "3D 表现与美术", "场景、构建与检查工具", "冻结或禁止用于新功能的旧内容",
+                    "资源、研究、人口、战斗和存档", "3D 表现与美术", "场景、构建与检查工具",
                 }, "06-User-Feedback-and-Change-Control-ZH.md", "Generated/Project-Inventory-ZH.md");
         }
 
@@ -566,18 +566,20 @@ namespace WasteCity.Tests
             string grayboxScene = File.ReadAllText(Path.Combine(
                 ProjectRoot(),
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity"));
-            string frozenScene = File.ReadAllText(Path.Combine(
-                ProjectRoot(),
-                "Assets/_Game/Scenes/FormalPrototype.unity"));
             StringAssert.Contains(evacuationGuid.Groups["guid"].Value, grayboxScene);
-            StringAssert.DoesNotContain(evacuationGuid.Groups["guid"].Value, frozenScene);
+            Assert.That(
+                File.Exists(Path.Combine(
+                    ProjectRoot(),
+                    "Assets/_Game/Scenes/FormalPrototype.unity")),
+                Is.False,
+                "The retired 2D scene must not remain a current project asset.");
 
             StringAssert.Contains(
                 "GrayboxFormalEvacuationVerticalSliceTests",
                 userGuide);
             StringAssert.Contains("六段", userGuide);
             StringAssert.Contains("真实输入", userGuide);
-            StringAssert.Contains("冻结 2D", userGuide);
+            StringAssert.Contains("已退役", userGuide);
 
             string evacuationChecks = MarkdownSectionBody(
                 bugGuide,

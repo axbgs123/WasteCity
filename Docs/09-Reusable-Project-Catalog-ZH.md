@@ -118,7 +118,7 @@
 
 ### 三维冻结撤离存档适配器（复用前审查）
 
-能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。不能负责什么：只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证，不代表人工、Windows 或全量验证已完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
+能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。不能负责什么：只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入已经退役的 legacy 2D runtime。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证；Task 13 完整自动化与构建已通过，Task 14 退役后的完整自动化、质量门和三项 3D 构建也已通过，正式验证记录将在实现提交后生成，人工试玩和真实 Windows 验收仍未完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
 
 ### 三维正式撤离协调与只读视图（仅限场景）
 
@@ -278,7 +278,15 @@
 
 ### 正式存档数据（复用前审查）
 
-能解决什么：保持 schema `1–30` 旧 2D payload 的历史身份与冻结回归能力。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：只用于读取和写回 legacy 2D schema 1–30 的历史 FormalSaveData 字段，并继续支撑冻结二维回归。不能负责什么：这是 legacy 2D 身份，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何变更仍需兼容性评审。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
+能解决什么：保持 schema `1–30` 旧 2D payload 的历史身份与兼容回归能力。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：保留 legacy 2D schema 1–30 的历史字段形状，供统一 codec 解码、验证历史档并执行固定夹具兼容回归。不能负责什么：这是只读兼容身份，不是现役运行时存档所有者，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何字段变更仍需兼容性评审。改后跑哪组测试：`FormalSaveTests`、`FormalSaveEnvelopeTests`、`FormalSaveValidatorTests`。代码名：`FormalSaveData`。
+
+### 历史二维存档兼容 DTO（禁止用于新功能）
+
+能解决什么：保留 schema 1–30 历史存档中建筑、敌人和友军快照的原命名空间与 public 字段形状，供旧档解码和验证。在哪里：`Assets/_Game/Scripts/Persistence/Legacy2D/BuildingSnapshot.cs`、`Assets/_Game/Scripts/Persistence/Legacy2D/EnemySnapshot.cs`、`Assets/_Game/Scripts/Persistence/Legacy2D/FriendlyUnitSnapshot.cs`。怎么复用：保留 schema 1–30 历史存档中建筑、敌人和友军快照的原命名空间与 public 字段形状，供旧档解码和验证。不能负责什么：只用于历史格式兼容，不是现役 3D 领域状态，不得新增玩法字段、运行时控制器或 schema 31 payload；变更必须保持 schema 1–30 固定夹具可读。改后跑哪组测试：`FormalSaveTests`、`FormalSaveValidatorTests`。代码名：`BuildingSnapshot`、`EnemySnapshot`、`FriendlyUnitSnapshot`。
+
+### 回溯锚点纯规则（复用前审查）
+
+能解决什么：保留历史回溯锚点读取后观测值增加并封顶的确定性纯规则。在哪里：`Assets/_Game/Scripts/Legacy/RewindAnchorRules.cs`。怎么复用：保留历史回溯锚点读取后观测值增加并封顶的确定性纯规则。不能负责什么：不拥有输入、场景控制器、存档捕获或恢复应用，只允许作为历史规则兼容边界复用。改后跑哪组测试：`FormalSaveTests`。代码名：`RewindAnchorRules`。
 
 ### 正式三维存档信封、编码与语义验证（复用前审查）
 
@@ -310,6 +318,10 @@
 
 ## 3D 表现与美术
 
+### 共享视觉定义库（复用前审查）
+
+能解决什么：用于按稳定内容 ID 保存和查询可替换的共享视觉定义。在哪里：`Assets/_Game/Scripts/Presentation/VisualLibrary.cs`、`Assets/_Game/Scripts/Presentation/VisualDefinition.cs`。怎么复用：用于按稳定内容 ID 保存和查询可替换的共享视觉定义。不能负责什么：只拥有视觉定义与目录查询，不创建场景槽位、运行时 Provider 或第二套玩法身份；正式 3D 表现应通过自身展示适配器消费该边界。改后跑哪组测试：`VisualSlotTests`。代码名：`VisualLibrary`、`VisualDefinition`。
+
 ### 三维共享资源图标目录（推荐复用）
 
 能解决什么：为全部正式资源提供稳定 Sprite 解析、可替换资产覆盖和确定性占位图标。在哪里：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs` 与共享资产 `Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset`。怎么复用：为全部正式资源提供稳定 Sprite 解析、可替换资产覆盖和确定性占位图标，供矿点、资源栏、仓库、背包、配方、科技与生产 UI 共享。不能负责什么：只负责资源 ID 到图标的表现映射，不拥有资源定义、数量或矿点真值；消费者必须使用同一目录资产或确定性 fallback，不得各自生成第二套资源身份和颜色语义。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`GrayboxSceneContractTests`。代码名：`ResourceIconCatalog3D`。
@@ -317,10 +329,6 @@
 ### 三维资源矿点标识与图标标记（仅限场景）
 
 能解决什么：把 `WorldMapModel` 的真实资源节点投影为带稳定 ID 和共享资源图标的可回收场景标记。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs` 与 `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`。怎么复用：在 GrayboxPrototype3D 中以世界坐标生成稳定矿点 ID，并把 WorldMapModel 的真实资源节点投影为复用共享资源图标的可回收标记。不能负责什么：只属于当前 3D 世界表现与对象复用层；不创建资源节点、不决定节点类型、储量、采矿合法性或枯竭规则，所有真值必须继续来自 WorldMapModel。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxResourceNodeIdentity3D`、`GrayboxResourceNodeMarker3D`。
-
-### 二维视觉槽位（复用前审查）
-
-能解决什么：挂接二维视觉定义。在哪里：`Assets/_Game/Scripts/Presentation/VisualSlot.cs`。怎么复用：用于挂接二维视觉定义。先确认项目目标仍是二维显示。不能负责什么：不适配三维地形。改后跑哪组测试：`VisualSlotTests`。代码名：`VisualSlot`。
 
 ### 三维灰盒视觉槽位（仅限场景）
 
@@ -358,18 +366,8 @@
 
 ### 正式构建工具（复用前审查）
 
-能解决什么：执行正式 Windows、冻结 2D 回归和 universal macOS 构建，并让包含三维灰盒场景的 Player 构建在 Shader stripping 前识别批准的 URP 管线。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于执行正式 Windows、冻结 2D 回归和 universal x86_64+arm64 macOS 构建，并在包含 3D 灰盒场景的 Player 构建期间临时登记批准的 URP 管线；带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。通过 `FormalBuildTools` 选择正式构建入口；`GrayboxRenderPipelineBuildScope` 只按实际场景列表临时登记 `GrayboxURP`。不能负责什么：不修改游戏规则；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。冻结 2D 构建不得获得 3D 管线覆盖，普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。改后跑哪组测试：`GrayboxBuildAndPerformanceTests` 中的 `Bug0005_BuildTools_ExposeRestorableUniversalMacOSGrayboxTarget`、`Bug0005_FinalExitRestoreActivatesOnlyForQuitFormalBuilds`、`Bug0005_FinalExitRestoreSynchronizesRuntimeBeforeExactBytes`，并执行受影响平台的真实 Player 构建与退出后哈希检查。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。
+能解决什么：执行 Windows Release 3D、Windows Development 3D 和 universal macOS 三项正式构建，并让正式 3D Player 在 Shader stripping 前识别批准的 URP 管线。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于三类现役 3D 构建：Windows Release、Windows Development 和 universal x86_64+arm64 macOS；构建期间临时登记批准的 URP 管线，带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。不能负责什么：不修改游戏规则，也不提供已退役的 2D 构建入口；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`，并执行受影响平台的真实 Player 构建与退出后哈希检查。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。
 
 ### 灰盒性能探针（仅限场景）
 
 能解决什么：采集灰盒性能数据，并为正式撤离混合负载与 schema `31` 存档建立可重复的分配、事务和 Marker 证据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：用于采集灰盒性能数据，并执行 IDEA-0014 活跃生产、八敌、防御 HUD、撤离 UI 的 300 稳定帧混合探针、GUI 捕获和正式汇总。IDEA-0015 继续通过该探针采集连续 20 次完整 capture、单次快照/文件事务分配预算、五类存档操作 Marker 与 300 次 idle callback 稳定观察。不能负责什么：只用于可重复验证和正式 Marker 取证，不改变玩法真值、不作为发布版本逻辑，也不替代用户试玩或真实 Windows GPU、显存和内存验收。同步 callback 观察不能冒充真实 300 PlayMode 帧，真实帧、场景重载和写盘稳定性由 `GrayboxFormalSaveRoundTripTests` 证明。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`、`GrayboxFormalEvacuationPerformanceTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxPerformanceProbe`。
-
-## 冻结或禁止用于新功能的旧内容
-
-### 正式原型冻结场景（冻结回归）
-
-能解决什么：保留二维旧功能的回归基线。在哪里：`Assets/_Game/Scenes/FormalPrototype.unity` 和 `Assets/_Game/Scripts/Core/FormalGameBootstrap.cs`。怎么复用：用于保留二维回归基线。只用于确认旧行为未倒退。不能负责什么：不得作为新功能起点。改后跑哪组测试：`SceneContractTests`。代码名：`FormalGameBootstrap`。
-
-### 占位建筑控制器（禁止用于新功能）
-
-能解决什么：维持旧回归兼容。在哪里：`Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs`。怎么复用：用于旧回归兼容验证。禁止新功能复用。不能负责什么：不能作为新的建筑实现。改后跑哪组测试：`TurretAndBuildingTests`。代码名：`PlaceholderBuildingController`。

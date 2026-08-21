@@ -292,7 +292,7 @@
 | 存档 | 自动检查点、退出保存、重开 | 多槽位、云存档、跨循环继承 | 模块化存档和版本迁移 |
 | 设置 | 分辨率、窗口/全屏、操作说明；音量与震动在对应消费系统接入后补入 | 完整重映射、手柄、无障碍套件 | 统一设置项和输入动作映射；玩家偏好独立于游戏进度存档 |
 
-> 已批准需求 `IDEA-0015`：正式 3D 使用 schema `31` 单槽存档，提供自动检查点、保存并退出和重开恢复。该能力当前为“已实现待验证”：默认 3D 已接入开始新进度、继续、保存并退出和自动检查点；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。准确状态见 `Docs/06-User-Feedback-and-Change-Control-ZH.md` 的 `IDEA-0015`。
+> 已批准需求 `IDEA-0015`：正式 3D 使用 schema `31` 单槽存档，提供自动检查点、保存并退出和重开恢复。该能力当前为“已实现待验证”：默认 3D 已接入开始新进度、继续、保存并退出和自动检查点；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项 3D 构建和文档生成/校验已通过，正式记录将在实现提交后生成。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。准确状态见 `Docs/06-User-Feedback-and-Change-Control-ZH.md` 的 `IDEA-0015`。
 
 ### A4.2 移动与展开
 
@@ -1120,7 +1120,7 @@ B 卷的 500 敌人和 2000 弹丸作为正式版压力目标，不作为首版�
 
 自动配方与应急手工配方进入同一正式配方目录，但必须是不同稳定 ID、不同数值的独立条目；研究解锁和 UI 引用目录条目，不得复制配方数值或把自动配方当成手工配方。
 
-首版机器配方稳定 ID 为：采矿 `core.production.extract-node-resource`、冶炼 `core.production.smelt-alloy`、装配 `core.production.assemble-ammunition`。上述 `3/6/6` 秒是 3D 首版最终有效周期，不叠加冻结 2D 的 `CityOperationalRules.FortressProductionMultiplier`；城市形态只通过现有建筑运行资格与物流连接影响本轮生产。未来若增加生产倍率，必须另行批准并进入正式配置。
+首版机器配方稳定 ID 为：采矿 `core.production.extract-node-resource`、冶炼 `core.production.smelt-alloy`、装配 `core.production.assemble-ammunition`。上述 `3/6/6` 秒是 3D 首版最终有效周期，不叠加 legacy 2D 历史规则中的 `CityOperationalRules.FortressProductionMultiplier`；城市形态只通过现有建筑运行资格与物流连接影响本轮生产。未来若增加生产倍率，必须另行批准并进入正式配置。
 
 ### A16.4 科技
 
@@ -1137,7 +1137,7 @@ B 卷的 500 敌人和 2000 弹丸作为正式版压力目标，不作为首版�
 
 科技完成产生关注度属于完整版本规则；`IDEA-0011` 不接关注度运行时，基础冶金与弹药装配在该里程碑完成时只生效正式解锁。`IDEA-0013` 同样不接关注度，只把自动防御改为可研究并在完成后解锁机枪塔。首版研究速度不受生产力影响。正式版可通过“生产力作用对象”将研究纳入城市生产力。
 
-3D Demo release profile 复用四个现有稳定研究 ID：`core.research.automated-machinery` 显示“基础冶金”，`core.research.precision-assembly` 显示“弹药装配”，并复用 `core.research.automated-defense`、`core.research.legacy-analysis`。批准新增六节点专用根节点 `core.research.scrap-processing` 与加固节点 `core.research.reinforced-structures`；不得为已有语义新增平行节点。冻结 2D 与长期 43 节点目录继续保留 `core.research.precision-assembly` 原有显示“精密装配”，3D 首版投影不得回写破坏该目录。
+3D Demo release profile 复用四个现有稳定研究 ID：`core.research.automated-machinery` 显示“基础冶金”，`core.research.precision-assembly` 显示“弹药装配”，并复用 `core.research.automated-defense`、`core.research.legacy-analysis`。批准新增六节点专用根节点 `core.research.scrap-processing` 与加固节点 `core.research.reinforced-structures`；不得为已有语义新增平行节点。长期 43 节点目录继续保留 `core.research.precision-assembly` 原有显示“精密装配”，3D 首版投影不得回写破坏该目录；退役 legacy 2D 场景适配器不改变这一共享目录语义。
 
 研究运行时规则：
 
@@ -1691,7 +1691,7 @@ updatedAt
 - 官方 ID 改名必须维护旧→新映射；
 - 至少保留当前和上一正式版本的存档回归样本。
 - schema `1–30` 继续由旧 2D 读取路径兼容和回归，不得静默转换为 schema `31`、覆盖原档，或把旧场景状态冒充正式 3D 状态；
-- schema `31` 的实现现已覆盖保存与加载、活动转换、战斗、撤离批次、自动检查点、原子写与回归样本，当前为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四构建和正式验证记录均已通过。独立 Task 14 尚未开始，因此 2D 专属 `FormalPrototype` 场景、专属控制器与 legacy build 入口仍保留；共享规则和 schema `1–30` 读取回归继续保留。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。
+- schema `31` 的实现现已覆盖保存与加载、活动转换、战斗、撤离批次、自动检查点、原子写与回归样本，当前为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建和正式验证记录均已通过。独立 Task 14 已退役 `FormalPrototype`、47 个只服务 legacy 2D 的运行时脚本（共 51 个 `MonoBehaviour` 类型）及 legacy build 入口，当前只保留正式 3D 场景和 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建；退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建和官方文档生成/校验已通过，正式验证记录将在实现提交后生成。共享纯规则、稳定 ID、schema `1–30` decoder、固定 fixtures 和旧档中文识别继续保留。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。
 
 ### A21.3 AI 架构治理
 
@@ -2343,7 +2343,7 @@ AI 任务开始前必须搜索现有接口，不得新建同义系统。新增�
 | **视角** | 俯视角 3D，可在角色、城市、区域和多城世界层间缩放；不采用第三人称 |
 | **节奏** | 支持暂停（随时规划）+ 加速 |
 
-当前 2D 场景是规则验证原型。转为 3D 时保留地图网格、规则坐标、存档 ID、碰撞代理和输入动作，模型、动画、材质与特效只负责表现，不持有生命、生产、攻击或存档真值。
+退役前的 2D 场景曾作为规则验证原型。转为 3D 时保留下来的地图网格、规则坐标、存档 ID 和共享纯规则继续作为正式真值；已退役场景的碰撞代理、输入与表现适配器不再是现役入口。模型、动画、材质与特效仍只负责表现，不持有生命、生产、攻击或存档真值。
 
 ---
 

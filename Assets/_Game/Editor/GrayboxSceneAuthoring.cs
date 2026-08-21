@@ -2584,10 +2584,7 @@ namespace WasteCity.Editor
         {
             EditorBuildSettings.scenes = new[]
             {
-                new EditorBuildSettingsScene(ScenePath, true),
-                new EditorBuildSettingsScene(
-                    "Assets/_Game/Scenes/FormalPrototype.unity",
-                    true)
+                new EditorBuildSettingsScene(ScenePath, true)
             };
         }
 

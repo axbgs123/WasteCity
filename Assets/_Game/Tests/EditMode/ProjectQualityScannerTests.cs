@@ -69,17 +69,9 @@ namespace WasteCity.Tests
                 .OrderBy(path => path, StringComparer.Ordinal).ToArray(), snapshot.ScenePaths);
             Assert.That(snapshot.SceneRecords.Single(record =>
                 record.Path == "Assets/_Game/Scenes/GrayboxPrototype3D.unity").BuildIndex, Is.EqualTo(0));
-            Assert.That(snapshot.SceneRecords.Single(record =>
-                record.Path == "Assets/_Game/Scenes/FormalPrototype.unity").BuildIndex, Is.EqualTo(1));
-        }
-
-        [Test]
-        public void Scan_MapsEachProductionTypeInBuildingRuntimeSourceFile()
-        {
-            ProjectInventorySnapshot snapshot = ProjectQualityScanner.Scan(ProjectRoot());
-            const string source = "Assets/_Game/Scripts/Building/BuildingRuntime.cs";
-            Assert.That(snapshot.TypeRecords.Single(x => x.FullName == "WasteCity.Building.BuildingRuntime").SourcePath, Is.EqualTo(source));
-            Assert.That(snapshot.TypeRecords.Single(x => x.FullName == "WasteCity.Building.PlaceholderShieldGenerator").SourcePath, Is.EqualTo(source));
+            Assert.That(snapshot.SceneRecords.SingleOrDefault(record =>
+                record.Path == "Assets/_Game/Scenes/FormalPrototype.unity"),
+                Is.Null);
         }
 
         [Test]

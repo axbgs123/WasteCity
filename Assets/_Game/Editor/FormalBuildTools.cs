@@ -34,28 +34,6 @@ namespace WasteCity.Editor
             if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());
         }
 
-        public static void BuildWindowsLegacy2D()
-        {
-            Directory.CreateDirectory("Builds/Windows2D");
-            BuildReport report;
-            try
-            {
-                GrayboxRenderPipelineBuildScope.
-                    BeginCommandLineFinalExitRestore();
-                report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
-                {
-                    scenes = new[] { "Assets/_Game/Scenes/FormalPrototype.unity" },
-                    locationPathName = "Builds/Windows2D/WasteCity2D.exe",
-                    target = BuildTarget.StandaloneWindows64
-                });
-            }
-            finally
-            {
-                GrayboxRenderPipelineBuildScope.RestoreAfterBuild();
-            }
-            if (report.summary.result != BuildResult.Succeeded) throw new InvalidOperationException(report.summary.result.ToString());
-        }
-
         public static void BuildWindowsGraybox3D()
         {
             Directory.CreateDirectory("Builds/Windows3D");
@@ -388,7 +366,6 @@ namespace WasteCity.Editor
             switch (executeMethod)
             {
                 case "WasteCity.Editor.FormalBuildTools.BuildWindows":
-                case "WasteCity.Editor.FormalBuildTools.BuildWindowsLegacy2D":
                 case "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3D":
                 case "WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment":
                 case "WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D":

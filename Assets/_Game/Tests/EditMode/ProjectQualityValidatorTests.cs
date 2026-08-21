@@ -82,36 +82,6 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Validate_RealFrozenReuseBecomingRecommended_ReturnsOnlyPq007()
-        {
-            ProjectQualityCatalog catalog = CurrentCatalog();
-            ProjectReuseEntry reuse = catalog.ReuseEntries.Single(entry => entry.Id == "formal-prototype-frozen");
-            reuse.ReuseLevel = ProjectReuseLevel.Recommended;
-
-            AssertIssuesExactly(ValidateCurrent(catalog), "PQ007");
-        }
-
-        [Test]
-        public void Validate_RealFrozenSceneBecomingRecommended_ReturnsOnlyPq007()
-        {
-            ProjectQualityCatalog catalog = CurrentCatalog();
-            ProjectSceneEntry scene = catalog.Scenes.Single(entry => entry.Id == "formal-prototype");
-            scene.ReuseLevel = ProjectReuseLevel.Recommended;
-
-            AssertIssuesExactly(ValidateCurrent(catalog), "PQ007");
-        }
-
-        [Test]
-        public void Validate_RealProhibitedReuseBecomingRecommended_ReturnsOnlyPq008()
-        {
-            ProjectQualityCatalog catalog = CurrentCatalog();
-            ProjectReuseEntry reuse = catalog.ReuseEntries.Single(entry => entry.Id == "placeholder-building-controller-frozen");
-            reuse.ReuseLevel = ProjectReuseLevel.Recommended;
-
-            AssertIssuesExactly(ValidateCurrent(catalog), "PQ008");
-        }
-
-        [Test]
         public void Validate_RejectsMissingSimpleCatalogTypeAgainstSnapshot()
         {
             ProjectQualityCatalog catalog = CurrentCatalog();

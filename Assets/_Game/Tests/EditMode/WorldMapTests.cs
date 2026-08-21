@@ -1,5 +1,4 @@
 using NUnit.Framework;
-using UnityEngine;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -25,31 +24,5 @@ namespace WasteCity.Tests
             Assert.That(map.Reveal(10, 10, 3), Is.Zero);
         }
 
-        [Test]
-        public void WorldAndCellCoordinatesKeepExistingCenteredGridConvention()
-        {
-            var worldObject = new GameObject("CoordinateWorld");
-            try
-            {
-                var view = worldObject.AddComponent<PlaceholderWorldView>();
-                view.Generate(new WorldSeed(8128));
-
-                Assert.That(
-                    view.TryWorldToCell(
-                        new Vector2(-8f, -5f),
-                        out int x,
-                        out int y),
-                    Is.True);
-                Assert.That(x, Is.EqualTo(8));
-                Assert.That(y, Is.EqualTo(7));
-                Assert.That(
-                    view.CellToWorld(8, 7),
-                    Is.EqualTo(new Vector2(-8f, -5f)));
-            }
-            finally
-            {
-                Object.DestroyImmediate(worldObject);
-            }
-        }
     }
 }

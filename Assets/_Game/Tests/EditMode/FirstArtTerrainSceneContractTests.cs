@@ -20,8 +20,6 @@ namespace WasteCity.Tests
     {
         private const string ScenePath =
             "Assets/_Game/Scenes/GrayboxPrototype3D.unity";
-        private const string FormalScenePath =
-            "Assets/_Game/Scenes/FormalPrototype.unity";
         private const string TemporaryScenePath =
             "Assets/_Game/Tests/EditMode/" +
             "TempFirstArtTerrainSceneContract.unity";
@@ -270,15 +268,13 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void BuildSettings_ContainExactlyTheApprovedScenesInOrder()
+        public void BuildSettings_ContainOnlyTheApprovedFormal3DScene()
         {
             EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
 
-            Assert.That(scenes.Length, Is.EqualTo(2));
+            Assert.That(scenes.Length, Is.EqualTo(1));
             Assert.That(scenes[0].enabled, Is.True);
             Assert.That(scenes[0].path, Is.EqualTo(ScenePath));
-            Assert.That(scenes[1].enabled, Is.True);
-            Assert.That(scenes[1].path, Is.EqualTo(FormalScenePath));
         }
 
         [Test]

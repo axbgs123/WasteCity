@@ -14,11 +14,9 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 using WasteCity.City;
-using WasteCity.Core;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
-using WasteCity.Persistence;
 using WasteCity.World;
 using Object = UnityEngine.Object;
 
@@ -28,6 +26,10 @@ namespace WasteCity.Tests
     {
         private const string ScenePath =
             "Assets/_Game/Scenes/GrayboxPrototype3D.unity";
+        private const string RetiredFormalScenePath =
+            "Assets/_Game/Scenes/FormalPrototype.unity";
+        private const string RetiredFormalProjectSetupPath =
+            "Assets/_Game/Editor/FormalProjectSetup.cs";
         private const string RendererPath =
             "Assets/_Game/Rendering/Graybox3D/" +
             "GrayboxUniversalRenderer.asset";
@@ -181,19 +183,22 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void Scene_ContainsNoFrozen2DRuntimeOrFormalSaveController()
+        public void Scene_ContainsNoRetired2DRuntimeTypes()
         {
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-            Assert.That(
-                Object.FindObjectsOfType<FormalSaveController>(true),
-                Is.Empty);
-            Assert.That(
-                Object.FindObjectsOfType<FormalGameBootstrap>(true),
-                Is.Empty);
-            Assert.That(
-                Object.FindObjectsOfType<PlaceholderWorldView>(true),
-                Is.Empty);
+            string[] retiredTypeNames =
+            {
+                "WasteCity.Persistence.FormalSaveController",
+                "WasteCity.Core.FormalGameBootstrap",
+                "WasteCity.World.PlaceholderWorldView",
+            };
+            foreach (MonoBehaviour behaviour in
+                     Object.FindObjectsOfType<MonoBehaviour>(true))
+                CollectionAssert.DoesNotContain(
+                    retiredTypeNames,
+                    behaviour.GetType().FullName,
+                    behaviour.gameObject.name);
         }
 
         [Test]
@@ -337,20 +342,28 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void BuildSettings_KeepGrayboxFirstAndFormalSecond()
+        public void BuildSettings_ContainOnlyTheFormal3DScene()
         {
             EditorBuildSettingsScene[] scenes =
                 EditorBuildSettings.scenes;
-            Assert.That(scenes.Length, Is.GreaterThanOrEqualTo(2));
+            Assert.That(scenes.Length, Is.EqualTo(1));
             Assert.That(scenes[0].enabled, Is.True);
             Assert.That(
                 scenes[0].path,
                 Is.EqualTo(ScenePath));
-            Assert.That(scenes[1].enabled, Is.True);
+        }
+
+        [Test]
+        public void Retired2DSceneAndAuthoringAssetsDoNotExist()
+        {
             Assert.That(
-                scenes[1].path,
-                Is.EqualTo(
-                    "Assets/_Game/Scenes/FormalPrototype.unity"));
+                AssetDatabase.LoadAssetAtPath<SceneAsset>(
+                    RetiredFormalScenePath),
+                Is.Null);
+            Assert.That(
+                AssetDatabase.LoadAssetAtPath<MonoScript>(
+                    RetiredFormalProjectSetupPath),
+                Is.Null);
         }
 
         [Test]
@@ -377,11 +390,10 @@ namespace WasteCity.Tests
                 compact);
         }
 
-        [TestCase("GrayboxSceneAuthoring.cs")]
-        [TestCase("FormalProjectSetup.cs")]
-        public void SceneAuthoringPaths_KeepGrayboxFirstAndFormalSecond(
-            string editorFileName)
+        [Test]
+        public void SceneAuthoring_ConfiguresOnlyTheFormal3DScene()
         {
+            const string editorFileName = "GrayboxSceneAuthoring.cs";
             string source = File.ReadAllText(
                 Path.Combine(
                     Application.dataPath,
@@ -398,18 +410,13 @@ namespace WasteCity.Tests
                     "ScenePath",
                     System.StringComparison.Ordinal);
             }
-            int formalIndex = assignment.IndexOf(
-                "Assets/_Game/Scenes/FormalPrototype.unity",
-                System.StringComparison.Ordinal);
-
             Assert.That(
                 grayboxIndex,
                 Is.GreaterThanOrEqualTo(0),
                 editorFileName);
-            Assert.That(
-                formalIndex,
-                Is.GreaterThan(grayboxIndex),
-                editorFileName);
+            StringAssert.DoesNotContain(
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+                assignment);
         }
 
         [Test]

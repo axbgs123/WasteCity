@@ -197,7 +197,7 @@ namespace WasteCity.Tests
             ProjectFeatureGroup editor = FindFeature(catalog, "scene-editor-build-performance");
             CollectionAssert.Contains(editor.TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs");
-            CollectionAssert.DoesNotContain(FindFeature(catalog, "frozen-2d-regression").TestFileGlobs,
+            CollectionAssert.DoesNotContain(FindFeature(catalog, "legacy-rules-compatibility").TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs");
 
             string[] expectedFailureLocations =
@@ -214,7 +214,7 @@ namespace WasteCity.Tests
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
-                "frozen-2d-regression|先检查冻结二维基线、历史场景和回归约束|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs|Assets/_Game/Scenes/FormalPrototype.unity",
+                "legacy-rules-compatibility|先检查历史规则、schema 1–30 兼容与固定回归样本|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Persistence/Legacy2D/**",
             };
             CollectionAssert.AreEqual(expectedFailureLocations, catalog.FeatureGroups.Select(feature =>
                 feature.Id + "|" + feature.FailureLocationSummary + "|" +
@@ -369,7 +369,6 @@ namespace WasteCity.Tests
         {
             ProjectQualityCatalog catalog =
                 ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(86));
 
             ProjectFeatureGroup persistence = FindFeature(
                 catalog,
@@ -399,10 +398,9 @@ namespace WasteCity.Tests
                         "Assets/_Game/Tests/PlayMode/" +
                         "GrayboxFormalPlayModeEntryFixture.cs"))
                     .Select(feature => feature.Id));
-            CollectionAssert.IsSubsetOf(new[]
+            CollectionAssert.AreEqual(new[]
             {
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-                "Assets/_Game/Scenes/FormalPrototype.unity",
             }, persistence.ScenePaths);
 
             ProjectReuseEntry envelope = FindReuse(
@@ -606,8 +604,68 @@ namespace WasteCity.Tests
             StringAssert.Contains("schema 1–30", legacy.UseSummary);
             StringAssert.Contains("不承载 schema 31", legacy.BoundarySummary);
             Assert.That(
-                FindReuse(catalog, "formal-prototype-frozen").ReuseLevel,
-                Is.EqualTo(ProjectReuseLevel.FrozenRegression));
+                catalog.ReuseEntries.Any(reuse =>
+                    reuse.Id == "formal-prototype-frozen"),
+                Is.False);
+            Assert.That(
+                catalog.ReuseEntries.Any(reuse =>
+                    reuse.Id == "placeholder-building-controller-frozen"),
+                Is.False);
+        }
+
+        [Test]
+        public void CommittedCatalog_ExcludesRetired2DSceneAuthoringAndControllers()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            string[] cataloguedPaths = catalog.FeatureGroups
+                .SelectMany(feature =>
+                    feature.SourceGlobs
+                        .Concat(feature.PrimarySourceGlobs)
+                        .Concat(feature.ScenePaths))
+                .Concat(catalog.ReuseEntries.SelectMany(reuse =>
+                    reuse.AssetPaths))
+                .Concat(catalog.Scenes.Select(scene => scene.Path))
+                .ToArray();
+            string[] retiredPaths =
+            {
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+                "Assets/_Game/Editor/FormalProjectSetup.cs",
+                "Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs",
+                "Assets/_Game/Scripts/City/PlaceholderMobileCity.cs",
+                "Assets/_Game/Scripts/Combat/FormalCombatController.cs",
+                "Assets/_Game/Scripts/Combat/FormalFriendlyUnitController.cs",
+                "Assets/_Game/Scripts/Combat/FormalTechnologyRouteController.cs",
+                "Assets/_Game/Scripts/Combat/PlaceholderBehemoth.cs",
+                "Assets/_Game/Scripts/Combat/PlaceholderBossEncounter.cs",
+                "Assets/_Game/Scripts/Combat/PlaceholderEnemy.cs",
+                "Assets/_Game/Scripts/Combat/PlaceholderPuppet.cs",
+                "Assets/_Game/Scripts/Core/FormalGameClockController.cs",
+                "Assets/_Game/Scripts/Core/FormalSessionController.cs",
+                "Assets/_Game/Scripts/Core/FormalSessionStatisticsController.cs",
+                "Assets/_Game/Scripts/Economy/FormalEconomyController.cs",
+                "Assets/_Game/Scripts/Leader/FormalLeaderController.cs",
+                "Assets/_Game/Scripts/Narrative/FormalGuidanceController.cs",
+                "Assets/_Game/Scripts/Persistence/FormalSaveController.cs",
+                "Assets/_Game/Scripts/Population/FormalPopulationController.cs",
+                "Assets/_Game/Scripts/Progression/FormalAdvancementController.cs",
+                "Assets/_Game/Scripts/Progression/FormalProgressionController.cs",
+                "Assets/_Game/Scripts/UI/FormalPlaceholderHud.cs",
+                "Assets/_Game/Scripts/UI/FormalTitleMenuController.cs",
+                "Assets/_Game/Scripts/World/FormalCameraController.cs",
+                "Assets/_Game/Scripts/World/FormalDroneController.cs",
+                "Assets/_Game/Scripts/World/PlaceholderWorldView.cs",
+            };
+
+            foreach (string retiredPath in retiredPaths)
+                CollectionAssert.DoesNotContain(
+                    cataloguedPaths,
+                    retiredPath,
+                    retiredPath);
+            Assert.That(
+                catalog.Scenes.Any(scene =>
+                    scene.Id == "formal-prototype"),
+                Is.False);
         }
 
         [Test]
@@ -1384,14 +1442,14 @@ namespace WasteCity.Tests
                 performance.ScenePaths,
                 "Assets/_Game/Scenes/GrayboxPrototype3D.unity");
 
-            ProjectFeatureGroup frozen = FindFeature(
+            ProjectFeatureGroup legacyCompatibility = FindFeature(
                 catalog,
-                "frozen-2d-regression");
+                "legacy-rules-compatibility");
             CollectionAssert.DoesNotContain(
-                frozen.RequirementIds,
+                legacyCompatibility.RequirementIds,
                 "IDEA-0014");
             CollectionAssert.DoesNotContain(
-                frozen.TestFileGlobs,
+                legacyCompatibility.TestFileGlobs,
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs");
 
             AssertIdea0014ReuseBoundary(

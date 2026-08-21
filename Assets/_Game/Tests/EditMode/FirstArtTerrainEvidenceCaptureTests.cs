@@ -691,7 +691,7 @@ namespace WasteCity.Tests
             Assert.That(
                 () => FirstArtTerrainEvidenceCapture.ValidateAcceptedEvidenceIntegrity(
                     decision,
-                    "Assets/_Game/Scenes/FormalPrototype.unity",
+                    "Assets/_Game/Scenes/UnapprovedEvidenceScene.unity",
                     true,
                     new[] { 10, 11, 12 },
                     3),
