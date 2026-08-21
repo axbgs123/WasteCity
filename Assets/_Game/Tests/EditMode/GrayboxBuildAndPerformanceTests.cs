@@ -50,7 +50,24 @@ namespace WasteCity.Tests
             "Library/WasteCity.GrayboxBuildMacArchitectureRestore.txt";
         private const string PerformanceProbeTypeName =
             "WasteCity.Editor.GrayboxPerformanceProbe";
+        private const string FormalSavePerformanceResultEnvironmentVariable =
+            "WASTECITY_FORMAL_SAVE_PERF_RESULT";
+        private const int FormalSaveCaptureSampleCount = 20;
+        private const int FormalSaveIdleCallbackCount = 300;
+        private const long FormalSaveSnapshotAllocationBudgetBytes =
+            1024L * 1024L;
+        private const long FormalSaveFileTransactionAllocationBudgetBytes =
+            4L * 1024L * 1024L;
         private const int BuildingInstanceCount = 128;
+
+        private static readonly string[] FormalSavePerformanceMarkerNames =
+        {
+            "WasteCity.Formal.Save.Capture",
+            "WasteCity.Formal.Save.Validate",
+            "WasteCity.Formal.Save.WriteTransaction",
+            "WasteCity.Formal.Save.Apply",
+            "WasteCity.Formal.Save.Rebuild"
+        };
 
         private readonly List<UnityEngine.Object> cleanup =
             new List<UnityEngine.Object>();
@@ -958,6 +975,100 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PerformanceProbe_ExposesFormalSavePersistenceEntryPointAndFiveMarkers()
+        {
+            Type probe = FindLoadedType(PerformanceProbeTypeName);
+            Assert.That(probe, Is.Not.Null);
+            MethodInfo method = probe?.GetMethod(
+                "MeasureFormalSavePersistencePerformance",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+            Assert.That(method?.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(method?.GetParameters(), Is.Empty);
+
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxPerformanceProbe.cs"));
+            StringAssert.Contains(
+                FormalSavePerformanceResultEnvironmentVariable,
+                source);
+            CollectionAssert.AreEqual(
+                FormalSavePerformanceMarkerNames,
+                ExtractFormalSavePerformanceMarkerNames(source));
+            StringAssert.Contains(
+                "FormalSaveSnapshotAllocationBudgetBytes",
+                source);
+            StringAssert.Contains(
+                "FormalSaveFileTransactionAllocationBudgetBytes",
+                source);
+            StringAssert.Contains(
+                "GrayboxFormalSaveCoordinator3D",
+                source);
+            StringAssert.Contains("CaptureEnvelope(", source);
+            StringAssert.Contains("FormalSaveValidator", source);
+            StringAssert.Contains("FormalSaveFileTransaction", source);
+            StringAssert.Contains(
+                "GrayboxFormalSaveRuntimeHost3D",
+                source);
+        }
+
+        [Test]
+        public void FormalSavePerformanceProbe_RecordsCaptureAllocationTransactionAndIdleCallbackBudgets()
+        {
+            FormalSavePerformanceResult result =
+                InvokeFormalSavePerformanceProbe();
+
+            Assert.That(
+                result.coordinatorCaptureCount,
+                Is.EqualTo(FormalSaveCaptureSampleCount));
+            Assert.That(
+                result.successfulCaptureCount,
+                Is.EqualTo(FormalSaveCaptureSampleCount));
+            AssertStableCaptureHashes(result.capturePayloadHashes);
+            Assert.That(result.fullSnapshotCount, Is.EqualTo(1));
+            Assert.That(
+                result.snapshotAllocationBudgetBytes,
+                Is.EqualTo(FormalSaveSnapshotAllocationBudgetBytes));
+            Assert.That(
+                result.snapshotMeasuredAllocationBytes,
+                Is.EqualTo(Math.Max(
+                    result.snapshotManagedAllocationBytes,
+                    result.snapshotProfiledAllocationBytes)));
+            Assert.That(
+                result.snapshotMeasuredAllocationBytes,
+                Is.LessThanOrEqualTo(
+                    result.snapshotAllocationBudgetBytes));
+
+            Assert.That(result.fileTransactionCount, Is.EqualTo(1));
+            Assert.That(
+                result.fileTransactionAllocationBudgetBytes,
+                Is.EqualTo(
+                    FormalSaveFileTransactionAllocationBudgetBytes));
+            Assert.That(
+                result.fileTransactionMeasuredAllocationBytes,
+                Is.EqualTo(Math.Max(
+                    result.fileTransactionManagedAllocationBytes,
+                    result.fileTransactionProfiledAllocationBytes)));
+            Assert.That(
+                result.fileTransactionMeasuredAllocationBytes,
+                Is.LessThanOrEqualTo(
+                    result.fileTransactionAllocationBudgetBytes));
+
+            Assert.That(
+                result.idleCallbackCount,
+                Is.EqualTo(FormalSaveIdleCallbackCount));
+            Assert.That(result.idlePendingCheckpointCount, Is.Zero);
+            Assert.That(result.idleFileWriteCount, Is.Zero);
+            Assert.That(
+                result.idlePersistentObjectCountAfter,
+                Is.EqualTo(result.idlePersistentObjectCountBefore));
+            CollectionAssert.AreEqual(
+                FormalSavePerformanceMarkerNames,
+                result.markerNames);
+        }
+
+        [Test]
         public void MixedBuildingPopulation_StaysWithinStructuralBudgets()
         {
             BuildingPerformanceFixture fixture =
@@ -1483,10 +1594,144 @@ namespace WasteCity.Tests
                 "Unbalanced method block for " + methodName + ".");
         }
 
+        private static string[] ExtractFormalSavePerformanceMarkerNames(
+            string source)
+        {
+            const string declaration =
+                "FormalSavePersistenceMarkerNames";
+            int declarationStart = source.IndexOf(
+                declaration,
+                StringComparison.Ordinal);
+            Assert.That(
+                declarationStart,
+                Is.GreaterThanOrEqualTo(0),
+                declaration);
+            int openingBrace = source.IndexOf('{', declarationStart);
+            int closingBrace = source.IndexOf("};", openingBrace,
+                StringComparison.Ordinal);
+            Assert.That(openingBrace, Is.GreaterThanOrEqualTo(0));
+            Assert.That(closingBrace, Is.GreaterThan(openingBrace));
+
+            var names = new List<string>();
+            int cursor = openingBrace + 1;
+            while (cursor < closingBrace)
+            {
+                int openingQuote = source.IndexOf('"', cursor);
+                if (openingQuote < 0 || openingQuote >= closingBrace)
+                    break;
+                int closingQuote = source.IndexOf('"', openingQuote + 1);
+                Assert.That(
+                    closingQuote,
+                    Is.GreaterThan(openingQuote));
+                names.Add(source.Substring(
+                    openingQuote + 1,
+                    closingQuote - openingQuote - 1));
+                cursor = closingQuote + 1;
+            }
+            return names.ToArray();
+        }
+
+        private static FormalSavePerformanceResult
+            InvokeFormalSavePerformanceProbe()
+        {
+            Type probe = FindLoadedType(PerformanceProbeTypeName);
+            Assert.That(probe, Is.Not.Null);
+            MethodInfo method = probe?.GetMethod(
+                "MeasureFormalSavePersistencePerformance",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null);
+
+            string resultPath = Path.Combine(
+                Path.GetTempPath(),
+                "wastecity-task13-formal-save-performance-" +
+                Guid.NewGuid().ToString("N") + ".json");
+            string previous = Environment.GetEnvironmentVariable(
+                FormalSavePerformanceResultEnvironmentVariable);
+            try
+            {
+                Environment.SetEnvironmentVariable(
+                    FormalSavePerformanceResultEnvironmentVariable,
+                    resultPath);
+                if (File.Exists(resultPath))
+                    File.Delete(resultPath);
+                try
+                {
+                    method?.Invoke(null, null);
+                }
+                catch (TargetInvocationException exception)
+                {
+                    Assert.Fail(
+                        "Formal save performance probe failed before " +
+                        "producing Task 13 evidence: " +
+                        (exception.InnerException?.Message ??
+                         exception.Message));
+                }
+
+                Assert.That(
+                    File.Exists(resultPath),
+                    Is.True,
+                    "Formal save performance evidence was not written.");
+                FormalSavePerformanceResult result =
+                    JsonUtility.FromJson<FormalSavePerformanceResult>(
+                        File.ReadAllText(resultPath));
+                Assert.That(result, Is.Not.Null);
+                return result;
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    FormalSavePerformanceResultEnvironmentVariable,
+                    previous);
+                if (File.Exists(resultPath))
+                    File.Delete(resultPath);
+            }
+        }
+
+        private static void AssertStableCaptureHashes(string[] hashes)
+        {
+            Assert.That(hashes, Is.Not.Null);
+            Assert.That(
+                hashes.Length,
+                Is.EqualTo(FormalSaveCaptureSampleCount));
+            string expected = hashes[0];
+            Assert.That(expected, Is.Not.Null.And.Not.Empty);
+            for (int index = 1; index < hashes.Length; index++)
+            {
+                Assert.That(
+                    hashes[index],
+                    Is.EqualTo(expected),
+                    "Capture payload hash changed at sample " + index + ".");
+            }
+        }
+
         private T Track<T>(T value) where T : UnityEngine.Object
         {
             cleanup.Add(value);
             return value;
+        }
+
+        [Serializable]
+        private sealed class FormalSavePerformanceResult
+        {
+            public int coordinatorCaptureCount;
+            public int successfulCaptureCount;
+            public string[] capturePayloadHashes;
+            public int fullSnapshotCount;
+            public long snapshotManagedAllocationBytes;
+            public long snapshotProfiledAllocationBytes;
+            public long snapshotMeasuredAllocationBytes;
+            public long snapshotAllocationBudgetBytes;
+            public int fileTransactionCount;
+            public long fileTransactionManagedAllocationBytes;
+            public long fileTransactionProfiledAllocationBytes;
+            public long fileTransactionMeasuredAllocationBytes;
+            public long fileTransactionAllocationBudgetBytes;
+            public int idleCallbackCount;
+            public int idlePendingCheckpointCount;
+            public int idleFileWriteCount;
+            public int idlePersistentObjectCountBefore;
+            public int idlePersistentObjectCountAfter;
+            public string[] markerNames;
         }
 
         private sealed class AdapterFixture

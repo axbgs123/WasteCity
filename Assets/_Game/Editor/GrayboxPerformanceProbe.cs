@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Profiling;
 using UnityEditorInternal;
@@ -19,6 +20,8 @@ using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Persistence;
+using WasteCity.Persistence.ThreeD;
 using WasteCity.World;
 using Debug = UnityEngine.Debug;
 
@@ -38,6 +41,8 @@ namespace WasteCity.Editor
             "WASTECITY_RUINS_CLIFF_PERF_RESULT";
         private const string FormalEvacuationMixedResultEnvironmentVariable =
             "WASTECITY_FORMAL_EVACUATION_MIXED_PERF_RESULT";
+        private const string FormalSavePersistenceResultEnvironmentVariable =
+            "WASTECITY_FORMAL_SAVE_PERF_RESULT";
         private const string FormalEvacuationMixedGuiProfilerEnvironmentVariable =
             "WASTECITY_FORMAL_EVACUATION_MIXED_GUI_PROFILER_RESULT";
         private const string DefaultFormalEvacuationMixedGuiDirectoryName =
@@ -59,6 +64,12 @@ namespace WasteCity.Editor
         private const int RuinsCliffRunCount = 5;
         private const int RuinsCliffStableObservationCount = 300;
         private const int FormalEvacuationMixedSampleCount = 300;
+        private const int FormalSaveCaptureSampleCount = 20;
+        private const int FormalSaveIdleCallbackCount = 300;
+        private const long FormalSaveSnapshotAllocationBudgetBytes =
+            1024L * 1024L;
+        private const long FormalSaveFileTransactionAllocationBudgetBytes =
+            4L * 1024L * 1024L;
         private const long FormalDefenseAllocationBudgetBytes = 64L * 1024L;
         private const long FormalTransactionAllocationBaselineBytes =
             64L * 1024L;
@@ -76,6 +87,24 @@ namespace WasteCity.Editor
             "WasteCity.Formal.Evacuation.CapacityPreflight",
             "WasteCity.Formal.Evacuation.Commit"
         };
+        private static readonly string[] FormalSavePersistenceMarkerNames =
+        {
+            "WasteCity.Formal.Save.Capture",
+            "WasteCity.Formal.Save.Validate",
+            "WasteCity.Formal.Save.WriteTransaction",
+            "WasteCity.Formal.Save.Apply",
+            "WasteCity.Formal.Save.Rebuild"
+        };
+        private static readonly ProfilerMarker FormalSaveCaptureMarker =
+            new ProfilerMarker("WasteCity.Formal.Save.Capture");
+        private static readonly ProfilerMarker FormalSaveValidateMarker =
+            new ProfilerMarker("WasteCity.Formal.Save.Validate");
+        private static readonly ProfilerMarker FormalSaveWriteTransactionMarker =
+            new ProfilerMarker("WasteCity.Formal.Save.WriteTransaction");
+        private static readonly ProfilerMarker FormalSaveApplyMarker =
+            new ProfilerMarker("WasteCity.Formal.Save.Apply");
+        private static readonly ProfilerMarker FormalSaveRebuildMarker =
+            new ProfilerMarker("WasteCity.Formal.Save.Rebuild");
         private const double
             RuinsCliffLayoutAndBatchingMaximumMedianMilliseconds = 100d;
         private const double
@@ -305,6 +334,166 @@ namespace WasteCity.Editor
             public long occurrenceCount;
             public long totalNanoseconds;
             public long maximumNanoseconds;
+        }
+
+        [Serializable]
+        private sealed class FormalSavePersistencePerformanceResult
+        {
+            public int coordinatorCaptureCount;
+            public int successfulCaptureCount;
+            public string[] capturePayloadHashes;
+            public int fullSnapshotCount;
+            public long snapshotManagedAllocationBytes;
+            public long snapshotProfiledAllocationBytes;
+            public long snapshotMeasuredAllocationBytes;
+            public long snapshotAllocationBudgetBytes;
+            public int fileTransactionCount;
+            public long fileTransactionManagedAllocationBytes;
+            public long fileTransactionProfiledAllocationBytes;
+            public long fileTransactionMeasuredAllocationBytes;
+            public long fileTransactionAllocationBudgetBytes;
+            public int idleCallbackCount;
+            public int idlePendingCheckpointCount;
+            public int idleFileWriteCount;
+            public int idlePersistentObjectCountBefore;
+            public int idlePersistentObjectCountAfter;
+            public string[] markerNames;
+            public FormalProfilerMarkerResult[] markers;
+        }
+
+        private sealed class FormalSaveProbeAuthority
+        {
+            private FormalThreeDSaveData captureCopy;
+
+            public FormalSaveProbeAuthority(FormalThreeDSaveData source)
+            {
+                State = CloneFormalSaveProbePayload(source);
+            }
+
+            public FormalThreeDSaveData State { get; private set; }
+
+            public FormalThreeDSaveData BeginCapture()
+            {
+                captureCopy = CloneFormalSaveProbePayload(State);
+                return captureCopy;
+            }
+
+            public FormalThreeDSaveData CaptureCopy => captureCopy ??
+                throw new InvalidOperationException(
+                    "Formal save probe capture order is invalid.");
+
+            public void BeginApply(FormalThreeDSaveData source)
+            {
+                State = CloneFormalSaveProbePayload(source);
+            }
+        }
+
+        private sealed class FormalSaveProbeDomain : IFormalThreeDSaveDomain
+        {
+            private readonly FormalSaveProbeAuthority authority;
+
+            public FormalSaveProbeDomain(
+                GrayboxFormalSaveDomainId3D domainId,
+                FormalSaveProbeAuthority authority)
+            {
+                DomainId = domainId;
+                this.authority = authority ??
+                    throw new ArgumentNullException(nameof(authority));
+            }
+
+            public GrayboxFormalSaveDomainId3D DomainId { get; }
+
+            public bool TryCapture(
+                FormalThreeDSaveData destination,
+                out string error)
+            {
+                if (DomainId == GrayboxFormalSaveDomainId3D.WorldCity)
+                    authority.BeginCapture();
+                CopyFormalSaveProbeDomain(
+                    authority.CaptureCopy,
+                    destination,
+                    DomainId);
+                error = string.Empty;
+                return true;
+            }
+
+            public bool TryApply(
+                FormalThreeDSaveData source,
+                out string error)
+            {
+                using (FormalSaveApplyMarker.Auto())
+                {
+                    if (DomainId == GrayboxFormalSaveDomainId3D.WorldCity)
+                        authority.BeginApply(source);
+                    CopyFormalSaveProbeDomain(
+                        source,
+                        authority.State,
+                        DomainId);
+                    error = string.Empty;
+                    return true;
+                }
+            }
+        }
+
+        private sealed class FormalSaveProbeRebuilder :
+            IFormalThreeDDerivedStateRebuilder
+        {
+            public int InvocationCount { get; private set; }
+
+            public void RebuildDerivedState()
+            {
+                using (FormalSaveRebuildMarker.Auto())
+                {
+                    InvocationCount++;
+                }
+            }
+        }
+
+        private sealed class FormalSaveProbeFileSystem :
+            IFormalSaveFileSystem
+        {
+            private readonly Dictionary<string, byte[]> files =
+                new Dictionary<string, byte[]>(StringComparer.Ordinal);
+
+            public bool FileExists(string path) => files.ContainsKey(path);
+
+            public byte[] ReadAllBytes(string path)
+            {
+                if (!files.TryGetValue(path, out byte[] bytes))
+                    throw new FileNotFoundException(path);
+                return (byte[])bytes.Clone();
+            }
+
+            public void CreateDirectory(string path)
+            {
+            }
+
+            public string CreateTemporarySiblingPath(
+                string targetPath,
+                string purpose)
+            {
+                return targetPath + "." + purpose + ".tmp";
+            }
+
+            public void WriteAllBytesAndFlush(string path, byte[] bytes)
+            {
+                files[path] = (byte[])bytes.Clone();
+            }
+
+            public void ReplaceAtomically(
+                string sourcePath,
+                string destinationPath)
+            {
+                if (!files.TryGetValue(sourcePath, out byte[] bytes))
+                    throw new FileNotFoundException(sourcePath);
+                files[destinationPath] = bytes;
+                files.Remove(sourcePath);
+            }
+
+            public void DeleteIfExists(string path)
+            {
+                files.Remove(path);
+            }
         }
 
         private readonly struct FormalTransactionAllocationMetrics
@@ -1614,6 +1803,517 @@ namespace WasteCity.Editor
             }
         }
 
+        public static void MeasureFormalSavePersistencePerformance()
+        {
+            string resultPath = ResolveExternalPath(
+                FormalSavePersistenceResultEnvironmentVariable,
+                true);
+            string temporaryPath = resultPath + ".tmp";
+            DeleteIfPresent(resultPath);
+            DeleteIfPresent(temporaryPath);
+            ProfilerRecorder[] markerRecorders = null;
+            try
+            {
+                FormalSaveEnvelope fixture =
+                    LoadFormalSavePerformanceFixture();
+                var authority = new FormalSaveProbeAuthority(
+                    fixture.formal3D);
+                var domains = new IFormalThreeDSaveDomain[
+                    GrayboxFormalSaveCoordinator3D.DomainOrder.Count];
+                for (int index = 0; index < domains.Length; index++)
+                {
+                    domains[index] = new FormalSaveProbeDomain(
+                        GrayboxFormalSaveCoordinator3D.DomainOrder[index],
+                        authority);
+                }
+                var rebuilder = new FormalSaveProbeRebuilder();
+                var coordinator = new GrayboxFormalSaveCoordinator3D(
+                    domains,
+                    rebuilder);
+
+                GrayboxFormalSaveCoordinatorResult3D warmup =
+                    coordinator.CaptureEnvelope(
+                        fixture.formal3D.sessionId,
+                        fixture.gameVersion,
+                        fixture.contentSources,
+                        fixture.checkpoint,
+                        ParseFormalSaveTimestamp(fixture.updatedAt));
+                RequireFormalSaveProbeSuccess(warmup, "warmup capture");
+                FormalSaveValidationResult warmupValidation =
+                    FormalSaveValidator.ValidateEnvelope(warmup.Envelope);
+                if (!warmupValidation.IsValid)
+                    throw new InvalidOperationException(
+                        "Formal save performance warmup validation failed: " +
+                        warmupValidation.Message);
+
+                markerRecorders = StartMarkerRecorders(
+                    FormalSavePersistenceMarkerNames);
+                var hashes = new string[FormalSaveCaptureSampleCount];
+                int successfulCaptures = 0;
+                GrayboxFormalSaveCoordinatorResult3D snapshot = null;
+                ProfilerRecorder snapshotGcRecorder =
+                    StartGcAllocationRecorder();
+                long snapshotManagedBytes = 0L;
+                long snapshotProfiledBytes = 0L;
+                try
+                {
+                    long before = GC.GetAllocatedBytesForCurrentThread();
+                    snapshot = CaptureAndValidateFormalSaveProbe(
+                        coordinator,
+                        fixture);
+                    snapshotManagedBytes =
+                        GC.GetAllocatedBytesForCurrentThread() - before;
+                }
+                finally
+                {
+                    snapshotGcRecorder.Stop();
+                    snapshotProfiledBytes = SumGcAllocationBytes(
+                        snapshotGcRecorder);
+                    snapshotGcRecorder.Dispose();
+                }
+                RequireFormalSaveProbeSuccess(snapshot, "measured capture");
+                hashes[0] = snapshot.Envelope.payloadHashSha256;
+                successfulCaptures++;
+                for (int sample = 1;
+                     sample < FormalSaveCaptureSampleCount;
+                     sample++)
+                {
+                    GrayboxFormalSaveCoordinatorResult3D capture =
+                        CaptureAndValidateFormalSaveProbe(
+                            coordinator,
+                            fixture);
+                    RequireFormalSaveProbeSuccess(
+                        capture,
+                        "capture " + sample);
+                    hashes[sample] = capture.Envelope.payloadHashSha256;
+                    successfulCaptures++;
+                }
+
+                string encoded = FormalSaveCodec.EncodeEnvelope(
+                    snapshot.Envelope);
+                byte[] bytes = new UTF8Encoding(false, true).GetBytes(
+                    encoded);
+                var fileSystem = new FormalSaveProbeFileSystem();
+                var transaction = new FormalSaveFileTransaction(fileSystem);
+                ProfilerRecorder transactionGcRecorder =
+                    StartGcAllocationRecorder();
+                long transactionManagedBytes = 0L;
+                long transactionProfiledBytes = 0L;
+                FormalSaveFileTransactionResult transactionResult = null;
+                try
+                {
+                    long before = GC.GetAllocatedBytesForCurrentThread();
+                    using (FormalSaveWriteTransactionMarker.Auto())
+                    {
+                        transactionResult = transaction.Commit(
+                            "formal-save-performance.json",
+                            bytes,
+                            ValidateFormalSaveProbeBytes);
+                    }
+                    transactionManagedBytes =
+                        GC.GetAllocatedBytesForCurrentThread() - before;
+                }
+                finally
+                {
+                    transactionGcRecorder.Stop();
+                    transactionProfiledBytes = SumGcAllocationBytes(
+                        transactionGcRecorder);
+                    transactionGcRecorder.Dispose();
+                }
+                if (transactionResult == null || !transactionResult.Success)
+                    throw new InvalidOperationException(
+                        "Formal save performance transaction failed: " +
+                        transactionResult?.Diagnostic);
+
+                GrayboxFormalSaveCoordinatorResult3D restore =
+                    coordinator.RestoreEnvelope(snapshot.Envelope);
+                RequireFormalSaveProbeSuccess(restore, "restore");
+                if (rebuilder.InvocationCount != 1)
+                    throw new InvalidOperationException(
+                        "Formal save performance restore must rebuild once.");
+
+                MeasureFormalSaveIdleHost(
+                    out int idleWriteCount,
+                    out int idlePendingCheckpointCount,
+                    out int idleObjectCountBefore,
+                    out int idleObjectCountAfter);
+
+                FormalProfilerMarkerResult[] markerResults =
+                    StopAndReadMarkerRecorders(
+                        markerRecorders,
+                        FormalSavePersistenceMarkerNames);
+                markerRecorders = null;
+                long snapshotMeasuredBytes = Math.Max(
+                    snapshotManagedBytes,
+                    snapshotProfiledBytes);
+                long transactionMeasuredBytes = Math.Max(
+                    transactionManagedBytes,
+                    transactionProfiledBytes);
+                var result = new FormalSavePersistencePerformanceResult
+                {
+                    coordinatorCaptureCount =
+                        FormalSaveCaptureSampleCount,
+                    successfulCaptureCount = successfulCaptures,
+                    capturePayloadHashes = hashes,
+                    fullSnapshotCount = 1,
+                    snapshotManagedAllocationBytes =
+                        snapshotManagedBytes,
+                    snapshotProfiledAllocationBytes =
+                        snapshotProfiledBytes,
+                    snapshotMeasuredAllocationBytes =
+                        snapshotMeasuredBytes,
+                    snapshotAllocationBudgetBytes =
+                        FormalSaveSnapshotAllocationBudgetBytes,
+                    fileTransactionCount = 1,
+                    fileTransactionManagedAllocationBytes =
+                        transactionManagedBytes,
+                    fileTransactionProfiledAllocationBytes =
+                        transactionProfiledBytes,
+                    fileTransactionMeasuredAllocationBytes =
+                        transactionMeasuredBytes,
+                    fileTransactionAllocationBudgetBytes =
+                        FormalSaveFileTransactionAllocationBudgetBytes,
+                    idleCallbackCount = FormalSaveIdleCallbackCount,
+                    idlePendingCheckpointCount =
+                        idlePendingCheckpointCount,
+                    idleFileWriteCount = idleWriteCount,
+                    idlePersistentObjectCountBefore = idleObjectCountBefore,
+                    idlePersistentObjectCountAfter = idleObjectCountAfter,
+                    markerNames = (string[])
+                        FormalSavePersistenceMarkerNames.Clone(),
+                    markers = markerResults,
+                };
+                ValidateFormalSavePersistenceResult(result);
+                File.WriteAllText(
+                    temporaryPath,
+                    JsonUtility.ToJson(result, true));
+                File.Move(temporaryPath, resultPath);
+                Debug.Log(
+                    "Formal save persistence performance result: " +
+                    resultPath);
+            }
+            finally
+            {
+                if (markerRecorders != null)
+                    DisposeRecorders(markerRecorders);
+                DeleteIfPresent(temporaryPath);
+            }
+        }
+
+        private static FormalSaveEnvelope
+            LoadFormalSavePerformanceFixture()
+        {
+            string path = Path.Combine(
+                Application.dataPath,
+                "_Game/Tests/Fixtures/Persistence/" +
+                "schema-31-formal-3d.json");
+            if (!File.Exists(path))
+                throw new FileNotFoundException(
+                    "Formal save performance fixture is unavailable.",
+                    path);
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                File.ReadAllText(path));
+            if (!decoded.Success ||
+                decoded.PayloadKind != FormalSavePayloadKind.Formal3D ||
+                decoded.Envelope?.formal3D == null)
+            {
+                throw new InvalidOperationException(
+                    "Formal save performance fixture decode failed: " +
+                    decoded.Message);
+            }
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            if (!validation.IsValid)
+                throw new InvalidOperationException(
+                    "Formal save performance fixture validation failed: " +
+                    validation.Message);
+            return decoded.Envelope;
+        }
+
+        private static DateTime ParseFormalSaveTimestamp(string value)
+        {
+            if (!DateTime.TryParse(
+                    value,
+                    null,
+                    System.Globalization.DateTimeStyles.RoundtripKind,
+                    out DateTime timestamp))
+            {
+                throw new InvalidOperationException(
+                    "Formal save performance fixture timestamp is invalid.");
+            }
+            return timestamp.ToUniversalTime();
+        }
+
+        private static GrayboxFormalSaveCoordinatorResult3D
+            CaptureAndValidateFormalSaveProbe(
+                GrayboxFormalSaveCoordinator3D coordinator,
+                FormalSaveEnvelope fixture)
+        {
+            GrayboxFormalSaveCoordinatorResult3D capture;
+            using (FormalSaveCaptureMarker.Auto())
+            {
+                capture = coordinator.CaptureEnvelope(
+                    fixture.formal3D.sessionId,
+                    fixture.gameVersion,
+                    fixture.contentSources,
+                    fixture.checkpoint,
+                    ParseFormalSaveTimestamp(fixture.updatedAt));
+            }
+            RequireFormalSaveProbeSuccess(capture, "capture");
+            FormalSaveValidationResult validation;
+            using (FormalSaveValidateMarker.Auto())
+            {
+                validation = FormalSaveValidator.ValidateEnvelope(
+                    capture.Envelope);
+            }
+            if (!validation.IsValid)
+                throw new InvalidOperationException(
+                    "Formal save performance capture validation failed: " +
+                    validation.Message);
+            return capture;
+        }
+
+        private static bool ValidateFormalSaveProbeBytes(byte[] bytes)
+        {
+            using (FormalSaveValidateMarker.Auto())
+            {
+                try
+                {
+                    string encoded = new UTF8Encoding(false, true)
+                        .GetString(bytes);
+                    FormalSaveDecodeResult decoded =
+                        FormalSaveCodec.DecodeAny(encoded);
+                    return decoded.Success &&
+                        decoded.PayloadKind ==
+                            FormalSavePayloadKind.Formal3D &&
+                        FormalSaveValidator.ValidateDecoded(decoded).IsValid;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
+
+        private static void RequireFormalSaveProbeSuccess(
+            GrayboxFormalSaveCoordinatorResult3D result,
+            string operation)
+        {
+            if (result == null || !result.Success ||
+                result.Envelope?.formal3D == null)
+            {
+                throw new InvalidOperationException(
+                    "Formal save performance " + operation +
+                    " failed: " + result?.Message);
+            }
+        }
+
+        private static void MeasureFormalSaveIdleHost(
+            out int writeCount,
+            out int pendingCheckpointCount,
+            out int persistentObjectCountBefore,
+            out int persistentObjectCountAfter)
+        {
+            var root = new GameObject("FormalSaveIdleHostProbe");
+            root.SetActive(false);
+            try
+            {
+                GrayboxFormalSaveRuntimeHost3D host =
+                    root.AddComponent<GrayboxFormalSaveRuntimeHost3D>();
+                int observedWriteCount = 0;
+                var policy = new FormalSaveCheckpointPolicy(
+                    _ =>
+                    {
+                        observedWriteCount++;
+                        return true;
+                    },
+                    () => 0f);
+                SetFormalSaveProbePrivateField(
+                    host,
+                    "checkpointPolicy",
+                    policy);
+                SetFormalSaveProbePrivateField(
+                    host,
+                    "<IsInitialized>k__BackingField",
+                    true);
+                MethodInfo lateUpdate = typeof(
+                    GrayboxFormalSaveRuntimeHost3D).GetMethod(
+                        "LateUpdate",
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                if (lateUpdate == null)
+                    throw new MissingMethodException(
+                        typeof(GrayboxFormalSaveRuntimeHost3D).FullName,
+                        "LateUpdate");
+                persistentObjectCountBefore = Resources.FindObjectsOfTypeAll<
+                    GrayboxFormalSaveRuntimeHost3D>().Length;
+                for (int callback = 0;
+                     callback < FormalSaveIdleCallbackCount;
+                     callback++)
+                {
+                    lateUpdate.Invoke(host, null);
+                }
+                persistentObjectCountAfter = Resources.FindObjectsOfTypeAll<
+                    GrayboxFormalSaveRuntimeHost3D>().Length;
+                writeCount = observedWriteCount;
+                pendingCheckpointCount = policy.HasPending ? 1 : 0;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        private static void SetFormalSaveProbePrivateField(
+            object owner,
+            string name,
+            object value)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                name,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            if (field == null)
+                throw new MissingFieldException(
+                    owner.GetType().FullName,
+                    name);
+            field.SetValue(owner, value);
+        }
+
+        private static void ValidateFormalSavePersistenceResult(
+            FormalSavePersistencePerformanceResult result)
+        {
+            if (result.coordinatorCaptureCount !=
+                    FormalSaveCaptureSampleCount ||
+                result.successfulCaptureCount !=
+                    FormalSaveCaptureSampleCount ||
+                result.capturePayloadHashes == null ||
+                result.capturePayloadHashes.Length !=
+                    FormalSaveCaptureSampleCount)
+            {
+                throw new InvalidOperationException(
+                    "Formal save probe did not complete 20 captures.");
+            }
+            string expectedHash = result.capturePayloadHashes[0];
+            if (string.IsNullOrWhiteSpace(expectedHash))
+                throw new InvalidOperationException(
+                    "Formal save probe capture hash is empty.");
+            for (int index = 1;
+                 index < result.capturePayloadHashes.Length;
+                 index++)
+            {
+                if (!string.Equals(
+                        expectedHash,
+                        result.capturePayloadHashes[index],
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        "Formal save probe capture hash changed at sample " +
+                        index + ".");
+                }
+            }
+            if (result.fullSnapshotCount != 1 ||
+                result.snapshotMeasuredAllocationBytes >
+                    FormalSaveSnapshotAllocationBudgetBytes)
+            {
+                throw new InvalidOperationException(
+                    "Formal save snapshot exceeded its allocation budget: " +
+                    result.snapshotMeasuredAllocationBytes + "/" +
+                    FormalSaveSnapshotAllocationBudgetBytes + " B.");
+            }
+            if (result.fileTransactionCount != 1 ||
+                result.fileTransactionMeasuredAllocationBytes >
+                    FormalSaveFileTransactionAllocationBudgetBytes)
+            {
+                throw new InvalidOperationException(
+                    "Formal save file transaction exceeded its allocation " +
+                    "budget: " +
+                    result.fileTransactionMeasuredAllocationBytes + "/" +
+                    FormalSaveFileTransactionAllocationBudgetBytes + " B.");
+            }
+            if (result.idleCallbackCount !=
+                    FormalSaveIdleCallbackCount ||
+                result.idlePendingCheckpointCount != 0 ||
+                result.idleFileWriteCount != 0 ||
+                result.idlePersistentObjectCountBefore !=
+                    result.idlePersistentObjectCountAfter)
+            {
+                throw new InvalidOperationException(
+                    "Formal save idle host wrote or grew objects across " +
+                    "300 callback invocations.");
+            }
+            if (result.markers == null ||
+                result.markers.Length !=
+                    FormalSavePersistenceMarkerNames.Length)
+            {
+                throw new InvalidOperationException(
+                    "Formal save marker evidence is incomplete.");
+            }
+            for (int index = 0; index < result.markers.Length; index++)
+            {
+                if (!string.Equals(
+                        result.markers[index].name,
+                        FormalSavePersistenceMarkerNames[index],
+                        StringComparison.Ordinal) ||
+                    result.markers[index].occurrenceCount <= 0L)
+                {
+                    throw new InvalidOperationException(
+                        "Formal save marker was not observed: " +
+                        FormalSavePersistenceMarkerNames[index]);
+                }
+            }
+        }
+
+        private static FormalThreeDSaveData CloneFormalSaveProbePayload(
+            FormalThreeDSaveData source)
+        {
+            if (source == null)
+                throw new ArgumentNullException(nameof(source));
+            return JsonUtility.FromJson<FormalThreeDSaveData>(
+                JsonUtility.ToJson(source, false));
+        }
+
+        private static void CopyFormalSaveProbeDomain(
+            FormalThreeDSaveData source,
+            FormalThreeDSaveData destination,
+            GrayboxFormalSaveDomainId3D domainId)
+        {
+            if (source == null || destination == null)
+                throw new ArgumentNullException(
+                    source == null ? nameof(source) : nameof(destination));
+            switch (domainId)
+            {
+                case GrayboxFormalSaveDomainId3D.WorldCity:
+                    destination.world = source.world;
+                    destination.city = source.city;
+                    return;
+                case GrayboxFormalSaveDomainId3D.BuildingStorage:
+                    destination.buildings = source.buildings;
+                    destination.storage = source.storage;
+                    return;
+                case GrayboxFormalSaveDomainId3D.Economy:
+                    destination.backpack = source.backpack;
+                    destination.crafting = source.crafting;
+                    destination.research = source.research;
+                    return;
+                case GrayboxFormalSaveDomainId3D.Production:
+                    destination.production = source.production;
+                    return;
+                case GrayboxFormalSaveDomainId3D.Defense:
+                    destination.defense = source.defense;
+                    return;
+                case GrayboxFormalSaveDomainId3D.Evacuation:
+                    destination.evacuation = source.evacuation;
+                    return;
+                case GrayboxFormalSaveDomainId3D.Pause:
+                    destination.pause = source.pause;
+                    return;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(domainId),
+                        domainId,
+                        null);
+            }
+        }
+
         public static void MeasureFormalEvacuationMixedPerformance()
         {
             string resultPath = ResolveFormalEvacuationMixedResultPath();
@@ -2655,15 +3355,21 @@ namespace WasteCity.Editor
 
         private static ProfilerRecorder[] StartFormalMarkerRecorders()
         {
+            return StartMarkerRecorders(FormalEvacuationMarkerNames);
+        }
+
+        private static ProfilerRecorder[] StartMarkerRecorders(
+            IReadOnlyList<string> markerNames)
+        {
             var recorders = new ProfilerRecorder[
-                FormalEvacuationMarkerNames.Length];
+                markerNames.Count];
             try
             {
                 for (int index = 0; index < recorders.Length; index++)
                 {
                     recorders[index] = ProfilerRecorder.StartNew(
                         ProfilerCategory.Scripts,
-                        FormalEvacuationMarkerNames[index],
+                        markerNames[index],
                         4096,
                         ProfilerRecorderOptions.StartImmediately |
                         ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
@@ -2681,6 +3387,20 @@ namespace WasteCity.Editor
         private static FormalProfilerMarkerResult[]
             StopAndReadFormalMarkerRecorders(ProfilerRecorder[] recorders)
         {
+            return StopAndReadMarkerRecorders(
+                recorders,
+                FormalEvacuationMarkerNames);
+        }
+
+        private static FormalProfilerMarkerResult[]
+            StopAndReadMarkerRecorders(
+                ProfilerRecorder[] recorders,
+                IReadOnlyList<string> markerNames)
+        {
+            if (recorders.Length != markerNames.Count)
+                throw new ArgumentException(
+                    "Profiler marker recorder/name counts differ.",
+                    nameof(markerNames));
             var results = new FormalProfilerMarkerResult[recorders.Length];
             for (int index = 0; index < recorders.Length; index++)
             {
@@ -2700,7 +3420,7 @@ namespace WasteCity.Editor
                 }
                 results[index] = new FormalProfilerMarkerResult
                 {
-                    name = FormalEvacuationMarkerNames[index],
+                    name = markerNames[index],
                     occurrenceCount = occurrences,
                     totalNanoseconds = totalNanoseconds,
                     maximumNanoseconds = maximumNanoseconds
