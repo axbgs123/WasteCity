@@ -209,14 +209,30 @@ namespace WasteCity.Tests
                 Environment.SetEnvironmentVariable("WASTECITY_QUALITY_PLAYMODE_RESULTS", Write("play.xml",
                     StandardNUnitXml("Passed", 1, 1, 0, 0)));
                 Environment.SetEnvironmentVariable("WASTECITY_QUALITY_COMPILE_LOG", Write("compile.log", "Compilation succeeded\n"));
+                string windowsRelease = EscapeJson(Write(
+                    "build-windows-release.log", "build passed\n"));
+                string windowsDevelopment = EscapeJson(Write(
+                    "build-windows-development.log", "build passed\n"));
+                string legacy = EscapeJson(Write(
+                    "build-legacy.log", "build passed\n"));
+                string macUniversal = EscapeJson(Write(
+                    "build-macos-universal.log", "build passed\n"));
                 Environment.SetEnvironmentVariable("WASTECITY_QUALITY_BUILD_SUMMARY", Write("builds.json",
-                    "{\"Builds\":[{\"Name\":\"Windows 3D\",\"Status\":\"NotRequired\",\"EvidenceLogPath\":\"" +
-                    EscapeJson(Write("build.log", "runtime inputs unchanged\n")) + "\",\"Reason\":\"runtime/build inputs unchanged\"}]}"));
+                    "{\"Builds\":[" +
+                    "{\"Name\":\"Windows Release 3D\",\"Status\":\"Succeeded\",\"EvidenceLogPath\":\"" + windowsRelease + "\"}," +
+                    "{\"Name\":\"Windows Development 3D\",\"Status\":\"Succeeded\",\"EvidenceLogPath\":\"" + windowsDevelopment + "\"}," +
+                    "{\"Name\":\"Windows Legacy 2D\",\"Status\":\"Succeeded\",\"EvidenceLogPath\":\"" + legacy + "\"}," +
+                    "{\"Name\":\"macOS universal\",\"Status\":\"Succeeded\",\"EvidenceLogPath\":\"" + macUniversal + "\"}]}"));
                 Environment.SetEnvironmentVariable("WASTECITY_QUALITY_HUMAN_PLAYTEST", "未进行");
 
                 ProjectQualityTools.RecordVerification();
 
-                StringAssert.Contains("2/2", File.ReadAllText(verification));
+                string rendered = File.ReadAllText(verification);
+                StringAssert.Contains("2/2", rendered);
+                StringAssert.Contains("## 2. 编译与正式构建", rendered);
+                StringAssert.Contains("- 正式构建：4 项", rendered);
+                StringAssert.DoesNotContain("编译与 Windows 构建", rendered);
+                StringAssert.DoesNotContain("Windows 构建：4 项", rendered);
                 Dictionary<string, string> after = HashFiles(ProjectRoot(), true);
                 CollectionAssert.AreEquivalent(new[] { ProjectDocumentationGenerator.VerificationPath },
                     ChangedPaths(before, after));

@@ -103,9 +103,9 @@ namespace WasteCity.Editor.ProjectQuality
             AppendTestRun(builder, "EditMode", snapshot.EditMode);
             AppendTestRun(builder, "PlayMode", snapshot.PlayMode);
             builder.AppendLine();
-            builder.AppendLine("## 2. 编译与 Windows 构建");
+            builder.AppendLine("## 2. 编译与正式构建");
             builder.AppendLine("- 无界面编译：" + (snapshot.Compile.Passed ? "通过" : "未通过") + "，证据：" + Code(snapshot.Compile.EvidencePath));
-            builder.AppendLine("- Windows 构建：" + snapshot.Builds.Length + " 项，" +
+            builder.AppendLine("- 正式构建：" + snapshot.Builds.Length + " 项，" +
                 (snapshot.Builds.All(build => build.Passed) ? "均通过" : "存在未通过项") + "。");
             foreach (ProjectCommandResult build in snapshot.Builds)
                 builder.AppendLine("  - " + (build.Passed ? "通过" : "未通过") + "：" + Code(build.EvidencePath));
