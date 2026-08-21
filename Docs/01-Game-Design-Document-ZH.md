@@ -292,7 +292,7 @@
 | 存档 | 自动检查点、退出保存、重开 | 多槽位、云存档、跨循环继承 | 模块化存档和版本迁移 |
 | 设置 | 分辨率、窗口/全屏、操作说明；音量与震动在对应消费系统接入后补入 | 完整重映射、手柄、无障碍套件 | 统一设置项和输入动作映射；玩家偏好独立于游戏进度存档 |
 
-> 已批准需求 `IDEA-0015`：正式 3D 使用 schema `31` 单槽存档，提供自动检查点、保存并退出和重开恢复。该能力当前为“已实现待验证”：默认 3D 已接入开始新进度、继续、保存并退出和自动检查点；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项 3D 构建和文档生成/校验已通过，正式记录将在实现提交后生成。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。准确状态见 `Docs/06-User-Feedback-and-Change-Control-ZH.md` 的 `IDEA-0015`。
+> 已批准需求 `IDEA-0015`：正式 3D 使用 schema `31` 单槽存档，提供自动检查点、保存并退出和重开恢复。该能力当前为“已实现待验证”：默认 3D 已接入开始新进度、继续、保存并退出和自动检查点；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项 3D 构建、文档生成/校验和正式验证记录均已通过。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。准确状态见 `Docs/06-User-Feedback-and-Change-Control-ZH.md` 的 `IDEA-0015`。
 
 ### A4.2 移动与展开
 
@@ -1691,7 +1691,7 @@ updatedAt
 - 官方 ID 改名必须维护旧→新映射；
 - 至少保留当前和上一正式版本的存档回归样本。
 - schema `1–30` 继续由旧 2D 读取路径兼容和回归，不得静默转换为 schema `31`、覆盖原档，或把旧场景状态冒充正式 3D 状态；
-- schema `31` 的实现现已覆盖保存与加载、活动转换、战斗、撤离批次、自动检查点、原子写与回归样本，当前为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建和正式验证记录均已通过。独立 Task 14 已退役 `FormalPrototype`、47 个只服务 legacy 2D 的运行时脚本（共 51 个 `MonoBehaviour` 类型）及 legacy build 入口，当前只保留正式 3D 场景和 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建；退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建和官方文档生成/校验已通过，正式验证记录将在实现提交后生成。共享纯规则、稳定 ID、schema `1–30` decoder、固定 fixtures 和旧档中文识别继续保留。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。
+- schema `31` 的实现现已覆盖保存与加载、活动转换、战斗、撤离批次、自动检查点、原子写与回归样本，当前为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建和正式验证记录均已通过。独立 Task 14 已退役 `FormalPrototype`、47 个只服务 legacy 2D 的运行时脚本（共 51 个 `MonoBehaviour` 类型）及 legacy build 入口，当前只保留正式 3D 场景和 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建；退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建、官方文档生成/校验和正式验证记录均已通过。共享纯规则、稳定 ID、schema `1–30` decoder、固定 fixtures 和旧档中文识别继续保留。用户人工试玩与真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成。
 
 ### A21.3 AI 架构治理
 

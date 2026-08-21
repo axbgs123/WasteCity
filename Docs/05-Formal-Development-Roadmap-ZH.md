@@ -5,7 +5,7 @@
 > 引擎：Unity `2022.3.62f1`（修订号 `4af31df58517`）  
 > 目标平台：Windows 10/11 64 位  
 > 当前形态：内部候选开发版，不公开发布  
-> 功能基线：`IDEA-0011`、`BUG-0006`、`IDEA-0012`、`IDEA-0013`、`IDEA-0014`、`IDEA-0015` 均已实现待验证；`IDEA-0015` 实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 已通过。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项现役 3D 构建和文档生成/校验已通过，正式验证记录将在实现提交后生成；人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收尚未完成
+> 功能基线：`IDEA-0011`、`BUG-0006`、`IDEA-0012`、`IDEA-0013`、`IDEA-0014`、`IDEA-0015` 均已实现待验证；`IDEA-0015` 实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 已通过。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项现役 3D 构建、文档生成/校验和正式验证记录均已通过；人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收尚未完成
 
 ---
 
@@ -26,7 +26,7 @@
 - `BUG-0006`、`IDEA-0012`：用户在 2026-08-18 的首次 `IDEA-0011` Player 试玩中确认建筑旋转/预览问题，并批准真实仓库共享库存与过滤、石料节点、统一资源图标和逐项缺料反馈；当前为“已实现待验证”，先于敌人和防御开发闭环，用户试玩与真实 Windows 验收仍待完成。
 - `IDEA-0013`：首个 3D 防御闭环；自动防御改为可研究，加固结构与遗产解析继续预览，接入一座耗弹机枪塔、一种啃噬者、首塔触发的教学波和城市核心受击；当前为“已实现待验证”，不得描述为用户试玩或真实 Windows 验收已经通过。
 - `IDEA-0014`：正式撤离与完整 3D 垂直切片；对齐 `5/8` 秒展开收起、转换取消、遇袭收起 `-30%`、战斗完整拆除 `60% + 5 秒`、物资与退款原子容量门和撤离可观察性，并以真实输入闭合“移动→展开→建造→生产→防御→撤离”。本里程碑保持 schema `30`，正式存档适配继续单独审批。
-- `IDEA-0015`：正式 3D 存档与 schema `31`；独立 3D payload、统一 Store/Coordinator、单槽开始/继续/保存并退出、事件驱动自动检查点、安全 `.tmp`/`.bak` 文件事务和中文错误反馈已经实现。真实输入已覆盖 Deploying、Packing、八敌战斗、已确认撤离处理中和容量阻塞撤离五类往返；schema `1–30` 仍明确保持旧 2D 身份。当前状态为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D、官方文档生成/验证和 `RecordVerification` 均已通过，这四项是 Task 14 前的正式构建证据。Task 14 已退役 `FormalPrototype`、47 个 2D 专属运行时脚本（共 51 个 `MonoBehaviour` 类型）和 legacy build 入口；当前只保留正式 3D 场景及 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建和官方文档生成/校验已通过，正式验证记录将在实现提交后生成。人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收尚未完成。共享规则、schema `1–30` decoder、迁移与回归样本必须长期保留。
+- `IDEA-0015`：正式 3D 存档与 schema `31`；独立 3D payload、统一 Store/Coordinator、单槽开始/继续/保存并退出、事件驱动自动检查点、安全 `.tmp`/`.bak` 文件事务和中文错误反馈已经实现。真实输入已覆盖 Deploying、Packing、八敌战斗、已确认撤离处理中和容量阻塞撤离五类往返；schema `1–30` 仍明确保持旧 2D 身份。当前状态为“已实现待验证”；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D、官方文档生成/验证和 `RecordVerification` 均已通过，这四项是 Task 14 前的正式构建证据。Task 14 已退役 `FormalPrototype`、47 个 2D 专属运行时脚本（共 51 个 `MonoBehaviour` 类型）和 legacy build 入口；当前只保留正式 3D 场景及 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建、官方文档生成/校验和正式验证记录均已通过。人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收尚未完成。共享规则、schema `1–30` decoder、迁移与回归样本必须长期保留。
 - `DOC-0001`：项目测试、可复用目录与自动文档维护规范；工具、主文档和机器验证已完成，等待用户验证。
 
 需求原始确认、状态和边界见 `Docs/06-User-Feedback-and-Change-Control-ZH.md`。
@@ -158,7 +158,7 @@
 - 首个垂直切片固定为“移动→展开→建造→生产→防御→撤离”；
 - 优先验证地形、移动城市、内城平台、领袖、基础建筑、一种敌人、镜头、选择、网格、遮挡、性能和 Windows 构建；建造 Task 13 通过后只允许进入 `IDEA-0004` 的有限美术样板验证，完整垂直切片通过后才允许批量制作正式美术。
 
-验收门：3D 迁移审计、设计、实施计划与“移动、展开、领袖、镜头、建造、性能、独立 Windows 构建”灰盒门已通过，默认编辑/构建入口仍为 3D；退役前 2D 基线与 schema `30` 回归持续通过。生产、物流与关联观察界面已由 `IDEA-0011` 实现，完整自动化、项目质量门、四个正式构建和本机 macOS Player 启动冒烟已经通过，仍等待真实 Windows 机器和用户人工复验；`IDEA-0013` 的首个战斗与防御闭环已完成自动化、项目质量门、四个正式构建和本机 macOS Metal 启动冒烟，状态为“已实现待验证”。`IDEA-0014` / F1F 已完成正式撤离、六段真实输入垂直切片、混合性能门、日常完整 EditMode `1787/1787`、完整 PlayMode `112/112`、项目质量门、四个正式构建和 `RecordVerification`，状态仍为“已实现待验证”，因为用户试玩与真实 Windows 验收尚未完成。`IDEA-0015` 的正式 3D 存档与 schema `31` 当前同样为“已实现待验证”；实现 HEAD `a8f30af` 已通过日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前构建、官方文档生成/验证和 `RecordVerification`。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项现役 3D 构建和文档生成/校验已通过，正式记录将在实现提交后生成；人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收仍未完成。连续地表和 Ruins/Cliff 已具有正式场景运行时接线、稳定映射和灰盒回退；Ruins/Cliff 仍须用户视觉复验，真实 Windows 10/11 Player 的 GPU、显存和视觉冒烟也仍待补，不能写成整个第一版美术包已完成。
+验收门：3D 迁移审计、设计、实施计划与“移动、展开、领袖、镜头、建造、性能、独立 Windows 构建”灰盒门已通过，默认编辑/构建入口仍为 3D；退役前 2D 基线与 schema `30` 回归持续通过。生产、物流与关联观察界面已由 `IDEA-0011` 实现，完整自动化、项目质量门、四个正式构建和本机 macOS Player 启动冒烟已经通过，仍等待真实 Windows 机器和用户人工复验；`IDEA-0013` 的首个战斗与防御闭环已完成自动化、项目质量门、四个正式构建和本机 macOS Metal 启动冒烟，状态为“已实现待验证”。`IDEA-0014` / F1F 已完成正式撤离、六段真实输入垂直切片、混合性能门、日常完整 EditMode `1787/1787`、完整 PlayMode `112/112`、项目质量门、四个正式构建和 `RecordVerification`，状态仍为“已实现待验证”，因为用户试玩与真实 Windows 验收尚未完成。`IDEA-0015` 的正式 3D 存档与 schema `31` 当前同样为“已实现待验证”；实现 HEAD `a8f30af` 已通过日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前构建、官方文档生成/验证和 `RecordVerification`。Task 14 已完成 2D 专属入口退役，退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项现役 3D 构建、文档生成/校验和正式验证记录均已通过；人工试玩与真实 Windows 10/11 视觉、GPU、显存、内存验收仍未完成。连续地表和 Ruins/Cliff 已具有正式场景运行时接线、稳定映射和灰盒回退；Ruins/Cliff 仍须用户视觉复验，真实 Windows 10/11 Player 的 GPU、显存和视觉冒烟也仍待补，不能写成整个第一版美术包已完成。
 
 ### 阶段 F1C：IDEA-0011 生产、物流与可观察化
 
@@ -241,7 +241,7 @@ F1C/F1D 中“敌人、炮塔与战斗不在本阶段”的文字继续作为对
 
 ### 阶段 F1G：IDEA-0015 正式 3D 存档与 schema 31
 
-状态：**已实现待验证**。schema `31` 正式 3D 单槽存档、自动检查点、安全文件事务、五类活动状态恢复和场景入口已经实现；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。Task 14 已删除 `FormalPrototype` 与 47 个专属运行时脚本（共 51 个 `MonoBehaviour` 类型），移除 legacy 2D build，当前只保留正式 3D 场景及三类 3D 构建；退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建和官方文档生成/校验已通过，正式验证记录将在实现提交后生成。用户人工试玩与真实 Windows 10/11 视觉、GPU、显存和内存验收仍未完成，因此不得写成“已验证”。
+状态：**已实现待验证**。schema `31` 正式 3D 单槽存档、自动检查点、安全文件事务、五类活动状态恢复和场景入口已经实现；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 均已通过。Task 14 已删除 `FormalPrototype` 与 47 个专属运行时脚本（共 51 个 `MonoBehaviour` 类型），移除 legacy 2D build，当前只保留正式 3D 场景及三类 3D 构建；退役后的聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建、官方文档生成/校验和正式验证记录均已通过。用户人工试玩与真实 Windows 10/11 视觉、GPU、显存和内存验收仍未完成，因此不得写成“已验证”。
 
 目标：建立全项目唯一的正式存档 Store/Coordinator，以独立 3D payload 保存当前单城市正式会话，并通过 schema `31` 覆盖世界、城市、建筑、仓储、背包、合成、研究、生产、防御和已确认撤离批次的权威状态；UI、选择、悬停、预览和其他可重建表现不进入存档。
 
@@ -373,7 +373,7 @@ F1C/F1D 中“敌人、炮塔与战斗不在本阶段”的文字继续作为对
 7. `IDEA-0013` 首个 3D 防御闭环已经完成自动验收并进入“已实现待验证”；等待用户人工试玩与真实 Windows 复验，不将其写成已验证；
 8. `IDEA-0014` 已完成正式撤离、混合性能复验、“移动→展开→建造→生产→防御→撤离”完整垂直切片、日常完整 EditMode `1787/1787`、完整 PlayMode `112/112`、项目质量门、四构建与验证记录，当前仍因用户试玩和真实 Windows 验收未完成而保持“已实现待验证”；
 9. `IDEA-0015` 的统一 Store/Coordinator、独立 3D payload、schema `31`、自动检查点、安全文件事务、五类活动状态往返和性能/稳定性门已实现；实现 HEAD `a8f30af` 的日常 EditMode `2069/2069`、完整 PlayMode `127/127`、项目质量门、四个退役前构建、官方文档生成/验证和 `RecordVerification` 已通过，当前仍等待用户人工试玩与真实 Windows 10/11 视觉、GPU、显存和内存验收；
-10. Task 14 已退役 2D 专属场景、47 个专属运行时脚本（共 51 个 `MonoBehaviour` 类型）和 legacy build；当前只保留正式 3D 场景及 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建。共享规则以及 schema `1–30` decoder、迁移和 fixture 已保留；聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建和官方文档生成/校验已通过，正式验证记录将在实现提交后生成；
+10. Task 14 已退役 2D 专属场景、47 个专属运行时脚本（共 51 个 `MonoBehaviour` 类型）和 legacy build；当前只保留正式 3D 场景及 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建。共享规则以及 schema `1–30` decoder、迁移和 fixture 已保留；聚焦 EditMode `317/317`、日常完整 EditMode `2039/2039`、完整 PlayMode `77/77`、项目质量门、三项构建、官方文档生成/校验和正式验证记录均已通过；
 11. 补齐前哨、迷雾、领袖交互和其余未完成 F1A 功能；
 12. 垂直切片通过独立验收后，才开始剩余正式模型、美术、动画与特效批量制作；
 13. 六个跨路线桥节点；

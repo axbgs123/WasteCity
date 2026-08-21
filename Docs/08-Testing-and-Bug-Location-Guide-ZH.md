@@ -99,11 +99,11 @@ WASTECITY_GUI_PROFILER_RESULT=/tmp/wastecity-idea0014-gui-summary.json \
 
 定位失败时按所有权排查：正式时间、转换取消和战斗收起先查 `CityDeploymentModel`、`CityDeploymentRules` 与 `GrayboxMobileCityController3D`；退款和处置先查 `BuildingEvacuationRules`；容量不足、部分写入或重复退款先查 `CityResourceStorageModel` 与 `GrayboxBuildingSession3D`；生产缓存、研究进度或塔内弹药丢失先查对应运行时和 `IsEvacuationLocked`；清单、冻结批次、稳定队列或重试先查 `GrayboxEvacuationController3D`；按钮、暂停透传和点击穿透先查 `GrayboxBuildingInputRouter3D`、`GrayboxUsabilityInputCoordinator3D` 与 `GrayboxBuildingMenuView3D`；场景引用先查 `GrayboxSceneContractTests` 和 `GrayboxSceneAuthoring`；性能再查正式 Marker、混合探针、GUI 原始捕获和汇总 JSON。
 
-`IDEA-0014` 的退役前实现与验证基线保持 schema `30`；当时冻结的 2D `FormalPrototype` 没有接入新 UI 或新功能，只同步复用共享稳定建筑目录的研究站首轮门槛并由 legacy 回归保护。后续 `IDEA-0015` 已独立实现 schema `31`、退出保存、自动检查点与重开恢复，并已通过完整自动化、项目质量门、四个退役前正式构建和正式验证记录，状态为“已实现待验证”。Task 14 已退役 2D 专属运行时，退役后的聚焦和完整自动化、项目质量门、三项现役 3D 构建和官方文档生成/校验均已通过，正式验证记录将在实现提交后生成。用户试玩和真实 Windows 10 与 Windows 11 的路径、权限、视觉、GPU、显存、内存验收仍必须由实际执行结果确认。
+`IDEA-0014` 的退役前实现与验证基线保持 schema `30`；当时冻结的 2D `FormalPrototype` 没有接入新 UI 或新功能，只同步复用共享稳定建筑目录的研究站首轮门槛并由 legacy 回归保护。后续 `IDEA-0015` 已独立实现 schema `31`、退出保存、自动检查点与重开恢复，并已通过完整自动化、项目质量门、四个退役前正式构建和正式验证记录，状态为“已实现待验证”。Task 14 已退役 2D 专属运行时，退役后的聚焦和完整自动化、项目质量门、三项现役 3D 构建、官方文档生成/校验和正式验证记录均已通过。用户试玩和真实 Windows 10 与 Windows 11 的路径、权限、视觉、GPU、显存、内存验收仍必须由实际执行结果确认。
 
 ## IDEA-0015 正式 3D 存档与 schema 31 检查边界
 
-`IDEA-0015` 当前为“已实现待验证”。统一 Store/Coordinator、独立 3D payload、schema `31` 单槽、开始/继续/保存并退出、事件驱动自动检查点、安全文件事务和五类活动状态往返已经实现；schema `1–30` 继续表示旧 2D 存档，按原语义可读，3D 入口不会把它们静默解释成 3D。实现 HEAD `a8f30af` 的完整自动化、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 已通过。Task 14 已退役 `FormalPrototype`、47 个 2D 专属运行时脚本（共 51 个 `MonoBehaviour` 类型）与 legacy build；退役后的聚焦和完整自动化、项目质量门、三项现役 3D 构建和官方文档生成/校验均已通过，正式验证记录将在实现提交后生成。这些证据不代表用户试玩或真实 Windows 10 与 Windows 11 的视觉、GPU、显存和内存验收完成。
+`IDEA-0015` 当前为“已实现待验证”。统一 Store/Coordinator、独立 3D payload、schema `31` 单槽、开始/继续/保存并退出、事件驱动自动检查点、安全文件事务和五类活动状态往返已经实现；schema `1–30` 继续表示旧 2D 存档，按原语义可读，3D 入口不会把它们静默解释成 3D。实现 HEAD `a8f30af` 的完整自动化、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个退役前正式构建、官方文档生成/验证和 `RecordVerification` 已通过。Task 14 已退役 `FormalPrototype`、47 个 2D 专属运行时脚本（共 51 个 `MonoBehaviour` 类型）与 legacy build；退役后的聚焦和完整自动化、项目质量门、三项现役 3D 构建、官方文档生成/校验和正式验证记录均已通过。这些证据不代表用户试玩或真实 Windows 10 与 Windows 11 的视觉、GPU、显存和内存验收完成。
 
 实现与定位按以下边界检查：
 
@@ -122,7 +122,7 @@ WASTECITY_GUI_PROFILER_RESULT=/tmp/wastecity-idea0014-gui-summary.json \
 
 失败定位先看结构化阶段，不要从 UI 文案猜原因：envelope/旧档身份/未来版本先查 `FormalSaveEnvelope`、`FormalSaveCodec`、`FormalSaveValidator`；`.tmp` 写入、复读校验、`.bak` 更新或主档替换失败先查 `FormalSaveFileTransactionResult.FailedStage`；主档/备份选择、`Legacy2DOnly`、`UnsupportedFutureSchema`、`DiskReadFailed` 和 `CorruptNoBackup` 先查 `FormalSaveStoreResult.Code`；某个领域 capture/apply 或 rollback 失败先查 `GrayboxFormalSaveCoordinatorResult3D` 的 domain/code；自动检查点重复、失败重试或错误轮询写盘先查 `FormalSaveCheckpointPolicy` 和 `GrayboxFormalSaveRuntimeHost3D`；启动页、继续按钮、覆盖确认、保存并退出和中文反馈再查 `GrayboxFormalSaveEntryController3D`、系统菜单视图与真实输入测试。
 
-Task 13 的退役前正式收尾门包括日常完整 EditMode、完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个正式构建、官方文档生成/验证和 `RecordVerification`；实现 HEAD `a8f30af` 已完成并通过这些门。Task 14 退役后当前只剩 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建，退役实现已经重新通过完整回归、质量门、三项构建和文档生成/校验，正式记录将在实现提交后生成。真实 Windows 机器仍要实际检查路径、权限、首次启动、退出保存、视觉、GPU、显存和内存；macOS 自动化或生成 Windows 产物不能代替这个门。
+Task 13 的退役前正式收尾门包括日常完整 EditMode、完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、legacy 2D、macOS universal 3D 四个正式构建、官方文档生成/验证和 `RecordVerification`；实现 HEAD `a8f30af` 已完成并通过这些门。Task 14 退役后当前只剩 Windows Release 3D、Windows Development 3D、macOS universal 3D 三类构建，退役实现已经重新通过完整回归、质量门、三项构建、文档生成/校验和正式验证记录。真实 Windows 机器仍要实际检查路径、权限、首次启动、退出保存、视觉、GPU、显存和内存；macOS 自动化或生成 Windows 产物不能代替这个门。
 
 schema `31` 的 Task 13 完整自动化、四个退役前构建和验证记录已经通过。独立 Task 14 已完成实现：Build Settings 只保留正式 3D 场景，`FormalPrototype`、47 个 2D 专属运行时脚本（共 51 个 `MonoBehaviour` 类型）和 `BuildWindowsLegacy2D` 已退役；共享纯规则以及 schema `1–30` decoder、既有迁移、正式 fixtures 与旧档中文识别继续保留并进入存档回归。Task 14 的聚焦和完整自动化、项目质量门、三项现役 3D 构建和文档生成/校验已通过；`RecordVerification` 将在实现提交后执行，用户试玩和真实 Windows 验收仍未完成。
 

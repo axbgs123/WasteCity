@@ -118,7 +118,7 @@
 
 ### 三维冻结撤离存档适配器（复用前审查）
 
-能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。不能负责什么：只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入已经退役的 legacy 2D runtime。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证；Task 13 完整自动化与构建已通过，Task 14 退役后的完整自动化、质量门和三项 3D 构建也已通过，正式验证记录将在实现提交后生成，人工试玩和真实 Windows 验收仍未完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
+能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。不能负责什么：只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入已经退役的 legacy 2D runtime。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证；Task 13 完整自动化与构建已通过，Task 14 退役后的完整自动化、质量门、三项 3D 构建和正式验证记录也已通过，人工试玩和真实 Windows 验收仍未完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
 
 ### 三维正式撤离协调与只读视图（仅限场景）
 
