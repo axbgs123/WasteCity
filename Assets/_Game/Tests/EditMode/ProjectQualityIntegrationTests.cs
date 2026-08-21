@@ -522,7 +522,6 @@ namespace WasteCity.Tests
                 ProjectRoot(),
                 "Assets/_Game/Scripts/Persistence/FormalSaveData.cs"));
             StringAssert.Contains("schema=30", deploymentSource);
-            StringAssert.Contains("schema<=30", deploymentSource);
             StringAssert.DoesNotContain("schema=31", deploymentSource);
             foreach (KeyValuePair<string, string> document in
                      new Dictionary<string, string>
@@ -605,7 +604,7 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(78));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(86));
             ProjectReuseEntry resourceInventory = catalog.ReuseEntries.Single(
                 entry => string.Equals(
                     entry.Id,

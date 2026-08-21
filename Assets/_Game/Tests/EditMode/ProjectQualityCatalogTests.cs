@@ -211,7 +211,7 @@ namespace WasteCity.Tests
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
                 "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
-                "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**",
+                "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
                 "frozen-2d-regression|先检查冻结二维基线、历史场景和回归约束|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Building/PlaceholderBuildingController.cs|Assets/_Game/Scenes/FormalPrototype.unity",
@@ -362,6 +362,244 @@ namespace WasteCity.Tests
                 .All(entry => entry.ReuseLevel == ProjectReuseLevel.SceneOnly),
                 Is.True,
                 "Scene-specific system menu View must not be promoted to general reuse.");
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsFormal3DSaveSchema31RuntimeAndEntryBoundaries()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(86));
+
+            ProjectFeatureGroup persistence = FindFeature(
+                catalog,
+                "persistence-migration");
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
+            }, persistence.SourceGlobs);
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+            }, persistence.TestFileGlobs);
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
+                "Assets/_Game/Scenes/FormalPrototype.unity",
+            }, persistence.ScenePaths);
+
+            ProjectReuseEntry envelope = FindReuse(
+                catalog,
+                "formal-save-envelope-schema-31");
+            Assert.That(envelope.FeatureGroupId,
+                Is.EqualTo("persistence-migration"));
+            CollectionAssert.AreEqual(new[]
+            {
+                "FormalSaveCheckpointMetadata",
+                "FormalSaveEnvelope",
+                "FormalSaveDecodeResult",
+                "FormalSaveCodec",
+                "FormalSaveValidationResult",
+                "FormalSaveValidator",
+                "FormalThreeDWorldSaveData",
+                "FormalThreeDBuildingsSaveData",
+                "FormalThreeDStorageSaveData",
+                "FormalThreeDWarehouseSaveData",
+                "FormalThreeDBackpackSaveData",
+                "FormalThreeDCraftingSaveData",
+                "FormalThreeDCraftingExecutionSaveData",
+                "FormalThreeDResearchSaveData",
+                "FormalThreeDProductionSaveData",
+                "FormalThreeDProductionStateSaveData",
+                "FormalThreeDDefenseSaveData",
+                "FormalThreeDEvacuationSaveData",
+                "FormalThreeDEvacuationRuntimePayloadSaveData",
+            }, envelope.TypeNames);
+            string[] expectedFormalThreeDDtoTypes =
+            {
+                "FormalThreeDSaveData",
+                "FormalThreeDWorldSaveData",
+                "FormalThreeDResourceNodeSaveData",
+                "FormalThreeDResourceAmountSaveData",
+                "FormalThreeDOrphanResourceSaveData",
+                "FormalThreeDCitySaveData",
+                "FormalThreeDBuildingsSaveData",
+                "FormalThreeDBuildingInstanceSaveData",
+                "FormalThreeDStorageSaveData",
+                "FormalThreeDWarehouseSaveData",
+                "FormalThreeDBackpackSaveData",
+                "FormalThreeDBackpackSlotSaveData",
+                "FormalThreeDCraftingSaveData",
+                "FormalThreeDCraftingExecutionSaveData",
+                "FormalThreeDResearchSaveData",
+                "FormalThreeDProductionSaveData",
+                "FormalThreeDProductionStateSaveData",
+                "FormalThreeDDefenseSaveData",
+                "FormalThreeDDefenseTowerSaveData",
+                "FormalThreeDDefenseEnemySaveData",
+                "FormalThreeDEvacuationSaveData",
+                "FormalThreeDEvacuationBatchContextSaveData",
+                "FormalThreeDEvacuationWorkSaveData",
+                "FormalThreeDEvacuationRuntimePayloadSaveData",
+                "FormalThreeDPauseSaveData",
+            };
+            string formalThreeDDtoPath = Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scripts/Persistence/ThreeD/" +
+                "FormalThreeDSaveData.cs");
+            Assert.That(File.Exists(formalThreeDDtoPath), Is.True);
+            string formalThreeDDtoSource = File.ReadAllText(
+                formalThreeDDtoPath);
+            string[] actualFormalThreeDDtoTypes = Regex.Matches(
+                    formalThreeDDtoSource,
+                    @"public\s+sealed\s+class\s+(FormalThreeD\w+)")
+                .Cast<Match>()
+                .Select(match => match.Groups[1].Value)
+                .ToArray();
+            CollectionAssert.AreEqual(
+                expectedFormalThreeDDtoTypes,
+                actualFormalThreeDDtoTypes,
+                "The source-level schema 31 DTO inventory must remain " +
+                "complete even when field-only DTOs are not emitted by " +
+                "the project snapshot scanner.");
+            CollectionAssert.DoesNotContain(
+                envelope.TypeNames,
+                "FormalSaveData",
+                "Legacy schema 1-30 DTO must remain a separate reuse entry.");
+            CollectionAssert.Contains(
+                envelope.AssetPaths,
+                "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs");
+            var fixtureContracts = new Dictionary<string, string>
+            {
+                {
+                    "Assets/_Game/Tests/Fixtures/Persistence/schema-01-legacy-2d.json",
+                    "\"schema\": 1"
+                },
+                {
+                    "Assets/_Game/Tests/Fixtures/Persistence/schema-30-legacy-2d.json",
+                    "\"schema\": 30"
+                },
+                {
+                    "Assets/_Game/Tests/Fixtures/Persistence/schema-31-formal-3d.json",
+                    "\"saveSchemaVersion\": 31"
+                },
+                {
+                    "Assets/_Game/Tests/Fixtures/Persistence/schema-31-invalid-cross-reference.json",
+                    "\"saveSchemaVersion\": 31"
+                },
+                {
+                    "Assets/_Game/Tests/Fixtures/Persistence/schema-32-future.json",
+                    "\"saveSchemaVersion\": 32"
+                },
+            };
+            foreach (KeyValuePair<string, string> fixture in
+                     fixtureContracts)
+            {
+                string path = Path.Combine(ProjectRoot(), fixture.Key);
+                Assert.That(File.Exists(path), Is.True, fixture.Key);
+                StringAssert.Contains(
+                    fixture.Value,
+                    File.ReadAllText(path),
+                    fixture.Key);
+                CollectionAssert.DoesNotContain(
+                    envelope.AssetPaths,
+                    fixture.Key,
+                    "Fixtures are test evidence, not scanner source assets.");
+            }
+
+            ProjectReuseEntry store = FindReuse(
+                catalog,
+                "formal-save-store-transaction");
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "FormalSaveFileTransaction",
+                "FormalSaveStore",
+            }, store.TypeNames);
+            StringAssert.Contains(".bak", store.UseSummary);
+            StringAssert.Contains("原子", store.UseSummary);
+
+            ProjectReuseEntry checkpoint = FindReuse(
+                catalog,
+                "formal-save-checkpoint-policy");
+            CollectionAssert.Contains(
+                checkpoint.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs");
+            StringAssert.Contains("每帧", checkpoint.BoundarySummary);
+
+            ProjectReuseEntry worldCity = FindReuse(
+                catalog,
+                "graybox-world-city-save-adapter-3d");
+            CollectionAssert.AreEqual(
+                new[] { "GrayboxWorldCitySaveAdapter3D" },
+                worldCity.TypeNames);
+            CollectionAssert.Contains(
+                worldCity.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs");
+
+            ProjectReuseEntry coordinator = FindReuse(
+                catalog,
+                "graybox-formal-save-coordinator-3d");
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxFormalControllerRebuilder3D",
+                "GrayboxFormalPauseSaveDomain3D",
+                "GrayboxFormalSaveCoordinatorResult3D",
+                "GrayboxFormalSaveCoordinator3D",
+            }, coordinator.TypeNames);
+            CollectionAssert.Contains(
+                coordinator.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs");
+            StringAssert.Contains("回滚", coordinator.BoundarySummary);
+
+            ProjectReuseEntry runtimeHost = FindReuse(
+                catalog,
+                "graybox-formal-save-runtime-host-3d");
+            Assert.That(runtimeHost.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            CollectionAssert.IsSubsetOf(new[]
+            {
+                "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
+            }, runtimeHost.RequiredTestFiles);
+
+            ProjectReuseEntry entry = FindReuse(
+                catalog,
+                "graybox-formal-save-entry-controller-3d");
+            Assert.That(entry.FeatureGroupId, Is.EqualTo("ui-input"));
+            Assert.That(entry.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.SceneOnly));
+            StringAssert.Contains("真实 UGUI 输入主循环",
+                entry.BoundarySummary);
+
+            ProjectUiEntry ui = FindUi(
+                catalog,
+                "graybox-formal-save-entry");
+            Assert.That(ui.OwnerTypeName,
+                Is.EqualTo("GrayboxFormalSaveEntryController3D"));
+            Assert.That(ui.SceneId, Is.EqualTo("graybox-prototype-3d"));
+            CollectionAssert.Contains(
+                ui.RequiredTestFiles,
+                "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs");
+
+            ProjectReuseEntry legacy = FindReuse(
+                catalog,
+                "formal-save-data");
+            StringAssert.Contains("legacy 2D", legacy.UseSummary);
+            StringAssert.Contains("schema 1–30", legacy.UseSummary);
+            StringAssert.Contains("不承载 schema 31", legacy.BoundarySummary);
+            Assert.That(
+                FindReuse(catalog, "formal-prototype-frozen").ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.FrozenRegression));
         }
 
         [Test]

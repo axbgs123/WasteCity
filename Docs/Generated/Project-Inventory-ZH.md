@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`8a067628a1e8072f329f6d05e84db1f9459d16340258da1c2233ad14da2101f6`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`091becd253a603e92fe1fe0fa0ba8b9890513799cc44ad50daad16bb522afb33`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -55,6 +55,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
@@ -207,10 +209,16 @@
 - `Assets/_Game/Scripts/Leader/FormalLeaderController.cs`
 - `Assets/_Game/Scripts/Leader/LeaderModel.cs`
 - 持久化与迁移（`persistence-migration`）：
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveCheckpointPolicy.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveController.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveData.cs`
@@ -288,6 +296,7 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsModel3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`
@@ -352,6 +361,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFormalMixedProfilerHeartbeat3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxFormalSaveRuntimeHost3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxProductionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
@@ -366,6 +376,7 @@
 - `WasteCity.Graybox3D.GrayboxUrpScope`：`Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs`
 - `WasteCity.Graybox3D.GrayboxVisualSlot`：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`
 - `WasteCity.Graybox3D.GrayboxWorldView3D`：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
+- `WasteCity.Graybox3D.Usability.GrayboxFormalSaveEntryController3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
 - `WasteCity.Graybox3D.Usability.GrayboxSystemMenuController3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuController3D.cs`
 - `WasteCity.Graybox3D.Usability.GrayboxSystemMenuView3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuView3D.cs`
 - `WasteCity.Graybox3D.Usability.GrayboxUsabilityInputCoordinator3D`：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`
@@ -402,6 +413,7 @@
 ## 7. 界面所有者
 - 灰盒建筑菜单：`GrayboxBuildingMenuView3D`，场景 `graybox-prototype-3d`
 - 灰盒首版防御 HUD：`GrayboxDefenseHudView3D`，场景 `graybox-prototype-3d`
+- 正式三维存档启动与退出入口：`GrayboxFormalSaveEntryController3D`，场景 `graybox-prototype-3d`
 - 灰盒输入路由：`GrayboxInputRouter`，场景 `graybox-prototype-3d`
 - 灰盒系统菜单：`GrayboxSystemMenuView3D`，场景 `graybox-prototype-3d`
 - 灰盒易用性输入协调器：`GrayboxUsabilityInputCoordinator3D`，场景 `graybox-prototype-3d`
@@ -422,6 +434,7 @@
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureBuildingPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFirstArtTerrainPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFormalEvacuationMixedPerformance`
+- `WasteCity.Editor.GrayboxPerformanceProbe.MeasureFormalSavePersistencePerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureRuinsCliffPerformance`
 - `WasteCity.Editor.GrayboxPerformanceProbe.MeasureWorldGeneration`
 - `WasteCity.Editor.GrayboxPerformanceProbe.PrepareFormalEvacuationMixedProfilerCapture`

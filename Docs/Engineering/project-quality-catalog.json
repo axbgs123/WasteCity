@@ -420,13 +420,21 @@
       "ChineseName": "持久化与迁移",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs"
       ],
       "PrimarySourceGlobs": [
-        "Assets/_Game/Scripts/Persistence/**"
+        "Assets/_Game/Scripts/Persistence/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs"
       ],
       "FailureLocationSummary": "先检查存档格式、迁移步骤和读写边界",
       "TestFileGlobs": [
@@ -434,13 +442,21 @@
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs"
       ],
       "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
         "Assets/_Game/Scenes/FormalPrototype.unity"
       ],
       "RequirementIds": [
@@ -2305,6 +2321,187 @@
       ]
     },
     {
+      "Id": "formal-save-envelope-schema-31",
+      "ChineseName": "正式三维存档信封、编码与语义验证",
+      "TypeNames": [
+        "FormalSaveCheckpointMetadata",
+        "FormalSaveEnvelope",
+        "FormalSaveDecodeResult",
+        "FormalSaveCodec",
+        "FormalSaveValidationResult",
+        "FormalSaveValidator",
+        "FormalThreeDWorldSaveData",
+        "FormalThreeDBuildingsSaveData",
+        "FormalThreeDStorageSaveData",
+        "FormalThreeDWarehouseSaveData",
+        "FormalThreeDBackpackSaveData",
+        "FormalThreeDCraftingSaveData",
+        "FormalThreeDCraftingExecutionSaveData",
+        "FormalThreeDResearchSaveData",
+        "FormalThreeDProductionSaveData",
+        "FormalThreeDProductionStateSaveData",
+        "FormalThreeDDefenseSaveData",
+        "FormalThreeDEvacuationSaveData",
+        "FormalThreeDEvacuationRuntimePayloadSaveData"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalSaveEnvelope.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs",
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31 和未来版本，提供确定性编码、payload hash、结构校验与高价值跨引用语义校验；复用固定 fixtures 验证兼容、损坏和未来版本边界。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec 与纯验证，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；schema 31 不写入 FormalSaveData，schema 1 与 30 不升级成正式 3D，当前不提供旧档迁移。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001",
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "formal-save-store-transaction",
+      "ChineseName": "正式单槽存档与文件事务",
+      "TypeNames": [
+        "FormalSaveFileTransactionResult",
+        "FormalSaveFileTransaction",
+        "SystemFormalSaveFileSystem",
+        "FormalSaveStoreResult",
+        "FormalSaveStore"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalSaveFileTransaction.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveStore.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "通过统一单槽 formal-world.json、有效主档与 .bak 回退、同目录临时文件复读验证和原子替换提交正式 3D 存档，并把旧 2D、未来 schema、损坏和磁盘故障映射为稳定结构化结果。",
+      "BoundarySummary": "只拥有路径、时间戳、编码后的字节和文件事务；不捕获或应用领域状态，不决定自动检查点，不把 legacy 2D 直接当作 schema 31，也不向 UI 硬编码玩法文案。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "DOC-0001",
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "formal-save-checkpoint-policy",
+      "ChineseName": "正式三维自动检查点策略",
+      "TypeNames": [
+        "FormalSaveCheckpointPolicy"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalSaveCheckpointPolicy.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按稳定原因与事件键合并自动检查点，维护 sequence、已完成一次性里程碑、失败保留和明确 Flush 边界，并允许恢复检查点基线。",
+      "BoundarySummary": "只拥有检查点意图与历史高水位，不自行 capture、写盘、重试每帧或决定玩家文案；保存回调、规则时间和事件订阅必须由正式运行时显式注入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-world-city-save-adapter-3d",
+      "ChineseName": "三维世界与移动城市存档适配器",
+      "TypeNames": [
+        "GrayboxWorldCitySaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从显式提供的 GrayboxSceneBootstrap、移动城市控制器与建筑会话捕获并恢复 schema 31 的确定性世界身份、城市位置、朝向、模式、展开/收起活动转换和规则时间。",
+      "BoundarySummary": "只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；恢复必须复用当前正式世界和城市公开恢复边界，不重新生成另一份世界。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0014",
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-formal-save-coordinator-3d",
+      "ChineseName": "正式三维存档领域协调器",
+      "TypeNames": [
+        "GrayboxFormalControllerRebuilder3D",
+        "GrayboxFormalPauseSaveDomain3D",
+        "GrayboxFormalSaveCoordinatorResult3D",
+        "GrayboxFormalSaveCoordinator3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按 world/city、building/storage、economy、production、defense、evacuation、pause 固定顺序协调 schema 31 capture 与恢复，先完整验证，再事务式应用，失败时回滚权威领域并在成功提交后统一重建派生状态。",
+      "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-formal-save-runtime-host-3d",
+      "ChineseName": "正式三维存档运行时主机",
+      "TypeNames": [
+        "GrayboxFormalSaveRuntimeHost3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "在 GrayboxPrototype3D 组合统一 store、七领域 coordinator、自动检查点、继续游戏、新游戏和保存退出，并在无待处理检查点时保持 LateUpdate 零写盘。",
+      "BoundarySummary": "只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案、领域 DTO 规则或第二套存档；测试路径覆盖必须外置并恢复，自动检查点失败不能伪装成已保存。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-formal-save-entry-controller-3d",
+      "ChineseName": "正式三维存档启动与退出入口",
+      "TypeNames": [
+        "GrayboxFormalSaveEntryController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "把正式 store/coordinator 的结构化结果映射为启动页继续、新游戏覆盖确认、自动存档警告和保存退出反馈，并通过既有系统菜单与输入协调器阻断未进入游戏时的世界输入。",
+      "BoundarySummary": "只拥有 GrayboxPrototype3D 的玩家入口状态与中文反馈，不读写文件、不持有 schema DTO、不绕过 runtime host，也不接入冻结 2D；继续、覆盖与退出必须经过真实 UGUI 输入主循环验证。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015"
+      ]
+    },
+    {
       "Id": "formal-save-data",
       "ChineseName": "正式存档数据",
       "TypeNames": [
@@ -2315,8 +2512,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于保存正式存档字段。",
-      "BoundarySummary": "变更需要兼容性评审。",
+      "UseSummary": "只用于读取和写回 legacy 2D schema 1–30 的历史 FormalSaveData 字段，并继续支撑冻结二维回归。",
+      "BoundarySummary": "这是 legacy 2D 身份，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何变更仍需兼容性评审。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs"
       ],
@@ -2419,6 +2616,18 @@
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
+      ]
+    },
+    {
+      "Id": "graybox-formal-save-entry",
+      "ChineseName": "正式三维存档启动与退出入口",
+      "OwnerTypeName": "GrayboxFormalSaveEntryController3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "启动页打开时阻断世界输入，只允许继续、新游戏和覆盖确认；进入游戏后保存退出复用系统菜单，并显示结构化错误与自动检查点警告。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
       ]
     },
     {

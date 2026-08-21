@@ -118,11 +118,11 @@
 
 ### 三维冻结撤离存档适配器（复用前审查）
 
-能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：从显式提供的 `GrayboxEvacuationController3D` 捕获确定性 DTO；恢复时先验证冻结 work 与队列顺序、未提交队列后缀、建筑会话锁、生产与防御载荷所有权、聚合资源和稳定阻塞码，再生成绑定 controller generation 与 session revision 的一次性计划并提交。未知建筑定义占位可保留无法解释的聚合资源载荷，已知普通建筑不得伪造无运行时所有者的资源载荷。不能负责什么：只负责撤离持久状态、DTO 映射和两阶段恢复边界；不创建或重算撤离 work、退款、容量、生产、防御、物流和建筑资格，不拥有文件 IO、检查点、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。当前状态为已实现待验证，不代表人工试玩、真实 Windows 或全量回归已经完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
+能解决什么：把正式三维撤离控制器的冻结批次映射到 schema 31，并安全恢复 work、建筑锁、运行时载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`。怎么复用：把正式三维撤离控制器的冻结批次确定性映射到 schema 31，保留 work、建筑锁、生产与防御载荷、稳定队列、批次高水位、剩余时间和容量阻塞身份，并通过绑定 controller generation 与 session revision 的计划执行两阶段恢复。不能负责什么：只负责撤离持久状态、FormalThreeD DTO 映射和恢复边界；不重算 work、退款、容量、运行时载荷、生产、防御、物流或建筑资格，不拥有文件 IO、恢复总协调、场景搜索、UI 或表现，也不接入冻结 2D。未知定义占位可保留聚合资源载荷，已知普通建筑拒绝无所有者载荷。当前为已实现待验证，不代表人工、Windows 或全量验证已完成。改后跑哪组测试：`GrayboxFormalSaveEvacuationTests`、`GrayboxEvacuationTests`。代码名：`GrayboxEvacuationPayloadPersistenceState3D`、`GrayboxEvacuationPersistenceState3D`、`GrayboxEvacuationRestorePlan3D`、`GrayboxEvacuationSaveAdapter3D`。
 
 ### 三维正式撤离协调与只读视图（仅限场景）
 
-能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。
+能解决什么：在正式三维场景中协调冻结撤离批次、内部物资迁移、稳定队列和只读清单。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`。怎么复用：在正式 3D 场景编排冻结撤离批次、稳定队列、内部载荷捕获、城市原子提交、运行时完成或遗弃，并发布不可变清单和队列 view。不能负责什么：只消费生产与防御运行时拥有的内部载荷，不拥有或重算载荷、退款、容量、战斗或物流真值；失败保留原 work 与锁供重试，不进入 schema 30、不接入冻结 2D，遗弃废墟不是前哨。改后跑哪组测试：`GrayboxEvacuationTests`、`GrayboxFormalSaveEvacuationTests`、`GrayboxBuildingUiAndInputTests`、`GrayboxFormalEvacuationVerticalSliceTests`。代码名：`EvacuationManifestItemViewModel`、`EvacuationManifestViewModel`、`EvacuationQueueViewModel`、`GrayboxEvacuationController3D`。
 
 ### 三维建筑共享运行与物流资格（推荐复用）
 
@@ -278,7 +278,35 @@
 
 ### 正式存档数据（复用前审查）
 
-能解决什么：保存正式存档字段。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：用于保存正式存档字段。变更需要兼容性评审。不能负责什么：不替代存档迁移方案。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
+能解决什么：保持 schema `1–30` 旧 2D payload 的历史身份与冻结回归能力。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveData.cs`。怎么复用：只用于读取和写回 legacy 2D schema 1–30 的历史 FormalSaveData 字段，并继续支撑冻结二维回归。不能负责什么：这是 legacy 2D 身份，不承载 schema 31 正式 3D payload，不得作为新 3D 功能起点，也不提供 2D 到 3D 的正式迁移；任何变更仍需兼容性评审。改后跑哪组测试：`FormalSaveTests`。代码名：`FormalSaveData`。
+
+### 正式三维存档信封、编码与语义验证（复用前审查）
+
+能解决什么：统一识别 legacy 2D、正式 3D 和未来版本，并对 schema `31` 做确定性编码与完整语义验证。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveEnvelope.cs`、`Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`、`Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs`、`Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs`。怎么复用：以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31 和未来版本，提供确定性编码、payload hash、结构校验与高价值跨引用语义校验；复用固定 fixtures 验证兼容、损坏和未来版本边界。不能负责什么：只定义存档身份、DTO 信封、codec 与纯验证，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；schema 31 不写入 FormalSaveData，schema 1 与 30 不升级成正式 3D，当前不提供旧档迁移。改后跑哪组测试：`FormalSaveEnvelopeTests`、`FormalSaveValidatorTests`。代码名：`FormalSaveCheckpointMetadata`、`FormalSaveEnvelope`、`FormalSaveDecodeResult`、`FormalSaveCodec`、`FormalSaveValidationResult`、`FormalSaveValidator`、`FormalThreeDWorldSaveData`、`FormalThreeDBuildingsSaveData`、`FormalThreeDStorageSaveData`、`FormalThreeDWarehouseSaveData`、`FormalThreeDBackpackSaveData`、`FormalThreeDCraftingSaveData`、`FormalThreeDCraftingExecutionSaveData`、`FormalThreeDResearchSaveData`、`FormalThreeDProductionSaveData`、`FormalThreeDProductionStateSaveData`、`FormalThreeDDefenseSaveData`、`FormalThreeDEvacuationSaveData`、`FormalThreeDEvacuationRuntimePayloadSaveData`。
+
+### 正式单槽存档与文件事务（复用前审查）
+
+能解决什么：通过单槽、备份和原子文件事务保护正式 3D 存档，并返回稳定的结构化故障。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveFileTransaction.cs`、`Assets/_Game/Scripts/Persistence/FormalSaveStore.cs`。怎么复用：通过统一单槽 formal-world.json、有效主档与 .bak 回退、同目录临时文件复读验证和原子替换提交正式 3D 存档，并把旧 2D、未来 schema、损坏和磁盘故障映射为稳定结构化结果。不能负责什么：只拥有路径、时间戳、编码后的字节和文件事务；不捕获或应用领域状态，不决定自动检查点，不把 legacy 2D 直接当作 schema 31，也不向 UI 硬编码玩法文案。改后跑哪组测试：`FormalSaveFileTransactionTests`、`GrayboxFormalSaveRuntimeInputTests`。代码名：`FormalSaveFileTransactionResult`、`FormalSaveFileTransaction`、`SystemFormalSaveFileSystem`、`FormalSaveStoreResult`、`FormalSaveStore`。
+
+### 正式三维自动检查点策略（复用前审查）
+
+能解决什么：把正式玩法事件合并成可持久恢复、失败可保留的有序检查点请求。在哪里：`Assets/_Game/Scripts/Persistence/FormalSaveCheckpointPolicy.cs`。怎么复用：按稳定原因与事件键合并自动检查点，维护 sequence、已完成一次性里程碑、失败保留和明确 Flush 边界，并允许恢复检查点基线。不能负责什么：只拥有检查点意图与历史高水位，不自行 capture、写盘、重试每帧或决定玩家文案；保存回调、规则时间和事件订阅必须由正式运行时显式注入。改后跑哪组测试：`GrayboxFormalSaveCheckpointTests`、`GrayboxFormalSaveRuntimeHostTests`。代码名：`FormalSaveCheckpointPolicy`。
+
+### 三维世界与移动城市存档适配器（复用前审查）
+
+能解决什么：在 schema `31` 与既有三维世界、移动城市权威状态之间做确定性捕获和恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`。怎么复用：从显式提供的 GrayboxSceneBootstrap、移动城市控制器与建筑会话捕获并恢复 schema 31 的确定性世界身份、城市位置、朝向、模式、展开/收起活动转换和规则时间。不能负责什么：只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；恢复必须复用当前正式世界和城市公开恢复边界，不重新生成另一份世界。改后跑哪组测试：`GrayboxFormalSaveWorldCityTests`。代码名：`GrayboxWorldCitySaveAdapter3D`。
+
+### 正式三维存档领域协调器（复用前审查）
+
+能解决什么：按七领域固定顺序协调完整快照和带回滚的事务式恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`。怎么复用：按 world/city、building/storage、economy、production、defense、evacuation、pause 固定顺序协调 schema 31 capture 与恢复，先完整验证，再事务式应用，失败时回滚权威领域并在成功提交后统一重建派生状态。不能负责什么：只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。改后跑哪组测试：`GrayboxFormalSaveCoordinatorTests`、`GrayboxFormalSaveCheckpointTests`、`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxFormalControllerRebuilder3D`、`GrayboxFormalPauseSaveDomain3D`、`GrayboxFormalSaveCoordinatorResult3D`、`GrayboxFormalSaveCoordinator3D`。
+
+### 正式三维存档运行时主机（仅限场景）
+
+能解决什么：在正式三维场景组合唯一存档运行时并承接事件驱动检查点。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`。怎么复用：在 GrayboxPrototype3D 组合统一 store、七领域 coordinator、自动检查点、继续游戏、新游戏和保存退出，并在无待处理检查点时保持 LateUpdate 零写盘。不能负责什么：只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案、领域 DTO 规则或第二套存档；测试路径覆盖必须外置并恢复，自动检查点失败不能伪装成已保存。改后跑哪组测试：`GrayboxFormalSaveRuntimeHostTests`、`GrayboxFormalSaveRuntimeInputTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxFormalSaveRuntimeHost3D`。
+
+### 正式三维存档启动与退出入口（仅限场景）
+
+能解决什么：把正式存档结果转为启动页、覆盖确认、检查点警告和退出反馈，并正确阻断世界输入。在哪里：`Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`。怎么复用：把正式 store/coordinator 的结构化结果映射为启动页继续、新游戏覆盖确认、自动存档警告和保存退出反馈，并通过既有系统菜单与输入协调器阻断未进入游戏时的世界输入。不能负责什么：只拥有 GrayboxPrototype3D 的玩家入口状态与中文反馈，不读写文件、不持有 schema DTO、不绕过 runtime host，也不接入冻结 2D；继续、覆盖与退出必须经过真实 UGUI 输入主循环验证。改后跑哪组测试：`GrayboxFormalSaveUiAndInputTests`、`GrayboxFormalSaveRuntimeInputTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxFormalSaveEntryController3D`。
 
 ## 3D 表现与美术
 
@@ -334,7 +362,7 @@
 
 ### 灰盒性能探针（仅限场景）
 
-能解决什么：采集灰盒性能数据，并对生产、防御和撤离同时运行的正式混合负载留下可重复证据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：用于采集灰盒性能数据，并执行 IDEA-0014 活跃生产、八敌、防御 HUD、撤离 UI 的 300 稳定帧混合探针、GUI 捕获和正式汇总。不能负责什么：只用于可重复验证和正式 Marker 取证，不改变玩法真值、不作为发布版本逻辑，也不替代用户试玩或真实 Windows GPU、显存和内存验收。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`、`GrayboxFormalEvacuationPerformanceTests`。代码名：`GrayboxPerformanceProbe`。
+能解决什么：采集灰盒性能数据，并为正式撤离混合负载与 schema `31` 存档建立可重复的分配、事务和 Marker 证据。在哪里：`Assets/_Game/Editor/GrayboxPerformanceProbe.cs`。怎么复用：用于采集灰盒性能数据，并执行 IDEA-0014 活跃生产、八敌、防御 HUD、撤离 UI 的 300 稳定帧混合探针、GUI 捕获和正式汇总。IDEA-0015 继续通过该探针采集连续 20 次完整 capture、单次快照/文件事务分配预算、五类存档操作 Marker 与 300 次 idle callback 稳定观察。不能负责什么：只用于可重复验证和正式 Marker 取证，不改变玩法真值、不作为发布版本逻辑，也不替代用户试玩或真实 Windows GPU、显存和内存验收。同步 callback 观察不能冒充真实 300 PlayMode 帧，真实帧、场景重载和写盘稳定性由 `GrayboxFormalSaveRoundTripTests` 证明。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`、`GrayboxFormalEvacuationPerformanceTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxPerformanceProbe`。
 
 ## 冻结或禁止用于新功能的旧内容
 
