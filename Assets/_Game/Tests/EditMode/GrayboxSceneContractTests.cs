@@ -736,6 +736,42 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0015_SceneHasOneSerializedFormalSaveEntryContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            Type entryType = typeof(GrayboxSystemMenuController3D).Assembly
+                .GetType(
+                    "WasteCity.Graybox3D.Usability." +
+                    "GrayboxFormalSaveEntryController3D",
+                    false);
+            Assert.That(entryType, Is.Not.Null);
+
+            Object[] entries = Object.FindObjectsOfType(entryType, true);
+            Assert.That(entries, Has.Length.EqualTo(1));
+            var entry = entries[0] as Component;
+            Assert.That(entry, Is.Not.Null);
+            Assert.That(
+                entry.transform.parent.name,
+                Is.EqualTo("GrayboxSystems"));
+
+            GrayboxUsabilityInputCoordinator3D coordinator =
+                Object.FindObjectOfType<
+                    GrayboxUsabilityInputCoordinator3D>(true);
+            GrayboxFormalSaveRuntimeHost3D formalSaveHost =
+                Object.FindObjectOfType<
+                    GrayboxFormalSaveRuntimeHost3D>(true);
+            Assert.That(coordinator, Is.Not.Null);
+            Assert.That(formalSaveHost, Is.Not.Null);
+            var serializedCoordinator = new SerializedObject(coordinator);
+            SerializedProperty entryReference = serializedCoordinator
+                .FindProperty("formalSaveEntry");
+            Assert.That(entryReference, Is.Not.Null);
+            Assert.That(
+                entryReference.objectReferenceValue,
+                Is.SameAs(entry));
+        }
+
+        [Test]
         public void IDEA0011_SceneHasSerializedOperationsUiContract()
         {
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -944,6 +980,9 @@ namespace WasteCity.Tests
             GrayboxUsabilityInputCoordinator3D coordinator =
                 Object.FindObjectOfType<
                     GrayboxUsabilityInputCoordinator3D>(true);
+            GrayboxFormalSaveRuntimeHost3D formalSaveHost =
+                Object.FindObjectOfType<
+                    GrayboxFormalSaveRuntimeHost3D>(true);
 
             Assert.That(evacuations, Has.Length.EqualTo(1));
             Assert.That(
@@ -954,17 +993,19 @@ namespace WasteCity.Tests
             Assert.That(buildingInput, Is.Not.Null);
             Assert.That(operations, Is.Not.Null);
             Assert.That(coordinator, Is.Not.Null);
+            Assert.That(formalSaveHost, Is.Not.Null);
 
             GrayboxEvacuationController3D evacuation = evacuations[0];
             AssertReference(evacuation, "production", production);
             AssertReference(evacuation, "defense", defense);
             AssertReference(buildingInput, "evacuation", evacuation);
+            AssertReference(formalSaveHost, "evacuation", evacuation);
             AssertReference(coordinator, "operations", operations);
             Assert.That(
                 CountSerializedReferencesTo(evacuation),
-                Is.EqualTo(1),
-                "Only the formal building input router may own the " +
-                "serialized evacuation command reference.");
+                Is.EqualTo(2),
+                "Only the formal building input router and save runtime " +
+                "host may reference evacuation commands/state.");
         }
 
         [Test]
@@ -1089,6 +1130,8 @@ namespace WasteCity.Tests
                 "private static void EnsureFirstArtTerrainContract");
             StringAssert.Contains("SystemMenuCanvas", method);
             StringAssert.Contains("GrayboxUsabilityInputCoordinator", method);
+            StringAssert.Contains("GrayboxFormalSaveEntryController", method);
+            StringAssert.Contains("formalSaveEntry", method);
             StringAssert.Contains("inputInterceptor", method);
             StringAssert.DoesNotContain("FindObjectOfType", method);
         }

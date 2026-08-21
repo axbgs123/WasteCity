@@ -7,6 +7,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
+using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence.ThreeD;
 
@@ -42,6 +43,67 @@ namespace WasteCity.Tests
             AssertMethod(type, "TryRestore", 2, typeof(bool));
             AssertMethod(type, "TryPrepareRestore", 3, typeof(bool));
             AssertMethod(type, "TryCommitRestore", 2, typeof(bool));
+        }
+
+        [Test]
+        public void SerializedRuntimeStartsWithRoundTrippableEmptyBatchState()
+        {
+            GrayboxBuildingSession3D session = AddComponent<
+                GrayboxBuildingSession3D>("SerializedEvacuation.Session");
+            session.Configure(true);
+            GrayboxMobileCityController3D city = AddComponent<
+                GrayboxMobileCityController3D>("SerializedEvacuation.City");
+            GrayboxBuildingWorldView3D presentation = AddComponent<
+                GrayboxBuildingWorldView3D>(
+                    "SerializedEvacuation.Presentation");
+            GrayboxBuildingMenuView3D menu = AddComponent<
+                GrayboxBuildingMenuView3D>("SerializedEvacuation.Menu");
+            GrayboxEvacuationController3D controller =
+                AddInactiveComponent<GrayboxEvacuationController3D>(
+                    "SerializedEvacuation.Controller");
+            SetPrivateField(controller, "session", session);
+            SetPrivateField(controller, "city", city);
+            SetPrivateField(controller, "presentation", presentation);
+            SetPrivateField(controller, "menu", menu);
+            controller.gameObject.SetActive(true);
+            InvokePrivate(
+                controller,
+                "RestoreSerializedRuntimeDependencies");
+
+            GrayboxEvacuationPersistenceState3D runtimeState =
+                controller.CaptureForPersistence();
+            FormalThreeDEvacuationSaveData saved = Capture(
+                Adapter(controller));
+
+            Assert.That(runtimeState.NextBatchOrdinal, Is.EqualTo(1));
+            Assert.That(runtimeState.IsProcessing, Is.False);
+            Assert.That(saved.nextBatchOrdinal, Is.EqualTo(1));
+            Assert.That(saved.isProcessing, Is.False);
+            Assert.That(saved.activeBatchId, Is.Empty);
+            Assert.That(saved.batchContext, Is.Null);
+            Assert.That(saved.work, Is.Empty);
+            Assert.That(saved.fullQueueStableInstanceIds, Is.Empty);
+            Assert.That(saved.runtimePayloads, Is.Empty);
+            Assert.That(saved.lockedStableInstanceIds, Is.Empty);
+            Assert.That(saved.pendingRollbackStableInstanceIds, Is.Empty);
+
+            Fixture target = CreateFixture();
+            object targetAdapter = Adapter(target.Controller);
+            Assert.That(
+                TryRestore(targetAdapter, saved, out string error),
+                Is.True,
+                error);
+            FormalThreeDEvacuationSaveData restored = Capture(targetAdapter);
+            Assert.That(restored.nextBatchOrdinal, Is.EqualTo(1));
+            Assert.That(restored.isProcessing, Is.False);
+            Assert.That(restored.activeBatchId, Is.Empty);
+            Assert.That(restored.work, Is.Empty);
+            Assert.That(restored.fullQueueStableInstanceIds, Is.Empty);
+            Assert.That(restored.runtimePayloads, Is.Empty);
+            Assert.That(restored.lockedStableInstanceIds, Is.Empty);
+            Assert.That(
+                restored.pendingRollbackStableInstanceIds,
+                Is.Empty);
         }
 
         [Test]
@@ -760,6 +822,44 @@ namespace WasteCity.Tests
             var value = new GameObject(name);
             cleanup.Add(value);
             return value.AddComponent<T>();
+        }
+
+        private T AddInactiveComponent<T>(string name) where T : Component
+        {
+            var value = new GameObject(name);
+            value.SetActive(false);
+            cleanup.Add(value);
+            return value.AddComponent<T>();
+        }
+
+        private static void SetPrivateField(
+            object owner,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(owner, value);
+        }
+
+        private static void InvokePrivate(
+            object owner,
+            string methodName)
+        {
+            MethodInfo method = owner.GetType().GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, methodName);
+            try
+            {
+                method.Invoke(owner, Array.Empty<object>());
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw exception.InnerException ?? exception;
+            }
         }
 
         private sealed class RecordingPresentation :

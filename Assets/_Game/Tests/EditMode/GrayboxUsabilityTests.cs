@@ -599,7 +599,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0007_ExitConfirmationWarnsAndInvokesExitOnlyOnce()
+        public void IDEA0015_ExitConfirmationOffersSaveAndExit()
         {
             MenuFixture fixture = CreateMenuControllerFixture(withView: true);
             fixture.Controller.Open();
@@ -609,20 +609,16 @@ namespace WasteCity.Tests
             Assert.That(fixture.Store.SaveCount, Is.Zero);
             Assert.That(
                 TextContent(fixture.Canvas.transform),
-                Does.Contain("当前 3D 灰盒进度不会保存"));
+                Does.Contain("保存并退出"));
+            Assert.That(
+                TextContent(fixture.Canvas.transform),
+                Does.Not.Contain("进度不会保存"));
 
             fixture.Controller.CancelExit();
             Assert.That(fixture.Exit.Count, Is.Zero);
             Assert.That(
                 fixture.Controller.Page,
                 Is.EqualTo(GrayboxSystemMenuPage3D.Main));
-
-            fixture.Controller.OpenExitConfirmation();
-            fixture.Controller.ConfirmExit();
-            fixture.Controller.ConfirmExit();
-
-            Assert.That(fixture.Exit.Count, Is.EqualTo(1));
-            Assert.That(fixture.Store.SaveCount, Is.Zero);
         }
 
         [Test]
@@ -636,7 +632,8 @@ namespace WasteCity.Tests
             Assert.That(development, Is.EqualTo(release));
             Assert.That(development, Does.Contain("Main.Continue"));
             Assert.That(development, Does.Contain("Settings.Apply"));
-            Assert.That(development, Does.Contain("Exit.Confirm"));
+            Assert.That(development, Does.Contain("Exit.SaveAndQuit"));
+            Assert.That(development, Does.Not.Contain("Exit.Confirm"));
             Assert.That(
                 development.Any(value => value.IndexOf(
                     "diagnostic",

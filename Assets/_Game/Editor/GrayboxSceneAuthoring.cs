@@ -168,6 +168,7 @@ namespace WasteCity.Editor
             public Transform Ui;
             public Canvas BuildingCanvas;
             public EventSystem EventSystem;
+            public GrayboxSceneBootstrap Bootstrap;
             public GrayboxBuildingSession3D Session;
             public GrayboxMobileCityController3D City;
             public GrayboxDirectControlCoordinator DirectControl;
@@ -178,6 +179,7 @@ namespace WasteCity.Editor
             public GrayboxProductionController3D Production;
             public GrayboxDefenseWorldView3D DefenseWorldView;
             public GrayboxDefenseController3D DefenseController;
+            public GrayboxEvacuationController3D Evacuation;
             public GrayboxBuildingInputRouter3D BuildingInput;
             public GrayboxDeveloperModifierBootstrap3D Developer;
         }
@@ -1018,6 +1020,7 @@ namespace WasteCity.Editor
                 Ui = ui,
                 BuildingCanvas = canvas,
                 EventSystem = eventSystem,
+                Bootstrap = RequireSingle<GrayboxSceneBootstrap>(scene),
                 Session = session,
                 City = city,
                 DirectControl = directControl,
@@ -1028,6 +1031,7 @@ namespace WasteCity.Editor
                 Production = production,
                 DefenseWorldView = defenseWorldView,
                 DefenseController = defenseController,
+                Evacuation = evacuation,
                 BuildingInput = buildingInput,
                 Developer = developer
             };
@@ -1108,13 +1112,44 @@ namespace WasteCity.Editor
             GrayboxUsabilityInputCoordinator3D coordinator =
                 EnsureComponent<GrayboxUsabilityInputCoordinator3D>(
                     coordinatorTransform);
+            Transform formalSaveHostTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxFormalSaveRuntimeHost");
+            GrayboxFormalSaveRuntimeHost3D formalSaveHost =
+                EnsureComponent<GrayboxFormalSaveRuntimeHost3D>(
+                    formalSaveHostTransform);
+            Transform formalSaveEntryTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxFormalSaveEntryController");
+            GrayboxFormalSaveEntryController3D formalSaveEntry =
+                EnsureComponent<GrayboxFormalSaveEntryController3D>(
+                    formalSaveEntryTransform);
 
             SetReferences(
                 view,
                 ("canvas", systemMenuCanvas),
                 ("eventSystem", buildingReferences.EventSystem),
-                ("controller", controller));
+                ("controller", controller),
+                ("formalSaveEntry", formalSaveEntry));
             SetReferences(controller, ("view", view));
+            SetReferences(
+                formalSaveHost,
+                ("bootstrap", buildingReferences.Bootstrap),
+                ("city", buildingReferences.City),
+                ("world", buildingReferences.World),
+                ("session", buildingReferences.Session),
+                ("buildingPresentation",
+                    buildingReferences.BuildingPresentation),
+                ("operations", operationsController),
+                ("production", buildingReferences.Production),
+                ("defense", buildingReferences.DefenseController),
+                ("evacuation", buildingReferences.Evacuation));
+            SetReferences(
+                formalSaveEntry,
+                ("runtimeHost", formalSaveHost),
+                ("view", view),
+                ("systemMenu", controller),
+                ("inputCoordinator", coordinator));
             SetReferences(
                 operationsView,
                 ("canvas", operationsCanvas),
@@ -1153,7 +1188,8 @@ namespace WasteCity.Editor
                 ("systemMenu", controller),
                 ("developer", buildingReferences.Developer),
                 ("operations", operationsController),
-                ("defense", buildingReferences.DefenseController));
+                ("defense", buildingReferences.DefenseController),
+                ("formalSaveEntry", formalSaveEntry));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
@@ -1162,6 +1198,14 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The graybox scene defense HUD is not unique.");
+            }
+            if (RequireSingle<GrayboxFormalSaveRuntimeHost3D>(scene) !=
+                    formalSaveHost ||
+                RequireSingle<GrayboxFormalSaveEntryController3D>(scene) !=
+                    formalSaveEntry)
+            {
+                throw new InvalidOperationException(
+                    "The formal 3D save runtime and entry must be unique.");
             }
 
             EditorSceneManager.MarkSceneDirty(scene);

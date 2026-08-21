@@ -27,10 +27,18 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxOperationsController3D operations;
         [SerializeField]
         private GrayboxDefenseController3D defense;
+        [SerializeField]
+        private GrayboxFormalSaveEntryController3D formalSaveEntry;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
 
         public uint BuildingInputInvocationCount { get; private set; }
+
+        public void ConfigureFormalSaveEntry(
+            GrayboxFormalSaveEntryController3D formalSaveEntry)
+        {
+            this.formalSaveEntry = formalSaveEntry;
+        }
 
         public void Configure(
             GrayboxBuildingInputRouter3D buildingInput,
@@ -89,6 +97,12 @@ namespace WasteCity.Graybox3D.Usability
 
         public GrayboxInputSuppression ProcessCurrentInput()
         {
+            if (formalSaveEntry != null &&
+                formalSaveEntry.BlocksGameplayInput)
+            {
+                return SuppressAll();
+            }
+
             Keyboard keyboard = Keyboard.current;
             bool escapePressed = keyboard != null &&
                 keyboard.escapeKey.wasPressedThisFrame;
@@ -217,6 +231,7 @@ namespace WasteCity.Graybox3D.Usability
             developer = null;
             operations = null;
             defense = null;
+            formalSaveEntry = null;
             developmentPanel = null;
         }
 

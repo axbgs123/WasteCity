@@ -10,6 +10,12 @@ namespace WasteCity.Graybox3D.Usability
     {
         private static readonly string[] VisibleControlIds =
         {
+            "Start.Continue",
+            "Start.NewGame",
+            "Start.NewGameConfirm",
+            "Start.NewGameCancel",
+            "FormalSave.Feedback",
+            "FormalSave.CheckpointWarning",
             "Main.Continue",
             "Main.Settings",
             "Main.Quit",
@@ -20,7 +26,8 @@ namespace WasteCity.Graybox3D.Usability
             "Settings.Defaults",
             "Settings.OperationGuide",
             "Guide.Back",
-            "Exit.Confirm",
+            "Exit.SaveAndQuit",
+            "Exit.QuitWithoutSaving",
             "Exit.Cancel"
         };
 
@@ -30,19 +37,33 @@ namespace WasteCity.Graybox3D.Usability
 
         private RectTransform uiRoot;
         private Image blocker;
+        private Text pausedTitle;
+        private RectTransform startPage;
+        private RectTransform newGameConfirmPage;
         private RectTransform mainPage;
         private RectTransform settingsPage;
         private RectTransform operationGuidePage;
         private RectTransform exitConfirmPage;
+        private Button startContinueButton;
+        private Button startNewGameButton;
+        private Button startNewGameCancelButton;
         private Button continueButton;
         private Dropdown resolutionDropdown;
         private Dropdown windowModeDropdown;
         private Button guideBackButton;
+        private Button exitWithoutSavingButton;
         private Button exitCancelButton;
+        private Text formalSaveFeedback;
+        private RectTransform checkpointWarningRoot;
+        private Text checkpointWarning;
         private bool isOpen;
+        private bool isStartPageOpen;
+        private bool isNewGameConfirmationOpen;
+        [SerializeField]
+        private GrayboxFormalSaveEntryController3D formalSaveEntry;
 
         public bool IsPointerBlockerActive =>
-            isOpen &&
+            (isOpen || isStartPageOpen) &&
             blocker != null &&
             blocker.raycastTarget &&
             blocker.gameObject.activeInHierarchy;
@@ -54,7 +75,7 @@ namespace WasteCity.Graybox3D.Usability
                 GameObject selected = eventSystem == null
                     ? null
                     : eventSystem.currentSelectedGameObject;
-                return isOpen &&
+                return (isOpen || isStartPageOpen) &&
                     uiRoot != null &&
                     selected != null &&
                     selected.transform.IsChildOf(uiRoot);
@@ -97,6 +118,57 @@ namespace WasteCity.Graybox3D.Usability
             this.controller = controller;
         }
 
+        public void ConfigureFormalSaveEntry(
+            GrayboxFormalSaveEntryController3D formalSaveEntry)
+        {
+            this.formalSaveEntry = formalSaveEntry;
+            TryBuildUi();
+        }
+
+        public void RenderStartPage(
+            bool open,
+            bool canContinue,
+            bool newGameConfirmationOpen,
+            string feedbackMessage)
+        {
+            TryBuildUi();
+            isStartPageOpen = open;
+            isNewGameConfirmationOpen =
+                open && newGameConfirmationOpen;
+            if (uiRoot == null) return;
+
+            startPage.gameObject.SetActive(
+                open && !isNewGameConfirmationOpen);
+            newGameConfirmPage.gameObject.SetActive(
+                open && isNewGameConfirmationOpen);
+            startContinueButton.interactable = canContinue;
+            SetFormalSaveFeedback(feedbackMessage);
+            UpdateRootVisibility();
+            if (open)
+                FocusStartPage();
+            else if (!isOpen && eventSystem != null)
+                eventSystem.SetSelectedGameObject(null);
+        }
+
+        public void SetFormalSaveFeedback(string message)
+        {
+            if (formalSaveFeedback == null) return;
+            formalSaveFeedback.text = message ?? string.Empty;
+            formalSaveFeedback.gameObject.SetActive(
+                (isOpen || isStartPageOpen) &&
+                !string.IsNullOrWhiteSpace(formalSaveFeedback.text));
+        }
+
+        public void SetCheckpointWarning(string message)
+        {
+            TryBuildUi();
+            if (checkpointWarning == null || checkpointWarningRoot == null)
+                return;
+            checkpointWarning.text = message ?? string.Empty;
+            checkpointWarningRoot.gameObject.SetActive(
+                !string.IsNullOrWhiteSpace(checkpointWarning.text));
+        }
+
         public void Render(
             bool open,
             GrayboxSystemMenuPage3D page,
@@ -107,7 +179,8 @@ namespace WasteCity.Graybox3D.Usability
             VisiblePage = page;
             if (uiRoot == null) return;
 
-            uiRoot.gameObject.SetActive(open);
+            UpdateRootVisibility();
+            pausedTitle.gameObject.SetActive(open);
             mainPage.gameObject.SetActive(
                 open && page == GrayboxSystemMenuPage3D.Main);
             settingsPage.gameObject.SetActive(
@@ -116,8 +189,13 @@ namespace WasteCity.Graybox3D.Usability
                 open && page == GrayboxSystemMenuPage3D.OperationGuide);
             exitConfirmPage.gameObject.SetActive(
                 open && page == GrayboxSystemMenuPage3D.ExitConfirm);
+            exitWithoutSavingButton.gameObject.SetActive(
+                open && page == GrayboxSystemMenuPage3D.ExitConfirm &&
+                controller.CanExitWithoutSaving);
+            exitWithoutSavingButton.interactable =
+                controller.CanExitWithoutSaving;
 
-            if (!open)
+            if (!open && !isStartPageOpen)
             {
                 if (eventSystem != null)
                     eventSystem.SetSelectedGameObject(null);
@@ -126,7 +204,8 @@ namespace WasteCity.Graybox3D.Usability
 
             if (settings != null)
                 SyncSettings(settings);
-            FocusPage(page);
+            if (open)
+                FocusPage(page);
         }
 
         private void Awake()
@@ -138,13 +217,18 @@ namespace WasteCity.Graybox3D.Usability
         {
             TryBuildUi();
             controller?.RefreshView();
+            formalSaveEntry?.RefreshView();
         }
 
         private void OnDisable()
         {
             isOpen = false;
+            isStartPageOpen = false;
+            isNewGameConfirmationOpen = false;
             if (uiRoot != null)
                 uiRoot.gameObject.SetActive(false);
+            if (checkpointWarningRoot != null)
+                checkpointWarningRoot.gameObject.SetActive(false);
             if (eventSystem != null)
                 eventSystem.SetSelectedGameObject(null);
         }
@@ -155,6 +239,7 @@ namespace WasteCity.Graybox3D.Usability
             canvas = null;
             eventSystem = null;
             controller = null;
+            formalSaveEntry = null;
         }
 
         private void TryBuildUi()
@@ -175,6 +260,24 @@ namespace WasteCity.Graybox3D.Usability
                 "GrayboxSystemMenuUi.Root");
             Stretch(uiRoot);
 
+            checkpointWarningRoot = CreateRect(
+                canvas.transform,
+                "GrayboxFormalSaveCheckpointWarning.Root");
+            PlaceFixed(
+                checkpointWarningRoot,
+                new Vector2(0f, -350f),
+                new Vector2(760f, 48f));
+            var checkpointBackground =
+                checkpointWarningRoot.gameObject.AddComponent<Image>();
+            checkpointBackground.color = new Color(.35f, .08f, .05f, .92f);
+            checkpointBackground.raycastTarget = false;
+            checkpointWarning = CreateLabel(
+                checkpointWarningRoot,
+                "FormalSave.CheckpointWarning",
+                string.Empty);
+            checkpointWarning.fontSize = 17;
+            checkpointWarningRoot.gameObject.SetActive(false);
+
             RectTransform blockerRect = CreateRect(
                 uiRoot,
                 "Modal.Blocker");
@@ -183,15 +286,58 @@ namespace WasteCity.Graybox3D.Usability
             blocker.color = new Color(0f, 0f, 0f, .78f);
             blocker.raycastTarget = true;
 
-            Text title = CreateLabel(
+            pausedTitle = CreateLabel(
                 uiRoot,
                 "Paused.Title",
                 "游戏已暂停");
-            title.fontSize = 28;
+            pausedTitle.fontSize = 28;
             PlaceFixed(
-                (RectTransform)title.transform,
+                (RectTransform)pausedTitle.transform,
                 new Vector2(0f, 260f),
                 new Vector2(500f, 48f));
+            pausedTitle.gameObject.SetActive(false);
+
+            startPage = CreatePage(uiRoot, "Page.Start");
+            Text startTitle = CreateLabel(
+                startPage,
+                "Start.Title",
+                "废土移动城");
+            startTitle.fontSize = 26;
+            startContinueButton = CreateButton(
+                startPage,
+                "Start.Continue",
+                "继续",
+                () => formalSaveEntry?.RequestContinue());
+            startNewGameButton = CreateButton(
+                startPage,
+                "Start.NewGame",
+                "新游戏",
+                () => formalSaveEntry?.RequestNewGame());
+
+            newGameConfirmPage = CreatePage(
+                uiRoot,
+                "Page.StartNewGameConfirm");
+            Text newGameWarning = CreateLabel(
+                newGameConfirmPage,
+                "Start.NewGameWarning",
+                "开始新的 3D 游戏将覆盖当前进度。\n" +
+                "旧版 2D 存档会先安全归档。是否继续？");
+            newGameWarning.fontSize = 18;
+            SetLayout(
+                (RectTransform)newGameWarning.transform,
+                0f,
+                100f,
+                1f);
+            CreateButton(
+                newGameConfirmPage,
+                "Start.NewGameConfirm",
+                "确认开始新游戏",
+                () => formalSaveEntry?.ConfirmNewGame());
+            startNewGameCancelButton = CreateButton(
+                newGameConfirmPage,
+                "Start.NewGameCancel",
+                "取消",
+                () => formalSaveEntry?.CancelNewGame());
 
             mainPage = CreatePage(uiRoot, "Page.Main");
             continueButton = CreateButton(
@@ -276,19 +422,39 @@ namespace WasteCity.Graybox3D.Usability
             Text warning = CreateLabel(
                 exitConfirmPage,
                 "Exit.Warning",
-                "当前 3D 灰盒进度不会保存\n确认退出游戏吗？");
+                "保存并退出会写入当前完整 3D 进度。\n" +
+                "保存失败时游戏会继续运行。");
             warning.fontSize = 18;
             SetLayout((RectTransform)warning.transform, 0f, 100f, 1f);
             CreateButton(
                 exitConfirmPage,
-                "Exit.Confirm",
-                "确认退出",
+                "Exit.SaveAndQuit",
+                "保存并退出",
                 () => controller?.ConfirmExit());
+            exitWithoutSavingButton = CreateButton(
+                exitConfirmPage,
+                "Exit.QuitWithoutSaving",
+                "不保存退出",
+                () => controller?.ConfirmExitWithoutSaving());
             exitCancelButton = CreateButton(
                 exitConfirmPage,
                 "Exit.Cancel",
                 "取消",
                 () => controller?.CancelExit());
+
+            formalSaveFeedback = CreateLabel(
+                uiRoot,
+                "FormalSave.Feedback",
+                string.Empty);
+            formalSaveFeedback.fontSize = 17;
+            PlaceFixed(
+                (RectTransform)formalSaveFeedback.transform,
+                new Vector2(0f, -300f),
+                new Vector2(760f, 54f));
+            formalSaveFeedback.gameObject.SetActive(false);
+
+            startPage.gameObject.SetActive(false);
+            newGameConfirmPage.gameObject.SetActive(false);
         }
 
         private void SyncSettings(GrayboxDisplaySettingsModel3D settings)
@@ -336,6 +502,30 @@ namespace WasteCity.Graybox3D.Usability
             eventSystem.SetSelectedGameObject(target);
         }
 
+        private void FocusStartPage()
+        {
+            if (eventSystem == null) return;
+            GameObject target = isNewGameConfirmationOpen
+                ? startNewGameCancelButton.gameObject
+                : startContinueButton.interactable
+                    ? startContinueButton.gameObject
+                    : startNewGameButton.gameObject;
+            eventSystem.SetSelectedGameObject(target);
+        }
+
+        private void UpdateRootVisibility()
+        {
+            if (uiRoot == null) return;
+            bool visible = isOpen || isStartPageOpen;
+            uiRoot.gameObject.SetActive(visible);
+            if (formalSaveFeedback != null)
+            {
+                formalSaveFeedback.gameObject.SetActive(
+                    visible &&
+                    !string.IsNullOrWhiteSpace(formalSaveFeedback.text));
+            }
+        }
+
         private void RetireStaleRoots()
         {
             for (var index = canvas.transform.childCount - 1;
@@ -343,7 +533,9 @@ namespace WasteCity.Graybox3D.Usability
                  index--)
             {
                 Transform child = canvas.transform.GetChild(index);
-                if (child.name != "GrayboxSystemMenuUi.Root")
+                if (child.name != "GrayboxSystemMenuUi.Root" &&
+                    child.name !=
+                        "GrayboxFormalSaveCheckpointWarning.Root")
                     continue;
                 child.gameObject.SetActive(false);
                 DestroyGenerated(child.gameObject);
@@ -357,18 +549,35 @@ namespace WasteCity.Graybox3D.Usability
                 uiRoot.gameObject.SetActive(false);
                 DestroyGenerated(uiRoot.gameObject);
             }
+            if (checkpointWarningRoot != null)
+            {
+                checkpointWarningRoot.gameObject.SetActive(false);
+                DestroyGenerated(checkpointWarningRoot.gameObject);
+            }
             uiRoot = null;
             blocker = null;
+            pausedTitle = null;
+            startPage = null;
+            newGameConfirmPage = null;
             mainPage = null;
             settingsPage = null;
             operationGuidePage = null;
             exitConfirmPage = null;
+            startContinueButton = null;
+            startNewGameButton = null;
+            startNewGameCancelButton = null;
             continueButton = null;
             resolutionDropdown = null;
             windowModeDropdown = null;
             guideBackButton = null;
+            exitWithoutSavingButton = null;
             exitCancelButton = null;
+            formalSaveFeedback = null;
+            checkpointWarningRoot = null;
+            checkpointWarning = null;
             isOpen = false;
+            isStartPageOpen = false;
+            isNewGameConfirmationOpen = false;
         }
 
         private static RectTransform CreatePage(

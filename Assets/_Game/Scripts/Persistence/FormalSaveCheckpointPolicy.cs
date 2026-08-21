@@ -56,6 +56,7 @@ namespace WasteCity.Persistence
         private bool isSaving;
         private bool isSuppressed;
         private bool hasFailureWarning;
+        private ulong pendingRevision;
 
         public FormalSaveCheckpointPolicy(
             Func<FormalSaveCheckpointMetadata, bool> save,
@@ -77,6 +78,7 @@ namespace WasteCity.Persistence
         public bool IsSaving => isSaving;
         public bool HasFailureWarning => hasFailureWarning;
         public bool IsSuppressed => isSuppressed;
+        public ulong PendingRevision => pendingRevision;
 
         public bool QueueCheckpoint(
             string reasonId,
@@ -104,6 +106,7 @@ namespace WasteCity.Persistence
 
             if (oneShot)
                 pending.MilestoneIds.Add(reasonId);
+            unchecked { pendingRevision++; }
             if (priority > pending.Priority ||
                 priority == pending.Priority &&
                 string.CompareOrdinal(reasonId, pending.ReasonId) < 0)
@@ -187,6 +190,7 @@ namespace WasteCity.Persistence
             committedEventKeys.Clear();
             pending = new PendingBatch();
             hasFailureWarning = false;
+            pendingRevision = 0;
             return true;
         }
 

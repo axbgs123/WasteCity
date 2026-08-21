@@ -1431,6 +1431,8 @@ namespace WasteCity.Graybox3D.Building
 
         private void RestoreSerializedRuntimeDependencies()
         {
+            if (nextBatchOrdinal == 0)
+                nextBatchOrdinal = 1;
             EnsureOperationalRuntimeBindings();
             if (session == null || city == null || presentation == null ||
                 menu == null)

@@ -244,6 +244,97 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void StartNewProgressResetsCreatedAtAndBacksUpPriorProgress()
+        {
+            using (var directory = new TemporaryDirectory())
+            {
+                var clock = new FakeClock(
+                    new DateTime(2031, 2, 3, 4, 5, 6,
+                        DateTimeKind.Utc));
+                var store = new FormalSaveStore(
+                    directory.Path,
+                    null,
+                    clock);
+                FormalSaveEnvelope firstEnvelope = LoadFixtureEnvelope();
+                Assert.That(store.SaveEnvelope(firstEnvelope).Success, Is.True);
+                string primaryPath = Path.Combine(
+                    directory.Path,
+                    FormalSaveStore.FileName);
+                string oldProgress = File.ReadAllText(primaryPath);
+
+                clock.UtcNow = clock.UtcNow.AddHours(2);
+                FormalSaveEnvelope nextEnvelope = LoadFixtureEnvelope();
+                nextEnvelope.formal3D.sessionId = "session-new-progress";
+                FormalSaveStoreResult result = store.SaveEnvelope(
+                    nextEnvelope,
+                    writeIntent: FormalSaveWriteIntent.StartNewProgress);
+
+                Assert.That(result.Success, Is.True, result.Diagnostic);
+                FormalSaveStoreResult loaded = store.Load(
+                    FormalSavePayloadKind.Formal3D);
+                Assert.That(
+                    loaded.Envelope.createdAt,
+                    Is.EqualTo("2031-02-03T06:05:06.0000000Z"));
+                Assert.That(
+                    loaded.Envelope.updatedAt,
+                    Is.EqualTo("2031-02-03T06:05:06.0000000Z"));
+                Assert.That(
+                    loaded.Envelope.formal3D.sessionId,
+                    Is.EqualTo("session-new-progress"));
+                Assert.That(
+                    File.ReadAllText(primaryPath + ".bak"),
+                    Is.EqualTo(oldProgress));
+                FormalSaveDecodeResult backup = FormalSaveCodec.DecodeAny(
+                    File.ReadAllText(primaryPath + ".bak"));
+                Assert.That(backup.Success, Is.True, backup.Message);
+                Assert.That(
+                    backup.Envelope.createdAt,
+                    Is.EqualTo("2031-02-03T04:05:06.0000000Z"));
+            }
+        }
+
+        [Test]
+        public void FailedStartNewProgressKeepsOldSaveAndCallerMetadata()
+        {
+            string directory = Path.GetFullPath(
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "wastecity-new-progress-memory"));
+            string primaryPath = Path.Combine(
+                directory,
+                FormalSaveStore.FileName);
+            var fileSystem = new MemoryFileSystem();
+            var clock = new FakeClock(
+                new DateTime(2031, 2, 3, 4, 5, 6,
+                    DateTimeKind.Utc));
+            var store = new FormalSaveStore(
+                directory,
+                fileSystem,
+                clock);
+            FormalSaveEnvelope firstEnvelope = LoadFixtureEnvelope();
+            Assert.That(store.SaveEnvelope(firstEnvelope).Success, Is.True);
+            string oldProgress = fileSystem.Text(primaryPath);
+
+            clock.UtcNow = clock.UtcNow.AddHours(2);
+            FormalSaveEnvelope nextEnvelope = LoadFixtureEnvelope();
+            string callerCreatedAt = nextEnvelope.createdAt;
+            string callerUpdatedAt = nextEnvelope.updatedAt;
+            fileSystem.FailAtOperation = fileSystem.Operations.Count + 1;
+
+            FormalSaveStoreResult result = store.SaveEnvelope(
+                nextEnvelope,
+                writeIntent: FormalSaveWriteIntent.StartNewProgress);
+
+            Assert.That(result.Success, Is.False);
+            Assert.That(
+                result.Code,
+                Is.EqualTo(FormalSaveStoreCode.DiskWriteFailed));
+            Assert.That(fileSystem.Text(primaryPath), Is.EqualTo(oldProgress));
+            Assert.That(nextEnvelope.createdAt, Is.EqualTo(callerCreatedAt));
+            Assert.That(nextEnvelope.updatedAt, Is.EqualTo(callerUpdatedAt));
+        }
+
+        [Test]
         public void ProbeValidatesContentRatherThanOnlyFileExistence()
         {
             using (var directory = new TemporaryDirectory())

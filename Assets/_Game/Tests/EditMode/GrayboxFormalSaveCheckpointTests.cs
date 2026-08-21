@@ -140,6 +140,60 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PendingRevisionAdvancesOnlyForNewEffectivePendingEvents()
+        {
+            var sink = new FakeSink(false, true, true);
+            object policy = CreatePolicy(sink, new FakeClock());
+            string oneShot = Reason("FirstDeploymentComplete");
+            string repeatable = Reason("EvacuationWorkCommitted");
+            const string firstEvent = "deployment.000001";
+
+            Assert.That(PendingRevision(policy), Is.Zero);
+
+            Queue(policy, oneShot, firstEvent);
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL));
+
+            Queue(policy, oneShot, firstEvent);
+            Queue(policy, "unknown-checkpoint-reason", "unknown.000001");
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL),
+                "Duplicate and unknown events do not change pending content.");
+
+            ((FormalSaveCheckpointPolicy)policy).SetSuppressed(true);
+            Queue(
+                policy,
+                repeatable,
+                "evacuation.batch.000001|building.000001");
+            ((FormalSaveCheckpointPolicy)policy).SetSuppressed(false);
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL),
+                "Suppressed events never join pending.");
+
+            Assert.That(Flush(policy), Is.False);
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL),
+                "Merging a failed in-flight batch back into pending is not " +
+                "a new domain event.");
+            Assert.That(Flush(policy), Is.True);
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL),
+                "Flushing existing pending content does not create an event.");
+
+            Queue(policy, oneShot, "deployment.000002");
+            Assert.That(PendingRevision(policy), Is.EqualTo(1UL),
+                "A completed one-shot milestone cannot rejoin pending.");
+
+            Queue(
+                policy,
+                repeatable,
+                "evacuation.batch.000001|building.000001");
+            Assert.That(PendingRevision(policy), Is.EqualTo(2UL));
+            Queue(
+                policy,
+                repeatable,
+                "evacuation.batch.000001|building.000001");
+            Assert.That(PendingRevision(policy), Is.EqualTo(2UL));
+            Assert.That(Flush(policy), Is.True);
+            Assert.That(PendingRevision(policy), Is.EqualTo(2UL));
+        }
+
+        [Test]
         public void SameFrameEventsCoalesceWithPriorityAndMilestoneUnion()
         {
             var sink = new FakeSink(true);
@@ -699,6 +753,19 @@ namespace WasteCity.Tests
             Assert.That(property.CanWrite, Is.False);
             Assert.That(property.PropertyType, Is.EqualTo(typeof(long)));
             return (long)property.GetValue(policy, null);
+        }
+
+        private static ulong PendingRevision(object policy)
+        {
+            PropertyInfo property = policy.GetType().GetProperty(
+                "PendingRevision",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null,
+                "Checkpoint policy must expose its pending content revision.");
+            Assert.That(property.CanWrite, Is.False,
+                "Pending revision is observation-only.");
+            Assert.That(property.PropertyType, Is.EqualTo(typeof(ulong)));
+            return (ulong)property.GetValue(policy, null);
         }
 
         private static bool ReadBoolProperty(object owner, string name)

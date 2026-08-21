@@ -4,6 +4,25 @@ using WasteCity.Core;
 
 namespace WasteCity.Graybox3D.Usability
 {
+    public sealed class GrayboxFormalSaveUiResult3D
+    {
+        public GrayboxFormalSaveUiResult3D(
+            bool success,
+            string message)
+        {
+            Success = success;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Success { get; }
+        public string Message { get; }
+    }
+
+    public interface IGrayboxFormalSaveExitCommand3D
+    {
+        GrayboxFormalSaveUiResult3D SaveAndExit();
+    }
+
     public enum GrayboxSystemMenuPage3D
     {
         Main,
@@ -19,15 +38,18 @@ namespace WasteCity.Graybox3D.Usability
         private GameSpeedModel speed;
         private GrayboxDisplaySettingsModel3D settings;
         private IGrayboxApplicationExit applicationExit;
+        private IGrayboxFormalSaveExitCommand3D formalSaveExit;
         private GrayboxSystemMenuPage3D operationGuideReturnPage;
         private float openingRequestedSpeed = 1f;
         private bool ownsSystemMenuPause;
         private bool exitRequested;
+        private bool canExitWithoutSaving;
 
         public bool IsOpen { get; private set; }
         public GrayboxSystemMenuPage3D Page { get; private set; } =
             GrayboxSystemMenuPage3D.Main;
         public GrayboxDisplaySettingsModel3D Settings => settings;
+        public bool CanExitWithoutSaving => canExitWithoutSaving;
         public bool IsTacticalPaused =>
             speed != null && speed.IsPaused(GamePauseReason.User);
 
@@ -50,6 +72,7 @@ namespace WasteCity.Graybox3D.Usability
             Page = GrayboxSystemMenuPage3D.Main;
             operationGuideReturnPage = GrayboxSystemMenuPage3D.Settings;
             exitRequested = false;
+            canExitWithoutSaving = false;
             this.view?.SetController(this);
             RenderView();
         }
@@ -57,6 +80,28 @@ namespace WasteCity.Graybox3D.Usability
         public void SetView(GrayboxSystemMenuView3D view)
         {
             this.view = view;
+            this.view?.SetController(this);
+            RenderView();
+        }
+
+        public void ConfigureFormalSaveExit(
+            IGrayboxFormalSaveExitCommand3D formalSaveExit)
+        {
+            this.formalSaveExit = formalSaveExit;
+        }
+
+        public void ConfigureRuntimeServices(
+            GameSpeedModel speed,
+            IGrayboxApplicationExit applicationExit,
+            GrayboxSystemMenuView3D view = null)
+        {
+            ReleasePauseOwnership();
+            this.speed = speed ??
+                throw new ArgumentNullException(nameof(speed));
+            this.applicationExit = applicationExit ??
+                throw new ArgumentNullException(nameof(applicationExit));
+            if (view != null)
+                this.view = view;
             this.view?.SetController(this);
             RenderView();
         }
@@ -70,6 +115,7 @@ namespace WasteCity.Graybox3D.Usability
             speed.SetPaused(GamePauseReason.SystemMenu, true);
             IsOpen = true;
             Page = GrayboxSystemMenuPage3D.Main;
+            canExitWithoutSaving = false;
             settings.Cancel();
             ApplyEffectiveSpeed();
             RenderView();
@@ -94,6 +140,7 @@ namespace WasteCity.Graybox3D.Usability
             settings?.Cancel();
             IsOpen = false;
             Page = GrayboxSystemMenuPage3D.Main;
+            canExitWithoutSaving = false;
             ReleasePauseOwnership();
             RenderView();
         }
@@ -190,6 +237,32 @@ namespace WasteCity.Graybox3D.Usability
                 Page != GrayboxSystemMenuPage3D.ExitConfirm ||
                 exitRequested)
                 return;
+            GrayboxFormalSaveUiResult3D result = formalSaveExit?.SaveAndExit();
+            if (result == null)
+            {
+                view?.SetFormalSaveFeedback(
+                    "保存服务尚未就绪，请稍后重试");
+                canExitWithoutSaving = true;
+                RenderView();
+                return;
+            }
+            view?.SetFormalSaveFeedback(result.Message);
+            if (!result.Success)
+            {
+                canExitWithoutSaving = true;
+                RenderView();
+                return;
+            }
+            exitRequested = true;
+            applicationExit.Exit();
+        }
+
+        public void ConfirmExitWithoutSaving()
+        {
+            if (!IsOpen ||
+                Page != GrayboxSystemMenuPage3D.ExitConfirm ||
+                exitRequested || !canExitWithoutSaving)
+                return;
             exitRequested = true;
             applicationExit.Exit();
         }
@@ -216,6 +289,7 @@ namespace WasteCity.Graybox3D.Usability
             speed = null;
             settings = null;
             applicationExit = null;
+            formalSaveExit = null;
         }
 
         private void DiscardOpenMenu()
@@ -223,6 +297,7 @@ namespace WasteCity.Graybox3D.Usability
             settings?.Cancel();
             IsOpen = false;
             Page = GrayboxSystemMenuPage3D.Main;
+            canExitWithoutSaving = false;
             ReleasePauseOwnership();
             RenderView();
         }

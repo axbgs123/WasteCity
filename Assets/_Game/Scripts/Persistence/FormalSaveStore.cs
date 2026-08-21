@@ -20,6 +20,12 @@ namespace WasteCity.Persistence
         IncompatibleRuntime,
     }
 
+    public enum FormalSaveWriteIntent
+    {
+        ContinueProgress,
+        StartNewProgress,
+    }
+
     public interface IFormalSaveClock
     {
         DateTime UtcNow { get; }
@@ -104,10 +110,19 @@ namespace WasteCity.Persistence
 
         public FormalSaveStoreResult SaveEnvelope(
             FormalSaveEnvelope envelope,
-            bool archiveLegacy2D = false)
+            bool archiveLegacy2D = false,
+            FormalSaveWriteIntent writeIntent =
+                FormalSaveWriteIntent.ContinueProgress)
         {
             if (envelope == null || envelope.formal3D == null)
                 return FailedWrite("正式 3D 存档数据为空");
+            if (!Enum.IsDefined(
+                    typeof(FormalSaveWriteIntent),
+                    writeIntent))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(writeIntent));
+            }
 
             FormalSaveStoreResult existing = Load(
                 FormalSavePayloadKind.Formal3D);
@@ -123,8 +138,16 @@ namespace WasteCity.Persistence
                     return FailedWrite(archived.Diagnostic);
             }
 
+            string originalCreatedAt = envelope.createdAt;
+            string originalUpdatedAt = envelope.updatedAt;
+            int originalSchemaVersion = envelope.saveSchemaVersion;
+            string originalRuntimeKind = envelope.runtimeKind;
+            string originalPayloadHash = envelope.payloadHashSha256;
             DateTime now = clock.UtcNow.ToUniversalTime();
-            envelope.createdAt = existing.Success &&
+            bool startsNewProgress =
+                writeIntent == FormalSaveWriteIntent.StartNewProgress;
+            envelope.createdAt = !startsNewProgress &&
+                                 existing.Success &&
                                  existing.Envelope != null
                 ? existing.Envelope.createdAt
                 : FormalSaveCodec.FormatUtcTimestamp(now);
@@ -139,12 +162,22 @@ namespace WasteCity.Persistence
             string json = FormalSaveCodec.EncodeEnvelope(envelope);
             byte[] bytes = Utf8.GetBytes(json);
             if (!ValidateBytes(bytes))
+            {
+                RestoreEnvelopeMetadata(
+                    envelope,
+                    originalCreatedAt,
+                    originalUpdatedAt,
+                    originalSchemaVersion,
+                    originalRuntimeKind,
+                    originalPayloadHash);
                 return FailedWrite("保存前语义验证失败");
+            }
 
             FormalSaveFileTransactionResult committed =
                 transaction.Commit(primaryPath, bytes, ValidateBytes);
-            return committed.Success
-                ? Result(
+            if (committed.Success)
+            {
+                return Result(
                     FormalSaveStoreCode.SaveSucceeded,
                     true,
                     true,
@@ -152,8 +185,16 @@ namespace WasteCity.Persistence
                     FormalSavePayloadKind.Formal3D,
                     envelope,
                     null,
-                    false)
-                : FailedWrite(committed.Diagnostic);
+                    false);
+            }
+            RestoreEnvelopeMetadata(
+                envelope,
+                originalCreatedAt,
+                originalUpdatedAt,
+                originalSchemaVersion,
+                originalRuntimeKind,
+                originalPayloadHash);
+            return FailedWrite(committed.Diagnostic);
         }
 
         public FormalSaveStoreResult SaveLegacy(FormalSaveData legacy)
@@ -386,6 +427,21 @@ namespace WasteCity.Persistence
             {
                 return false;
             }
+        }
+
+        private static void RestoreEnvelopeMetadata(
+            FormalSaveEnvelope envelope,
+            string createdAt,
+            string updatedAt,
+            int schemaVersion,
+            string runtimeKind,
+            string payloadHash)
+        {
+            envelope.createdAt = createdAt;
+            envelope.updatedAt = updatedAt;
+            envelope.saveSchemaVersion = schemaVersion;
+            envelope.runtimeKind = runtimeKind;
+            envelope.payloadHashSha256 = payloadHash;
         }
 
         private static FormalSaveStoreResult FailedWrite(string diagnostic)
