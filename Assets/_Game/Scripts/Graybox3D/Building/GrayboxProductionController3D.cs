@@ -87,13 +87,22 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxWorldView3D worldView;
 
+        private Func<bool> persistencePauseSource;
+
         public GrayboxProductionClock3D Clock { get; } =
             new GrayboxProductionClock3D();
         public GrayboxProductionCommandFacade3D Commands => Clock.Commands;
         public ProductionObservabilitySnapshot Snapshot => Clock.Snapshot;
         public ulong Revision => Clock.Revision;
+        public bool IsPersistencePaused =>
+            persistencePauseSource != null && persistencePauseSource();
         public bool IsConfigured =>
             session != null && city != null && worldView != null;
+
+        public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
+        {
+            persistencePauseSource = pauseSource;
+        }
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -106,6 +115,45 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(city));
             this.worldView = worldView ??
                 throw new ArgumentNullException(nameof(worldView));
+        }
+
+        public bool TryRebuildAfterPersistenceRestore(out string error)
+        {
+            if (!IsConfigured ||
+                session.Inventory == null ||
+                session.CityStorage == null ||
+                session.Instances == null ||
+                worldView.Model == null ||
+                worldView.Coordinates == null ||
+                !worldView.Coordinates.TryWorldToCell(
+                    city.transform.position,
+                    out int cityX,
+                    out int cityY))
+            {
+                error = "正式生产运行时尚未完成恢复后重建配置";
+                return false;
+            }
+
+            Clock.Tick(
+                0f,
+                paused: false,
+                session.Instances,
+                city.Mode,
+                cityX,
+                cityY,
+                session.GroundBuildRadius,
+                worldView.Model,
+                session.CityStorage);
+            Clock.Runtime.Synchronize(
+                session.Instances,
+                city.Mode,
+                cityX,
+                cityY,
+                session.GroundBuildRadius,
+                session.CityStorage);
+            Clock.PublishObservabilityIfChanged();
+            error = string.Empty;
+            return true;
         }
 
         public bool Tick(float deltaSeconds, bool paused)
@@ -128,7 +176,7 @@ namespace WasteCity.Graybox3D.Building
 
                 Clock.Tick(
                     deltaSeconds,
-                    paused,
+                    paused || IsPersistencePaused,
                     session.Instances,
                     city.Mode,
                     cityX,

@@ -210,6 +210,7 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxProductionRuntime3D productionRuntime;
         private GrayboxDefenseRuntime3D defenseRuntime;
         private Func<int> aliveEnemyCountSource;
+        private Func<bool> persistencePauseSource;
         private GrayboxMobileCityController3D aliveEnemyCountSourceCity;
 
         private readonly List<GrayboxBuildingInstance3D> manifest =
@@ -260,6 +261,8 @@ namespace WasteCity.Graybox3D.Building
         public bool IsManifestOpen { get; private set; }
         public bool IsProcessing { get; private set; }
         public bool IsBlocked => isBlocked;
+        public bool IsPersistencePaused =>
+            persistencePauseSource != null && persistencePauseSource();
         public string BlockedReason => blockedReason;
         public IReadOnlyList<BuildingEvacuationWork> Work => readOnlyWork;
 
@@ -445,6 +448,11 @@ namespace WasteCity.Graybox3D.Building
             if (isActiveAndEnabled) SubscribeMenu();
         }
 
+        public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
+        {
+            persistencePauseSource = pauseSource;
+        }
+
         public bool TryHandleDeploymentRequest()
         {
             if (!IsConfigured) return false;
@@ -600,10 +608,11 @@ namespace WasteCity.Graybox3D.Building
         {
             using (TickMarker.Auto())
             {
-                queuePaused = paused;
+                bool effectivePaused = paused || IsPersistencePaused;
+                queuePaused = effectivePaused;
                 if (IsManifestOpen && !IsProcessing)
                     menu.ShowEvacuationManifest(CaptureManifestView());
-                if (!IsProcessing || IsBlocked || paused ||
+                if (!IsProcessing || IsBlocked || effectivePaused ||
                     unscaledDeltaTime <= 0f)
                 {
                     if (IsProcessing)
@@ -619,6 +628,27 @@ namespace WasteCity.Graybox3D.Building
                 if (IsProcessing)
                     menu.ShowEvacuationQueue(CaptureQueueView());
             }
+        }
+
+        public bool TryRebuildAfterPersistenceRestore(out string error)
+        {
+            if (!IsConfigured)
+            {
+                error = "正式撤离运行时尚未完成恢复后重建配置";
+                return false;
+            }
+
+            queuePaused = IsPersistencePaused;
+            InvalidateViewCaches();
+            menu.SetConstructionCancellationBlocked(IsProcessing);
+            if (IsManifestOpen && !IsProcessing)
+                menu.ShowEvacuationManifest(CaptureManifestView());
+            else if (IsProcessing)
+                menu.ShowEvacuationQueue(CaptureQueueView());
+            else
+                menu.HideEvacuation();
+            error = string.Empty;
+            return true;
         }
 
         public bool RetryBlockedWork()
@@ -1321,6 +1351,7 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             CleanupController(true);
+            persistencePauseSource = null;
         }
 
         private void OnItemTreatmentRequested(
@@ -1521,7 +1552,8 @@ namespace WasteCity.Graybox3D.Building
                 error = "撤离控制器或持久状态未就绪";
                 return false;
             }
-            if (IsProcessing || IsManifestOpen)
+            if ((IsProcessing || IsManifestOpen) &&
+                !IsPersistencePaused)
             {
                 error = "撤离控制器已有活动事务";
                 return false;
@@ -1821,7 +1853,8 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
             if (plan.ExpectedGeneration != persistenceGeneration ||
-                IsProcessing || IsManifestOpen)
+                ((IsProcessing || IsManifestOpen) &&
+                 !IsPersistencePaused))
             {
                 error = "撤离控制器在提交恢复前发生变化";
                 return false;

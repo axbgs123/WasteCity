@@ -29,6 +29,7 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxDefenseSelectionKind3D presentedKind;
         private string selectedStableId;
         private string presentedStableId;
+        private Func<bool> persistencePauseSource;
         private bool hudBound;
 
         public GrayboxDefenseRuntime3D Runtime => runtime;
@@ -40,6 +41,8 @@ namespace WasteCity.Graybox3D.Building
             !string.IsNullOrWhiteSpace(selectedStableId);
         public GrayboxDefenseSelectionKind3D SelectedKind => selectedKind;
         public string SelectedStableId => selectedStableId;
+        public bool IsPersistencePaused =>
+            persistencePauseSource != null && persistencePauseSource();
         public bool IsConfigured =>
             session != null &&
             city != null &&
@@ -72,43 +75,48 @@ namespace WasteCity.Graybox3D.Building
             BindHud();
         }
 
+        public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
+        {
+            persistencePauseSource = pauseSource;
+        }
+
         public bool Tick(float deltaSeconds, bool paused)
         {
             using (TickMarker.Auto())
             {
-                worldView?.SetSimulationPaused(paused);
-                if (!IsConfigured ||
-                    session.CityStorage == null ||
-                    session.Instances == null ||
-                    world.Coordinates == null ||
-                    !TryResolveCityPosition(
-                        out int cityX,
-                        out int cityY,
-                        out float logicalCoreX,
-                        out float logicalCoreZ))
-                {
+                bool effectivePaused = paused || IsPersistencePaused;
+                worldView?.SetSimulationPaused(effectivePaused);
+                if (effectivePaused) return true;
+                if (session?.CityStorage == null ||
+                    !TrySynchronizeRuntime(out _))
                     return false;
-                }
-
-                if (!ReferenceEquals(boundCoordinates, world.Coordinates))
-                {
-                    worldView.BindCoordinates(world.Coordinates);
-                    boundCoordinates = world.Coordinates;
-                    InvalidatePresentation();
-                }
-                EnsureRuntime(logicalCoreX, logicalCoreZ);
-                runtime.SetCorePosition(logicalCoreX, logicalCoreZ);
-                runtime.Synchronize(
-                    session.Instances,
-                    city.Mode,
-                    cityX,
-                    cityY,
-                    session.GroundBuildRadius);
-                runtime.Tick(deltaSeconds, paused, session.CityStorage);
+                runtime.Tick(
+                    deltaSeconds,
+                    effectivePaused,
+                    session.CityStorage);
                 snapshot = runtime.Snapshot;
                 ValidateSelection();
                 ApplyPresentation();
                 return true;
+            }
+        }
+
+        public bool TryRebuildAfterPersistenceRestore(out string error)
+        {
+            try
+            {
+                if (!TrySynchronizeRuntime(out error))
+                    return false;
+                snapshot = runtime.Snapshot;
+                ValidateSelection();
+                ApplyPresentation(force: true);
+                error = string.Empty;
+                return true;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
             }
         }
 
@@ -189,6 +197,7 @@ namespace WasteCity.Graybox3D.Building
             snapshot = null;
             presentedSnapshot = null;
             boundCoordinates = null;
+            persistencePauseSource = null;
             selectedStableId = null;
             presentedStableId = null;
             selectedKind = GrayboxDefenseSelectionKind3D.None;
@@ -211,6 +220,42 @@ namespace WasteCity.Graybox3D.Building
                 coreZ,
                 spawnX,
                 coreZ);
+        }
+
+        private bool TrySynchronizeRuntime(out string error)
+        {
+            if (!IsConfigured || session.Instances == null ||
+                world.Coordinates == null)
+            {
+                error = "防御运行时依赖未就绪";
+                return false;
+            }
+            if (!TryResolveCityPosition(
+                    out int cityX,
+                    out int cityY,
+                    out float logicalCoreX,
+                    out float logicalCoreZ))
+            {
+                error = "无法解析城市坐标";
+                return false;
+            }
+
+            if (!ReferenceEquals(boundCoordinates, world.Coordinates))
+            {
+                worldView.BindCoordinates(world.Coordinates);
+                boundCoordinates = world.Coordinates;
+                InvalidatePresentation();
+            }
+            EnsureRuntime(logicalCoreX, logicalCoreZ);
+            runtime.SetCorePosition(logicalCoreX, logicalCoreZ);
+            runtime.Synchronize(
+                session.Instances,
+                city.Mode,
+                cityX,
+                cityY,
+                session.GroundBuildRadius);
+            error = string.Empty;
+            return true;
         }
 
         private bool TryResolveCityPosition(

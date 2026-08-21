@@ -98,6 +98,109 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PersistencePauseBarrierDoesNotSynchronizeOrAdvanceRuntime()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            GrayboxBuildingInstance3D firstTurret =
+                CreateCompletedDefenseChain(fixture);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            fixture.Controller.Tick(.1f, paused: false);
+            float warningBefore =
+                fixture.Controller.Snapshot.WarningRemainingSeconds;
+
+            GrayboxBuildingInstance3D secondTurret = BeginBuilding(
+                fixture.Session,
+                BuildingCatalog.MachineGunTurret,
+                10,
+                12);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                NullPresentation.Instance);
+            fixture.Controller.ConfigurePersistencePauseSource(() => true);
+
+            Assert.That(fixture.Controller.Tick(10f, paused: false), Is.True);
+
+            Assert.That(fixture.Controller.Snapshot.WarningRemainingSeconds,
+                Is.EqualTo(warningBefore));
+            Assert.That(
+                fixture.Controller.Snapshot.Towers.Select(value =>
+                    value.StableId),
+                Is.EqualTo(new[] { firstTurret.StableInstanceId }));
+            Assert.That(
+                fixture.Controller.Snapshot.Towers.Any(value =>
+                    value.StableId == secondTurret.StableInstanceId),
+                Is.False,
+                "The persistence barrier must not synchronize new authority.");
+        }
+
+        [Test]
+        public void PersistenceRebuildSynchronizesWithoutAdvancingRules()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            CreateCompletedDefenseChain(fixture);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            fixture.Controller.Tick(.1f, paused: false);
+            fixture.Controller.Tick(20f, paused: false);
+            float warningBefore =
+                fixture.Controller.Snapshot.WarningRemainingSeconds;
+            int enemyCountBefore = fixture.Controller.Snapshot.Enemies.Count;
+            Assert.That(enemyCountBefore, Is.GreaterThan(0));
+            GrayboxDefenseEnemySnapshot3D enemyBefore =
+                fixture.Controller.Snapshot.Enemies[0];
+            int coreHealthBefore =
+                fixture.Controller.Snapshot.CoreCurrentHealth;
+
+            GrayboxBuildingInstance3D secondTurret = BeginBuilding(
+                fixture.Session,
+                BuildingCatalog.MachineGunTurret,
+                10,
+                12);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                NullPresentation.Instance);
+            fixture.Controller.ConfigurePersistencePauseSource(() => true);
+
+            Assert.That(
+                fixture.Controller.TryRebuildAfterPersistenceRestore(
+                    out string error),
+                Is.True,
+                error);
+
+            Assert.That(error, Is.Empty);
+            Assert.That(fixture.Controller.Snapshot.WarningRemainingSeconds,
+                Is.EqualTo(warningBefore));
+            Assert.That(fixture.Controller.Snapshot.Enemies.Count,
+                Is.EqualTo(enemyCountBefore));
+            GrayboxDefenseEnemySnapshot3D enemyAfter =
+                fixture.Controller.Snapshot.Enemies[0];
+            Assert.That(enemyAfter.StableId, Is.EqualTo(enemyBefore.StableId));
+            Assert.That(enemyAfter.X, Is.EqualTo(enemyBefore.X));
+            Assert.That(enemyAfter.Z, Is.EqualTo(enemyBefore.Z));
+            Assert.That(enemyAfter.CurrentHealth,
+                Is.EqualTo(enemyBefore.CurrentHealth));
+            Assert.That(fixture.Controller.Snapshot.CoreCurrentHealth,
+                Is.EqualTo(coreHealthBefore));
+            Assert.That(
+                fixture.Controller.Snapshot.Towers.Any(value =>
+                    value.StableId == secondTurret.StableInstanceId),
+                Is.True);
+            Assert.That(fixture.DefenseWorldView.LastSnapshot,
+                Is.SameAs(fixture.Controller.Snapshot));
+            Assert.That(fixture.Hud.LastSnapshot,
+                Is.SameAs(fixture.Controller.Snapshot));
+        }
+
+        [Test]
         public void RaySelectionCloseAndTowerPauseCommandsUseStableRuntimeIds()
         {
             RuntimeFixture fixture = CreateGeneratedRuntime();

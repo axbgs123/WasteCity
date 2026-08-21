@@ -117,6 +117,69 @@ namespace WasteCity.Tests
                 Is.EqualTo(state.ProgressSeconds).Within(.0001f));
         }
 
+        [Test]
+        public void RebuildAfterPersistenceRestoreRefreshesSnapshotWithoutAdvancingTruth()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            fixture.Session.UnlockAllResearchForDevelopment();
+            GrayboxBuildingInstance3D smelter = BeginSmelter(
+                fixture.Session,
+                x: 10,
+                y: 10);
+            fixture.Session.TickConstruction(
+                BuildingCatalog.Smelter.BuildSeconds,
+                CityMode.Fortress,
+                paused: false,
+                presentation: NullPresentation.Instance);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World);
+            Assert.That(fixture.Controller.Tick(
+                GrayboxProductionClock3D.StepSeconds,
+                paused: false), Is.True);
+            Assert.That(fixture.Controller.Clock.Runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(fixture.Controller.Snapshot.TryGet(
+                smelter.StableInstanceId,
+                out ProductionBuildingObservability stale), Is.True);
+
+            Assert.That(state.TryRestoreForPersistence(
+                state.Input.CapturePositiveAmounts(),
+                hasReservedInputs: true,
+                state.ReservedInputs,
+                state.Output.CapturePositiveAmounts(),
+                progressSeconds: 2f,
+                isPlayerPaused: false,
+                out string restoreError), Is.True, restoreError);
+            Assert.That(stale.ProgressSeconds, Is.Not.EqualTo(2f));
+            int cityIron = fixture.Session.Inventory.Get(ResourceIds.Iron);
+            int localIron = state.Input.Get(ResourceIds.Iron);
+            int localAlloy = state.Output.Get(ResourceIds.Alloy);
+            float accumulator = fixture.Controller.Clock.AccumulatorSeconds;
+
+            Assert.That(
+                fixture.Controller.TryRebuildAfterPersistenceRestore(
+                    out string error),
+                Is.True,
+                error);
+
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+            Assert.That(fixture.Session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(cityIron));
+            Assert.That(state.Input.Get(ResourceIds.Iron),
+                Is.EqualTo(localIron));
+            Assert.That(state.Output.Get(ResourceIds.Alloy),
+                Is.EqualTo(localAlloy));
+            Assert.That(fixture.Controller.Clock.AccumulatorSeconds,
+                Is.EqualTo(accumulator));
+            Assert.That(fixture.Controller.Snapshot.TryGet(
+                smelter.StableInstanceId,
+                out ProductionBuildingObservability refreshed), Is.True);
+            Assert.That(refreshed.ProgressSeconds, Is.EqualTo(2f));
+        }
+
         private RuntimeFixture CreateGeneratedRuntime()
         {
             GrayboxBuildingSession3D session = CreateSession();
