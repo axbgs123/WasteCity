@@ -73,6 +73,21 @@ namespace WasteCity.Tests
             Assert.That(smelterDetails.InputRequiredPerCycle, Is.EqualTo(2));
             Assert.That(smelterDetails.OutputProducedPerCycle, Is.EqualTo(1));
             Assert.That(smelterDetails.DurationSeconds, Is.EqualTo(6f));
+            Assert.That(smelterDetails.Inputs, Has.Count.EqualTo(1));
+            AssertResourceChannel(
+                smelterDetails.Inputs[0],
+                ResourceIds.Iron,
+                currentAmount: 0,
+                capacity: 20,
+                amountPerCycle: 2);
+            Assert.That(smelterDetails.Outputs, Has.Count.EqualTo(1));
+            AssertResourceChannel(
+                smelterDetails.Outputs[0],
+                ResourceIds.Alloy,
+                currentAmount: 0,
+                capacity: 10,
+                amountPerCycle: 1);
+            Assert.That(smelterDetails.ReservedInputs, Is.Empty);
             Assert.That(smelterDetails.StopReason,
                 Is.EqualTo(ProductionStopReason.MissingInput));
             Assert.That(snapshot.TryGet("missing", out _), Is.False);
@@ -82,6 +97,323 @@ namespace WasteCity.Tests
             Assert.That(mutableView.IsReadOnly, Is.True);
             Assert.Throws<System.NotSupportedException>(() =>
                 mutableView[0] = smelterDetails);
+        }
+
+        [Test]
+        public void SnapshotCapturesAllRecipeChannelsAndReservationsImmutably()
+        {
+            FormalProductionDefinition definition = CreateDefinition(
+                "test.production.multi-channel",
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 3),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 2),
+                },
+                inputCapacity: 17,
+                outputCapacity: 19);
+            var state = new BuildingProductionState(
+                "building.instance.multi-channel",
+                definition);
+            Assert.That(state.TryRestoreForPersistence(
+                    input: new[]
+                    {
+                        new ResourceAmount(ResourceIds.Water, 7),
+                        new ResourceAmount(ResourceIds.EnergyCrystal, 4),
+                    },
+                    hasReservedInputs: true,
+                    reservedInputs: definition.Inputs,
+                    output: new[]
+                    {
+                        new ResourceAmount(ResourceIds.Coolant, 5),
+                        new ResourceAmount(ResourceIds.CarbonFiber, 6),
+                    },
+                    progressSeconds: 1f,
+                    isPlayerPaused: false,
+                    out string error),
+                Is.True,
+                error);
+
+            ProductionObservabilitySnapshot snapshot = Capture(
+                revision: 11,
+                state);
+            ProductionBuildingObservability details = snapshot.Entries[0];
+
+            Assert.That(details.Inputs, Has.Count.EqualTo(2));
+            AssertResourceChannel(
+                details.Inputs[0],
+                ResourceIds.Water,
+                currentAmount: 7,
+                capacity: 17,
+                amountPerCycle: 2);
+            AssertResourceChannel(
+                details.Inputs[1],
+                ResourceIds.EnergyCrystal,
+                currentAmount: 4,
+                capacity: 17,
+                amountPerCycle: 1);
+            Assert.That(details.Outputs, Has.Count.EqualTo(2));
+            AssertResourceChannel(
+                details.Outputs[0],
+                ResourceIds.Coolant,
+                currentAmount: 5,
+                capacity: 19,
+                amountPerCycle: 3);
+            AssertResourceChannel(
+                details.Outputs[1],
+                ResourceIds.CarbonFiber,
+                currentAmount: 6,
+                capacity: 19,
+                amountPerCycle: 2);
+            Assert.That(details.ReservedInputs, Has.Count.EqualTo(2));
+            Assert.That(details.ReservedInputs[0].ResourceId,
+                Is.EqualTo(ResourceIds.Water));
+            Assert.That(details.ReservedInputs[0].Amount, Is.EqualTo(2));
+            Assert.That(details.ReservedInputs[1].ResourceId,
+                Is.EqualTo(ResourceIds.EnergyCrystal));
+            Assert.That(details.ReservedInputs[1].Amount, Is.EqualTo(1));
+
+            Assert.That(details.InputResourceId, Is.EqualTo(ResourceIds.Water));
+            Assert.That(details.InputAmount, Is.EqualTo(7));
+            Assert.That(details.InputRequiredPerCycle, Is.EqualTo(2));
+            Assert.That(details.OutputResourceId, Is.EqualTo(ResourceIds.Coolant));
+            Assert.That(details.OutputAmount, Is.EqualTo(5));
+            Assert.That(details.OutputProducedPerCycle, Is.EqualTo(3));
+
+            IList<ProductionResourceObservability> mutableInputs =
+                details.Inputs as IList<ProductionResourceObservability>;
+            IList<ProductionResourceObservability> mutableOutputs =
+                details.Outputs as IList<ProductionResourceObservability>;
+            IList<ResourceAmount> mutableReserved =
+                details.ReservedInputs as IList<ResourceAmount>;
+            Assert.That(mutableInputs, Is.Not.Null);
+            Assert.That(mutableOutputs, Is.Not.Null);
+            Assert.That(mutableReserved, Is.Not.Null);
+            Assert.That(mutableInputs.IsReadOnly, Is.True);
+            Assert.That(mutableOutputs.IsReadOnly, Is.True);
+            Assert.That(mutableReserved.IsReadOnly, Is.True);
+            Assert.Throws<System.NotSupportedException>(() =>
+                mutableInputs[0] = details.Inputs[1]);
+            Assert.Throws<System.NotSupportedException>(() =>
+                mutableOutputs[0] = details.Outputs[1]);
+            Assert.Throws<System.NotSupportedException>(() =>
+                mutableReserved[0] = new ResourceAmount(ResourceIds.Iron, 99));
+
+            Assert.That(state.TryRestoreForPersistence(
+                    input: new[]
+                    {
+                        new ResourceAmount(ResourceIds.Water, 1),
+                        new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                    },
+                    hasReservedInputs: false,
+                    reservedInputs: System.Array.Empty<ResourceAmount>(),
+                    output: System.Array.Empty<ResourceAmount>(),
+                    progressSeconds: 0f,
+                    isPlayerPaused: false,
+                    out error),
+                Is.True,
+                error);
+            Assert.That(details.Inputs[0].CurrentAmount, Is.EqualTo(7));
+            Assert.That(details.Outputs[0].CurrentAmount, Is.EqualTo(5));
+            Assert.That(details.ReservedInputs, Has.Count.EqualTo(2));
+        }
+
+        [Test]
+        public void SecondInventoryAndReservedChannelsEachPublishFreshSnapshot()
+        {
+            FormalProductionDefinition definition = CreateDefinition(
+                "test.production.multi-channel.hash",
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 3),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 2),
+                },
+                inputCapacity: 17,
+                outputCapacity: 19);
+            var state = new BuildingProductionState(
+                "building.instance.multi-channel.hash",
+                definition);
+            Assert.That(state.TryRestoreForPersistence(
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 7),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 4),
+                },
+                hasReservedInputs: true,
+                definition.Inputs,
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 5),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 6),
+                },
+                progressSeconds: 1f,
+                isPlayerPaused: false,
+                out string error), Is.True, error);
+            var clock = new GrayboxProductionClock3D();
+            SetOnlyRuntimeState(clock.Runtime, state);
+            Publish(clock);
+            ulong beforeInput = clock.Revision;
+
+            Assert.That(state.Input.Add(ResourceIds.EnergyCrystal, 1),
+                Is.EqualTo(1));
+            Publish(clock);
+            Assert.That(clock.Revision, Is.GreaterThan(beforeInput),
+                "Changing only the second input inventory channel must publish.");
+            ulong beforeOutput = clock.Revision;
+
+            Assert.That(state.Output.Add(ResourceIds.CarbonFiber, 1),
+                Is.EqualTo(1));
+            Publish(clock);
+            Assert.That(clock.Revision, Is.GreaterThan(beforeOutput),
+                "Changing only the second output inventory channel must publish.");
+            ulong beforeReserved = clock.Revision;
+
+            SetReservedInputs(state, new[]
+            {
+                new ResourceAmount(ResourceIds.Water, 2),
+                new ResourceAmount(ResourceIds.EnergyCrystal, 2),
+            });
+            Publish(clock);
+            Assert.That(clock.Revision, Is.GreaterThan(beforeReserved),
+                "Changing only the second reserved-input channel must publish.");
+        }
+
+        [Test]
+        public void SecondDefinitionInputAndOutputChannelsAffectContentHash()
+        {
+            FormalProductionDefinition first = CreateDefinition(
+                "test.production.same-stable-id",
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 3),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 2),
+                },
+                inputCapacity: 17,
+                outputCapacity: 19);
+            FormalProductionDefinition second = CreateDefinition(
+                "test.production.same-stable-id",
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 9),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 3),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 8),
+                },
+                inputCapacity: 17,
+                outputCapacity: 19);
+            var runtime = new GrayboxProductionRuntime3D();
+            SetOnlyRuntimeState(runtime, new BuildingProductionState(
+                "building.instance.definition-hash",
+                first));
+            ulong firstHash = runtime.ComputeObservabilityContentHash(null);
+
+            SetOnlyRuntimeState(runtime, new BuildingProductionState(
+                "building.instance.definition-hash",
+                second));
+            ulong secondHash = runtime.ComputeObservabilityContentHash(null);
+
+            Assert.That(secondHash, Is.Not.EqualTo(firstHash));
+        }
+
+        [Test]
+        public void QualifiedTransferCommandsAcceptEveryDefinedChannel()
+        {
+            FormalProductionDefinition definition = CreateDefinition(
+                "test.production.multi-channel-transfer",
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Water, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Coolant, 3),
+                    new ResourceAmount(ResourceIds.CarbonFiber, 2),
+                },
+                inputCapacity: 20,
+                outputCapacity: 20);
+            var state = new BuildingProductionState(
+                "building.instance.multi-channel-transfer",
+                definition);
+            Assert.That(state.Output.Add(ResourceIds.Coolant, 2), Is.EqualTo(2));
+            Assert.That(state.Output.Add(ResourceIds.CarbonFiber, 3),
+                Is.EqualTo(3));
+            var clock = new GrayboxProductionClock3D();
+            SetOnlyRuntimeState(clock.Runtime, state);
+            var source = new ResourceInventory(100);
+            Assert.That(source.Add(ResourceIds.Water, 5), Is.EqualTo(5));
+            Assert.That(source.Add(ResourceIds.EnergyCrystal, 4), Is.EqualTo(4));
+
+            Assert.That(clock.Commands.TransferInputFromInventory(
+                    state.StableInstanceId,
+                    source,
+                    ResourceIds.Water,
+                    5,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(clock.Commands.TransferInputFromInventory(
+                    state.StableInstanceId,
+                    source,
+                    ResourceIds.EnergyCrystal,
+                    4,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(state.Input.Get(ResourceIds.Water), Is.EqualTo(5));
+            Assert.That(state.Input.Get(ResourceIds.EnergyCrystal), Is.EqualTo(4));
+
+            var target = new ResourceInventory(100);
+            var targetCapacity = new ResourceCapacityPolicy(100, 0);
+            Assert.That(clock.Commands.TransferOutputToInventory(
+                    state.StableInstanceId,
+                    target,
+                    targetCapacity,
+                    ResourceIds.Coolant,
+                    2,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(clock.Commands.TransferOutputToInventory(
+                    state.StableInstanceId,
+                    target,
+                    targetCapacity,
+                    ResourceIds.CarbonFiber,
+                    3,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.Completed));
+            Assert.That(target.Get(ResourceIds.Coolant), Is.EqualTo(2));
+            Assert.That(target.Get(ResourceIds.CarbonFiber), Is.EqualTo(3));
+
+            Assert.That(clock.Commands.TransferInputFromInventory(
+                    state.StableInstanceId,
+                    source,
+                    ResourceIds.Iron,
+                    1,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.InvalidRequest));
+            Assert.That(clock.Commands.TransferOutputToInventory(
+                    state.StableInstanceId,
+                    target,
+                    targetCapacity,
+                    ResourceIds.Ammunition,
+                    1,
+                    accessValidated: true).Status,
+                Is.EqualTo(ResourceTransferStatus.InvalidRequest));
         }
 
         [Test]
@@ -416,6 +748,120 @@ namespace WasteCity.Tests
                     total += slot.Amount;
             }
             return total;
+        }
+
+        private static ProductionObservabilitySnapshot Capture(
+            ulong revision,
+            BuildingProductionState state)
+        {
+            MethodInfo capture = typeof(ProductionObservabilitySnapshot)
+                .GetMethod(
+                    "Capture",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(capture, Is.Not.Null);
+            return (ProductionObservabilitySnapshot)capture.Invoke(
+                null,
+                new object[]
+                {
+                    revision,
+                    new[] { state },
+                    null,
+                    0,
+                });
+        }
+
+        private static FormalProductionDefinition CreateDefinition(
+            string id,
+            IReadOnlyList<ResourceAmount> inputs,
+            IReadOnlyList<ResourceAmount> outputs,
+            int inputCapacity,
+            int outputCapacity)
+        {
+            ConstructorInfo constructor = typeof(FormalProductionDefinition)
+                .GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[]
+                    {
+                        typeof(string),
+                        typeof(string),
+                        typeof(float),
+                        typeof(IReadOnlyList<ResourceAmount>),
+                        typeof(IReadOnlyList<ResourceAmount>),
+                        typeof(int),
+                        typeof(int),
+                        typeof(bool),
+                    },
+                    null);
+            Assert.That(constructor, Is.Not.Null);
+            return (FormalProductionDefinition)constructor.Invoke(
+                new object[]
+                {
+                    id,
+                    BuildingCatalog.Assembler.Id.Value,
+                    8f,
+                    inputs,
+                    outputs,
+                    inputCapacity,
+                    outputCapacity,
+                    false,
+                });
+        }
+
+        private static void SetOnlyRuntimeState(
+            GrayboxProductionRuntime3D runtime,
+            BuildingProductionState state)
+        {
+            FieldInfo field = typeof(GrayboxProductionRuntime3D).GetField(
+                "states",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var states = (List<BuildingProductionState>)field.GetValue(runtime);
+            states.Clear();
+            states.Add(state);
+            FieldInfo stateByIdField = typeof(GrayboxProductionRuntime3D)
+                .GetField(
+                    "stateById",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(stateByIdField, Is.Not.Null);
+            var stateById =
+                (Dictionary<string, BuildingProductionState>)
+                stateByIdField.GetValue(runtime);
+            stateById.Clear();
+            stateById.Add(state.StableInstanceId, state);
+        }
+
+        private static void SetReservedInputs(
+            BuildingProductionState state,
+            IReadOnlyList<ResourceAmount> values)
+        {
+            FieldInfo field = typeof(BuildingProductionState).GetField(
+                "reservedInputs",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(state, values);
+        }
+
+        private static void Publish(GrayboxProductionClock3D clock)
+        {
+            MethodInfo method = typeof(GrayboxProductionClock3D).GetMethod(
+                "PublishObservabilityIfChanged",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(clock, null);
+        }
+
+        private static void AssertResourceChannel(
+            ProductionResourceObservability actual,
+            string resourceId,
+            int currentAmount,
+            int capacity,
+            int amountPerCycle)
+        {
+            Assert.That(actual.ResourceId, Is.EqualTo(resourceId));
+            Assert.That(actual.CurrentAmount, Is.EqualTo(currentAmount));
+            Assert.That(actual.Capacity, Is.EqualTo(capacity));
+            Assert.That(actual.AmountPerCycle, Is.EqualTo(amountPerCycle));
         }
 
         private static void Tick(

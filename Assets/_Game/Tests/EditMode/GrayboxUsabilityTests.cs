@@ -797,6 +797,10 @@ namespace WasteCity.Tests
 
             Assert.That(development.CloseCount, Is.EqualTo(1));
             Assert.That(development.IsOpen, Is.False);
+            Assert.That(fixture.Menu.IsOpen, Is.False);
+
+            PressCoordinatorKey(fixture.Coordinator, Key.Escape);
+
             Assert.That(fixture.Menu.IsOpen, Is.True);
         }
 

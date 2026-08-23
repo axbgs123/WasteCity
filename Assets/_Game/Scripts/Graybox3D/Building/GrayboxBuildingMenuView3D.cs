@@ -893,6 +893,22 @@ namespace WasteCity.Graybox3D.Building
                 "Placement.Status.Text",
                 string.Empty);
             placementStatusText.fontSize = 15;
+            placementStatusText.rectTransform.offsetMin =
+                new Vector2(40f, 0f);
+            RectTransform reticleRect = CreateRect(
+                placementStatusRoot,
+                "Placement.Status.SelectionReticle");
+            reticleRect.anchorMin = new Vector2(0f, .5f);
+            reticleRect.anchorMax = new Vector2(0f, .5f);
+            reticleRect.pivot = new Vector2(0f, .5f);
+            reticleRect.anchoredPosition = new Vector2(6f, 0f);
+            reticleRect.sizeDelta = new Vector2(30f, 30f);
+            Image reticle = reticleRect.gameObject.AddComponent<Image>();
+            reticle.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.WorldMarker,
+                "core.world-marker.selection-reticle");
+            reticle.preserveAspect = true;
+            reticle.raycastTarget = false;
             placementStatusRoot.gameObject.SetActive(false);
 
             miningGuidanceLegendRoot = CreatePanel(
@@ -1074,8 +1090,17 @@ namespace WasteCity.Graybox3D.Building
             SetLayout(rect, 596f, 108f, 0f);
             rect.GetComponent<LayoutElement>().minWidth = 596f;
 
+            Image buildingIcon = CreateBuildingIcon(
+                rect,
+                "Catalog.Card." + definition.Id.Value + ".BuildingIcon",
+                definition.Id.Value);
+            PlaceFixed(
+                buildingIcon.rectTransform,
+                new Vector2(6f, 4f),
+                new Vector2(88f, 88f));
+
             RectTransform summary = CreateRect(rect, "Summary");
-            PlaceFixed(summary, new Vector2(6f, 0f), new Vector2(220f, 96f));
+            PlaceFixed(summary, new Vector2(100f, 0f), new Vector2(126f, 96f));
             Text name = CreateLabel(
                 summary,
                 "Name",
@@ -1198,6 +1223,19 @@ namespace WasteCity.Graybox3D.Building
             icon.sprite = resourceIconCatalog == null
                 ? ResourceIconCatalog3D.Resolve(resourceId)
                 : resourceIconCatalog.ResolveIcon(resourceId);
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            return icon;
+        }
+
+        private static Image CreateBuildingIcon(
+            Transform parent,
+            string name,
+            string buildingId)
+        {
+            RectTransform rect = CreateRect(parent, name);
+            var icon = rect.gameObject.AddComponent<Image>();
+            icon.sprite = BuildingIconCatalog3D.Resolve(buildingId);
             icon.preserveAspect = true;
             icon.raycastTarget = false;
             return icon;
@@ -1755,6 +1793,7 @@ namespace WasteCity.Graybox3D.Building
             rect.sizeDelta = new Vector2(100f, 30f);
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = ButtonColor;
+            ApplyFormalUiSprite(image, "core.ui.control.primary-button");
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             SetLayout(rect, 80f, 30f, 1f);
@@ -1799,7 +1838,20 @@ namespace WasteCity.Graybox3D.Building
             rect.sizeDelta = size;
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = PanelColor;
+            ApplyFormalUiSprite(image, "core.ui.frame.primary-panel");
             return rect;
+        }
+
+        private static void ApplyFormalUiSprite(Image image, string contentId)
+        {
+            if (image == null) return;
+            image.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                contentId);
+            image.type = image.sprite != null &&
+                image.sprite.border.sqrMagnitude > 0f
+                    ? Image.Type.Sliced
+                    : Image.Type.Simple;
         }
 
         private static RectTransform CreateRect(

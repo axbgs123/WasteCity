@@ -797,8 +797,10 @@ namespace WasteCity.Tests
                 Assert.That(costIcon, Is.Not.Null, expected.Definition.Id.Value);
                 Assert.That(
                     costIcon.sprite,
-                    Is.SameAs(ResourceIconCatalog3D.Resolve(
-                        expected.Definition.CostId)),
+                    Is.SameAs(FindTransform(
+                            "ResourceStatus.Item." +
+                            expected.Definition.CostId + ".Icon")
+                        .GetComponent<Image>().sprite),
                     expected.Definition.Id.Value);
             }
         }
@@ -838,8 +840,14 @@ namespace WasteCity.Tests
             Transform status = FindTransform("Placement.Status");
             Text statusText = FindTransform("Placement.Status.Text")
                 .GetComponent<Text>();
+            Image reticle = FindTransform("Placement.Status.SelectionReticle")
+                .GetComponent<Image>();
             Assert.That(status.gameObject.activeInHierarchy, Is.True);
             Assert.That(statusText, Is.Not.Null);
+            Assert.That(reticle, Is.Not.Null);
+            Assert.That(reticle.sprite, Is.Not.Null);
+            Assert.That(reticle.sprite.name,
+                Is.EqualTo("world-marker-selection-reticle"));
             Assert.That(statusText.text, Does.Contain(item.Definition.Name));
             Assert.That(statusText.text,
                 Does.Contain(item.PrimaryLockReason));
@@ -1632,16 +1640,20 @@ namespace WasteCity.Tests
                 "building.complete." + inner.StableInstanceId);
             Vector3 cityBefore = city.transform.position;
             Vector3 innerBefore = innerSlot.transform.position;
+            Vector3 innerLocalBefore =
+                city.transform.InverseTransformPoint(innerBefore);
             yield return HoldKey(Key.W, 2);
             yield return WaitForInnerCityPresentation(
                 city.transform,
                 innerSlot.transform,
                 cityBefore,
                 innerBefore);
-            Vector3 cityDelta = city.transform.position - cityBefore;
-            Vector3 innerDelta = innerSlot.transform.position - innerBefore;
-            Assert.That(innerDelta.x, Is.EqualTo(cityDelta.x).Within(.001f));
-            Assert.That(innerDelta.z, Is.EqualTo(cityDelta.z).Within(.001f));
+            Vector3 innerLocalAfter = city.transform.InverseTransformPoint(
+                innerSlot.transform.position);
+            Assert.That(innerLocalAfter.x,
+                Is.EqualTo(innerLocalBefore.x).Within(.001f));
+            Assert.That(innerLocalAfter.z,
+                Is.EqualTo(innerLocalBefore.z).Within(.001f));
 
             Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
             yield return null;
@@ -1667,6 +1679,8 @@ namespace WasteCity.Tests
             GrayboxBuildingInstance3D warehouseQuick = session.Instances[3];
             yield return WaitForCompletion(warehouseQuick, 2f);
 
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True);
             yield return TapKey(Key.F);
             Assert.That(city.Mode, Is.EqualTo(CityMode.Fortress));
             Assert.That(evacuation.IsManifestOpen, Is.True);
@@ -2278,7 +2292,7 @@ namespace WasteCity.Tests
         {
             for (var frame = 0; frame < 4; frame++)
             {
-                yield return null;
+                yield return new WaitForFixedUpdate();
                 yield return null;
                 Vector3 cityDelta = city.position - cityBefore;
                 Vector3 innerDelta = inner.position - innerBefore;

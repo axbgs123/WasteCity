@@ -6,6 +6,26 @@ using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public sealed class ProductionResourceObservability
+    {
+        internal ProductionResourceObservability(
+            string resourceId,
+            int currentAmount,
+            int capacity,
+            int amountPerCycle)
+        {
+            ResourceId = resourceId;
+            CurrentAmount = Math.Max(0, currentAmount);
+            Capacity = Math.Max(0, capacity);
+            AmountPerCycle = Math.Max(0, amountPerCycle);
+        }
+
+        public string ResourceId { get; }
+        public int CurrentAmount { get; }
+        public int Capacity { get; }
+        public int AmountPerCycle { get; }
+    }
+
     public sealed class ProductionBuildingObservability
     {
         internal ProductionBuildingObservability(
@@ -19,6 +39,15 @@ namespace WasteCity.Graybox3D.Building
             ProductionDefinitionId = definition.Id;
             BuildingDefinitionId = definition.BuildingId;
             DurationSeconds = definition.DurationSeconds;
+            Inputs = CaptureChannels(
+                definition.Inputs,
+                state.Input,
+                definition.InputCapacity);
+            Outputs = CaptureOutputs(
+                definition,
+                state,
+                outputResourceId);
+            ReservedInputs = CopyAmounts(state.ReservedInputs);
             InputResourceId = definition.InputResourceId;
             InputRequiredPerCycle = definition.InputAmount;
             OutputResourceId = outputResourceId;
@@ -44,6 +73,10 @@ namespace WasteCity.Graybox3D.Building
             BoundResourceRemaining = Math.Max(0, boundResourceRemaining);
         }
 
+        public IReadOnlyList<ProductionResourceObservability> Inputs { get; }
+        public IReadOnlyList<ProductionResourceObservability> Outputs { get; }
+        public IReadOnlyList<ResourceAmount> ReservedInputs { get; }
+
         public string StableInstanceId { get; }
         public string ProductionDefinitionId { get; }
         public string BuildingDefinitionId { get; }
@@ -67,6 +100,65 @@ namespace WasteCity.Graybox3D.Building
         public int BoundNodeY { get; }
         public string BoundResourceId { get; }
         public int BoundResourceRemaining { get; }
+
+        private static IReadOnlyList<ProductionResourceObservability>
+            CaptureChannels(
+                IReadOnlyList<ResourceAmount> definitions,
+                ResourceInventory inventory,
+                int capacity)
+        {
+            var channels = new List<ProductionResourceObservability>(
+                definitions.Count);
+            for (var index = 0; index < definitions.Count; index++)
+            {
+                ResourceAmount definition = definitions[index];
+                channels.Add(new ProductionResourceObservability(
+                    definition.ResourceId,
+                    inventory.Get(definition.ResourceId),
+                    capacity,
+                    definition.Amount));
+            }
+
+            return new ReadOnlyCollection<ProductionResourceObservability>(
+                channels);
+        }
+
+        private static IReadOnlyList<ProductionResourceObservability>
+            CaptureOutputs(
+                FormalProductionDefinition definition,
+                BuildingProductionState state,
+                string outputResourceId)
+        {
+            if (!definition.UsesBoundResourceNode)
+            {
+                return CaptureChannels(
+                    definition.Outputs,
+                    state.Output,
+                    definition.OutputCapacity);
+            }
+
+            var channels = new List<ProductionResourceObservability>(1);
+            if (!string.IsNullOrEmpty(outputResourceId))
+            {
+                channels.Add(new ProductionResourceObservability(
+                    outputResourceId,
+                    state.Output.Get(outputResourceId),
+                    definition.OutputCapacity,
+                    definition.OutputAmount));
+            }
+
+            return new ReadOnlyCollection<ProductionResourceObservability>(
+                channels);
+        }
+
+        private static IReadOnlyList<ResourceAmount> CopyAmounts(
+            IReadOnlyList<ResourceAmount> source)
+        {
+            var copy = new List<ResourceAmount>(source.Count);
+            for (var index = 0; index < source.Count; index++)
+                copy.Add(source[index]);
+            return new ReadOnlyCollection<ResourceAmount>(copy);
+        }
     }
 
     public sealed class ProductionObservabilitySnapshot
@@ -248,7 +340,56 @@ namespace WasteCity.Graybox3D.Building
                 left.BoundNodeY == right.BoundNodeY &&
                 string.Equals(left.BoundResourceId,
                     right.BoundResourceId, StringComparison.Ordinal) &&
-                left.BoundResourceRemaining == right.BoundResourceRemaining;
+                left.BoundResourceRemaining == right.BoundResourceRemaining &&
+                HasSameChannels(left.Inputs, right.Inputs) &&
+                HasSameChannels(left.Outputs, right.Outputs) &&
+                HasSameAmounts(left.ReservedInputs, right.ReservedInputs);
+        }
+
+        private static bool HasSameChannels(
+            IReadOnlyList<ProductionResourceObservability> left,
+            IReadOnlyList<ProductionResourceObservability> right)
+        {
+            if (left.Count != right.Count)
+                return false;
+            for (var index = 0; index < left.Count; index++)
+            {
+                ProductionResourceObservability leftValue = left[index];
+                ProductionResourceObservability rightValue = right[index];
+                if (!string.Equals(
+                        leftValue.ResourceId,
+                        rightValue.ResourceId,
+                        StringComparison.Ordinal) ||
+                    leftValue.CurrentAmount != rightValue.CurrentAmount ||
+                    leftValue.Capacity != rightValue.Capacity ||
+                    leftValue.AmountPerCycle != rightValue.AmountPerCycle)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasSameAmounts(
+            IReadOnlyList<ResourceAmount> left,
+            IReadOnlyList<ResourceAmount> right)
+        {
+            if (left.Count != right.Count)
+                return false;
+            for (var index = 0; index < left.Count; index++)
+            {
+                if (!string.Equals(
+                        left[index].ResourceId,
+                        right[index].ResourceId,
+                        StringComparison.Ordinal) ||
+                    left[index].Amount != right[index].Amount)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

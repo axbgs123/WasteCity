@@ -279,11 +279,7 @@ namespace WasteCity.Graybox3D.Building
             state = null;
             return accessValidated &&
                 owner.Runtime.TryGetState(stableInstanceId, out state) &&
-                state.Definition.InputAmount > 0 &&
-                string.Equals(
-                    state.Definition.InputResourceId,
-                    resourceId,
-                    StringComparison.Ordinal);
+                ContainsResource(state.Definition.Inputs, resourceId);
         }
 
         private bool TryGetOutputState(
@@ -299,6 +295,9 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
+            if (!state.Definition.UsesBoundResourceNode)
+                return ContainsResource(state.Definition.Outputs, resourceId);
+
             string expectedResourceId =
                 ProductionObservabilitySnapshot.ResolveOutputResourceId(
                     state,
@@ -308,6 +307,25 @@ namespace WasteCity.Graybox3D.Building
                     expectedResourceId,
                     resourceId,
                     StringComparison.Ordinal);
+        }
+
+        private static bool ContainsResource(
+            System.Collections.Generic.IReadOnlyList<ResourceAmount> amounts,
+            string resourceId)
+        {
+            if (amounts == null || string.IsNullOrWhiteSpace(resourceId))
+                return false;
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                if (amounts[index].Amount > 0 && string.Equals(
+                        amounts[index].ResourceId,
+                        resourceId,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void PublishAfterSuccess(ResourceTransferResult result)

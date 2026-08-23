@@ -89,11 +89,11 @@ namespace WasteCity.Graybox3D
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
         public int ResourceNodeMarkerCount => resourceNodeMarkers.Count;
         public int ResourceNodeMarkerRendererCount =>
-            resourceNodeMarkers.Count * 2;
+            resourceNodeMarkers.Count * 3;
         public int TotalGeneratedRendererCount =>
             WorldRendererCount + ResourceNodeMarkerRendererCount;
         public int TotalPersistentGeneratedObjectCount =>
-            PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 3;
+            PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 4;
         public bool HasActiveTerrainPresentation =>
             IsPresentationAlive(activeTerrainPresentation);
 
@@ -134,6 +134,9 @@ namespace WasteCity.Graybox3D
                 GrayboxResourceNodeMarker3D marker =
                     resourceNodeMarkers[index];
                 marker.SetIcon(ResolveResourceIcon(marker.ResourceId));
+                marker.SetFrame(Production2DVisualCatalog3D.Resolve(
+                    Production2DVisualClass.WorldMarker,
+                    "core.world-marker.resource-node"));
             }
         }
 

@@ -163,11 +163,16 @@ namespace WasteCity.Tests
                 Is.EquivalentTo(new[]
                 {
                     "System.Boolean AddResource(System.String,System.Int32)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D AddResourceWithFeedback(System.String,System.Int32)",
                     "System.Boolean SetResource(System.String,System.Int32)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D SetResourceWithFeedback(System.String,System.Int32)",
                     "System.Boolean ClearResource(System.String)",
                     "System.Boolean UnlockResearch(System.String)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D UnlockResearchWithFeedback(System.String)",
                     "System.Boolean UnlockRoute(WasteCity.Content.ContentRoute)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D UnlockRouteWithFeedback(WasteCity.Content.ContentRoute)",
                     "System.Void UnlockAllResearch()",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D UnlockAllResearchWithFeedback()",
                     "System.Boolean SetCityMode(WasteCity.City.CityMode)",
                     "System.Boolean CompleteCityTransition()",
                     "System.Boolean SetPopulation(System.Int32)",
@@ -433,6 +438,76 @@ namespace WasteCity.Tests
 
                 Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
                 Assert.That(fixture.Bootstrap.IsPanelOpen, Is.True);
+                InputField resourceSearch = panel.transform
+                    .Find("Resource Search")
+                    .GetComponent<InputField>();
+                InputField researchSearch = panel.transform
+                    .Find("Research Search")
+                    .GetComponent<InputField>();
+                Assert.That(resourceSearch, Is.Not.Null);
+                Assert.That(researchSearch, Is.Not.Null);
+                Assert.That(panel.transform.Find("Resource Results")
+                    .GetComponent<ScrollRect>(), Is.Not.Null);
+                Assert.That(panel.transform.Find("Research Results")
+                    .GetComponent<ScrollRect>(), Is.Not.Null);
+                Assert.That(panel.transform.Find("Developer Feedback")
+                    .GetComponentInChildren<Text>(true).text,
+                    Is.EqualTo("请选择物品或科技"));
+                Button[] catalogButtons =
+                    panel.GetComponentsInChildren<Button>(true);
+                Assert.That(catalogButtons.Count(button =>
+                    button.name.StartsWith(
+                        "Developer.Resource.",
+                        StringComparison.Ordinal)), Is.EqualTo(31));
+                Assert.That(catalogButtons.Count(button =>
+                    button.name.StartsWith(
+                        "Developer.Research.",
+                        StringComparison.Ordinal)), Is.EqualTo(43));
+                Assert.That(ButtonNamed(
+                        panel,
+                        "Developer.Resource." + ResourceIds.HybridCore)
+                    .GetComponentInChildren<Text>(true).text,
+                    Is.EqualTo("融合核心"));
+                Assert.That(ButtonNamed(
+                        panel,
+                        "Developer.Research.core.research.spirit-sensing")
+                    .GetComponentInChildren<Text>(true).text,
+                    Is.EqualTo("灵火淬炼"));
+                resourceSearch.text = "融合";
+                Assert.That(catalogButtons.Count(button =>
+                    button.name.StartsWith(
+                        "Developer.Resource.",
+                        StringComparison.Ordinal) &&
+                    button.gameObject.activeSelf), Is.EqualTo(1));
+                resourceSearch.text = string.Empty;
+                ButtonNamed(
+                    panel,
+                    "Developer.Resource." + ResourceIds.HybridCore)
+                    .onClick.Invoke();
+                ButtonNamed(panel, "Resource +100").onClick.Invoke();
+                Assert.That(fixture.Session.Inventory.Get(
+                    ResourceIds.HybridCore), Is.EqualTo(100));
+                Assert.That(panel.transform.Find("Developer Feedback")
+                    .GetComponentInChildren<Text>(true).text,
+                    Does.Contain("融合核心 已增加 100"));
+                ButtonNamed(
+                    panel,
+                    "Developer.Resource." + ResourceIds.Iron)
+                    .onClick.Invoke();
+                researchSearch.text = "灵火";
+                Assert.That(catalogButtons.Count(button =>
+                    button.name.StartsWith(
+                        "Developer.Research.",
+                        StringComparison.Ordinal) &&
+                    button.gameObject.activeSelf), Is.EqualTo(1));
+                ButtonNamed(
+                    panel,
+                    "Developer.Research.core.research.spirit-sensing")
+                    .onClick.Invoke();
+                ButtonNamed(panel, "Unlock Research").onClick.Invoke();
+                Assert.That(fixture.Session.IsResearchCompleted(
+                    "core.research.spirit-sensing"), Is.True);
+                researchSearch.text = string.Empty;
                 Assert.That(new[]
                 {
                     "Resource +100",
@@ -730,6 +805,85 @@ namespace WasteCity.Tests
                 "core.research.automated-machinery"), Is.True);
             Assert.That(fixture.Session.HasContactedRoute(
                 ContentRoute.Technology), Is.True);
+            Assert.That(fixture.Session.Research.CompletedCount,
+                Is.EqualTo(ResearchCatalog.All.Length));
+        }
+
+        [Test]
+        public void FeedbackCommandsResolveChineseAndReportActualChanges()
+        {
+            ModifierFixture fixture = CreateFixture();
+            fixture.Session.Inventory.Set(ResourceIds.HybridCore, 4995);
+
+            GrayboxDeveloperCommandResult3D partial =
+                fixture.Modifier.AddResourceWithFeedback("融合核心", 10);
+            Assert.That(partial.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.PartialCapacity));
+            Assert.That(partial.Succeeded, Is.True);
+            Assert.That(partial.StableId, Is.EqualTo(ResourceIds.HybridCore));
+            Assert.That(partial.DisplayName, Is.EqualTo("融合核心"));
+            Assert.That(partial.RequestedAmount, Is.EqualTo(10));
+            Assert.That(partial.AppliedAmount, Is.EqualTo(5));
+            Assert.That(partial.Message, Does.Contain("实际增加 5"));
+            Assert.That(fixture.Session.Inventory.Get(ResourceIds.HybridCore),
+                Is.EqualTo(5000));
+
+            GrayboxDeveloperCommandResult3D full =
+                fixture.Modifier.AddResourceWithFeedback("融合核心", 10);
+            Assert.That(full.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.CapacityFull));
+            Assert.That(full.Succeeded, Is.False);
+            Assert.That(full.AppliedAmount, Is.Zero);
+            Assert.That(full.Message, Does.Contain("容量已满"));
+
+            GrayboxDeveloperCommandResult3D invalid =
+                fixture.Modifier.AddResourceWithFeedback("未知物品", 10);
+            Assert.That(invalid.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.UnknownResource));
+            Assert.That(invalid.Message, Does.Contain("未找到物品"));
+
+            GrayboxDeveloperCommandResult3D cappedSet =
+                fixture.Modifier.SetResourceWithFeedback("融合核心", 9999);
+            Assert.That(cappedSet.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.PartialCapacity));
+            Assert.That(cappedSet.Succeeded, Is.True);
+            Assert.That(cappedSet.RequestedAmount, Is.EqualTo(9999));
+            Assert.That(cappedSet.AppliedAmount, Is.EqualTo(5000));
+            Assert.That(cappedSet.Message,
+                Does.Contain("容量上限").And.Contain("实际设为 5000"));
+            Assert.That(fixture.Session.Inventory.Get(ResourceIds.HybridCore),
+                Is.EqualTo(5000));
+
+            GrayboxDeveloperCommandResult3D unlocked =
+                fixture.Modifier.UnlockResearchWithFeedback("灵火淬炼");
+            Assert.That(unlocked.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.Success));
+            Assert.That(unlocked.AffectedCount, Is.EqualTo(1));
+            Assert.That(unlocked.Message, Does.Contain("已解锁科技：灵火淬炼"));
+            Assert.That(fixture.Session.IsResearchCompleted(
+                "core.research.spirit-sensing"), Is.True);
+
+            GrayboxDeveloperCommandResult3D repeated =
+                fixture.Modifier.UnlockResearchWithFeedback("灵火淬炼");
+            Assert.That(repeated.Code,
+                Is.EqualTo(GrayboxDeveloperCommandCode3D.AlreadyCompleted));
+            Assert.That(repeated.AffectedCount, Is.Zero);
+            Assert.That(repeated.Message, Does.Contain("已经解锁"));
+
+            GrayboxDeveloperCommandResult3D route =
+                fixture.Modifier.UnlockRouteWithFeedback(
+                    ContentRoute.Technology);
+            Assert.That(route.Succeeded, Is.True);
+            Assert.That(route.AffectedCount, Is.GreaterThan(0));
+            Assert.That(route.Message, Does.Contain("科技路线已解锁"));
+            Assert.That(fixture.Session.HasContactedRoute(
+                ContentRoute.Technology), Is.True);
+
+            GrayboxDeveloperCommandResult3D all =
+                fixture.Modifier.UnlockAllResearchWithFeedback();
+            Assert.That(all.Succeeded, Is.True);
+            Assert.That(all.AffectedCount, Is.GreaterThan(0));
+            Assert.That(all.Message, Does.Contain("全部科技已解锁"));
             Assert.That(fixture.Session.Research.CompletedCount,
                 Is.EqualTo(ResearchCatalog.All.Length));
         }

@@ -108,54 +108,50 @@ namespace WasteCity.Economy
             if (!state.IsLogisticsConnected)
                 return;
 
-            string outputResourceId = ResolveOutputResourceId(state, world);
-            if (!string.IsNullOrEmpty(outputResourceId))
+            FormalProductionDefinition definition = state.Definition;
+            if (definition.UsesBoundResourceNode)
             {
-                int outputAmount = state.Output.Get(outputResourceId);
-                if (outputAmount > 0)
+                TransferOutputToCity(
+                    state,
+                    cityInventory,
+                    cityCapacity,
+                    activeWarehouseCount,
+                    ResolveOutputResourceId(state, world));
+            }
+            else
+            {
+                for (var index = 0; index < definition.Outputs.Count; index++)
                 {
-                    using (cityInventory.AttributeChanges(
-                               new ResourceChangeAttribution(
-                                   ResourceChangeAttributionKind.Production,
-                                   state.Definition.BuildingId)))
-                    {
-                        ResourceTransaction.Transfer(
-                            state.Output,
-                            cityInventory,
-                            cityCapacity,
-                            activeWarehouseCount,
-                            outputResourceId,
-                            outputAmount);
-                    }
+                    TransferOutputToCity(
+                        state,
+                        cityInventory,
+                        cityCapacity,
+                        activeWarehouseCount,
+                        definition.Outputs[index].ResourceId);
                 }
             }
 
-            FormalProductionDefinition definition = state.Definition;
-            if (definition.InputAmount <= 0 ||
-                string.IsNullOrEmpty(definition.InputResourceId))
+            for (var index = 0; index < definition.Inputs.Count; index++)
             {
-                return;
-            }
-
-            int missing = Math.Max(
-                0,
-                definition.InputCapacity -
-                state.Input.Get(definition.InputResourceId));
-            if (missing == 0)
-                return;
-
-            using (cityInventory.AttributeChanges(
-                       new ResourceChangeAttribution(
-                           ResourceChangeAttributionKind.Production,
-                           definition.BuildingId)))
-            {
-                ResourceTransaction.Transfer(
-                    cityInventory,
-                    state.Input,
-                    state.InputCapacityPolicy,
+                string resourceId = definition.Inputs[index].ResourceId;
+                int missing = Math.Max(
                     0,
-                    definition.InputResourceId,
-                    missing);
+                    definition.InputCapacity - state.Input.Get(resourceId));
+                if (missing == 0) continue;
+
+                using (cityInventory.AttributeChanges(
+                           new ResourceChangeAttribution(
+                               ResourceChangeAttributionKind.Production,
+                               definition.BuildingId)))
+                {
+                    ResourceTransaction.Transfer(
+                        cityInventory,
+                        state.Input,
+                        state.InputCapacityPolicy,
+                        0,
+                        resourceId,
+                        missing);
+                }
             }
         }
 
@@ -166,60 +162,89 @@ namespace WasteCity.Economy
         {
             if (!state.IsLogisticsConnected) return;
 
-            string outputResourceId = ResolveOutputResourceId(state, world);
-            if (!string.IsNullOrEmpty(outputResourceId))
+            FormalProductionDefinition definition = state.Definition;
+            if (definition.UsesBoundResourceNode)
             {
-                int outputAmount = state.Output.Get(outputResourceId);
-                int moved = Math.Min(
-                    outputAmount,
-                    cityStorage.GetNetworkAcceptableSpace(outputResourceId));
-                if (moved > 0)
+                TransferOutputToCity(
+                    state,
+                    cityStorage,
+                    ResolveOutputResourceId(state, world));
+            }
+            else
+            {
+                for (var index = 0; index < definition.Outputs.Count; index++)
                 {
-                    int before = outputAmount;
-                    if (state.Output.TrySpend(outputResourceId, moved))
-                    {
-                        int accepted = cityStorage.AddToNetwork(
-                            outputResourceId,
-                            moved);
-                        if (accepted != moved)
-                        {
-                            if (accepted > 0)
-                                cityStorage.TrySpendFromNetwork(
-                                    outputResourceId,
-                                    accepted);
-                            state.Output.Restore(outputResourceId, before);
-                        }
-                    }
+                    TransferOutputToCity(
+                        state,
+                        cityStorage,
+                        definition.Outputs[index].ResourceId);
                 }
             }
 
-            FormalProductionDefinition definition = state.Definition;
-            if (definition.InputAmount <= 0 ||
-                string.IsNullOrEmpty(definition.InputResourceId))
+            for (var index = 0; index < definition.Inputs.Count; index++)
             {
-                return;
+                string resourceId = definition.Inputs[index].ResourceId;
+                int missing = Math.Max(
+                    0,
+                    definition.InputCapacity - state.Input.Get(resourceId));
+                int supplied = Math.Min(
+                    missing,
+                    cityStorage.GetNetworkAmount(resourceId));
+                if (supplied <= 0 || !cityStorage.TrySpendFromNetwork(
+                        resourceId,
+                        supplied))
+                {
+                    continue;
+                }
+                if (state.Input.Add(resourceId, supplied) != supplied)
+                    cityStorage.AddToNetwork(resourceId, supplied);
             }
-            int missing = Math.Max(
-                0,
-                definition.InputCapacity -
-                state.Input.Get(definition.InputResourceId));
-            int supplied = Math.Min(
-                missing,
-                cityStorage.GetNetworkAmount(definition.InputResourceId));
-            if (supplied <= 0 || !cityStorage.TrySpendFromNetwork(
-                    definition.InputResourceId,
-                    supplied))
+        }
+
+        private static void TransferOutputToCity(
+            BuildingProductionState state,
+            ResourceInventory cityInventory,
+            ResourceCapacityPolicy cityCapacity,
+            int activeWarehouseCount,
+            string resourceId)
+        {
+            if (string.IsNullOrEmpty(resourceId)) return;
+            int outputAmount = state.Output.Get(resourceId);
+            if (outputAmount <= 0) return;
+            using (cityInventory.AttributeChanges(
+                       new ResourceChangeAttribution(
+                           ResourceChangeAttributionKind.Production,
+                           state.Definition.BuildingId)))
             {
-                return;
+                ResourceTransaction.Transfer(
+                    state.Output,
+                    cityInventory,
+                    cityCapacity,
+                    activeWarehouseCount,
+                    resourceId,
+                    outputAmount);
             }
-            if (state.Input.Add(
-                    definition.InputResourceId,
-                    supplied) != supplied)
-            {
-                cityStorage.AddToNetwork(
-                    definition.InputResourceId,
-                    supplied);
-            }
+        }
+
+        private static void TransferOutputToCity(
+            BuildingProductionState state,
+            CityResourceStorageModel cityStorage,
+            string resourceId)
+        {
+            if (string.IsNullOrEmpty(resourceId)) return;
+            int outputAmount = state.Output.Get(resourceId);
+            int moved = Math.Min(
+                outputAmount,
+                cityStorage.GetNetworkAcceptableSpace(resourceId));
+            if (moved <= 0) return;
+
+            int before = outputAmount;
+            if (!state.Output.TrySpend(resourceId, moved)) return;
+            int accepted = cityStorage.AddToNetwork(resourceId, moved);
+            if (accepted == moved) return;
+            if (accepted > 0)
+                cityStorage.TrySpendFromNetwork(resourceId, accepted);
+            state.Output.Restore(resourceId, before);
         }
 
         private static void AdvanceProduction(
@@ -296,8 +321,7 @@ namespace WasteCity.Economy
                 return false;
             }
 
-            if (state.Output.Get(outputResourceId) + definition.OutputAmount >
-                definition.OutputCapacity)
+            if (!CanStoreCycleOutputs(state, world))
             {
                 state.SetStopReason(ProductionStopReason.OutputFull);
                 return false;
@@ -309,31 +333,35 @@ namespace WasteCity.Economy
                 return true;
             }
 
-            if (state.Input.Get(definition.InputResourceId) <
-                definition.InputAmount)
+            bool hasMissingInput = false;
+            bool cityCouldSupplyEveryShortfall = true;
+            for (var index = 0; index < definition.Inputs.Count; index++)
             {
+                ResourceAmount input = definition.Inputs[index];
                 int localShortfall = Math.Max(
                     0,
-                    definition.InputAmount -
-                    state.Input.Get(definition.InputResourceId));
+                    input.Amount - state.Input.Get(input.ResourceId));
+                if (localShortfall == 0) continue;
+                hasMissingInput = true;
                 int cityAvailable = cityStorage != null
-                    ? cityStorage.GetNetworkAmount(definition.InputResourceId)
+                    ? cityStorage.GetNetworkAmount(input.ResourceId)
                     : cityInventory == null
                         ? 0
-                        : cityInventory.Get(definition.InputResourceId);
-                bool cityCouldSupply = cityAvailable >= localShortfall;
+                        : cityInventory.Get(input.ResourceId);
+                if (cityAvailable < localShortfall)
+                    cityCouldSupplyEveryShortfall = false;
+            }
+            if (hasMissingInput)
+            {
                 state.SetStopReason(
-                    !state.IsLogisticsConnected && cityCouldSupply
+                    !state.IsLogisticsConnected &&
+                    cityCouldSupplyEveryShortfall
                         ? ProductionStopReason.OutOfLogistics
                         : ProductionStopReason.MissingInput);
                 return false;
             }
 
-            if (!ResourceTransaction.TrySpendAll(
-                    state.Input,
-                    new ResourceAmount(
-                        definition.InputResourceId,
-                        definition.InputAmount)))
+            if (!TrySpendAllInputs(state.Input, definition.Inputs))
             {
                 state.SetStopReason(ProductionStopReason.MissingInput);
                 return false;
@@ -384,9 +412,7 @@ namespace WasteCity.Economy
                     return false;
                 }
             }
-            else if (state.Output.Add(
-                         definition.OutputResourceId,
-                         definition.OutputAmount) != definition.OutputAmount)
+            else if (!TryStoreAllOutputs(state.Output, definition.Outputs))
             {
                 state.SetStopReason(ProductionStopReason.OutputFull);
                 return false;
@@ -394,6 +420,241 @@ namespace WasteCity.Economy
 
             state.CompleteCycle();
             return true;
+        }
+
+        private static bool CanStoreCycleOutputs(
+            BuildingProductionState state,
+            WorldMapModel world)
+        {
+            FormalProductionDefinition definition = state.Definition;
+            if (definition.UsesBoundResourceNode)
+            {
+                string resourceId = ResolveOutputResourceId(state, world);
+                return !string.IsNullOrEmpty(resourceId) &&
+                    state.Output.Get(resourceId) + definition.OutputAmount <=
+                    definition.OutputCapacity;
+            }
+
+            return CanStoreAllOutputs(state.Output, definition.Outputs);
+        }
+
+        private static bool CanStoreAllOutputs(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> outputs)
+        {
+            if (inventory == null || outputs == null || outputs.Count == 0)
+                return false;
+            for (var index = 0; index < outputs.Count; index++)
+            {
+                ResourceAmount output = outputs[index];
+                if (string.IsNullOrWhiteSpace(output.ResourceId) ||
+                    output.Amount <= 0)
+                {
+                    return false;
+                }
+
+                int total = AggregateAmount(outputs, output.ResourceId);
+                if (total <= 0) return false;
+                if (inventory.Get(output.ResourceId) + total >
+                    inventory.CapacityPerResource)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool TryStoreAllOutputs(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> outputs)
+        {
+            if (!CanStoreAllOutputs(inventory, outputs)) return false;
+
+            string previousResourceId = null;
+            for (var committed = 0; committed < outputs.Count; committed++)
+            {
+                string resourceId = FindNextResourceId(
+                    outputs,
+                    previousResourceId);
+                if (resourceId == null) return true;
+
+                int total = AggregateAmount(outputs, resourceId);
+                int before = inventory.Get(resourceId);
+                if (inventory.Add(resourceId, total) != total)
+                {
+                    RollBackStoredOutputs(
+                        inventory,
+                        outputs,
+                        previousResourceId);
+                    inventory.Restore(resourceId, before);
+                    return false;
+                }
+                previousResourceId = resourceId;
+            }
+            return true;
+        }
+
+        private static bool TrySpendAllInputs(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> inputs)
+        {
+            if (inventory == null || inputs == null || inputs.Count == 0)
+                return false;
+
+            for (var index = 0; index < inputs.Count; index++)
+            {
+                ResourceAmount input = inputs[index];
+                if (!ResourceCapacityPolicy.IsRegisteredResource(
+                        input.ResourceId) || input.Amount <= 0)
+                {
+                    return false;
+                }
+                if (HasEarlierResourceId(inputs, index)) continue;
+
+                int total = AggregateAmount(inputs, input.ResourceId);
+                if (total <= 0 || inventory.Get(input.ResourceId) < total)
+                    return false;
+            }
+
+            var lastCommittedIndex = -1;
+            var attemptedIndex = -1;
+            try
+            {
+                for (var index = 0; index < inputs.Count; index++)
+                {
+                    if (HasEarlierResourceId(inputs, index)) continue;
+                    ResourceAmount input = inputs[index];
+                    int total = AggregateAmount(inputs, input.ResourceId);
+                    attemptedIndex = index;
+                    if (!inventory.TrySpend(input.ResourceId, total))
+                    {
+                        RollBackSpentInputs(
+                            inventory,
+                            inputs,
+                            lastCommittedIndex);
+                        return false;
+                    }
+                    lastCommittedIndex = index;
+                }
+                return true;
+            }
+            catch
+            {
+                RollBackSpentInputs(inventory, inputs, attemptedIndex);
+                return false;
+            }
+        }
+
+        private static void RollBackSpentInputs(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> inputs,
+            int lastCommittedIndex)
+        {
+            for (var index = 0; index <= lastCommittedIndex; index++)
+            {
+                if (HasEarlierResourceId(inputs, index)) continue;
+                ResourceAmount input = inputs[index];
+                inventory.Restore(
+                    input.ResourceId,
+                    inventory.Get(input.ResourceId) +
+                    AggregateAmount(inputs, input.ResourceId));
+            }
+        }
+
+        private static void RollBackStoredOutputs(
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> outputs,
+            string lastCommittedResourceId)
+        {
+            string previousResourceId = null;
+            while (true)
+            {
+                string resourceId = FindNextResourceId(
+                    outputs,
+                    previousResourceId);
+                if (resourceId == null ||
+                    (lastCommittedResourceId != null &&
+                     string.Compare(
+                         resourceId,
+                         lastCommittedResourceId,
+                         StringComparison.Ordinal) > 0))
+                {
+                    return;
+                }
+
+                inventory.Restore(
+                    resourceId,
+                    inventory.Get(resourceId) -
+                    AggregateAmount(outputs, resourceId));
+                previousResourceId = resourceId;
+            }
+        }
+
+        private static string FindNextResourceId(
+            IReadOnlyList<ResourceAmount> amounts,
+            string previousResourceId)
+        {
+            string nextResourceId = null;
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                string resourceId = amounts[index].ResourceId;
+                if (previousResourceId != null &&
+                    string.Compare(
+                        resourceId,
+                        previousResourceId,
+                        StringComparison.Ordinal) <= 0)
+                {
+                    continue;
+                }
+                if (nextResourceId == null ||
+                    string.Compare(
+                        resourceId,
+                        nextResourceId,
+                        StringComparison.Ordinal) < 0)
+                {
+                    nextResourceId = resourceId;
+                }
+            }
+            return nextResourceId;
+        }
+
+        private static bool HasEarlierResourceId(
+            IReadOnlyList<ResourceAmount> amounts,
+            int index)
+        {
+            for (var candidateIndex = 0;
+                 candidateIndex < index;
+                 candidateIndex++)
+            {
+                if (string.Equals(
+                        amounts[candidateIndex].ResourceId,
+                        amounts[index].ResourceId,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static int AggregateAmount(
+            IReadOnlyList<ResourceAmount> amounts,
+            string resourceId)
+        {
+            long total = 0;
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                ResourceAmount amount = amounts[index];
+                if (string.Equals(
+                        amount.ResourceId,
+                        resourceId,
+                        StringComparison.Ordinal))
+                {
+                    total += amount.Amount;
+                    if (total > int.MaxValue) return -1;
+                }
+            }
+            return (int)total;
         }
 
         private static bool HasHarvestableCompatibleNode(

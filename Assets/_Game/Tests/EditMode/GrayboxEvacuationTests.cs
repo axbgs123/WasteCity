@@ -539,6 +539,24 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Controller_ManifestRuntimeSignatureTracksEveryReservedRecipeInput()
+        {
+            string source = File.ReadAllText(Path.Combine(
+                Application.dataPath,
+                "_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxEvacuationController3D.cs"));
+            string method = ExtractMethodBlock(
+                source,
+                "private void MixManifestRuntimePayload(");
+
+            StringAssert.Contains("definition.Inputs", method,
+                "Multi-input production must refresh evacuation payloads " +
+                "when any reserved recipe channel changes.");
+            StringAssert.DoesNotContain("definition.InputResourceId", method);
+            StringAssert.DoesNotContain("definition.InputAmount", method);
+        }
+
+        [Test]
         public void Controller_ManifestViewRefreshesForInternalProductionOutputAndTowerAmmoWithoutStorageRevision()
         {
             EvacuationFixture fixture = CreateFixture();

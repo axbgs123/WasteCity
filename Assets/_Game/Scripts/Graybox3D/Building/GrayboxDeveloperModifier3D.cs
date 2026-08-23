@@ -34,12 +34,112 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public GrayboxDeveloperCommandResult3D AddResourceWithFeedback(
+            string resourceIdOrChineseName,
+            int amount)
+        {
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveResource(
+                    resourceIdOrChineseName,
+                    out GrayboxDeveloperCatalogEntry3D entry))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.UnknownResource,
+                    false,
+                    message: "未找到物品：" +
+                        (resourceIdOrChineseName ?? string.Empty));
+            }
+            if (amount <= 0)
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.InvalidAmount,
+                    false,
+                    entry,
+                    amount,
+                    message: "增加数量必须大于 0");
+            }
+
+            int applied = session.Inventory.Add(entry.StableId, amount);
+            if (applied == amount)
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.Success,
+                    true,
+                    entry,
+                    amount,
+                    applied,
+                    message: entry.DisplayName + " 已增加 " + applied);
+            }
+            if (applied > 0)
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.PartialCapacity,
+                    true,
+                    entry,
+                    amount,
+                    applied,
+                    message: entry.DisplayName + " 容量不足，实际增加 " +
+                        applied);
+            }
+            return Result(
+                GrayboxDeveloperCommandCode3D.CapacityFull,
+                false,
+                entry,
+                amount,
+                message: entry.DisplayName + " 容量已满，未增加");
+        }
+
         public bool SetResource(string resourceId, int amount)
         {
             if (!IsKnownResource(resourceId) || amount < 0)
                 return false;
             session.Inventory.Set(resourceId, amount);
             return true;
+        }
+
+        public GrayboxDeveloperCommandResult3D SetResourceWithFeedback(
+            string resourceIdOrChineseName,
+            int amount)
+        {
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveResource(
+                    resourceIdOrChineseName,
+                    out GrayboxDeveloperCatalogEntry3D entry))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.UnknownResource,
+                    false,
+                    message: "未找到物品：" +
+                        (resourceIdOrChineseName ?? string.Empty));
+            }
+            if (amount < 0)
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.InvalidAmount,
+                    false,
+                    entry,
+                    amount,
+                    message: "设置数量必须是非负整数");
+            }
+
+            session.Inventory.Set(entry.StableId, amount);
+            int actual = session.Inventory.Get(entry.StableId);
+            if (actual == amount)
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.Success,
+                    true,
+                    entry,
+                    amount,
+                    actual,
+                    message: entry.DisplayName + " 已设置为 " + actual);
+            }
+            return Result(
+                GrayboxDeveloperCommandCode3D.PartialCapacity,
+                true,
+                entry,
+                amount,
+                actual,
+                message: entry.DisplayName + " 超过容量上限，实际设为 " +
+                    actual);
         }
 
         public bool ClearResource(string resourceId)
@@ -58,6 +158,38 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public GrayboxDeveloperCommandResult3D UnlockResearchWithFeedback(
+            string researchIdOrChineseName)
+        {
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveResearch(
+                    researchIdOrChineseName,
+                    out GrayboxDeveloperCatalogEntry3D entry))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.UnknownResearch,
+                    false,
+                    message: "未找到科技：" +
+                        (researchIdOrChineseName ?? string.Empty));
+            }
+            if (session.IsResearchCompleted(entry.StableId))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.AlreadyCompleted,
+                    true,
+                    entry,
+                    affectedCount: 0,
+                    message: "科技已经解锁：" + entry.DisplayName);
+            }
+
+            session.UnlockResearchForDevelopment(entry.StableId);
+            return Result(
+                GrayboxDeveloperCommandCode3D.Success,
+                true,
+                entry,
+                affectedCount: 1,
+                message: "已解锁科技：" + entry.DisplayName);
+        }
+
         public bool UnlockRoute(ContentRoute route)
         {
             if (route != ContentRoute.Technology &&
@@ -69,9 +201,52 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public GrayboxDeveloperCommandResult3D UnlockRouteWithFeedback(
+            ContentRoute route)
+        {
+            if (!IsUnlockableRoute(route))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.InvalidRoute,
+                    false,
+                    message: "无法解锁未知路线");
+            }
+
+            int before = session.Research.CompletedCount;
+            session.UnlockRouteForDevelopment(route);
+            int affected = Math.Max(
+                0,
+                session.Research.CompletedCount - before);
+            return Result(
+                affected > 0
+                    ? GrayboxDeveloperCommandCode3D.Success
+                    : GrayboxDeveloperCommandCode3D.NoChange,
+                true,
+                affectedCount: affected,
+                message: RouteName(route) + "路线已解锁，新增 " +
+                    affected + " 项科技");
+        }
+
         public void UnlockAllResearch()
         {
             session.UnlockAllResearchForDevelopment();
+        }
+
+        public GrayboxDeveloperCommandResult3D
+            UnlockAllResearchWithFeedback()
+        {
+            int before = session.Research.CompletedCount;
+            session.UnlockAllResearchForDevelopment();
+            int affected = Math.Max(
+                0,
+                session.Research.CompletedCount - before);
+            return Result(
+                affected > 0
+                    ? GrayboxDeveloperCommandCode3D.Success
+                    : GrayboxDeveloperCommandCode3D.NoChange,
+                true,
+                affectedCount: affected,
+                message: "全部科技已解锁，新增 " + affected + " 项");
         }
 
         public bool SetCityMode(CityMode mode)
@@ -111,7 +286,47 @@ namespace WasteCity.Graybox3D.Building
 
         private static bool IsKnownResource(string resourceId)
         {
-            return Array.IndexOf(ResourceIds.All, resourceId) >= 0;
+            return ResourceDefinitionCatalog.TryGet(resourceId, out _);
+        }
+
+        private static bool IsUnlockableRoute(ContentRoute route)
+        {
+            return route == ContentRoute.Technology ||
+                route == ContentRoute.Cultivation ||
+                route == ContentRoute.BiologicalAscension ||
+                route == ContentRoute.Psionics;
+        }
+
+        private static string RouteName(ContentRoute route)
+        {
+            switch (route)
+            {
+                case ContentRoute.Technology: return "科技";
+                case ContentRoute.Cultivation: return "修仙";
+                case ContentRoute.BiologicalAscension: return "血肉";
+                case ContentRoute.Psionics: return "灵能";
+                default: return "未知";
+            }
+        }
+
+        private static GrayboxDeveloperCommandResult3D Result(
+            GrayboxDeveloperCommandCode3D code,
+            bool succeeded,
+            GrayboxDeveloperCatalogEntry3D entry = null,
+            int requestedAmount = 0,
+            int appliedAmount = 0,
+            int affectedCount = 0,
+            string message = null)
+        {
+            return new GrayboxDeveloperCommandResult3D(
+                code,
+                succeeded,
+                entry?.StableId,
+                entry?.DisplayName,
+                requestedAmount,
+                appliedAmount,
+                affectedCount,
+                message);
         }
     }
 }

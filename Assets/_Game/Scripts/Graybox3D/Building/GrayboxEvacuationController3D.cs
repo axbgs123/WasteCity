@@ -1271,16 +1271,25 @@ namespace WasteCity.Graybox3D.Building
                 {
                     string resourceId = ResourceIds.All[index];
                     Mix(ref hash, productionState.Input.Get(resourceId));
-                    int reservedAmount =
-                        productionState.HasReservedInputs &&
-                        !definition.UsesBoundResourceNode &&
-                        definition.InputAmount > 0 &&
-                        string.Equals(
-                            definition.InputResourceId,
-                            resourceId,
-                            StringComparison.Ordinal)
-                            ? definition.InputAmount
-                            : 0;
+                    var reservedAmount = 0;
+                    if (productionState.HasReservedInputs &&
+                        !definition.UsesBoundResourceNode)
+                    {
+                        for (var inputIndex = 0;
+                             inputIndex < definition.Inputs.Count;
+                             inputIndex++)
+                        {
+                            ResourceAmount input =
+                                definition.Inputs[inputIndex];
+                            if (string.Equals(
+                                    input.ResourceId,
+                                    resourceId,
+                                    StringComparison.Ordinal))
+                            {
+                                reservedAmount += input.Amount;
+                            }
+                        }
+                    }
                     Mix(ref hash, reservedAmount);
                     Mix(ref hash, productionState.Output.Get(resourceId));
                 }

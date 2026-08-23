@@ -585,6 +585,293 @@ namespace WasteCity.Tests
             Assert.That(runtime.ActiveWarehouseCount, Is.EqualTo(2));
         }
 
+        [Test]
+        public void ProductionBuildingsExposeCatalogOrderedMachineRecipesAndUniqueDefault()
+        {
+            GrayboxBuildingInstance3D smelter = CreateInstance(
+                "building.instance.recipe-list.smelter",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            GrayboxBuildingInstance3D spiritFireFurnace = CreateInstance(
+                "building.instance.recipe-list.spirit-fire",
+                BuildingCatalog.SpiritFireFurnace,
+                BuildingSite.Ground,
+                12,
+                10);
+            Complete(smelter);
+            Complete(spiritFireFurnace);
+            var runtime = new GrayboxProductionRuntime3D();
+
+            runtime.Synchronize(
+                new[] { spiritFireFurnace, smelter },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+
+            IReadOnlyList<ResourceRecipeDefinition> smelterRecipes =
+                GetMachineRecipes(runtime, smelter.StableInstanceId);
+            Assert.That(
+                smelterRecipes.Select(recipe => recipe.Id),
+                Is.EqualTo(new[]
+                {
+                    FormalProductionDefinitionCatalog.Smelting.Id,
+                    "core.production.refine-stone",
+                }));
+            Assert.That(
+                smelterRecipes.Count(recipe => recipe.DefaultForBuilding),
+                Is.EqualTo(1));
+            Assert.That(runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState smelterState), Is.True);
+            Assert.That(
+                smelterState.Definition,
+                Is.SameAs(FormalProductionDefinitionCatalog.Smelting));
+            Assert.That(smelterState.Definition.InputCapacity, Is.EqualTo(20));
+            Assert.That(smelterState.Definition.OutputCapacity, Is.EqualTo(10));
+
+            IReadOnlyList<ResourceRecipeDefinition> spiritRecipes =
+                GetMachineRecipes(runtime, spiritFireFurnace.StableInstanceId);
+            Assert.That(
+                spiritRecipes.Select(recipe => recipe.Id),
+                Is.EqualTo(new[]
+                {
+                    "cultivation.production.refine-spirit-iron",
+                }));
+            Assert.That(spiritRecipes.Single().DefaultForBuilding, Is.True);
+            Assert.That(runtime.TryGetState(
+                spiritFireFurnace.StableInstanceId,
+                out BuildingProductionState spiritState), Is.True);
+            Assert.That(
+                spiritState.Definition.Id,
+                Is.EqualTo("cultivation.production.refine-spirit-iron"));
+            Assert.That(spiritState.Definition.InputCapacity, Is.EqualTo(20));
+            Assert.That(spiritState.Definition.OutputCapacity, Is.EqualTo(20));
+        }
+
+        [Test]
+        public void RecipeSelectionUsesCatalogDefinitionAndSurvivesSynchronization()
+        {
+            GrayboxBuildingInstance3D smelter = CreateInstance(
+                "building.instance.recipe-select",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            Complete(smelter);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { smelter },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            Assert.That(runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState before), Is.True);
+            before.SetPlayerPaused(true);
+
+            bool selected = TrySelectRecipe(
+                runtime,
+                smelter.StableInstanceId,
+                "core.production.refine-stone",
+                new[] { "core.research.automated-machinery" },
+                out object result);
+
+            Assert.That(selected, Is.True);
+            Assert.That(ResultStatus(result), Is.EqualTo("Completed"));
+            Assert.That(runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState selectedState), Is.True);
+            Assert.That(selectedState, Is.Not.SameAs(before));
+            Assert.That(selectedState.Definition.Id,
+                Is.EqualTo("core.production.refine-stone"));
+            Assert.That(selectedState.Definition.DurationSeconds, Is.EqualTo(6f));
+            Assert.That(selectedState.Definition.Inputs,
+                Is.EqualTo(new[] { new ResourceAmount(ResourceIds.Stone, 3) }));
+            Assert.That(selectedState.Definition.Outputs,
+                Is.EqualTo(new[]
+                {
+                    new ResourceAmount(ResourceIds.RefinedStone, 2),
+                }));
+            Assert.That(selectedState.Definition.InputCapacity, Is.EqualTo(20));
+            Assert.That(selectedState.Definition.OutputCapacity, Is.EqualTo(20));
+            Assert.That(selectedState.IsPlayerPaused, Is.True);
+            Assert.That(selectedState.IsLogisticsConnected, Is.True);
+
+            runtime.Synchronize(
+                new[] { smelter },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+
+            Assert.That(runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState synchronized), Is.True);
+            Assert.That(synchronized, Is.SameAs(selectedState));
+            Assert.That(synchronized.Definition.Id,
+                Is.EqualTo("core.production.refine-stone"));
+            Assert.That(synchronized.IsPlayerPaused, Is.True);
+
+            AssertSelectionStatus(
+                runtime,
+                smelter.StableInstanceId,
+                "core.production.refine-stone",
+                new[] { "core.research.automated-machinery" },
+                expectedSuccess: true,
+                "AlreadySelected");
+            Assert.That(runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState noOpState), Is.True);
+            Assert.That(noOpState, Is.SameAs(synchronized));
+        }
+
+        [Test]
+        public void RecipeSelectionRejectsUnknownManualWrongBuildingAndLockedResearch()
+        {
+            GrayboxBuildingInstance3D smelter = CreateInstance(
+                "building.instance.recipe-gates.smelter",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            GrayboxBuildingInstance3D assembler = CreateInstance(
+                "building.instance.recipe-gates.assembler",
+                BuildingCatalog.Assembler,
+                BuildingSite.Ground,
+                12,
+                10);
+            Complete(smelter);
+            Complete(assembler);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { smelter, assembler },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+
+            AssertSelectionStatus(runtime, smelter.StableInstanceId,
+                "missing.recipe", Array.Empty<string>(), false,
+                "RecipeNotFound");
+            AssertSelectionStatus(runtime, smelter.StableInstanceId,
+                ResourceRecipeCatalog.FieldAlloyId,
+                new[] { "core.research.automated-machinery" }, false,
+                "RecipeNotMachine");
+            AssertSelectionStatus(runtime, smelter.StableInstanceId,
+                FormalProductionDefinitionCatalog.Assembly.Id,
+                new[] { "core.research.precision-assembly" }, false,
+                "RecipeNotAllowedForBuilding");
+            object missingResearch = AssertSelectionStatus(
+                runtime, smelter.StableInstanceId,
+                "core.production.refine-stone", Array.Empty<string>(), false,
+                "ResearchNotCompleted");
+            Assert.That(ResultMissingResearchId(missingResearch),
+                Is.EqualTo("core.research.automated-machinery"));
+
+            object previewResearch = AssertSelectionStatus(
+                runtime, assembler.StableInstanceId,
+                "fusion.production.hybrid-core",
+                new[]
+                {
+                    "core.research.unmanned-systems",
+                    "core.research.formation-reinforcement",
+                    "core.research.gene-splicing",
+                    "core.research.collective-consciousness",
+                },
+                false,
+                "ResearchNotCompleted");
+            Assert.That(ResultMissingResearchId(previewResearch),
+                Is.EqualTo("core.research.unmanned-systems"));
+        }
+
+        [Test]
+        public void RecipeSelectionRequiresCompletedOwnedAndEvacuationUnlockedBuilding()
+        {
+            GrayboxBuildingInstance3D unfinished = CreateInstance(
+                "building.instance.recipe-lifecycle.unfinished",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            GrayboxBuildingInstance3D unowned = CreateInstance(
+                "building.instance.recipe-lifecycle.unowned",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                12,
+                10);
+            GrayboxBuildingInstance3D locked = CreateInstance(
+                "building.instance.recipe-lifecycle.locked",
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                14,
+                10);
+            SetOwnershipAndState(unowned, false,
+                GrayboxBuildingInstanceState.Completed);
+            Complete(locked);
+            SetEvacuationLocked(locked, true);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { unfinished, unowned, locked },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            string[] research = { "core.research.automated-machinery" };
+
+            AssertSelectionStatus(runtime, unfinished.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "BuildingNotCompleted");
+            AssertSelectionStatus(runtime, unowned.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "BuildingNotPlayerOwned");
+            AssertSelectionStatus(runtime, locked.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "BuildingEvacuationLocked");
+        }
+
+        [Test]
+        public void RecipeSelectionRejectsProgressInputAndOutputWithoutMutatingState()
+        {
+            string[] research = { "core.research.automated-machinery" };
+            GrayboxProductionRuntime3D progressRuntime =
+                RuntimeWithActiveSmelter(
+                    "building.instance.recipe-dirty.progress",
+                    out _,
+                    out BuildingProductionState progressState);
+            AssertSelectionStatus(progressRuntime, progressState.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "CycleInProgress");
+            Assert.That(progressRuntime.TryGetState(progressState.StableInstanceId,
+                out BuildingProductionState progressAfter), Is.True);
+            Assert.That(progressAfter, Is.SameAs(progressState));
+
+            GrayboxProductionRuntime3D inputRuntime = RuntimeWithEmptySmelter(
+                "building.instance.recipe-dirty.input",
+                out BuildingProductionState inputState);
+            Assert.That(inputState.Input.Add(ResourceIds.Iron, 1), Is.EqualTo(1));
+            AssertSelectionStatus(inputRuntime, inputState.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "InputNotEmpty");
+            Assert.That(inputRuntime.TryGetState(inputState.StableInstanceId,
+                out BuildingProductionState inputAfter), Is.True);
+            Assert.That(inputAfter, Is.SameAs(inputState));
+
+            GrayboxProductionRuntime3D outputRuntime = RuntimeWithEmptySmelter(
+                "building.instance.recipe-dirty.output",
+                out BuildingProductionState outputState);
+            Assert.That(outputState.Output.Add(ResourceIds.Alloy, 1), Is.EqualTo(1));
+            AssertSelectionStatus(outputRuntime, outputState.StableInstanceId,
+                "core.production.refine-stone", research, false,
+                "OutputNotEmpty");
+            Assert.That(outputRuntime.TryGetState(outputState.StableInstanceId,
+                out BuildingProductionState outputAfter), Is.True);
+            Assert.That(outputAfter, Is.SameAs(outputState));
+        }
+
         private static GrayboxBuildingInstance3D CreateInstance(
             string stableInstanceId,
             BuildingDefinition definition,
@@ -695,6 +982,102 @@ namespace WasteCity.Tests
             return runtime;
         }
 
+        private static GrayboxProductionRuntime3D RuntimeWithEmptySmelter(
+            string stableId,
+            out BuildingProductionState state)
+        {
+            GrayboxBuildingInstance3D instance = CreateInstance(
+                stableId,
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                10);
+            Complete(instance);
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { instance },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            Assert.That(runtime.TryGetState(stableId, out state), Is.True);
+            return runtime;
+        }
+
+        private static IReadOnlyList<ResourceRecipeDefinition> GetMachineRecipes(
+            GrayboxProductionRuntime3D runtime,
+            string stableInstanceId)
+        {
+            MethodInfo method = FindRuntimeMethod(
+                runtime,
+                "TryGetMachineRecipes",
+                2);
+            object[] arguments = { stableInstanceId, null };
+            Assert.That((bool)method.Invoke(runtime, arguments), Is.True);
+            Assert.That(arguments[1],
+                Is.InstanceOf<IReadOnlyList<ResourceRecipeDefinition>>());
+            return (IReadOnlyList<ResourceRecipeDefinition>)arguments[1];
+        }
+
+        private static bool TrySelectRecipe(
+            GrayboxProductionRuntime3D runtime,
+            string stableInstanceId,
+            string recipeId,
+            IReadOnlyCollection<string> completedResearchIds,
+            out object result)
+        {
+            MethodInfo method = FindRuntimeMethod(runtime, "TrySelectRecipe", 4);
+            object[] arguments =
+            {
+                stableInstanceId,
+                recipeId,
+                completedResearchIds,
+                null,
+            };
+            bool succeeded = (bool)method.Invoke(runtime, arguments);
+            result = arguments[3];
+            Assert.That(result, Is.Not.Null);
+            return succeeded;
+        }
+
+        private static object AssertSelectionStatus(
+            GrayboxProductionRuntime3D runtime,
+            string stableInstanceId,
+            string recipeId,
+            IReadOnlyCollection<string> completedResearchIds,
+            bool expectedSuccess,
+            string expectedStatus)
+        {
+            bool succeeded = TrySelectRecipe(
+                runtime,
+                stableInstanceId,
+                recipeId,
+                completedResearchIds,
+                out object result);
+            Assert.That(succeeded, Is.EqualTo(expectedSuccess));
+            Assert.That(ResultStatus(result), Is.EqualTo(expectedStatus));
+            return result;
+        }
+
+        private static string ResultStatus(object result)
+        {
+            PropertyInfo property = result.GetType().GetProperty(
+                "Status",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, "RecipeSelectionResult.Status");
+            return property.GetValue(result).ToString();
+        }
+
+        private static string ResultMissingResearchId(object result)
+        {
+            PropertyInfo property = result.GetType().GetProperty(
+                "MissingResearchId",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null,
+                "RecipeSelectionResult.MissingResearchId");
+            return (string)property.GetValue(result);
+        }
+
         private static bool TryCaptureEvacuationPayload(
             GrayboxProductionRuntime3D runtime,
             string stableId,
@@ -746,7 +1129,7 @@ namespace WasteCity.Tests
             Assert.That(
                 method,
                 Is.Not.Null,
-                $"Missing evacuation runtime API: {runtime.GetType().Name}.{name}");
+                $"Missing runtime API: {runtime.GetType().Name}.{name}");
             return method;
         }
 
@@ -820,6 +1203,14 @@ namespace WasteCity.Tests
         private static void Abandon(GrayboxBuildingInstance3D instance)
         {
             Invoke(instance, "Abandon");
+        }
+
+        private static void SetOwnershipAndState(
+            GrayboxBuildingInstance3D instance,
+            bool playerOwned,
+            GrayboxBuildingInstanceState state)
+        {
+            Invoke(instance, "RestoreEvacuationState", playerOwned, state);
         }
 
         private static void Invoke(

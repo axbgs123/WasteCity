@@ -16,7 +16,10 @@ namespace WasteCity.Graybox3D
         private MeshFilter iconFilter;
         private MeshRenderer iconRenderer;
         private MaterialPropertyBlock iconProperties;
+        private MeshFilter frameFilter;
+        private MeshRenderer frameRenderer;
         private Sprite icon;
+        private Sprite frame;
         private TextMesh amountLabel;
 
         public string StableId { get; private set; }
@@ -28,6 +31,7 @@ namespace WasteCity.Graybox3D
             ? string.Empty
             : amountLabel.text;
         public Sprite Icon => icon;
+        public Sprite Frame => frame;
 
         public void Configure(
             string stableId,
@@ -53,6 +57,9 @@ namespace WasteCity.Graybox3D
             WorldY = worldY;
             transform.position = worldPosition + Vector3.up * 1.05f;
             EnsurePresentation();
+            SetFrame(Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.WorldMarker,
+                "core.world-marker.resource-node"));
             SetIcon(icon);
         }
 
@@ -95,6 +102,18 @@ namespace WasteCity.Graybox3D
                 : ResolveIconMaterial(icon.texture);
         }
 
+        public void SetFrame(Sprite frame)
+        {
+            EnsurePresentation();
+            this.frame = frame;
+            frameFilter.sharedMesh = frame == null
+                ? null
+                : ResolveIconMesh(frame);
+            frameRenderer.sharedMaterial = frame == null
+                ? null
+                : ResolveIconMaterial(frame.texture);
+        }
+
         public void FaceCamera(Transform cameraTransform)
         {
             if (cameraTransform != null)
@@ -103,6 +122,17 @@ namespace WasteCity.Graybox3D
 
         private void EnsurePresentation()
         {
+            if (frameRenderer == null || frameFilter == null)
+            {
+                var frameObject = new GameObject("Frame");
+                frameObject.transform.SetParent(transform, false);
+                frameObject.transform.localPosition =
+                    new Vector3(0f, .08f, .01f);
+                frameObject.transform.localScale = Vector3.one * .96f;
+                frameFilter = frameObject.AddComponent<MeshFilter>();
+                frameRenderer = frameObject.AddComponent<MeshRenderer>();
+                frameRenderer.sortingOrder = 29;
+            }
             if (iconRenderer == null || iconFilter == null)
             {
                 var iconObject = new GameObject("Icon");
@@ -143,16 +173,17 @@ namespace WasteCity.Graybox3D
             float right = rect.xMax * inverseWidth;
             float bottom = rect.yMin * inverseHeight;
             float top = rect.yMax * inverseHeight;
+            float halfWidth = .5f * rect.width / rect.height;
             var mesh = new Mesh
             {
                 name = "ResourceIconQuad_" + sprite.name,
                 hideFlags = HideFlags.HideAndDontSave,
                 vertices = new[]
                 {
-                    new Vector3(-.5f, -.5f, 0f),
-                    new Vector3(.5f, -.5f, 0f),
-                    new Vector3(.5f, .5f, 0f),
-                    new Vector3(-.5f, .5f, 0f),
+                    new Vector3(-halfWidth, -.5f, 0f),
+                    new Vector3(halfWidth, -.5f, 0f),
+                    new Vector3(halfWidth, .5f, 0f),
+                    new Vector3(-halfWidth, .5f, 0f),
                 },
                 uv = new[]
                 {

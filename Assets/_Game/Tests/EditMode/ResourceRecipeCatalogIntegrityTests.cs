@@ -239,6 +239,75 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void Recipes_OwnTheExactFormalMachineBufferCapacities()
+        {
+            Assert.That(ResourceRecipeCatalog.All, Has.Count.EqualTo(30));
+
+            foreach (ResourceRecipeDefinition recipe in ResourceRecipeCatalog.All)
+            {
+                (int expectedInput, int expectedOutput) =
+                    ExpectedCapacities(recipe);
+                Assert.That(
+                    ReflectedInt(recipe, "InputCapacity"),
+                    Is.EqualTo(expectedInput),
+                    $"{recipe.Id} 输入缓存容量必须由正式配方目录持有");
+                Assert.That(
+                    ReflectedInt(recipe, "OutputCapacity"),
+                    Is.EqualTo(expectedOutput),
+                    $"{recipe.Id} 输出缓存容量必须由正式配方目录持有");
+            }
+        }
+
+        [Test]
+        public void EveryMachineProjection_CopiesCatalogCapacitiesWithoutBuildingDefaults()
+        {
+            foreach (ResourceRecipeDefinition recipe in ResourceRecipeCatalog.All
+                         .Where(value =>
+                             value.Kind == ResourceRecipeKind.Machine))
+            {
+                foreach (string buildingId in recipe.AllowedBuildingIds)
+                {
+                    Assert.That(
+                        FormalProductionDefinitionCatalog.TryResolveRecipe(
+                            recipe.Id,
+                            buildingId,
+                            out FormalProductionDefinition projection),
+                        Is.True,
+                        recipe.Id);
+                    Assert.That(
+                        projection.InputCapacity,
+                        Is.EqualTo(ReflectedInt(recipe, "InputCapacity")),
+                        $"{recipe.Id} 输入容量投影与配方真值漂移");
+                    Assert.That(
+                        projection.OutputCapacity,
+                        Is.EqualTo(ReflectedInt(recipe, "OutputCapacity")),
+                        $"{recipe.Id} 输出容量投影与配方真值漂移");
+                }
+            }
+        }
+
+        [Test]
+        public void ManualRecipes_HaveZeroMachineCapacityAndCannotEnterMachineRuntime()
+        {
+            foreach (ResourceRecipeDefinition recipe in ResourceRecipeCatalog.All
+                         .Where(value =>
+                             value.Kind == ResourceRecipeKind.ManualCrafting))
+            {
+                Assert.That(ReflectedInt(recipe, "InputCapacity"), Is.Zero,
+                    recipe.Id);
+                Assert.That(ReflectedInt(recipe, "OutputCapacity"), Is.Zero,
+                    recipe.Id);
+                Assert.That(
+                    FormalProductionDefinitionCatalog.TryResolveRecipe(
+                        recipe.Id,
+                        "core.building.assembler",
+                        out _),
+                    Is.False,
+                    $"{recipe.Id} 是背包合成配方，不得误投影为机器生产");
+            }
+        }
+
+        [Test]
         public void Recipes_HaveExactMachineManualBuildingAndResearchBoundaries()
         {
             foreach (ResourceRecipeDefinition recipe in ResourceRecipeCatalog.All)
@@ -534,6 +603,35 @@ namespace WasteCity.Tests
             object value = property.GetValue(owner);
             Assert.That(value, Is.TypeOf<bool>(), propertyName);
             return (bool)value;
+        }
+
+        private static int ReflectedInt(object owner, string propertyName)
+        {
+            PropertyInfo property = AssertPublicProperty(
+                owner.GetType(),
+                propertyName);
+            object value = property.GetValue(owner);
+            Assert.That(value, Is.TypeOf<int>(), propertyName);
+            return (int)value;
+        }
+
+        private static (int Input, int Output) ExpectedCapacities(
+            ResourceRecipeDefinition recipe)
+        {
+            if (recipe.Kind == ResourceRecipeKind.ManualCrafting)
+                return (0, 0);
+
+            switch (recipe.Id)
+            {
+                case "core.production.extract-node-resource":
+                    return (0, 20);
+                case "core.production.smelt-alloy":
+                    return (20, 10);
+                case "core.production.assemble-ammunition":
+                    return (20, 30);
+                default:
+                    return (20, 20);
+            }
         }
 
         private static string RoutePrefix(string stableId)

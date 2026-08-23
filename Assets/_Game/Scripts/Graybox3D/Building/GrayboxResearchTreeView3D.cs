@@ -328,6 +328,21 @@ namespace WasteCity.Graybox3D.Building
                 .Configure(PanViewport, ZoomViewport);
             ownedRoots.Add(viewport.gameObject);
 
+            RectTransform branchLegend = CreateRect(
+                viewport,
+                "Research.BranchConnectorLegend");
+            branchLegend.anchorMin = new Vector2(0f, 1f);
+            branchLegend.anchorMax = new Vector2(0f, 1f);
+            branchLegend.pivot = new Vector2(0f, 1f);
+            branchLegend.anchoredPosition = new Vector2(8f, -8f);
+            branchLegend.sizeDelta = new Vector2(32f, 32f);
+            Image branchImage = branchLegend.gameObject.AddComponent<Image>();
+            branchImage.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                "core.ui.connector.technology-branch");
+            branchImage.preserveAspect = true;
+            branchImage.raycastTarget = false;
+
             content = CreateRect(viewport, "Research.Content");
             content.anchorMin = new Vector2(.5f, .5f);
             content.anchorMax = new Vector2(.5f, .5f);
@@ -367,12 +382,16 @@ namespace WasteCity.Graybox3D.Building
                 rect.anchoredPosition = projected.Position;
                 rect.sizeDelta = ResearchTreeProjection3D.NodeSize;
 
+                Image icon = CreateResearchIcon(rect, researchId);
+
                 Text name = CreateLabel(
                     rect,
                     "Research.Node." + researchId + ".Name",
                     definition.Name,
                     14);
                 Anchor(name.rectTransform, .72f, 1f);
+                name.rectTransform.offsetMin = new Vector2(56f, 0f);
+                name.rectTransform.offsetMax = new Vector2(-5f, 0f);
                 Text details = CreateLabel(
                     rect,
                     "Research.Node." + researchId + ".Details",
@@ -380,7 +399,7 @@ namespace WasteCity.Graybox3D.Building
                     9);
                 details.alignment = TextAnchor.MiddleLeft;
                 Anchor(details.rectTransform, .18f, .72f);
-                details.rectTransform.offsetMin = new Vector2(5f, 0f);
+                details.rectTransform.offsetMin = new Vector2(56f, 0f);
                 details.rectTransform.offsetMax = new Vector2(-5f, 0f);
                 Text state = CreateLabel(
                     rect,
@@ -391,8 +410,28 @@ namespace WasteCity.Graybox3D.Building
                 AddCostIcons(rect, definition);
                 nodeRows.Add(
                     researchId,
-                    new NodeRow(button, name, details, state));
+                    new NodeRow(button, icon, name, details, state));
             }
+        }
+
+        private static Image CreateResearchIcon(
+            Transform parent,
+            string researchId)
+        {
+            RectTransform rect = CreateRect(
+                parent,
+                "Research.Node." + researchId + ".Icon");
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.zero;
+            rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(6f, 50f);
+            rect.sizeDelta = new Vector2(48f, 48f);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.sprite = ResearchIconCatalog3D.Resolve(researchId);
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            image.gameObject.SetActive(image.sprite != null);
+            return image;
         }
 
         private void BuildConnections()
@@ -950,12 +989,28 @@ namespace WasteCity.Graybox3D.Building
             RectTransform rect = CreateRect(parent, name);
             Image background = rect.gameObject.AddComponent<Image>();
             background.color = ButtonColor;
+            ApplyFormalUiSprite(
+                background,
+                "core.ui.frame.secondary-card");
             var input = rect.gameObject.AddComponent<InputField>();
             input.targetGraphic = background;
 
+            RectTransform iconRect = CreateRect(rect, name + ".Icon");
+            iconRect.anchorMin = new Vector2(0f, .5f);
+            iconRect.anchorMax = new Vector2(0f, .5f);
+            iconRect.pivot = new Vector2(0f, .5f);
+            iconRect.anchoredPosition = new Vector2(6f, 0f);
+            iconRect.sizeDelta = new Vector2(20f, 20f);
+            Image icon = iconRect.gameObject.AddComponent<Image>();
+            icon.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                "core.ui.icon.search");
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+
             Text text = CreateLabel(rect, name + ".Text", string.Empty, 14);
             text.alignment = TextAnchor.MiddleLeft;
-            text.rectTransform.offsetMin = new Vector2(8f, 2f);
+            text.rectTransform.offsetMin = new Vector2(32f, 2f);
             text.rectTransform.offsetMax = new Vector2(-8f, -2f);
             Text placeholder = CreateLabel(
                 rect,
@@ -964,7 +1019,7 @@ namespace WasteCity.Graybox3D.Building
                 14);
             placeholder.alignment = TextAnchor.MiddleLeft;
             placeholder.color = new Color(.7f, .75f, .78f, 1f);
-            placeholder.rectTransform.offsetMin = new Vector2(8f, 2f);
+            placeholder.rectTransform.offsetMin = new Vector2(32f, 2f);
             placeholder.rectTransform.offsetMax = new Vector2(-8f, -2f);
             input.textComponent = text;
             input.placeholder = placeholder;
@@ -981,6 +1036,13 @@ namespace WasteCity.Graybox3D.Building
             RectTransform rect = CreateRect(parent, name);
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = ButtonColor;
+            ApplyFormalUiSprite(
+                image,
+                name.StartsWith(
+                    "Research.Node.",
+                    StringComparison.Ordinal)
+                    ? "core.ui.frame.technology-node"
+                    : "core.ui.control.primary-button");
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             if (callback != null)
@@ -988,6 +1050,18 @@ namespace WasteCity.Graybox3D.Building
             if (!string.IsNullOrEmpty(label))
                 CreateLabel(rect, name + ".Label", label, 13);
             return button;
+        }
+
+        private static void ApplyFormalUiSprite(Image image, string contentId)
+        {
+            if (image == null) return;
+            image.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                contentId);
+            image.type = image.sprite != null &&
+                image.sprite.border.sqrMagnitude > 0f
+                    ? Image.Type.Sliced
+                    : Image.Type.Simple;
         }
 
         private static Text CreateLabel(
@@ -1138,17 +1212,20 @@ namespace WasteCity.Graybox3D.Building
         {
             public NodeRow(
                 Button button,
+                Image icon,
                 Text name,
                 Text details,
                 Text state)
             {
                 Button = button;
+                Icon = icon;
                 Name = name;
                 Details = details;
                 State = state;
             }
 
             public Button Button { get; }
+            public Image Icon { get; }
             public Text Name { get; }
             public Text Details { get; }
             public Text State { get; }

@@ -156,6 +156,49 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0016_RealInventoryInputShowsFormalPanelAndLeaderArt()
+        {
+            GameObject inventory = RequireSceneObject(InventoryPanelName, true);
+            Assert.That(inventory.activeSelf, Is.False);
+
+            yield return TapKey(Key.E);
+            Assert.That(inventory.activeInHierarchy, Is.True);
+
+            Image panel = inventory.GetComponent<Image>();
+            Assert.That(panel, Is.Not.Null);
+            Assert.That(panel.type, Is.EqualTo(Image.Type.Sliced));
+            Assert.That(panel.sprite, Is.Not.Null);
+            Assert.That(panel.sprite.name, Is.EqualTo("ui-primary-panel"));
+
+            GameObject portraitObject = RequireSceneObject(
+                "InventoryCrafting.LeaderPortrait");
+            Image portrait = portraitObject.GetComponent<Image>();
+            Assert.That(portrait, Is.Not.Null);
+            Assert.That(portrait.sprite, Is.Not.Null);
+            Assert.That(portrait.sprite.name, Is.EqualTo("character-cen-jin"));
+            Assert.That(portrait.preserveAspect, Is.True);
+
+            yield return ClickUiElement(
+                RequireSceneObject("InventoryCrafting.Tab.Backpack"),
+                MouseButton.Left);
+            Assert.That(EventSystem.current.currentSelectedGameObject,
+                Is.Not.Null);
+            yield return TapKey(Key.E);
+            Assert.That(inventory.activeSelf, Is.False,
+                "A selected inventory button must not consume the E close key.");
+
+            yield return TapKey(Key.E);
+            yield return ClickUiElement(
+                RequireSceneObject("InventoryCrafting.Tab.City"),
+                MouseButton.Left);
+            yield return TapKey(Key.Escape);
+            Assert.That(inventory.activeSelf, Is.False,
+                "A selected inventory button must not consume Escape.");
+            Assert.That(Object.FindObjectOfType<GrayboxSystemMenuController3D>()
+                .IsOpen, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator IDEA0016_ResearchTreeOwnsRealViewportSearchAndModalInput()
         {
             GrayboxBuildingInteractionModel3D building =
@@ -163,6 +206,25 @@ namespace WasteCity.Tests
             yield return TapKey(Key.T);
             GameObject panel = RequireSceneObject(ResearchPanelName);
             Assert.That(panel.activeInHierarchy, Is.True);
+            Assert.That(panel.GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-primary-panel"));
+            Assert.That(RequireSceneObject("Research.Search")
+                    .GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-secondary-card"));
+            Assert.That(RequireSceneObject("Research.Search.Icon")
+                    .GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-search"));
+            Assert.That(RequireSceneObject("Research.BranchConnectorLegend")
+                    .GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-technology-branch-connector"));
+            string firstResearchId = ResearchCatalog.All[0].Id.Value;
+            Assert.That(RequireSceneObject("Research.Node." + firstResearchId)
+                    .GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-technology-node"));
+            Assert.That(RequireSceneObject(
+                    "Research.Filter.Route.Technology")
+                    .GetComponent<Image>().sprite.name,
+                Is.EqualTo("ui-primary-button"));
             RectTransform viewport = RequireSceneObject(
                     "Research.Viewport")
                 .GetComponent<RectTransform>();
@@ -238,6 +300,11 @@ namespace WasteCity.Tests
 
             GameObject bar = RequireSceneObject(ResourceBarName);
             Assert.That(bar.activeInHierarchy, Is.True);
+            ScrollRect resourceScroll = RequireSceneObject(
+                    "ResourceStatus.Viewport")
+                .GetComponent<ScrollRect>();
+            Assert.That(resourceScroll, Is.Not.Null);
+            Assert.That(resourceScroll.horizontal, Is.True);
             Graphic passiveBackground = RequireSceneObject(
                 "ResourceStatus.Background").GetComponent<Graphic>();
             Assert.That(passiveBackground, Is.Not.Null);
@@ -262,9 +329,10 @@ namespace WasteCity.Tests
                 Image icon = RequireSceneObject(
                         "ResourceStatus.Item." + resourceId + ".Icon")
                     .GetComponent<Image>();
+                Assert.That(icon.sprite, Is.Not.Null, resourceId);
                 Assert.That(icon.sprite,
-                    Is.SameAs(ResourceIconCatalog3D.Resolve(resourceId)),
-                    resourceId);
+                    Is.Not.SameAs(ResourceIconCatalog3D.Resolve(resourceId)),
+                    resourceId + " should use the serialized production icon");
                 Assert.That(amount.text,
                     Does.Contain(session.Inventory.Get(resourceId).ToString()),
                     resourceId);
@@ -287,8 +355,20 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject(
                     "ResourceStatus.Item." + ResourceIds.Ammunition,
                     includeInactive: true).activeInHierarchy,
-                Is.True,
-                "A discovered HUD resource must stay visible after depletion.");
+                Is.False,
+                "Discovery is derived from current authoritative facts and must not persist as hidden schema state.");
+            Assert.That(modifier.SetResource(ResourceIds.AcidGland, 3), Is.True);
+            yield return null;
+            Assert.That(RequireSceneObject(
+                    "ResourceStatus.Item." + ResourceIds.AcidGland,
+                    includeInactive: true).activeInHierarchy,
+                Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.AcidGland, 0), Is.True);
+            yield return null;
+            Assert.That(RequireSceneObject(
+                    "ResourceStatus.Item." + ResourceIds.AcidGland,
+                    includeInactive: true).activeInHierarchy,
+                Is.False);
             yield return HoverUiElement(
                 RequireSceneObject(
                     "ResourceStatus.Item." + ResourceIds.Iron));
@@ -297,6 +377,9 @@ namespace WasteCity.Tests
                 includeInactive: true);
             Assert.That(tooltip.activeInHierarchy, Is.True);
             Text tooltipText = RequireText("ResourceStatus.Tooltip.Text");
+            Assert.That(tooltipText.text,
+                Does.Contain("氧化废铁").And.Contain("来源：")
+                    .And.Contain("用途：").And.Contain("通用 · 原料"));
             Assert.That(tooltipText.text, Does.Contain("容量：基础"));
             Assert.That(tooltipText.text, Does.Contain("近期收入"));
             Assert.That(tooltipText.text, Does.Contain("近期净值"));
@@ -307,15 +390,49 @@ namespace WasteCity.Tests
                 MouseButton.Left);
             GameObject ledger = RequireSceneObject(ResourceLedgerName, true);
             Assert.That(ledger.activeInHierarchy, Is.True);
+            Assert.That(RequireSceneObject(
+                    "ResourceLedger.Items.Viewport")
+                .GetComponent<ScrollRect>(), Is.Not.Null);
+            string[] ledgerVisible = ResourceDefinitionCatalog
+                .BaseHudResourceIds
+                .Concat(new[] { ResourceIds.Alloy })
+                .ToArray();
             foreach (ResourceDefinition definition in ResourceDefinitionCatalog.All)
             {
                 Assert.That(
                     RequireSceneObject(
                         "ResourceLedger.Item." + definition.Id,
                         includeInactive: true).activeInHierarchy,
-                    Is.True,
+                    Is.EqualTo(ledgerVisible.Contains(definition.Id)),
                     definition.Id);
             }
+            yield return ClickUiElement(
+                RequireSceneObject(
+                    "ResourceLedger.Filter.Route.Technology"),
+                MouseButton.Left);
+            Assert.That(RequireSceneObject(
+                    "ResourceLedger.Item." + ResourceIds.Alloy,
+                    includeInactive: true).activeInHierarchy,
+                Is.True);
+            Assert.That(RequireSceneObject(
+                    "ResourceLedger.Item." + ResourceIds.Iron,
+                    includeInactive: true).activeInHierarchy,
+                Is.False);
+            yield return ClickUiElement(
+                RequireSceneObject(
+                    "ResourceLedger.Filter.Tier.Product"),
+                MouseButton.Left);
+            Assert.That(RequireSceneObject(
+                    "ResourceLedger.Item." + ResourceIds.Alloy,
+                    includeInactive: true).activeInHierarchy,
+                Is.False);
+            yield return ClickUiElement(
+                RequireSceneObject("ResourceLedger.Filter.All"),
+                MouseButton.Left);
+            Assert.That(RequireSceneObject(
+                    "ResourceLedger.Item." + ResourceIds.Iron,
+                    includeInactive: true).activeInHierarchy,
+                Is.True);
         }
 
         [UnityTest]
@@ -591,7 +708,7 @@ namespace WasteCity.Tests
                             ".Cost." + cost.ResourceId + ".Icon")
                         .GetComponent<Image>();
                     Assert.That(costIcon.sprite,
-                        Is.SameAs(ResourceIconCatalog3D.Resolve(
+                        Is.SameAs(ResolvePresentedResourceIcon(
                             cost.ResourceId)),
                         definition.Id.Value);
                 }
@@ -698,19 +815,24 @@ namespace WasteCity.Tests
             yield return ClickUiElement(
                 RequireSceneObject("InventoryCrafting.Tab.Crafting"),
                 MouseButton.Left);
+            yield return WaitForUiLayout();
 
             GameObject recipe = RequireSceneObject(
                 "Crafting.Recipe." + ResourceRecipeCatalog.FieldAlloyId);
+            yield return ScrollIntoView(
+                RequireSceneObject("Crafting.Recipes.Viewport")
+                    .GetComponent<ScrollRect>(),
+                recipe.GetComponent<RectTransform>());
             Assert.That(RequireSceneObject(
                     "Crafting.Recipe." +
                     ResourceRecipeCatalog.FieldAlloyId + ".Input." +
                     ResourceIds.Iron + ".Icon").GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
             Assert.That(RequireSceneObject(
                     "Crafting.Recipe." +
                     ResourceRecipeCatalog.FieldAlloyId + ".Output." +
                     ResourceIds.Alloy + ".Icon").GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Alloy)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Alloy)));
             Assert.That(recipe.GetComponentInChildren<Text>(true).text,
                 Does.Contain("当前可排 20"));
             Text count = RequireText("Crafting.Queue.Count");
@@ -746,6 +868,63 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0016_CraftingPageShowsScrollableFormalCatalogButQueuesOnlyManualRecipes()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(modifier.UnlockResearch(
+                ResearchCatalog.AutomatedMachineryId), Is.True);
+
+            yield return TapKey(Key.E);
+            yield return ClickUiElement(
+                RequireSceneObject("InventoryCrafting.Tab.Crafting"),
+                MouseButton.Left);
+            yield return WaitForUiLayout();
+
+            foreach (ResourceRecipeDefinition definition in
+                     ResourceRecipeCatalog.All)
+            {
+                GameObject card = RequireSceneObject(
+                    "Crafting.Recipe." + definition.Id);
+                Assert.That(card.activeInHierarchy, Is.True, definition.Id);
+                Assert.That(card.GetComponent<Button>().interactable,
+                    Is.EqualTo(
+                        definition.Kind == ResourceRecipeKind.ManualCrafting &&
+                        (definition.RequiredResearchIds.Count == 0 ||
+                         definition.RequiredResearchIds.All(
+                             session.IsResearchCompleted))),
+                    definition.Id);
+            }
+
+            ScrollRect recipes = RequireSceneObject(
+                    "Crafting.Recipes.Viewport")
+                .GetComponent<ScrollRect>();
+            Assert.That(recipes, Is.Not.Null);
+            Assert.That(recipes.vertical, Is.True);
+            Assert.That(recipes.content.rect.height,
+                Is.GreaterThan(recipes.viewport.rect.height));
+            float positionBefore = recipes.verticalNormalizedPosition;
+            recipes.verticalNormalizedPosition = .75f;
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+            Assert.That(recipes.verticalNormalizedPosition,
+                Is.LessThan(positionBefore));
+
+            ResourceRecipeDefinition machine = ResourceRecipeCatalog.All
+                .First(value => value.Kind == ResourceRecipeKind.Machine);
+            int queueBefore = Object.FindObjectOfType<
+                    GrayboxOperationsController3D>()
+                .Crafting.QueuedExecutionCount;
+            Assert.That(RequireSceneObject(
+                    "Crafting.Recipe." + machine.Id)
+                .GetComponent<Button>().interactable, Is.False);
+            Assert.That(Object.FindObjectOfType<
+                    GrayboxOperationsController3D>()
+                .Crafting.QueuedExecutionCount, Is.EqualTo(queueBefore));
+        }
+
+        [UnityTest]
         public IEnumerator IDEA0011_RealBackpackClicksMoveSplitAndReturnAtomically()
         {
             GrayboxBuildingSession3D session =
@@ -769,7 +948,7 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject(
                     "Inventory.City." + ResourceIds.Iron + ".Icon")
                     .GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
 
             yield return ClickUiElement(
                 RequireSceneObject("InventoryCrafting.Tab.Backpack"),
@@ -783,7 +962,7 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject(
                     "Inventory.Backpack.Slot.0.Icon")
                     .GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
             Assert.That(slot0.GetComponent<Button>(), Is.Not.Null,
                 "Backpack slots must receive real Input System clicks.");
             Assert.That(slot1.GetComponent<Button>(), Is.Not.Null);
@@ -977,7 +1156,7 @@ namespace WasteCity.Tests
                         true)
                     .GetComponent<Image>();
                 Assert.That(ledgerIcon.sprite,
-                    Is.SameAs(ResourceIconCatalog3D.Resolve(definition.Id)),
+                    Is.SameAs(ResolvePresentedResourceIcon(definition.Id)),
                     definition.Id);
                 Assert.That(warehouseIcon.sprite,
                     Is.SameAs(ledgerIcon.sprite),
@@ -1005,6 +1184,316 @@ namespace WasteCity.Tests
                 warehouse.StableInstanceId), Is.EqualTo(ResourceIds.Iron));
             Assert.That(RequireText("WarehouseDetail.FilterStatus").text,
                 Does.Contain("铁矿"));
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0016_RealMachineRecipeClickSwitchesSmelterAndMarksCurrentRecipe()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>();
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(production, Is.Not.Null);
+            Assert.That(operations, Is.Not.Null);
+            Assert.That(modifier.UnlockResearch(
+                BuildingCatalog.Smelter.RequiredResearchId), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 100), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Iron, 0), Is.True);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            Assert.That(world.Coordinates.TryWorldToCell(
+                city.transform.position,
+                out int cityX,
+                out int cityY), Is.True);
+
+            GrayboxBuildingInstance3D smelter = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Smelter,
+                cityX + 2,
+                cityY,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 0), Is.True);
+            float stateDeadline = Time.realtimeSinceStartup + 1f;
+            while (!production.Clock.Runtime.TryGetState(
+                       smelter.StableInstanceId,
+                       out _) &&
+                   Time.realtimeSinceStartup < stateDeadline)
+            {
+                yield return null;
+            }
+            Assert.That(production.Clock.Runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState initialState), Is.True);
+            Assert.That(initialState.Definition.Id,
+                Is.EqualTo(FormalProductionDefinitionCatalog.Smelting.Id));
+
+            Time.timeScale = 0f;
+            Assert.That(operations.TryOpenProductionDetail(
+                smelter.StableInstanceId), Is.True);
+            yield return null;
+            string rowName = RequireProductionRowName(
+                smelter.StableInstanceId);
+            string smeltingRecipeId =
+                FormalProductionDefinitionCatalog.Smelting.Id;
+            const string refinedStoneRecipeId =
+                "core.production.refine-stone";
+            string smeltingButtonName = rowName + ".Recipe." +
+                smeltingRecipeId;
+            string refinedStoneButtonName = rowName + ".Recipe." +
+                refinedStoneRecipeId;
+            Assert.That(RequireText(smeltingButtonName + ".Label").text,
+                Does.Contain("当前配方")
+                    .And.Contain("合金冶炼")
+                    .And.Contain("6秒")
+                    .And.Contain("铁矿")
+                    .And.Contain("合金")
+                    .And.Contain("科技："));
+            Assert.That(RequireText(refinedStoneButtonName + ".Label").text,
+                Does.Contain("精整石材")
+                    .And.Contain("石料")
+                    .And.Contain("精制石材"));
+
+            yield return ClickUiElement(
+                RequireSceneObject(refinedStoneButtonName),
+                MouseButton.Left);
+            Assert.That(production.Clock.Runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState selectedState), Is.True);
+            Assert.That(selectedState.Definition.Id,
+                Is.EqualTo(refinedStoneRecipeId));
+            Assert.That(RequireText(refinedStoneButtonName + ".Label").text,
+                Does.Contain("当前配方"));
+            Assert.That(RequireText(rowName + ".AccessStatus").text,
+                Does.Contain("已切换配方").And.Contain("精整石材"));
+
+            Assert.That(production.Tick(
+                GrayboxProductionClock3D.StepSeconds,
+                paused: false), Is.True);
+            operations.RefreshIfChanged();
+            Assert.That(production.Clock.Runtime.TryGetState(
+                smelter.StableInstanceId,
+                out BuildingProductionState synchronizedState), Is.True);
+            Assert.That(synchronizedState.Definition.Id,
+                Is.EqualTo(refinedStoneRecipeId));
+            Assert.That(RequireText(refinedStoneButtonName + ".Label").text,
+                Does.Contain("当前配方"));
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0016_RealMachineRecipeClickExplainsLockedResearch()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>();
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(modifier.UnlockResearch(
+                BuildingCatalog.Smelter.RequiredResearchId), Is.True);
+            Assert.That(modifier.UnlockResearch(
+                BuildingCatalog.Assembler.RequiredResearchId), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 100), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 100), Is.True);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            Assert.That(world.Coordinates.TryWorldToCell(
+                city.transform.position,
+                out int cityX,
+                out int cityY), Is.True);
+
+            GrayboxBuildingInstance3D smelter = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Smelter,
+                cityX + 2,
+                cityY,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            Assert.That(smelter.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            GrayboxBuildingInstance3D assembler = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Assembler,
+                cityX + 2,
+                cityY + 3,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 0), Is.True);
+            float stateDeadline = Time.realtimeSinceStartup + 1f;
+            while (!production.Clock.Runtime.TryGetState(
+                       assembler.StableInstanceId,
+                       out _) &&
+                   Time.realtimeSinceStartup < stateDeadline)
+            {
+                yield return null;
+            }
+            Assert.That(production.Clock.Runtime.TryGetState(
+                assembler.StableInstanceId,
+                out BuildingProductionState initialState), Is.True);
+
+            Time.timeScale = 0f;
+            Assert.That(operations.TryOpenProductionDetail(
+                assembler.StableInstanceId), Is.True);
+            yield return null;
+            string rowName = RequireProductionRowName(
+                assembler.StableInstanceId);
+            const string lockedRecipeId =
+                "technology.production.energy-cell";
+            string lockedButtonName = rowName + ".Recipe." + lockedRecipeId;
+            ResearchDefinition requiredResearch = ResearchCatalog.Find(
+                "core.research.thermal-engineering");
+            Assert.That(requiredResearch, Is.Not.Null);
+            Button lockedButton = RequireSceneObject(lockedButtonName)
+                .GetComponent<Button>();
+            Assert.That(lockedButton, Is.Not.Null);
+            Assert.That(lockedButton.interactable, Is.True,
+                "Locked recipes remain clickable so the formal runtime can explain the denial.");
+            Assert.That(RequireText(lockedButtonName + ".Label").text,
+                Does.Contain("封装能量电池")
+                    .And.Contain(requiredResearch.Name)
+                    .And.Contain("未解锁"));
+
+            yield return ClickUiElement(
+                lockedButton.gameObject,
+                MouseButton.Left);
+            Assert.That(production.Clock.Runtime.TryGetState(
+                assembler.StableInstanceId,
+                out BuildingProductionState unchangedState), Is.True);
+            Assert.That(unchangedState, Is.SameAs(initialState));
+            Assert.That(unchangedState.Definition.Id,
+                Is.EqualTo(FormalProductionDefinitionCatalog.Assembly.Id));
+            Assert.That(RequireText(rowName + ".AccessStatus").text,
+                Does.Contain("需要科技").And.Contain(requiredResearch.Name));
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0016_OutOfLogisticsMultiInputRecipeSuppliesEveryChannelFromBackpack()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>();
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            Assert.That(modifier.UnlockResearch(
+                BuildingCatalog.Smelter.RequiredResearchId), Is.True);
+            Assert.That(modifier.UnlockResearch(
+                BuildingCatalog.Assembler.RequiredResearchId), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Stone, 100), Is.True);
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 100), Is.True);
+            Assert.That(modifier.SetCityMode(CityMode.Fortress), Is.True);
+            Assert.That(world.Coordinates.TryWorldToCell(
+                city.transform.position,
+                out int cityX,
+                out int cityY), Is.True);
+
+            GrayboxBuildingInstance3D smelter = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Smelter,
+                cityX + 4,
+                cityY,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            Assert.That(smelter.State,
+                Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            GrayboxBuildingInstance3D assembler = BeginGroundConstruction(
+                session,
+                presentation,
+                BuildingCatalog.Assembler,
+                cityX + 1,
+                cityY + 1,
+                cityX,
+                cityY);
+            modifier.CompleteAllConstruction();
+            Assert.That(modifier.SetResource(ResourceIds.Alloy, 0), Is.True);
+            float stateDeadline = Time.realtimeSinceStartup + 1f;
+            while (!production.Clock.Runtime.TryGetState(
+                       assembler.StableInstanceId,
+                       out _) &&
+                   Time.realtimeSinceStartup < stateDeadline)
+            {
+                yield return null;
+            }
+
+            Time.timeScale = 0f;
+            Assert.That(operations.TryOpenProductionDetail(
+                assembler.StableInstanceId), Is.True);
+            yield return null;
+            string rowName = RequireProductionRowName(
+                assembler.StableInstanceId);
+            const string recipeId = "core.production.mix-coolant";
+            yield return ClickUiElement(
+                RequireSceneObject(rowName + ".Recipe." + recipeId),
+                MouseButton.Left);
+            Assert.That(production.Clock.Runtime.TryGetState(
+                assembler.StableInstanceId,
+                out BuildingProductionState selectedState), Is.True);
+            Assert.That(selectedState.Definition.Id, Is.EqualTo(recipeId));
+
+            Assert.That(modifier.SetCityMode(CityMode.Mobile), Is.True);
+            Assert.That(production.Tick(
+                GrayboxProductionClock3D.StepSeconds,
+                paused: false), Is.True);
+            operations.RefreshIfChanged();
+            Assert.That(selectedState.IsLogisticsConnected, Is.False);
+            Assert.That(operations.Backpack.Add(ResourceIds.Water, 4),
+                Is.EqualTo(4));
+            Assert.That(operations.Backpack.Add(ResourceIds.EnergyCrystal, 3),
+                Is.EqualTo(3));
+            operations.RefreshIfChanged();
+
+            string waterButtonName = rowName + ".InputTransfer." +
+                ResourceIds.Water;
+            string crystalButtonName = rowName + ".InputTransfer." +
+                ResourceIds.EnergyCrystal;
+            Assert.That(RequireText(waterButtonName + ".Label").text,
+                Does.Contain("补给").And.Contain("水").And.Contain("0/20"));
+            Assert.That(RequireText(crystalButtonName + ".Label").text,
+                Does.Contain("补给").And.Contain("能晶").And.Contain("0/20"));
+
+            yield return ShiftClickUiElement(
+                RequireSceneObject(waterButtonName));
+            yield return ShiftClickUiElement(
+                RequireSceneObject(crystalButtonName));
+            Assert.That(selectedState.Input.Get(ResourceIds.Water),
+                Is.EqualTo(4));
+            Assert.That(selectedState.Input.Get(ResourceIds.EnergyCrystal),
+                Is.EqualTo(3));
+            Assert.That(BackpackAmount(operations, ResourceIds.Water), Is.Zero);
+            Assert.That(BackpackAmount(
+                operations,
+                ResourceIds.EnergyCrystal), Is.Zero);
+            Assert.That(RequireText(rowName + ".AccessStatus").text,
+                Does.Contain("已转移 3"));
         }
 
         [UnityTest]
@@ -1157,9 +1646,9 @@ namespace WasteCity.Tests
             string productionRowName = RequireProductionRowName(
                 instance.StableInstanceId);
             GameObject input = RequireSceneObject(
-                productionRowName + ".InputTransfer");
+                productionRowName + ".InputTransfer." + ResourceIds.Iron);
             GameObject output = RequireSceneObject(
-                productionRowName + ".OutputTransfer");
+                productionRowName + ".OutputTransfer." + ResourceIds.Alloy);
             GameObject pause = RequireSceneObject(
                 productionRowName + ".Pause");
             Assert.That(input.GetComponent<Button>(), Is.Not.Null);
@@ -1174,11 +1663,11 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject(
                     productionRowName + ".Input.Icon")
                     .GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Iron)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
             Assert.That(RequireSceneObject(
                     productionRowName + ".Output.Icon")
                     .GetComponent<Image>().sprite,
-                Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Alloy)));
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Alloy)));
 
             yield return ClickUiElement(pause, MouseButton.Left);
             Assert.That(state.IsPlayerPaused, Is.True);
@@ -1453,6 +1942,37 @@ namespace WasteCity.Tests
             yield return null;
         }
 
+        private static IEnumerator WaitForUiLayout()
+        {
+            yield return null;
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+        }
+
+        private static IEnumerator ScrollIntoView(
+            ScrollRect scroll,
+            RectTransform target)
+        {
+            Assert.That(scroll, Is.Not.Null);
+            Assert.That(scroll.content, Is.Not.Null);
+            Assert.That(scroll.viewport, Is.Not.Null);
+            Assert.That(target, Is.Not.Null);
+            Canvas.ForceUpdateCanvases();
+            float maximumOffset = Mathf.Max(
+                0f,
+                scroll.content.rect.height - scroll.viewport.rect.height);
+            float targetOffset = Mathf.Clamp(
+                -target.anchoredPosition.y -
+                scroll.viewport.rect.height * .5f,
+                0f,
+                maximumOffset);
+            scroll.verticalNormalizedPosition = maximumOffset <= 0f
+                ? 1f
+                : 1f - targetOffset / maximumOffset;
+            Canvas.ForceUpdateCanvases();
+            yield return null;
+        }
+
         private IEnumerator DragPointer(
             Vector2 start,
             Vector2 end,
@@ -1624,6 +2144,17 @@ namespace WasteCity.Tests
             Assert.That(text, Is.Not.Null, name);
             Assert.That(value.activeInHierarchy, Is.True, name);
             return text;
+        }
+
+        private static Sprite ResolvePresentedResourceIcon(string resourceId)
+        {
+            Image icon = RequireSceneObject(
+                    "ResourceStatus.Item." + resourceId + ".Icon",
+                    true)
+                .GetComponent<Image>();
+            Assert.That(icon, Is.Not.Null, resourceId);
+            Assert.That(icon.sprite, Is.Not.Null, resourceId);
+            return icon.sprite;
         }
 
         private static int ParseLeadingInteger(string value)

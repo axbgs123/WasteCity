@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`c5f0c9b0414aaf29bb9066a8026c81c90c9e8d9f7856a2ab8ddc98d5c03514ea`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`7a28baf9647bfa5db3ee279c737dbd50af3b48391523e16336b915860a9ee926`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -47,6 +47,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
@@ -123,6 +124,7 @@
 - `Assets/_Game/Scripts/Economy/ProductionModel.cs`
 - `Assets/_Game/Scripts/Economy/ResourceCapacityPolicy.cs`
 - `Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`
+- `Assets/_Game/Scripts/Economy/ResourceDiscoveryProjection.cs`
 - `Assets/_Game/Scripts/Economy/ResourceExtractionProcess.cs`
 - `Assets/_Game/Scripts/Economy/ResourceIds.cs`
 - `Assets/_Game/Scripts/Economy/ResourceInventory.cs`
@@ -193,6 +195,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainMeshBuilder3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
@@ -202,6 +205,8 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
@@ -225,6 +230,15 @@
 - `Assets/_Game/Editor/FormalBuildTools.cs`
 - `Assets/_Game/Editor/GrayboxPerformanceProbe.cs`
 - `Assets/_Game/Editor/GrayboxSceneAuthoring.cs`
+- `Assets/_Game/Editor/Production2DBuildingIconCatalogBuilder.cs`
+- `Assets/_Game/Editor/Production2DBuildingImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DItemIconCatalogBuilder.cs`
+- `Assets/_Game/Editor/Production2DItemImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs`
+- `Assets/_Game/Editor/Production2DTechnologyIconCatalogBuilder.cs`
+- `Assets/_Game/Editor/Production2DTechnologyImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DUiCharacterMarkerImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs`
@@ -237,6 +251,7 @@
 - 界面与输入（`ui-input`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
@@ -305,6 +320,9 @@
 ## 6. ScriptableObject 资源
 - `WasteCity.ArtIntegration3D.FirstArtRuinsCliffProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
+- `WasteCity.Graybox3D.BuildingIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `WasteCity.Graybox3D.Production2DVisualCatalog3D`：`Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
+- `WasteCity.Graybox3D.ResearchIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `WasteCity.Graybox3D.ResourceIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `WasteCity.Presentation.VisualDefinition`：`Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `WasteCity.Presentation.VisualLibrary`：`Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
@@ -356,6 +374,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainMeshBuilder3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
@@ -365,6 +384,8 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`

@@ -20,6 +20,8 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxOperationsView3D : MonoBehaviour
     {
+        private const float ProductionRowBaseHeight = 192f;
+        private const float ProductionTransferButtonHeight = 28f;
         private static readonly Color PanelColor =
             new Color(.07f, .09f, .11f, .96f);
         private static readonly Color ButtonColor =
@@ -59,11 +61,15 @@ namespace WasteCity.Graybox3D.Building
         private int selectedBackpackSlot = -1;
         private int productionStateCount;
         private string hoveredResourceId;
+        private ResourceRoute? ledgerRouteFilter;
+        private ResourceTier? ledgerTierFilter;
 
         private readonly Dictionary<string, ResourceRow> statusRows =
             new Dictionary<string, ResourceRow>(StringComparer.Ordinal);
         private readonly Dictionary<string, ResourceRow> ledgerRows =
             new Dictionary<string, ResourceRow>(StringComparer.Ordinal);
+        private readonly Dictionary<string, bool> ledgerDiscovered =
+            new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly Dictionary<string, Text> cityRows =
             new Dictionary<string, Text>(StringComparer.Ordinal);
         private readonly Dictionary<string, Text> warehouseResourceRows =
@@ -84,9 +90,10 @@ namespace WasteCity.Graybox3D.Building
         public event Action<string, int> CraftRequested;
         public event Action CraftCancelRequested;
         public event Action<string, bool> ResourceHoverChanged;
-        public event Action<string, bool, bool>
+        public event Action<string, string, bool, bool>
             ProductionCacheTransferRequested;
         public event Action<string> ProductionPauseRequested;
+        public event Action<string, string> ProductionRecipeRequested;
         public event Action<string> ResearchSelected;
         public event Action ResearchStartRequested;
         public event Action ResearchCancelRequested;
@@ -128,6 +135,7 @@ namespace WasteCity.Graybox3D.Building
             ResourceHoverChanged = null;
             ProductionCacheTransferRequested = null;
             ProductionPauseRequested = null;
+            ProductionRecipeRequested = null;
             ResearchSelected = null;
             ResearchStartRequested = null;
             ResearchCancelRequested = null;
@@ -242,29 +250,55 @@ namespace WasteCity.Graybox3D.Building
             int capacity,
             float netFlow)
         {
+            SetLedgerResource(resourceId, true, amount, capacity, netFlow);
+        }
+
+        public void SetLedgerResource(
+            string resourceId,
+            bool visible,
+            int amount,
+            int capacity,
+            float netFlow)
+        {
             TryBuildUi();
             if (!ledgerRows.TryGetValue(resourceId, out ResourceRow row))
                 return;
-            if (row.HasValue && row.AmountValue == amount &&
+            if (row.HasValue &&
+                ledgerDiscovered.TryGetValue(
+                    resourceId,
+                    out bool wasDiscovered) &&
+                wasDiscovered == visible &&
+                row.AmountValue == amount &&
                 row.CapacityValue == capacity &&
                 Mathf.Approximately(row.NetFlowValue, netFlow))
                 return;
             row.HasValue = true;
-            row.Visible = true;
+            ledgerDiscovered[resourceId] = visible;
             row.AmountValue = amount;
             row.CapacityValue = capacity;
             row.NetFlowValue = netFlow;
-            row.Root.gameObject.SetActive(true);
             row.Amount.text = amount.ToString();
             row.Capacity.text = CapacityText(amount, capacity);
             row.NetFlow.text = FormatFlow(netFlow);
+            ApplyLedgerRowVisibility(resourceId, row);
         }
 
         public void SetCityResource(string resourceId, int amount)
         {
+            SetCityResource(resourceId, true, amount);
+        }
+
+        public void SetCityResource(
+            string resourceId,
+            bool visible,
+            int amount)
+        {
             TryBuildUi();
             if (cityRows.TryGetValue(resourceId, out Text label))
+            {
                 label.text = ResourceName(resourceId) + "  " + amount;
+                label.transform.parent.gameObject.SetActive(visible);
+            }
         }
 
         public void SetInventoryTransferStatus(string status)
@@ -359,6 +393,128 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
             if (index < 0 || productionStateContent == null) return;
             EnsureProductionRow(index).AccessStatus.text = status ?? string.Empty;
+        }
+
+        public void SetProductionRecipeCount(int index, int count)
+        {
+            TryBuildUi();
+            if (index < 0 || productionStateContent == null) return;
+            ProductionRow row = EnsureProductionRow(index);
+            int visibleCount = Math.Max(0, count);
+            row.RecipeCount = visibleCount;
+            row.RecipeSection.gameObject.SetActive(visibleCount > 0);
+            float recipeHeight = visibleCount > 0
+                ? 20f + visibleCount * 46f
+                : 0f;
+            SetLayout(row.RecipeSection, 0f, recipeHeight, 1f);
+            UpdateProductionRowHeight(row);
+            for (var recipeIndex = 0;
+                 recipeIndex < row.RecipeButtons.Count;
+                 recipeIndex++)
+            {
+                row.RecipeButtons[recipeIndex].Button.gameObject.SetActive(
+                    recipeIndex < visibleCount);
+            }
+        }
+
+        public void SetProductionRecipe(
+            int index,
+            int recipeIndex,
+            string recipeId,
+            string label,
+            bool current)
+        {
+            TryBuildUi();
+            if (index < 0 || recipeIndex < 0 ||
+                productionStateContent == null)
+            {
+                return;
+            }
+            ProductionRow row = EnsureProductionRow(index);
+            ProductionRecipeButton recipe = EnsureProductionRecipeButton(
+                row,
+                index,
+                recipeIndex);
+            recipe.RecipeId = recipeId ?? string.Empty;
+            recipe.Button.gameObject.name = row.Root.name + ".Recipe." +
+                recipe.RecipeId;
+            recipe.Label.gameObject.name =
+                recipe.Button.gameObject.name + ".Label";
+            recipe.Label.text = label ?? string.Empty;
+            recipe.Button.interactable = true;
+            recipe.Button.image.color = current ? SelectedColor : ButtonColor;
+            recipe.Button.gameObject.SetActive(recipeIndex < row.RecipeCount);
+        }
+
+        public void SetProductionTransferCount(
+            int index,
+            bool input,
+            int count)
+        {
+            TryBuildUi();
+            if (index < 0 || productionStateContent == null) return;
+            ProductionRow row = EnsureProductionRow(index);
+            int visibleCount = Math.Max(0, count);
+            RectTransform section = input
+                ? row.InputTransferSection
+                : row.OutputTransferSection;
+            List<ProductionTransferButton> buttons = input
+                ? row.InputTransferButtons
+                : row.OutputTransferButtons;
+            if (input)
+                row.InputTransferCount = visibleCount;
+            else
+                row.OutputTransferCount = visibleCount;
+            section.gameObject.SetActive(visibleCount > 0);
+            SetLayout(
+                section,
+                0f,
+                visibleCount * ProductionTransferButtonHeight,
+                1f);
+            for (var channelIndex = 0;
+                 channelIndex < buttons.Count;
+                 channelIndex++)
+            {
+                buttons[channelIndex].Button.gameObject.SetActive(
+                    channelIndex < visibleCount);
+            }
+            UpdateProductionRowHeight(row);
+        }
+
+        public void SetProductionTransferChannel(
+            int index,
+            bool input,
+            int channelIndex,
+            string resourceId,
+            int amount,
+            int capacity)
+        {
+            TryBuildUi();
+            if (index < 0 || channelIndex < 0 ||
+                productionStateContent == null)
+            {
+                return;
+            }
+            ProductionRow row = EnsureProductionRow(index);
+            ProductionTransferButton channel =
+                EnsureProductionTransferButton(
+                    row,
+                    index,
+                    input,
+                    channelIndex);
+            channel.ResourceId = resourceId ?? string.Empty;
+            string prefix = input ? "补给 " : "取出 ";
+            string sectionName = input ? ".InputTransfer." : ".OutputTransfer.";
+            channel.Button.gameObject.name = row.Root.name + sectionName +
+                channel.ResourceId;
+            channel.Label.gameObject.name =
+                channel.Button.gameObject.name + ".Label";
+            channel.Label.text = prefix + ResourceName(channel.ResourceId) +
+                " " + amount + "/" + capacity + "（Shift：背包）";
+            int visibleCount = input
+                ? row.InputTransferCount
+                : row.OutputTransferCount;
+            channel.Button.gameObject.SetActive(channelIndex < visibleCount);
         }
 
         public void SetProductionResourceIcons(
@@ -602,13 +758,35 @@ namespace WasteCity.Graybox3D.Building
             backgroundImage.color = PanelColor;
             backgroundImage.raycastTarget = false;
 
-            RectTransform items = CreateRect(resourceStatusBar, "Items");
-            Stretch(items);
+            RectTransform viewport = CreateRect(
+                resourceStatusBar,
+                "ResourceStatus.Viewport");
+            Stretch(viewport);
+            viewport.offsetMin = new Vector2(6f, 6f);
+            viewport.offsetMax = new Vector2(-6f, -6f);
+            Image viewportTarget = viewport.gameObject.AddComponent<Image>();
+            viewportTarget.color = new Color(0f, 0f, 0f, .01f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            RectTransform items = CreateRect(viewport, "Items");
+            items.anchorMin = new Vector2(0f, 0f);
+            items.anchorMax = new Vector2(0f, 1f);
+            items.pivot = new Vector2(0f, .5f);
+            items.anchoredPosition = Vector2.zero;
+            items.sizeDelta = Vector2.zero;
             var layout = items.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(6, 6, 6, 6);
             layout.spacing = 4f;
-            layout.childForceExpandWidth = true;
+            layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
+            var contentSize = items.gameObject.AddComponent<ContentSizeFitter>();
+            contentSize.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.content = items;
+            scroll.viewport = viewport;
+            scroll.horizontal = true;
+            scroll.vertical = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 28f;
 
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
@@ -624,6 +802,7 @@ namespace WasteCity.Graybox3D.Building
                     resourceId,
                     () => ResourceClicked?.Invoke(resourceId),
                     compact: true);
+                SetLayout(row.Root, 150f, 46f, 0f);
                 var trigger = row.Root.gameObject.AddComponent<EventTrigger>();
                 AddTrigger(
                     trigger,
@@ -641,8 +820,8 @@ namespace WasteCity.Graybox3D.Building
                 uiRoot,
                 "ResourceStatus.Tooltip",
                 new Vector2(.5f, 1f),
-                new Vector2(0f, -112f),
-                new Vector2(620f, 86f));
+                new Vector2(0f, -166f),
+                new Vector2(760f, 174f));
             resourceTooltipText = CreateLabel(
                 resourceTooltipRoot,
                 "ResourceStatus.Tooltip.Text",
@@ -672,23 +851,81 @@ namespace WasteCity.Graybox3D.Building
                 20);
             SetLayout(title.rectTransform, 0f, 34f, 1f);
 
+            RectTransform filters = CreateRect(
+                resourceLedgerPanel,
+                "ResourceLedger.Filters");
+            SetLayout(filters, 0f, 38f, 1f);
+            var filterLayout = filters.gameObject
+                .AddComponent<HorizontalLayoutGroup>();
+            filterLayout.spacing = 4f;
+            filterLayout.childForceExpandWidth = true;
+            filterLayout.childForceExpandHeight = true;
+            CreateButton(
+                filters,
+                "ResourceLedger.Filter.All",
+                "全部",
+                () => SetLedgerFilters(null, null));
+            CreateLedgerRouteFilter(filters, ResourceRoute.Common, "通用");
+            CreateLedgerRouteFilter(
+                filters,
+                ResourceRoute.Technology,
+                "科技");
+            CreateLedgerRouteFilter(
+                filters,
+                ResourceRoute.Cultivation,
+                "修仙");
+            CreateLedgerRouteFilter(
+                filters,
+                ResourceRoute.Biological,
+                "血肉");
+            CreateLedgerRouteFilter(filters, ResourceRoute.Psionics, "灵能");
+            CreateLedgerRouteFilter(filters, ResourceRoute.Fusion, "融合");
+            CreateLedgerTierFilter(filters, ResourceTier.Raw, "原料");
+            CreateLedgerTierFilter(
+                filters,
+                ResourceTier.Intermediate,
+                "中间品");
+            CreateLedgerTierFilter(filters, ResourceTier.Product, "制成品");
+
             RectTransform body = CreateRect(
                 resourceLedgerPanel,
                 "ResourceLedger.Body");
-            SetLayout(body, 0f, 580f, 1f);
+            SetLayout(body, 0f, 534f, 1f);
             var bodyLayout = body.gameObject.AddComponent<HorizontalLayoutGroup>();
             bodyLayout.spacing = 10f;
             bodyLayout.childForceExpandWidth = false;
             bodyLayout.childForceExpandHeight = true;
 
-            RectTransform grid = CreateRect(body, "ResourceLedger.Items");
-            SetLayout(grid, 748f, 0f, 0f);
+            RectTransform gridViewport = CreateRect(
+                body,
+                "ResourceLedger.Items.Viewport");
+            SetLayout(gridViewport, 748f, 0f, 0f);
+            Image gridTarget = gridViewport.gameObject.AddComponent<Image>();
+            gridTarget.color = new Color(0f, 0f, 0f, .01f);
+            gridViewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform grid = CreateRect(
+                gridViewport,
+                "ResourceLedger.Items");
+            grid.anchorMin = new Vector2(0f, 1f);
+            grid.anchorMax = new Vector2(1f, 1f);
+            grid.pivot = new Vector2(.5f, 1f);
+            grid.anchoredPosition = Vector2.zero;
+            grid.sizeDelta = Vector2.zero;
             var layout = grid.gameObject.AddComponent<GridLayoutGroup>();
             layout.cellSize = new Vector2(238f, 68f);
             layout.spacing = new Vector2(6f, 6f);
             layout.padding = new RectOffset(6, 6, 6, 6);
             layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             layout.constraintCount = 3;
+            var gridSize = grid.gameObject.AddComponent<ContentSizeFitter>();
+            gridSize.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var gridScroll = gridViewport.gameObject.AddComponent<ScrollRect>();
+            gridScroll.content = grid;
+            gridScroll.viewport = gridViewport;
+            gridScroll.horizontal = false;
+            gridScroll.vertical = true;
+            gridScroll.movementType = ScrollRect.MovementType.Clamped;
+            gridScroll.scrollSensitivity = 28f;
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
             {
@@ -700,6 +937,7 @@ namespace WasteCity.Graybox3D.Building
                     callback: null,
                     compact: false);
                 ledgerRows.Add(definition.Id, row);
+                ledgerDiscovered.Add(definition.Id, false);
             }
 
             RectTransform production = CreateRect(
@@ -763,6 +1001,60 @@ namespace WasteCity.Graybox3D.Building
                 () => SetLedgerOpen(false));
         }
 
+        private void CreateLedgerRouteFilter(
+            Transform parent,
+            ResourceRoute route,
+            string label)
+        {
+            CreateButton(
+                parent,
+                "ResourceLedger.Filter.Route." + route,
+                label,
+                () => SetLedgerFilters(route, ledgerTierFilter));
+        }
+
+        private void CreateLedgerTierFilter(
+            Transform parent,
+            ResourceTier tier,
+            string label)
+        {
+            CreateButton(
+                parent,
+                "ResourceLedger.Filter.Tier." + tier,
+                label,
+                () => SetLedgerFilters(ledgerRouteFilter, tier));
+        }
+
+        private void SetLedgerFilters(
+            ResourceRoute? route,
+            ResourceTier? tier)
+        {
+            ledgerRouteFilter = route;
+            ledgerTierFilter = tier;
+            foreach (KeyValuePair<string, ResourceRow> pair in ledgerRows)
+                ApplyLedgerRowVisibility(pair.Key, pair.Value);
+        }
+
+        private void ApplyLedgerRowVisibility(
+            string resourceId,
+            ResourceRow row)
+        {
+            if (row == null) return;
+            bool discovered = ledgerDiscovered.TryGetValue(
+                resourceId,
+                out bool current) && current;
+            bool matches = ResourceDefinitionCatalog.TryGet(
+                    resourceId,
+                    out ResourceDefinition definition) &&
+                (!ledgerRouteFilter.HasValue ||
+                 definition.Route == ledgerRouteFilter.Value) &&
+                (!ledgerTierFilter.HasValue ||
+                 definition.Tier == ledgerTierFilter.Value);
+            bool visible = discovered && matches;
+            row.Visible = visible;
+            row.Root.gameObject.SetActive(visible);
+        }
+
         private void BuildWarehouseDetail(Transform parent)
         {
             warehouseDetailPanel = CreateRect(parent, "WarehouseDetailPanel");
@@ -801,10 +1093,22 @@ namespace WasteCity.Graybox3D.Building
             warehouseCapacity.alignment = TextAnchor.MiddleLeft;
             SetLayout(warehouseCapacity.rectTransform, 0f, 22f, 1f);
 
-            RectTransform contents = CreateRect(
+            RectTransform contentsViewport = CreateRect(
                 warehouseDetailPanel,
+                "WarehouseDetail.Resources.Viewport");
+            SetLayout(contentsViewport, 0f, 210f, 1f);
+            Image contentsTarget = contentsViewport.gameObject
+                .AddComponent<Image>();
+            contentsTarget.color = new Color(0f, 0f, 0f, .01f);
+            contentsViewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform contents = CreateRect(
+                contentsViewport,
                 "WarehouseDetail.Resources");
-            SetLayout(contents, 0f, 210f, 1f);
+            contents.anchorMin = new Vector2(0f, 1f);
+            contents.anchorMax = new Vector2(1f, 1f);
+            contents.pivot = new Vector2(.5f, 1f);
+            contents.anchoredPosition = Vector2.zero;
+            contents.sizeDelta = Vector2.zero;
             var contentsLayout =
                 contents.gameObject.AddComponent<GridLayoutGroup>();
             contentsLayout.cellSize = new Vector2(142f, 36f);
@@ -812,6 +1116,17 @@ namespace WasteCity.Graybox3D.Building
             contentsLayout.constraint =
                 GridLayoutGroup.Constraint.FixedColumnCount;
             contentsLayout.constraintCount = 3;
+            var contentsSize = contents.gameObject
+                .AddComponent<ContentSizeFitter>();
+            contentsSize.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var contentsScroll = contentsViewport.gameObject
+                .AddComponent<ScrollRect>();
+            contentsScroll.content = contents;
+            contentsScroll.viewport = contentsViewport;
+            contentsScroll.horizontal = false;
+            contentsScroll.vertical = true;
+            contentsScroll.movementType = ScrollRect.MovementType.Clamped;
+            contentsScroll.scrollSensitivity = 28f;
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
             {
@@ -844,15 +1159,38 @@ namespace WasteCity.Graybox3D.Building
                 12);
             filterTitle.alignment = TextAnchor.MiddleLeft;
             SetLayout(filterTitle.rectTransform, 0f, 20f, 1f);
-            RectTransform filters = CreateRect(
+            RectTransform filterViewport = CreateRect(
                 warehouseDetailPanel,
+                "WarehouseDetail.Filter.Options.Viewport");
+            SetLayout(filterViewport, 0f, 156f, 1f);
+            Image filterTarget = filterViewport.gameObject
+                .AddComponent<Image>();
+            filterTarget.color = new Color(0f, 0f, 0f, .01f);
+            filterViewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform filters = CreateRect(
+                filterViewport,
                 "WarehouseDetail.Filter.Options");
-            SetLayout(filters, 0f, 156f, 1f);
+            filters.anchorMin = new Vector2(0f, 1f);
+            filters.anchorMax = new Vector2(1f, 1f);
+            filters.pivot = new Vector2(.5f, 1f);
+            filters.anchoredPosition = Vector2.zero;
+            filters.sizeDelta = Vector2.zero;
             var filterLayout = filters.gameObject.AddComponent<GridLayoutGroup>();
             filterLayout.cellSize = new Vector2(104f, 34f);
             filterLayout.spacing = new Vector2(5f, 5f);
             filterLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             filterLayout.constraintCount = 4;
+            var filterSize = filters.gameObject
+                .AddComponent<ContentSizeFitter>();
+            filterSize.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var filterScroll = filterViewport.gameObject
+                .AddComponent<ScrollRect>();
+            filterScroll.content = filters;
+            filterScroll.viewport = filterViewport;
+            filterScroll.horizontal = false;
+            filterScroll.vertical = true;
+            filterScroll.movementType = ScrollRect.MovementType.Clamped;
+            filterScroll.scrollSensitivity = 28f;
             Button any = CreateButton(
                 filters,
                 "WarehouseDetail.Filter.Any",
@@ -909,12 +1247,31 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(920f, 610f));
             AddVerticalLayout(inventoryCraftingPanel, 12, 8f);
 
+            RectTransform portraitRect = CreateRect(
+                inventoryCraftingPanel,
+                "InventoryCrafting.LeaderPortrait");
+            portraitRect.anchorMin = Vector2.one;
+            portraitRect.anchorMax = Vector2.one;
+            portraitRect.pivot = Vector2.one;
+            portraitRect.anchoredPosition = new Vector2(-14f, -14f);
+            portraitRect.sizeDelta = new Vector2(76f, 76f);
+            var portraitLayout = portraitRect.gameObject
+                .AddComponent<LayoutElement>();
+            portraitLayout.ignoreLayout = true;
+            Image portrait = portraitRect.gameObject.AddComponent<Image>();
+            portrait.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Character,
+                "core.character.cen-jin");
+            portrait.preserveAspect = true;
+            portrait.raycastTarget = false;
+
             Text title = CreateLabel(
                 inventoryCraftingPanel,
                 "InventoryCrafting.Title",
                 "库存与应急合成",
                 20);
             SetLayout(title.rectTransform, 0f, 36f, 1f);
+            title.rectTransform.offsetMax = new Vector2(-84f, 0f);
 
             RectTransform tabs = CreateRect(
                 inventoryCraftingPanel,
@@ -939,6 +1296,17 @@ namespace WasteCity.Graybox3D.Building
                 "InventoryCrafting.Tab.Crafting",
                 "应急合成",
                 () => SetInventoryTab(GrayboxInventoryTab3D.Crafting));
+
+            RectTransform divider = CreateRect(
+                inventoryCraftingPanel,
+                "InventoryCrafting.TerminalDivider");
+            Image dividerImage = divider.gameObject.AddComponent<Image>();
+            dividerImage.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                "core.ui.divider.terminal-horizontal");
+            dividerImage.type = Image.Type.Sliced;
+            dividerImage.raycastTarget = false;
+            SetLayout(divider, 0f, 8f, 1f);
 
             RectTransform pages = CreateRect(
                 inventoryCraftingPanel,
@@ -974,21 +1342,55 @@ namespace WasteCity.Graybox3D.Building
 
         private void BuildCityPage()
         {
-            var layout = cityPage.gameObject.AddComponent<GridLayoutGroup>();
+            RectTransform viewport = CreateRect(
+                cityPage,
+                "Inventory.City.Viewport");
+            Stretch(viewport);
+            Image viewportTarget = viewport.gameObject.AddComponent<Image>();
+            viewportTarget.color = new Color(0f, 0f, 0f, .01f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            RectTransform content = CreateRect(
+                viewport,
+                "Inventory.City.Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            var layout = content.gameObject.AddComponent<GridLayoutGroup>();
             layout.cellSize = new Vector2(280f, 52f);
             layout.spacing = new Vector2(8f, 8f);
             layout.padding = new RectOffset(8, 8, 8, 8);
             layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             layout.constraintCount = 3;
+            var contentSize = content.gameObject.AddComponent<ContentSizeFitter>();
+            contentSize.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 28f;
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
             {
                 string resourceId = definition.Id;
                 Button button = CreatePointerButton(
-                    cityPage,
+                    content,
                     "Inventory.City." + resourceId,
                     definition.ChineseName + "  0",
                     data => HandleCityResourceClick(resourceId, data));
+                EventTrigger hover = button.GetComponent<EventTrigger>() ??
+                    button.gameObject.AddComponent<EventTrigger>();
+                AddTrigger(
+                    hover,
+                    EventTriggerType.PointerEnter,
+                    _ => HandleResourceHover(resourceId, true));
+                AddTrigger(
+                    hover,
+                    EventTriggerType.PointerExit,
+                    _ => HandleResourceHover(resourceId, false));
                 CreateOverlayResourceIcon(
                     button.transform,
                     "Inventory.City." + resourceId + ".Icon",
@@ -1039,22 +1441,50 @@ namespace WasteCity.Graybox3D.Building
 
         private void BuildCraftingPage()
         {
-            AddVerticalLayout(craftingPage, 10, 8f);
+            RectTransform viewport = CreateRect(
+                craftingPage,
+                "Crafting.Recipes.Viewport");
+            viewport.anchorMin = new Vector2(0f, .31f);
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = new Vector2(8f, 6f);
+            viewport.offsetMax = new Vector2(-8f, -6f);
+            Image viewportTarget = viewport.gameObject.AddComponent<Image>();
+            viewportTarget.color = new Color(0f, 0f, 0f, .01f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            RectTransform content = CreateRect(
+                viewport,
+                "Crafting.Recipes.Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            AddVerticalLayout(content, 4, 6f);
+            var contentSize = content.gameObject.AddComponent<ContentSizeFitter>();
+            contentSize.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 28f;
+
             foreach (ResourceRecipeDefinition definition in
                      ResourceRecipeCatalog.All)
             {
-                if (definition.Kind != ResourceRecipeKind.ManualCrafting)
-                    continue;
                 string recipeId = definition.Id;
                 Button button = CreatePointerButton(
-                    craftingPage,
+                    content,
                     "Crafting.Recipe." + recipeId,
                     RecipeName(recipeId),
                     data => HandleRecipeClick(recipeId, data));
                 SetLayout(
                     button.GetComponent<RectTransform>(),
                     0f,
-                    66f,
+                    84f,
                     1f);
                 recipeButtons.Add(recipeId, button);
                 AddAmountIcons(
@@ -1067,12 +1497,17 @@ namespace WasteCity.Graybox3D.Building
                     "Crafting.Recipe." + recipeId + ".Output.",
                     definition.Outputs,
                     new Vector2(22f, -20f));
+                button.interactable =
+                    definition.Kind == ResourceRecipeKind.ManualCrafting;
             }
 
             RectTransform queue = CreateRect(
                 craftingPage,
                 "Crafting.Queue");
-            SetLayout(queue, 0f, 136f, 1f);
+            queue.anchorMin = Vector2.zero;
+            queue.anchorMax = new Vector2(1f, .29f);
+            queue.offsetMin = new Vector2(8f, 4f);
+            queue.offsetMax = new Vector2(-8f, -4f);
             Image background = queue.gameObject.AddComponent<Image>();
             background.color = new Color(.1f, .13f, .15f, .9f);
             background.raycastTarget = false;
@@ -1155,7 +1590,7 @@ namespace WasteCity.Graybox3D.Building
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
             RectTransform header = CreateRect(rect, name + ".Header");
-            SetLayout(header, 0f, compact ? 16f : 20f, 1f);
+            SetLayout(header, 0f, compact ? 22f : 26f, 1f);
             var headerLayout =
                 header.gameObject.AddComponent<HorizontalLayoutGroup>();
             headerLayout.spacing = 3f;
@@ -1166,12 +1601,12 @@ namespace WasteCity.Graybox3D.Building
                 header,
                 name + ".Icon",
                 resourceId);
-            SetLayout(icon.rectTransform, compact ? 15f : 18f, 0f, 0f);
+            SetLayout(icon.rectTransform, compact ? 20f : 24f, 0f, 0f);
             Text nameLabel = CreateLabel(header, name + ".Name", title, 12);
             SetLayout(nameLabel.rectTransform, 0f, 0f, 1f);
 
             RectTransform values = CreateRect(rect, name + ".Values");
-            SetLayout(values, 0f, compact ? 28f : 34f, 1f);
+            SetLayout(values, 0f, compact ? 20f : 34f, 1f);
             var valuesLayout =
                 values.gameObject.AddComponent<HorizontalLayoutGroup>();
             valuesLayout.childForceExpandWidth = true;
@@ -1262,7 +1697,7 @@ namespace WasteCity.Graybox3D.Building
             RectTransform root = CreateRect(
                 productionStateContent,
                 "ProductionState.Item." + index);
-            SetLayout(root, 0f, 158f, 1f);
+            SetLayout(root, 0f, 192f, 1f);
             Image background = root.gameObject.AddComponent<Image>();
             background.color = ButtonColor;
             background.raycastTarget = false;
@@ -1304,32 +1739,32 @@ namespace WasteCity.Graybox3D.Building
                 root,
                 "ProductionState.Item." + index + ".Input",
                 "输入：",
-                10);
+                9);
             input.alignment = TextAnchor.MiddleLeft;
             Image inputIcon = CreateOverlayResourceIcon(
                 input.transform,
                 "ProductionState.Item." + index + ".Input.Icon",
                 null,
-                14f,
-                new Vector2(8f, 0f));
+                20f,
+                new Vector2(11f, 0f));
             inputIcon.gameObject.SetActive(false);
-            input.rectTransform.offsetMin = new Vector2(22f, 0f);
-            SetLayout(input.rectTransform, 0f, 15f, 1f);
+            input.rectTransform.offsetMin = new Vector2(28f, 0f);
+            SetLayout(input.rectTransform, 0f, 32f, 1f);
             Text output = CreateLabel(
                 root,
                 "ProductionState.Item." + index + ".Output",
                 "输出：",
-                10);
+                9);
             output.alignment = TextAnchor.MiddleLeft;
             Image outputIcon = CreateOverlayResourceIcon(
                 output.transform,
                 "ProductionState.Item." + index + ".Output.Icon",
                 null,
-                14f,
-                new Vector2(8f, 0f));
+                20f,
+                new Vector2(11f, 0f));
             outputIcon.gameObject.SetActive(false);
-            output.rectTransform.offsetMin = new Vector2(22f, 0f);
-            SetLayout(output.rectTransform, 0f, 15f, 1f);
+            output.rectTransform.offsetMin = new Vector2(28f, 0f);
+            SetLayout(output.rectTransform, 0f, 32f, 1f);
 
             RectTransform actions = CreateRect(
                 root,
@@ -1340,37 +1775,11 @@ namespace WasteCity.Graybox3D.Building
             actionLayout.spacing = 6f;
             actionLayout.childForceExpandWidth = true;
             actionLayout.childForceExpandHeight = true;
-            Button inputTransfer = CreatePointerButton(
-                actions,
-                "ProductionState.Item." + index + ".InputTransfer",
-                "补给输入（Shift：背包）",
-                data => HandleProductionCacheTransfer(
-                    index,
-                    input: true,
-                    data: data));
-            Button outputTransfer = CreatePointerButton(
-                actions,
-                "ProductionState.Item." + index + ".OutputTransfer",
-                "取出输出（Shift：背包）",
-                data => HandleProductionCacheTransfer(
-                    index,
-                    input: false,
-                    data: data));
             Button pause = CreateButton(
                 actions,
                 "ProductionState.Item." + index + ".Pause",
                 "暂停运行",
                 () => HandleProductionPause(index));
-            SetLayout(
-                inputTransfer.GetComponent<RectTransform>(),
-                0f,
-                28f,
-                1f);
-            SetLayout(
-                outputTransfer.GetComponent<RectTransform>(),
-                0f,
-                28f,
-                1f);
             SetLayout(
                 pause.GetComponent<RectTransform>(),
                 0f,
@@ -1384,6 +1793,38 @@ namespace WasteCity.Graybox3D.Building
             accessStatus.alignment = TextAnchor.MiddleLeft;
             accessStatus.color = new Color(.95f, .78f, .42f, 1f);
             SetLayout(accessStatus.rectTransform, 0f, 16f, 1f);
+
+            RectTransform inputTransferSection = CreateRect(
+                root,
+                "ProductionState.Item." + index + ".InputTransfers");
+            AddVerticalLayout(inputTransferSection, 0, 0f);
+            SetLayout(inputTransferSection, 0f, 0f, 1f);
+            inputTransferSection.gameObject.SetActive(false);
+            RectTransform outputTransferSection = CreateRect(
+                root,
+                "ProductionState.Item." + index + ".OutputTransfers");
+            AddVerticalLayout(outputTransferSection, 0, 0f);
+            SetLayout(outputTransferSection, 0f, 0f, 1f);
+            outputTransferSection.gameObject.SetActive(false);
+
+            RectTransform recipeSection = CreateRect(
+                root,
+                "ProductionState.Item." + index + ".Recipes");
+            SetLayout(recipeSection, 0f, 0f, 1f);
+            var recipeLayout = recipeSection.gameObject
+                .AddComponent<VerticalLayoutGroup>();
+            recipeLayout.spacing = 2f;
+            recipeLayout.childForceExpandWidth = true;
+            recipeLayout.childForceExpandHeight = false;
+            Text recipeHeader = CreateLabel(
+                recipeSection,
+                "ProductionState.Item." + index + ".Recipes.Title",
+                "可选机器配方",
+                10);
+            recipeHeader.alignment = TextAnchor.MiddleLeft;
+            recipeHeader.color = new Color(.72f, .86f, .91f, 1f);
+            SetLayout(recipeHeader.rectTransform, 0f, 18f, 1f);
+            recipeSection.gameObject.SetActive(false);
             return new ProductionRow(
                 root,
                 stableId,
@@ -1395,7 +1836,98 @@ namespace WasteCity.Graybox3D.Building
                 inputIcon,
                 outputIcon,
                 pause,
-                accessStatus);
+                accessStatus,
+                inputTransferSection,
+                outputTransferSection,
+                recipeSection);
+        }
+
+        private ProductionTransferButton EnsureProductionTransferButton(
+            ProductionRow row,
+            int rowIndex,
+            bool input,
+            int channelIndex)
+        {
+            List<ProductionTransferButton> buttons = input
+                ? row.InputTransferButtons
+                : row.OutputTransferButtons;
+            RectTransform parent = input
+                ? row.InputTransferSection
+                : row.OutputTransferSection;
+            while (buttons.Count <= channelIndex)
+            {
+                int slot = buttons.Count;
+                Button button = CreatePointerButton(
+                    parent,
+                    "ProductionState.Item." + rowIndex +
+                    (input ? ".InputTransferSlot." : ".OutputTransferSlot.") +
+                    slot,
+                    string.Empty,
+                    data => HandleProductionCacheTransfer(
+                        rowIndex,
+                        input,
+                        slot,
+                        data));
+                SetLayout(
+                    button.GetComponent<RectTransform>(),
+                    0f,
+                    ProductionTransferButtonHeight,
+                    1f);
+                Text label = button.GetComponentInChildren<Text>(true);
+                label.fontSize = 10;
+                label.alignment = TextAnchor.MiddleLeft;
+                buttons.Add(new ProductionTransferButton(button, label));
+            }
+            return buttons[channelIndex];
+        }
+
+        private ProductionRecipeButton EnsureProductionRecipeButton(
+            ProductionRow row,
+            int rowIndex,
+            int recipeIndex)
+        {
+            while (row.RecipeButtons.Count <= recipeIndex)
+            {
+                int slot = row.RecipeButtons.Count;
+                Button button = CreateButton(
+                    row.RecipeSection,
+                    "ProductionState.Item." + rowIndex +
+                    ".RecipeSlot." + slot,
+                    string.Empty,
+                    () => HandleProductionRecipe(rowIndex, slot));
+                SetLayout(
+                    button.GetComponent<RectTransform>(),
+                    0f,
+                    44f,
+                    1f);
+                Text label = button.GetComponentInChildren<Text>(true);
+                label.fontSize = 10;
+                label.alignment = TextAnchor.MiddleLeft;
+                row.RecipeButtons.Add(new ProductionRecipeButton(
+                    button,
+                    label));
+            }
+            return row.RecipeButtons[recipeIndex];
+        }
+
+        private void HandleProductionRecipe(int rowIndex, int recipeIndex)
+        {
+            if (rowIndex < 0 || rowIndex >= productionRows.Count) return;
+            ProductionRow row = productionRows[rowIndex];
+            if (recipeIndex < 0 || recipeIndex >= row.RecipeCount ||
+                recipeIndex >= row.RecipeButtons.Count)
+            {
+                return;
+            }
+            string stableInstanceId = row.StableInstanceId;
+            string recipeId = row.RecipeButtons[recipeIndex].RecipeId;
+            if (!string.IsNullOrWhiteSpace(stableInstanceId) &&
+                !string.IsNullOrWhiteSpace(recipeId))
+            {
+                ProductionRecipeRequested?.Invoke(
+                    stableInstanceId,
+                    recipeId);
+            }
         }
 
         private void HandleProductionPause(int index)
@@ -1409,6 +1941,7 @@ namespace WasteCity.Graybox3D.Building
         private void HandleProductionCacheTransfer(
             int index,
             bool input,
+            int channelIndex,
             PointerEventData data)
         {
             if (data == null ||
@@ -1421,10 +1954,34 @@ namespace WasteCity.Graybox3D.Building
             string stableInstanceId =
                 productionRows[index].StableInstanceId;
             if (string.IsNullOrWhiteSpace(stableInstanceId)) return;
+            List<ProductionTransferButton> buttons = input
+                ? productionRows[index].InputTransferButtons
+                : productionRows[index].OutputTransferButtons;
+            if (channelIndex < 0 || channelIndex >= buttons.Count ||
+                string.IsNullOrWhiteSpace(buttons[channelIndex].ResourceId))
+            {
+                return;
+            }
             ProductionCacheTransferRequested?.Invoke(
                 stableInstanceId,
+                buttons[channelIndex].ResourceId,
                 input,
                 IsShiftPressed());
+        }
+
+        private static void UpdateProductionRowHeight(ProductionRow row)
+        {
+            float transferHeight =
+                (row.InputTransferCount + row.OutputTransferCount) *
+                ProductionTransferButtonHeight;
+            float recipeHeight = row.RecipeCount > 0
+                ? 20f + row.RecipeCount * 46f
+                : 0f;
+            SetLayout(
+                row.Root,
+                0f,
+                ProductionRowBaseHeight + transferHeight + recipeHeight,
+                1f);
         }
 
         private void RetireStaleRoots()
@@ -1476,6 +2033,7 @@ namespace WasteCity.Graybox3D.Building
             craftCancelButton = null;
             statusRows.Clear();
             ledgerRows.Clear();
+            ledgerDiscovered.Clear();
             cityRows.Clear();
             warehouseResourceRows.Clear();
             warehouseFilterButtons.Clear();
@@ -1487,6 +2045,8 @@ namespace WasteCity.Graybox3D.Building
             selectedBackpackSlot = -1;
             productionStateCount = 0;
             hoveredResourceId = null;
+            ledgerRouteFilter = null;
+            ledgerTierFilter = null;
         }
 
         private static RectTransform CreateFixedPanel(
@@ -1505,6 +2065,7 @@ namespace WasteCity.Graybox3D.Building
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = PanelColor;
             image.raycastTarget = false;
+            ApplyFormalUiSprite(image, "core.ui.frame.primary-panel");
             return rect;
         }
 
@@ -1524,6 +2085,7 @@ namespace WasteCity.Graybox3D.Building
             RectTransform rect = CreateRect(parent, name);
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = ButtonColor;
+            ApplyFormalUiSprite(image, "core.ui.control.primary-button");
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             SetLayout(rect, 0f, 38f, 1f);
@@ -1531,6 +2093,18 @@ namespace WasteCity.Graybox3D.Building
                 button.onClick.AddListener(() => callback());
             CreateLabel(rect, name + ".Label", label, 14);
             return button;
+        }
+
+        private static void ApplyFormalUiSprite(Image image, string contentId)
+        {
+            if (image == null) return;
+            image.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                contentId);
+            image.type = image.sprite != null &&
+                image.sprite.border.sqrMagnitude > 0f
+                    ? Image.Type.Sliced
+                    : Image.Type.Simple;
         }
 
         private static Button CreatePointerButton(
@@ -1740,7 +2314,8 @@ namespace WasteCity.Graybox3D.Building
                 " → " + FormatRecipeAmounts(definition.Outputs) +
                 " / " + definition.DurationSeconds.ToString(
                     "0.##",
-                    CultureInfo.InvariantCulture) + " 秒";
+                    CultureInfo.InvariantCulture) + " 秒\n" +
+                definition.LoreBrief;
         }
 
         private static string RecipeTitle(string recipeId)
@@ -1815,7 +2390,10 @@ namespace WasteCity.Graybox3D.Building
                 Image inputIcon,
                 Image outputIcon,
                 Button pause,
-                Text accessStatus)
+                Text accessStatus,
+                RectTransform inputTransferSection,
+                RectTransform outputTransferSection,
+                RectTransform recipeSection)
             {
                 Root = root;
                 StableId = stableId;
@@ -1828,6 +2406,14 @@ namespace WasteCity.Graybox3D.Building
                 OutputIcon = outputIcon;
                 Pause = pause;
                 AccessStatus = accessStatus;
+                InputTransferSection = inputTransferSection;
+                OutputTransferSection = outputTransferSection;
+                InputTransferButtons =
+                    new List<ProductionTransferButton>();
+                OutputTransferButtons =
+                    new List<ProductionTransferButton>();
+                RecipeSection = recipeSection;
+                RecipeButtons = new List<ProductionRecipeButton>();
             }
 
             public RectTransform Root { get; }
@@ -1842,6 +2428,41 @@ namespace WasteCity.Graybox3D.Building
             public Image OutputIcon { get; }
             public Button Pause { get; }
             public Text AccessStatus { get; }
+            public RectTransform InputTransferSection { get; }
+            public RectTransform OutputTransferSection { get; }
+            public List<ProductionTransferButton> InputTransferButtons { get; }
+            public List<ProductionTransferButton> OutputTransferButtons { get; }
+            public int InputTransferCount { get; set; }
+            public int OutputTransferCount { get; set; }
+            public RectTransform RecipeSection { get; }
+            public List<ProductionRecipeButton> RecipeButtons { get; }
+            public int RecipeCount { get; set; }
+        }
+
+        private sealed class ProductionTransferButton
+        {
+            public ProductionTransferButton(Button button, Text label)
+            {
+                Button = button;
+                Label = label;
+            }
+
+            public Button Button { get; }
+            public Text Label { get; }
+            public string ResourceId { get; set; }
+        }
+
+        private sealed class ProductionRecipeButton
+        {
+            public ProductionRecipeButton(Button button, Text label)
+            {
+                Button = button;
+                Label = label;
+            }
+
+            public Button Button { get; }
+            public Text Label { get; }
+            public string RecipeId { get; set; }
         }
     }
 }

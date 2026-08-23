@@ -1,6 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
+using Unity.Profiling;
 using WasteCity.Building;
 using WasteCity.Economy;
 using WasteCity.World;
@@ -356,6 +359,288 @@ namespace WasteCity.Tests
             Assert.That(later.StopReason, Is.EqualTo(ProductionStopReason.MissingInput));
         }
 
+        [Test]
+        public void MultiInputCycleReservesNothingUntilEveryIngredientIsAvailable()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState("multi-input.001", definition);
+            state.Input.Add(ResourceIds.Iron, 2);
+            var simulation = new FormalProductionSimulation();
+
+            Tick(simulation, state, 0f);
+
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(state.Input.Get(ResourceIds.EnergyCrystal), Is.Zero);
+            Assert.That(state.HasReservedInputs, Is.False);
+            Assert.That(state.ReservedInputs, Is.Empty);
+            Assert.That(state.StopReason,
+                Is.EqualTo(ProductionStopReason.MissingInput));
+
+            state.Input.Add(ResourceIds.EnergyCrystal, 1);
+            Tick(simulation, state, 1f);
+
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(state.Input.Get(ResourceIds.EnergyCrystal), Is.Zero);
+            Assert.That(state.HasReservedInputs, Is.True);
+            CollectionAssert.AreEqual(
+                new[] { ResourceIds.Iron, ResourceIds.EnergyCrystal },
+                state.ReservedInputs.Select(value => value.ResourceId));
+            CollectionAssert.AreEqual(
+                new[] { 2, 1 },
+                state.ReservedInputs.Select(value => value.Amount));
+
+            Tick(simulation, state, 3f);
+
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void MultiOutputCapacityBlocksCycleStartWithoutConsumingAnyInput()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState("multi-output.start", definition);
+            state.Input.Add(ResourceIds.Iron, 2);
+            state.Input.Add(ResourceIds.EnergyCrystal, 1);
+            state.Output.Add(ResourceIds.RefinedStone, 2);
+
+            Tick(new FormalProductionSimulation(), state, 0f);
+
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(2));
+            Assert.That(state.Input.Get(ResourceIds.EnergyCrystal), Is.EqualTo(1));
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.EqualTo(2));
+            Assert.That(state.HasReservedInputs, Is.False);
+            Assert.That(state.StopReason,
+                Is.EqualTo(ProductionStopReason.OutputFull));
+        }
+
+        [Test]
+        public void MultiOutputCompletionProducesNothingUntilEveryOutputFits()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState("multi-output.finish", definition);
+            state.Input.Add(ResourceIds.Iron, 2);
+            state.Input.Add(ResourceIds.EnergyCrystal, 1);
+            var simulation = new FormalProductionSimulation();
+            Tick(simulation, state, 2f);
+            state.Output.Add(ResourceIds.RefinedStone, 2);
+
+            Tick(simulation, state, 2f);
+
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.EqualTo(2));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.ProgressSeconds, Is.EqualTo(4f));
+            Assert.That(state.StopReason,
+                Is.EqualTo(ProductionStopReason.OutputFull));
+
+            Assert.That(state.Output.TrySpend(ResourceIds.RefinedStone, 1),
+                Is.True);
+            Tick(simulation, state, 0f);
+
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.EqualTo(3));
+            Assert.That(state.HasReservedInputs, Is.False);
+        }
+
+        [Test]
+        public void ConnectedMultiResourceMachineTransfersEveryInputAndOutputType()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState("multi-logistics.001", definition);
+            state.SetLogisticsConnected(true);
+            state.Output.Add(ResourceIds.Alloy, 1);
+            state.Output.Add(ResourceIds.RefinedStone, 2);
+            var city = new ResourceInventory(1000);
+            city.Add(ResourceIds.Iron, 2);
+            city.Add(ResourceIds.EnergyCrystal, 1);
+
+            Tick(new FormalProductionSimulation(), state, 0f, city);
+
+            Assert.That(city.Get(ResourceIds.Alloy), Is.EqualTo(1));
+            Assert.That(city.Get(ResourceIds.RefinedStone), Is.EqualTo(2));
+            Assert.That(city.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(city.Get(ResourceIds.EnergyCrystal), Is.Zero);
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.Zero);
+            Assert.That(state.HasReservedInputs, Is.True);
+        }
+
+        [Test]
+        public void AuthoritativeCityStorageTransfersEveryMultiResourceType()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState("multi-storage.001", definition);
+            state.SetLogisticsConnected(true);
+            state.Output.Add(ResourceIds.Alloy, 1);
+            state.Output.Add(ResourceIds.RefinedStone, 2);
+            var core = new ResourceInventory(1000);
+            core.Add(ResourceIds.Iron, 2);
+            core.Add(ResourceIds.EnergyCrystal, 1);
+            using (var cityStorage = new CityResourceStorageModel(core, 150))
+            {
+                new FormalProductionSimulation().Tick(
+                    new[] { state },
+                    0f,
+                    world: null,
+                    cityStorage: cityStorage,
+                    globallyPaused: false);
+
+                Assert.That(cityStorage.GetNetworkAmount(ResourceIds.Alloy),
+                    Is.EqualTo(1));
+                Assert.That(cityStorage.GetNetworkAmount(ResourceIds.RefinedStone),
+                    Is.EqualTo(2));
+                Assert.That(cityStorage.GetNetworkAmount(ResourceIds.Iron),
+                    Is.Zero);
+                Assert.That(cityStorage.GetNetworkAmount(ResourceIds.EnergyCrystal),
+                    Is.Zero);
+                Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
+                Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.Zero);
+                Assert.That(state.HasReservedInputs, Is.True);
+            }
+        }
+
+        [Test]
+        public void MultiResourceRestoreRejectsWrongDuplicateAndWrongAmountReservations()
+        {
+            IReadOnlyList<ResourceAmount>[] invalidReservations =
+            {
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.Stone, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.Iron, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 2),
+                },
+            };
+
+            for (int index = 0; index < invalidReservations.Length; index++)
+            {
+                var state = new BuildingProductionState(
+                    "multi-restore.invalid." + index,
+                    MultiResourceDefinition());
+
+                Assert.That(state.TryRestoreForPersistence(
+                    Array.Empty<ResourceAmount>(),
+                    hasReservedInputs: true,
+                    invalidReservations[index],
+                    Array.Empty<ResourceAmount>(),
+                    progressSeconds: 1f,
+                    isPlayerPaused: false,
+                    out string error), Is.False, error);
+                Assert.That(state.HasReservedInputs, Is.False);
+                Assert.That(state.ProgressSeconds, Is.Zero);
+            }
+        }
+
+        [Test]
+        public void MultiResourceRestoreAcceptsReversedReservationsAndCanonicalizesOrder()
+        {
+            FormalProductionDefinition definition = MultiResourceDefinition();
+            var state = new BuildingProductionState(
+                "multi-restore.reversed",
+                definition);
+
+            Assert.That(state.TryRestoreForPersistence(
+                Array.Empty<ResourceAmount>(),
+                hasReservedInputs: true,
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                },
+                Array.Empty<ResourceAmount>(),
+                progressSeconds: 1f,
+                isPlayerPaused: false,
+                out string error), Is.True, error);
+
+            CollectionAssert.AreEqual(
+                definition.Inputs,
+                state.ReservedInputs);
+        }
+
+        [Test]
+        public void MultiResourceProductionCrossesManyCyclesWithoutManagedAllocations()
+        {
+            const int warmupCycles = 2;
+            const int measuredCycles = 64;
+            const int reservedCycles = warmupCycles + measuredCycles + 1;
+            FormalProductionDefinition definition = MultiResourceDefinition(
+                inputCapacity: 512,
+                outputCapacity: 512);
+            var state = new BuildingProductionState(
+                "multi-allocation.001",
+                definition);
+            state.Input.Add(ResourceIds.Iron, reservedCycles * 2);
+            state.Input.Add(ResourceIds.EnergyCrystal, reservedCycles);
+            var states = new[] { state };
+            var city = new ResourceInventory(1000);
+            var cityCapacity = new ResourceCapacityPolicy();
+            var simulation = new FormalProductionSimulation();
+
+            simulation.Tick(
+                states,
+                warmupCycles * definition.DurationSeconds,
+                world: null,
+                cityInventory: city,
+                cityCapacity: cityCapacity,
+                activeWarehouseCount: 0,
+                globallyPaused: false);
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            ProfilerRecorder recorder = ProfilerRecorder.StartNew(
+                ProfilerCategory.Memory,
+                "GC.Alloc",
+                1024,
+                ProfilerRecorderOptions.StartImmediately |
+                ProfilerRecorderOptions.CollectOnlyOnCurrentThread |
+                ProfilerRecorderOptions.WrapAroundWhenCapacityReached);
+            long before = GC.GetAllocatedBytesForCurrentThread();
+
+            simulation.Tick(
+                states,
+                measuredCycles * definition.DurationSeconds,
+                world: null,
+                cityInventory: city,
+                cityCapacity: cityCapacity,
+                activeWarehouseCount: 0,
+                globallyPaused: false);
+
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+            recorder.Stop();
+            long profiledBytes = 0;
+            for (var index = 0; index < recorder.Count; index++)
+            {
+                ProfilerRecorderSample sample = recorder.GetSample(index);
+                profiledBytes += sample.Value * sample.Count;
+            }
+            recorder.Dispose();
+            TestContext.WriteLine(
+                "MultiResourceProductionAllocationBytes=" + allocated);
+            TestContext.WriteLine(
+                "MultiResourceProductionProfiledBytes=" + profiledBytes);
+            Assert.That(allocated, Is.Zero,
+                "A warmed multi-input/multi-output production path must not allocate per completed cycle.");
+            Assert.That(profiledBytes, Is.Zero,
+                "The Unity managed-allocation recorder must remain empty across completed cycles.");
+            Assert.That(state.Output.Get(ResourceIds.Alloy),
+                Is.EqualTo(warmupCycles + measuredCycles));
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone),
+                Is.EqualTo((warmupCycles + measuredCycles) * 2));
+            Assert.That(state.HasReservedInputs, Is.True);
+        }
+
         private static BuildingProductionState Smelter(string stableId, bool connected)
         {
             var state = new BuildingProductionState(
@@ -363,6 +648,48 @@ namespace WasteCity.Tests
                 FormalProductionDefinitionCatalog.Smelting);
             state.SetLogisticsConnected(connected);
             return state;
+        }
+
+        private static FormalProductionDefinition MultiResourceDefinition(
+            int inputCapacity = 10,
+            int outputCapacity = 3)
+        {
+            ConstructorInfo constructor = typeof(FormalProductionDefinition)
+                .GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    binder: null,
+                    new[]
+                    {
+                        typeof(string),
+                        typeof(string),
+                        typeof(float),
+                        typeof(IReadOnlyList<ResourceAmount>),
+                        typeof(IReadOnlyList<ResourceAmount>),
+                        typeof(int),
+                        typeof(int),
+                        typeof(bool),
+                    },
+                    modifiers: null);
+            Assert.That(constructor, Is.Not.Null);
+            return (FormalProductionDefinition)constructor.Invoke(new object[]
+            {
+                "test.production.multi-resource",
+                BuildingCatalog.Smelter.Id.Value,
+                4f,
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                },
+                new[]
+                {
+                    new ResourceAmount(ResourceIds.Alloy, 1),
+                    new ResourceAmount(ResourceIds.RefinedStone, 2),
+                },
+                inputCapacity,
+                outputCapacity,
+                false,
+            });
         }
 
         private static BuildingProductionState Mine(string stableId, bool connected)

@@ -1196,7 +1196,8 @@ namespace WasteCity.Tests
             Assert.That(
                 generatedRendererCount,
                 Is.EqualTo(view.TotalGeneratedRendererCount));
-            Assert.That(generatedRendererCount, Is.LessThan(64 * 24));
+            Assert.That(generatedRendererCount, Is.LessThan(64 * 32),
+                "Formal resource marker frames add one bounded renderer per node.");
         }
 
         [Test]

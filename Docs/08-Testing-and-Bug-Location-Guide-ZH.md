@@ -22,11 +22,23 @@
 
 ## IDEA-0011 生产与界面的检查边界
 
-`IDEA-0011` 的生产、背包、应急合成、六节点兼容研究和资源状态栏已经实现待验证；`IDEA-0016` 的正式研究目录、运行时和 43 节点科技树当前为部分实现。排查正式研究规则、初始根、倍率、暂停、退款或 schema `31` 恢复时，优先运行 `FormalResearchRuntimeTests` 与 `GrayboxFormalResearchSaveAdapterTests`；排查节点数、依赖边、确定布局、缩放或视图层级时，运行 `ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`；排查真实 T、搜索字符、双 Esc、拖动、滚轮、Home、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`。历史 `DemoResearchRuntimeTests` 继续作为六节点和退役内容兼容回归，不得替代正式目录测试。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
+`IDEA-0011` 的生产、背包、应急合成、六节点兼容研究和资源状态栏已经实现待验证；`IDEA-0016` 当前正在把它扩展为 31 种资源、30 条配方、正式研究运行时和 43 节点科技树。排查正式研究规则、初始根、倍率、暂停、退款或 schema `31` 恢复时，优先运行 `FormalResearchRuntimeTests` 与 `GrayboxFormalResearchSaveAdapterTests`；排查节点数、依赖边、确定布局、缩放或视图层级时，运行 `ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`；排查真实 T、搜索字符、双 Esc、拖动、滚轮、Home、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`。历史 `DemoResearchRuntimeTests` 继续作为六节点和退役内容兼容回归，不得替代正式目录测试。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
 
 不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。该测试只验证运行时生产闭环；自然开局的石料路径应由 `IDEA-0012` 的 seed `8128` 原始内容区可采石料节点及其场景测试单独证明。若试玩仍找不到或无法采集石料，应作为 `IDEA-0012` 回归记录，不要在测试里偷偷修改正式开局或建筑成本。
 
-本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。schema 必须保持 `30`；冻结 2D 不接新 UI 或新功能并只做回归，但共享稳定 `BuildingCatalog` 的首轮研究站人口门槛 `0` 会同步生效。敌人、炮塔和弹丸不属于本轮测试通过所能证明的范围。
+本阶段的聚焦 TDD 证据不能替代最终门：日常完整 EditMode、完整 PlayMode、项目质量检查、正式构建、文档生成和 `RecordVerification` 仍要在收尾时完成。真实 Windows 10 和 Windows 11 机器的视觉、GPU、显存、内存表现和用户试玩只能由实际执行结果确认；macOS 编辑器测试或跨平台构建成功不能替代这些结论。当前正式 3D 存档 schema 必须保持 `31`；已经退役的 2D 运行时不接新 UI 或新功能，schema `1–30` decoder、迁移和固定样本只做兼容回归。敌人、炮塔和弹丸不属于 `IDEA-0016` 本轮测试通过所能证明的范围。
+
+## IDEA-0016 资源、配方、修改器与二维资产检查边界
+
+`IDEA-0016` 当前是“开发中，主体已实现，待本轮完整验证”。聚焦检查已经覆盖部分子系统，但本节列出的类名只是收口入口，不代表完整回归、构建或人工验收已完成。
+
+按责任边界定位：31 种资源定义、来源用途和发现条件先查 `ResourceDefinitionCatalogTests` 与 `ResourceDiscoveryProjectionTests`；30 条配方、机器/手工边界和研究引用先查 `ResourceRecipeCatalogIntegrityTests`；多输入原子预留、多输出容量和停工原因先查 `FormalProductionSimulationTests`；同建筑多配方、切换拒绝、未知配方和生命周期先查 `GrayboxProductionRuntimeTests`；非默认配方及无序预留的 schema `31` 往返先查 `GrayboxFormalSaveProductionTests`；详情中的全部输入/输出通道、暂停与资源转移先查 `GrayboxProductionObservabilityFacadeTests`。不要从界面文字重新推导配方、容量、物流连接或发现状态。
+
+修改器目录、中文搜索和正式命令分别由 `GrayboxDeveloperModifierCatalogTests`、`GrayboxDeveloperModifierTests` 保护；数字键 `0`、文本焦点、双 Esc、世界输入抑制和 Release 无入口必须再跑 `GrayboxDeveloperModifierRuntimeInputTests` 与相关易用性测试。测试必须通过正式 Input System 主循环，不能只直接调用按钮方法。`F10` 继续无行为，stable ID 只用于内部键，主列表必须显示游戏中文名。
+
+二维资产按类别运行 `Production2DItemIconPipelineTests`、`Production2DBuildingIconPipelineTests`、`Production2DTechnologyIconPipelineTests` 和 `Production2DUiCharacterMarkerPipelineTests`；统一视觉目录与 SpriteAtlas 运行 `Production2DVisualCatalogAtlasTests`。当前统一目录/图集的六项聚焦 EditMode 检查已通过，只证明 114 个稳定视觉键、30 条配方视觉投影、六类 Atlas 和重复构建稳定性，不代表本轮完整回归或用户视觉验收。失败时先区分四层：源母版和透明 Alpha、Unity 交付 PNG 与 `.meta`、导入规则、运行时目录/消费者。导入器只能作用于 `Assets/_Game/Art/Production2D/`，不得触碰地形；GUID、尺寸、安全区、九宫格 Border、世界标记中央透明孔和重复构建字节稳定必须由资产测试读取。联络表、Alpha 检查和静态测试不能替代用户对正式图片的视觉判断，也不能推断真实 Windows GPU、显存和内存。
+
+真实 UI 回归统一补跑 `GrayboxProductionObservabilityRuntimeInputTests` 与受影响的建筑运行时输入测试，至少检查全部配方可滚动、只有两条应急手工配方可排队、资源账本筛选、机器配方选择、科技图标、建筑图标和所有文字输入焦点不穿透。最终仍须按顺序完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役 3D 构建、官方文档生成/验证和 `RecordVerification`；在这些门完成前，不得把 IDEA-0016 写成“已验证”。本轮未修改地形源、地形导入规则、Texture2DArray Builder 或数组生成，因此日常回归不运行 `TerrainAssetDeep`；只有真正进入发布准备时才单独补跑。
 
 ## BUG-0007 自然开局研究站与统一放置失败反馈
 

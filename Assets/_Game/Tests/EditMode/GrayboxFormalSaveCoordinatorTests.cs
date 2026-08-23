@@ -7,7 +7,10 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Building;
+using WasteCity.City;
 using WasteCity.Core;
+using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
@@ -764,6 +767,96 @@ namespace WasteCity.Tests
                 "Persistence must not overwrite unrelated pause ownership.");
         }
 
+        [Test]
+        public void Schema31CoordinatorRoundTripsRouteBuildingNonDefaultRecipe()
+        {
+            const string stableId = "building.instance.000001";
+            const string recipeId =
+                "biological.production.active-biomass";
+            FormalSaveEnvelope fixture = LoadFixtureEnvelope();
+            FormalThreeDSaveData payload = ClonePayload(fixture.formal3D);
+            FormalThreeDBuildingInstanceSaveData savedBuilding =
+                payload.buildings.instances.Single(instance =>
+                    instance.stableInstanceId == stableId);
+            savedBuilding.definitionId = BuildingCatalog.ColonyPool.Id.Value;
+            savedBuilding.boundResourceNodeId = string.Empty;
+            savedBuilding.boundNodeX = -1;
+            savedBuilding.boundNodeY = -1;
+
+            GrayboxBuildingInstance3D sourceInstance = CompleteInstance(
+                stableId,
+                BuildingCatalog.ColonyPool,
+                savedBuilding.x,
+                savedBuilding.y);
+            GrayboxProductionRuntime3D sourceRuntime = ProductionRuntime(
+                sourceInstance,
+                payload.city);
+            Assert.That(sourceRuntime.TrySelectRecipe(
+                    stableId,
+                    recipeId,
+                    new[] { "core.research.adaptive-tissue" },
+                    out GrayboxProductionRecipeSelectionResult3D selection),
+                Is.True,
+                selection.Status.ToString());
+            Assert.That(sourceRuntime.TryGetState(
+                stableId,
+                out BuildingProductionState sourceState), Is.True);
+            Assert.That(sourceState.Input.Add(
+                ResourceIds.BiomassConcentrate, 5), Is.EqualTo(5));
+            Assert.That(sourceState.Input.Add(
+                ResourceIds.EnergyCrystal, 3), Is.EqualTo(3));
+            Assert.That(sourceState.Output.Add(
+                ResourceIds.ActiveBiomass, 2), Is.EqualTo(2));
+            sourceState.SetPlayerPaused(true);
+
+            GrayboxFormalSaveCoordinator3D sourceCoordinator =
+                CoordinatorWithProduction(
+                    payload,
+                    sourceRuntime,
+                    new[] { sourceInstance });
+            GrayboxFormalSaveCoordinatorResult3D captured =
+                sourceCoordinator.CaptureEnvelope(
+                    payload.sessionId,
+                    fixture.gameVersion,
+                    fixture.contentSources,
+                    fixture.checkpoint,
+                    new DateTime(2026, 8, 23, 0, 0, 0,
+                        DateTimeKind.Utc));
+            Assert.That(captured.Success, Is.True, captured.Message);
+            Assert.That(captured.Envelope.saveSchemaVersion, Is.EqualTo(31));
+
+            GrayboxBuildingInstance3D targetInstance = CompleteInstance(
+                stableId,
+                BuildingCatalog.ColonyPool,
+                savedBuilding.x,
+                savedBuilding.y);
+            GrayboxProductionRuntime3D targetRuntime = ProductionRuntime(
+                targetInstance,
+                payload.city);
+            GrayboxFormalSaveCoordinator3D targetCoordinator =
+                CoordinatorWithProduction(
+                    ClonePayload(payload),
+                    targetRuntime,
+                    new[] { targetInstance });
+
+            GrayboxFormalSaveCoordinatorResult3D restored =
+                targetCoordinator.RestoreEncoded(
+                    FormalSaveCodec.EncodeEnvelope(captured.Envelope));
+
+            Assert.That(restored.Success, Is.True, restored.Message);
+            Assert.That(targetRuntime.TryGetState(
+                stableId,
+                out BuildingProductionState targetState), Is.True);
+            Assert.That(targetState.Definition.Id, Is.EqualTo(recipeId));
+            Assert.That(targetState.Input.Get(ResourceIds.BiomassConcentrate),
+                Is.EqualTo(5));
+            Assert.That(targetState.Input.Get(ResourceIds.EnergyCrystal),
+                Is.EqualTo(3));
+            Assert.That(targetState.Output.Get(ResourceIds.ActiveBiomass),
+                Is.EqualTo(2));
+            Assert.That(targetState.IsPlayerPaused, Is.True);
+        }
+
         private static Type RequireRuntimeType(string shortName)
         {
             string fullName = RuntimeNamespace + shortName;
@@ -1120,6 +1213,127 @@ namespace WasteCity.Tests
                 if (ThrowOnFirstInvocation && InvocationCount == 1)
                     throw new InvalidOperationException(InjectedFailure);
             }
+        }
+
+        private sealed class ProductionDomain : IFormalThreeDSaveDomain
+        {
+            private readonly GrayboxProductionSaveAdapter3D adapter;
+            private readonly IReadOnlyList<GrayboxBuildingInstance3D>
+                instances;
+
+            public ProductionDomain(
+                GrayboxProductionRuntime3D runtime,
+                IReadOnlyList<GrayboxBuildingInstance3D> instances)
+            {
+                adapter = new GrayboxProductionSaveAdapter3D(runtime);
+                this.instances = instances;
+            }
+
+            public GrayboxFormalSaveDomainId3D DomainId =>
+                GrayboxFormalSaveDomainId3D.Production;
+
+            public bool TryCapture(
+                FormalThreeDSaveData destination,
+                out string error)
+            {
+                destination.production = adapter.Capture();
+                error = string.Empty;
+                return true;
+            }
+
+            public bool TryApply(
+                FormalThreeDSaveData source,
+                out string error)
+            {
+                return adapter.TryRestore(
+                    source.production,
+                    instances,
+                    world: null,
+                    out error);
+            }
+        }
+
+        private static GrayboxFormalSaveCoordinator3D
+            CoordinatorWithProduction(
+                FormalThreeDSaveData payload,
+                GrayboxProductionRuntime3D runtime,
+                IReadOnlyList<GrayboxBuildingInstance3D> instances)
+        {
+            var authority = new MutableAuthority(payload);
+            var calls = new List<string>();
+            var pauses = new List<bool>();
+            IFormalThreeDSaveDomain[] domains =
+                GrayboxFormalSaveCoordinator3D.DomainOrder
+                    .Select(domainId => domainId ==
+                        GrayboxFormalSaveDomainId3D.Production
+                        ? (IFormalThreeDSaveDomain)new ProductionDomain(
+                            runtime,
+                            instances)
+                        : new FakeDomain(
+                            domainId,
+                            authority,
+                            calls,
+                            pauses,
+                            DomainFault.None))
+                    .ToArray();
+            return new GrayboxFormalSaveCoordinator3D(
+                domains,
+                new CountingRebuilder(calls, pauses));
+        }
+
+        private static GrayboxProductionRuntime3D ProductionRuntime(
+            GrayboxBuildingInstance3D instance,
+            FormalThreeDCitySaveData city)
+        {
+            var runtime = new GrayboxProductionRuntime3D();
+            runtime.Synchronize(
+                new[] { instance },
+                (CityMode)city.cityMode,
+                city.cellX,
+                city.cellY,
+                BuildingRangeRules.InitialGroundRadius);
+            return runtime;
+        }
+
+        private static GrayboxBuildingInstance3D CompleteInstance(
+            string stableId,
+            BuildingDefinition definition,
+            int x,
+            int y)
+        {
+            ConstructorInfo constructor = typeof(GrayboxBuildingInstance3D)
+                .GetConstructor(
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[]
+                    {
+                        typeof(string),
+                        typeof(PlacedBuilding),
+                        typeof(ConstructionProgress),
+                        typeof(ResourceNodeBinding),
+                    },
+                    null);
+            Assert.That(constructor, Is.Not.Null);
+            var instance = (GrayboxBuildingInstance3D)constructor.Invoke(
+                new object[]
+                {
+                    stableId,
+                    new PlacedBuilding(
+                        definition,
+                        x,
+                        y,
+                        BuildingSite.Ground,
+                        BuildingOrientation.North),
+                    new ConstructionProgress(definition.BuildSeconds),
+                    default(ResourceNodeBinding),
+                });
+            MethodInfo complete = typeof(GrayboxBuildingInstance3D)
+                .GetMethod(
+                    "Complete",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(complete, Is.Not.Null);
+            complete.Invoke(instance, Array.Empty<object>());
+            return instance;
         }
 
         private sealed class CoordinatorHarness

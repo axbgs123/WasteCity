@@ -98,13 +98,13 @@ namespace WasteCity.Tests
             Assert.That(view.ResourceNodeMarkerCount,
                 Is.EqualTo(model.ResourceNodeCount));
             Assert.That(view.ResourceNodeMarkerRendererCount,
-                Is.EqualTo(model.ResourceNodeCount * 2));
+                Is.EqualTo(model.ResourceNodeCount * 3));
             Assert.That(view.TotalGeneratedRendererCount,
                 Is.EqualTo(view.WorldRendererCount +
-                    model.ResourceNodeCount * 2));
+                    model.ResourceNodeCount * 3));
             Assert.That(view.TotalPersistentGeneratedObjectCount,
                 Is.EqualTo(view.PersistentGeneratedObjectCount +
-                    model.ResourceNodeCount * 3));
+                    model.ResourceNodeCount * 4));
             Assert.That(
                 view.GetComponentsInChildren<Renderer>(true).Length,
                 Is.EqualTo(view.TotalGeneratedRendererCount));
@@ -266,6 +266,10 @@ namespace WasteCity.Tests
             Assert.That(marker.DisplayText, Does.Contain("100"));
             Assert.That(marker.Icon,
                 Is.SameAs(ResourceIconCatalog3D.Resolve(ResourceIds.Stone)));
+            Assert.That(marker.Frame, Is.Not.Null);
+            Assert.That(marker.Frame.name,
+                Is.EqualTo("world-marker-resource-node"));
+            Assert.That(marker.transform.Find("Frame"), Is.Not.Null);
 
             Assert.That(model.Harvest(9, 0, 7, out string resourceId),
                 Is.EqualTo(7));

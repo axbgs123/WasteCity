@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -31,6 +32,10 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxFormalSaveEntryController3D formalSaveEntry;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
+        private readonly Dictionary<Keyboard, Action<char>>
+            developmentTextInputBindings =
+                new Dictionary<Keyboard, Action<char>>();
+        private bool observesDevelopmentInputDevices;
 
         public uint BuildingInputInvocationCount { get; private set; }
 
@@ -114,6 +119,24 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
+            EnsureDevelopmentPanelAdapter();
+            if (developmentPanel != null && developmentPanel.IsOpen)
+            {
+                if (buildingInput != null && HasActiveTextInputFocus())
+                {
+                    unchecked { BuildingInputInvocationCount++; }
+                    buildingInput.ProcessCurrentInput();
+                    return SuppressAll();
+                }
+
+                bool closeDevelopmentPressed = escapePressed ||
+                    (keyboard != null &&
+                     keyboard.digit0Key.wasPressedThisFrame);
+                if (closeDevelopmentPressed)
+                    developmentPanel.Close();
+                return SuppressAll();
+            }
+
             bool tacticalPausePressed = keyboard != null &&
                 keyboard.spaceKey.wasPressedThisFrame;
             if (tacticalPausePressed &&
@@ -148,7 +171,9 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
-            if (buildingInput != null && buildingInput.HasKeyboardFocus)
+            if (buildingInput != null &&
+                buildingInput.HasKeyboardFocus &&
+                (operations == null || !operations.IsAnyPanelOpen))
             {
                 unchecked { BuildingInputInvocationCount++; }
                 return buildingInput.ProcessCurrentInput();
@@ -223,6 +248,10 @@ namespace WasteCity.Graybox3D.Usability
                 buildingSuppression = buildingInput.ProcessCurrentInput();
             }
 
+            EnsureDevelopmentPanelAdapter();
+            if (developmentPanel != null && developmentPanel.IsOpen)
+                return SuppressAll();
+
             if (!escapePressed ||
                 buildingInput == null ||
                 (buildingInput.LastEscapeConsumed &&
@@ -240,15 +269,23 @@ namespace WasteCity.Graybox3D.Usability
         private void Awake()
         {
             EnsureDevelopmentPanelAdapter();
+            BindDevelopmentTextInput();
+        }
+
+        private void OnEnable()
+        {
+            BindDevelopmentTextInput();
         }
 
         private void OnDisable()
         {
+            UnbindDevelopmentTextInput();
             CloseOwnedMenu();
         }
 
         private void OnDestroy()
         {
+            UnbindDevelopmentTextInput();
             CloseOwnedMenu();
             buildingInput = null;
             systemMenu = null;
@@ -304,6 +341,130 @@ namespace WasteCity.Graybox3D.Usability
             return input != null &&
                    input.IsActive() &&
                    input.IsInteractable();
+        }
+
+        private void BindDevelopmentTextInput()
+        {
+            if (!isActiveAndEnabled) return;
+            if (!observesDevelopmentInputDevices)
+            {
+                InputSystem.onDeviceChange +=
+                    OnDevelopmentInputDeviceChange;
+                observesDevelopmentInputDevices = true;
+            }
+
+            for (var index = 0; index < InputSystem.devices.Count; index++)
+                if (InputSystem.devices[index] is Keyboard keyboard)
+                    BindDevelopmentKeyboard(keyboard);
+        }
+
+        private void UnbindDevelopmentTextInput()
+        {
+            if (observesDevelopmentInputDevices)
+            {
+                InputSystem.onDeviceChange -=
+                    OnDevelopmentInputDeviceChange;
+                observesDevelopmentInputDevices = false;
+            }
+
+            foreach (KeyValuePair<Keyboard, Action<char>> binding in
+                     developmentTextInputBindings)
+                binding.Key.onTextInput -= binding.Value;
+            developmentTextInputBindings.Clear();
+        }
+
+        private void OnDevelopmentInputDeviceChange(
+            InputDevice device,
+            InputDeviceChange change)
+        {
+            if (!(device is Keyboard keyboard)) return;
+            switch (change)
+            {
+                case InputDeviceChange.Added:
+                case InputDeviceChange.Reconnected:
+                case InputDeviceChange.Enabled:
+                    BindDevelopmentKeyboard(keyboard);
+                    break;
+                case InputDeviceChange.Removed:
+                case InputDeviceChange.Disconnected:
+                case InputDeviceChange.Disabled:
+                    UnbindDevelopmentKeyboard(keyboard);
+                    break;
+            }
+        }
+
+        private void BindDevelopmentKeyboard(Keyboard keyboard)
+        {
+            if (keyboard == null ||
+                developmentTextInputBindings.ContainsKey(keyboard))
+                return;
+            Action<char> callback = character =>
+                OnDevelopmentTextInput(keyboard, character);
+            developmentTextInputBindings.Add(keyboard, callback);
+            keyboard.onTextInput += callback;
+        }
+
+        private void UnbindDevelopmentKeyboard(Keyboard keyboard)
+        {
+            if (keyboard == null ||
+                !developmentTextInputBindings.TryGetValue(
+                    keyboard,
+                    out Action<char> callback))
+                return;
+            keyboard.onTextInput -= callback;
+            developmentTextInputBindings.Remove(keyboard);
+        }
+
+        private void OnDevelopmentTextInput(
+            Keyboard source,
+            char character)
+        {
+            if (!isActiveAndEnabled ||
+                source == null ||
+                !ReferenceEquals(source, Keyboard.current) ||
+                char.IsControl(character))
+                return;
+
+            InputField input = FocusedDevelopmentInput();
+            if (input == null) return;
+            string value = input.text ?? string.Empty;
+            int anchor = Mathf.Clamp(
+                input.selectionAnchorPosition,
+                0,
+                value.Length);
+            int focus = Mathf.Clamp(
+                input.selectionFocusPosition,
+                0,
+                value.Length);
+            int start = Mathf.Min(anchor, focus);
+            int length = Mathf.Abs(anchor - focus);
+            input.text = value.Remove(start, length)
+                .Insert(start, character.ToString());
+            input.caretPosition = start + 1;
+        }
+
+        private InputField FocusedDevelopmentInput()
+        {
+            if (developmentPanel == null || !developmentPanel.IsOpen)
+                return null;
+            EventSystem eventSystem = EventSystem.current;
+            GameObject selected = eventSystem == null
+                ? null
+                : eventSystem.currentSelectedGameObject;
+            InputField input = selected == null
+                ? null
+                : selected.GetComponentInParent<InputField>();
+            if (input == null || !input.isFocused)
+                return null;
+
+            Transform current = input.transform;
+            while (current != null)
+            {
+                if (current.name == "Graybox Developer Modifier")
+                    return input;
+                current = current.parent;
+            }
+            return null;
         }
 
         private static GrayboxInputSuppression SuppressAll()

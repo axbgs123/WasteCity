@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace WasteCity.Economy
 {
@@ -163,7 +162,9 @@ namespace WasteCity.Economy
             ResourceAmount[] restoredOutput =
                 outputValidation.CapturePositiveAmounts();
             IReadOnlyList<ResourceAmount> restoredReserved =
-                CopyAsReadOnly(reservedInputs);
+                hasReservedInputs
+                    ? CaptureDefinitionInputs()
+                    : EmptyAmounts;
 
             if (!Input.TryReplaceAll(
                     restoredInput,
@@ -197,18 +198,12 @@ namespace WasteCity.Economy
         private IReadOnlyList<ResourceAmount> CaptureDefinitionInputs()
         {
             if (Definition.UsesBoundResourceNode ||
-                string.IsNullOrEmpty(Definition.InputResourceId) ||
-                Definition.InputAmount <= 0)
+                Definition.Inputs.Count == 0)
             {
                 return EmptyAmounts;
             }
 
-            return Array.AsReadOnly(new[]
-            {
-                new ResourceAmount(
-                    Definition.InputResourceId,
-                    Definition.InputAmount),
-            });
+            return Definition.Inputs;
         }
 
         private bool ValidateReservedInputs(
@@ -227,31 +222,47 @@ namespace WasteCity.Economy
                 return false;
             }
 
-            if (values.Count != 1 ||
-                !string.Equals(
-                    values[0].ResourceId,
-                    Definition.InputResourceId,
-                    StringComparison.Ordinal) ||
-                values[0].Amount != Definition.InputAmount)
+            if (values.Count != Definition.Inputs.Count)
             {
                 error = "Reserved production inputs do not match the current recipe.";
                 return false;
+            }
+
+            var matched = new bool[Definition.Inputs.Count];
+            for (var valueIndex = 0;
+                 valueIndex < values.Count;
+                 valueIndex++)
+            {
+                ResourceAmount actual = values[valueIndex];
+                bool found = false;
+                for (var expectedIndex = 0;
+                     expectedIndex < Definition.Inputs.Count;
+                     expectedIndex++)
+                {
+                    ResourceAmount expected = Definition.Inputs[expectedIndex];
+                    if (matched[expectedIndex] ||
+                        !string.Equals(
+                            actual.ResourceId,
+                            expected.ResourceId,
+                            StringComparison.Ordinal) ||
+                        actual.Amount != expected.Amount)
+                    {
+                        continue;
+                    }
+                    matched[expectedIndex] = true;
+                    found = true;
+                    break;
+                }
+                if (!found)
+                {
+                    error = "Reserved production inputs do not match the current recipe.";
+                    return false;
+                }
             }
 
             error = string.Empty;
             return true;
         }
 
-        private static IReadOnlyList<ResourceAmount> CopyAsReadOnly(
-            IReadOnlyList<ResourceAmount> source)
-        {
-            if (source.Count == 0)
-                return EmptyAmounts;
-
-            var copy = new ResourceAmount[source.Count];
-            for (var index = 0; index < source.Count; index++)
-                copy[index] = source[index];
-            return new ReadOnlyCollection<ResourceAmount>(copy);
-        }
     }
 }

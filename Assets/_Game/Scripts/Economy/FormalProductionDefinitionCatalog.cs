@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using WasteCity.Building;
 
 namespace WasteCity.Economy
 {
@@ -96,43 +95,13 @@ namespace WasteCity.Economy
     public static class FormalProductionDefinitionCatalog
     {
         public static readonly FormalProductionDefinition Extraction =
-            new FormalProductionDefinition(
-                "core.production.extract-node-resource",
-                BuildingCatalog.MiningStation.Id.Value,
-                durationSeconds: 3f,
-                inputResourceId: null,
-                inputAmount: 0,
-                outputResourceId: null,
-                outputAmount: 1,
-                inputCapacity: 0,
-                outputCapacity: 20,
-                usesBoundResourceNode: true);
+            ProjectRequiredRecipe("core.production.extract-node-resource");
 
         public static readonly FormalProductionDefinition Smelting =
-            new FormalProductionDefinition(
-                "core.production.smelt-alloy",
-                BuildingCatalog.Smelter.Id.Value,
-                durationSeconds: 6f,
-                inputResourceId: ResourceIds.Iron,
-                inputAmount: 2,
-                outputResourceId: ResourceIds.Alloy,
-                outputAmount: 1,
-                inputCapacity: 20,
-                outputCapacity: 10,
-                usesBoundResourceNode: false);
+            ProjectRequiredRecipe("core.production.smelt-alloy");
 
         public static readonly FormalProductionDefinition Assembly =
-            new FormalProductionDefinition(
-                "core.production.assemble-ammunition",
-                BuildingCatalog.Assembler.Id.Value,
-                durationSeconds: 6f,
-                inputResourceId: ResourceIds.Alloy,
-                inputAmount: 2,
-                outputResourceId: ResourceIds.Ammunition,
-                outputAmount: 2,
-                inputCapacity: 20,
-                outputCapacity: 30,
-                usesBoundResourceNode: false);
+            ProjectRequiredRecipe("core.production.assemble-ammunition");
 
         private static readonly ReadOnlyCollection<FormalProductionDefinition> all =
             Array.AsReadOnly(new[]
@@ -147,6 +116,11 @@ namespace WasteCity.Economy
 
         private static readonly IReadOnlyDictionary<string, FormalProductionDefinition> byBuildingId =
             BuildLookup(definition => definition.BuildingId);
+
+        private static readonly Dictionary<string, FormalProductionDefinition>
+            resolvedRecipeDefinitions =
+                new Dictionary<string, FormalProductionDefinition>(
+                    StringComparer.Ordinal);
 
         public static IReadOnlyList<FormalProductionDefinition> All => all;
 
@@ -166,6 +140,100 @@ namespace WasteCity.Economy
             definition = null;
             return !string.IsNullOrWhiteSpace(buildingId) &&
                    byBuildingId.TryGetValue(buildingId, out definition);
+        }
+
+        public static bool TryResolveRecipe(
+            string recipeId,
+            string buildingId,
+            out FormalProductionDefinition definition)
+        {
+            definition = null;
+            if (string.IsNullOrWhiteSpace(recipeId) ||
+                string.IsNullOrWhiteSpace(buildingId) ||
+                !ResourceRecipeCatalog.TryGet(
+                    recipeId,
+                    out ResourceRecipeDefinition recipe) ||
+                recipe.Kind != ResourceRecipeKind.Machine ||
+                !ContainsOrdinal(recipe.AllowedBuildingIds, buildingId))
+            {
+                return false;
+            }
+
+            if (byId.TryGetValue(recipeId, out definition))
+            {
+                return string.Equals(
+                    definition.BuildingId,
+                    buildingId,
+                    StringComparison.Ordinal);
+            }
+
+            string cacheKey = buildingId + "\n" + recipeId;
+            if (resolvedRecipeDefinitions.TryGetValue(cacheKey, out definition))
+                return true;
+
+            definition = ProjectRecipe(recipe, buildingId);
+            resolvedRecipeDefinitions.Add(cacheKey, definition);
+            return true;
+        }
+
+        private static FormalProductionDefinition ProjectRequiredRecipe(
+            string recipeId)
+        {
+            if (!ResourceRecipeCatalog.TryGet(
+                    recipeId,
+                    out ResourceRecipeDefinition recipe) ||
+                recipe.Kind != ResourceRecipeKind.Machine ||
+                recipe.AllowedBuildingIds.Count != 1)
+            {
+                throw new InvalidOperationException(
+                    $"正式机器配方 {recipeId} 缺失或建筑归属不唯一。");
+            }
+
+            return ProjectRecipe(recipe, recipe.AllowedBuildingIds[0]);
+        }
+
+        private static FormalProductionDefinition ProjectRecipe(
+            ResourceRecipeDefinition recipe,
+            string buildingId)
+        {
+            return recipe.UsesBoundResourceNode
+                ? new FormalProductionDefinition(
+                    recipe.Id,
+                    buildingId,
+                    recipe.DurationSeconds,
+                    inputResourceId: null,
+                    inputAmount: 0,
+                    outputResourceId: null,
+                    outputAmount: recipe.BoundResourceNodeOutputAmount,
+                    inputCapacity: recipe.InputCapacity,
+                    outputCapacity: recipe.OutputCapacity,
+                    usesBoundResourceNode: true)
+                : new FormalProductionDefinition(
+                    recipe.Id,
+                    buildingId,
+                    recipe.DurationSeconds,
+                    recipe.Inputs,
+                    recipe.Outputs,
+                    recipe.InputCapacity,
+                    recipe.OutputCapacity,
+                    usesBoundResourceNode: false);
+        }
+
+        private static bool ContainsOrdinal(
+            IReadOnlyList<string> values,
+            string expected)
+        {
+            for (int index = 0; index < values.Count; index++)
+            {
+                if (string.Equals(
+                        values[index],
+                        expected,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static IReadOnlyDictionary<string, FormalProductionDefinition> BuildLookup(

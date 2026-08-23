@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Production2D-Buildings
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 0
+      compressionQuality: 0
+      maxTextureSize: 0
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: 1549e2a7c03ee4211ad22f70df6a8368, type: 3}
+    - {fileID: 2800000, guid: f7fccba22124c4529b996b0c7f4d7af6, type: 3}
+    - {fileID: 2800000, guid: 6abe66c54bd3d4db08e562273e47272d, type: 3}
+    - {fileID: 2800000, guid: 2c22f43e37f0746248e781f56a5dfc14, type: 3}
+    - {fileID: 2800000, guid: 35d05a7acb6ae41f98b7df096f8e2a03, type: 3}
+    - {fileID: 2800000, guid: 4aedf27c74dd74908850eeeab620e103, type: 3}
+    - {fileID: 2800000, guid: aa6483ef67ef34b14b26aeebfa4341b8, type: 3}
+    - {fileID: 2800000, guid: 838a0e0ab4a55433ea47820eb71d0ab2, type: 3}
+    - {fileID: 2800000, guid: 8db9adb27de3e4e67a42da39b13d4ada, type: 3}
+    - {fileID: 2800000, guid: d97f40d0570ff42988c4679f15ec1118, type: 3}
+    - {fileID: 2800000, guid: d03b5c1b19a1b4fc6beae0ae94f2dcf5, type: 3}
+    - {fileID: 2800000, guid: 154d9e11a66954f4c811c2cf03ed1e41, type: 3}
+    - {fileID: 2800000, guid: 842d05765762041a58402da991001abb, type: 3}
+    - {fileID: 2800000, guid: d9817cbc60ae24c2e8d8d4de50ce10f0, type: 3}
+    - {fileID: 2800000, guid: 75bdf6eaa9f1146f5bfd428a8cd8baac, type: 3}
+    - {fileID: 2800000, guid: 401a0edf670bd4b658fdae31d693d461, type: 3}
+    - {fileID: 2800000, guid: dff0e5a75eb094be38935e912c97f371, type: 3}
+    - {fileID: 2800000, guid: 97e8cd45d96b143d2bf0b30cd2cf6d59, type: 3}
+    - {fileID: 2800000, guid: 9f1e28d87e56147d3935149d1a9eb0a8, type: 3}
+    - {fileID: 2800000, guid: d3bb86dfc6430439e87c68422818738b, type: 3}
+    - {fileID: 2800000, guid: 18cc07884bec345cc854331a79527728, type: 3}
+    - {fileID: 2800000, guid: 0847600ab619c4d18ae1864d66ee4d81, type: 3}
+    - {fileID: 2800000, guid: 4d3f17978b7394e22b3f27bf2f287310, type: 3}
+    - {fileID: 2800000, guid: c2bd0200ce8644ad18860e832326e876, type: 3}
+    - {fileID: 2800000, guid: 88ccb67c113aa42d59d5a08adfe83e22, type: 3}
+    - {fileID: 2800000, guid: 9a5cb7e4826bf4250b816a233994df97, type: 3}
+    - {fileID: 2800000, guid: 71d4ec31f3b974bde8de61e6bff43829, type: 3}
+    - {fileID: 2800000, guid: 5aac83a35e9064c6b92356a663373c73, type: 3}
+    - {fileID: 2800000, guid: d112b9c7cd7a64e3ab7d246e1112ab76, type: 3}
+    - {fileID: 2800000, guid: 84e0150187f1f41bbad4da74faeeb372, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys: []
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites: []
+  m_PackedSpriteNamesToIndex: []
+  m_RenderDataMap: {}
+  m_Tag: Production2D-Buildings
+  m_IsVariant: 0

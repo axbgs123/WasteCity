@@ -863,6 +863,7 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+                    "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs",
                 });
             AssertReuseContract(
                 FindReuse(catalog, "building-production-state"),
@@ -983,6 +984,7 @@ namespace WasteCity.Tests
                 },
                 new[]
                 {
+                    "ProductionResourceObservability",
                     "ProductionBuildingObservability",
                     "ProductionObservabilitySnapshot",
                     "GrayboxProductionCommandFacade3D",
@@ -1144,6 +1146,7 @@ namespace WasteCity.Tests
             {
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+                "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
             }, iconCatalog.RequiredTestFiles);
             CollectionAssert.AreEqual(
                 new[] { "IDEA-0012", "IDEA-0016" },

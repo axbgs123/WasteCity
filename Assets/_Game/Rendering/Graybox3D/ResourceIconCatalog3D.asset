@@ -12,4 +12,66 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 17ec88cbea46441c8eec7abbd9342913, type: 3}
   m_Name: ResourceIconCatalog3D
   m_EditorClassIdentifier:
-  overrides: []
+  overrides:
+  - resourceId: biological.resource.acid-gland
+    sprite: {fileID: 21300000, guid: b2d9a31c9668c4dc1b0fda92c7bebfc4, type: 3}
+  - resourceId: biological.resource.active-biomass
+    sprite: {fileID: 21300000, guid: 8d549eaaa772a43de9ee1a81d4534c02, type: 3}
+  - resourceId: biological.resource.biomass-concentrate
+    sprite: {fileID: 21300000, guid: 1cb55b424f38f4024a1b1c3db4a01c73, type: 3}
+  - resourceId: biological.resource.bone-steel
+    sprite: {fileID: 21300000, guid: 6e8ef1436c3c5418ea3238ddcc7ec19a, type: 3}
+  - resourceId: biological.resource.mutant-gene
+    sprite: {fileID: 21300000, guid: d271622560a5c427093c519e1ea079a1, type: 3}
+  - resourceId: biological.resource.weapon
+    sprite: {fileID: 21300000, guid: ee12c1a704e1c422fa0699d15f5af0e0, type: 3}
+  - resourceId: core.resource.biomass
+    sprite: {fileID: 21300000, guid: ea8466c548c834fac9158ff45e69658e, type: 3}
+  - resourceId: core.resource.carbon-fiber
+    sprite: {fileID: 21300000, guid: 82f5a494a300f443d905ada87dc3416f, type: 3}
+  - resourceId: core.resource.coolant
+    sprite: {fileID: 21300000, guid: a16f80462fcb84166b6bb0732793ae1e, type: 3}
+  - resourceId: core.resource.energy-crystal
+    sprite: {fileID: 21300000, guid: 7b0feb39d58764cd78f54bd3800b06a2, type: 3}
+  - resourceId: core.resource.iron
+    sprite: {fileID: 21300000, guid: a0fd68e5792014409a84dba61c0c3faf, type: 3}
+  - resourceId: core.resource.refined-stone
+    sprite: {fileID: 21300000, guid: fd2ff94611f444402b8e86aa7d309113, type: 3}
+  - resourceId: core.resource.stone
+    sprite: {fileID: 21300000, guid: 701a923c0dea94c9fb3abc8a054715e3, type: 3}
+  - resourceId: core.resource.water
+    sprite: {fileID: 21300000, guid: cdd1e0fd6d5274e4bbe31ddca64b6069, type: 3}
+  - resourceId: cultivation.resource.elixir
+    sprite: {fileID: 21300000, guid: 1be435102cbc64411a439138b7678426, type: 3}
+  - resourceId: cultivation.resource.flying-sword
+    sprite: {fileID: 21300000, guid: d8b122e5ab90a4c8a9124418ff8635d4, type: 3}
+  - resourceId: cultivation.resource.formation-core
+    sprite: {fileID: 21300000, guid: f45ff07d6c5a54bed95d1d01bef06681, type: 3}
+  - resourceId: cultivation.resource.spirit-iron
+    sprite: {fileID: 21300000, guid: 73aa3721731e346e6b622a6883dd19b1, type: 3}
+  - resourceId: cultivation.resource.spirit-stone
+    sprite: {fileID: 21300000, guid: 41086ad6034f640ecaf10fbec5999756, type: 3}
+  - resourceId: fusion.resource.hybrid-core
+    sprite: {fileID: 21300000, guid: 70ebf85ce802b4ac88640212289de521, type: 3}
+  - resourceId: fusion.resource.spirit-plant-extract
+    sprite: {fileID: 21300000, guid: e8d54f385388c459da72c653aadaefdb, type: 3}
+  - resourceId: psionics.resource.amplifier
+    sprite: {fileID: 21300000, guid: 907f66794103c4ef3afe8e7728208f52, type: 3}
+  - resourceId: psionics.resource.consciousness-shard
+    sprite: {fileID: 21300000, guid: 10559f9a4710241e98fbefab7dd74f54, type: 3}
+  - resourceId: psionics.resource.psionic-crystal
+    sprite: {fileID: 21300000, guid: 4285c25e7e01a48f8a407af17b2dbecd, type: 3}
+  - resourceId: psionics.resource.resonance-metal
+    sprite: {fileID: 21300000, guid: 08e20a83a63464de782628c0f4076fa8, type: 3}
+  - resourceId: technology.resource.alloy
+    sprite: {fileID: 21300000, guid: f7490fca6775b4c08aab6012fead6527, type: 3}
+  - resourceId: technology.resource.ammunition
+    sprite: {fileID: 21300000, guid: 677e39f8512cf4cb4ad110315d1bda64, type: 3}
+  - resourceId: technology.resource.control-chip
+    sprite: {fileID: 21300000, guid: 528a21f8d6a4646cc941f076e9c82266, type: 3}
+  - resourceId: technology.resource.energy-cell
+    sprite: {fileID: 21300000, guid: c98015ff0e94e4646a38d850a8d9f3d4, type: 3}
+  - resourceId: technology.resource.mechanical-component
+    sprite: {fileID: 21300000, guid: eaa4b3a11f65245d2b9da4274a962ef7, type: 3}
+  - resourceId: technology.resource.superconductive-coil
+    sprite: {fileID: 21300000, guid: 2a001a538d51d4f4bbe1f4eeab6b6e10, type: 3}

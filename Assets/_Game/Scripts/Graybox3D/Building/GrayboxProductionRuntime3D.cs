@@ -4,10 +4,156 @@ using System.Collections.ObjectModel;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Economy;
+using WasteCity.Research;
 using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public enum GrayboxProductionRecipeSelectionStatus3D
+    {
+        Completed,
+        AlreadySelected,
+        BuildingNotFound,
+        RecipeNotFound,
+        RecipeNotMachine,
+        RecipeNotAllowedForBuilding,
+        BuildingNotCompleted,
+        BuildingNotPlayerOwned,
+        BuildingEvacuationLocked,
+        ResearchNotCompleted,
+        ProductionStateUnavailable,
+        CycleInProgress,
+        InputNotEmpty,
+        OutputNotEmpty,
+    }
+
+    public sealed class GrayboxProductionRecipeSelectionResult3D
+    {
+        internal GrayboxProductionRecipeSelectionResult3D(
+            GrayboxProductionRecipeSelectionStatus3D status,
+            string missingResearchId = null)
+        {
+            Status = status;
+            MissingResearchId = missingResearchId ?? string.Empty;
+        }
+
+        public GrayboxProductionRecipeSelectionStatus3D Status { get; }
+        public string MissingResearchId { get; }
+        public bool Succeeded =>
+            Status == GrayboxProductionRecipeSelectionStatus3D.Completed ||
+            Status == GrayboxProductionRecipeSelectionStatus3D.AlreadySelected;
+    }
+
+    internal static class GrayboxMachineRecipeCatalog3D
+    {
+        private static readonly IReadOnlyDictionary<
+            string,
+            ReadOnlyCollection<ResourceRecipeDefinition>> recipesByBuildingId;
+        private static readonly IReadOnlyDictionary<
+            string,
+            ResourceRecipeDefinition> defaultRecipeByBuildingId;
+
+        static GrayboxMachineRecipeCatalog3D()
+        {
+            var mutableRecipes = new Dictionary<
+                string,
+                List<ResourceRecipeDefinition>>(StringComparer.Ordinal);
+            IReadOnlyList<ResourceRecipeDefinition> recipes =
+                ResourceRecipeCatalog.All;
+            for (int recipeIndex = 0;
+                 recipeIndex < recipes.Count;
+                 recipeIndex++)
+            {
+                ResourceRecipeDefinition recipe = recipes[recipeIndex];
+                if (recipe.Kind != ResourceRecipeKind.Machine)
+                    continue;
+                for (int buildingIndex = 0;
+                     buildingIndex < recipe.AllowedBuildingIds.Count;
+                     buildingIndex++)
+                {
+                    string buildingId = recipe.AllowedBuildingIds[buildingIndex];
+                    if (!mutableRecipes.TryGetValue(
+                            buildingId,
+                            out List<ResourceRecipeDefinition> buildingRecipes))
+                    {
+                        buildingRecipes = new List<ResourceRecipeDefinition>();
+                        mutableRecipes.Add(buildingId, buildingRecipes);
+                    }
+                    buildingRecipes.Add(recipe);
+                }
+            }
+
+            var frozenRecipes = new Dictionary<
+                string,
+                ReadOnlyCollection<ResourceRecipeDefinition>>(
+                    mutableRecipes.Count,
+                    StringComparer.Ordinal);
+            var defaults = new Dictionary<string, ResourceRecipeDefinition>(
+                mutableRecipes.Count,
+                StringComparer.Ordinal);
+            foreach (KeyValuePair<string, List<ResourceRecipeDefinition>> entry
+                     in mutableRecipes)
+            {
+                ResourceRecipeDefinition defaultRecipe = null;
+                for (int index = 0; index < entry.Value.Count; index++)
+                {
+                    if (!entry.Value[index].DefaultForBuilding)
+                        continue;
+                    if (defaultRecipe != null)
+                    {
+                        throw new InvalidOperationException(
+                            "Machine building has multiple default recipes: " +
+                            entry.Key);
+                    }
+                    defaultRecipe = entry.Value[index];
+                }
+                if (defaultRecipe == null)
+                {
+                    throw new InvalidOperationException(
+                        "Machine building has no default recipe: " + entry.Key);
+                }
+
+                frozenRecipes.Add(
+                    entry.Key,
+                    new ReadOnlyCollection<ResourceRecipeDefinition>(
+                        entry.Value.ToArray()));
+                defaults.Add(entry.Key, defaultRecipe);
+            }
+
+            recipesByBuildingId = new ReadOnlyDictionary<
+                string,
+                ReadOnlyCollection<ResourceRecipeDefinition>>(frozenRecipes);
+            defaultRecipeByBuildingId = new ReadOnlyDictionary<
+                string,
+                ResourceRecipeDefinition>(defaults);
+        }
+
+        public static bool TryGetRecipes(
+            string buildingId,
+            out IReadOnlyList<ResourceRecipeDefinition> recipes)
+        {
+            recipes = null;
+            if (string.IsNullOrWhiteSpace(buildingId) ||
+                !recipesByBuildingId.TryGetValue(
+                    buildingId,
+                    out ReadOnlyCollection<ResourceRecipeDefinition> found))
+            {
+                return false;
+            }
+            recipes = found;
+            return true;
+        }
+
+        public static bool TryGetDefault(
+            string buildingId,
+            out ResourceRecipeDefinition recipe)
+        {
+            recipe = null;
+            return !string.IsNullOrWhiteSpace(buildingId) &&
+                defaultRecipeByBuildingId.TryGetValue(buildingId, out recipe);
+        }
+    }
+
     public sealed class GrayboxProductionPersistenceState3D
     {
         private readonly ReadOnlyCollection<ResourceAmount> input;
@@ -93,14 +239,17 @@ namespace WasteCity.Graybox3D.Building
     {
         public GrayboxProductionRestoreEntry3D(
             BuildingProductionState state,
-            GrayboxProductionPersistenceState3D snapshot)
+            GrayboxProductionPersistenceState3D snapshot,
+            BuildingProductionState replacementState = null)
         {
             State = state;
             Snapshot = snapshot;
+            ReplacementState = replacementState;
         }
 
         public BuildingProductionState State { get; }
         public GrayboxProductionPersistenceState3D Snapshot { get; }
+        public BuildingProductionState ReplacementState { get; }
     }
 
     public sealed class GrayboxProductionEvacuationPayload3D
@@ -281,11 +430,16 @@ namespace WasteCity.Graybox3D.Building
                     continue;
                 }
 
+                string buildingId = instance.Placement.Definition.Id.Value;
                 if (!GrayboxBuildingOperationalAccess3D.CanRetainState(instance) ||
-                    !FormalProductionDefinitionCatalog.TryGetByBuildingId(
-                        instance.Placement.Definition.Id.Value,
-                        out FormalProductionDefinition definition) ||
-                    (definition.UsesBoundResourceNode &&
+                    !GrayboxMachineRecipeCatalog3D.TryGetDefault(
+                        buildingId,
+                        out ResourceRecipeDefinition defaultRecipe) ||
+                    !FormalProductionDefinitionCatalog.TryResolveRecipe(
+                        defaultRecipe.Id,
+                        buildingId,
+                        out FormalProductionDefinition defaultDefinition) ||
+                    (defaultDefinition.UsesBoundResourceNode &&
                      !instance.BoundResourceNode.IsValid))
                 {
                     continue;
@@ -299,18 +453,25 @@ namespace WasteCity.Graybox3D.Building
                     ResourceNodeBinding binding = instance.BoundResourceNode;
                     state = new BuildingProductionState(
                         instance.StableInstanceId,
-                        definition,
+                        defaultDefinition,
                         binding.StableId,
                         binding.X,
                         binding.Y);
                     stateById.Add(instance.StableInstanceId, state);
                 }
-                else if (!StateMatchesInstance(state, definition, instance))
+                else if (!FormalProductionDefinitionCatalog.TryResolveRecipe(
+                             state.Definition.Id,
+                             buildingId,
+                             out FormalProductionDefinition currentDefinition) ||
+                         !StateMatchesInstance(
+                             state,
+                             currentDefinition,
+                             instance))
                 {
                     ResourceNodeBinding binding = instance.BoundResourceNode;
                     state = new BuildingProductionState(
                         instance.StableInstanceId,
-                        definition,
+                        defaultDefinition,
                         binding.StableId,
                         binding.X,
                         binding.Y);
@@ -426,6 +587,224 @@ namespace WasteCity.Graybox3D.Building
                 stateById.TryGetValue(stableInstanceId, out state);
         }
 
+        public bool TryGetMachineRecipes(
+            string stableInstanceId,
+            out IReadOnlyList<ResourceRecipeDefinition> recipes)
+        {
+            recipes = null;
+            if (!TryFindInstance(
+                    stableInstanceId,
+                    out GrayboxBuildingInstance3D instance))
+            {
+                return false;
+            }
+            return GrayboxMachineRecipeCatalog3D.TryGetRecipes(
+                instance.Placement.Definition.Id.Value,
+                out recipes);
+        }
+
+        public bool TrySelectRecipe(
+            string stableInstanceId,
+            string recipeId,
+            IReadOnlyCollection<string> completedResearchIds,
+            out GrayboxProductionRecipeSelectionResult3D result)
+        {
+            if (!TryFindInstance(
+                    stableInstanceId,
+                    out GrayboxBuildingInstance3D instance))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.BuildingNotFound);
+                return false;
+            }
+            if (!ResourceRecipeCatalog.TryGet(
+                    recipeId,
+                    out ResourceRecipeDefinition recipe))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.RecipeNotFound);
+                return false;
+            }
+            if (recipe.Kind != ResourceRecipeKind.Machine)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.RecipeNotMachine);
+                return false;
+            }
+
+            string buildingId = instance.Placement.Definition.Id.Value;
+            if (!ContainsOrdinal(recipe.AllowedBuildingIds, buildingId))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .RecipeNotAllowedForBuilding);
+                return false;
+            }
+            if (instance.State != GrayboxBuildingInstanceState.Completed)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .BuildingNotCompleted);
+                return false;
+            }
+            if (!instance.IsPlayerOwned)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .BuildingNotPlayerOwned);
+                return false;
+            }
+            if (instance.IsEvacuationLocked)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .BuildingEvacuationLocked);
+                return false;
+            }
+
+            for (int index = 0;
+                 index < recipe.RequiredResearchIds.Count;
+                 index++)
+            {
+                string requiredResearchId = recipe.RequiredResearchIds[index];
+                ResearchDefinition research = ResearchCatalog.Find(
+                    requiredResearchId);
+                bool available = research != null &&
+                    research.ReleaseState != ResearchReleaseState.PreviewOnly &&
+                    research.ReleaseState !=
+                        ResearchReleaseState.RetiredCompatibility &&
+                    (research.ReleaseState ==
+                         ResearchReleaseState.InitiallyCompleted ||
+                     ContainsOrdinal(
+                         completedResearchIds,
+                         requiredResearchId));
+                if (available)
+                    continue;
+
+                result = new GrayboxProductionRecipeSelectionResult3D(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .ResearchNotCompleted,
+                    requiredResearchId);
+                return false;
+            }
+
+            if (!stateById.TryGetValue(
+                    stableInstanceId,
+                    out BuildingProductionState state))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .ProductionStateUnavailable);
+                return false;
+            }
+            if (string.Equals(
+                    state.Definition.Id,
+                    recipe.Id,
+                    StringComparison.Ordinal))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.AlreadySelected);
+                return true;
+            }
+            if (state.HasReservedInputs || state.ProgressSeconds > 0f)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.CycleInProgress);
+                return false;
+            }
+            if (state.Input.CapturePositiveAmounts().Length > 0)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.InputNotEmpty);
+                return false;
+            }
+            if (state.Output.CapturePositiveAmounts().Length > 0)
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D.OutputNotEmpty);
+                return false;
+            }
+            if (!FormalProductionDefinitionCatalog.TryResolveRecipe(
+                    recipe.Id,
+                    buildingId,
+                    out FormalProductionDefinition definition))
+            {
+                result = SelectionResult(
+                    GrayboxProductionRecipeSelectionStatus3D
+                        .RecipeNotAllowedForBuilding);
+                return false;
+            }
+
+            ResourceNodeBinding binding = instance.BoundResourceNode;
+            var replacement = new BuildingProductionState(
+                stableInstanceId,
+                definition,
+                binding.StableId,
+                binding.X,
+                binding.Y);
+            replacement.SetLogisticsConnected(state.IsLogisticsConnected);
+            replacement.SetPlayerPaused(state.IsPlayerPaused);
+            stateById[stableInstanceId] = replacement;
+            ReplaceStateReference(states, state, replacement);
+            ReplaceStateReference(runnableStates, state, replacement);
+
+            result = SelectionResult(
+                GrayboxProductionRecipeSelectionStatus3D.Completed);
+            return true;
+        }
+
+        private bool TryFindInstance(
+            string stableInstanceId,
+            out GrayboxBuildingInstance3D instance)
+        {
+            instance = null;
+            if (string.IsNullOrWhiteSpace(stableInstanceId))
+                return false;
+            for (int index = 0; index < orderedInstances.Count; index++)
+            {
+                if (!string.Equals(
+                        orderedInstances[index].StableInstanceId,
+                        stableInstanceId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                instance = orderedInstances[index];
+                return true;
+            }
+            return false;
+        }
+
+        private static GrayboxProductionRecipeSelectionResult3D SelectionResult(
+            GrayboxProductionRecipeSelectionStatus3D status)
+        {
+            return new GrayboxProductionRecipeSelectionResult3D(status);
+        }
+
+        private static bool ContainsOrdinal(
+            IReadOnlyCollection<string> values,
+            string expected)
+        {
+            if (values == null)
+                return false;
+            foreach (string value in values)
+            {
+                if (string.Equals(value, expected, StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static void ReplaceStateReference(
+            List<BuildingProductionState> collection,
+            BuildingProductionState before,
+            BuildingProductionState after)
+        {
+            int index = collection.IndexOf(before);
+            if (index >= 0)
+                collection[index] = after;
+        }
+
         public bool TryCaptureEvacuationPayload(
             string stableInstanceId,
             out GrayboxProductionEvacuationPayload3D payload)
@@ -513,9 +892,9 @@ namespace WasteCity.Graybox3D.Building
                 }
 
                 string buildingId = instance.Placement.Definition.Id.Value;
-                if (!FormalProductionDefinitionCatalog.TryGetByBuildingId(
+                if (!GrayboxMachineRecipeCatalog3D.TryGetRecipes(
                         buildingId,
-                        out FormalProductionDefinition definition))
+                        out _))
                 {
                     if (IsKnownBuilding(buildingId) ||
                         !ValidateOpaqueSnapshot(snapshot, out error))
@@ -528,24 +907,36 @@ namespace WasteCity.Graybox3D.Building
                     continue;
                 }
 
-                if (!FormalProductionDefinitionCatalog.TryGet(
+                if (!FormalProductionDefinitionCatalog.TryResolveRecipe(
                         snapshot.DefinitionId,
-                        out _))
+                        buildingId,
+                        out FormalProductionDefinition definition))
                 {
+                    if (ResourceRecipeCatalog.TryGet(
+                            snapshot.DefinitionId,
+                            out _))
+                    {
+                        error = "生产定义与建筑不一致";
+                        return false;
+                    }
                     if (!ValidateOpaqueSnapshot(snapshot, out error))
                         return false;
                     orphans.Add(Clone(snapshot));
                     continue;
                 }
 
-                if (!string.Equals(
-                        definition.Id,
-                        snapshot.DefinitionId,
-                        StringComparison.Ordinal) ||
-                    !stateById.TryGetValue(
+                if (!stateById.TryGetValue(
                         snapshot.StableInstanceId,
                         out BuildingProductionState state) ||
-                    !StateMatchesInstance(state, definition, instance) ||
+                    !FormalProductionDefinitionCatalog.TryResolveRecipe(
+                        state.Definition.Id,
+                        buildingId,
+                        out FormalProductionDefinition currentDefinition) ||
+                    !StateMatchesInstance(
+                        state,
+                        currentDefinition,
+                        instance) ||
+                    !BindingMatchesInstance(state, definition, instance) ||
                     !ValidateBinding(snapshot, instance, definition, world,
                         out error))
                 {
@@ -571,9 +962,16 @@ namespace WasteCity.Graybox3D.Building
                 {
                     return false;
                 }
+                candidate.SetLogisticsConnected(state.IsLogisticsConnected);
                 entries.Add(new GrayboxProductionRestoreEntry3D(
                     state,
-                    Clone(snapshot)));
+                    Clone(snapshot),
+                    string.Equals(
+                        state.Definition.Id,
+                        definition.Id,
+                        StringComparison.Ordinal)
+                        ? null
+                        : candidate));
             }
 
             foreach (BuildingProductionState state in stateById.Values)
@@ -644,6 +1042,11 @@ namespace WasteCity.Graybox3D.Building
             {
                 GrayboxProductionRestoreEntry3D entry = plan.Entries[index];
                 GrayboxProductionPersistenceState3D snapshot = entry.Snapshot;
+                if (entry.ReplacementState != null)
+                {
+                    InstallReplacementState(entry.State, entry.ReplacementState);
+                    continue;
+                }
                 if (entry.State.TryRestoreForPersistence(
                         snapshot.Input,
                         snapshot.HasReservedInputs,
@@ -660,9 +1063,18 @@ namespace WasteCity.Graybox3D.Building
                      rollbackIndex < index;
                      rollbackIndex++)
                 {
+                    GrayboxProductionRestoreEntry3D rollbackEntry =
+                        plan.Entries[rollbackIndex];
                     GrayboxProductionPersistenceState3D before =
                         rollback[rollbackIndex];
-                    plan.Entries[rollbackIndex].State.TryRestoreForPersistence(
+                    if (rollbackEntry.ReplacementState != null)
+                    {
+                        InstallReplacementState(
+                            rollbackEntry.ReplacementState,
+                            rollbackEntry.State);
+                        continue;
+                    }
+                    rollbackEntry.State.TryRestoreForPersistence(
                         before.Input,
                         before.HasReservedInputs,
                         before.ReservedInput,
@@ -690,6 +1102,15 @@ namespace WasteCity.Graybox3D.Building
             plan.IsConsumed = true;
             error = string.Empty;
             return true;
+        }
+
+        private void InstallReplacementState(
+            BuildingProductionState before,
+            BuildingProductionState after)
+        {
+            stateById[before.StableInstanceId] = after;
+            ReplaceStateReference(states, before, after);
+            ReplaceStateReference(runnableStates, before, after);
         }
 
         public bool TryFinalizeEvacuationPayload(
@@ -744,20 +1165,31 @@ namespace WasteCity.Graybox3D.Building
                 Mix(ref value, definition.Id);
                 Mix(ref value, definition.BuildingId);
                 Mix(ref value, definition.DurationSeconds.GetHashCode());
-                Mix(ref value, definition.InputResourceId);
-                Mix(ref value, definition.InputAmount);
-                Mix(ref value, definition.OutputAmount);
+                MixAmounts(ref value, definition.Inputs);
+                MixAmounts(ref value, definition.Outputs);
+                Mix(ref value, definition.UsesBoundResourceNode);
+                if (definition.UsesBoundResourceNode)
+                    Mix(ref value, definition.OutputAmount);
                 Mix(ref value, definition.InputCapacity);
                 Mix(ref value, definition.OutputCapacity);
                 Mix(ref value, outputResourceId);
-                Mix(ref value, string.IsNullOrEmpty(definition.InputResourceId)
-                    ? 0
-                    : state.Input.Get(definition.InputResourceId));
-                Mix(ref value, string.IsNullOrEmpty(outputResourceId)
-                    ? 0
-                    : state.Output.Get(outputResourceId));
+                MixInventoryChannels(
+                    ref value,
+                    state.Input,
+                    definition.Inputs);
+                MixInventoryChannels(
+                    ref value,
+                    state.Output,
+                    definition.Outputs);
+                if (definition.UsesBoundResourceNode)
+                {
+                    Mix(ref value, string.IsNullOrEmpty(outputResourceId)
+                        ? 0
+                        : state.Output.Get(outputResourceId));
+                }
                 Mix(ref value, state.ProgressSeconds.GetHashCode());
                 Mix(ref value, state.HasReservedInputs);
+                MixAmounts(ref value, state.ReservedInputs);
                 Mix(ref value, state.IsLogisticsConnected);
                 Mix(ref value, state.IsPlayerPaused);
                 Mix(ref value, (int)state.StopReason);
@@ -777,6 +1209,20 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             return value;
+        }
+
+        private static void MixInventoryChannels(
+            ref ulong value,
+            ResourceInventory inventory,
+            IReadOnlyList<ResourceAmount> channels)
+        {
+            Mix(ref value, channels.Count);
+            for (var index = 0; index < channels.Count; index++)
+            {
+                string resourceId = channels[index].ResourceId;
+                Mix(ref value, resourceId);
+                Mix(ref value, inventory.Get(resourceId));
+            }
         }
 
         private static GrayboxProductionPersistenceState3D CaptureState(
@@ -1018,6 +1464,14 @@ namespace WasteCity.Graybox3D.Building
             {
                 return false;
             }
+            return BindingMatchesInstance(state, definition, instance);
+        }
+
+        private static bool BindingMatchesInstance(
+            BuildingProductionState state,
+            FormalProductionDefinition definition,
+            GrayboxBuildingInstance3D instance)
+        {
             ResourceNodeBinding binding = instance.BoundResourceNode;
             if (!definition.UsesBoundResourceNode)
             {

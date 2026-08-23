@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
@@ -35,9 +36,6 @@ namespace WasteCity.Graybox3D.Building
             new List<string>();
         private readonly Dictionary<string, string> productionAccessStatus =
             new Dictionary<string, string>(StringComparer.Ordinal);
-        private readonly HashSet<string> discoveredHudResources =
-            new HashSet<string>(StringComparer.Ordinal);
-
         private GrayboxBuildingSession3D modelSession;
         private CityResourceStorageModel observedStorage;
         private PlayerBackpackModel backpack;
@@ -261,7 +259,6 @@ namespace WasteCity.Graybox3D.Building
             selectedResearchId = null;
             hoveredResourceId = null;
             productionAccessStatus.Clear();
-            discoveredHudResources.Clear();
             inventoryTransferStatus = string.Empty;
             craftingFeedback = string.Empty;
             selectedWarehouseId = null;
@@ -317,6 +314,7 @@ namespace WasteCity.Graybox3D.Building
             view.ProductionCacheTransferRequested +=
                 TransferProductionCache;
             view.ProductionPauseRequested += ToggleProductionPause;
+            view.ProductionRecipeRequested += SelectProductionRecipe;
             view.ResearchSelected += SelectResearch;
             view.ResearchStartRequested += StartResearch;
             view.ResearchCancelRequested += CancelResearch;
@@ -341,6 +339,7 @@ namespace WasteCity.Graybox3D.Building
             view.ProductionCacheTransferRequested -=
                 TransferProductionCache;
             view.ProductionPauseRequested -= ToggleProductionPause;
+            view.ProductionRecipeRequested -= SelectProductionRecipe;
             view.ResearchSelected -= SelectResearch;
             view.ResearchStartRequested -= StartResearch;
             view.ResearchCancelRequested -= CancelResearch;
@@ -607,6 +606,8 @@ namespace WasteCity.Graybox3D.Building
             if (!EnsureReady()) return;
             unchecked { ViewRefreshCount++; }
             CaptureRecentFlow();
+            ResourceDiscoveryFacts discoveryFacts =
+                CaptureResourceDiscoveryFacts();
             foreach (ResourceDefinition definition in
                      ResourceDefinitionCatalog.All)
             {
@@ -615,14 +616,19 @@ namespace WasteCity.Graybox3D.Building
                 int capacity =
                     session.CityStorage.GetNetworkCapacityLimit(id);
                 float netFlow = NetFlow(id);
-                bool visible = IsHudResourceVisible(id, amount);
+                bool visible = ResourceDiscoveryProjection.IsDiscovered(
+                    definition,
+                    discoveryFacts);
                 view.SetResource(id, visible, amount, capacity, netFlow);
                 if (view.IsLedgerOpen)
-                    view.SetLedgerResource(id, amount, capacity, netFlow);
+                    view.SetLedgerResource(
+                        id,
+                        visible,
+                        amount,
+                        capacity,
+                        netFlow);
                 if (view.IsInventoryOpen)
-                    view.SetCityResource(id, amount);
-                if (amount > 0)
-                    discoveredHudResources.Add(id);
+                    view.SetCityResource(id, visible, amount);
             }
 
             if (view.IsInventoryOpen)
@@ -683,33 +689,66 @@ namespace WasteCity.Graybox3D.Building
                 progress,
                 queueStatus);
 
-            SetCraftRecipe(
-                ResourceRecipeCatalog.FieldAlloyId);
-            SetCraftRecipe(
-                ResourceRecipeCatalog.FieldAmmunitionId);
+            foreach (ResourceRecipeDefinition definition in
+                     ResourceRecipeCatalog.All)
+                SetCraftRecipe(definition);
         }
 
-        private void SetCraftRecipe(string recipeId)
+        private void SetCraftRecipe(ResourceRecipeDefinition definition)
         {
-            bool unlocked = ResourceRecipeCatalog.TryGet(
-                    recipeId,
-                    out ResourceRecipeDefinition definition) &&
-                (string.IsNullOrWhiteSpace(definition.RequiredResearchId) ||
-                 session.IsResearchCompleted(
-                     definition.RequiredResearchId));
-            ResearchDefinition requiredResearch = definition == null
-                ? null
-                : ResearchCatalog.Find(
-                    definition.RequiredResearchId);
-            string stateText = unlocked
-                ? "当前可排 " +
-                  AvailableCraftExecutions(definition)
-                : "需要科技：" +
-                  (requiredResearch?.Name ?? "未解锁科技");
+            if (definition == null) return;
+            bool unlocked = RequiredResearchCompleted(definition);
+            bool manual = definition.Kind ==
+                ResourceRecipeKind.ManualCrafting;
+            string stateText;
+            if (!unlocked)
+            {
+                stateText = "需要科技：" +
+                    MissingRecipeResearchNames(definition);
+            }
+            else if (manual)
+            {
+                stateText = "当前可排 " +
+                    AvailableCraftExecutions(definition);
+            }
+            else
+            {
+                stateText = "自动生产配方 · 需在对应建筑中运行";
+            }
             view.SetCraftRecipe(
-                recipeId,
+                definition.Id,
                 stateText,
-                unlocked);
+                manual && unlocked);
+        }
+
+        private bool RequiredResearchCompleted(
+            ResourceRecipeDefinition definition)
+        {
+            for (int index = 0;
+                 index < definition.RequiredResearchIds.Count;
+                 index++)
+            {
+                if (!session.IsResearchCompleted(
+                        definition.RequiredResearchIds[index]))
+                    return false;
+            }
+            return true;
+        }
+
+        private string MissingRecipeResearchNames(
+            ResourceRecipeDefinition definition)
+        {
+            string result = string.Empty;
+            for (int index = 0;
+                 index < definition.RequiredResearchIds.Count;
+                 index++)
+            {
+                string id = definition.RequiredResearchIds[index];
+                if (session.IsResearchCompleted(id)) continue;
+                if (!string.IsNullOrEmpty(result)) result += "、";
+                result += ResearchCatalog.Find(id)?.Name ?? id;
+            }
+            return string.IsNullOrEmpty(result) ? "未解锁科技" : result;
         }
 
         private void RefreshResearch()
@@ -946,33 +985,82 @@ namespace WasteCity.Graybox3D.Building
             return production?.Clock?.Snapshot?.ActiveWarehouseCount ?? 0;
         }
 
-        private bool IsHudResourceVisible(string resourceId, int amount)
+        private ResourceDiscoveryFacts CaptureResourceDiscoveryFacts()
         {
-            for (int index = 0;
-                 index < ResourceDefinitionCatalog.BaseHudResourceIds.Count;
-                 index++)
+            var cityNetwork = new List<ResourceAmount>();
+            var backpackAmounts = new List<ResourceAmount>();
+            var productionInputs = new List<ResourceAmount>();
+            var productionOutputs = new List<ResourceAmount>();
+            var productionReserved = new List<ResourceAmount>();
+            var craftingReserved = new List<ResourceAmount>();
+            var completedResearch = new List<string>();
+
+            AddPositiveAmounts(
+                cityNetwork,
+                ResourceDiscoveryProjection.ProjectOwnedStorageAmounts(
+                    session.CityStorage.CaptureSnapshot()));
+
+            for (int index = 0; index < backpack.SlotCount; index++)
             {
-                if (string.Equals(
-                        ResourceDefinitionCatalog.BaseHudResourceIds[index],
-                        resourceId,
-                        StringComparison.Ordinal))
-                    return true;
+                BackpackSlot slot = backpack.GetSlot(index);
+                if (slot.Amount > 0)
+                    backpackAmounts.Add(new ResourceAmount(
+                        slot.ResourceId,
+                        slot.Amount));
             }
-            if (string.Equals(resourceId, ResourceIds.Alloy,
-                    StringComparison.Ordinal))
+
+            IReadOnlyList<BuildingProductionState> states =
+                production?.Clock?.Runtime?.States;
+            if (states != null)
             {
-                return discoveredHudResources.Contains(resourceId) ||
-                    amount > 0 || research.IsCompleted(
-                    ResearchCatalog.AutomatedMachineryId);
+                for (int index = 0; index < states.Count; index++)
+                {
+                    BuildingProductionState state = states[index];
+                    AddPositiveAmounts(
+                        productionInputs,
+                        state.Input.CapturePositiveAmounts());
+                    AddPositiveAmounts(
+                        productionOutputs,
+                        state.Output.CapturePositiveAmounts());
+                    AddPositiveAmounts(
+                        productionReserved,
+                        state.ReservedInputs);
+                }
             }
-            if (string.Equals(resourceId, ResourceIds.Ammunition,
-                    StringComparison.Ordinal))
+
+            CraftingQueueExecutionSnapshot[] executions =
+                crafting.CaptureExecutions();
+            for (int index = 0; index < executions.Length; index++)
+                AddPositiveAmounts(
+                    craftingReserved,
+                    executions[index].ReservedInputs);
+
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
-                return discoveredHudResources.Contains(resourceId) ||
-                    amount > 0 || research.IsCompleted(
-                    ResearchCatalog.PrecisionAssemblyId);
+                if (research.IsCompleted(definition.Id.Value))
+                    completedResearch.Add(definition.Id.Value);
             }
-            return false;
+
+            return new ResourceDiscoveryFacts(
+                cityNetwork,
+                backpackAmounts,
+                productionInputs,
+                productionOutputs,
+                productionReserved,
+                craftingReserved,
+                completedResearch);
+        }
+
+        private static void AddPositiveAmounts(
+            List<ResourceAmount> target,
+            IReadOnlyList<ResourceAmount> source)
+        {
+            if (target == null || source == null) return;
+            for (int index = 0; index < source.Count; index++)
+            {
+                if (source[index].Amount > 0)
+                    target.Add(source[index]);
+            }
         }
 
         private void CaptureRecentFlow()
@@ -1130,6 +1218,12 @@ namespace WasteCity.Graybox3D.Building
                 TryFindBuildingInstance(
                     state.StableInstanceId,
                     out GrayboxBuildingInstance3D instance);
+                bool selectedDetails = !string.IsNullOrWhiteSpace(
+                        selectedProductionId) &&
+                    string.Equals(
+                        selectedProductionId,
+                        state.StableInstanceId,
+                        StringComparison.Ordinal);
                 view.SetProductionState(
                     index,
                     state.StableInstanceId,
@@ -1139,14 +1233,51 @@ namespace WasteCity.Graybox3D.Building
                     ProductionInputText(state),
                     ProductionOutputText(state),
                     visible: string.IsNullOrEmpty(selectedProductionId) ||
-                        string.Equals(
-                            selectedProductionId,
-                            state.StableInstanceId,
-                            StringComparison.Ordinal));
+                        selectedDetails);
                 view.SetProductionResourceIcons(
                     index,
-                    state.InputResourceId,
-                    state.OutputResourceId);
+                    state.Inputs.Count == 0
+                        ? null
+                        : state.Inputs[0].ResourceId,
+                    state.Outputs.Count == 0
+                        ? null
+                        : state.Outputs[0].ResourceId);
+                view.SetProductionTransferCount(
+                    index,
+                    true,
+                    selectedDetails ? state.Inputs.Count : 0);
+                for (int channelIndex = 0;
+                     selectedDetails && channelIndex < state.Inputs.Count;
+                     channelIndex++)
+                {
+                    ProductionResourceObservability channel =
+                        state.Inputs[channelIndex];
+                    view.SetProductionTransferChannel(
+                        index,
+                        true,
+                        channelIndex,
+                        channel.ResourceId,
+                        channel.CurrentAmount,
+                        channel.Capacity);
+                }
+                view.SetProductionTransferCount(
+                    index,
+                    false,
+                    selectedDetails ? state.Outputs.Count : 0);
+                for (int channelIndex = 0;
+                     selectedDetails && channelIndex < state.Outputs.Count;
+                     channelIndex++)
+                {
+                    ProductionResourceObservability channel =
+                        state.Outputs[channelIndex];
+                    view.SetProductionTransferChannel(
+                        index,
+                        false,
+                        channelIndex,
+                        channel.ResourceId,
+                        channel.CurrentAmount,
+                        channel.Capacity);
+                }
                 view.SetProductionPaused(
                     index,
                     state.IsPlayerPaused,
@@ -1161,7 +1292,53 @@ namespace WasteCity.Graybox3D.Building
                         out string accessStatus)
                         ? accessStatus
                         : string.Empty);
+                IReadOnlyList<ResourceRecipeDefinition> recipes = null;
+                bool showRecipes = selectedDetails &&
+                    production.Clock.Runtime.TryGetMachineRecipes(
+                        state.StableInstanceId,
+                        out recipes);
+                int recipeCount = showRecipes ? recipes.Count : 0;
+                view.SetProductionRecipeCount(index, recipeCount);
+                for (int recipeIndex = 0;
+                     recipeIndex < recipeCount;
+                     recipeIndex++)
+                {
+                    ResourceRecipeDefinition recipe = recipes[recipeIndex];
+                    bool current = string.Equals(
+                        recipe.Id,
+                        state.ProductionDefinitionId,
+                        StringComparison.Ordinal);
+                    view.SetProductionRecipe(
+                        index,
+                        recipeIndex,
+                        recipe.Id,
+                        ProductionRecipeText(recipe, current),
+                        current);
+                }
             }
+        }
+
+        private void SelectProductionRecipe(
+            string stableInstanceId,
+            string recipeId)
+        {
+            if (!EnsureReady() || production?.Clock?.Runtime == null)
+            {
+                return;
+            }
+
+            ResearchPersistenceSnapshot researchSnapshot =
+                research.CaptureForPersistence();
+            production.Clock.Runtime.TrySelectRecipe(
+                stableInstanceId,
+                recipeId,
+                researchSnapshot.CompletedResearchIds,
+                out GrayboxProductionRecipeSelectionResult3D result);
+            productionAccessStatus[stableInstanceId] =
+                ProductionRecipeSelectionStatusText(recipeId, result);
+            if (result.Succeeded)
+                production.Clock.PublishObservabilityIfChanged();
+            RefreshView();
         }
 
         private void SetWarehouseFilter(
@@ -1219,6 +1396,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void TransferProductionCache(
             string stableInstanceId,
+            string resourceId,
             bool input,
             bool useBackpack)
         {
@@ -1249,13 +1427,15 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
 
-            string resourceId = input
-                ? state.InputResourceId
-                : state.OutputResourceId;
-            if (string.IsNullOrWhiteSpace(resourceId))
+            if (string.IsNullOrWhiteSpace(resourceId) ||
+                !TryFindProductionChannel(
+                    state,
+                    input,
+                    resourceId,
+                    out ProductionResourceObservability channel))
             {
                 productionAccessStatus[stableInstanceId] =
-                    input ? "无需输入" : "无法访问：无有效输出资源";
+                    "无法访问：生产通道状态已变化";
                 RefreshView();
                 return;
             }
@@ -1281,7 +1461,7 @@ namespace WasteCity.Graybox3D.Building
             }
             else
             {
-                int requested = state.OutputAmount;
+                int requested = channel.CurrentAmount;
                 result = useBackpack
                     ? production.Clock.Commands.TransferOutputToBackpack(
                         stableInstanceId,
@@ -1299,6 +1479,32 @@ namespace WasteCity.Graybox3D.Building
             productionAccessStatus[stableInstanceId] =
                 ProductionTransferStatusText(result);
             RefreshView();
+        }
+
+        private static bool TryFindProductionChannel(
+            ProductionBuildingObservability state,
+            bool input,
+            string resourceId,
+            out ProductionResourceObservability channel)
+        {
+            channel = null;
+            IReadOnlyList<ProductionResourceObservability> channels = input
+                ? state?.Inputs
+                : state?.Outputs;
+            if (channels == null) return false;
+            for (var index = 0; index < channels.Count; index++)
+            {
+                if (!string.Equals(
+                        channels[index].ResourceId,
+                        resourceId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                channel = channels[index];
+                return true;
+            }
+            return false;
         }
 
         private bool TryFindProductionDetails(
@@ -1480,6 +1686,57 @@ namespace WasteCity.Graybox3D.Building
             return TransferStatusText(result);
         }
 
+        private static string ProductionRecipeSelectionStatusText(
+            string recipeId,
+            GrayboxProductionRecipeSelectionResult3D result)
+        {
+            string recipeName = ResourceRecipeCatalog.DisplayName(recipeId);
+            if (result == null)
+                return "切换失败：生产运行时未返回结果";
+            switch (result.Status)
+            {
+                case GrayboxProductionRecipeSelectionStatus3D.Completed:
+                    return "已切换配方：" + recipeName;
+                case GrayboxProductionRecipeSelectionStatus3D.AlreadySelected:
+                    return "当前已经是配方：" + recipeName;
+                case GrayboxProductionRecipeSelectionStatus3D.BuildingNotFound:
+                    return "切换失败：建筑不存在";
+                case GrayboxProductionRecipeSelectionStatus3D.RecipeNotFound:
+                    return "切换失败：配方不存在";
+                case GrayboxProductionRecipeSelectionStatus3D.RecipeNotMachine:
+                    return "切换失败：该配方不是机器配方";
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .RecipeNotAllowedForBuilding:
+                    return "切换失败：该建筑不能使用此配方";
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .BuildingNotCompleted:
+                    return "切换失败：建筑尚未完工";
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .BuildingNotPlayerOwned:
+                    return "切换失败：建筑不属于玩家";
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .BuildingEvacuationLocked:
+                    return "切换失败：建筑正在撤离处理中";
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .ResearchNotCompleted:
+                    ResearchDefinition research = ResearchCatalog.Find(
+                        result.MissingResearchId);
+                    return "切换失败：需要科技 " +
+                        (research?.Name ?? result.MissingResearchId);
+                case GrayboxProductionRecipeSelectionStatus3D
+                    .ProductionStateUnavailable:
+                    return "切换失败：生产状态尚未建立";
+                case GrayboxProductionRecipeSelectionStatus3D.CycleInProgress:
+                    return "切换失败：生产周期进行中，请等待本周期结束";
+                case GrayboxProductionRecipeSelectionStatus3D.InputNotEmpty:
+                    return "切换失败：请先清空输入缓存";
+                case GrayboxProductionRecipeSelectionStatus3D.OutputNotEmpty:
+                    return "切换失败：请先清空输出缓存";
+                default:
+                    return "切换失败：生产状态已变化";
+            }
+        }
+
         private static string TransferStatusText(
             ResourceTransferResult result)
         {
@@ -1535,29 +1792,86 @@ namespace WasteCity.Graybox3D.Building
             string recipe = !string.IsNullOrWhiteSpace(
                     state.BoundResourceNodeId)
                 ? "采集 " + ResourceName(state.OutputResourceId)
-                : ResourceName(state.InputResourceId) + " → " +
-                  ResourceName(state.OutputResourceId);
+                : ResourceRecipeCatalog.TryGet(
+                    state.ProductionDefinitionId,
+                    out ResourceRecipeDefinition definition)
+                    ? definition.ChineseName
+                    : state.ProductionDefinitionId;
             return buildingName + " · " + recipe;
+        }
+
+        private string ProductionRecipeText(
+            ResourceRecipeDefinition definition,
+            bool current)
+        {
+            if (definition == null) return string.Empty;
+            string text = current ? "【当前配方】" : string.Empty;
+            text += definition.ChineseName + " · " +
+                definition.DurationSeconds.ToString(
+                    "0.#",
+                    CultureInfo.InvariantCulture) + "秒\n" +
+                FormatRecipeAmounts(definition.Inputs) + " → " +
+                FormatRecipeAmounts(definition.Outputs) + " · 科技：";
+            if (definition.RequiredResearchIds.Count == 0)
+                return text + "无需科技";
+            for (int index = 0;
+                 index < definition.RequiredResearchIds.Count;
+                 index++)
+            {
+                if (index > 0) text += "、";
+                string researchId = definition.RequiredResearchIds[index];
+                text += (ResearchCatalog.Find(researchId)?.Name ?? researchId) +
+                    (research.IsCompleted(researchId)
+                        ? "（已解锁）"
+                        : "（未解锁）");
+            }
+            return text;
+        }
+
+        private static string FormatRecipeAmounts(
+            IReadOnlyList<ResourceAmount> amounts)
+        {
+            if (amounts == null || amounts.Count == 0) return "无";
+            string result = string.Empty;
+            for (int index = 0; index < amounts.Count; index++)
+            {
+                if (index > 0) result += " + ";
+                result += ResourceName(amounts[index].ResourceId) + "×" +
+                    amounts[index].Amount;
+            }
+            return result;
         }
 
         private static string ProductionInputText(
             ProductionBuildingObservability state)
         {
-            if (string.IsNullOrWhiteSpace(state.InputResourceId) ||
-                state.InputRequiredPerCycle <= 0)
+            if (state.Inputs.Count == 0) return "输入：无";
+            string text = "输入：";
+            for (int index = 0; index < state.Inputs.Count; index++)
             {
-                return "输入：无";
+                ProductionResourceObservability channel = state.Inputs[index];
+                if (index > 0) text += " · ";
+                text += ResourceName(channel.ResourceId) + " " +
+                    channel.CurrentAmount + "/" + channel.Capacity +
+                    "（每周期 " + channel.AmountPerCycle + "）";
             }
-            return "输入：" + ResourceName(state.InputResourceId) +
-                " " + state.InputAmount + "/" + state.InputCapacity;
+            return text;
         }
 
         private static string ProductionOutputText(
             ProductionBuildingObservability state)
         {
-            string result = "输出：" + ResourceName(
-                state.OutputResourceId) + " " + state.OutputAmount + "/" +
-                state.OutputCapacity;
+            string result = "输出：";
+            if (state.Outputs.Count == 0)
+                result += "无";
+            for (int index = 0; index < state.Outputs.Count; index++)
+            {
+                ProductionResourceObservability channel = state.Outputs[index];
+                if (index > 0) result += " · ";
+                result += ResourceName(channel.ResourceId) + " " +
+                    channel.CurrentAmount + "/" + channel.Capacity +
+                    "（每周期 " + channel.AmountPerCycle + "）";
+            }
             if (!string.IsNullOrWhiteSpace(state.BoundResourceNodeId))
                 result += " · 节点剩余 " +
                     state.BoundResourceRemaining;
@@ -1641,9 +1955,40 @@ namespace WasteCity.Graybox3D.Building
                 capacity,
                 net);
             view.SetResourceTooltip(
-                definition.ChineseName + "\n" + capacityText + "\n" +
+                definition.ChineseName + " · " +
+                ResourceRouteName(definition.Route) + " · " +
+                ResourceTierName(definition.Tier) + "\n" +
+                definition.LoreBrief + "\n" +
+                "来源：" + definition.SourceSummary + "\n" +
+                "用途：" + definition.UseSummary + "\n" +
+                capacityText + "\n" +
                 flowText + "\n" + attributionText + "\n" + etaText,
                 visible: true);
+        }
+
+        private static string ResourceRouteName(ResourceRoute route)
+        {
+            switch (route)
+            {
+                case ResourceRoute.Common: return "通用";
+                case ResourceRoute.Technology: return "科技";
+                case ResourceRoute.Cultivation: return "修仙";
+                case ResourceRoute.Biological: return "血肉";
+                case ResourceRoute.Psionics: return "灵能";
+                case ResourceRoute.Fusion: return "融合";
+                default: return "未知路线";
+            }
+        }
+
+        private static string ResourceTierName(ResourceTier tier)
+        {
+            switch (tier)
+            {
+                case ResourceTier.Raw: return "原料";
+                case ResourceTier.Intermediate: return "中间品";
+                case ResourceTier.Product: return "制成品";
+                default: return "未知层级";
+            }
         }
 
         private string RecentFlowAttributionText(string resourceId)

@@ -1,0 +1,1452 @@
+{
+  "schemaVersion": 1,
+  "ideaId": "IDEA-0016",
+  "styleId": "idea0016.style.technology.industrial-emblem",
+  "visualClass": "technology",
+  "sourceRoot": "Docs/Art/IDEA-0016/Source/Technologies",
+  "unityRoot": "Assets/_Game/Art/Production2D/Technology",
+  "delivery": {
+    "pixelWidth": 256,
+    "pixelHeight": 256,
+    "displaySizesPx": [
+      32,
+      48,
+      64,
+      80
+    ],
+    "safeAreaNormalized": {
+      "x": 0.125,
+      "y": 0.125,
+      "width": 0.75,
+      "height": 0.75
+    },
+    "pivotNormalized": {
+      "x": 0.5,
+      "y": 0.5
+    },
+    "fallbackKey": "technology.formal-route-tier"
+  },
+  "sharedVisualContractZh": "非写实工业手绘科技徽记；单一核心原理、紧凑主体、明确外轮廓、少量必要辅助符号、受控高光和粗细一致的深色描边；透明背景；32像素仍可辨识；不烘焙节点边框与科技状态。",
+  "sharedForbiddenElementsZh": "文字、数字、字母、复杂场景、人物、完整建筑、路线面板、锁定或完成状态、装饰性粒子海、镜头光晕、水印、商标、照片写实、纯色键背景进入最终PNG",
+  "entries": [
+    {
+      "catalogOrder": 0,
+      "contentId": "core.research.scrap-processing",
+      "displayNameZh": "废料加工",
+      "route": "Common",
+      "tier": 0,
+      "loreBriefZh": "城市从废墟中整理出可复用结构、基础工具与最初工业标准。",
+      "visualKeywordsZh": "拆解后的齿轮、扳手与分拣金属片构成一个紧凑循环箭头",
+      "forbiddenElementsZh": "垃圾山、完整工厂、文字回收标志",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-scrap-processing-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-scrap-processing.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“废料加工”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.scrap-processing 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 1,
+      "contentId": "core.research.automated-machinery",
+      "displayNameZh": "基础冶金",
+      "route": "Technology",
+      "tier": 1,
+      "loreBriefZh": "把不稳定废铁重新纳入可控温度和标准合金流程。",
+      "visualKeywordsZh": "钢制坩埚、橙红熔流、温度刻槽，蓝钢工业结构",
+      "forbiddenElementsZh": "完整熔炉建筑、铁砧文字、写实火焰烟雾",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-automated-machinery-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-automated-machinery.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“基础冶金”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.automated-machinery 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 2,
+      "contentId": "core.research.spirit-sensing",
+      "displayNameZh": "灵火淬炼",
+      "route": "Cultivation",
+      "tier": 1,
+      "loreBriefZh": "从能晶共鸣中稳定灵火，使普通金属获得可控灵性。",
+      "visualKeywordsZh": "青金灵焰包裹一段铁胚，几何阵纹仅两笔",
+      "forbiddenElementsZh": "人物修士、丹炉场景、复杂经文",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-spirit-sensing-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-spirit-sensing.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“灵火淬炼”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.spirit-sensing 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 3,
+      "contentId": "core.research.adaptive-tissue",
+      "displayNameZh": "菌落培养",
+      "route": "Biological",
+      "tier": 1,
+      "loreBriefZh": "在受控营养液中培养能适应污染环境的基础组织群。",
+      "visualKeywordsZh": "半透明培养皿轮廓内的绿色组织团和三枚孢芽",
+      "forbiddenElementsZh": "写实内脏、血腥、玻璃反射、实验室场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-adaptive-tissue-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-adaptive-tissue.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“菌落培养”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.adaptive-tissue 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 4,
+      "contentId": "core.research.mind-resonance",
+      "displayNameZh": "意识共振",
+      "route": "Psionics",
+      "tier": 1,
+      "loreBriefZh": "用稳定频率捕捉集体思维留下的微弱共鸣并写入金属。",
+      "visualKeywordsZh": "紫色同心脑波穿过金属音叉核心",
+      "forbiddenElementsZh": "真人大脑、头部肖像、复杂波形图表",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-mind-resonance-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-mind-resonance.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“意识共振”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.mind-resonance 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 5,
+      "contentId": "core.research.precision-assembly",
+      "displayNameZh": "精密装配",
+      "route": "Technology",
+      "tier": 2,
+      "loreBriefZh": "统一公差、夹具与装配顺序，让弹药和机械件可以稳定量产。",
+      "visualKeywordsZh": "两枚啮合精密齿轮夹持校准卡尺，蓝钢与黄铜",
+      "forbiddenElementsZh": "完整流水线、子弹文字、微小零件堆",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-precision-assembly-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-precision-assembly.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“精密装配”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.precision-assembly 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 6,
+      "contentId": "core.research.automated-defense",
+      "displayNameZh": "自动防御架构",
+      "route": "Technology",
+      "tier": 2,
+      "loreBriefZh": "以传感、供弹和射控回路组成无需持续人工瞄准的防线。",
+      "visualKeywordsZh": "机械瞄准环、传感眼和三段供弹链构成盾形核心",
+      "forbiddenElementsZh": "真实枪械、完整炮塔、敌人、准星文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-automated-defense-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-automated-defense.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“自动防御架构”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.automated-defense 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 7,
+      "contentId": "core.research.thermal-engineering",
+      "displayNameZh": "热能工程",
+      "route": "Technology",
+      "tier": 2,
+      "loreBriefZh": "回收炉温与废热，为重型工业建立稳定的热力循环。",
+      "visualKeywordsZh": "橙红热交换盘管环绕蓝钢涡轮核心",
+      "forbiddenElementsZh": "完整发电厂、蒸汽云、核符号",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-thermal-engineering-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-thermal-engineering.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“热能工程”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.thermal-engineering 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 8,
+      "contentId": "core.research.ballistics",
+      "displayNameZh": "弹道学",
+      "route": "Technology",
+      "tier": 2,
+      "loreBriefZh": "通过轨迹、膛压与弹体结构校正远程火力。",
+      "visualKeywordsZh": "一枚简化弹体沿两道橙色抛物轨迹穿过测距环",
+      "forbiddenElementsZh": "枪支、爆炸场景、数字刻度、敌人",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-ballistics-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-ballistics.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“弹道学”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.ballistics 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 9,
+      "contentId": "core.research.artifact-crafting",
+      "displayNameZh": "炼器基础",
+      "route": "Cultivation",
+      "tier": 2,
+      "loreBriefZh": "以阵纹和灵铁统一器胚结构，建立法器批量制造方法。",
+      "visualKeywordsZh": "金色阵纹夹具托住青钢器胚，锤与灵光极简",
+      "forbiddenElementsZh": "人物、完整工坊、复杂汉字符箓",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-artifact-crafting-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-artifact-crafting.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“炼器基础”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.artifact-crafting 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 10,
+      "contentId": "core.research.sword-array",
+      "displayNameZh": "剑阵初解",
+      "route": "Cultivation",
+      "tier": 2,
+      "loreBriefZh": "让多柄飞剑按固定阵位循环，形成持续覆盖的杀伤区域。",
+      "visualKeywordsZh": "三柄短飞剑围绕金色三角阵位旋转",
+      "forbiddenElementsZh": "人物御剑、山水场景、大量飞剑、文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-sword-array-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-sword-array.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“剑阵初解”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.sword-array 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 11,
+      "contentId": "core.research.spirit-gathering",
+      "displayNameZh": "聚灵术",
+      "route": "Cultivation",
+      "tier": 2,
+      "loreBriefZh": "以地脉节点和阵基汇聚环境中稀薄而游离的灵性。",
+      "visualKeywordsZh": "四枚金色地脉节点向中央青色灵珠汇聚",
+      "forbiddenElementsZh": "风景、人物打坐、复杂法阵、粒子海",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-spirit-gathering-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-spirit-gathering.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“聚灵术”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.spirit-gathering 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 12,
+      "contentId": "core.research.talisman-basics",
+      "displayNameZh": "符箓入门",
+      "route": "Cultivation",
+      "tier": 2,
+      "loreBriefZh": "将短时防护规律压缩进可附着于城墙的基础符纹。",
+      "visualKeywordsZh": "厚实金属符牌上的单道抽象防护纹与铆钉",
+      "forbiddenElementsZh": "可读汉字、纸张卷轴、人物、复杂咒文",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-talisman-basics-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-talisman-basics.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“符箓入门”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.talisman-basics 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 13,
+      "contentId": "core.research.bio-cultivation",
+      "displayNameZh": "生物培育",
+      "route": "Biological",
+      "tier": 2,
+      "loreBriefZh": "将骨架和活体组织按用途定向生长为可控生物器件。",
+      "visualKeywordsZh": "骨质支架托住对称生长的绿色肌束芽体",
+      "forbiddenElementsZh": "血腥、写实器官、完整生物、实验室场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bio-cultivation-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bio-cultivation.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“生物培育”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bio-cultivation 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 14,
+      "contentId": "core.research.spore-dispersal",
+      "displayNameZh": "孢子散布",
+      "route": "Biological",
+      "tier": 2,
+      "loreBriefZh": "调节孢子的附着与休眠周期，使感染能在目标区域持续扩散。",
+      "visualKeywordsZh": "中央绿色孢囊向三向喷出少量圆形孢子",
+      "forbiddenElementsZh": "烟雾云、写实霉菌、场景感染、粒子填满画面",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-spore-dispersal-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-spore-dispersal.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“孢子散布”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.spore-dispersal 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 15,
+      "contentId": "core.research.metabolic-acceleration",
+      "displayNameZh": "代谢加速",
+      "route": "Biological",
+      "tier": 2,
+      "loreBriefZh": "迫使培养体快速分解废弃组织，将其转成可调度的高能产物。",
+      "visualKeywordsZh": "绿色细胞核心外绕三枚橙色加速叶片和能量箭头",
+      "forbiddenElementsZh": "速度数字、人体、写实细胞图、复杂管线",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-metabolic-acceleration-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-metabolic-acceleration.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“代谢加速”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.metabolic-acceleration 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 16,
+      "contentId": "core.research.carapace-growth",
+      "displayNameZh": "甲壳增生",
+      "route": "Biological",
+      "tier": 2,
+      "loreBriefZh": "让外墙表面附着可补生的甲壳层，以生物质交换缓慢修复。",
+      "visualKeywordsZh": "三片层叠绿色甲壳护板从裂缝处长出新边缘",
+      "forbiddenElementsZh": "完整昆虫、血肉、城墙场景、盾牌文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-carapace-growth-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-carapace-growth.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“甲壳增生”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.carapace-growth 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 17,
+      "contentId": "core.research.psionic-workshop",
+      "displayNameZh": "灵能工坊",
+      "route": "Psionics",
+      "tier": 2,
+      "loreBriefZh": "将共振结构加工为能放大、约束和转发精神信号的器件。",
+      "visualKeywordsZh": "紫色晶核嵌入三爪金属增幅夹具，双环共振",
+      "forbiddenElementsZh": "完整建筑、人物、车间场景、复杂电路板",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-psionic-workshop-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-psionic-workshop.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“灵能工坊”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.psionic-workshop 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 18,
+      "contentId": "core.research.mind-spire",
+      "displayNameZh": "心灵尖塔",
+      "route": "Psionics",
+      "tier": 2,
+      "loreBriefZh": "以高塔阵列集中精神灼烧，绕开目标的物理防护。",
+      "visualKeywordsZh": "细长紫晶尖塔向上汇聚三道精神波束",
+      "forbiddenElementsZh": "完整城市塔楼、敌人头部、激光场景、文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-mind-spire-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-mind-spire.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“心灵尖塔”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.mind-spire 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 19,
+      "contentId": "core.research.consciousness-network",
+      "displayNameZh": "意识网络",
+      "route": "Psionics",
+      "tier": 2,
+      "loreBriefZh": "把分散思维节点接入同一低延迟网络，沉淀可用精神资源。",
+      "visualKeywordsZh": "中央紫晶节点连接四枚小型脑波节点，清楚网络拓扑",
+      "forbiddenElementsZh": "人脸、大脑写实、完整城市网络、细密线路",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-consciousness-network-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-consciousness-network.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“意识网络”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.consciousness-network 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 20,
+      "contentId": "core.research.thought-acceleration",
+      "displayNameZh": "思维加速",
+      "route": "Psionics",
+      "tier": 2,
+      "loreBriefZh": "通过并行认知分工压缩推演时间，让研究站更快完成同量工作。",
+      "visualKeywordsZh": "三枚紫色意识晶片并行穿过一个青色计时环",
+      "forbiddenElementsZh": "人头、大脑、钟表数字、速度文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-thought-acceleration-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-thought-acceleration.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“思维加速”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.thought-acceleration 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 21,
+      "contentId": "core.research.alloy-armor",
+      "displayNameZh": "合金装甲",
+      "route": "Technology",
+      "tier": 3,
+      "loreBriefZh": "以层叠合金和缓冲结构把城市外壳改造成承压装甲。",
+      "visualKeywordsZh": "三层蓝钢装甲板截面与橙色缓冲蜂窝核心",
+      "forbiddenElementsZh": "坦克、士兵、完整城墙、盾牌文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-alloy-armor-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-alloy-armor.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“合金装甲”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.alloy-armor 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 22,
+      "contentId": "core.research.unmanned-systems",
+      "displayNameZh": "无人系统",
+      "route": "Technology",
+      "tier": 3,
+      "loreBriefZh": "将感知、路径和维修指令封装进可替代人员的自动平台。",
+      "visualKeywordsZh": "紧凑四足无人机剪影、单眼传感器和路径节点",
+      "forbiddenElementsZh": "人物、军用品牌、完整战场、写实无人机",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-unmanned-systems-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-unmanned-systems.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“无人系统”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.unmanned-systems 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 23,
+      "contentId": "core.research.orbital-supply",
+      "displayNameZh": "轨道补给",
+      "route": "Technology",
+      "tier": 3,
+      "loreBriefZh": "用高空测绘和远距调度把城市补给范围延伸到更远工位。",
+      "visualKeywordsZh": "小型轨道卫星向地面货箱投射三道蓝色调度线",
+      "forbiddenElementsZh": "地球、火箭发射场、文字坐标、复杂星空",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-orbital-supply-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-orbital-supply.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“轨道补给”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.orbital-supply 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 24,
+      "contentId": "core.research.energy-weapons",
+      "displayNameZh": "能量武器",
+      "route": "Technology",
+      "tier": 3,
+      "loreBriefZh": "将高密度能量约束为可定向释放的穿甲束流。",
+      "visualKeywordsZh": "蓝色聚焦线圈将青白能量压成单束穿过装甲片",
+      "forbiddenElementsZh": "完整枪炮、人物、爆炸、激光塔场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-energy-weapons-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-energy-weapons.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“能量武器”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.energy-weapons 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 25,
+      "contentId": "core.research.sword-riding",
+      "displayNameZh": "御剑术",
+      "route": "Cultivation",
+      "tier": 3,
+      "loreBriefZh": "用连续神识校正高速飞剑，使其脱离固定阵台远距行动。",
+      "visualKeywordsZh": "一柄金青飞剑沿弯曲神识轨迹穿过两个校正环",
+      "forbiddenElementsZh": "骑剑人物、山水云海、多柄剑阵、文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-sword-riding-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-sword-riding.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“御剑术”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.sword-riding 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 26,
+      "contentId": "core.research.alchemy",
+      "displayNameZh": "炼丹术",
+      "route": "Cultivation",
+      "tier": 3,
+      "loreBriefZh": "以灵火提纯活性物质，把短暂药性封存为可携带丹剂。",
+      "visualKeywordsZh": "金色丹丸悬在青色灵火上，外绕简洁蒸馏环",
+      "forbiddenElementsZh": "完整丹炉、人物、烟云、汉字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-alchemy-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-alchemy.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“炼丹术”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.alchemy 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 27,
+      "contentId": "core.research.formation-reinforcement",
+      "displayNameZh": "阵法强化",
+      "route": "Cultivation",
+      "tier": 3,
+      "loreBriefZh": "扩展阵基回路，让聚灵与近域调度共享更稳定的能量边界。",
+      "visualKeywordsZh": "双层金青六角阵环、四个加固节点和向外扩展箭头",
+      "forbiddenElementsZh": "复杂法阵密纹、文字、人物、地面场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-formation-reinforcement-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-formation-reinforcement.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“阵法强化”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.formation-reinforcement 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 28,
+      "contentId": "core.research.puppetry",
+      "displayNameZh": "傀儡术",
+      "route": "Cultivation",
+      "tier": 3,
+      "loreBriefZh": "以符纹驱动机械关节，制造不依赖血肉疲劳的作战傀儡。",
+      "visualKeywordsZh": "木钢傀儡手臂关节由金色符纹丝线控制",
+      "forbiddenElementsZh": "完整人形角色、恐怖木偶、文字咒符、武器",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-puppetry-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-puppetry.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“傀儡术”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.puppetry 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 29,
+      "contentId": "core.research.behemoth-breeding",
+      "displayNameZh": "巨兽培育",
+      "route": "Biological",
+      "tier": 3,
+      "loreBriefZh": "通过长期定向选择培育能承担攻城和运输负荷的大型个体。",
+      "visualKeywordsZh": "大型角质胚胎剪影位于骨质培养环内，尺度箭头极简",
+      "forbiddenElementsZh": "完整怪兽场景、血腥、人物、文字尺寸",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-behemoth-breeding-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-behemoth-breeding.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“巨兽培育”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.behemoth-breeding 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 30,
+      "contentId": "core.research.acid-spit",
+      "displayNameZh": "酸液喷吐",
+      "route": "Biological",
+      "tier": 3,
+      "loreBriefZh": "重构腺体压力和酸液配方，使喷吐物针对装甲持续腐蚀。",
+      "visualKeywordsZh": "加压腺体向前喷出一滴亮绿酸液并蚀穿金属片",
+      "forbiddenElementsZh": "嘴巴怪物、写实组织、液体飞溅满屏、血液",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-acid-spit-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-acid-spit.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“酸液喷吐”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.acid-spit 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 31,
+      "contentId": "core.research.tissue-regeneration",
+      "displayNameZh": "组织再生",
+      "route": "Biological",
+      "tier": 3,
+      "loreBriefZh": "让受损组织持续复制并替换坏死区域，形成低速自愈循环。",
+      "visualKeywordsZh": "断裂绿色组织两端长出新芽并由循环箭头闭合",
+      "forbiddenElementsZh": "伤口血液、人体、医疗十字、写实细胞图",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-tissue-regeneration-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-tissue-regeneration.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“组织再生”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.tissue-regeneration 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 32,
+      "contentId": "core.research.gene-splicing",
+      "displayNameZh": "基因剪接",
+      "route": "Biological",
+      "tier": 3,
+      "loreBriefZh": "组合筛选后的基因片段，为活体赋予短期而强烈的适应特征。",
+      "visualKeywordsZh": "分段双螺旋由骨质夹具切开并重接成绿色链",
+      "forbiddenElementsZh": "剪刀图标、人物、文字DNA、实验室场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-gene-splicing-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-gene-splicing.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“基因剪接”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.gene-splicing 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 33,
+      "contentId": "core.research.mind-shield",
+      "displayNameZh": "心灵护盾",
+      "route": "Psionics",
+      "tier": 3,
+      "loreBriefZh": "以同步意识维持范围屏障，削弱进入城市范围的攻击。",
+      "visualKeywordsZh": "三枚紫色意识节点同步投射弧形青紫屏障",
+      "forbiddenElementsZh": "人物头部、城市景观、复杂力场网格、文字",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-mind-shield-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-mind-shield.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“心灵护盾”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.mind-shield 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 34,
+      "contentId": "core.research.mind-control",
+      "displayNameZh": "精神操控",
+      "route": "Psionics",
+      "tier": 3,
+      "loreBriefZh": "干扰低阶目标的判断回路，使其短暂服从外来指令。",
+      "visualKeywordsZh": "紫色控制环压住简化机械眼，三道指令波束",
+      "forbiddenElementsZh": "真人脸、脑部写实、提线木偶、文字命令",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-mind-control-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-mind-control.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“精神操控”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.mind-control 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 35,
+      "contentId": "core.research.precognitive-sense",
+      "displayNameZh": "预知感应",
+      "route": "Psionics",
+      "tier": 3,
+      "loreBriefZh": "从杂乱精神噪声中提取即将发生的敌意征兆，提前形成预警。",
+      "visualKeywordsZh": "紫色感知眼前方叠出三层未来轮廓与橙色警示楔",
+      "forbiddenElementsZh": "真人眼睛、钟表数字、场景敌人、文字警报",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-precognitive-sense-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-precognitive-sense.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“预知感应”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.precognitive-sense 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 36,
+      "contentId": "core.research.collective-consciousness",
+      "displayNameZh": "集体意识",
+      "route": "Psionics",
+      "tier": 3,
+      "loreBriefZh": "让多座城市共享部分认知成果，但仍保留各自独立决策。",
+      "visualKeywordsZh": "五枚独立紫色意识晶核围绕共享光环连接，中心留空",
+      "forbiddenElementsZh": "人群、人脸、城市地图、蜂巢文字、细密网络",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-collective-consciousness-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-collective-consciousness.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“集体意识”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.collective-consciousness 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 37,
+      "contentId": "core.research.bridge.psionic-mech",
+      "displayNameZh": "灵能机甲",
+      "route": "BridgeTechnologyPsionics",
+      "tier": 3,
+      "loreBriefZh": "将机械骨架与灵能护盾耦合，形成兼具实体火力和精神防护的机体。",
+      "visualKeywordsZh": "蓝钢机械胸甲与紫色灵能护盾核心左右咬合",
+      "forbiddenElementsZh": "完整机甲角色、驾驶员、武器战斗姿态、场景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-psionic-mech-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-psionic-mech.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“灵能机甲”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.psionic-mech 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 38,
+      "contentId": "core.research.bridge.high-frequency-sword",
+      "displayNameZh": "高周波飞剑",
+      "route": "BridgeCultivationTechnology",
+      "tier": 3,
+      "loreBriefZh": "以精密振荡结构强化灵铁飞剑，使刃口在高速共振中切割装甲。",
+      "visualKeywordsZh": "金青飞剑刃口嵌蓝色机械振荡齿并发出双频波纹",
+      "forbiddenElementsZh": "人物、完整武器场景、文字频率、火花海",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-high-frequency-sword-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-high-frequency-sword.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“高周波飞剑”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.high-frequency-sword 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 39,
+      "contentId": "core.research.bridge.bio-hangar",
+      "displayNameZh": "生物机库",
+      "route": "BridgeBiologicalTechnology",
+      "tier": 3,
+      "loreBriefZh": "让活体肌束和机械承力架共同生长，形成可维护的半机械巨兽平台。",
+      "visualKeywordsZh": "绿色肌束沿蓝钢肋架对称生长并在中央锁扣融合",
+      "forbiddenElementsZh": "完整机库建筑、巨兽全身、血腥、场景背景",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-bio-hangar-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-bio-hangar.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“生物机库”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.bio-hangar 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 40,
+      "contentId": "core.research.bridge.spirit-plant",
+      "displayNameZh": "灵植培育",
+      "route": "BridgeCultivationBiological",
+      "tier": 3,
+      "loreBriefZh": "用灵性阵纹引导活体组织生长，稳定培育可炼制的灵植。",
+      "visualKeywordsZh": "绿色灵植芽从金色阵纹培养环中央生长，青色叶脉发光",
+      "forbiddenElementsZh": "完整花园、风景、人物、文字符咒、植物群",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-spirit-plant-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-spirit-plant.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“灵植培育”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.spirit-plant 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 41,
+      "contentId": "core.research.bridge.psionic-pulse",
+      "displayNameZh": "精神脉冲武器",
+      "route": "BridgePsionicsTechnology",
+      "tier": 3,
+      "loreBriefZh": "把精神共振编码成定向脉冲，扰乱机械目标的控制回路。",
+      "visualKeywordsZh": "紫色晶体发射定向脉冲穿过蓝钢线圈击中控制芯片",
+      "forbiddenElementsZh": "完整枪炮、人物、爆炸、文字EMP、战场",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-psionic-pulse-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-psionic-pulse.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“精神脉冲武器”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.psionic-pulse 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    },
+    {
+      "catalogOrder": 42,
+      "contentId": "core.research.bridge.flesh-elixir",
+      "displayNameZh": "血肉灵丹",
+      "route": "BridgeBiologicalCultivation",
+      "tier": 3,
+      "loreBriefZh": "将高活性组织封入丹体，换取三倍效力并承担可见的突变风险。",
+      "visualKeywordsZh": "金色丹壳包裹绿色活性组织核心并分出三道增幅脉络",
+      "forbiddenElementsZh": "血腥肉块、人物、完整炼丹场景、三倍文字、突变怪物",
+      "sourceAssetPath": "Docs/Art/IDEA-0016/Source/Technologies/tech-bridge-flesh-elixir-master-v1.png",
+      "unitySpritePath": "Assets/_Game/Art/Production2D/Technology/tech-bridge-flesh-elixir.png",
+      "sourceSummaryZh": "由研究站满足正式前置后，消耗 ResearchCatalog 定义的研究资源完成。",
+      "useSummaryZh": "用于解锁或预览“血肉灵丹”对应的正式建筑、配方或规则效果。",
+      "unlockSummaryZh": "前置科技、成本、时长、发布状态与效果引用由 ResearchCatalog 中 core.research.bridge.flesh-elixir 唯一定义。",
+      "runtimeUsages": [
+        "technology-tree-node",
+        "technology-detail"
+      ],
+      "displaySizesPx": [
+        32,
+        48,
+        64,
+        80
+      ],
+      "safeAreaNormalized": {
+        "x": 0.125,
+        "y": 0.125,
+        "width": 0.75,
+        "height": 0.75
+      },
+      "fallbackKey": "technology.formal-route-tier",
+      "reviewState": "integrated-automated-pending-visual-review"
+    }
+  ]
+}

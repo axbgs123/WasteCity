@@ -24,6 +24,8 @@ namespace WasteCity.Economy
             bool defaultForBuilding,
             string iconProjection,
             string loreBrief,
+            int inputCapacity,
+            int outputCapacity,
             bool usesBoundResourceNode = false,
             int boundResourceNodeOutputAmount = 0)
         {
@@ -38,6 +40,8 @@ namespace WasteCity.Economy
             DefaultForBuilding = defaultForBuilding;
             IconProjection = iconProjection;
             LoreBrief = loreBrief;
+            InputCapacity = Math.Max(0, inputCapacity);
+            OutputCapacity = Math.Max(0, outputCapacity);
             UsesBoundResourceNode = usesBoundResourceNode;
             BoundResourceNodeOutputAmount = usesBoundResourceNode
                 ? Math.Max(0, boundResourceNodeOutputAmount)
@@ -58,6 +62,8 @@ namespace WasteCity.Economy
         public bool DefaultForBuilding { get; }
         public string IconProjection { get; }
         public string LoreBrief { get; }
+        public int InputCapacity { get; }
+        public int OutputCapacity { get; }
         public bool UsesBoundResourceNode { get; }
         public int BoundResourceNodeOutputAmount { get; }
 
@@ -77,6 +83,9 @@ namespace WasteCity.Economy
 
     public static class ResourceRecipeCatalog
     {
+        private const int StandardMachineInputCapacity = 20;
+        private const int StandardMachineOutputCapacity = 20;
+
         public const string FieldAlloyId = "core.crafting.field-alloy";
         public const string FieldAmmunitionId =
             "core.crafting.field-ammunition";
@@ -107,27 +116,50 @@ namespace WasteCity.Economy
         private static readonly ReadOnlyCollection<ResourceRecipeDefinition>
             all = Array.AsReadOnly(new[]
             {
-                FromMachine(
-                    FormalProductionDefinitionCatalog.Extraction,
+                new ResourceRecipeDefinition(
+                    "core.production.extract-node-resource",
                     "节点资源采集",
+                    ResourceRecipeKind.Machine,
+                    R(MiningStationId),
+                    Array.Empty<ResourceAmount>(),
+                    Array.Empty<ResourceAmount>(),
+                    3f,
                     R("core.research.scrap-processing"),
                     defaultForBuilding: true,
                     "bound-resource|badge:machine",
-                    "采矿站从绑定矿点稳定提取对应的基础资源。"),
-                FromMachine(
-                    FormalProductionDefinitionCatalog.Smelting,
+                    "采矿站从绑定矿点稳定提取对应的基础资源。",
+                    inputCapacity: 0,
+                    outputCapacity: 20,
+                    usesBoundResourceNode: true,
+                    boundResourceNodeOutputAmount: 1),
+                new ResourceRecipeDefinition(
+                    "core.production.smelt-alloy",
                     "合金冶炼",
+                    ResourceRecipeKind.Machine,
+                    R(SmelterId),
+                    Amounts(("core.resource.iron", 2)),
+                    Amounts(("technology.resource.alloy", 1)),
+                    6f,
                     R("core.research.automated-machinery"),
                     defaultForBuilding: true,
                     MachineIcon("technology.resource.alloy"),
-                    "以标准炉温把废铁矿冶炼为耐热合金。"),
-                FromMachine(
-                    FormalProductionDefinitionCatalog.Assembly,
+                    "以标准炉温把废铁矿冶炼为耐热合金。",
+                    inputCapacity: 20,
+                    outputCapacity: 10),
+                new ResourceRecipeDefinition(
+                    "core.production.assemble-ammunition",
                     "弹药装配",
+                    ResourceRecipeKind.Machine,
+                    R(AssemblerId),
+                    Amounts(("technology.resource.alloy", 2)),
+                    Amounts(("technology.resource.ammunition", 2)),
+                    6f,
                     R("core.research.precision-assembly"),
                     defaultForBuilding: true,
                     MachineIcon("technology.resource.ammunition"),
-                    "把合金封装成城市防御系统使用的统一弹箱。"),
+                    "把合金封装成城市防御系统使用的统一弹箱。",
+                    inputCapacity: 20,
+                    outputCapacity: 30),
                 Manual(
                     FieldAlloyId,
                     "应急合金",
@@ -479,30 +511,6 @@ namespace WasteCity.Economy
                 : recipeId ?? string.Empty;
         }
 
-        private static ResourceRecipeDefinition FromMachine(
-            FormalProductionDefinition definition,
-            string chineseName,
-            IReadOnlyList<string> requiredResearchIds,
-            bool defaultForBuilding,
-            string iconProjection,
-            string loreBrief)
-        {
-            return new ResourceRecipeDefinition(
-                definition.Id,
-                chineseName,
-                ResourceRecipeKind.Machine,
-                R(definition.BuildingId),
-                definition.Inputs,
-                definition.Outputs,
-                definition.DurationSeconds,
-                requiredResearchIds,
-                defaultForBuilding,
-                iconProjection,
-                loreBrief,
-                usesBoundResourceNode: definition.UsesBoundResourceNode,
-                boundResourceNodeOutputAmount: definition.OutputAmount);
-        }
-
         private static ResourceRecipeDefinition Machine(
             string id,
             string chineseName,
@@ -525,7 +533,9 @@ namespace WasteCity.Economy
                 requiredResearchIds,
                 defaultForBuilding,
                 MachineIcon(outputs[0].ResourceId),
-                loreBrief);
+                loreBrief,
+                StandardMachineInputCapacity,
+                StandardMachineOutputCapacity);
         }
 
         private static ResourceRecipeDefinition Manual(
@@ -548,7 +558,9 @@ namespace WasteCity.Economy
                 requiredResearchIds,
                 defaultForBuilding: false,
                 ManualIcon(outputs[0].ResourceId),
-                loreBrief);
+                loreBrief,
+                inputCapacity: 0,
+                outputCapacity: 0);
         }
 
         private static ResourceAmount[] Amounts(

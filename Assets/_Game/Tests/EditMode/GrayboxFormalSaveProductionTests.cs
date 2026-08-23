@@ -197,6 +197,161 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SelectedCoreMachineRecipeRoundTripsWithItsExactState()
+        {
+            const string stableId =
+                "building.instance.persistence.selected-recipe";
+            GrayboxBuildingInstance3D sourceInstance = Instance(
+                stableId,
+                BuildingCatalog.Smelter,
+                10,
+                10);
+            GrayboxProductionRuntime3D source = Runtime(
+                new[] { sourceInstance },
+                CityMode.Fortress,
+                10,
+                10);
+            Assert.That(source.TrySelectRecipe(
+                stableId,
+                "core.production.refine-stone",
+                new[] { "core.research.automated-machinery" },
+                out GrayboxProductionRecipeSelectionResult3D selection),
+                Is.True,
+                selection.Status.ToString());
+            Assert.That(source.TryGetState(
+                stableId,
+                out BuildingProductionState sourceState), Is.True);
+            Assert.That(sourceState.Input.Add(ResourceIds.Stone, 5),
+                Is.EqualTo(5));
+            Tick(sourceState, 2f);
+            Assert.That(sourceState.Output.Add(ResourceIds.RefinedStone, 4),
+                Is.EqualTo(4));
+            sourceState.SetPlayerPaused(true);
+            FormalThreeDProductionSaveData saved = Capture(Adapter(source));
+
+            GrayboxBuildingInstance3D restoredInstance = Instance(
+                stableId,
+                BuildingCatalog.Smelter,
+                10,
+                10);
+            GrayboxProductionRuntime3D restored = Runtime(
+                new[] { restoredInstance },
+                CityMode.Fortress,
+                10,
+                10);
+            Assert.That(restored.TryGetState(
+                stableId,
+                out BuildingProductionState defaultState), Is.True);
+
+            Assert.That(TryRestore(
+                Adapter(restored),
+                saved,
+                new[] { restoredInstance },
+                world: null,
+                out string error), Is.True, error);
+            Assert.That(restored.TryGetState(
+                stableId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(state, Is.Not.SameAs(defaultState));
+            Assert.That(state.Definition.Id,
+                Is.EqualTo("core.production.refine-stone"));
+            Assert.That(state.Input.Get(ResourceIds.Stone), Is.EqualTo(2));
+            Assert.That(state.ReservedInputs,
+                Is.EqualTo(new[] { new ResourceAmount(ResourceIds.Stone, 3) }));
+            Assert.That(state.Output.Get(ResourceIds.RefinedStone), Is.EqualTo(4));
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+            Assert.That(state.HasReservedInputs, Is.True);
+            Assert.That(state.IsPlayerPaused, Is.True);
+            Assert.That(state.IsLogisticsConnected, Is.True);
+
+            restored.Synchronize(
+                new[] { restoredInstance },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+            Assert.That(restored.TryGetState(stableId, out BuildingProductionState
+                synchronized), Is.True);
+            Assert.That(synchronized, Is.SameAs(state));
+        }
+
+        [Test]
+        public void RouteDefaultMachineRecipeRoundTripsAsLiveProduction()
+        {
+            const string stableId =
+                "building.instance.persistence.route-default";
+            GrayboxBuildingInstance3D sourceInstance = Instance(
+                stableId,
+                BuildingCatalog.SpiritFireFurnace,
+                10,
+                10);
+            GrayboxProductionRuntime3D source = Runtime(
+                new[] { sourceInstance },
+                CityMode.Fortress,
+                10,
+                10);
+            Assert.That(source.TryGetState(
+                stableId,
+                out BuildingProductionState sourceState), Is.True);
+            Assert.That(sourceState.Definition.Id,
+                Is.EqualTo("cultivation.production.refine-spirit-iron"));
+            Assert.That(sourceState.Input.Add(ResourceIds.Iron, 5), Is.EqualTo(5));
+            Assert.That(sourceState.Input.Add(ResourceIds.EnergyCrystal, 3),
+                Is.EqualTo(3));
+            Tick(sourceState, 2f);
+            Assert.That(sourceState.ReservedInputs,
+                Is.EqualTo(new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                }));
+            Assert.That(sourceState.Output.Add(ResourceIds.SpiritIron, 2),
+                Is.EqualTo(2));
+            FormalThreeDProductionSaveData saved = Capture(Adapter(source));
+            CollectionAssert.AreEqual(
+                new[] { ResourceIds.Iron, ResourceIds.EnergyCrystal },
+                saved.states.Single().reservedInputs
+                    .Select(amount => amount.resourceId)
+                    .ToArray());
+
+            GrayboxBuildingInstance3D restoredInstance = Instance(
+                stableId,
+                BuildingCatalog.SpiritFireFurnace,
+                10,
+                10);
+            GrayboxProductionRuntime3D restored = Runtime(
+                new[] { restoredInstance },
+                CityMode.Fortress,
+                10,
+                10);
+
+            Assert.That(TryRestore(
+                Adapter(restored),
+                saved,
+                new[] { restoredInstance },
+                world: null,
+                out string error), Is.True, error);
+            Assert.That(restored.TryGetState(
+                stableId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(state.Definition.Id,
+                Is.EqualTo("cultivation.production.refine-spirit-iron"));
+            Assert.That(state.Definition.InputCapacity, Is.EqualTo(20));
+            Assert.That(state.Definition.OutputCapacity, Is.EqualTo(20));
+            Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(3));
+            Assert.That(state.Input.Get(ResourceIds.EnergyCrystal), Is.EqualTo(2));
+            Assert.That(state.ReservedInputs,
+                Is.EqualTo(new[]
+                {
+                    new ResourceAmount(ResourceIds.Iron, 2),
+                    new ResourceAmount(ResourceIds.EnergyCrystal, 1),
+                }));
+            Assert.That(state.Output.Get(ResourceIds.SpiritIron), Is.EqualTo(2));
+            Assert.That(state.ProgressSeconds, Is.EqualTo(2f));
+            Assert.That(state.HasReservedInputs, Is.True);
+        }
+
+        [Test]
         public void PrepareIsAtomicAndCommitRejectsStaleOrAlreadyConsumedPlan()
         {
             const string stableId = "building.instance.000050";

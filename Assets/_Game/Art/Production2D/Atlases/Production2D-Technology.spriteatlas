@@ -1,0 +1,87 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!687078895 &4343727234628468602
+SpriteAtlas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Production2D-Technology
+  m_EditorData:
+    serializedVersion: 2
+    textureSettings:
+      serializedVersion: 2
+      anisoLevel: 0
+      compressionQuality: 0
+      maxTextureSize: 0
+      textureCompression: 0
+      filterMode: 1
+      generateMipMaps: 0
+      readable: 0
+      crunchedCompression: 0
+      sRGB: 1
+    platformSettings: []
+    packingSettings:
+      serializedVersion: 2
+      padding: 4
+      blockOffset: 1
+      allowAlphaSplitting: 0
+      enableRotation: 0
+      enableTightPacking: 0
+      enableAlphaDilation: 0
+    secondaryTextureSettings: {}
+    variantMultiplier: 1
+    packables:
+    - {fileID: 2800000, guid: bada0d68296ef4d76b1c4ec68e787fdd, type: 3}
+    - {fileID: 2800000, guid: 31ceddcb9f13144e5ab558b89b372d13, type: 3}
+    - {fileID: 2800000, guid: 9b78a133263a54018aa8575d9cfd64b9, type: 3}
+    - {fileID: 2800000, guid: 0a273c0e4194140589e8a94480ba5822, type: 3}
+    - {fileID: 2800000, guid: 604f030694b02414b8f062e50e6fdb34, type: 3}
+    - {fileID: 2800000, guid: 2a1943c6b7d28454caa5eb3860ee8130, type: 3}
+    - {fileID: 2800000, guid: 27dad5fa7eeda4a23981ab65ecd478e3, type: 3}
+    - {fileID: 2800000, guid: 08bfbf10f15aa43e0a9c2c6911e571c4, type: 3}
+    - {fileID: 2800000, guid: b0c64e817740c42c1aa3fca139fed8ef, type: 3}
+    - {fileID: 2800000, guid: be085083c66a74c99a0999fe239cfb69, type: 3}
+    - {fileID: 2800000, guid: 54b89212407004e15afc661f486290d8, type: 3}
+    - {fileID: 2800000, guid: edd4f11bbe5994fe5a3821215129eab5, type: 3}
+    - {fileID: 2800000, guid: 26d1e6b04b0824720bd9fdf870d9b8e3, type: 3}
+    - {fileID: 2800000, guid: e3530e6dd22d941e6bf3104f3e701a4d, type: 3}
+    - {fileID: 2800000, guid: bff44a60a25e447ac83d14edd5e9bd5a, type: 3}
+    - {fileID: 2800000, guid: 4f3740fb904c7439b9598f16b294bff8, type: 3}
+    - {fileID: 2800000, guid: 2c36bdd4f3420448ab5d9b793bbe34fb, type: 3}
+    - {fileID: 2800000, guid: c9c4cfed9bdd24c0c86d86f5cff21ca0, type: 3}
+    - {fileID: 2800000, guid: 52ebaeeae3be6496ab6634cfe8e0a91a, type: 3}
+    - {fileID: 2800000, guid: 1af11e05f304e424986aa7b0ee75edfe, type: 3}
+    - {fileID: 2800000, guid: 06d0e37f60b15447ba4f9c7c7b3cd47a, type: 3}
+    - {fileID: 2800000, guid: 170bcac84cb734f40ab2e0fc80099eff, type: 3}
+    - {fileID: 2800000, guid: 7578def23dc984baf9893e71c5eccfae, type: 3}
+    - {fileID: 2800000, guid: 036829adbf6b14a6d967e231e85d47a5, type: 3}
+    - {fileID: 2800000, guid: c335397470cdc4c0082bd534d98b1b84, type: 3}
+    - {fileID: 2800000, guid: ae194461c5bca4639829f7b5ff34fed8, type: 3}
+    - {fileID: 2800000, guid: c8a788ddd825a4f4f839fce9ba2a1103, type: 3}
+    - {fileID: 2800000, guid: a78613c8d1d0247768dbc543ff9bd085, type: 3}
+    - {fileID: 2800000, guid: 98d37af72ae2245268f263e2bb480f3f, type: 3}
+    - {fileID: 2800000, guid: da7f80718c59b47d39b79e2cef618d3f, type: 3}
+    - {fileID: 2800000, guid: 5825efc9996eb460390d19a708cec1f3, type: 3}
+    - {fileID: 2800000, guid: 168529bb5957d48bc80ca320203a8771, type: 3}
+    - {fileID: 2800000, guid: f33847b7bd2584ae288661e6f373455a, type: 3}
+    - {fileID: 2800000, guid: 883fa1afcb6214bca8740b19e15267ee, type: 3}
+    - {fileID: 2800000, guid: 58de700a92bc24805aa3158945792e1d, type: 3}
+    - {fileID: 2800000, guid: b56d96970d1a1467b89672e5eeec8726, type: 3}
+    - {fileID: 2800000, guid: 3efab4b03f1fc4cf99f62b96f0b5fba9, type: 3}
+    - {fileID: 2800000, guid: a611004e6081e4ac594de9db32f54971, type: 3}
+    - {fileID: 2800000, guid: 488c71796511b4ed794adb648362738c, type: 3}
+    - {fileID: 2800000, guid: 47d4cad99db694f1e9d3ce55bf1db67f, type: 3}
+    - {fileID: 2800000, guid: 641e4776de1b048c7bf51e06360b4d50, type: 3}
+    - {fileID: 2800000, guid: 8224cdf09f8484f4eae5f409aff17cea, type: 3}
+    - {fileID: 2800000, guid: cbf3c6ff323044cdeb4a96422bdc66bf, type: 3}
+    bindAsDefault: 1
+    isAtlasV2: 0
+    cachedData: {fileID: 0}
+    packedSpriteRenderDataKeys: []
+  m_MasterAtlas: {fileID: 0}
+  m_PackedSprites: []
+  m_PackedSpriteNamesToIndex: []
+  m_RenderDataMap: {}
+  m_Tag: Production2D-Technology
+  m_IsVariant: 0

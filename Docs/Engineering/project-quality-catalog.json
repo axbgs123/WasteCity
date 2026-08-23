@@ -214,7 +214,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearch*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/ResearchTree*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**",
@@ -232,12 +232,14 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
@@ -300,6 +302,7 @@
         "Assets/_Game/Tests/EditMode/ProductionTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceDiscoveryProjectionTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceShortfallRulesTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
@@ -490,10 +493,15 @@
         "Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs",
         "Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs",
         "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs",
-        "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset"
+        "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset",
+        "Assets/_Game/Resources/Production2D/**",
+        "Assets/_Game/Art/Production2D/**"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Presentation/**",
@@ -502,6 +510,11 @@
       "FailureLocationSummary": "先检查视觉槽、材质接入、投影与相机场景引用",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
         "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
       ],
       "ScenePaths": [
@@ -513,7 +526,10 @@
         "IDEA-0016"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/Engineering/idea-0016-visual-assets.json",
+        "Docs/Art/IDEA-0016/IDEA0016-2D-Visual-Content-Catalog-ZH.md",
+        "Docs/superpowers/specs/2026-08-23-idea-0016-production-2d-art-pipeline-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -529,6 +545,7 @@
         "Assets/_Game/Editor/FormalBuildTools.cs",
         "Assets/_Game/Editor/GrayboxPerformanceProbe.cs",
         "Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
+        "Assets/_Game/Editor/Production2D*.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs",
         "Assets/_Game/Editor/ProjectQuality/ProjectQualityModels.cs",
@@ -556,7 +573,12 @@
         "Assets/_Game/Tests/EditMode/ProjectQualityIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectQualityScannerTests.cs",
         "Assets/_Game/Tests/EditMode/ProjectTestResultAnalyzerTests.cs",
-        "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs"
+        "Assets/_Game/Tests/EditMode/ProjectQualityValidatorTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -565,7 +587,8 @@
         "BUG-0005",
         "DOC-0001",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0016"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1252,7 +1275,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 内组合背包、应急合成、43 节点正式研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。",
+      "UseSummary": "在 GrayboxPrototype3D 内组合背包、30 条配方目录与两条可执行应急合成、43 节点正式研究、派生资源发现、资源状态栏、真实仓库详情、多配方生产与面板命令，并把真实输入提交到正式模型。",
       "BoundarySummary": "只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 31，也不得接入冻结 2D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
@@ -1284,7 +1307,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "显示当前 3D 场景的资源栏、完整账本、背包与合成面板、43 节点自下向上正式科技树、真实仓库内容与共享资源图标；科技树提供确定连线、搜索、路线筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。",
+      "UseSummary": "显示当前 3D 场景的文明式横向资源栏、路线/层级可筛选账本、背包与 30 条配方合成面板、43 节点自下向上正式科技树、真实仓库内容、多配方生产通道与共享资源图标；科技树提供确定连线、搜索、路线/状态筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。",
       "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；图标必须复用 ResourceIconCatalog3D，视图和输入表面不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间、判断访问资格或进入 schema 31。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
@@ -1294,6 +1317,29 @@
       "RequirementIds": [
         "IDEA-0011",
         "IDEA-0012",
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "graybox-developer-catalog-query-3d",
+      "ChineseName": "三维开发修改器中文目录查询",
+      "TypeNames": [
+        "GrayboxDeveloperCatalogQuery3D",
+        "GrayboxDeveloperCatalogEntry3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从正式资源与研究目录建立稳定顺序的中文查询快照，支持中文名和 stable ID 的规范化子串搜索，供 Editor/Development 修改器的列表与输入查找共用。",
+      "BoundarySummary": "只负责只读目录投影和查询，不增加资源、不解锁科技、不持有搜索框或选择状态；命令仍须经过正式库存和研究入口，Release 不得引用修改器 UI 或行为。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
         "IDEA-0016"
       ]
     },
@@ -1431,6 +1477,28 @@
       ]
     },
     {
+      "Id": "resource-discovery-projection",
+      "ChineseName": "正式资源发现投影",
+      "TypeNames": [
+        "ResourceDiscoveryFacts",
+        "ResourceDiscoveryProjection"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Economy/ResourceDiscoveryProjection.cs"
+      ],
+      "FeatureGroupId": "economy-production-logistics",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "把城市核心、全部真实仓库、背包、生产输入/输出/预留、合成预留和已完成研究聚合为只读事实，再按 ResourceDefinitionCatalog 的正式发现规则投影当前可见资源。",
+      "BoundarySummary": "发现状态完全从 schema 31 已有权威事实派生，不保存永久发现位；断开物流的仓库仍计入玩家所有资产，但不改变联网可用数量。投影不转移资源、不推进研究，也不持有 UI 筛选状态。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResourceDiscoveryProjectionTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
       "Id": "player-backpack-model",
       "ChineseName": "玩家背包模型",
       "TypeNames": [
@@ -1468,7 +1536,7 @@
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
       "UseSummary": "统一提供 30 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。",
-      "BoundarySummary": "只定义正式配方静态配置并保留旧三机器定义的兼容投影；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。",
+      "BoundarySummary": "只定义正式配方静态配置；FormalProductionDefinitionCatalog 可按建筑和配方 ID 投影机器定义，但本目录不拥有队列、背包、建筑缓存、选择或进度，也不执行资源事务、自动串联或 UI 手势。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs"
@@ -1654,10 +1722,11 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "提供采矿、冶炼和装配三条正式机器配方的稳定标识、周期、输入输出与内部容量。",
-      "BoundarySummary": "只定义机器生产静态配置；不保存建筑实例状态，不推进周期，也不判断物流连接。",
+      "UseSummary": "把 ResourceRecipeCatalog 的正式机器配方按建筑投影为运行时生产定义，并保留采矿、冶炼和装配三个兼容入口；输入、输出、周期和内部容量仍以正式配方目录为真值。",
+      "BoundarySummary": "只负责机器配方到运行时定义的确定性投影与缓存；不保存建筑实例当前配方或库存，不推进周期，不判断物流连接，也不维护第二套配方数值。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011"
@@ -1674,7 +1743,7 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "按稳定建筑实例拥有输入、输出、真实周期预留输入、进度与玩家暂停；schema 31 恢复先完整验证资源和配方语义，再原子替换单建筑状态。",
+      "UseSummary": "按稳定建筑实例和当前配方拥有多资源输入、多资源输出、完整批次预留、进度与玩家暂停；schema 31 恢复先以配方输入集合验证无序预留和资源语义，再原子替换单建筑状态。",
       "BoundarySummary": "只拥有单座建筑的生产状态，不自行读取场景或城市范围。物流连接与停工原因属于派生状态而不入档；玩家暂停入档，并在恢复时据此重建 PlayerPaused 停工原因。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
@@ -1696,8 +1765,8 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "按稳定实例顺序通过 CityResourceStorageModel 执行单个确定性物流步、推进独立生产周期并通过世界地图真值完成采矿。",
-      "BoundarySummary": "不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格、连接状态和正式城市仓库聚合模型。保留 ResourceCapacityPolicy 重载只用于旧接口兼容。",
+      "UseSummary": "按稳定实例顺序通过 CityResourceStorageModel 执行确定性物流步，对全部输入/输出通道进行原子预留、容量预检和批次完成，推进独立生产周期并通过世界地图真值完成采矿。",
+      "BoundarySummary": "不选择配方，不计算放置合法性、物流距离、建筑生命周期或场景时间；调用方必须提供已确认资格、连接状态和正式城市仓库聚合模型。保留 ResourceCapacityPolicy 重载只用于旧接口兼容。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
@@ -1742,8 +1811,8 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定实例 ID 同步生产状态、可运行集合和物流连接；schema 31 提供确定性持久化快照，以及绑定 owner、同步 generation 与内容 fingerprint 的 prepare/commit 恢复。未知配方保留为不可运行 orphan，正式定义或资源点绑定变化时同步替换状态；撤离载荷所有权保持不变。",
-      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D 与正式生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不得复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 仍由当前规则重建而不持久化。",
+      "UseSummary": "按稳定实例 ID 同步允许配方列表、当前配方、生产状态、可运行集合和物流连接；只在进度、预留及输入输出缓存均为空时提交安全切换。schema 31 确定性保存非默认配方，未知配方保留为不可运行 orphan，并通过绑定 owner、同步 generation 与内容 fingerprint 的 prepare/commit 恢复。",
+      "BoundarySummary": "只桥接 GrayboxBuildingInstance3D、正式配方目录与逐建筑生产状态；不推进时间、不执行城市事务，撤离协调器不能修改载荷快照。不得复制放置、物流范围或节点兼容规则；物流连接、停工原因和 observability revision/hash 仍由当前规则重建而不持久化。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
@@ -1784,6 +1853,7 @@
       "Id": "production-observability-boundary-3d",
       "ChineseName": "三维生产可观察化只读边界",
       "TypeNames": [
+        "ProductionResourceObservability",
         "ProductionBuildingObservability",
         "ProductionObservabilitySnapshot",
         "GrayboxProductionCommandFacade3D"
@@ -1794,7 +1864,7 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "发布按稳定实例 ID 排序的不可变生产详情；仓库与城市库存变化通过 CityResourceStorageModel.Revision 进入内容哈希。命令门面按 stable ID 在建筑缓存、背包和权威城市仓库聚合模型之间提交转移。",
+      "UseSummary": "发布按稳定实例 ID 排序、包含允许/当前配方和全部输入/输出/预留通道的不可变生产详情；仓库与城市库存变化通过 CityResourceStorageModel.Revision 进入内容哈希。命令门面按 stable ID 提交配方切换、暂停和建筑缓存/背包/权威城市仓库之间的通道转移。",
       "BoundarySummary": "快照只读，不暴露 BuildingProductionState 或可变库存；命令不接受 UI 传入仓库数量。访问距离、物流和建筑生命周期资格仍由当前 3D 场景适配器在每次提交前基于权威事实重新验证；本边界不复制资格规则、不接入冻结 2D，也不进入 schema 30。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
@@ -2104,8 +2174,8 @@
       "TypeNames": [
         "ResourceIconCatalog3D"
       ],
-      "AssetPaths": [
-        "Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs"
+    "AssetPaths": [
+      "Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs"
       ],
       "FeatureGroupId": "presentation-art-integration",
       "ReuseLevel": "Recommended",
@@ -2113,10 +2183,139 @@
       "BoundarySummary": "只负责资源 ID 到图标的表现映射，不拥有资源定义、数量或矿点真值；消费者必须使用同一目录资产或确定性 fallback，不得各自生成第二套资源身份和颜色语义。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0012",
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "building-icon-catalog-3d",
+      "ChineseName": "三维共享建筑图标目录",
+      "TypeNames": [
+        "BuildingIconOverride3D",
+        "BuildingIconCatalog3D"
+      ],
+    "AssetPaths": [
+      "Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按 BuildingCatalog 稳定建筑 ID 解析 30 张正式建筑 Sprite 和确定性类别回退，供建造栏、建筑详情与撤离列表共享。",
+      "BoundarySummary": "只拥有建筑 ID 到 Sprite 的表现映射；不决定建筑可见性、解锁、成本、占地或放置合法性，不把二维图写成三维模型完成。新消费者不得维护平行建筑图标字典。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "research-icon-catalog-3d",
+      "ChineseName": "三维共享科技图标目录",
+      "TypeNames": [
+        "ResearchIconOverride3D",
+        "ResearchIconCatalog3D"
+      ],
+    "AssetPaths": [
+      "Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按 ResearchCatalog 的 43 个稳定科技 ID 解析正式科技 Sprite，并提供路线/层级确定性回退，供科技树节点与详情共享。",
+      "BoundarySummary": "只拥有科技 ID 到 Sprite 的表现映射；不决定研究前置、成本、状态、布局或效果是否已接入。缺图回退不能授予科技效果，UI 不得用文件名建立第二套目录。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "production2d-visual-catalog-3d",
+      "ChineseName": "统一二维视觉目录",
+    "TypeNames": [
+      "Production2DVisualEntry3D",
+      "Production2DRecipeVisualEntry3D",
+      "Production2DVisualCatalog3D"
+    ],
+    "AssetPaths": [
+      "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、43 科技、30 建筑、7 UI、1 人物和 2 世界标记共 114 个视觉条目，并登记 30 条配方的主产物与机器/手工角标投影。",
+      "BoundarySummary": "运行时资产只保存稳定视觉键、Sprite、配方视觉投影和类别回退；机器清单另行保存制作、导入与审核元数据。二者都不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局；未知键只能回退，不能改写玩法 ID。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "production2d-import-policies",
+      "ChineseName": "正式二维图类级导入规则",
+      "TypeNames": [
+        "Production2DItemImportPolicy",
+        "Production2DBuildingImportPolicy",
+        "Production2DTechnologyImportPolicy",
+        "Production2DUiCharacterMarkerImportPolicy"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/Production2DItemImportPolicy.cs",
+        "Assets/_Game/Editor/Production2DBuildingImportPolicy.cs",
+        "Assets/_Game/Editor/Production2DTechnologyImportPolicy.cs",
+        "Assets/_Game/Editor/Production2DUiCharacterMarkerImportPolicy.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "只在 Assets/_Game/Art/Production2D 的六类批准目录内统一 Sprite、Alpha、sRGB、Clamp、无 mipmap、FullRect、Pivot 和 UI Border 导入合同。",
+      "BoundarySummary": "只管理限定二维交付目录的 TextureImporter；不生成内容简介、中文名、运行时映射或视觉验收结论，绝不能扫描或修改地形及其它既有纹理。扩展目录前必须同步 manifest 和导入测试。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "production2d-catalog-atlas-builders",
+      "ChineseName": "正式二维目录与图集生成器",
+      "TypeNames": [
+        "Production2DItemIconCatalogBuilder",
+        "Production2DBuildingIconCatalogBuilder",
+        "Production2DTechnologyIconCatalogBuilder",
+        "Production2DVisualCatalogBuilder",
+        "Production2DSpriteAtlasBuilder"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/Production2DItemIconCatalogBuilder.cs",
+        "Assets/_Game/Editor/Production2DBuildingIconCatalogBuilder.cs",
+        "Assets/_Game/Editor/Production2DTechnologyIconCatalogBuilder.cs",
+        "Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs",
+        "Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从已复核的类别 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 114 项视觉目录、30 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。",
+      "BoundarySummary": "仅供 Editor 生成和验证已批准的表现资产；不从文件名猜玩法内容，不改场景、配方、研究或建筑规则，不替代 Alpha/缩小联络表与用户视觉验收。Atlas 打包顺序不构成运行时身份。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
+      ],
+      "RequirementIds": [
         "IDEA-0016"
       ]
     },
