@@ -1419,6 +1419,10 @@ namespace WasteCity.Persistence
                     item + ".attackDamageRemainder");
                 if (result != null) return result;
                 if (!string.IsNullOrEmpty(value.targetStableId) &&
+                    !string.Equals(
+                        value.targetStableId,
+                        SingleCityDefenseCampaignModel.CityCoreTargetId,
+                        StringComparison.Ordinal) &&
                     !IsStableId(value.targetStableId))
                     return Invalid(FormalSaveValidationError.InvalidStableId,
                         item + ".targetStableId");

@@ -1,9 +1,11 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.Defense;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 
@@ -249,6 +251,114 @@ namespace WasteCity.Tests
             Assert.That(ReadBoolean(statistics, "partialFromMigration"), Is.True,
                 "Unavailable pre-schema-32 combat statistics must be marked " +
                 "partial instead of being presented as complete zeroes.");
+        }
+
+        [Test]
+        public void SchemaThirtyOneMigrationExcludesCompletedNonPlayerBuildingsFromCombatTopology()
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            FormalThreeDBuildingInstanceSaveData abandonedBuilding =
+                Array.Find(
+                    source.formal3D.buildings.instances,
+                    item => item.stableInstanceId ==
+                        "building.instance.000001");
+            FormalThreeDBuildingInstanceSaveData abandonedTower =
+                Array.Find(
+                    source.formal3D.buildings.instances,
+                    item => item.stableInstanceId ==
+                        "building.instance.000003");
+            Assert.That(abandonedBuilding, Is.Not.Null);
+            Assert.That(abandonedTower, Is.Not.Null);
+            Assert.That(abandonedBuilding.state, Is.EqualTo(1));
+            Assert.That(abandonedTower.state, Is.EqualTo(1));
+            abandonedBuilding.isPlayerOwned = false;
+            abandonedTower.isPlayerOwned = false;
+            Assert.That(source.formal3D.defense.towers.Any(
+                    item => item.stableInstanceId ==
+                        abandonedTower.stableInstanceId), Is.True,
+                "The schema 31 mutation must retain the obsolete tower cache " +
+                "so migration proves it is filtered by building ownership.");
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalThreeDDefenseCampaignSaveData campaign =
+                decoded.Envelope.formal3D.defenseCampaign;
+
+            Assert.That(campaign.towerCombatStates.Any(
+                    item => item.stableInstanceId ==
+                        abandonedTower.stableInstanceId), Is.False,
+                "A completed but non-player tower is absent from formal runtime " +
+                "topology and must not make schema 31 restore fail.");
+            Assert.That(campaign.buildingHealthStates.Any(
+                    item => item.stableInstanceId ==
+                        abandonedBuilding.stableInstanceId), Is.False);
+            Assert.That(campaign.buildingHealthStates.Any(
+                    item => item.stableInstanceId ==
+                        abandonedTower.stableInstanceId), Is.False);
+            Assert.That(campaign.buildingHealthStates.Any(
+                    item => item.stableInstanceId ==
+                        "building.instance.000002"), Is.True,
+                "Player-owned completed buildings must remain in health truth.");
+
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+            var restored = new SingleCityDefenseCampaignModel(28f, 28f);
+            Assert.That(restored.TryPrepareRestore(
+                ToCampaignPersistence(campaign),
+                out SingleCityDefenseCampaignRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(plan, Is.Not.Null,
+                "Filtered schema 31 campaign truth must remain restorable.");
+        }
+
+        [Test]
+        public void ActiveSchemaThirtyOneEnemyAndTowerLockMigrateToRestorableFormalIdentity()
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            Assert.That(source.formal3D.defense.enemies, Has.Length.EqualTo(1));
+            Assert.That(
+                source.formal3D.defense.enemies[0].stableEnemyId,
+                Is.EqualTo("core.enemy.gnawer.tutorial.000"),
+                "The fixture must exercise a real schema 31 tutorial ID.");
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalThreeDDefenseCampaignSaveData campaign =
+                decoded.Envelope.formal3D.defenseCampaign;
+            const string expectedEnemyId =
+                "campaign.enemy.wave-01.0000";
+
+            Assert.That(campaign.enemyStates, Has.Length.EqualTo(1));
+            Assert.That(campaign.enemyStates[0].stableEnemyId,
+                Is.EqualTo(expectedEnemyId));
+            Assert.That(campaign.enemyStates[0].targetStableId,
+                Is.EqualTo(SingleCityDefenseCampaignModel.CityCoreTargetId));
+            Assert.That(campaign.towerCombatStates, Has.Length.EqualTo(1));
+            Assert.That(campaign.towerCombatStates[0].targetStableEnemyId,
+                Is.Null.Or.Empty,
+                "Schema 31 did not persist a tower target. Migration must " +
+                "leave it empty for the next formal fixed step to reacquire.");
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+
+            var restored = new SingleCityDefenseCampaignModel(28f, 28f);
+            Assert.That(restored.TryPrepareRestore(
+                ToCampaignPersistence(campaign),
+                out SingleCityDefenseCampaignRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(plan, Is.Not.Null,
+                "An active survivor is one of the five schema 31 migration " +
+                "states and must be accepted by the formal restore model.");
         }
 
         [Test]
@@ -736,6 +846,126 @@ namespace WasteCity.Tests
             Assert.That(
                 Convert.ToInt32(ReadField(value, "amount")),
                 Is.EqualTo(expectedAmount));
+        }
+
+        private static SingleCityDefenseCampaignPersistenceState
+            ToCampaignPersistence(
+                FormalThreeDDefenseCampaignSaveData source)
+        {
+            FormalThreeDDefenseCampaignStatisticsSaveData statistics =
+                source.statistics;
+            return new SingleCityDefenseCampaignPersistenceState(
+                source.campaignId,
+                (SingleCityDefenseCampaignPhase)source.phase,
+                source.currentWaveNumber,
+                source.warningRemainingSeconds,
+                source.spawnClockSeconds,
+                source.fixedStepAccumulatorSeconds,
+                source.nextEnemyOrdinal,
+                source.coreCurrentHealth,
+                (SingleCityDefenseCampaignResult)source.result,
+                ToCounts(source.plannedEnemyCountsByEnemyId),
+                ToCounts(source.spawnedEnemyCountsByEnemyId),
+                ToCounts(source.defeatedEnemyCountsByEnemyId),
+                ToAnchors(source.frozenSpawnAnchors),
+                ToEnemies(source.enemyStates),
+                new SingleCityDefenseCampaignStatisticsPersistenceState(
+                    statistics.elapsedRuleSeconds,
+                    statistics.spawnedEnemyCount,
+                    statistics.defeatedEnemyCount,
+                    statistics.completedWaveCount,
+                    ToMetrics(statistics.killsByEnemyId),
+                    statistics.highestAliveEnemyCount,
+                    statistics.coreDamageTaken,
+                    ToMetrics(statistics.damageByTowerBuildingId),
+                    Array.Empty<
+                        SingleCityDefenseCampaignMetricPersistenceState>(),
+                    ToMetrics(statistics.consumablesSpentByResourceId),
+                    SumMetrics(statistics.buildingLossesByBuildingId)));
+        }
+
+        private static
+            SingleCityDefenseCampaignEnemyCountPersistenceState[] ToCounts(
+                FormalThreeDDefenseCampaignEnemyCountSaveData[] source)
+        {
+            var result =
+                new SingleCityDefenseCampaignEnemyCountPersistenceState[
+                    source.Length];
+            for (var index = 0; index < source.Length; index++)
+            {
+                result[index] = new
+                    SingleCityDefenseCampaignEnemyCountPersistenceState(
+                        source[index].enemyId,
+                        source[index].count);
+            }
+            return result;
+        }
+
+        private static
+            SingleCityDefenseCampaignSpawnAnchorPersistenceState[] ToAnchors(
+                FormalThreeDDefenseCampaignSpawnAnchorSaveData[] source)
+        {
+            var result =
+                new SingleCityDefenseCampaignSpawnAnchorPersistenceState[
+                    source.Length];
+            for (var index = 0; index < source.Length; index++)
+            {
+                result[index] = new
+                    SingleCityDefenseCampaignSpawnAnchorPersistenceState(
+                        source[index].direction,
+                        source[index].positionX,
+                        source[index].positionZ);
+            }
+            return result;
+        }
+
+        private static SingleCityDefenseCampaignEnemyPersistenceState[]
+            ToEnemies(FormalThreeDDefenseCampaignEnemyStateSaveData[] source)
+        {
+            var result = new SingleCityDefenseCampaignEnemyPersistenceState[
+                source.Length];
+            for (var index = 0; index < source.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData enemy =
+                    source[index];
+                result[index] = new
+                    SingleCityDefenseCampaignEnemyPersistenceState(
+                        enemy.stableEnemyId,
+                        enemy.archetypeId,
+                        enemy.spawnOrder,
+                        enemy.positionX,
+                        enemy.positionZ,
+                        enemy.currentHealth,
+                        enemy.movementRemainder,
+                        enemy.attackDamageRemainder,
+                        enemy.targetStableId);
+            }
+            return result;
+        }
+
+        private static SingleCityDefenseCampaignMetricPersistenceState[]
+            ToMetrics(FormalThreeDDefenseCampaignMetricSaveData[] source)
+        {
+            var result =
+                new SingleCityDefenseCampaignMetricPersistenceState[
+                    source.Length];
+            for (var index = 0; index < source.Length; index++)
+            {
+                result[index] = new
+                    SingleCityDefenseCampaignMetricPersistenceState(
+                        source[index].stableId,
+                        source[index].amount);
+            }
+            return result;
+        }
+
+        private static int SumMetrics(
+            FormalThreeDDefenseCampaignMetricSaveData[] source)
+        {
+            var total = 0;
+            for (var index = 0; index < source.Length; index++)
+                total += source[index].amount;
+            return total;
         }
 
         private static FormalSaveEnvelope MigratedFixtureEnvelope()

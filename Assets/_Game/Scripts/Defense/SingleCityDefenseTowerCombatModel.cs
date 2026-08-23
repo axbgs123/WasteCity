@@ -89,6 +89,104 @@ namespace WasteCity.Defense
         public bool IsLogisticsConnected { get; private set; } = true;
         public bool IsPlayerPaused { get; private set; }
 
+        public SingleCityDefenseTowerPersistenceState CaptureForPersistence()
+        {
+            return new SingleCityDefenseTowerPersistenceState(
+                StableInstanceId,
+                BuildingId,
+                X,
+                Z,
+                LocalConsumableAmount,
+                activeConsumableSeconds,
+                damageRemainder,
+                targetStableEnemyId,
+                IsLogisticsConnected,
+                IsPlayerPaused);
+        }
+
+        public static bool TryCreateForPersistence(
+            SingleCityDefenseTowerPersistenceState state,
+            string expectedStableInstanceId,
+            out SingleCityDefenseTowerCombatModel restored,
+            out string error)
+        {
+            restored = null;
+            if (state == null)
+            {
+                error = "防御塔持久化状态不能为空";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(expectedStableInstanceId) ||
+                string.IsNullOrWhiteSpace(state.StableInstanceId) ||
+                !string.Equals(
+                    state.StableInstanceId,
+                    expectedStableInstanceId,
+                    StringComparison.Ordinal))
+            {
+                error = "防御塔稳定实例 ID 与恢复目标不一致";
+                return false;
+            }
+            if (!IsFormalTower(state.BuildingId) ||
+                DefenseTowerCatalog.For(state.BuildingId) == null)
+            {
+                error = "防御塔建筑 ID 不属于正式三塔";
+                return false;
+            }
+            if (!IsFinite(state.X) || !IsFinite(state.Z))
+            {
+                error = "防御塔位置必须为有限数值";
+                return false;
+            }
+
+            DefenseTowerDefinition restoredDefinition =
+                DefenseTowerCatalog.For(state.BuildingId);
+            if (state.LocalConsumableAmount < 0 ||
+                state.LocalConsumableAmount >
+                restoredDefinition.LocalCapacity)
+            {
+                error = "防御塔本地耗材超出正式容量";
+                return false;
+            }
+            if (!IsFinite(state.ActiveConsumableSeconds) ||
+                state.ActiveConsumableSeconds < 0f ||
+                state.ActiveConsumableSeconds >
+                restoredDefinition.SecondsPerConsumable)
+            {
+                error = "防御塔活动耗材租约超出有效范围";
+                return false;
+            }
+            if (!IsFinite(state.DamageRemainder) ||
+                state.DamageRemainder < 0f ||
+                state.DamageRemainder >= 1f)
+            {
+                error = "防御塔伤害余量必须处于 [0, 1)";
+                return false;
+            }
+            if (state.TargetStableEnemyId != null &&
+                string.IsNullOrWhiteSpace(state.TargetStableEnemyId))
+            {
+                error = "防御塔目标锁定 ID 不能为空白字符串";
+                return false;
+            }
+
+            var candidate = new SingleCityDefenseTowerCombatModel(
+                state.StableInstanceId,
+                state.BuildingId,
+                state.X,
+                state.Z,
+                state.LocalConsumableAmount)
+            {
+                activeConsumableSeconds = state.ActiveConsumableSeconds,
+                damageRemainder = state.DamageRemainder,
+                targetStableEnemyId = state.TargetStableEnemyId,
+                IsLogisticsConnected = state.IsLogisticsConnected,
+                IsPlayerPaused = state.IsPlayerPaused,
+            };
+            restored = candidate;
+            error = string.Empty;
+            return true;
+        }
+
         public void SetLogisticsConnected(bool connected)
         {
             IsLogisticsConnected = connected;

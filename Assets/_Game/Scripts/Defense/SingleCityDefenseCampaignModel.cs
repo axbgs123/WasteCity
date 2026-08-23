@@ -265,6 +265,12 @@ namespace WasteCity.Defense
             new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly Dictionary<string, int> consumablesSpentByResourceId =
             new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> buildingLossesByBuildingId =
+            new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly Dictionary<CampaignSpawnDirection,
+            SingleCityDefenseCampaignSpawnAnchorPersistenceState>
+            frozenSpawnAnchors = new Dictionary<CampaignSpawnDirection,
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState>();
 
         private double fixedStepAccumulatorSeconds;
         private double warningRemainingSeconds;
@@ -278,9 +284,9 @@ namespace WasteCity.Defense
         private bool campaignTriggered;
         private int nextSpawnIndex;
         private int completedWaveCount;
-        private int buildingLossCount;
         private int highestAliveEnemyCount;
         private int coreCurrentHealth = CityCoreCombatModel.FormalMaximumHealth;
+        private ulong persistenceGeneration;
 
         public SingleCityDefenseCampaignModel(float coreX, float coreZ)
         {
@@ -291,6 +297,198 @@ namespace WasteCity.Defense
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
         public bool IsTerminal =>
             result != SingleCityDefenseCampaignResult.None;
+
+        public SingleCityDefenseCampaignPersistenceState CaptureForPersistence()
+        {
+            var planned = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (currentWave != null)
+            {
+                for (var index = 0; index < currentWave.Entries.Count; index++)
+                {
+                    EnemyDefinition definition = FindEnemyDefinition(
+                        currentWave.Entries[index].Archetype);
+                    if (definition != null)
+                    {
+                        Add(
+                            planned,
+                            definition.Id.Value,
+                            currentWave.Entries[index].Count);
+                    }
+                }
+            }
+
+            var spawned = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (var index = 0;
+                 index < nextSpawnIndex && index < spawnSequence.Count;
+                 index++)
+            {
+                Add(spawned, spawnSequence[index].Definition.Id.Value, 1);
+            }
+
+            var alive = new Dictionary<string, int>(StringComparer.Ordinal);
+            var persistedEnemies =
+                new List<SingleCityDefenseCampaignEnemyPersistenceState>();
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                EnemyState enemy = enemies[index];
+                if (enemy.CurrentHealth <= 0) continue;
+                Add(alive, enemy.Definition.Id.Value, 1);
+                persistedEnemies.Add(
+                    new SingleCityDefenseCampaignEnemyPersistenceState(
+                        enemy.StableId,
+                        enemy.Definition.Id.Value,
+                        enemy.SpawnOrder,
+                        enemy.X,
+                        enemy.Z,
+                        enemy.CurrentHealth,
+                        0f,
+                        enemy.AttackDamageRemainder,
+                        enemy.TargetStableId));
+            }
+
+            var defeated = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (KeyValuePair<string, int> pair in spawned)
+            {
+                alive.TryGetValue(pair.Key, out int aliveCount);
+                defeated[pair.Key] = pair.Value - aliveCount;
+            }
+
+            var anchors =
+                new List<SingleCityDefenseCampaignSpawnAnchorPersistenceState>();
+            foreach (KeyValuePair<CampaignSpawnDirection,
+                     SingleCityDefenseCampaignSpawnAnchorPersistenceState> pair
+                     in frozenSpawnAnchors)
+            {
+                anchors.Add(pair.Value);
+            }
+
+            return new SingleCityDefenseCampaignPersistenceState(
+                CampaignWaveCatalog.Id,
+                phase,
+                currentWave == null ? 0 : currentWave.Number,
+                (float)warningRemainingSeconds,
+                (float)spawnClockSeconds,
+                (float)fixedStepAccumulatorSeconds,
+                nextSpawnIndex,
+                coreCurrentHealth,
+                result,
+                CountStates(planned),
+                CountStates(spawned),
+                CountStates(defeated),
+                anchors,
+                persistedEnemies,
+                new SingleCityDefenseCampaignStatisticsPersistenceState(
+                    (float)elapsedRuleSeconds,
+                    TotalSpawnedEnemyCount,
+                    TotalKillCount,
+                    completedWaveCount,
+                    MetricStates(killsByEnemyId),
+                    highestAliveEnemyCount,
+                    CityCoreCombatModel.FormalMaximumHealth -
+                        coreCurrentHealth,
+                    MetricStates(damageByTowerBuildingId),
+                    MetricStates(killsByTowerBuildingId),
+                    MetricStates(consumablesSpentByResourceId),
+                    TotalBuildingLossCount,
+                    MetricStates(buildingLossesByBuildingId)));
+        }
+
+        public bool TryPrepareRestore(
+            SingleCityDefenseCampaignPersistenceState state,
+            out SingleCityDefenseCampaignRestorePlan plan,
+            out string error)
+        {
+            plan = null;
+            if (!TryBuildRestoreCandidate(state, out RestoreCandidate candidate,
+                    out error))
+            {
+                return false;
+            }
+
+            plan = new SingleCityDefenseCampaignRestorePlan(
+                this,
+                persistenceGeneration,
+                ComputePersistenceFingerprint(CaptureForPersistence()),
+                candidate);
+            error = null;
+            return true;
+        }
+
+        public bool TryCommitRestore(
+            SingleCityDefenseCampaignRestorePlan plan,
+            out string error)
+        {
+            if (plan == null)
+            {
+                error = "Restore plan is required.";
+                return false;
+            }
+            if (!ReferenceEquals(plan.Owner, this))
+            {
+                error = "Restore plan belongs to another campaign model.";
+                return false;
+            }
+            if (plan.Consumed)
+            {
+                error = "Restore plan has already been consumed.";
+                return false;
+            }
+            if (plan.ExpectedGeneration != persistenceGeneration ||
+                plan.ExpectedFingerprint != ComputePersistenceFingerprint(
+                    CaptureForPersistence()))
+            {
+                error = "Campaign changed after restore preparation.";
+                return false;
+            }
+            if (!(plan.Candidate is RestoreCandidate candidate))
+            {
+                error = "Restore plan is invalid.";
+                return false;
+            }
+
+            enemies.Clear();
+            enemies.AddRange(candidate.Enemies);
+            spawnSequence.Clear();
+            spawnSequence.AddRange(candidate.SpawnSequence);
+            CopyDictionary(candidate.KillsByEnemyId, killsByEnemyId);
+            CopyDictionary(
+                candidate.DamageByTowerBuildingId,
+                damageByTowerBuildingId);
+            CopyDictionary(
+                candidate.KillsByTowerBuildingId,
+                killsByTowerBuildingId);
+            CopyDictionary(
+                candidate.ConsumablesSpentByResourceId,
+                consumablesSpentByResourceId);
+            CopyDictionary(
+                candidate.BuildingLossesByBuildingId,
+                buildingLossesByBuildingId);
+            frozenSpawnAnchors.Clear();
+            foreach (KeyValuePair<CampaignSpawnDirection,
+                     SingleCityDefenseCampaignSpawnAnchorPersistenceState> pair
+                     in candidate.FrozenSpawnAnchors)
+            {
+                frozenSpawnAnchors.Add(pair.Key, pair.Value);
+            }
+
+            currentWave = candidate.CurrentWave;
+            phase = candidate.Phase;
+            result = candidate.Result;
+            campaignTriggered = candidate.CampaignTriggered;
+            warningRemainingSeconds = candidate.WarningRemainingSeconds;
+            spawnClockSeconds = candidate.SpawnClockSeconds;
+            fixedStepAccumulatorSeconds =
+                candidate.FixedStepAccumulatorSeconds;
+            elapsedRuleSeconds = candidate.ElapsedRuleSeconds;
+            nextSpawnIndex = candidate.NextSpawnIndex;
+            completedWaveCount = candidate.CompletedWaveCount;
+            highestAliveEnemyCount = candidate.HighestAliveEnemyCount;
+            coreCurrentHealth = candidate.CoreCurrentHealth;
+            plan.Consumed = true;
+            persistenceGeneration++;
+            error = null;
+            return true;
+        }
 
         public void SetCorePosition(float x, float z)
         {
@@ -303,6 +501,7 @@ namespace WasteCity.Defense
             }
             coreX = x;
             coreZ = z;
+            persistenceGeneration++;
         }
 
         public bool NotifyDefenseTowerCompleted(
@@ -326,6 +525,7 @@ namespace WasteCity.Defense
 
             campaignTriggered = true;
             BeginWave(0);
+            persistenceGeneration++;
             return true;
         }
 
@@ -372,6 +572,7 @@ namespace WasteCity.Defense
 
             fixedStepAccumulatorSeconds +=
                 (double)unscaledDeltaSeconds * speed;
+            persistenceGeneration++;
             while (fixedStepAccumulatorSeconds + StepEpsilon >=
                    FixedStepSeconds)
             {
@@ -408,6 +609,7 @@ namespace WasteCity.Defense
             enemy.CurrentHealth = 0;
             RegisterDamage(sourceTowerBuildingId, appliedDamage);
             RegisterKill(enemy.Definition.Id.Value, sourceTowerBuildingId);
+            persistenceGeneration++;
             return true;
         }
 
@@ -433,6 +635,7 @@ namespace WasteCity.Defense
             {
                 RegisterKill(enemy.Definition.Id.Value, towerBuildingId);
             }
+            persistenceGeneration++;
             return applied;
         }
 
@@ -516,6 +719,7 @@ namespace WasteCity.Defense
                     enemy.Definition.Id.Value,
                     towerBuildingId);
             }
+            persistenceGeneration++;
             return applied;
         }
 
@@ -529,18 +733,23 @@ namespace WasteCity.Defense
                 result = SingleCityDefenseCampaignResult.Defeat;
                 phase = SingleCityDefenseCampaignPhase.Defeat;
             }
+            persistenceGeneration++;
             return applied;
         }
 
         public void RegisterConsumableSpent(string resourceId, int amount)
         {
             if (IsTerminal) return;
+            if (string.IsNullOrWhiteSpace(resourceId) || amount <= 0) return;
             Add(consumablesSpentByResourceId, resourceId, amount);
+            persistenceGeneration++;
         }
 
-        public void RegisterBuildingLoss()
+        public void RegisterBuildingLoss(string buildingId)
         {
-            buildingLossCount++;
+            if (FindBuildingDefinition(buildingId) == null) return;
+            Add(buildingLossesByBuildingId, buildingId, 1);
+            persistenceGeneration++;
         }
 
         public string ResolveEnemyTarget(
@@ -880,9 +1089,7 @@ namespace WasteCity.Defense
         private void SpawnEnemy(SpawnDefinition spawn, int spawnOrder)
         {
             ResolveSpawnPosition(spawn.Direction, out float x, out float z);
-            string stableId = "campaign.enemy.wave-" +
-                currentWave.Number.ToString("00", CultureInfo.InvariantCulture) +
-                "." + spawnOrder.ToString("0000", CultureInfo.InvariantCulture);
+            string stableId = EnemyStableId(currentWave.Number, spawnOrder);
             enemies.Add(new EnemyState(
                 stableId,
                 spawn.Definition,
@@ -899,6 +1106,15 @@ namespace WasteCity.Defense
             out float x,
             out float z)
         {
+            if (frozenSpawnAnchors.TryGetValue(
+                    direction,
+                    out SingleCityDefenseCampaignSpawnAnchorPersistenceState
+                        anchor))
+            {
+                x = anchor.X;
+                z = anchor.Z;
+                return;
+            }
             x = coreX;
             z = coreZ;
             switch (direction)
@@ -960,12 +1176,53 @@ namespace WasteCity.Defense
             nextSpawnIndex = 0;
             enemies.Clear();
             BuildSpawnSequence(currentWave);
+            FreezeSpawnAnchors(currentWave);
             phase = SingleCityDefenseCampaignPhase.Warning;
+        }
+
+        private void FreezeSpawnAnchors(CampaignWaveDefinition wave)
+        {
+            frozenSpawnAnchors.Clear();
+            for (var index = 0; index < wave.Directions.Count; index++)
+            {
+                CampaignSpawnDirection direction = wave.Directions[index];
+                if (frozenSpawnAnchors.ContainsKey(direction)) continue;
+                float x = coreX;
+                float z = coreZ;
+                switch (direction)
+                {
+                    case CampaignSpawnDirection.North:
+                        z += 20f;
+                        break;
+                    case CampaignSpawnDirection.South:
+                        z -= 20f;
+                        break;
+                    case CampaignSpawnDirection.West:
+                        x -= 20f;
+                        break;
+                    default:
+                        x += 20f;
+                        break;
+                }
+                frozenSpawnAnchors.Add(
+                    direction,
+                    new SingleCityDefenseCampaignSpawnAnchorPersistenceState(
+                        direction,
+                        x,
+                        z));
+            }
         }
 
         private void BuildSpawnSequence(CampaignWaveDefinition wave)
         {
             spawnSequence.Clear();
+            BuildSpawnSequenceFor(wave, spawnSequence);
+        }
+
+        private static void BuildSpawnSequenceFor(
+            CampaignWaveDefinition wave,
+            IList<SpawnDefinition> destination)
+        {
             var remaining = new int[wave.Entries.Count];
             for (var index = 0; index < wave.Entries.Count; index++)
                 remaining[index] = wave.Entries[index].Count;
@@ -983,9 +1240,9 @@ namespace WasteCity.Defense
                     if (definition == null) continue;
                     CampaignSpawnDirection direction = wave.Directions.Count == 0
                         ? CampaignSpawnDirection.East
-                        : wave.Directions[spawnSequence.Count %
+                        : wave.Directions[destination.Count %
                             wave.Directions.Count];
-                    spawnSequence.Add(new SpawnDefinition(
+                    destination.Add(new SpawnDefinition(
                         definition,
                         direction));
                     added = true;
@@ -1061,10 +1318,706 @@ namespace WasteCity.Defense
                     damageByTowerBuildingId,
                     killsByTowerBuildingId,
                     consumablesSpentByResourceId,
-                    buildingLossCount,
+                    TotalBuildingLossCount,
                     coreCurrentHealth,
                     CityCoreCombatModel.FormalMaximumHealth,
                     highestAliveEnemyCount));
+        }
+
+        private bool TryBuildRestoreCandidate(
+            SingleCityDefenseCampaignPersistenceState state,
+            out RestoreCandidate candidate,
+            out string error)
+        {
+            candidate = null;
+            if (state == null)
+                return Fail("Campaign persistence state is required.", out error);
+            if (!string.Equals(
+                    state.CampaignId,
+                    CampaignWaveCatalog.Id,
+                    StringComparison.Ordinal))
+            {
+                return Fail("Campaign id is not supported.", out error);
+            }
+            if (!Enum.IsDefined(typeof(SingleCityDefenseCampaignPhase),
+                    state.Phase) ||
+                !Enum.IsDefined(typeof(SingleCityDefenseCampaignResult),
+                    state.Result))
+            {
+                return Fail("Campaign phase or result is invalid.", out error);
+            }
+            if (!IsFiniteNonNegative(state.WarningRemainingSeconds) ||
+                !IsFiniteNonNegative(state.SpawnClockSeconds) ||
+                !IsFiniteNonNegative(state.FixedStepAccumulatorSeconds) ||
+                state.FixedStepAccumulatorSeconds >= FormalFixedStepSeconds ||
+                state.NextEnemyOrdinal < 0 ||
+                state.CoreCurrentHealth < 0 ||
+                state.CoreCurrentHealth >
+                    CityCoreCombatModel.FormalMaximumHealth)
+            {
+                return Fail("Campaign clocks, ordinal, or core health are invalid.",
+                    out error);
+            }
+
+            bool isIdle = state.Phase == SingleCityDefenseCampaignPhase.Idle;
+            if (isIdle)
+            {
+                if (state.CurrentWaveNumber != 0 ||
+                    state.Result != SingleCityDefenseCampaignResult.None ||
+                    state.NextEnemyOrdinal != 0)
+                {
+                    return Fail("Idle campaign state is inconsistent.", out error);
+                }
+            }
+            else if (state.CurrentWaveNumber < 1 ||
+                     state.CurrentWaveNumber > CampaignWaveCatalog.All.Count)
+            {
+                return Fail("Campaign wave number is invalid.", out error);
+            }
+
+            bool isVictory =
+                state.Phase == SingleCityDefenseCampaignPhase.Victory;
+            bool isDefeat =
+                state.Phase == SingleCityDefenseCampaignPhase.Defeat;
+            if (isVictory !=
+                    (state.Result ==
+                        SingleCityDefenseCampaignResult.Victory) ||
+                isDefeat !=
+                    (state.Result ==
+                        SingleCityDefenseCampaignResult.Defeat) ||
+                (!isVictory && !isDefeat) !=
+                    (state.Result == SingleCityDefenseCampaignResult.None))
+            {
+                return Fail("Campaign terminal result is inconsistent.", out error);
+            }
+            if (isDefeat != (state.CoreCurrentHealth == 0))
+            {
+                return Fail(
+                    "City core health does not match the terminal phase.",
+                    out error);
+            }
+
+            CampaignWaveDefinition wave = isIdle
+                ? null
+                : CampaignWaveCatalog.All[state.CurrentWaveNumber - 1];
+            var sequence = new List<SpawnDefinition>();
+            if (wave != null) BuildSpawnSequenceFor(wave, sequence);
+            if (state.NextEnemyOrdinal > sequence.Count)
+            {
+                return Fail("Next enemy ordinal exceeds the wave plan.", out error);
+            }
+            if (wave != null &&
+                state.WarningRemainingSeconds > wave.WarningSeconds + .0001f)
+            {
+                return Fail("Warning clock exceeds the wave definition.", out error);
+            }
+            if (wave != null && sequence.Count > 0 &&
+                state.SpawnClockSeconds >
+                    wave.SpawnSeconds / sequence.Count + .0001f)
+            {
+                return Fail("Spawn clock exceeds one spawn cadence.", out error);
+            }
+            if (state.Phase == SingleCityDefenseCampaignPhase.Warning &&
+                (state.NextEnemyOrdinal != 0 ||
+                 state.SpawnClockSeconds > .0001f))
+            {
+                return Fail("Warning phase cannot contain spawned enemies.",
+                    out error);
+            }
+            if ((state.Phase == SingleCityDefenseCampaignPhase.CombatCleanup ||
+                 state.Phase == SingleCityDefenseCampaignPhase.Victory) &&
+                state.NextEnemyOrdinal != sequence.Count)
+            {
+                return Fail("Cleanup or victory requires a complete spawn plan.",
+                    out error);
+            }
+
+            if (!TryReadEnemyCounts(
+                    state.PlannedEnemyCountsByEnemyId,
+                    out Dictionary<string, int> planned,
+                    out error) ||
+                !TryReadEnemyCounts(
+                    state.SpawnedEnemyCountsByEnemyId,
+                    out Dictionary<string, int> spawned,
+                    out error) ||
+                !TryReadEnemyCounts(
+                    state.DefeatedEnemyCountsByEnemyId,
+                    out Dictionary<string, int> defeated,
+                    out error))
+            {
+                return false;
+            }
+
+            var expectedPlanned = new Dictionary<string, int>(
+                StringComparer.Ordinal);
+            if (wave != null)
+            {
+                for (var index = 0; index < wave.Entries.Count; index++)
+                {
+                    EnemyDefinition definition = FindEnemyDefinition(
+                        wave.Entries[index].Archetype);
+                    if (definition != null)
+                    {
+                        Add(expectedPlanned, definition.Id.Value,
+                            wave.Entries[index].Count);
+                    }
+                }
+            }
+            var expectedSpawned = new Dictionary<string, int>(
+                StringComparer.Ordinal);
+            for (var index = 0; index < state.NextEnemyOrdinal; index++)
+                Add(expectedSpawned, sequence[index].Definition.Id.Value, 1);
+            if (!DictionariesEqual(planned, expectedPlanned) ||
+                !DictionariesEqual(spawned, expectedSpawned))
+            {
+                return Fail("Persisted enemy counts do not match the wave plan.",
+                    out error);
+            }
+
+            if (!TryReadAnchors(
+                    state.FrozenSpawnAnchors,
+                    wave,
+                    out Dictionary<CampaignSpawnDirection,
+                        SingleCityDefenseCampaignSpawnAnchorPersistenceState>
+                        anchors,
+                    out error))
+            {
+                return false;
+            }
+
+            var restoredEnemies = new List<EnemyState>();
+            var aliveByDefinition = new Dictionary<string, int>(
+                StringComparer.Ordinal);
+            var stableIds = new HashSet<string>(StringComparer.Ordinal);
+            var spawnOrders = new HashSet<int>();
+            if (state.Enemies == null)
+                return Fail("Enemy collection is required.", out error);
+            for (var index = 0; index < state.Enemies.Count; index++)
+            {
+                SingleCityDefenseCampaignEnemyPersistenceState persisted =
+                    state.Enemies[index];
+                if (persisted == null ||
+                    !stableIds.Add(persisted.StableId) ||
+                    !spawnOrders.Add(persisted.SpawnOrder) ||
+                    persisted.SpawnOrder < 0 ||
+                    persisted.SpawnOrder >= state.NextEnemyOrdinal ||
+                    !IsFinite(persisted.X) || !IsFinite(persisted.Z) ||
+                    !IsFinite(persisted.MovementRemainder) ||
+                    Math.Abs(persisted.MovementRemainder) > .000001f ||
+                    !IsFinite(persisted.AttackDamageRemainder) ||
+                    persisted.AttackDamageRemainder < 0f ||
+                    persisted.AttackDamageRemainder >= 1f ||
+                    (!string.IsNullOrEmpty(persisted.TargetStableId) &&
+                     string.IsNullOrWhiteSpace(persisted.TargetStableId)))
+                {
+                    return Fail("Persisted enemy state is invalid or duplicated.",
+                        out error);
+                }
+                EnemyDefinition definition = FindEnemyDefinition(
+                    persisted.EnemyDefinitionId);
+                SpawnDefinition expected = sequence[persisted.SpawnOrder];
+                string expectedStableId = EnemyStableId(
+                    wave.Number,
+                    persisted.SpawnOrder);
+                if (definition == null ||
+                    !string.Equals(definition.Id.Value,
+                        expected.Definition.Id.Value,
+                        StringComparison.Ordinal) ||
+                    !string.Equals(persisted.StableId,
+                        expectedStableId,
+                        StringComparison.Ordinal) ||
+                    persisted.CurrentHealth <= 0 ||
+                    persisted.CurrentHealth > definition.MaximumHealth)
+                {
+                    return Fail("Persisted enemy does not match its wave slot.",
+                        out error);
+                }
+                restoredEnemies.Add(new EnemyState(
+                    persisted.StableId,
+                    definition,
+                    persisted.SpawnOrder,
+                    persisted.X,
+                    persisted.Z,
+                    persisted.CurrentHealth,
+                    persisted.AttackDamageRemainder,
+                    persisted.TargetStableId));
+                Add(aliveByDefinition, definition.Id.Value, 1);
+            }
+
+            var expectedDefeated = new Dictionary<string, int>(
+                StringComparer.Ordinal);
+            foreach (KeyValuePair<string, int> pair in spawned)
+            {
+                aliveByDefinition.TryGetValue(pair.Key, out int aliveCount);
+                if (aliveCount > pair.Value)
+                    return Fail("Alive enemy count exceeds spawned count.",
+                        out error);
+                expectedDefeated[pair.Key] = pair.Value - aliveCount;
+            }
+            if (!DictionariesEqual(defeated, expectedDefeated))
+                return Fail("Defeated enemy counts are inconsistent.", out error);
+            if (state.Phase == SingleCityDefenseCampaignPhase.Victory &&
+                restoredEnemies.Count != 0)
+            {
+                return Fail("Victory cannot retain living enemies.", out error);
+            }
+
+            if (!TryReadStatistics(
+                    state,
+                    restoredEnemies.Count,
+                    out Dictionary<string, int> restoredKills,
+                    out Dictionary<string, int> restoredDamage,
+                    out Dictionary<string, int> restoredTowerKills,
+                    out Dictionary<string, int> restoredConsumables,
+                    out Dictionary<string, int> restoredBuildingLosses,
+                    out error))
+            {
+                return false;
+            }
+
+            SingleCityDefenseCampaignStatisticsPersistenceState statistics =
+                state.Statistics;
+            candidate = new RestoreCandidate(
+                wave,
+                state.Phase,
+                state.Result,
+                !isIdle,
+                state.WarningRemainingSeconds,
+                state.SpawnClockSeconds,
+                state.FixedStepAccumulatorSeconds,
+                statistics.ElapsedRuleSeconds,
+                state.NextEnemyOrdinal,
+                statistics.CompletedWaveCount,
+                statistics.HighestAliveEnemyCount,
+                state.CoreCurrentHealth,
+                sequence,
+                restoredEnemies,
+                anchors,
+                restoredKills,
+                restoredDamage,
+                restoredTowerKills,
+                restoredConsumables,
+                restoredBuildingLosses);
+            error = null;
+            return true;
+        }
+
+        private bool TryReadStatistics(
+            SingleCityDefenseCampaignPersistenceState state,
+            int aliveEnemyCount,
+            out Dictionary<string, int> restoredKills,
+            out Dictionary<string, int> restoredDamage,
+            out Dictionary<string, int> restoredTowerKills,
+            out Dictionary<string, int> restoredConsumables,
+            out Dictionary<string, int> restoredBuildingLosses,
+            out string error)
+        {
+            restoredKills = null;
+            restoredDamage = null;
+            restoredTowerKills = null;
+            restoredConsumables = null;
+            restoredBuildingLosses = null;
+            SingleCityDefenseCampaignStatisticsPersistenceState statistics =
+                state.Statistics;
+            if (statistics == null ||
+                !IsFiniteNonNegative(statistics.ElapsedRuleSeconds) ||
+                statistics.SpawnedEnemyCount < 0 ||
+                statistics.DefeatedEnemyCount < 0 ||
+                statistics.CompletedWaveCount < 0 ||
+                statistics.BuildingLossCount < 0 ||
+                statistics.CoreDamageTaken < 0 ||
+                statistics.HighestAliveEnemyCount < aliveEnemyCount)
+            {
+                return Fail("Campaign statistics are invalid.", out error);
+            }
+            int expectedCompleted = state.Phase ==
+                SingleCityDefenseCampaignPhase.Victory
+                ? CampaignWaveCatalog.All.Count
+                : Math.Max(0, state.CurrentWaveNumber - 1);
+            int expectedSpawned = SpawnedBeforeWave(state.CurrentWaveNumber) +
+                state.NextEnemyOrdinal;
+            if (statistics.CompletedWaveCount != expectedCompleted ||
+                statistics.SpawnedEnemyCount != expectedSpawned ||
+                statistics.CoreDamageTaken !=
+                    CityCoreCombatModel.FormalMaximumHealth -
+                        state.CoreCurrentHealth)
+            {
+                return Fail("Campaign statistics do not match campaign truth.",
+                    out error);
+            }
+            if (!TryReadMetrics(statistics.KillsByEnemyId,
+                    MetricKind.Enemy,
+                    out restoredKills,
+                    out error) ||
+                !TryReadMetrics(statistics.DamageByTowerBuildingId,
+                    MetricKind.Tower,
+                    out restoredDamage,
+                    out error) ||
+                !TryReadMetrics(statistics.KillsByTowerBuildingId,
+                    MetricKind.Tower,
+                    out restoredTowerKills,
+                    out error) ||
+                !TryReadMetrics(statistics.ConsumablesSpentByResourceId,
+                    MetricKind.Resource,
+                    out restoredConsumables,
+                    out error) ||
+                !TryReadMetrics(statistics.BuildingLossesByBuildingId,
+                    MetricKind.Building,
+                    out restoredBuildingLosses,
+                    out error))
+            {
+                return false;
+            }
+            if (Sum(restoredKills) != statistics.DefeatedEnemyCount)
+                return Fail("Defeated enemy statistics are inconsistent.",
+                    out error);
+            if (Sum(restoredBuildingLosses) != statistics.BuildingLossCount)
+                return Fail("Building loss statistics are inconsistent.",
+                    out error);
+            error = null;
+            return true;
+        }
+
+        private static bool TryReadEnemyCounts(
+            IReadOnlyList<SingleCityDefenseCampaignEnemyCountPersistenceState>
+                source,
+            out Dictionary<string, int> result,
+            out string error)
+        {
+            result = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (source == null)
+                return Fail("Enemy count collection is required.", out error);
+            for (var index = 0; index < source.Count; index++)
+            {
+                SingleCityDefenseCampaignEnemyCountPersistenceState item =
+                    source[index];
+                if (item == null || item.Count < 0 ||
+                    FindEnemyDefinition(item.EnemyDefinitionId) == null ||
+                    result.ContainsKey(item.EnemyDefinitionId))
+                {
+                    return Fail("Enemy count collection is invalid.", out error);
+                }
+                result.Add(item.EnemyDefinitionId, item.Count);
+            }
+            error = null;
+            return true;
+        }
+
+        private static bool TryReadAnchors(
+            IReadOnlyList<SingleCityDefenseCampaignSpawnAnchorPersistenceState>
+                source,
+            CampaignWaveDefinition wave,
+            out Dictionary<CampaignSpawnDirection,
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState> result,
+            out string error)
+        {
+            result = new Dictionary<CampaignSpawnDirection,
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState>();
+            if (source == null)
+                return Fail("Spawn anchor collection is required.", out error);
+            for (var index = 0; index < source.Count; index++)
+            {
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState item =
+                    source[index];
+                if (item == null ||
+                    !Enum.IsDefined(typeof(CampaignSpawnDirection),
+                        item.Direction) ||
+                    !IsFinite(item.X) || !IsFinite(item.Z) ||
+                    result.ContainsKey(item.Direction))
+                {
+                    return Fail("Spawn anchor collection is invalid.", out error);
+                }
+                result.Add(
+                    item.Direction,
+                    new SingleCityDefenseCampaignSpawnAnchorPersistenceState(
+                        item.Direction,
+                        item.X,
+                        item.Z));
+            }
+            var expected = new HashSet<CampaignSpawnDirection>();
+            if (wave != null)
+            {
+                for (var index = 0; index < wave.Directions.Count; index++)
+                    expected.Add(wave.Directions[index]);
+            }
+            if (result.Count != expected.Count)
+                return Fail("Spawn anchors do not match the current wave.",
+                    out error);
+            foreach (CampaignSpawnDirection direction in expected)
+            {
+                if (!result.ContainsKey(direction))
+                    return Fail("A current-wave spawn anchor is missing.",
+                        out error);
+            }
+            error = null;
+            return true;
+        }
+
+        private static bool TryReadMetrics(
+            IReadOnlyList<SingleCityDefenseCampaignMetricPersistenceState>
+                source,
+            MetricKind kind,
+            out Dictionary<string, int> result,
+            out string error)
+        {
+            result = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (source == null)
+                return Fail("Statistics metric collection is required.",
+                    out error);
+            for (var index = 0; index < source.Count; index++)
+            {
+                SingleCityDefenseCampaignMetricPersistenceState item =
+                    source[index];
+                bool known = item != null && item.Amount > 0 &&
+                    !string.IsNullOrWhiteSpace(item.StableId);
+                if (known && kind == MetricKind.Enemy)
+                    known = FindEnemyDefinition(item.StableId) != null;
+                else if (known && kind == MetricKind.Tower)
+                    known = DefenseTowerCatalog.For(item.StableId) != null;
+                else if (known && kind == MetricKind.Building)
+                    known = FindBuildingDefinition(item.StableId) != null;
+                if (!known || result.ContainsKey(item.StableId))
+                {
+                    return Fail("Statistics metric collection is invalid.",
+                        out error);
+                }
+                result.Add(item.StableId, item.Amount);
+            }
+            error = null;
+            return true;
+        }
+
+        private static IReadOnlyList<
+            SingleCityDefenseCampaignEnemyCountPersistenceState> CountStates(
+                IReadOnlyDictionary<string, int> source)
+        {
+            var result = new List<
+                SingleCityDefenseCampaignEnemyCountPersistenceState>();
+            if (source != null)
+            {
+                foreach (KeyValuePair<string, int> pair in source)
+                {
+                    result.Add(
+                        new SingleCityDefenseCampaignEnemyCountPersistenceState(
+                            pair.Key,
+                            pair.Value));
+                }
+            }
+            return result;
+        }
+
+        private static IReadOnlyList<
+            SingleCityDefenseCampaignMetricPersistenceState> MetricStates(
+                IReadOnlyDictionary<string, int> source)
+        {
+            var result = new List<
+                SingleCityDefenseCampaignMetricPersistenceState>();
+            if (source != null)
+            {
+                foreach (KeyValuePair<string, int> pair in source)
+                {
+                    result.Add(
+                        new SingleCityDefenseCampaignMetricPersistenceState(
+                            pair.Key,
+                            pair.Value));
+                }
+            }
+            return result;
+        }
+
+        private int TotalSpawnedEnemyCount =>
+            SpawnedBeforeWave(currentWave == null ? 0 : currentWave.Number) +
+            nextSpawnIndex;
+
+        private static int SpawnedBeforeWave(int currentWaveNumber)
+        {
+            int total = 0;
+            int count = Math.Max(0, currentWaveNumber - 1);
+            for (var index = 0;
+                 index < count && index < CampaignWaveCatalog.All.Count;
+                 index++)
+            {
+                total += CampaignWaveCatalog.All[index].TotalCount;
+            }
+            return total;
+        }
+
+        private static int Sum(IReadOnlyDictionary<string, int> source)
+        {
+            int total = 0;
+            foreach (KeyValuePair<string, int> pair in source)
+                total += pair.Value;
+            return total;
+        }
+
+        private static bool DictionariesEqual(
+            IReadOnlyDictionary<string, int> left,
+            IReadOnlyDictionary<string, int> right)
+        {
+            if (left.Count != right.Count) return false;
+            foreach (KeyValuePair<string, int> pair in left)
+            {
+                if (!right.TryGetValue(pair.Key, out int value) ||
+                    value != pair.Value)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static void CopyDictionary(
+            IReadOnlyDictionary<string, int> source,
+            IDictionary<string, int> destination)
+        {
+            destination.Clear();
+            foreach (KeyValuePair<string, int> pair in source)
+                destination.Add(pair.Key, pair.Value);
+        }
+
+        private static string EnemyStableId(int waveNumber, int spawnOrder)
+        {
+            return "campaign.enemy.wave-" +
+                waveNumber.ToString("00", CultureInfo.InvariantCulture) +
+                "." + spawnOrder.ToString("0000",
+                    CultureInfo.InvariantCulture);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool IsFiniteNonNegative(float value)
+        {
+            return IsFinite(value) && value >= 0f;
+        }
+
+        private static bool Fail(string message, out string error)
+        {
+            error = message;
+            return false;
+        }
+
+        private static ulong ComputePersistenceFingerprint(
+            SingleCityDefenseCampaignPersistenceState state)
+        {
+            const ulong offset = 14695981039346656037UL;
+            ulong hash = offset;
+            Mix(ref hash, state.CampaignId);
+            Mix(ref hash, (int)state.Phase);
+            Mix(ref hash, state.CurrentWaveNumber);
+            Mix(ref hash, state.WarningRemainingSeconds);
+            Mix(ref hash, state.SpawnClockSeconds);
+            Mix(ref hash, state.FixedStepAccumulatorSeconds);
+            Mix(ref hash, state.NextEnemyOrdinal);
+            Mix(ref hash, state.CoreCurrentHealth);
+            Mix(ref hash, (int)state.Result);
+            MixCounts(ref hash, state.PlannedEnemyCountsByEnemyId);
+            MixCounts(ref hash, state.SpawnedEnemyCountsByEnemyId);
+            MixCounts(ref hash, state.DefeatedEnemyCountsByEnemyId);
+            Mix(ref hash, state.FrozenSpawnAnchors.Count);
+            for (var index = 0; index < state.FrozenSpawnAnchors.Count; index++)
+            {
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState item =
+                    state.FrozenSpawnAnchors[index];
+                Mix(ref hash, (int)item.Direction);
+                Mix(ref hash, item.X);
+                Mix(ref hash, item.Z);
+            }
+            Mix(ref hash, state.Enemies.Count);
+            for (var index = 0; index < state.Enemies.Count; index++)
+            {
+                SingleCityDefenseCampaignEnemyPersistenceState item =
+                    state.Enemies[index];
+                Mix(ref hash, item.StableId);
+                Mix(ref hash, item.EnemyDefinitionId);
+                Mix(ref hash, item.SpawnOrder);
+                Mix(ref hash, item.X);
+                Mix(ref hash, item.Z);
+                Mix(ref hash, item.CurrentHealth);
+                Mix(ref hash, item.MovementRemainder);
+                Mix(ref hash, item.AttackDamageRemainder);
+                Mix(ref hash, item.TargetStableId);
+            }
+            SingleCityDefenseCampaignStatisticsPersistenceState statistics =
+                state.Statistics;
+            if (statistics == null)
+            {
+                Mix(ref hash, -1);
+                return hash;
+            }
+            Mix(ref hash, statistics.ElapsedRuleSeconds);
+            Mix(ref hash, statistics.SpawnedEnemyCount);
+            Mix(ref hash, statistics.DefeatedEnemyCount);
+            Mix(ref hash, statistics.CompletedWaveCount);
+            MixMetrics(ref hash, statistics.KillsByEnemyId);
+            Mix(ref hash, statistics.HighestAliveEnemyCount);
+            Mix(ref hash, statistics.CoreDamageTaken);
+            MixMetrics(ref hash, statistics.DamageByTowerBuildingId);
+            MixMetrics(ref hash, statistics.KillsByTowerBuildingId);
+            MixMetrics(ref hash, statistics.ConsumablesSpentByResourceId);
+            Mix(ref hash, statistics.BuildingLossCount);
+            MixMetrics(ref hash, statistics.BuildingLossesByBuildingId);
+            return hash;
+        }
+
+        private static void MixCounts(
+            ref ulong hash,
+            IReadOnlyList<SingleCityDefenseCampaignEnemyCountPersistenceState>
+                values)
+        {
+            Mix(ref hash, values.Count);
+            for (var index = 0; index < values.Count; index++)
+            {
+                Mix(ref hash, values[index].EnemyDefinitionId);
+                Mix(ref hash, values[index].Count);
+            }
+        }
+
+        private static void MixMetrics(
+            ref ulong hash,
+            IReadOnlyList<SingleCityDefenseCampaignMetricPersistenceState>
+                values)
+        {
+            Mix(ref hash, values.Count);
+            for (var index = 0; index < values.Count; index++)
+            {
+                Mix(ref hash, values[index].StableId);
+                Mix(ref hash, values[index].Amount);
+            }
+        }
+
+        private static void Mix(ref ulong hash, float value)
+        {
+            Mix(ref hash, value.GetHashCode());
+        }
+
+        private static void Mix(ref ulong hash, int value)
+        {
+            unchecked
+            {
+                hash ^= (uint)value;
+                hash *= 1099511628211UL;
+            }
+        }
+
+        private static void Mix(ref ulong hash, string value)
+        {
+            if (value == null)
+            {
+                Mix(ref hash, -1);
+                return;
+            }
+            Mix(ref hash, value.Length);
+            unchecked
+            {
+                for (var index = 0; index < value.Length; index++)
+                {
+                    hash ^= value[index];
+                    hash *= 1099511628211UL;
+                }
+            }
         }
 
         private int TotalKillCount
@@ -1077,6 +2030,8 @@ namespace WasteCity.Defense
                 return total;
             }
         }
+
+        private int TotalBuildingLossCount => Sum(buildingLossesByBuildingId);
 
         private static bool IsFormalDefenseTower(string buildingId)
         {
@@ -1164,6 +2119,23 @@ namespace WasteCity.Defense
             return null;
         }
 
+        private static BuildingDefinition FindBuildingDefinition(string stableId)
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) return null;
+            for (var index = 0; index < BuildingCatalog.All.Length; index++)
+            {
+                BuildingDefinition definition = BuildingCatalog.All[index];
+                if (string.Equals(
+                        definition.Id.Value,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    return definition;
+                }
+            }
+            return null;
+        }
+
         private static EnemyDefinition FindEnemyDefinition(
             EnemyArchetype archetype)
         {
@@ -1224,6 +2196,22 @@ namespace WasteCity.Defense
                 CurrentHealth = definition.MaximumHealth;
             }
 
+            public EnemyState(
+                string stableId,
+                EnemyDefinition definition,
+                int spawnOrder,
+                float x,
+                float z,
+                int currentHealth,
+                float attackDamageRemainder,
+                string targetStableId)
+                : this(stableId, definition, spawnOrder, x, z)
+            {
+                CurrentHealth = currentHealth;
+                AttackDamageRemainder = attackDamageRemainder;
+                TargetStableId = targetStableId;
+            }
+
             public string StableId { get; }
             public EnemyDefinition Definition { get; }
             public int SpawnOrder { get; }
@@ -1264,6 +2252,92 @@ namespace WasteCity.Defense
 
             public EnemyDefinition Definition { get; }
             public CampaignSpawnDirection Direction { get; }
+        }
+
+        private enum MetricKind
+        {
+            Enemy,
+            Tower,
+            Resource,
+            Building,
+        }
+
+        private sealed class RestoreCandidate
+        {
+            public RestoreCandidate(
+                CampaignWaveDefinition currentWave,
+                SingleCityDefenseCampaignPhase phase,
+                SingleCityDefenseCampaignResult result,
+                bool campaignTriggered,
+                double warningRemainingSeconds,
+                double spawnClockSeconds,
+                double fixedStepAccumulatorSeconds,
+                double elapsedRuleSeconds,
+                int nextSpawnIndex,
+                int completedWaveCount,
+                int highestAliveEnemyCount,
+                int coreCurrentHealth,
+                List<SpawnDefinition> spawnSequence,
+                List<EnemyState> enemies,
+                Dictionary<CampaignSpawnDirection,
+                    SingleCityDefenseCampaignSpawnAnchorPersistenceState>
+                    frozenSpawnAnchors,
+                Dictionary<string, int> killsByEnemyId,
+                Dictionary<string, int> damageByTowerBuildingId,
+                Dictionary<string, int> killsByTowerBuildingId,
+                Dictionary<string, int> consumablesSpentByResourceId,
+                Dictionary<string, int> buildingLossesByBuildingId)
+            {
+                CurrentWave = currentWave;
+                Phase = phase;
+                Result = result;
+                CampaignTriggered = campaignTriggered;
+                WarningRemainingSeconds = warningRemainingSeconds;
+                SpawnClockSeconds = spawnClockSeconds;
+                FixedStepAccumulatorSeconds = fixedStepAccumulatorSeconds;
+                ElapsedRuleSeconds = elapsedRuleSeconds;
+                NextSpawnIndex = nextSpawnIndex;
+                CompletedWaveCount = completedWaveCount;
+                HighestAliveEnemyCount = highestAliveEnemyCount;
+                CoreCurrentHealth = coreCurrentHealth;
+                SpawnSequence = spawnSequence;
+                Enemies = enemies;
+                FrozenSpawnAnchors = frozenSpawnAnchors;
+                KillsByEnemyId = killsByEnemyId;
+                DamageByTowerBuildingId = damageByTowerBuildingId;
+                KillsByTowerBuildingId = killsByTowerBuildingId;
+                ConsumablesSpentByResourceId = consumablesSpentByResourceId;
+                BuildingLossesByBuildingId = buildingLossesByBuildingId;
+            }
+
+            public CampaignWaveDefinition CurrentWave { get; }
+            public SingleCityDefenseCampaignPhase Phase { get; }
+            public SingleCityDefenseCampaignResult Result { get; }
+            public bool CampaignTriggered { get; }
+            public double WarningRemainingSeconds { get; }
+            public double SpawnClockSeconds { get; }
+            public double FixedStepAccumulatorSeconds { get; }
+            public double ElapsedRuleSeconds { get; }
+            public int NextSpawnIndex { get; }
+            public int CompletedWaveCount { get; }
+            public int HighestAliveEnemyCount { get; }
+            public int CoreCurrentHealth { get; }
+            public List<SpawnDefinition> SpawnSequence { get; }
+            public List<EnemyState> Enemies { get; }
+            public Dictionary<CampaignSpawnDirection,
+                SingleCityDefenseCampaignSpawnAnchorPersistenceState>
+                FrozenSpawnAnchors { get; }
+            public Dictionary<string, int> KillsByEnemyId { get; }
+            public Dictionary<string, int> DamageByTowerBuildingId { get; }
+            public Dictionary<string, int> KillsByTowerBuildingId { get; }
+            public Dictionary<string, int> ConsumablesSpentByResourceId
+            {
+                get;
+            }
+            public Dictionary<string, int> BuildingLossesByBuildingId
+            {
+                get;
+            }
         }
     }
 }

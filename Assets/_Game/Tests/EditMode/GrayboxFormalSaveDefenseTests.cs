@@ -1311,6 +1311,7 @@ namespace WasteCity.Tests
                         break;
                     case GrayboxFormalSaveDomainId3D.Defense:
                         destination.defense = copy.defense;
+                        destination.defenseCampaign = copy.defenseCampaign;
                         break;
                     case GrayboxFormalSaveDomainId3D.Evacuation:
                         destination.evacuation = copy.evacuation;

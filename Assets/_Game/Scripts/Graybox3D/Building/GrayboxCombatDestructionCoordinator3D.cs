@@ -243,7 +243,7 @@ namespace WasteCity.Graybox3D.Building
                 presentationFailure = true;
             }
 
-            campaign.RegisterBuildingLoss();
+            campaign.RegisterBuildingLoss(definitionId);
             var committed = new GrayboxCombatDestructionResult3D(
                 presentationFailure
                     ? GrayboxCombatDestructionStatus3D

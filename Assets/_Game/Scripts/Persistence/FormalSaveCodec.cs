@@ -432,6 +432,25 @@ namespace WasteCity.Persistence
                 };
         }
 
+        private static FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            MigratedDefeatedCounts(FormalThreeDDefenseSaveData legacy)
+        {
+            if (legacy == null || IsCompletedTutorial(legacy) ||
+                legacy.spawnedEnemyCount <= 0)
+            {
+                return Array.Empty<
+                    FormalThreeDDefenseCampaignEnemyCountSaveData>();
+            }
+            return new[]
+            {
+                new FormalThreeDDefenseCampaignEnemyCountSaveData
+                {
+                    enemyId = EnemyCatalog.Gnawer.Id.Value,
+                    count = Math.Max(0, legacy.defeatedEnemyCount),
+                },
+            };
+        }
+
         private static FormalThreeDDefenseCampaignMetricSaveData[] Metrics(
             string stableId,
             int amount)
@@ -483,7 +502,11 @@ namespace WasteCity.Persistence
                 BuildingDefinition definition = instance == null
                     ? null
                     : FindBuildingDefinition(instance.definitionId);
-                if (definition == null || instance.state != 1) continue;
+                if (definition == null || instance.state != 1 ||
+                    !instance.isPlayerOwned)
+                {
+                    continue;
+                }
                 result.Add(new
                     FormalThreeDDefenseCampaignBuildingHealthStateSaveData
                     {
@@ -544,10 +567,8 @@ namespace WasteCity.Persistence
                     IsCompletedTutorial(legacy)
                         ? 0
                         : legacy?.spawnedEnemyCount ?? 0),
-                defeatedEnemyCountsByEnemyId = GnawerCounts(
-                    IsCompletedTutorial(legacy)
-                        ? 0
-                        : legacy?.defeatedEnemyCount ?? 0),
+                defeatedEnemyCountsByEnemyId =
+                    MigratedDefeatedCounts(legacy),
                 frozenSpawnAnchors = MigrateSpawnAnchors(legacy),
                 warningRemainingSeconds = MigratedWarningSeconds(legacy),
                 spawnClockSeconds = legacy?.spawnClockSeconds ?? 0f,
@@ -580,6 +601,8 @@ namespace WasteCity.Persistence
                         completedWaveCount = IsCompletedTutorial(legacy)
                             ? 1
                             : 0,
+                        highestAliveEnemyCount =
+                            legacy?.enemies?.Length ?? 0,
                         killsByEnemyId = Metrics(
                             EnemyCatalog.Gnawer.Id.Value,
                             legacy?.defeatedEnemyCount ?? 0),
@@ -676,7 +699,11 @@ namespace WasteCity.Persistence
                 DefenseTowerDefinition definition = building == null
                     ? null
                     : FormalTower(building.definitionId);
-                if (definition == null || building.state != 1) continue;
+                if (definition == null || building.state != 1 ||
+                    !building.isPlayerOwned)
+                {
+                    continue;
+                }
                 sourceById.TryGetValue(
                     building.stableInstanceId,
                     out FormalThreeDDefenseTowerSaveData item);
@@ -715,8 +742,19 @@ namespace WasteCity.Persistence
                     ? null
                     : new FormalThreeDDefenseCampaignEnemyStateSaveData
                     {
-                        stableEnemyId = item.stableEnemyId,
-                        archetypeId = "core.enemy.gnawer",
+                        // Schema 31 tutorial identities were runtime-local
+                        // (`core.enemy.gnawer.tutorial.000`) and do not match
+                        // the formal campaign restore contract. Wave one is
+                        // the only possible active legacy wave, so its
+                        // canonical identity is derived from the persisted
+                        // spawn order rather than the obsolete text ID.
+                        stableEnemyId = CampaignEnemyStableId(
+                            waveNumber: 1,
+                            item.spawnOrder),
+                        archetypeId = string.IsNullOrWhiteSpace(
+                            item.archetypeId)
+                                ? EnemyCatalog.Gnawer.Id.Value
+                                : item.archetypeId,
                         spawnOrder = item.spawnOrder,
                         positionX = item.positionX,
                         positionZ = item.positionZ,
@@ -724,10 +762,23 @@ namespace WasteCity.Persistence
                         movementRemainder = item.movementRemainder,
                         attackDamageRemainder =
                             item.attackDamageRemainder,
+                        targetStableId =
+                            SingleCityDefenseCampaignModel.CityCoreTargetId,
                     };
             }
             Array.Sort(result, CompareEnemyState);
             return result;
+        }
+
+        private static string CampaignEnemyStableId(
+            int waveNumber,
+            int spawnOrder)
+        {
+            return "campaign.enemy.wave-" +
+                waveNumber.ToString("00", CultureInfo.InvariantCulture) +
+                "." + spawnOrder.ToString(
+                    "0000",
+                    CultureInfo.InvariantCulture);
         }
 
         private static

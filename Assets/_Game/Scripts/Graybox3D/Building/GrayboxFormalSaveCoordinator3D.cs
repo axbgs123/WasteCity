@@ -196,7 +196,6 @@ namespace WasteCity.Graybox3D.Building
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private GrayboxDefenseController3D checkpointDefense;
         private GrayboxBuildingSession3D checkpointSession;
-        private FormalThreeDDefenseCampaignSaveData retainedCampaign;
 
         public GrayboxFormalSaveCoordinator3D(
             IReadOnlyList<IFormalThreeDSaveDomain> domains,
@@ -318,7 +317,15 @@ namespace WasteCity.Graybox3D.Building
                     }),
                 new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Defense,
-                    destination => destination.defense = defense.Capture(),
+                    destination =>
+                    {
+                        // Keep schema-31 output available for compatibility,
+                        // while schema 32 truth comes only from the live
+                        // formal campaign runtime.
+                        destination.defense = defense.Capture();
+                        destination.defenseCampaign =
+                            defense.CaptureCampaign();
+                    },
                     (FormalThreeDSaveData source, out string error) =>
                     {
                         if (!defenseController
@@ -327,10 +334,15 @@ namespace WasteCity.Graybox3D.Building
                         {
                             return false;
                         }
-                        return defense.TryRestore(
-                            source.defense,
-                            instancesProvider(),
-                            out error);
+                        return source.defenseCampaign != null
+                            ? defense.TryRestoreCampaign(
+                                source.defenseCampaign,
+                                instancesProvider(),
+                                out error)
+                            : defense.TryRestore(
+                                source.defense,
+                                instancesProvider(),
+                                out error);
                     }),
                 new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Evacuation,
@@ -707,8 +719,6 @@ namespace WasteCity.Graybox3D.Building
                 checkpointSession?.TryRestoreCheckpointRuleTime(
                     envelope.checkpoint.ruleTimeSeconds,
                     out _);
-                retainedCampaign = FormalSaveCodec.CloneCampaignState(
-                    envelope.formal3D.defenseCampaign);
                 try
                 {
                     RestoreCompleted?.Invoke();
@@ -790,11 +800,6 @@ namespace WasteCity.Graybox3D.Building
                     error = exception.Message;
                     return false;
                 }
-            }
-            if (payload.defenseCampaign == null && retainedCampaign != null)
-            {
-                payload.defenseCampaign = FormalSaveCodec.CloneCampaignState(
-                    retainedCampaign);
             }
             failedDomain = null;
             error = string.Empty;

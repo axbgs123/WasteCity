@@ -6,6 +6,7 @@ using WasteCity.City;
 using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Economy;
+using WasteCity.Persistence.ThreeD;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -463,6 +464,197 @@ namespace WasteCity.Graybox3D.Building
                 randomState: null,
                 tutorial.CaptureForPersistence(),
                 capturedTowers);
+        }
+
+        public GrayboxFormalDefenseCampaignPersistenceState3D
+            CaptureFormalCampaignForPersistence()
+        {
+            if (campaign == null || campaignBuildingHealth == null)
+            {
+                throw new InvalidOperationException(
+                    "正式单城防御战役尚未配置");
+            }
+
+            var capturedTowers = new SingleCityDefenseTowerPersistenceState[
+                campaignTowerById.Count];
+            var index = 0;
+            foreach (SingleCityDefenseTowerCombatModel tower in
+                     campaignTowerById.Values)
+            {
+                capturedTowers[index++] = tower.CaptureForPersistence();
+            }
+            Array.Sort(capturedTowers, (left, right) =>
+                string.CompareOrdinal(
+                    left.StableInstanceId,
+                    right.StableInstanceId));
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] health =
+                CloneHealth(campaignBuildingHealth.Capture());
+            Array.Sort(health, (left, right) => string.CompareOrdinal(
+                left.stableInstanceId,
+                right.stableInstanceId));
+            return new GrayboxFormalDefenseCampaignPersistenceState3D(
+                campaign.CaptureForPersistence(),
+                capturedTowers,
+                health);
+        }
+
+        public bool TryPrepareFormalCampaignRestore(
+            GrayboxFormalDefenseCampaignPersistenceState3D snapshot,
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            out GrayboxFormalDefenseCampaignRestorePlan3D plan,
+            out string error)
+        {
+            plan = null;
+            if (campaign == null || campaignBuildingHealth == null ||
+                snapshot?.Campaign == null || snapshot.Towers == null ||
+                snapshot.BuildingHealth == null || instances == null)
+            {
+                error = "正式防御战役恢复状态不完整";
+                return false;
+            }
+
+            ulong expectedGeneration = persistenceGeneration;
+            ulong expectedFingerprint =
+                ComputeFormalCampaignPersistenceFingerprint();
+            error = string.Empty;
+            var instanceById = new Dictionary<
+                string,
+                GrayboxBuildingInstance3D>(StringComparer.Ordinal);
+            var capturedInstances = new GrayboxBuildingInstance3D[
+                instances.Count];
+            for (var index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (instance == null ||
+                    string.IsNullOrWhiteSpace(instance.StableInstanceId) ||
+                    instance.Placement?.Definition == null ||
+                    instanceById.ContainsKey(instance.StableInstanceId))
+                {
+                    error = "正式防御战役引用的建筑实例无效或重复";
+                    return false;
+                }
+                instanceById.Add(instance.StableInstanceId, instance);
+                capturedInstances[index] = instance;
+            }
+
+            var restoredTowers = new SingleCityDefenseTowerCombatModel[
+                snapshot.Towers.Count];
+            var towerIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < snapshot.Towers.Count; index++)
+            {
+                SingleCityDefenseTowerPersistenceState tower =
+                    snapshot.Towers[index];
+                if (tower == null ||
+                    !towerIds.Add(tower.StableInstanceId) ||
+                    !instanceById.TryGetValue(
+                        tower.StableInstanceId,
+                        out GrayboxBuildingInstance3D instance) ||
+                    !string.Equals(
+                        instance.Placement.Definition.Id.Value,
+                        tower.BuildingId,
+                        StringComparison.Ordinal) ||
+                    instance.Placement.X != tower.X ||
+                    instance.Placement.Y != tower.Z ||
+                    !SingleCityDefenseTowerCombatModel.TryCreateForPersistence(
+                        tower,
+                        tower.StableInstanceId,
+                        out restoredTowers[index],
+                        out error))
+                {
+                    if (string.IsNullOrEmpty(error))
+                        error = "正式防御塔状态与建筑实例不一致";
+                    return false;
+                }
+            }
+            Array.Sort(restoredTowers, (left, right) =>
+                string.CompareOrdinal(
+                    left.StableInstanceId,
+                    right.StableInstanceId));
+
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] health =
+                CloneHealth(snapshot.BuildingHealth);
+            var healthValidator = new GrayboxBuildingHealthRuntime3D();
+            if (!healthValidator.TryRestore(
+                    health,
+                    instances,
+                    out error) ||
+                !campaign.TryPrepareRestore(
+                    snapshot.Campaign,
+                    out SingleCityDefenseCampaignRestorePlan campaignPlan,
+                    out error))
+            {
+                return false;
+            }
+
+            plan = new GrayboxFormalDefenseCampaignRestorePlan3D(
+                this,
+                expectedGeneration,
+                expectedFingerprint,
+                campaignPlan,
+                restoredTowers,
+                health,
+                capturedInstances);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryCommitFormalCampaignRestore(
+            GrayboxFormalDefenseCampaignRestorePlan3D plan,
+            out string error)
+        {
+            if (plan == null || plan.Consumed ||
+                !ReferenceEquals(plan.Owner, this))
+            {
+                error = "正式防御战役恢复计划无效、已消费或不属于当前运行时";
+                return false;
+            }
+            if (persistenceGeneration != plan.ExpectedGeneration ||
+                ComputeFormalCampaignPersistenceFingerprint() !=
+                    plan.ExpectedFingerprint)
+            {
+                error = "正式防御战役恢复计划已过期";
+                return false;
+            }
+            if (!campaign.TryCommitRestore(plan.CampaignPlan, out error))
+                return false;
+            if (!campaignBuildingHealth.TryRestore(
+                    plan.Health,
+                    plan.Instances,
+                    out error))
+            {
+                return false;
+            }
+
+            campaignTowerById.Clear();
+            campaignTowers.Clear();
+            campaignRetainedIds.Clear();
+            campaignStatusById.Clear();
+            for (var index = 0; index < plan.Towers.Length; index++)
+            {
+                SingleCityDefenseTowerCombatModel tower = plan.Towers[index];
+                campaignTowerById.Add(tower.StableInstanceId, tower);
+                campaignTowers.Add(tower);
+                campaignRetainedIds.Add(tower.StableInstanceId);
+                campaignStatusById.Add(
+                    tower.StableInstanceId,
+                    tower.IsPlayerPaused
+                        ? GrayboxDefenseTowerStatus3D.PlayerPaused
+                        : GrayboxDefenseTowerStatus3D.NoTarget);
+            }
+            campaignRunnableIds.RemoveWhere(
+                stableId => !campaignRetainedIds.Contains(stableId));
+            campaignTriggered = plan.CampaignPlan != null &&
+                campaign.CaptureForPersistence().CurrentWaveNumber > 0;
+            plan.Consumed = true;
+            persistenceGeneration++;
+            cachedCampaignSnapshot = null;
+            campaignSnapshotDirty = true;
+            cachedSnapshot = null;
+            snapshotDirty = true;
+            hasCampaignBuildingTargetFingerprint = false;
+            RefreshCampaignBuildingTargets();
+            error = string.Empty;
+            return true;
         }
 
         public bool TryPrepareRestore(
@@ -1566,6 +1758,96 @@ namespace WasteCity.Graybox3D.Building
                 }
             }
             return value;
+        }
+
+        private ulong ComputeFormalCampaignPersistenceFingerprint()
+        {
+            GrayboxFormalDefenseCampaignPersistenceState3D snapshot =
+                CaptureFormalCampaignForPersistence();
+            SingleCityDefenseCampaignSnapshot campaignSnapshot =
+                CampaignSnapshot;
+            ulong value = 1469598103934665603ul;
+            Mix(ref value, (int)campaignSnapshot.Phase);
+            Mix(ref value, campaignSnapshot.CurrentWaveNumber);
+            Mix(ref value, campaignSnapshot.WarningRemainingSeconds);
+            Mix(ref value, campaignSnapshot.SpawnedEnemyCount);
+            Mix(ref value, campaignSnapshot.CoreCurrentHealth);
+            Mix(ref value, (int)campaignSnapshot.Result);
+            Mix(ref value, campaignSnapshot.Enemies.Count);
+            for (var index = 0;
+                 index < campaignSnapshot.Enemies.Count;
+                 index++)
+            {
+                SingleCityDefenseEnemySnapshot enemy =
+                    campaignSnapshot.Enemies[index];
+                Mix(ref value, enemy.StableId);
+                Mix(ref value, enemy.EnemyDefinitionId);
+                Mix(ref value, enemy.SpawnOrder);
+                Mix(ref value, enemy.X);
+                Mix(ref value, enemy.Z);
+                Mix(ref value, enemy.CurrentHealth);
+                Mix(ref value, enemy.TargetStableId);
+            }
+            Mix(ref value, snapshot.Towers.Count);
+            for (var index = 0; index < snapshot.Towers.Count; index++)
+            {
+                SingleCityDefenseTowerPersistenceState tower =
+                    snapshot.Towers[index];
+                Mix(ref value, tower.StableInstanceId);
+                Mix(ref value, tower.BuildingId);
+                Mix(ref value, tower.X);
+                Mix(ref value, tower.Z);
+                Mix(ref value, tower.LocalConsumableAmount);
+                Mix(ref value, tower.ActiveConsumableSeconds);
+                Mix(ref value, tower.DamageRemainder);
+                Mix(ref value, tower.TargetStableEnemyId);
+                Mix(ref value, tower.IsLogisticsConnected);
+                Mix(ref value, tower.IsPlayerPaused);
+            }
+            Mix(ref value, snapshot.BuildingHealth.Count);
+            for (var index = 0;
+                 index < snapshot.BuildingHealth.Count;
+                 index++)
+            {
+                FormalThreeDDefenseCampaignBuildingHealthStateSaveData health =
+                    snapshot.BuildingHealth[index];
+                Mix(ref value, health.stableInstanceId);
+                Mix(ref value, health.currentHealth);
+                Mix(ref value, health.isDestroyed);
+            }
+            return value;
+        }
+
+        private static
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[]
+            CloneHealth(
+                IReadOnlyList<
+                    FormalThreeDDefenseCampaignBuildingHealthStateSaveData>
+                    source)
+        {
+            if (source == null)
+            {
+                return Array.Empty<
+                    FormalThreeDDefenseCampaignBuildingHealthStateSaveData>();
+            }
+            var result =
+                new FormalThreeDDefenseCampaignBuildingHealthStateSaveData[
+                    source.Count];
+            for (var index = 0; index < source.Count; index++)
+            {
+                FormalThreeDDefenseCampaignBuildingHealthStateSaveData item =
+                    source[index];
+                result[index] = item == null
+                    ? null
+                    : new
+                        FormalThreeDDefenseCampaignBuildingHealthStateSaveData
+                        {
+                            stableInstanceId = item.stableInstanceId,
+                            currentHealth = item.currentHealth,
+                            isDestroyed = item.isDestroyed,
+                        };
+            }
+            return result;
         }
 
         private bool TryGetSynchronizedInstance(
