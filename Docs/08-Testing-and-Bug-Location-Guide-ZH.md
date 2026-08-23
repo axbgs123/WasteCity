@@ -22,7 +22,7 @@
 
 ## IDEA-0011 生产与界面的检查边界
 
-`IDEA-0011` 的生产、背包、应急合成、六节点研究和资源状态栏已经实现待验证。排查规则或数据问题时，可从 `ResourceDefinitionCatalogTests`、`ResourceTransactionAndCapacityTests`、`FormalProductionSimulationTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`、`ManualResourceAccessRulesTests` 和 `ResourceInventoryChangeTests` 中选择最小相关类；排查 3D 生产适配与时间推进时，再看 `GrayboxProductionRuntimeTests` 和 `GrayboxProductionClockTests`；排查玩家操作、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`，真实建造生产链则由 `GrayboxBuildingRuntimeSceneTests` 覆盖。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
+`IDEA-0011` 的生产、背包、应急合成、六节点兼容研究和资源状态栏已经实现待验证；`IDEA-0016` 的正式研究目录、运行时和 43 节点科技树当前为部分实现。排查正式研究规则、初始根、倍率、暂停、退款或 schema `31` 恢复时，优先运行 `FormalResearchRuntimeTests` 与 `GrayboxFormalResearchSaveAdapterTests`；排查节点数、依赖边、确定布局、缩放或视图层级时，运行 `ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`；排查真实 T、搜索字符、双 Esc、拖动、滚轮、Home、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`。历史 `DemoResearchRuntimeTests` 继续作为六节点和退役内容兼容回归，不得替代正式目录测试。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
 
 不要把开发补给夹具当成自然开局证据。正式会话石料为 `0`，而现有冶炼厂施工需要 `6` 石料；自动链测试会先通过显式开发补给搭建 `2 采矿站 → 2 冶炼厂 → 1 装配厂`，再清零铁矿、合金和弹药等生产物资，观察节点采收和机器加工是否自动补出完整链。该测试只验证运行时生产闭环；自然开局的石料路径应由 `IDEA-0012` 的 seed `8128` 原始内容区可采石料节点及其场景测试单独证明。若试玩仍找不到或无法采集石料，应作为 `IDEA-0012` 回归记录，不要在测试里偷偷修改正式开局或建筑成本。
 

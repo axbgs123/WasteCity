@@ -124,6 +124,30 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
+            if (operations != null && operations.IsResearchOpen)
+            {
+                if (operations.HasResearchTextInputFocus)
+                {
+                    if (escapePressed)
+                        operations.ConsumeFocusedResearchEscape();
+                    return SuppressAll();
+                }
+
+                bool researchClosePressed = keyboard != null &&
+                    keyboard.tKey.wasPressedThisFrame;
+                if (escapePressed || researchClosePressed)
+                {
+                    operations.ClosePanels();
+                    return SuppressAll();
+                }
+                if (keyboard != null &&
+                    keyboard.homeKey.wasPressedThisFrame)
+                {
+                    operations.FitResearchTree();
+                }
+                return SuppressAll();
+            }
+
             if (buildingInput != null && buildingInput.HasKeyboardFocus)
             {
                 unchecked { BuildingInputInvocationCount++; }

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -155,6 +156,77 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0016_ResearchTreeOwnsRealViewportSearchAndModalInput()
+        {
+            GrayboxBuildingInteractionModel3D building =
+                Object.FindObjectOfType<GrayboxBuildingInteractionModel3D>();
+            yield return TapKey(Key.T);
+            GameObject panel = RequireSceneObject(ResearchPanelName);
+            Assert.That(panel.activeInHierarchy, Is.True);
+            RectTransform viewport = RequireSceneObject(
+                    "Research.Viewport")
+                .GetComponent<RectTransform>();
+            RectTransform content = RequireSceneObject(
+                    "Research.Content")
+                .GetComponent<RectTransform>();
+            Assert.That(viewport.GetComponent<GrayboxResearchTreeViewportInput3D>(),
+                Is.Not.Null);
+
+            float zoomBefore = content.localScale.x;
+            yield return ScrollUiElement(viewport, -1f);
+            Assert.That(content.localScale.x, Is.LessThan(zoomBefore));
+
+            Vector2 blank = FindViewportBlank(viewport);
+            Vector2 positionBeforeDrag = content.anchoredPosition;
+            yield return DragPointer(
+                blank,
+                blank + new Vector2(-100f, 70f),
+                MouseButton.Left);
+            Assert.That(content.anchoredPosition,
+                Is.Not.EqualTo(positionBeforeDrag));
+
+            yield return TapKey(Key.Home);
+            Vector2 fittedPosition = content.anchoredPosition;
+            float fittedZoom = content.localScale.x;
+            yield return DragPointer(
+                blank,
+                blank + new Vector2(80f, -55f),
+                MouseButton.Middle);
+            Assert.That(content.anchoredPosition,
+                Is.Not.EqualTo(fittedPosition));
+            yield return TapKey(Key.Home);
+            Assert.That(
+                Vector2.Distance(content.anchoredPosition, fittedPosition),
+                Is.LessThan(.01f));
+            Assert.That(content.localScale.x,
+                Is.EqualTo(fittedZoom).Within(.001f));
+
+            yield return ClickUiElement(
+                RequireSceneObject("Research.Filter.Route.Technology"),
+                MouseButton.Left);
+            yield return TapKey(Key.B);
+            Assert.That(panel.activeInHierarchy, Is.True);
+            Assert.That(building.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
+
+            InputField search = RequireSceneObject("Research.Search")
+                .GetComponent<InputField>();
+            yield return ClickUiElement(search.gameObject, MouseButton.Left);
+            Assert.That(EventSystem.current.currentSelectedGameObject,
+                Is.SameAs(search.gameObject));
+            Assert.That(search.isFocused, Is.True);
+            yield return TapTextKey(Key.T, 't');
+            Assert.That(search.text, Is.EqualTo("t"));
+            Assert.That(panel.activeInHierarchy, Is.True,
+                "T typed into search must not close the research tree.");
+            yield return TapKey(Key.Escape);
+            Assert.That(panel.activeInHierarchy, Is.True);
+            Assert.That(EventSystem.current.currentSelectedGameObject, Is.Null);
+            yield return TapKey(Key.Escape);
+            Assert.That(panel.activeSelf, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator IDEA0011_ResourceBarShowsCapacityFlowAndRealClickLedger()
         {
             GrayboxBuildingSession3D session =
@@ -299,7 +371,7 @@ namespace WasteCity.Tests
 
             GrayboxDeveloperModifier3D modifier = CreateModifier(session);
             Assert.That(modifier.UnlockResearch(
-                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+                ResearchCatalog.AutomatedMachineryId), Is.True);
             Assert.That(operations.Backpack.Add(ResourceIds.Iron, 4),
                 Is.EqualTo(4));
             Assert.That(operations.Crafting.TryEnqueue(
@@ -505,7 +577,7 @@ namespace WasteCity.Tests
             yield return TapKey(Key.T);
             GameObject researchPanel = RequireSceneObject(ResearchPanelName);
             Assert.That(researchPanel.activeInHierarchy, Is.True);
-            foreach (ResearchDefinition definition in DemoResearchCatalog.All)
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
                 Assert.That(
                     RequireSceneObject(
@@ -526,7 +598,7 @@ namespace WasteCity.Tests
             }
             string automatedDefenseState = RequireText(
                     "Research.Node." +
-                    DemoResearchCatalog.AutomatedDefenseId +
+                    ResearchCatalog.AutomatedDefenseId +
                     ".State")
                 .text;
             Assert.That(automatedDefenseState, Does.Contain("前置"));
@@ -535,28 +607,50 @@ namespace WasteCity.Tests
                 Does.Not.Contain("本阶段未开放"));
             Assert.That(RequireText(
                     "Research.Node." +
-                    DemoResearchCatalog.ReinforcedStructuresId +
+                    "core.research.ballistics" +
                     ".State").text,
                 Does.Contain("本阶段未开放"));
             Assert.That(RequireText(
                     "Research.Node." +
-                    DemoResearchCatalog.LegacyAnalysisId +
+                    "core.research.bridge.psionic-mech" +
                     ".State").text,
                 Does.Contain("本阶段未开放"));
             Assert.That(RequireText(
                     "Research.Node." +
-                    DemoResearchCatalog.AmmunitionAssemblyId +
+                    ResearchCatalog.PrecisionAssemblyId +
                     ".State").text,
                 Does.Contain("前置"));
 
             yield return ClickUiElement(
                 RequireSceneObject(
                     "Research.Node." +
-                    DemoResearchCatalog.BasicMetallurgyId),
+                    ResearchCatalog.AutomatedMachineryId),
                 MouseButton.Left);
+            InputField search = RequireSceneObject("Research.Search")
+                .GetComponent<InputField>();
+            yield return ClickUiElement(search.gameObject, MouseButton.Left);
+            yield return TapTextKey(Key.Z, 'z');
+            GameObject selectedNode = RequireSceneObject(
+                "Research.Node." +
+                ResearchCatalog.AutomatedMachineryId,
+                includeInactive: true);
+            Button startButton = RequireSceneObject("Research.Start")
+                .GetComponent<Button>();
+            Assert.That(selectedNode.activeSelf, Is.False);
+            Assert.That(startButton.interactable, Is.False,
+                "a filtered-out selection must not remain startable");
+            int ironBeforeHiddenStart = session.Inventory.Get(ResourceIds.Iron);
+            yield return TapKey(Key.Backspace);
+            Assert.That(search.text, Is.Empty);
+            yield return TapKey(Key.Escape);
+            Assert.That(EventSystem.current.currentSelectedGameObject, Is.Null);
+            yield return ClickUiElement(startButton.gameObject, MouseButton.Left);
+            Assert.That(session.Inventory.Get(ResourceIds.Iron),
+                Is.EqualTo(ironBeforeHiddenStart));
+            yield return ClickUiElement(selectedNode, MouseButton.Left);
             int ironBeforeStart = session.Inventory.Get(ResourceIds.Iron);
             yield return ClickUiElement(
-                RequireSceneObject("Research.Start"),
+                startButton.gameObject,
                 MouseButton.Left);
             Assert.That(session.Inventory.Get(ResourceIds.Iron),
                 Is.EqualTo(ironBeforeStart - 10));
@@ -592,7 +686,7 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();
             GrayboxDeveloperModifier3D modifier = CreateModifier(session);
             Assert.That(modifier.UnlockResearch(
-                DemoResearchCatalog.BasicMetallurgyId), Is.True);
+                ResearchCatalog.AutomatedMachineryId), Is.True);
             Assert.That(modifier.SetResource(ResourceIds.Iron, 100), Is.True);
 
             yield return TapKey(Key.E);
@@ -1323,6 +1417,86 @@ namespace WasteCity.Tests
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             InputSystem.Update();
             yield return null;
+        }
+
+        private IEnumerator TapTextKey(Key key, char character)
+        {
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
+            InputSystem.QueueTextEvent(keyboard, character);
+            InputSystem.Update();
+            Assert.That(keyboard[key].wasPressedThisFrame, Is.True);
+            yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+            InputSystem.Update();
+            yield return null;
+        }
+
+        private IEnumerator ScrollUiElement(
+            RectTransform target,
+            float delta)
+        {
+            Canvas.ForceUpdateCanvases();
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(
+                null,
+                target.TransformPoint(target.rect.center));
+            QueueMouse(position);
+            yield return null;
+            var state = new MouseState
+            {
+                position = position,
+                scroll = new Vector2(0f, delta * 120f),
+            };
+            InputSystem.QueueStateEvent(mouse, state);
+            InputSystem.Update();
+            yield return null;
+            QueueMouse(position);
+            yield return null;
+        }
+
+        private IEnumerator DragPointer(
+            Vector2 start,
+            Vector2 end,
+            MouseButton button)
+        {
+            QueueMouse(start);
+            yield return null;
+            QueueMouse(start, button);
+            yield return null;
+            QueueMouse(Vector2.Lerp(start, end, .5f), button);
+            yield return null;
+            QueueMouse(end, button);
+            yield return null;
+            QueueMouse(end);
+            yield return null;
+        }
+
+        private static Vector2 FindViewportBlank(RectTransform viewport)
+        {
+            Vector2 center = RectTransformUtility.WorldToScreenPoint(
+                null,
+                viewport.TransformPoint(viewport.rect.center));
+            var results = new List<RaycastResult>();
+            for (var y = -200f; y <= 200f; y += 50f)
+            {
+                for (var x = -300f; x <= 300f; x += 50f)
+                {
+                    Vector2 candidate = center + new Vector2(x, y);
+                    results.Clear();
+                    EventSystem.current.RaycastAll(
+                        new PointerEventData(EventSystem.current)
+                        {
+                            position = candidate,
+                        },
+                        results);
+                    if (results.Count > 0 &&
+                        results[0].gameObject == viewport.gameObject)
+                    {
+                        return candidate;
+                    }
+                }
+            }
+            Assert.Fail("No visible blank point was found in research viewport.");
+            return center;
         }
 
         private IEnumerator ShiftClickUiElement(GameObject target)

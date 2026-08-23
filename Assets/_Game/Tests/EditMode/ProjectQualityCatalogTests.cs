@@ -323,7 +323,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsController.RequiredTestFiles);
-            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012" },
+            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
                 operationsController.RequirementIds);
 
             ProjectReuseEntry operationsView = FindReuse(catalog,
@@ -332,19 +332,29 @@ namespace WasteCity.Tests
                 Is.EqualTo("ui-input"));
             Assert.That(operationsView.ReuseLevel,
                 Is.EqualTo(ProjectReuseLevel.SceneOnly));
-            CollectionAssert.AreEqual(
-                new[] { "GrayboxOperationsView3D" },
-                operationsView.TypeNames);
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxOperationsView3D",
+                "GrayboxResearchTreeView3D",
+                "GrayboxResearchTreeViewportInput3D",
+                "GrayboxResearchSearchFocus3D",
+                "ResearchTreeConnectionGraphic3D",
+            }, operationsView.TypeNames);
             CollectionAssert.AreEqual(new[]
             {
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs",
             }, operationsView.AssetPaths);
             CollectionAssert.AreEqual(new[]
             {
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+                "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsView.RequiredTestFiles);
-            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012" },
+            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
                 operationsView.RequirementIds);
 
             ProjectUiEntry systemMenu = FindUi(catalog, "graybox-system-menu");
@@ -1179,7 +1189,7 @@ namespace WasteCity.Tests
                 catalog,
                 "graybox-operations-controller-3d");
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0011", "IDEA-0012" },
+                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
                 operationsController.RequirementIds);
             CollectionAssert.Contains(
                 operationsController.RequiredTestFiles,
@@ -1188,7 +1198,7 @@ namespace WasteCity.Tests
                 catalog,
                 "graybox-operations-view-3d");
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0011", "IDEA-0012" },
+                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
                 operationsView.RequirementIds);
             CollectionAssert.Contains(
                 operationsView.RequiredTestFiles,

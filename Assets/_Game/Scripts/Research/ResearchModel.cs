@@ -225,8 +225,16 @@ namespace WasteCity.Research
 
     public static class ResearchCatalog
     {
-        private const string ScrapProcessingId =
+        public const string ScrapProcessingId =
             "core.research.scrap-processing";
+        public const string AutomatedMachineryId =
+            "core.research.automated-machinery";
+        public const string PrecisionAssemblyId =
+            "core.research.precision-assembly";
+        public const string AutomatedDefenseId =
+            "core.research.automated-defense";
+        public const string ThoughtAccelerationId =
+            "core.research.thought-acceleration";
 
         private static readonly ResearchDefinition retiredLegacyAnalysis =
             new ResearchDefinition(
@@ -256,7 +264,7 @@ namespace WasteCity.Research
                 "building:core.building.warehouse",
                 "building:core.building.wall"),
 
-            Node(1, "core.research.automated-machinery", "基础冶金",
+            Node(1, AutomatedMachineryId, "基础冶金",
                 DevelopmentRoute.Technology, 1, 1,
                 ResearchReleaseState.Researchable,
                 Costs(Cost(ResourceIds.Iron, 10)), 20f, "解锁冶炼与应急合金",
@@ -288,32 +296,32 @@ namespace WasteCity.Research
                 "building:psionics.building.resonance-furnace",
                 "recipe:psionics.production.resonance-metal"),
 
-            Node(5, "core.research.precision-assembly", "精密装配",
+            Node(5, PrecisionAssemblyId, "精密装配",
                 DevelopmentRoute.Technology, 2, 2,
                 ResearchReleaseState.Researchable,
                 Costs(Cost(ResourceIds.Alloy, 10)), 30f, "解锁装配与应急弹药",
-                Req("core.research.automated-machinery"),
+                Req(AutomatedMachineryId),
                 "building:core.building.assembler",
                 "recipe:core.production.assemble-ammunition",
                 "recipe:core.crafting.field-ammunition"),
-            Node(6, "core.research.automated-defense", "自动防御架构",
+            Node(6, AutomatedDefenseId, "自动防御架构",
                 DevelopmentRoute.Technology, 2, 2,
                 ResearchReleaseState.Researchable,
                 Costs(Cost(ResourceIds.Alloy, 12), Cost(ResourceIds.Biomass, 10)),
-                35f, "解锁机枪塔", Req("core.research.automated-machinery"),
+                35f, "解锁机枪塔", Req(AutomatedMachineryId),
                 "building:core.building.machine-gun-turret"),
             Node(7, "core.research.thermal-engineering", "热能工程",
                 DevelopmentRoute.Technology, 2, 2,
                 ResearchReleaseState.Researchable,
                 Costs(Cost(ResourceIds.Iron, 16), Cost(ResourceIds.Alloy, 8)),
-                40f, "解锁热能生产", Req("core.research.automated-machinery"),
+                40f, "解锁热能生产", Req(AutomatedMachineryId),
                 "building:technology.building.power-plant",
                 "recipe:technology.production.energy-cell"),
             Node(8, "core.research.ballistics", "弹道学",
                 DevelopmentRoute.Technology, 2, 2,
                 ResearchReleaseState.PreviewOnly,
                 Costs(Cost(ResourceIds.Iron, 12), Cost(ResourceIds.Alloy, 10)),
-                40f, "弹道规则仅预览", Req("core.research.automated-machinery"),
+                40f, "弹道规则仅预览", Req(AutomatedMachineryId),
                 "rule:core.effect.ballistics"),
 
             Node(9, "core.research.artifact-crafting", "炼器基础",
@@ -393,7 +401,7 @@ namespace WasteCity.Research
                 40f, "解锁意识碎片生产", Req("core.research.mind-resonance"),
                 "building:psionics.building.consciousness-network",
                 "recipe:psionics.production.consciousness-shard"),
-            Node(20, "core.research.thought-acceleration", "思维加速",
+            Node(20, ThoughtAccelerationId, "思维加速",
                 DevelopmentRoute.Psionics, 2, 2,
                 ResearchReleaseState.Researchable,
                 Costs(Cost(ResourceIds.PsionicAmplifier, 8), Cost(ResourceIds.Water, 14)),

@@ -37,6 +37,7 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform resourceLedgerPanel;
         private RectTransform inventoryCraftingPanel;
         private RectTransform researchTreePanel;
+        private GrayboxResearchTreeView3D researchTreeView;
         private RectTransform resourceTooltipRoot;
         private Text resourceTooltipText;
         private RectTransform cityPage;
@@ -49,16 +50,11 @@ namespace WasteCity.Graybox3D.Building
         private Text warehouseLogistics;
         private Text warehouseCapacity;
         private Text warehouseFilterStatus;
-        private RectTransform researchActiveRoot;
-        private Text researchActiveName;
-        private Text researchActiveProgress;
         private Text craftQueueCount;
         private Text craftQueueProgress;
         private Text craftQueueReason;
         private Button craftCancelButton;
         private Text inventoryTransferStatus;
-        private Button researchStartButton;
-        private Button researchCancelButton;
         private GrayboxInventoryTab3D inventoryTab;
         private int selectedBackpackSlot = -1;
         private int productionStateCount;
@@ -76,8 +72,6 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, Button>(StringComparer.Ordinal);
         private readonly Dictionary<string, Button> recipeButtons =
             new Dictionary<string, Button>(StringComparer.Ordinal);
-        private readonly Dictionary<string, ResearchRow> researchRows =
-            new Dictionary<string, ResearchRow>(StringComparer.Ordinal);
         private readonly Text[] backpackSlotLabels = new Text[30];
         private readonly Button[] backpackSlotButtons = new Button[30];
         private readonly Image[] backpackSlotIcons = new Image[30];
@@ -173,6 +167,27 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
             if (researchTreePanel != null)
                 researchTreePanel.gameObject.SetActive(open);
+            if (!open)
+                researchTreeView?.NotifyClosed();
+        }
+
+        public bool HasResearchTextInputFocus =>
+            researchTreeView != null && researchTreeView.HasTextInputFocus;
+
+        public bool ConsumeFocusedResearchEscape()
+        {
+            return researchTreeView != null &&
+                researchTreeView.ConsumeFocusedEscape();
+        }
+
+        public void FitResearchTree()
+        {
+            researchTreeView?.FitAll();
+        }
+
+        public void FocusResearchTreeOnOpen(string researchId)
+        {
+            researchTreeView?.NotifyOpened(researchId);
         }
 
         public void SetLedgerOpen(bool open)
@@ -501,16 +516,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (definition == null) return;
             TryBuildUi();
-            if (!researchRows.TryGetValue(
-                    definition.Id.Value,
-                    out ResearchRow row))
-                return;
-            row.Name.text = definition.Name;
-            row.Details.text = ResearchDetails(definition);
-            row.State.text = stateText ?? string.Empty;
-            row.Button.image.color = selected
-                ? SelectedColor
-                : ButtonColor;
+            researchTreeView?.SetNode(definition, stateText, selected);
         }
 
         public void SetResearchActive(
@@ -519,22 +525,34 @@ namespace WasteCity.Graybox3D.Building
             bool visible)
         {
             TryBuildUi();
-            if (researchActiveRoot == null) return;
-            researchActiveName.text = name ?? string.Empty;
-            researchActiveProgress.text = progressText ?? string.Empty;
-            researchActiveRoot.gameObject.SetActive(visible);
+            researchTreeView?.SetActiveResearch(
+                name,
+                progressText,
+                visible);
+        }
+
+        public void SetResearchActive(
+            string name,
+            string progressText,
+            bool visible,
+            string researchId)
+        {
+            TryBuildUi();
+            researchTreeView?.SetActiveResearch(
+                name,
+                progressText,
+                visible,
+                researchId);
         }
 
         public void SetResearchStartInteractable(bool interactable)
         {
-            if (researchStartButton != null)
-                researchStartButton.interactable = interactable;
+            researchTreeView?.SetStartInteractable(interactable);
         }
 
         public void SetResearchCancelInteractable(bool interactable)
         {
-            if (researchCancelButton != null)
-                researchCancelButton.interactable = interactable;
+            researchTreeView?.SetCancelInteractable(interactable);
         }
 
         private void ResolveCanvas()
@@ -1095,109 +1113,15 @@ namespace WasteCity.Graybox3D.Building
                 "ResearchTreePanel",
                 new Vector2(.5f, .5f),
                 Vector2.zero,
-                new Vector2(900f, 600f));
-            AddVerticalLayout(researchTreePanel, 12, 8f);
-            Text title = CreateLabel(
+                new Vector2(1500f, 850f));
+            researchTreeView = researchTreePanel.gameObject.AddComponent<
+                GrayboxResearchTreeView3D>();
+            researchTreeView.Initialize(
                 researchTreePanel,
-                "Research.Title",
-                "首版科技树",
-                20);
-            SetLayout(title.rectTransform, 0f, 36f, 1f);
-
-            RectTransform nodes = CreateRect(
-                researchTreePanel,
-                "Research.Nodes");
-            SetLayout(nodes, 0f, 390f, 1f);
-            var nodeLayout = nodes.gameObject.AddComponent<GridLayoutGroup>();
-            nodeLayout.cellSize = new Vector2(280f, 116f);
-            nodeLayout.spacing = new Vector2(8f, 8f);
-            nodeLayout.padding = new RectOffset(8, 8, 8, 8);
-            nodeLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            nodeLayout.constraintCount = 3;
-            foreach (ResearchDefinition definition in DemoResearchCatalog.All)
-            {
-                ResearchDefinition captured = definition;
-                Button button = CreateButton(
-                    nodes,
-                    "Research.Node." + definition.Id.Value,
-                    string.Empty,
-                    () => ResearchSelected?.Invoke(captured.Id.Value));
-                RectTransform rect = button.GetComponent<RectTransform>();
-                Text name = CreateLabel(
-                    rect,
-                    "Research.Node." + definition.Id.Value + ".Name",
-                    definition.Name,
-                    15);
-                Anchor(name.rectTransform, .74f, 1f);
-                Text details = CreateLabel(
-                    rect,
-                    "Research.Node." + definition.Id.Value + ".Details",
-                    ResearchDetails(definition),
-                    10);
-                details.alignment = TextAnchor.MiddleLeft;
-                Anchor(details.rectTransform, .18f, .74f);
-                details.rectTransform.offsetMin = new Vector2(6f, 0f);
-                details.rectTransform.offsetMax = new Vector2(-6f, 0f);
-                Text state = CreateLabel(
-                    rect,
-                    "Research.Node." + definition.Id.Value + ".State",
-                    "待刷新",
-                    12);
-                Anchor(state.rectTransform, 0f, .18f);
-                AddAmountIcons(
-                    rect,
-                    "Research.Node." + definition.Id.Value + ".Cost.",
-                    definition.Costs,
-                    new Vector2(18f, 14f));
-                researchRows.Add(
-                    definition.Id.Value,
-                    new ResearchRow(button, name, details, state));
-            }
-
-            researchActiveRoot = CreateRect(
-                researchTreePanel,
-                "Research.Active");
-            SetLayout(researchActiveRoot, 0f, 64f, 1f);
-            Image activeBackground =
-                researchActiveRoot.gameObject.AddComponent<Image>();
-            activeBackground.color = new Color(.1f, .16f, .18f, .96f);
-            activeBackground.raycastTarget = false;
-            researchActiveName = CreateLabel(
-                researchActiveRoot,
-                "Research.Active.Name",
-                string.Empty,
-                14);
-            Anchor(researchActiveName.rectTransform, .5f, 1f);
-            researchActiveProgress = CreateLabel(
-                researchActiveRoot,
-                "Research.Active.Progress",
-                string.Empty,
-                14);
-            Anchor(researchActiveProgress.rectTransform, 0f, .5f);
-            researchActiveRoot.gameObject.SetActive(false);
-
-            RectTransform actions = CreateRect(
-                researchTreePanel,
-                "Research.Actions");
-            SetLayout(actions, 0f, 42f, 1f);
-            var actionLayout = actions.gameObject.AddComponent<HorizontalLayoutGroup>();
-            actionLayout.spacing = 8f;
-            actionLayout.childForceExpandWidth = true;
-            actionLayout.childForceExpandHeight = true;
-            researchStartButton = CreateButton(
-                actions,
-                "Research.Start",
-                "开始研究",
-                () => ResearchStartRequested?.Invoke());
-            researchCancelButton = CreateButton(
-                actions,
-                "Research.Cancel",
-                "取消研究",
-                () => ResearchCancelRequested?.Invoke());
-            CreateButton(
-                actions,
-                "Research.Close",
-                "关闭",
+                ResolveIcon,
+                researchId => ResearchSelected?.Invoke(researchId),
+                () => ResearchStartRequested?.Invoke(),
+                () => ResearchCancelRequested?.Invoke(),
                 () => SetResearchOpen(false));
         }
 
@@ -1533,6 +1457,7 @@ namespace WasteCity.Graybox3D.Building
             resourceLedgerPanel = null;
             inventoryCraftingPanel = null;
             researchTreePanel = null;
+            researchTreeView = null;
             resourceTooltipRoot = null;
             resourceTooltipText = null;
             cityPage = null;
@@ -1545,22 +1470,16 @@ namespace WasteCity.Graybox3D.Building
             warehouseLogistics = null;
             warehouseCapacity = null;
             warehouseFilterStatus = null;
-            researchActiveRoot = null;
-            researchActiveName = null;
-            researchActiveProgress = null;
             craftQueueCount = null;
             craftQueueProgress = null;
             craftQueueReason = null;
             craftCancelButton = null;
-            researchStartButton = null;
-            researchCancelButton = null;
             statusRows.Clear();
             ledgerRows.Clear();
             cityRows.Clear();
             warehouseResourceRows.Clear();
             warehouseFilterButtons.Clear();
             recipeButtons.Clear();
-            researchRows.Clear();
             productionRows.Clear();
             Array.Clear(backpackSlotLabels, 0, backpackSlotLabels.Length);
             Array.Clear(backpackSlotButtons, 0, backpackSlotButtons.Length);
@@ -1843,33 +1762,6 @@ namespace WasteCity.Graybox3D.Building
             return text;
         }
 
-        private static string ResearchDetails(ResearchDefinition definition)
-        {
-            if (definition == null) return string.Empty;
-            string prerequisites = "无";
-            if (definition.RequiredResearchIds.Count > 0)
-            {
-                prerequisites = string.Empty;
-                for (var index = 0;
-                     index < definition.RequiredResearchIds.Count;
-                     index++)
-                {
-                    if (index > 0) prerequisites += "、";
-                    string requiredId =
-                        definition.RequiredResearchIds[index];
-                    ResearchDefinition required =
-                        DemoResearchCatalog.Find(requiredId);
-                    prerequisites += required?.Name ?? requiredId;
-                }
-            }
-            return "前置：" + prerequisites + "\n成本：" +
-                FormatRecipeAmounts(definition.Costs) + "  时间：" +
-                definition.Duration.ToString(
-                    "0.##",
-                    CultureInfo.InvariantCulture) + " 秒\n效果：" +
-                (definition.EffectSummary ?? string.Empty);
-        }
-
         private static void DestroyGenerated(GameObject gameObject)
         {
             if (gameObject == null) return;
@@ -1908,26 +1800,6 @@ namespace WasteCity.Graybox3D.Building
             public int AmountValue { get; set; }
             public int CapacityValue { get; set; }
             public float NetFlowValue { get; set; }
-        }
-
-        private sealed class ResearchRow
-        {
-            public ResearchRow(
-                Button button,
-                Text name,
-                Text details,
-                Text state)
-            {
-                Button = button;
-                Name = name;
-                Details = details;
-                State = state;
-            }
-
-            public Button Button { get; }
-            public Text Name { get; }
-            public Text Details { get; }
-            public Text State { get; }
         }
 
         private sealed class ProductionRow

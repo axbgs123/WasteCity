@@ -569,13 +569,13 @@ namespace WasteCity.Tests
             yield return TapKey(Key.T);
             yield return ResearchThroughUi(
                 session,
-                DemoResearchCatalog.BasicMetallurgyId);
+                ResearchCatalog.AutomatedMachineryId);
             yield return ResearchThroughUi(
                 session,
-                DemoResearchCatalog.AmmunitionAssemblyId);
+                ResearchCatalog.PrecisionAssemblyId);
             yield return ResearchThroughUi(
                 session,
-                DemoResearchCatalog.AutomatedDefenseId);
+                ResearchCatalog.AutomatedDefenseId);
             yield return TapKey(Key.T);
 
             yield return TapKey(Key.B);
@@ -690,8 +690,18 @@ namespace WasteCity.Tests
             string researchId)
         {
             ResearchDefinition definition =
-                DemoResearchCatalog.Find(researchId);
+                ResearchCatalog.Find(researchId);
             Assert.That(definition, Is.Not.Null, researchId);
+            InputField search = RequireSceneObject("Research.Search")
+                .GetComponent<InputField>();
+            yield return ClickUiElement(search.gameObject);
+            search.selectionAnchorPosition = 0;
+            search.selectionFocusPosition = search.text.Length;
+            for (var index = 0; index < researchId.Length; index++)
+                InputSystem.QueueTextEvent(keyboard, researchId[index]);
+            InputSystem.Update();
+            yield return null;
+            Assert.That(search.text, Is.EqualTo(researchId));
             yield return ClickUiElement(RequireSceneObject(
                 "Research.Node." + researchId));
             yield return ClickUiElement(RequireSceneObject("Research.Start"));

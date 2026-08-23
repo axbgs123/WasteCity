@@ -211,9 +211,12 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearch*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/ResearchTree*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
+        "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**",
         "Assets/_Game/Scripts/Graybox3D/Usability/WasteCity.Graybox3D.Usability.asmdef"
       ],
@@ -231,6 +234,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
@@ -248,7 +253,8 @@
         "BUG-0007",
         "IDEA-0012",
         "IDEA-0013",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0016"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -334,6 +340,8 @@
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalResearchSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
@@ -1053,16 +1061,18 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 DemoResearchRuntime 捕获 schema 31 背包、合成与科技 DTO；恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。",
+      "UseSummary": "从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 FormalResearchRuntime 捕获 schema 31 背包、合成与正式科技 DTO；兼容重载继续服务历史 Demo 测试。恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。",
       "BoundarySummary": "只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
-        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalResearchSaveAdapterTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0016"
       ]
     },
     {
@@ -1242,8 +1252,8 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。",
-      "BoundarySummary": "只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。",
+      "UseSummary": "在 GrayboxPrototype3D 内组合背包、应急合成、43 节点正式研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。",
+      "BoundarySummary": "只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 31，也不得接入冻结 2D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
@@ -1251,29 +1261,40 @@
       ],
       "RequirementIds": [
         "IDEA-0011",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0016"
       ]
     },
     {
       "Id": "graybox-operations-view-3d",
       "ChineseName": "三维生产可观察化视图",
       "TypeNames": [
-        "GrayboxOperationsView3D"
+        "GrayboxOperationsView3D",
+        "GrayboxResearchTreeView3D",
+        "GrayboxResearchTreeViewportInput3D",
+        "GrayboxResearchSearchFocus3D",
+        "ResearchTreeConnectionGraphic3D"
       ],
       "AssetPaths": [
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs"
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树、真实仓库内容与共享资源图标，并把 UGUI 操作发布为命令事件。",
-      "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；图标必须复用 ResourceIconCatalog3D，视图不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。",
+      "UseSummary": "显示当前 3D 场景的资源栏、完整账本、背包与合成面板、43 节点自下向上正式科技树、真实仓库内容与共享资源图标；科技树提供确定连线、搜索、路线筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。",
+      "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；图标必须复用 ResourceIconCatalog3D，视图和输入表面不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间、判断访问资格或进入 schema 31。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0016"
       ]
     },
     {
@@ -1836,6 +1857,53 @@
       ]
     },
     {
+      "Id": "formal-research-runtime",
+      "ChineseName": "正式四路线科技运行时",
+      "TypeNames": [
+        "FormalResearchRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Research/FormalResearchRuntime.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "组合统一 ResearchModel 与正式 43 节点 ResearchCatalog，提交稳定 ID 研究启动、城市形态/思维加速倍率推进、研究站与全局暂停、80% 原子退款，以及 schema 31 正式目录恢复。",
+      "BoundarySummary": "不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO 或效果表现；未知活动科技冻结并继续通过持久化往返，初始根科技在新会话和恢复后由正式运行时修复。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalResearchSaveAdapterTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0015",
+        "IDEA-0016"
+      ]
+    },
+    {
+      "Id": "research-tree-projection-3d",
+      "ChineseName": "正式科技树确定性投影",
+      "TypeNames": [
+        "ResearchTreeProjection3D",
+        "ResearchTreeNodeProjection3D",
+        "ResearchTreeEdgeProjection3D",
+        "ResearchTreeViewportState3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "把正式科技目录投影为稳定的 43 节点、48 依赖边、自下向上固定坐标与图空间边界，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。",
+      "BoundarySummary": "只拥有不可变图空间投影，不创建 Unity 场景对象，不读取输入、库存、研究运行态或存档，也不解析中文状态文案；路线布局常量变更必须同步设计规格与非重叠测试。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0016"
+      ]
+    },
+    {
       "Id": "demo-research-catalog",
       "ChineseName": "三维首版科技目录",
       "TypeNames": [
@@ -1846,8 +1914,8 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "提供 A16.4 六节点的稳定顺序、稳定 ID、前置、成本、时长、效果与发布状态，3D 科技树和解锁投影必须读取该目录。",
-      "BoundarySummary": "只定义 3D Demo release profile 的静态配置；不保存完成状态、不扣资源、不推进时间，也不回写冻结 2D 的 43 节点目录。",
+      "UseSummary": "保留 A16.4 历史六节点 release profile 的稳定 ID 与退役内容元数据，供旧测试、旧存档和兼容 facade 使用；正式 3D 科技树与新运行时必须读取 ResearchCatalog。",
+      "BoundarySummary": "只定义历史 Demo 兼容配置；不得重新成为正式枚举源，不保存完成状态、不扣资源、不推进时间，也不向正式 43 节点目录静默映射退役 ID。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs"
       ],

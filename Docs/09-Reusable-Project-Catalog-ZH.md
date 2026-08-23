@@ -106,7 +106,7 @@
 
 ### 三维背包合成与科技存档适配器（复用前审查）
 
-能解决什么：把正式 3D 背包、应急合成队列与六节点科技状态映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`。怎么复用：从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 DemoResearchRuntime 捕获 schema 31 背包、合成与科技 DTO；恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。不能负责什么：只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。改后跑哪组测试：`GrayboxFormalSaveEconomyTests`、`PlayerBackpackModelTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`。代码名：`GrayboxEconomySaveAdapter3D`。
+能解决什么：把正式 3D 背包、应急合成队列与 43 节点正式科技状态映射到 schema 31。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`。怎么复用：从显式提供的当前 PlayerBackpackModel、CraftingQueueModel 和 FormalResearchRuntime 捕获 schema 31 背包、合成与正式科技 DTO；兼容重载继续服务历史 Demo 测试。恢复时先通过各模型公开且受验证的 snapshot/prepare 边界完成三域预检，再按背包、研究、合成顺序提交，保留队列稳定执行 ID、高水位、预留输入及未知内容降级状态。不能负责什么：只负责领域真值与 FormalThreeD DTO 映射，不拥有文件路径、codec、文件事务、检查点或恢复总协调，不搜索场景，也不重新扣除合成预留或研究成本。背包超栈兼容策略由上层根据内容配置显式传入；研究站资格、城市倍率、UI、派生阻塞原因和表现对象不入档。改后跑哪组测试：`GrayboxFormalSaveEconomyTests`、`GrayboxFormalResearchSaveAdapterTests`、`PlayerBackpackModelTests`、`CraftingQueueModelTests`、`DemoResearchRuntimeTests`。代码名：`GrayboxEconomySaveAdapter3D`。
 
 ### 三维逐建筑生产存档适配器（复用前审查）
 
@@ -144,11 +144,11 @@
 
 ### 三维生产可观察化控制器（仅限场景）
 
-能解决什么：把当前 3D 会话的背包、应急合成、六节点研究、资源状态栏、真实仓库详情和面板命令接到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、应急合成、六节点研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 30，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
+能解决什么：把当前 3D 会话的背包、应急合成、43 节点正式研究、资源状态栏、真实仓库详情和面板命令接到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、应急合成、43 节点正式研究、资源状态栏、真实仓库详情与面板命令，并把真实输入提交到正式模型。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 31，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
 
 ### 三维生产可观察化视图（仅限场景）
 
-能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成、科技树、真实仓库内容和共享材料图标，并把点击转换为命令事件。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、六节点科技树、真实仓库内容与共享资源图标，并把 UGUI 操作发布为命令事件。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、文案投影和点击事件；图标必须复用 ResourceIconCatalog3D，视图不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间或判断访问资格。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`。
+能解决什么：呈现当前 3D 场景的资源栏、账本、背包、合成、43 节点正式科技树、真实仓库内容和共享材料图标。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`。怎么复用：显示当前 3D 场景的资源栏、完整账本、背包与合成面板、43 节点自下向上正式科技树、真实仓库内容与共享资源图标；科技树提供确定连线、搜索、路线筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；图标必须复用 ResourceIconCatalog3D，视图和输入表面不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间、判断访问资格或进入 schema 31。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`ResearchTreeUiContractTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`、`GrayboxResearchTreeView3D`、`GrayboxResearchTreeViewportInput3D`、`GrayboxResearchSearchFocus3D`、`ResearchTreeConnectionGraphic3D`。
 
 ### 三维首版防御场景接线与表现（仅限场景）
 
@@ -252,9 +252,17 @@
 
 能解决什么：管理研究状态，并在 schema 31 恢复时区分正式科技、退役兼容内容与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`FormalResearchCatalogTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。
 
+### 正式四路线科技运行时（推荐复用）
+
+能解决什么：用正式 43 节点目录统一当前 3D 研究启动、推进、暂停、退款和 schema 31 恢复。在哪里：`Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`。怎么复用：组合统一 ResearchModel 与正式 43 节点 ResearchCatalog，提交稳定 ID 研究启动、城市形态/思维加速倍率推进、研究站与全局暂停、80% 原子退款，以及 schema 31 正式目录恢复。不能负责什么：不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO 或效果表现；未知活动科技冻结并继续通过持久化往返，初始根科技在新会话和恢复后由正式运行时修复。改后跑哪组测试：`FormalResearchRuntimeTests`、`GrayboxFormalResearchSaveAdapterTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`FormalResearchRuntime`。
+
+### 正式科技树确定性投影（复用前审查）
+
+能解决什么：把正式目录变成稳定的 43 节点、48 条依赖边、自下向上坐标和可复用视口计算。在哪里：`Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs`。怎么复用：把正式科技目录投影为稳定的 43 节点、48 依赖边、自下向上固定坐标与图空间边界，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。不能负责什么：只拥有不可变图空间投影，不创建 Unity 场景对象，不读取输入、库存、研究运行态或存档，也不解析中文状态文案；路线布局常量变更必须同步设计规格与非重叠测试。改后跑哪组测试：`ResearchTreeProjection3DTests`、`ResearchTreeUiContractTests`。代码名：`ResearchTreeProjection3D`、`ResearchTreeNodeProjection3D`、`ResearchTreeEdgeProjection3D`、`ResearchTreeViewportState3D`。
+
 ### 三维首版科技目录（推荐复用）
 
-能解决什么：集中提供 GDD A16.4 六节点科技树的稳定顺序、稳定 ID、前置、成本、时长、效果与正式发布状态。在哪里：`Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`。怎么复用：提供 A16.4 六节点的稳定顺序、稳定 ID、前置、成本、时长、效果与发布状态，3D 科技树和解锁投影必须读取该目录。不能负责什么：只定义 3D Demo release profile 的静态配置；不保存完成状态、不扣资源、不推进时间，也不回写冻结 2D 的 43 节点目录。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchCatalog`。
+能解决什么：保留 A16.4 历史六节点 release profile 的稳定 ID 与退役内容元数据。在哪里：`Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`。怎么复用：保留 A16.4 历史六节点 release profile 的稳定 ID 与退役内容元数据，供旧测试、旧存档和兼容 facade 使用；正式 3D 科技树与新运行时必须读取 ResearchCatalog。不能负责什么：只定义历史 Demo 兼容配置；不得重新成为正式枚举源，不保存完成状态、不扣资源、不推进时间，也不向正式 43 节点目录静默映射退役 ID。改后跑哪组测试：`DemoResearchRuntimeTests`。代码名：`DemoResearchCatalog`。
 
 ### 三维首版科技运行时（推荐复用）
 

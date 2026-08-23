@@ -1,0 +1,433 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using UnityEngine;
+using WasteCity.Graybox3D.Usability;
+using WasteCity.Research;
+
+namespace WasteCity.Tests
+{
+    /// <summary>
+    /// IDEA-0016 pure graph/layout contract for the formal bottom-up research
+    /// tree. The projection must not depend on a scene, Canvas or input device.
+    /// </summary>
+    public sealed class ResearchTreeProjection3DTests
+    {
+        private const string RootId =
+            "core.research.scrap-processing";
+        private const string TechnologyT1Id =
+            "core.research.automated-machinery";
+        private const string CultivationT1Id =
+            "core.research.spirit-sensing";
+        private const string BiologicalT1Id =
+            "core.research.adaptive-tissue";
+        private const string PsionicsT1Id =
+            "core.research.mind-resonance";
+        private const string PrecisionAssemblyId =
+            "core.research.precision-assembly";
+        private const string AutomatedDefenseId =
+            "core.research.automated-defense";
+
+        private static readonly float[] RowY =
+        {
+            0f,
+            280f,
+            600f,
+            920f,
+            1260f,
+        };
+
+        private static readonly Dictionary<DevelopmentRoute, float>
+            RouteCenterX = new Dictionary<DevelopmentRoute, float>
+        {
+            { DevelopmentRoute.Technology, -1200f },
+            { DevelopmentRoute.Cultivation, -400f },
+            { DevelopmentRoute.Biological, 400f },
+            { DevelopmentRoute.Psionics, 1200f },
+        };
+
+        private static readonly float[] BranchOffsets =
+        {
+            -270f,
+            -90f,
+            90f,
+            270f,
+        };
+
+        private static readonly float[] BridgeX =
+        {
+            -1000f,
+            -600f,
+            -200f,
+            200f,
+            600f,
+            1000f,
+        };
+
+        [Test]
+        public void FormalCatalog_ProjectsAllNodesAndAllPrerequisiteEdgesUpward()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            int expectedEdgeCount = ResearchCatalog.All.Sum(
+                definition => definition.RequiredResearchIds.Count);
+
+            Assert.That(projection.Nodes, Has.Count.EqualTo(43));
+            Assert.That(projection.Edges,
+                Has.Count.EqualTo(expectedEdgeCount));
+            Assert.That(expectedEdgeCount, Is.EqualTo(48),
+                "The approved formal catalog has exactly 48 prerequisite edges.");
+
+            var actualEdges = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ResearchTreeEdgeProjection3D edge in projection.Edges)
+            {
+                ResearchTreeNodeProjection3D prerequisite =
+                    projection.FindNode(edge.PrerequisiteResearchId);
+                ResearchTreeNodeProjection3D dependent =
+                    projection.FindNode(edge.DependentResearchId);
+                Assert.That(prerequisite, Is.Not.Null,
+                    edge.PrerequisiteResearchId);
+                Assert.That(dependent, Is.Not.Null,
+                    edge.DependentResearchId);
+                Assert.That(prerequisite.Position.y,
+                    Is.LessThan(dependent.Position.y),
+                    edge.PrerequisiteResearchId + " -> " +
+                    edge.DependentResearchId);
+                Assert.That(actualEdges.Add(
+                        edge.PrerequisiteResearchId + "\n" +
+                        edge.DependentResearchId),
+                    Is.True,
+                    "Projected prerequisite edges must be unique.");
+            }
+
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
+            {
+                foreach (string prerequisiteId in
+                         definition.RequiredResearchIds)
+                {
+                    Assert.That(actualEdges, Does.Contain(
+                        prerequisiteId + "\n" + definition.Id.Value));
+                }
+            }
+        }
+
+        [Test]
+        public void Layout_IsBottomUpAndUsesApprovedRouteColumnsWithoutOverlap()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+
+            Assert.That(projection.FindNode(RootId).Position,
+                Is.EqualTo(new Vector2(0f, RowY[0])));
+            Assert.That(projection.FindNode(TechnologyT1Id).Position.x,
+                Is.EqualTo(RouteCenterX[DevelopmentRoute.Technology]));
+            Assert.That(projection.FindNode(CultivationT1Id).Position.x,
+                Is.EqualTo(RouteCenterX[DevelopmentRoute.Cultivation]));
+            Assert.That(projection.FindNode(BiologicalT1Id).Position.x,
+                Is.EqualTo(RouteCenterX[DevelopmentRoute.Biological]));
+            Assert.That(projection.FindNode(PsionicsT1Id).Position.x,
+                Is.EqualTo(RouteCenterX[DevelopmentRoute.Psionics]));
+
+            foreach (ResearchTreeNodeProjection3D node in projection.Nodes)
+            {
+                Assert.That(node.Position.y,
+                    Is.EqualTo(RowY[node.Definition.LayoutRow]),
+                    node.ResearchId);
+            }
+
+            foreach (DevelopmentRoute route in RouteCenterX.Keys)
+            {
+                for (var row = 2; row <= 3; row++)
+                {
+                    ResearchTreeNodeProjection3D[] nodes = projection.Nodes
+                        .Where(node => node.Definition.Route == route &&
+                            node.Definition.LayoutRow == row)
+                        .OrderBy(node => node.Definition.CatalogOrder)
+                        .ToArray();
+                    Assert.That(nodes, Has.Length.EqualTo(4),
+                        route + " row " + row);
+                    for (var index = 0; index < nodes.Length; index++)
+                    {
+                        Assert.That(nodes[index].Position.x,
+                            Is.EqualTo(RouteCenterX[route] +
+                                BranchOffsets[index]),
+                            nodes[index].ResearchId);
+                    }
+                }
+            }
+
+            ResearchTreeNodeProjection3D[] bridges = projection.Nodes
+                .Where(node => node.Definition.Route ==
+                    DevelopmentRoute.Bridge)
+                .OrderBy(node => node.Definition.CatalogOrder)
+                .ToArray();
+            Assert.That(bridges, Has.Length.EqualTo(BridgeX.Length));
+            for (var index = 0; index < bridges.Length; index++)
+            {
+                Assert.That(bridges[index].Position,
+                    Is.EqualTo(new Vector2(BridgeX[index], RowY[4])),
+                    bridges[index].ResearchId);
+            }
+
+            foreach (IGrouping<float, ResearchTreeNodeProjection3D> row in
+                     projection.Nodes.GroupBy(node => node.Position.y))
+            {
+                ResearchTreeNodeProjection3D[] ordered = row
+                    .OrderBy(node => node.Position.x)
+                    .ToArray();
+                for (var index = 1; index < ordered.Length; index++)
+                {
+                    Assert.That(
+                        ordered[index].Position.x -
+                        ordered[index - 1].Position.x,
+                        Is.GreaterThanOrEqualTo(
+                            ResearchTreeProjection3D.NodeSize.x),
+                        ordered[index - 1].ResearchId + " overlaps " +
+                        ordered[index].ResearchId);
+                }
+            }
+        }
+
+        [Test]
+        public void Projection_IsStableWhenCatalogInputOrderChanges()
+        {
+            ResearchTreeProjection3D first = CreateProjection();
+            ResearchTreeProjection3D second =
+                ResearchTreeProjection3D.Create(
+                    ResearchCatalog.All.Reverse().ToArray());
+
+            CollectionAssert.AreEqual(
+                first.Nodes.Select(NodeSignature).ToArray(),
+                second.Nodes.Select(NodeSignature).ToArray());
+            CollectionAssert.AreEqual(
+                first.Edges.Select(EdgeSignature).ToArray(),
+                second.Edges.Select(EdgeSignature).ToArray());
+            Assert.That(second.Bounds, Is.EqualTo(first.Bounds));
+        }
+
+        [Test]
+        public void BridgeNodes_ProjectBothFormalPrerequisites()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            ResearchDefinition[] bridges = ResearchCatalog.All
+                .Where(definition => definition.Route ==
+                    DevelopmentRoute.Bridge)
+                .ToArray();
+
+            Assert.That(bridges, Has.Length.EqualTo(6));
+            foreach (ResearchDefinition bridge in bridges)
+            {
+                Assert.That(bridge.RequiredResearchIds,
+                    Has.Count.EqualTo(2), bridge.Id.Value);
+                string[] projectedPrerequisites = projection.Edges
+                    .Where(edge => edge.DependentResearchId ==
+                        bridge.Id.Value)
+                    .Select(edge => edge.PrerequisiteResearchId)
+                    .OrderBy(id => id, StringComparer.Ordinal)
+                    .ToArray();
+                CollectionAssert.AreEqual(
+                    bridge.RequiredResearchIds
+                        .OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray(),
+                    projectedPrerequisites,
+                    bridge.Id.Value);
+            }
+        }
+
+        [Test]
+        public void LatestResearchable_UsesHighestLayoutRowThenCatalogOrder()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            ResearchTreeNodeProjection3D selected =
+                projection.SelectLatestResearchable(new[]
+                {
+                    AutomatedDefenseId,
+                    TechnologyT1Id,
+                    PrecisionAssemblyId,
+                });
+
+            Assert.That(selected, Is.Not.Null);
+            Assert.That(selected.ResearchId,
+                Is.EqualTo(PrecisionAssemblyId),
+                "Both T2 candidates are current; the lower CatalogOrder " +
+                "must be the deterministic main focus.");
+            Assert.That(projection.SelectLatestResearchable(
+                Array.Empty<string>()), Is.Null);
+        }
+
+        [Test]
+        public void Filtering_HidesNodesWithoutChangingGraphCoordinatesOrBounds()
+        {
+            ResearchTreeProjection3D original = CreateProjection();
+            ResearchTreeProjection3D filtered =
+                original.WithVisibleResearchIds(new[]
+                {
+                    RootId,
+                    TechnologyT1Id,
+                    PrecisionAssemblyId,
+                });
+
+            Assert.That(filtered.Nodes, Has.Count.EqualTo(43));
+            Assert.That(filtered.Bounds, Is.EqualTo(original.Bounds));
+            foreach (ResearchTreeNodeProjection3D originalNode in
+                     original.Nodes)
+            {
+                ResearchTreeNodeProjection3D filteredNode =
+                    filtered.FindNode(originalNode.ResearchId);
+                Assert.That(filteredNode.Position,
+                    Is.EqualTo(originalNode.Position),
+                    originalNode.ResearchId);
+            }
+            CollectionAssert.AreEquivalent(
+                new[] { RootId, TechnologyT1Id, PrecisionAssemblyId },
+                filtered.Nodes.Where(node => node.Visible)
+                    .Select(node => node.ResearchId)
+                    .ToArray());
+        }
+
+        [Test]
+        public void Zoom_ClampsAndKeepsThePointerGraphAnchorFixed()
+        {
+            Assert.That(ResearchTreeProjection3D.ClampZoom(-10f),
+                Is.EqualTo(.4f));
+            Assert.That(ResearchTreeProjection3D.ClampZoom(.9f),
+                Is.EqualTo(.9f));
+            Assert.That(ResearchTreeProjection3D.ClampZoom(10f),
+                Is.EqualTo(1.45f));
+
+            var viewportSize = new Vector2(1000f, 600f);
+            var pointer = new Vector2(730f, 210f);
+            var before = new ResearchTreeViewportState3D(
+                new Vector2(120f, 310f),
+                .8f);
+            Vector2 anchorBefore = ResearchTreeProjection3D.ScreenToGraph(
+                pointer,
+                viewportSize,
+                before);
+            ResearchTreeViewportState3D after =
+                ResearchTreeProjection3D.ZoomAroundPointer(
+                    before,
+                    requestedZoom: 1.3f,
+                    pointer,
+                    viewportSize);
+            Vector2 anchorAfter = ResearchTreeProjection3D.ScreenToGraph(
+                pointer,
+                viewportSize,
+                after);
+
+            Assert.That(after.Zoom, Is.EqualTo(1.3f));
+            Assert.That(anchorAfter.x,
+                Is.EqualTo(anchorBefore.x).Within(.0001f));
+            Assert.That(anchorAfter.y,
+                Is.EqualTo(anchorBefore.y).Within(.0001f));
+        }
+
+        [Test]
+        public void FitAndFocus_AreStableAndContainTheirRequestedBounds()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            var viewportSize = new Vector2(2000f, 1200f);
+            const float padding = 48f;
+
+            ResearchTreeViewportState3D firstFit = projection.FitAll(
+                viewportSize,
+                padding);
+            ResearchTreeViewportState3D secondFit = projection.FitAll(
+                viewportSize,
+                padding);
+            Assert.That(secondFit, Is.EqualTo(firstFit));
+            AssertNodesInsideViewport(
+                projection.Nodes,
+                firstFit,
+                viewportSize,
+                padding);
+
+            string[] focusIds =
+            {
+                TechnologyT1Id,
+                PrecisionAssemblyId,
+                AutomatedDefenseId,
+            };
+            ResearchTreeViewportState3D firstFocus = projection.Focus(
+                focusIds,
+                viewportSize,
+                padding);
+            ResearchTreeViewportState3D secondFocus = projection.Focus(
+                focusIds.Reverse().ToArray(),
+                viewportSize,
+                padding);
+            Assert.That(secondFocus, Is.EqualTo(firstFocus),
+                "Focus must not depend on caller enumeration order.");
+            AssertNodesInsideViewport(
+                focusIds.Select(projection.FindNode),
+                firstFocus,
+                viewportSize,
+                padding);
+        }
+
+        [Test]
+        public void FitAll_ContainsEveryNodeAtDefaultResearchViewportSize()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            var viewportSize = new Vector2(1476f, 644f);
+            const float padding = 28f;
+
+            ResearchTreeViewportState3D state = projection.FitAll(
+                viewportSize,
+                padding);
+
+            AssertNodesInsideViewport(
+                projection.Nodes,
+                state,
+                viewportSize,
+                padding);
+        }
+
+        private static ResearchTreeProjection3D CreateProjection()
+        {
+            return ResearchTreeProjection3D.Create(ResearchCatalog.All);
+        }
+
+        private static string NodeSignature(
+            ResearchTreeNodeProjection3D node)
+        {
+            return node.ResearchId + "|" + node.Position.x + "|" +
+                node.Position.y + "|" + node.Visible;
+        }
+
+        private static string EdgeSignature(
+            ResearchTreeEdgeProjection3D edge)
+        {
+            return edge.PrerequisiteResearchId + "|" +
+                edge.DependentResearchId;
+        }
+
+        private static void AssertNodesInsideViewport(
+            IEnumerable<ResearchTreeNodeProjection3D> nodes,
+            ResearchTreeViewportState3D state,
+            Vector2 viewportSize,
+            float padding)
+        {
+            Vector2 halfNode = ResearchTreeProjection3D.NodeSize *
+                (.5f * state.Zoom);
+            foreach (ResearchTreeNodeProjection3D node in nodes)
+            {
+                Vector2 screen = ResearchTreeProjection3D.GraphToScreen(
+                    node.Position,
+                    viewportSize,
+                    state);
+                Assert.That(screen.x - halfNode.x,
+                    Is.GreaterThanOrEqualTo(padding - .01f),
+                    node.ResearchId + " left");
+                Assert.That(screen.x + halfNode.x,
+                    Is.LessThanOrEqualTo(viewportSize.x - padding + .01f),
+                    node.ResearchId + " right");
+                Assert.That(screen.y - halfNode.y,
+                    Is.GreaterThanOrEqualTo(padding - .01f),
+                    node.ResearchId + " bottom");
+                Assert.That(screen.y + halfNode.y,
+                    Is.LessThanOrEqualTo(viewportSize.y - padding + .01f),
+                    node.ResearchId + " top");
+            }
+        }
+    }
+}

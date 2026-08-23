@@ -10,7 +10,8 @@ namespace WasteCity.Graybox3D.Building
     {
         private readonly PlayerBackpackModel backpack;
         private readonly CraftingQueueModel crafting;
-        private readonly DemoResearchRuntime research;
+        private readonly DemoResearchRuntime demoResearch;
+        private readonly FormalResearchRuntime formalResearch;
 
         public GrayboxEconomySaveAdapter3D(
             PlayerBackpackModel backpack,
@@ -21,7 +22,20 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(backpack));
             this.crafting = crafting ??
                 throw new ArgumentNullException(nameof(crafting));
-            this.research = research ??
+            demoResearch = research ??
+                throw new ArgumentNullException(nameof(research));
+        }
+
+        public GrayboxEconomySaveAdapter3D(
+            PlayerBackpackModel backpack,
+            CraftingQueueModel crafting,
+            FormalResearchRuntime research)
+        {
+            this.backpack = backpack ??
+                throw new ArgumentNullException(nameof(backpack));
+            this.crafting = crafting ??
+                throw new ArgumentNullException(nameof(crafting));
+            formalResearch = research ??
                 throw new ArgumentNullException(nameof(research));
         }
 
@@ -85,7 +99,7 @@ namespace WasteCity.Graybox3D.Building
         public FormalThreeDResearchSaveData CaptureResearch()
         {
             ResearchPersistenceSnapshot snapshot =
-                research.CaptureForPersistence();
+                CaptureResearchSnapshot();
             var completed = new string[
                 snapshot.CompletedResearchIds.Count];
             for (var index = 0; index < completed.Length; index++)
@@ -122,7 +136,7 @@ namespace WasteCity.Graybox3D.Building
                     allowBackpackOverStack,
                     out PlayerBackpackRestorePlan backpackPlan,
                     out error) ||
-                !research.TryPrepareRestoreForPersistence(
+                !TryPrepareResearchRestore(
                     researchData.completedResearchIds,
                     researchData.activeResearchId,
                     researchData.remainingSeconds,
@@ -143,7 +157,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             if (!backpack.TryCommitRestore(backpackPlan, out error) ||
-                !research.TryCommitRestoreForPersistence(
+                !TryCommitResearchRestore(
                     researchPlan,
                     out error) ||
                 !crafting.TryCommitRestore(craftingPlan, out error))
@@ -153,6 +167,48 @@ namespace WasteCity.Graybox3D.Building
 
             error = string.Empty;
             return true;
+        }
+
+        private ResearchPersistenceSnapshot CaptureResearchSnapshot()
+        {
+            return formalResearch != null
+                ? formalResearch.CaptureForPersistence()
+                : demoResearch.CaptureForPersistence();
+        }
+
+        private bool TryPrepareResearchRestore(
+            IReadOnlyList<string> completedResearchIds,
+            string activeResearchId,
+            float remainingSeconds,
+            out ResearchRestorePlan plan,
+            out string error)
+        {
+            return formalResearch != null
+                ? formalResearch.TryPrepareRestoreForPersistence(
+                    completedResearchIds,
+                    activeResearchId,
+                    remainingSeconds,
+                    out plan,
+                    out error)
+                : demoResearch.TryPrepareRestoreForPersistence(
+                    completedResearchIds,
+                    activeResearchId,
+                    remainingSeconds,
+                    out plan,
+                    out error);
+        }
+
+        private bool TryCommitResearchRestore(
+            ResearchRestorePlan plan,
+            out string error)
+        {
+            return formalResearch != null
+                ? formalResearch.TryCommitRestoreForPersistence(
+                    plan,
+                    out error)
+                : demoResearch.TryCommitRestoreForPersistence(
+                    plan,
+                    out error);
         }
 
         private static bool TryBuildBackpackSlots(

@@ -42,7 +42,7 @@ namespace WasteCity.Graybox3D.Building
         private CityResourceStorageModel observedStorage;
         private PlayerBackpackModel backpack;
         private CraftingQueueModel crafting;
-        private DemoResearchRuntime research;
+        private FormalResearchRuntime research;
         private string selectedResearchId;
         private string hoveredResourceId;
         private int selectedBackpackSlot = -1;
@@ -61,9 +61,12 @@ namespace WasteCity.Graybox3D.Building
             (view.IsInventoryOpen ||
              view.IsResearchOpen ||
              view.IsLedgerOpen);
+        public bool IsResearchOpen => view != null && view.IsResearchOpen;
+        public bool HasResearchTextInputFocus =>
+            view != null && view.HasResearchTextInputFocus;
         public PlayerBackpackModel Backpack => backpack;
         public CraftingQueueModel Crafting => crafting;
-        public DemoResearchRuntime Research => research;
+        public FormalResearchRuntime Research => research;
         public uint ViewRefreshCount { get; private set; }
 
         public void Configure(
@@ -113,6 +116,19 @@ namespace WasteCity.Graybox3D.Building
                 view.SetLedgerOpen(false);
             }
             RefreshView();
+            if (open)
+                view.FocusResearchTreeOnOpen(
+                    LatestProgressionCandidateId());
+        }
+
+        public bool ConsumeFocusedResearchEscape()
+        {
+            return view != null && view.ConsumeFocusedResearchEscape();
+        }
+
+        public void FitResearchTree()
+        {
+            view?.FitResearchTree();
         }
 
         public void ClosePanels()
@@ -241,7 +257,7 @@ namespace WasteCity.Graybox3D.Building
             crafting = new CraftingQueueModel(
                 backpack,
                 session.IsResearchCompleted);
-            research = new DemoResearchRuntime(session.Research);
+            research = new FormalResearchRuntime(session.Research);
             selectedResearchId = null;
             hoveredResourceId = null;
             productionAccessStatus.Clear();
@@ -545,7 +561,13 @@ namespace WasteCity.Graybox3D.Building
 
         private void SelectResearch(string researchId)
         {
-            if (DemoResearchCatalog.Find(researchId) == null) return;
+            if (string.IsNullOrEmpty(researchId))
+            {
+                selectedResearchId = null;
+                RefreshView();
+                return;
+            }
+            if (ResearchCatalog.Find(researchId) == null) return;
             selectedResearchId = researchId;
             RefreshView();
         }
@@ -677,7 +699,7 @@ namespace WasteCity.Graybox3D.Building
                      definition.RequiredResearchId));
             ResearchDefinition requiredResearch = definition == null
                 ? null
-                : DemoResearchCatalog.Find(
+                : ResearchCatalog.Find(
                     definition.RequiredResearchId);
             string stateText = unlocked
                 ? "当前可排 " +
@@ -693,7 +715,7 @@ namespace WasteCity.Graybox3D.Building
         private void RefreshResearch()
         {
             ResearchDefinition active = research.Model.Active;
-            foreach (ResearchDefinition definition in DemoResearchCatalog.All)
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
                 view.SetResearchNode(
                     definition,
@@ -711,7 +733,8 @@ namespace WasteCity.Graybox3D.Building
             view.SetResearchActive(
                 hasActive ? active.Name : string.Empty,
                 progress,
-                hasActive);
+                hasActive,
+                hasActive ? active.Id.Value : null);
             view.SetResearchStartInteractable(CanStartSelectedResearch());
             view.SetResearchCancelInteractable(hasActive);
         }
@@ -724,8 +747,7 @@ namespace WasteCity.Graybox3D.Building
                 return "已完成";
             if (active != null && active.Id.Equals(definition.Id))
                 return "研究中";
-            if (DemoResearchCatalog.ReleaseState(definition.Id.Value) ==
-                DemoResearchReleaseState.PreviewOnly)
+            if (definition.ReleaseState == ResearchReleaseState.PreviewOnly)
             {
                 return "本阶段未开放（预览）";
             }
@@ -754,10 +776,9 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
             ResearchDefinition definition =
-                DemoResearchCatalog.Find(selectedResearchId);
+                ResearchCatalog.Find(selectedResearchId);
             if (definition == null ||
-                DemoResearchCatalog.ReleaseState(definition.Id.Value) !=
-                    DemoResearchReleaseState.Researchable ||
+                definition.ReleaseState != ResearchReleaseState.Researchable ||
                 research.IsCompleted(definition.Id.Value) ||
                 !PrerequisitesCompleted(definition))
             {
@@ -787,6 +808,29 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        private string LatestProgressionCandidateId()
+        {
+            ResearchDefinition selected = null;
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
+            {
+                if (definition.ReleaseState !=
+                        ResearchReleaseState.Researchable ||
+                    research.IsCompleted(definition.Id.Value) ||
+                    !PrerequisitesCompleted(definition))
+                {
+                    continue;
+                }
+                if (selected == null ||
+                    definition.LayoutRow > selected.LayoutRow ||
+                    definition.LayoutRow == selected.LayoutRow &&
+                    definition.CatalogOrder < selected.CatalogOrder)
+                {
+                    selected = definition;
+                }
+            }
+            return selected?.Id.Value;
+        }
+
         private string ResearchProgressText(ResearchDefinition active)
         {
             float duration = Mathf.Max(.001f, active.Duration);
@@ -798,7 +842,10 @@ namespace WasteCity.Graybox3D.Building
                     ? " · 缺少研究站，已暂停"
                     : string.Empty;
             int efficiency = Mathf.RoundToInt(
-                DemoResearchRuntime.SpeedMultiplier(city.Mode) * 100f);
+                FormalResearchRuntime.SpeedMultiplier(
+                    city.Mode,
+                    research.IsCompleted(
+                        ResearchCatalog.ThoughtAccelerationId)) * 100f);
             return Mathf.RoundToInt(normalized * 100f) + "% · 剩余 " +
                 research.Model.Remaining.ToString("0.0") +
                 " 秒 · 效率 " + efficiency + "%" + pausedReason;
@@ -816,7 +863,7 @@ namespace WasteCity.Graybox3D.Building
                 if (research.IsCompleted(id)) continue;
                 if (!string.IsNullOrEmpty(result)) result += "、";
                 ResearchDefinition prerequisite =
-                    DemoResearchCatalog.Find(id);
+                    ResearchCatalog.Find(id);
                 result += prerequisite?.Name ?? id;
             }
             return result;
@@ -875,8 +922,23 @@ namespace WasteCity.Graybox3D.Building
 
         private bool HasEligibleResearchStation()
         {
-            return session.CompletedBuildingCount(
-                BuildingCatalog.ResearchStation.Id.Value) > 0;
+            if (session?.Instances == null) return false;
+            for (var index = 0; index < session.Instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = session.Instances[index];
+                if (instance.State ==
+                        GrayboxBuildingInstanceState.Completed &&
+                    instance.IsPlayerOwned &&
+                    !instance.IsEvacuationLocked &&
+                    string.Equals(
+                        instance.Placement.Definition.Id.Value,
+                        BuildingCatalog.ResearchStation.Id.Value,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private int ActiveWarehouseCount()
@@ -901,14 +963,14 @@ namespace WasteCity.Graybox3D.Building
             {
                 return discoveredHudResources.Contains(resourceId) ||
                     amount > 0 || research.IsCompleted(
-                    DemoResearchCatalog.BasicMetallurgyId);
+                    ResearchCatalog.AutomatedMachineryId);
             }
             if (string.Equals(resourceId, ResourceIds.Ammunition,
                     StringComparison.Ordinal))
             {
                 return discoveredHudResources.Contains(resourceId) ||
                     amount > 0 || research.IsCompleted(
-                    DemoResearchCatalog.AmmunitionAssemblyId);
+                    ResearchCatalog.PrecisionAssemblyId);
             }
             return false;
         }
