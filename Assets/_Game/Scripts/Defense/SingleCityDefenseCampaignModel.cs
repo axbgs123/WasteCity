@@ -59,6 +59,48 @@ namespace WasteCity.Defense
             !string.IsNullOrWhiteSpace(StableId);
     }
 
+    public sealed class DefenseBuildingCombatTarget
+    {
+        public DefenseBuildingCombatTarget(
+            string stableId,
+            string buildingId,
+            float x,
+            float z,
+            bool isCompleted,
+            bool isPlayerOwned,
+            bool isDestroyed,
+            bool isEvacuationLocked,
+            bool isProduction)
+        {
+            StableId = stableId;
+            BuildingId = buildingId;
+            X = x;
+            Z = z;
+            IsCompleted = isCompleted;
+            IsPlayerOwned = isPlayerOwned;
+            IsDestroyed = isDestroyed;
+            IsEvacuationLocked = isEvacuationLocked;
+            IsProduction = isProduction;
+        }
+
+        public string StableId { get; }
+        public string BuildingId { get; }
+        public float X { get; }
+        public float Z { get; }
+        public bool IsCompleted { get; }
+        public bool IsPlayerOwned { get; }
+        public bool IsDestroyed { get; }
+        public bool IsEvacuationLocked { get; }
+        public bool IsProduction { get; }
+
+        public bool IsValidTarget =>
+            IsCompleted &&
+            IsPlayerOwned &&
+            !IsDestroyed &&
+            !IsEvacuationLocked &&
+            !string.IsNullOrWhiteSpace(StableId);
+    }
+
     public sealed class SingleCityDefenseEnemySnapshot
     {
         public SingleCityDefenseEnemySnapshot(
@@ -67,7 +109,8 @@ namespace WasteCity.Defense
             int spawnOrder,
             float x,
             float z,
-            int currentHealth)
+            int currentHealth,
+            string targetStableId = null)
         {
             StableId = stableId;
             EnemyDefinitionId = enemyDefinitionId;
@@ -75,6 +118,7 @@ namespace WasteCity.Defense
             X = x;
             Z = z;
             CurrentHealth = Math.Max(0, currentHealth);
+            TargetStableId = targetStableId;
         }
 
         public string StableId { get; }
@@ -83,6 +127,7 @@ namespace WasteCity.Defense
         public float X { get; }
         public float Z { get; }
         public int CurrentHealth { get; }
+        public string TargetStableId { get; }
     }
 
     public sealed class SingleCityDefenseCampaignStatisticsSnapshot
@@ -273,6 +318,35 @@ namespace WasteCity.Defense
 
         public void Advance(float unscaledDeltaSeconds, int requestedSpeed)
         {
+            AdvanceInternal(
+                unscaledDeltaSeconds,
+                requestedSpeed,
+                buildingTargetProvider: null,
+                applyBuildingDamage: null,
+                advanceEnemyCombat: false);
+        }
+
+        public void Advance(
+            float unscaledDeltaSeconds,
+            int requestedSpeed,
+            Func<DefenseBuildingCombatTarget[]> buildingTargetProvider,
+            Func<string, string, int, int> applyBuildingDamage)
+        {
+            AdvanceInternal(
+                unscaledDeltaSeconds,
+                requestedSpeed,
+                buildingTargetProvider,
+                applyBuildingDamage,
+                advanceEnemyCombat: true);
+        }
+
+        private void AdvanceInternal(
+            float unscaledDeltaSeconds,
+            int requestedSpeed,
+            Func<DefenseBuildingCombatTarget[]> buildingTargetProvider,
+            Func<string, string, int, int> applyBuildingDamage,
+            bool advanceEnemyCombat)
+        {
             if (!campaignTriggered ||
                 IsTerminal ||
                 unscaledDeltaSeconds <= 0f)
@@ -291,7 +365,11 @@ namespace WasteCity.Defense
                 fixedStepAccumulatorSeconds -= FixedStepSeconds;
                 if (fixedStepAccumulatorSeconds < 0d)
                     fixedStepAccumulatorSeconds = 0d;
-                Step(FormalFixedStepSeconds);
+                Step(
+                    FormalFixedStepSeconds,
+                    buildingTargetProvider,
+                    applyBuildingDamage,
+                    advanceEnemyCombat);
                 if (IsTerminal)
                 {
                     fixedStepAccumulatorSeconds = 0d;
@@ -510,7 +588,11 @@ namespace WasteCity.Defense
             return SingleCityDefenseCampaignResult.None;
         }
 
-        private void Step(float deltaSeconds)
+        private void Step(
+            float deltaSeconds,
+            Func<DefenseBuildingCombatTarget[]> buildingTargetProvider,
+            Func<string, string, int, int> applyBuildingDamage,
+            bool advanceEnemyCombat)
         {
             elapsedRuleSeconds += deltaSeconds;
             if (phase == SingleCityDefenseCampaignPhase.Warning)
@@ -530,9 +612,234 @@ namespace WasteCity.Defense
             }
 
             if (phase == SingleCityDefenseCampaignPhase.SpawningAndCombat)
-                Spawn(deltaSeconds);
-            else if (phase == SingleCityDefenseCampaignPhase.CombatCleanup)
+            {
+                if (advanceEnemyCombat && !IsTerminal)
+                {
+                    StepEnemyCombat(
+                        deltaSeconds,
+                        buildingTargetProvider,
+                        applyBuildingDamage);
+                }
+                if (!IsTerminal)
+                    Spawn(deltaSeconds);
+            }
+            else if (phase == SingleCityDefenseCampaignPhase.CombatCleanup &&
+                     advanceEnemyCombat && !IsTerminal)
+            {
+                StepEnemyCombat(
+                    deltaSeconds,
+                    buildingTargetProvider,
+                    applyBuildingDamage);
+            }
+            if (!IsTerminal &&
+                phase == SingleCityDefenseCampaignPhase.CombatCleanup)
+            {
                 TryCompleteWave();
+            }
+        }
+
+        private void StepEnemyCombat(
+            float deltaSeconds,
+            Func<DefenseBuildingCombatTarget[]> buildingTargetProvider,
+            Func<string, string, int, int> applyBuildingDamage)
+        {
+            if (deltaSeconds <= 0f || AliveEnemyCount == 0) return;
+            DefenseBuildingCombatTarget[] buildingTargets =
+                applyBuildingDamage != null && HasBuildingSeekingEnemy()
+                    ? buildingTargetProvider?.Invoke() ??
+                        Array.Empty<DefenseBuildingCombatTarget>()
+                    : Array.Empty<DefenseBuildingCombatTarget>();
+            enemies.Sort(EnemyStateProcessingComparer.Instance);
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                if (IsTerminal) return;
+                EnemyState enemy = enemies[index];
+                if (enemy.CurrentHealth <= 0) continue;
+
+                string targetStableId = ResolveEnemyCombatTarget(
+                    enemy,
+                    buildingTargets,
+                    applyBuildingDamage != null);
+                ResolveEnemyTargetPosition(
+                    targetStableId,
+                    buildingTargets,
+                    out float targetX,
+                    out float targetZ,
+                    out DefenseBuildingCombatTarget buildingTarget);
+                enemy.TargetStableId = buildingTarget == null
+                    ? CityCoreTargetId
+                    : buildingTarget.StableId;
+
+                if (!MoveEnemyIntoRange(
+                        enemy,
+                        targetX,
+                        targetZ,
+                        deltaSeconds))
+                {
+                    continue;
+                }
+
+                float attackDamageRemainder =
+                    enemy.AttackDamageRemainder +
+                    enemy.Definition.DamagePerSecond * deltaSeconds;
+                int rawDamage = WholeDamage(ref attackDamageRemainder);
+                enemy.AttackDamageRemainder = attackDamageRemainder;
+                if (rawDamage <= 0) continue;
+                if (buildingTarget == null)
+                {
+                    ApplyCoreDamage(rawDamage);
+                }
+                else
+                {
+                    applyBuildingDamage?.Invoke(
+                        enemy.StableId,
+                        buildingTarget.StableId,
+                        rawDamage);
+                }
+            }
+        }
+
+        private bool HasBuildingSeekingEnemy()
+        {
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                EnemyState enemy = enemies[index];
+                if (enemy.CurrentHealth > 0 &&
+                    enemy.Definition.TargetPriority !=
+                        EnemyTargetPriority.Core)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private string ResolveEnemyCombatTarget(
+            EnemyState enemy,
+            DefenseBuildingCombatTarget[] buildingTargets,
+            bool canDamageBuildings)
+        {
+            if (enemy.Definition.TargetPriority == EnemyTargetPriority.Core ||
+                !canDamageBuildings)
+            {
+                return CityCoreTargetId;
+            }
+
+            DefenseBuildingCombatTarget locked = FindBuildingCombatTarget(
+                enemy.TargetStableId,
+                buildingTargets);
+            if (MatchesPriority(enemy.Definition.TargetPriority, locked))
+                return locked.StableId;
+
+            DefenseBuildingCombatTarget selected = null;
+            float selectedDistanceSquared = float.MaxValue;
+            for (var index = 0;
+                 index < (buildingTargets?.Length ?? 0);
+                 index++)
+            {
+                DefenseBuildingCombatTarget target = buildingTargets[index];
+                if (!MatchesPriority(
+                        enemy.Definition.TargetPriority,
+                        target))
+                {
+                    continue;
+                }
+                float distanceSquared = DistanceSquared(
+                    enemy.X,
+                    enemy.Z,
+                    target.X,
+                    target.Z);
+                if (selected == null ||
+                    distanceSquared < selectedDistanceSquared ||
+                    distanceSquared == selectedDistanceSquared &&
+                    string.CompareOrdinal(
+                        target.StableId,
+                        selected.StableId) < 0)
+                {
+                    selected = target;
+                    selectedDistanceSquared = distanceSquared;
+                }
+            }
+            return selected == null ? CityCoreTargetId : selected.StableId;
+        }
+
+        private void ResolveEnemyTargetPosition(
+            string targetStableId,
+            DefenseBuildingCombatTarget[] buildingTargets,
+            out float targetX,
+            out float targetZ,
+            out DefenseBuildingCombatTarget buildingTarget)
+        {
+            buildingTarget = string.Equals(
+                targetStableId,
+                CityCoreTargetId,
+                StringComparison.Ordinal)
+                ? null
+                : FindBuildingCombatTarget(
+                    targetStableId,
+                    buildingTargets);
+            targetX = buildingTarget == null ? coreX : buildingTarget.X;
+            targetZ = buildingTarget == null ? coreZ : buildingTarget.Z;
+        }
+
+        private static DefenseBuildingCombatTarget FindBuildingCombatTarget(
+            string stableId,
+            DefenseBuildingCombatTarget[] buildingTargets)
+        {
+            if (string.IsNullOrWhiteSpace(stableId) ||
+                buildingTargets == null)
+            {
+                return null;
+            }
+            for (var index = 0; index < buildingTargets.Length; index++)
+            {
+                DefenseBuildingCombatTarget target = buildingTargets[index];
+                if (target != null && target.IsValidTarget && string.Equals(
+                        target.StableId,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    return target;
+                }
+            }
+            return null;
+        }
+
+        private static bool MoveEnemyIntoRange(
+            EnemyState enemy,
+            float targetX,
+            float targetZ,
+            float deltaSeconds)
+        {
+            float offsetX = targetX - enemy.X;
+            float offsetZ = targetZ - enemy.Z;
+            float distance = (float)Math.Sqrt(
+                offsetX * offsetX + offsetZ * offsetZ);
+            float attackRange = Math.Max(0f, enemy.Definition.AttackRange);
+            float availableDistance = Math.Max(0f, distance - attackRange);
+            if (availableDistance > 0f && distance > 0f)
+            {
+                float moved = Math.Min(
+                    availableDistance,
+                    enemy.Definition.MoveSpeed * deltaSeconds);
+                enemy.X += offsetX / distance * moved;
+                enemy.Z += offsetZ / distance * moved;
+                return false;
+            }
+            return distance <= attackRange + (float)StepEpsilon;
+        }
+
+        private static int WholeDamage(ref float remainder)
+        {
+            int whole = (int)remainder;
+            float fraction = remainder - whole;
+            if (fraction > 0f && 1f - fraction <= .00001f)
+            {
+                whole++;
+                fraction = 0f;
+            }
+            remainder = fraction;
+            return whole;
         }
 
         private void Spawn(double deltaSeconds)
@@ -718,7 +1025,8 @@ namespace WasteCity.Defense
                     enemy.SpawnOrder,
                     enemy.X,
                     enemy.Z,
-                    enemy.CurrentHealth));
+                    enemy.CurrentHealth,
+                    enemy.TargetStableId));
             }
 
             return new SingleCityDefenseCampaignSnapshot(
@@ -776,6 +1084,22 @@ namespace WasteCity.Defense
         private static bool MatchesPriority(
             EnemyTargetPriority priority,
             DefenseBuildingTargetCandidate candidate)
+        {
+            if (candidate == null || !candidate.IsValidTarget) return false;
+            if (priority == EnemyTargetPriority.Walls)
+            {
+                return string.Equals(
+                    candidate.BuildingId,
+                    BuildingCatalog.Wall.Id.Value,
+                    StringComparison.Ordinal);
+            }
+            return priority == EnemyTargetPriority.Production &&
+                candidate.IsProduction;
+        }
+
+        private static bool MatchesPriority(
+            EnemyTargetPriority priority,
+            DefenseBuildingCombatTarget candidate)
         {
             if (candidate == null || !candidate.IsValidTarget) return false;
             if (priority == EnemyTargetPriority.Walls)
@@ -890,9 +1214,29 @@ namespace WasteCity.Defense
             public string StableId { get; }
             public EnemyDefinition Definition { get; }
             public int SpawnOrder { get; }
-            public float X { get; }
-            public float Z { get; }
+            public float X { get; set; }
+            public float Z { get; set; }
             public int CurrentHealth { get; set; }
+            public float AttackDamageRemainder { get; set; }
+            public string TargetStableId { get; set; }
+        }
+
+        private sealed class EnemyStateProcessingComparer :
+            IComparer<EnemyState>
+        {
+            public static readonly EnemyStateProcessingComparer Instance =
+                new EnemyStateProcessingComparer();
+
+            public int Compare(EnemyState left, EnemyState right)
+            {
+                if (ReferenceEquals(left, right)) return 0;
+                if (left == null) return 1;
+                if (right == null) return -1;
+                int spawnOrder = left.SpawnOrder.CompareTo(right.SpawnOrder);
+                return spawnOrder != 0
+                    ? spawnOrder
+                    : string.CompareOrdinal(left.StableId, right.StableId);
+            }
         }
 
         private readonly struct SpawnDefinition
