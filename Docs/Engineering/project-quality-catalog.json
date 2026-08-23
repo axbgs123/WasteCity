@@ -293,6 +293,7 @@
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
         "Assets/_Game/Tests/EditMode/ProductionTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceInventoryChangeTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceShortfallRulesTests.cs",
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
@@ -307,7 +308,8 @@
         "IDEA-0012",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0016"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -331,6 +333,7 @@
       "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
@@ -345,7 +348,8 @@
         "IDEA-0011",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0016"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -497,7 +501,8 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0016"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1394,13 +1399,14 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。",
-      "BoundarySummary": "只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。",
+      "UseSummary": "提供 31 项正式资源的稳定标识、中文名称、路线层级、来源用途、发现规则、图标 ID、背景简介、显示尺寸与基础资源栏顺序。",
+      "BoundarySummary": "只定义资源身份与不可变静态配置；不保存库存数量，不执行转移、生产、发现状态或界面输入。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0016"
       ]
     },
     {
@@ -1440,13 +1446,15 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
-      "UseSummary": "统一提供三条机器配方和两条应急手工配方的稳定 ID、输入输出、周期、绑定节点动态产出与研究解锁条件。",
-      "BoundarySummary": "只定义正式配方静态配置并复用既有机器生产定义；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。",
+      "UseSummary": "统一提供 30 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。",
+      "BoundarySummary": "只定义正式配方静态配置并保留旧三机器定义的兼容投影；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs"
+        "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
+        "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0011"
+        "IDEA-0011",
+        "IDEA-0016"
       ]
     },
     {
@@ -1816,13 +1824,15 @@
       "BoundarySummary": "未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0011",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0016"
       ]
     },
     {
@@ -2038,7 +2048,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0016"
       ]
     },
     {

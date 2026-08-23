@@ -96,11 +96,11 @@ namespace WasteCity.Tests
                 ResearchCatalog.Find(AmmunitionAssembly);
             Assert.That(longAssembly.Name, Is.EqualTo("精密装配"));
             Assert.That(longAssembly.CostId, Is.EqualTo(ResourceIds.Alloy));
-            Assert.That(longAssembly.Cost, Is.EqualTo(20));
-            Assert.That(longAssembly.Duration, Is.EqualTo(40f));
+            Assert.That(longAssembly.Cost, Is.EqualTo(10));
+            Assert.That(longAssembly.Duration, Is.EqualTo(30f));
             AssertCosts(
                 longAssembly.Costs,
-                new ResourceAmount(ResourceIds.Alloy, 20));
+                new ResourceAmount(ResourceIds.Alloy, 10));
         }
 
         [Test]
@@ -542,6 +542,7 @@ namespace WasteCity.Tests
             var city = new ResourceInventory(500);
             var capacity = new ResourceCapacityPolicy();
             city.Add(ResourceIds.Water, 10);
+            city.Add(ResourceIds.EnergyCrystal, 8);
             ResearchDefinition longCatalogResearch =
                 ResearchCatalog.Find("core.research.mind-resonance");
             Assert.That(model.Start(longCatalogResearch, city), Is.True);
@@ -555,7 +556,8 @@ namespace WasteCity.Tests
             Assert.That(runtime.TryCancel(city, capacity, 0), Is.False);
             Assert.That(model.Active, Is.SameAs(longCatalogResearch));
             Assert.That(model.Remaining, Is.EqualTo(remaining));
-            Assert.That(city.Get(ResourceIds.Water), Is.Zero);
+            Assert.That(city.Get(ResourceIds.Water), Is.EqualTo(4));
+            Assert.That(city.Get(ResourceIds.EnergyCrystal), Is.Zero);
 
             model = new ResearchModel();
             model.Restore(

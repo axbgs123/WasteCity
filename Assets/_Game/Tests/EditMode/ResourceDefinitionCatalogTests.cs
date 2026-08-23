@@ -231,6 +231,50 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void SourceMetadataSeparatesWorldEntryInitialInventoryAndFusionProduction()
+        {
+            ResourceDefinitionCatalog.TryGet(
+                ResourceIds.Biomass,
+                out ResourceDefinition biomass);
+            ResourceDefinitionCatalog.TryGet(
+                ResourceIds.Water,
+                out ResourceDefinition water);
+            ResourceDefinitionCatalog.TryGet(
+                ResourceIds.SpiritPlantExtract,
+                out ResourceDefinition spiritPlantExtract);
+            ResourceDefinitionCatalog.TryGet(
+                ResourceIds.HybridCore,
+                out ResourceDefinition hybridCore);
+
+            Assert.That(biomass.SourceKinds,
+                Does.Contain(ResourceSourceKind.InitialInventory));
+            Assert.That(
+                water.SourceKinds.Contains(ResourceSourceKind.InitialInventory),
+                Is.False);
+            Assert.That(spiritPlantExtract.SourceKinds,
+                Does.Contain(ResourceSourceKind.FusionProduction));
+            Assert.That(hybridCore.SourceKinds,
+                Does.Contain(ResourceSourceKind.FusionProduction));
+        }
+
+        [Test]
+        public void SpiritPlantExtractDiscoveryUsesBothDirectRouteRequirements()
+        {
+            Assert.That(ResourceDefinitionCatalog.TryGet(
+                ResourceIds.SpiritPlantExtract,
+                out ResourceDefinition definition), Is.True);
+            Assert.That(definition.DiscoveryRule,
+                Is.EqualTo(ResourceDiscoveryRule.OwnedOrAllRequirements));
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "core.research.artifact-crafting",
+                    "core.research.bio-cultivation"
+                },
+                definition.RequiredResearchIds);
+        }
+
         [TestCase(null)]
         [TestCase("")]
         [TestCase("   ")]

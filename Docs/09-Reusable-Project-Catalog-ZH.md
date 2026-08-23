@@ -174,7 +174,7 @@
 
 ### 正式资源定义目录（推荐复用）
 
-能解决什么：集中提供 15 种正式资源的稳定 ID、中文名称、显示顺序、单格栈上限、图标回退键和正式 3D 初始城市数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`。怎么复用：提供全部正式资源的稳定标识、中文名称、堆叠上限与基础资源栏顺序。资源 UI、背包和正式 3D 会话接入时统一从目录读取定义；正式城市底层账本通过 `CreateFormalCityInventory` 创建。不能负责什么：只定义资源身份与静态配置；不保存库存数量，不执行转移、生产或界面输入。工厂返回的是允许保留超额数量的 backing ledger，不代表城市拥有无限有效容量；正式 3D 入库与读取必须经过 `CityResourceStorageModel`。改后跑哪组测试：`ResourceDefinitionCatalogTests`。代码名：`ResourceDefinition`、`ResourceDefinitionCatalog`。
+能解决什么：集中提供 31 种正式资源的稳定 ID、路线层级、来源用途、发现规则、图标与正式 3D 初始城市数量。在哪里：`Assets/_Game/Scripts/Economy/ResourceDefinitionCatalog.cs`。怎么复用：提供 31 项正式资源的稳定标识、中文名称、路线层级、来源用途、发现规则、图标 ID、背景简介、显示尺寸与基础资源栏顺序。资源 UI、背包和正式 3D 会话接入时统一从目录读取定义；正式城市底层账本通过 `CreateFormalCityInventory` 创建。不能负责什么：只定义资源身份与不可变静态配置；不保存库存数量，不执行转移、生产、发现状态或界面输入。工厂返回的是允许保留超额数量的 backing ledger，不代表城市拥有无限有效容量；正式 3D 入库与读取必须经过 `CityResourceStorageModel`。改后跑哪组测试：`ResourceDefinitionCatalogTests`。代码名：`ResourceDefinition`、`ResourceDefinitionCatalog`。
 
 ### 资源库存（推荐复用）
 
@@ -206,7 +206,7 @@
 
 ### 正式资源配方目录（推荐复用）
 
-能解决什么：用一份正式目录统一三条机器配方与两条应急手工配方，避免 UI、生产和合成各自复制数值。在哪里：`Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`。怎么复用：统一提供三条机器配方和两条应急手工配方的稳定 ID、输入输出、周期、绑定节点动态产出与研究解锁条件。机器条目继续从正式机器生产定义投影；科技树和合成 UI 只引用稳定配方 ID。不能负责什么：只定义正式配方静态配置并复用既有机器生产定义；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。改后跑哪组测试：`CraftingQueueModelTests`。代码名：`ResourceRecipeDefinition`、`ResourceRecipeCatalog`。
+能解决什么：用一份正式目录统一 30 条机器、应急与融合配方，避免 UI、生产和合成各自复制数值。在哪里：`Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`。怎么复用：统一提供 30 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。科技树和合成 UI 只引用稳定配方 ID。不能负责什么：只定义正式配方静态配置并保留旧三机器定义的兼容投影；不拥有队列、背包、建筑缓存或进度，也不执行资源事务、自动串联或 UI 手势。改后跑哪组测试：`CraftingQueueModelTests`、`ResourceRecipeCatalogIntegrityTests`。代码名：`ResourceRecipeDefinition`、`ResourceRecipeCatalog`。
 
 ### 应急合成队列（推荐复用）
 
@@ -250,7 +250,7 @@
 
 ### 研究模型（推荐复用）
 
-能解决什么：管理研究状态，并在 schema 31 恢复时区分已知科技与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。
+能解决什么：管理研究状态，并在 schema 31 恢复时区分正式科技、退役兼容内容与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`FormalResearchCatalogTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。
 
 ### 三维首版科技目录（推荐复用）
 

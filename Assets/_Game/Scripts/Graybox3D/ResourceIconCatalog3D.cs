@@ -45,7 +45,23 @@ namespace WasteCity.Graybox3D
             new Color32(202, 73, 92, 255),
             new Color32(111, 135, 223, 255),
             new Color32(219, 102, 216, 255),
-            new Color32(238, 160, 83, 255)
+            new Color32(238, 160, 83, 255),
+            new Color32(176, 170, 158, 255),
+            new Color32(72, 198, 214, 255),
+            new Color32(76, 82, 92, 255),
+            new Color32(242, 196, 64, 255),
+            new Color32(198, 132, 72, 255),
+            new Color32(60, 184, 171, 255),
+            new Color32(82, 154, 235, 255),
+            new Color32(82, 221, 171, 255),
+            new Color32(225, 188, 70, 255),
+            new Color32(70, 202, 112, 255),
+            new Color32(211, 83, 142, 255),
+            new Color32(151, 207, 65, 255),
+            new Color32(137, 104, 221, 255),
+            new Color32(173, 91, 232, 255),
+            new Color32(62, 210, 180, 255),
+            new Color32(223, 218, 201, 255)
         };
 
         private static readonly string[] FallbackShapeKeys =
@@ -64,7 +80,23 @@ namespace WasteCity.Graybox3D
             "biological-spore",
             "resonance-rings",
             "psionic-amplifier",
-            "elixir-capsule"
+            "elixir-capsule",
+            "refined-stone",
+            "coolant-canister",
+            "carbon-weave",
+            "energy-cell",
+            "mechanical-component",
+            "control-chip",
+            "superconductive-coil",
+            "spirit-stone",
+            "formation-core",
+            "active-biomass",
+            "mutant-gene",
+            "acid-gland",
+            "consciousness-shard",
+            "psionic-crystal",
+            "spirit-plant-extract",
+            "hybrid-core"
         };
 
         private static readonly Dictionary<string, int> IndexByResourceId =

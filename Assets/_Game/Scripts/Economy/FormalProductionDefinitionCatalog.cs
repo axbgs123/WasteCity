@@ -7,13 +7,25 @@ namespace WasteCity.Economy
 {
     public sealed class FormalProductionDefinition
     {
+        private readonly int legacyOutputAmount;
+
         public string Id { get; }
         public string BuildingId { get; }
         public float DurationSeconds { get; }
-        public string InputResourceId { get; }
-        public int InputAmount { get; }
-        public string OutputResourceId { get; }
-        public int OutputAmount { get; }
+        public ReadOnlyCollection<ResourceAmount> Inputs { get; }
+        public ReadOnlyCollection<ResourceAmount> Outputs { get; }
+        public string InputResourceId => Inputs.Count == 0
+            ? null
+            : Inputs[0].ResourceId;
+        public int InputAmount => Inputs.Count == 0
+            ? 0
+            : Inputs[0].Amount;
+        public string OutputResourceId => Outputs.Count == 0
+            ? null
+            : Outputs[0].ResourceId;
+        public int OutputAmount => Outputs.Count == 0
+            ? legacyOutputAmount
+            : Outputs[0].Amount;
         public int InputCapacity { get; }
         public int OutputCapacity { get; }
         public bool UsesBoundResourceNode { get; }
@@ -29,17 +41,55 @@ namespace WasteCity.Economy
             int inputCapacity,
             int outputCapacity,
             bool usesBoundResourceNode)
+            : this(
+                id,
+                buildingId,
+                durationSeconds,
+                string.IsNullOrWhiteSpace(inputResourceId) || inputAmount <= 0
+                    ? Array.Empty<ResourceAmount>()
+                    : new[] { new ResourceAmount(inputResourceId, inputAmount) },
+                string.IsNullOrWhiteSpace(outputResourceId) || outputAmount <= 0
+                    ? Array.Empty<ResourceAmount>()
+                    : new[] { new ResourceAmount(outputResourceId, outputAmount) },
+                inputCapacity,
+                outputCapacity,
+                usesBoundResourceNode)
+        {
+            legacyOutputAmount = Math.Max(0, outputAmount);
+        }
+
+        internal FormalProductionDefinition(
+            string id,
+            string buildingId,
+            float durationSeconds,
+            IReadOnlyList<ResourceAmount> inputs,
+            IReadOnlyList<ResourceAmount> outputs,
+            int inputCapacity,
+            int outputCapacity,
+            bool usesBoundResourceNode)
         {
             Id = id;
             BuildingId = buildingId;
             DurationSeconds = durationSeconds;
-            InputResourceId = inputResourceId;
-            InputAmount = inputAmount;
-            OutputResourceId = outputResourceId;
-            OutputAmount = outputAmount;
+            Inputs = Snapshot(inputs);
+            Outputs = Snapshot(outputs);
             InputCapacity = inputCapacity;
             OutputCapacity = outputCapacity;
             UsesBoundResourceNode = usesBoundResourceNode;
+            legacyOutputAmount = 0;
+        }
+
+        private static ReadOnlyCollection<ResourceAmount> Snapshot(
+            IReadOnlyList<ResourceAmount> values)
+        {
+            var snapshot = new List<ResourceAmount>();
+            if (values != null)
+            {
+                for (int index = 0; index < values.Count; index++)
+                    snapshot.Add(values[index]);
+            }
+
+            return new ReadOnlyCollection<ResourceAmount>(snapshot);
         }
     }
 

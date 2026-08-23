@@ -60,6 +60,8 @@ namespace WasteCity.Tests
             Assert.That(extraction.Outputs, Is.Empty);
             Assert.That(extraction.UsesBoundResourceNode, Is.True);
             Assert.That(extraction.BoundResourceNodeOutputAmount, Is.EqualTo(1));
+            Assert.That(extraction.RequiredResearchId,
+                Is.EqualTo(DemoResearchCatalog.ScrapProcessingId));
 
             Assert.That(ResourceRecipeCatalog.TryGet(
                 FormalProductionDefinitionCatalog.Smelting.Id,
@@ -69,7 +71,7 @@ namespace WasteCity.Tests
             AssertRecipe(
                 smelting,
                 FormalProductionDefinitionCatalog.Smelting.Id,
-                requiredResearchId: null,
+                DemoResearchCatalog.BasicMetallurgyId,
                 ResourceIds.Iron,
                 2,
                 ResourceIds.Alloy,
@@ -84,7 +86,7 @@ namespace WasteCity.Tests
             AssertRecipe(
                 assembly,
                 FormalProductionDefinitionCatalog.Assembly.Id,
-                requiredResearchId: null,
+                DemoResearchCatalog.AmmunitionAssemblyId,
                 ResourceIds.Alloy,
                 2,
                 ResourceIds.Ammunition,

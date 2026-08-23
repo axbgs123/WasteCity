@@ -7,7 +7,24 @@ using WasteCity.Economy;
 
 namespace WasteCity.Research
 {
-    public enum DevelopmentRoute { Technology, Cultivation, BiologicalAscension, Psionics }
+    public enum DevelopmentRoute
+    {
+        Technology = 0,
+        Cultivation = 1,
+        BiologicalAscension = 2,
+        Biological = BiologicalAscension,
+        Psionics = 3,
+        Common = 4,
+        Bridge = 5,
+    }
+
+    public enum ResearchReleaseState
+    {
+        InitiallyCompleted,
+        Researchable,
+        PreviewOnly,
+        RetiredCompatibility,
+    }
     public static class CollectiveConsciousnessRules
     {
         public const float SharedProgressRatio = .2f;
@@ -28,6 +45,13 @@ namespace WasteCity.Research
         public IReadOnlyList<string> RequiredResearchIds { get; }
         public int Tier { get; }
         public string EffectSummary { get; }
+        public int CatalogOrder { get; }
+        public int LayoutRow { get; }
+        public string NameKey { get; }
+        public string BriefKey { get; }
+        public string IconId { get; }
+        public ResearchReleaseState ReleaseState { get; }
+        public IReadOnlyList<string> EffectReferences { get; }
         public ResearchDefinition(
             string id,
             string name,
@@ -114,7 +138,7 @@ namespace WasteCity.Research
             Cost = Costs.Count == 0 ? 0 : Costs[0].Amount;
             Duration = Math.Max(minimumDuration, duration);
             RequiredResearchId = requiredResearchId;
-            Tier = Math.Max(1, Math.Min(3, tier));
+            Tier = Math.Max(0, Math.Min(3, tier));
             EffectSummary = effectSummary ?? "规则效果待运行系统接入";
             var requirements = new List<string>();
             if (!string.IsNullOrEmpty(requiredResearchId))
@@ -126,64 +150,476 @@ namespace WasteCity.Research
             }
             RequiredResearchIds =
                 new ReadOnlyCollection<string>(requirements);
+            CatalogOrder = -1;
+            LayoutRow = Tier;
+            NameKey = id + ".name";
+            BriefKey = id + ".brief";
+            IconId = ResearchIconId(id);
+            ReleaseState = ResearchReleaseState.Researchable;
+            EffectReferences = Array.AsReadOnly(Array.Empty<string>());
+        }
+
+        internal ResearchDefinition(
+            string id,
+            string name,
+            DevelopmentRoute route,
+            IReadOnlyList<ResourceAmount> costs,
+            float duration,
+            IReadOnlyList<string> requiredResearchIds,
+            int tier,
+            string effectSummary,
+            int catalogOrder,
+            int layoutRow,
+            ResearchReleaseState releaseState,
+            IReadOnlyList<string> effectReferences)
+            : this(
+                id,
+                name,
+                route,
+                costs,
+                duration,
+                requiredResearchId: null,
+                tier,
+                effectSummary,
+                minimumDuration: 0f,
+                Array.Empty<string>())
+        {
+            var requirements = SnapshotStrings(requiredResearchIds);
+            RequiredResearchId = requirements.Count == 0
+                ? null
+                : requirements[0];
+            RequiredResearchIds = requirements;
+            CatalogOrder = catalogOrder;
+            LayoutRow = Math.Max(0, Math.Min(4, layoutRow));
+            NameKey = id + ".name";
+            BriefKey = id + ".brief";
+            IconId = ResearchIconId(id);
+            ReleaseState = releaseState;
+            EffectReferences = SnapshotStrings(effectReferences);
+        }
+
+        private static ReadOnlyCollection<string> SnapshotStrings(
+            IReadOnlyList<string> values)
+        {
+            var snapshot = new List<string>();
+            if (values != null)
+            {
+                for (var index = 0; index < values.Count; index++)
+                {
+                    if (!string.IsNullOrWhiteSpace(values[index]))
+                        snapshot.Add(values[index]);
+                }
+            }
+            return new ReadOnlyCollection<string>(snapshot);
+        }
+
+        private static string ResearchIconId(string id)
+        {
+            const string prefix = "core.research.";
+            return "art.icon.research." +
+                (id != null && id.StartsWith(prefix, StringComparison.Ordinal)
+                    ? id.Substring(prefix.Length)
+                    : id);
         }
     }
+
     public static class ResearchCatalog
     {
-        private static ResearchDefinition Node(string id,string name,DevelopmentRoute route,int tier,string costId,int cost,float duration,string effect,string required=null,params string[] additional)=>new ResearchDefinition(id,name,route,costId,cost,duration,required,tier,effect,additional);
+        private const string ScrapProcessingId =
+            "core.research.scrap-processing";
+
+        private static readonly ResearchDefinition retiredLegacyAnalysis =
+            new ResearchDefinition(
+                "core.research.legacy-analysis",
+                "遗产解析",
+                DevelopmentRoute.Technology,
+                Costs(
+                    Cost(ResourceIds.Alloy, 30),
+                    Cost(ResourceIds.Biomass, 20)),
+                60f,
+                Req("core.research.automated-defense"),
+                2,
+                "满足首循环文明升阶条件",
+                -1,
+                2,
+                ResearchReleaseState.RetiredCompatibility,
+                Effects("progression:core.progression.legacy-analysis"));
+
         public static readonly ResearchDefinition[] All =
         {
-            Node("core.research.automated-machinery","基础冶金",DevelopmentRoute.Technology,1,ResourceIds.Iron,10,20,"解锁冶炼厂"),
-            Node("core.research.spirit-sensing","灵火淬炼",DevelopmentRoute.Cultivation,1,ResourceIds.EnergyCrystal,10,20,"解锁灵火炉"),
-            Node("core.research.adaptive-tissue","菌落培养",DevelopmentRoute.BiologicalAscension,1,ResourceIds.Biomass,10,20,"解锁菌落池"),
-            Node("core.research.mind-resonance","意识共振",DevelopmentRoute.Psionics,1,ResourceIds.Water,10,20,"解锁共振炉"),
-            Node("core.research.legacy-analysis","遗产解析",DevelopmentRoute.Technology,2,ResourceIds.Alloy,30,60,"满足首循环文明升阶条件","core.research.automated-machinery"),
+            Node(0, ScrapProcessingId, "废料加工", DevelopmentRoute.Common,
+                0, 0, ResearchReleaseState.InitiallyCompleted, Costs(), 0f,
+                "解锁基础城市与采集建筑", Req(),
+                "building:core.building.mining-station",
+                "building:core.building.research-station",
+                "building:core.building.housing",
+                "building:core.building.warehouse",
+                "building:core.building.wall"),
 
-            Node("core.research.precision-assembly","精密装配",DevelopmentRoute.Technology,2,ResourceIds.Alloy,20,40,"解锁装配厂、弹药量产","core.research.automated-machinery"),
-            Node("core.research.automated-defense","自动防御架构",DevelopmentRoute.Technology,2,ResourceIds.Alloy,20,40,"解锁机枪塔","core.research.automated-machinery"),
-            Node("core.research.thermal-engineering","热能工程",DevelopmentRoute.Technology,2,ResourceIds.Iron,20,40,"解锁发电站、城墙升级","core.research.automated-machinery"),
-            Node("core.research.ballistics","弹道学",DevelopmentRoute.Technology,2,ResourceIds.Iron,20,40,"炮塔射程+20%、弹药伤害+15%","core.research.automated-machinery"),
-            Node("core.research.alloy-armor","合金装甲",DevelopmentRoute.Technology,3,ResourceIds.Alloy,35,60,"解锁重型机枪塔、建筑耐久+30%","core.research.precision-assembly"),
-            Node("core.research.unmanned-systems","无人系统",DevelopmentRoute.Technology,3,ResourceIds.Alloy,35,60,"解锁侦查无人机、自动维修机甲","core.research.automated-defense"),
-            Node("core.research.orbital-supply","轨道补给",DevelopmentRoute.Technology,3,ResourceIds.Alloy,35,60,"物流范围扩大至24格","core.research.thermal-engineering"),
-            Node("core.research.energy-weapons","能量武器",DevelopmentRoute.Technology,3,ResourceIds.EnergyCrystal,35,60,"解锁激光塔","core.research.ballistics"),
+            Node(1, "core.research.automated-machinery", "基础冶金",
+                DevelopmentRoute.Technology, 1, 1,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Iron, 10)), 20f, "解锁冶炼与应急合金",
+                Req(ScrapProcessingId),
+                "building:core.building.smelter",
+                "recipe:core.production.smelt-alloy",
+                "recipe:core.crafting.field-alloy"),
+            Node(2, "core.research.spirit-sensing", "灵火淬炼",
+                DevelopmentRoute.Cultivation, 1, 1,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.EnergyCrystal, 8), Cost(ResourceIds.Iron, 4)),
+                20f, "解锁灵火淬炼", Req(ScrapProcessingId),
+                "building:cultivation.building.spirit-fire-furnace",
+                "recipe:cultivation.production.refine-spirit-iron"),
+            Node(3, "core.research.adaptive-tissue", "菌落培养",
+                DevelopmentRoute.Biological, 1, 1,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Biomass, 10), Cost(ResourceIds.Water, 5)),
+                20f, "解锁基础菌落培养", Req(ScrapProcessingId),
+                "building:biological.building.colony-pool",
+                "recipe:biological.production.biomass-concentrate",
+                "recipe:biological.production.active-biomass",
+                "recipe:biological.production.bone-steel"),
+            Node(4, "core.research.mind-resonance", "意识共振",
+                DevelopmentRoute.Psionics, 1, 1,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.EnergyCrystal, 8), Cost(ResourceIds.Water, 6)),
+                20f, "解锁意识共振加工", Req(ScrapProcessingId),
+                "building:psionics.building.resonance-furnace",
+                "recipe:psionics.production.resonance-metal"),
 
-            Node("core.research.artifact-crafting","炼器基础",DevelopmentRoute.Cultivation,2,ResourceIds.EnergyCrystal,20,40,"解锁炼器坊、飞剑量产","core.research.spirit-sensing"),
-            Node("core.research.sword-array","剑阵初解",DevelopmentRoute.Cultivation,2,ResourceIds.EnergyCrystal,20,40,"解锁剑阵台","core.research.spirit-sensing"),
-            Node("core.research.spirit-gathering","聚灵术",DevelopmentRoute.Cultivation,2,ResourceIds.EnergyCrystal,20,40,"解锁聚灵阵","core.research.spirit-sensing"),
-            Node("core.research.talisman-basics","符箓入门",DevelopmentRoute.Cultivation,2,ResourceIds.Stone,20,40,"城墙附加基础防护符","core.research.spirit-sensing"),
-            Node("core.research.sword-riding","御剑术",DevelopmentRoute.Cultivation,3,ResourceIds.EnergyCrystal,35,60,"解锁御剑台、飞剑射程+30%","core.research.artifact-crafting"),
-            Node("core.research.alchemy","炼丹术",DevelopmentRoute.Cultivation,3,ResourceIds.Biomass,35,60,"解锁炼丹房","core.research.sword-array"),
-            Node("core.research.formation-reinforcement","阵法强化",DevelopmentRoute.Cultivation,3,ResourceIds.EnergyCrystal,35,60,"扩大物流区、聚灵产量+50%","core.research.spirit-gathering"),
-            Node("core.research.puppetry","傀儡术",DevelopmentRoute.Cultivation,3,ResourceIds.Alloy,35,60,"解锁傀儡工坊","core.research.talisman-basics"),
+            Node(5, "core.research.precision-assembly", "精密装配",
+                DevelopmentRoute.Technology, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Alloy, 10)), 30f, "解锁装配与应急弹药",
+                Req("core.research.automated-machinery"),
+                "building:core.building.assembler",
+                "recipe:core.production.assemble-ammunition",
+                "recipe:core.crafting.field-ammunition"),
+            Node(6, "core.research.automated-defense", "自动防御架构",
+                DevelopmentRoute.Technology, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Alloy, 12), Cost(ResourceIds.Biomass, 10)),
+                35f, "解锁机枪塔", Req("core.research.automated-machinery"),
+                "building:core.building.machine-gun-turret"),
+            Node(7, "core.research.thermal-engineering", "热能工程",
+                DevelopmentRoute.Technology, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Iron, 16), Cost(ResourceIds.Alloy, 8)),
+                40f, "解锁热能生产", Req("core.research.automated-machinery"),
+                "building:technology.building.power-plant",
+                "recipe:technology.production.energy-cell"),
+            Node(8, "core.research.ballistics", "弹道学",
+                DevelopmentRoute.Technology, 2, 2,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.Iron, 12), Cost(ResourceIds.Alloy, 10)),
+                40f, "弹道规则仅预览", Req("core.research.automated-machinery"),
+                "rule:core.effect.ballistics"),
 
-            Node("core.research.bio-cultivation","生物培育",DevelopmentRoute.BiologicalAscension,2,ResourceIds.Biomass,20,40,"解锁培育室、基础生物武器","core.research.adaptive-tissue"),
-            Node("core.research.spore-dispersal","孢子散布",DevelopmentRoute.BiologicalAscension,2,ResourceIds.Biomass,20,40,"解锁孢子塔","core.research.adaptive-tissue"),
-            Node("core.research.metabolic-acceleration","代谢加速",DevelopmentRoute.BiologicalAscension,2,ResourceIds.Biomass,20,40,"怪物尸体回收+50%","core.research.adaptive-tissue"),
-            Node("core.research.carapace-growth","甲壳增生",DevelopmentRoute.BiologicalAscension,2,ResourceIds.Biomass,20,40,"城墙消耗生物质缓慢再生","core.research.adaptive-tissue"),
-            Node("core.research.behemoth-breeding","巨兽培育",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,35,60,"解锁巨兽栏","core.research.bio-cultivation"),
-            Node("core.research.acid-spit","酸液喷吐",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,35,60,"解锁酸液塔","core.research.spore-dispersal"),
-            Node("core.research.tissue-regeneration","组织再生",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,35,60,"建筑与军队缓慢回血","core.research.metabolic-acceleration"),
-            Node("core.research.gene-splicing","基因剪接",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,35,60,"领袖临时生物特质","core.research.carapace-growth"),
+            Node(9, "core.research.artifact-crafting", "炼器基础",
+                DevelopmentRoute.Cultivation, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.SpiritIron, 12), Cost(ResourceIds.EnergyCrystal, 8)),
+                40f, "解锁法器生产", Req("core.research.spirit-sensing"),
+                "building:cultivation.building.artifact-workshop",
+                "recipe:cultivation.production.flying-sword"),
+            Node(10, "core.research.sword-array", "剑阵初解",
+                DevelopmentRoute.Cultivation, 2, 2,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.SpiritIron, 14), Cost(ResourceIds.FlyingSword, 2)),
+                40f, "剑阵建筑仅预览", Req("core.research.spirit-sensing"),
+                "building:cultivation.building.sword-array-tower"),
+            Node(11, "core.research.spirit-gathering", "聚灵术",
+                DevelopmentRoute.Cultivation, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.EnergyCrystal, 16), Cost(ResourceIds.Stone, 8)),
+                40f, "解锁聚灵生产", Req("core.research.spirit-sensing"),
+                "building:cultivation.building.spirit-gathering-array",
+                "recipe:cultivation.production.gather-spirit-stone"),
+            Node(12, "core.research.talisman-basics", "符箓入门",
+                DevelopmentRoute.Cultivation, 2, 2,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.SpiritIron, 8), Cost(ResourceIds.Stone, 12)),
+                40f, "城墙符箓仅预览", Req("core.research.spirit-sensing"),
+                "rule:core.effect.wall-talisman"),
 
-            Node("core.research.psionic-workshop","灵能工坊",DevelopmentRoute.Psionics,2,ResourceIds.Water,20,40,"解锁灵能工坊、增幅器量产","core.research.mind-resonance"),
-            Node("core.research.mind-spire","心灵尖塔",DevelopmentRoute.Psionics,2,ResourceIds.EnergyCrystal,20,40,"解锁心灵尖塔","core.research.mind-resonance"),
-            Node("core.research.consciousness-network","意识网络",DevelopmentRoute.Psionics,2,ResourceIds.Water,20,40,"远程通讯免费","core.research.mind-resonance"),
-            Node("core.research.thought-acceleration","思维加速",DevelopmentRoute.Psionics,2,ResourceIds.Water,20,40,"研究速度+25%","core.research.mind-resonance"),
-            Node("core.research.mind-shield","心灵护盾",DevelopmentRoute.Psionics,3,ResourceIds.EnergyCrystal,35,60,"解锁护盾发生器","core.research.psionic-workshop"),
-            Node("core.research.mind-control","精神操控",DevelopmentRoute.Psionics,3,ResourceIds.Water,35,60,"小概率控制普通怪物","core.research.mind-spire"),
-            Node("core.research.precognitive-sense","预知感应",DevelopmentRoute.Psionics,3,ResourceIds.Water,35,60,"波次预警提前50%","core.research.consciousness-network"),
-            Node("core.research.collective-consciousness","集体意识",DevelopmentRoute.Psionics,3,ResourceIds.Water,35,60,"多城市共享研究进度","core.research.thought-acceleration"),
+            Node(13, "core.research.bio-cultivation", "生物培育",
+                DevelopmentRoute.Biological, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.BoneSteel, 10),
+                    Cost(ResourceIds.BiomassConcentrate, 10)),
+                40f, "解锁生物武器生产", Req("core.research.adaptive-tissue"),
+                "building:biological.building.breeding-chamber",
+                "recipe:biological.production.weapon"),
+            Node(14, "core.research.spore-dispersal", "孢子散布",
+                DevelopmentRoute.Biological, 2, 2,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BiomassConcentrate, 16), Cost(ResourceIds.Water, 8)),
+                40f, "孢子塔仅预览", Req("core.research.adaptive-tissue"),
+                "building:biological.building.spore-tower"),
+            Node(15, "core.research.metabolic-acceleration", "代谢加速",
+                DevelopmentRoute.Biological, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Biomass, 16), Cost(ResourceIds.BoneSteel, 8)),
+                40f, "解锁代谢生产", Req("core.research.adaptive-tissue"),
+                "building:biological.building.metabolic-furnace",
+                "rule:biological.effect.corpse-recovery-150-percent"),
+            Node(16, "core.research.carapace-growth", "甲壳增生",
+                DevelopmentRoute.Biological, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.BoneSteel, 12), Cost(ResourceIds.Biomass, 14)),
+                40f, "解锁城墙甲壳再生", Req("core.research.adaptive-tissue"),
+                "rule:biological.effect.wall-carapace-regeneration"),
 
-            Node("core.research.bridge.psionic-mech","灵能机甲",DevelopmentRoute.Technology,3,ResourceIds.Alloy,50,90,"解锁灵能机甲厂","core.research.precision-assembly","core.research.psionic-workshop"),
-            Node("core.research.bridge.high-frequency-sword","高周波飞剑",DevelopmentRoute.Cultivation,3,ResourceIds.Alloy,50,90,"解锁飞剑铸造台","core.research.artifact-crafting","core.research.precision-assembly"),
-            Node("core.research.bridge.bio-hangar","生物机库",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,50,90,"解锁生物机库","core.research.bio-cultivation","core.research.precision-assembly"),
-            Node("core.research.bridge.spirit-plant","灵植培育",DevelopmentRoute.Cultivation,3,ResourceIds.Biomass,50,90,"解锁灵植园","core.research.artifact-crafting","core.research.bio-cultivation"),
-            Node("core.research.bridge.psionic-pulse","精神脉冲武器",DevelopmentRoute.Psionics,3,ResourceIds.EnergyCrystal,50,90,"解锁EMP塔","core.research.psionic-workshop","core.research.precision-assembly"),
-            Node("core.research.bridge.flesh-elixir","血肉灵丹",DevelopmentRoute.BiologicalAscension,3,ResourceIds.Biomass,50,90,"活性生物质炼丹","core.research.bio-cultivation","core.research.artifact-crafting")
+            Node(17, "core.research.psionic-workshop", "灵能工坊",
+                DevelopmentRoute.Psionics, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.ResonanceMetal, 12),
+                    Cost(ResourceIds.EnergyCrystal, 8)),
+                40f, "解锁灵能增幅器生产", Req("core.research.mind-resonance"),
+                "building:psionics.building.workshop",
+                "recipe:psionics.production.amplifier"),
+            Node(18, "core.research.mind-spire", "心灵尖塔",
+                DevelopmentRoute.Psionics, 2, 2,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.ResonanceMetal, 14),
+                    Cost(ResourceIds.PsionicAmplifier, 4)),
+                40f, "心灵尖塔仅预览", Req("core.research.mind-resonance"),
+                "building:psionics.building.mind-spire"),
+            Node(19, "core.research.consciousness-network", "意识网络",
+                DevelopmentRoute.Psionics, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.ResonanceMetal, 16), Cost(ResourceIds.Water, 10)),
+                40f, "解锁意识碎片生产", Req("core.research.mind-resonance"),
+                "building:psionics.building.consciousness-network",
+                "recipe:psionics.production.consciousness-shard"),
+            Node(20, "core.research.thought-acceleration", "思维加速",
+                DevelopmentRoute.Psionics, 2, 2,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.PsionicAmplifier, 8), Cost(ResourceIds.Water, 14)),
+                40f, "研究速度提高25%", Req("core.research.mind-resonance"),
+                "rule:psionics.effect.research-speed-125-percent"),
+
+            Node(21, "core.research.alloy-armor", "合金装甲",
+                DevelopmentRoute.Technology, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.Alloy, 24), Cost(ResourceIds.Stone, 8)),
+                60f, "合金装甲与重型塔仅预览",
+                Req("core.research.precision-assembly"),
+                "rule:core.effect.alloy-armor",
+                "building:core.building.heavy-machine-gun-turret"),
+            Node(22, "core.research.unmanned-systems", "无人系统",
+                DevelopmentRoute.Technology, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.Alloy, 24), Cost(ResourceIds.EnergyCrystal, 10)),
+                60f, "无人系统仅预览", Req("core.research.automated-defense"),
+                "building:core.building.automated-repair-bay",
+                "rule:core.effect.scout-drone"),
+            Node(23, "core.research.orbital-supply", "轨道补给",
+                DevelopmentRoute.Technology, 3, 3,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.Alloy, 30), Cost(ResourceIds.Ammunition, 15)),
+                75f, "物流范围扩大至24格", Req("core.research.thermal-engineering"),
+                "rule:core.effect.logistics-range-24"),
+            Node(24, "core.research.energy-weapons", "能量武器",
+                DevelopmentRoute.Technology, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.Alloy, 20), Cost(ResourceIds.EnergyCrystal, 20)),
+                75f, "能量武器仅预览", Req("core.research.ballistics"),
+                "building:core.building.laser-tower",
+                "rule:core.effect.technology-overload"),
+
+            Node(25, "core.research.sword-riding", "御剑术",
+                DevelopmentRoute.Cultivation, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.SpiritIron, 24), Cost(ResourceIds.FlyingSword, 8)),
+                60f, "御剑单位仅预览", Req("core.research.sword-array"),
+                "building:cultivation.building.sword-riding-platform",
+                "rule:core.effect.flying-sword-range"),
+            Node(26, "core.research.alchemy", "炼丹术",
+                DevelopmentRoute.Cultivation, 3, 3,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.SpiritIron, 16), Cost(ResourceIds.Biomass, 20)),
+                60f, "解锁丹药生产", Req("core.research.artifact-crafting"),
+                "building:cultivation.building.alchemy-chamber",
+                "recipe:cultivation.production.elixir"),
+            Node(27, "core.research.formation-reinforcement", "阵法强化",
+                DevelopmentRoute.Cultivation, 3, 3,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.EnergyCrystal, 24), Cost(ResourceIds.Stone, 16)),
+                60f, "强化物流范围与聚灵产量", Req("core.research.spirit-gathering"),
+                "rule:cultivation.effect.logistics-range-12",
+                "rule:cultivation.effect.spirit-output-150-percent"),
+            Node(28, "core.research.puppetry", "傀儡术",
+                DevelopmentRoute.Cultivation, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.SpiritIron, 20), Cost(ResourceIds.Alloy, 12)),
+                60f, "傀儡单位仅预览", Req("core.research.talisman-basics"),
+                "building:cultivation.building.puppet-workshop",
+                "rule:cultivation.effect.puppet-unit"),
+
+            Node(29, "core.research.behemoth-breeding", "巨兽培育",
+                DevelopmentRoute.Biological, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BoneSteel, 24),
+                    Cost(ResourceIds.BiomassConcentrate, 18)),
+                60f, "巨兽单位仅预览", Req("core.research.bio-cultivation"),
+                "building:biological.building.behemoth-pen",
+                "rule:biological.effect.behemoth-unit"),
+            Node(30, "core.research.acid-spit", "酸液喷吐",
+                DevelopmentRoute.Biological, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BiomassConcentrate, 20),
+                    Cost(ResourceIds.BiologicalWeapon, 10)),
+                60f, "酸液塔仅预览", Req("core.research.spore-dispersal"),
+                "building:biological.building.acid-tower",
+                "rule:biological.effect.armor-corrosion"),
+            Node(31, "core.research.tissue-regeneration", "组织再生",
+                DevelopmentRoute.Biological, 3, 3,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.BiomassConcentrate, 24),
+                    Cost(ResourceIds.Biomass, 20)),
+                60f, "解锁建筑与单位再生",
+                Req("core.research.metabolic-acceleration"),
+                "rule:biological.effect.building-and-unit-regeneration"),
+            Node(32, "core.research.gene-splicing", "基因剪接",
+                DevelopmentRoute.Biological, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BoneSteel, 18),
+                    Cost(ResourceIds.BiomassConcentrate, 18)),
+                60f, "领袖临时特质仅预览", Req("core.research.carapace-growth"),
+                "rule:biological.effect.leader-temporary-trait"),
+
+            Node(33, "core.research.mind-shield", "心灵护盾",
+                DevelopmentRoute.Psionics, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.ResonanceMetal, 24),
+                    Cost(ResourceIds.PsionicAmplifier, 12)),
+                60f, "城市护盾仅预览", Req("core.research.psionic-workshop"),
+                "building:psionics.building.shield-generator",
+                "rule:psionics.effect.city-damage-shield"),
+            Node(34, "core.research.mind-control", "精神操控",
+                DevelopmentRoute.Psionics, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.PsionicAmplifier, 20), Cost(ResourceIds.Water, 20)),
+                60f, "精神操控仅预览", Req("core.research.mind-spire"),
+                "rule:psionics.effect.control-normal-enemy"),
+            Node(35, "core.research.precognitive-sense", "预知感应",
+                DevelopmentRoute.Psionics, 3, 3,
+                ResearchReleaseState.Researchable,
+                Costs(Cost(ResourceIds.PsionicAmplifier, 18),
+                    Cost(ResourceIds.EnergyCrystal, 20)),
+                60f, "预警时间提高50%", Req("core.research.consciousness-network"),
+                "rule:psionics.effect.warning-time-150-percent"),
+            Node(36, "core.research.collective-consciousness", "集体意识",
+                DevelopmentRoute.Psionics, 3, 3,
+                ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.PsionicAmplifier, 24), Cost(ResourceIds.Water, 24)),
+                60f, "灵能结晶与多城市共享研究仅预览",
+                Req("core.research.thought-acceleration"),
+                "recipe:psionics.production.psionic-crystal",
+                "rule:psionics.effect.multi-city-shared-progress-20-percent"),
+
+            Node(37, "core.research.bridge.psionic-mech", "灵能机甲",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.Alloy, 30),
+                    Cost(ResourceIds.PsionicAmplifier, 20)),
+                90f, "跨路线建筑仅预览",
+                Req("core.research.precision-assembly", "core.research.psionic-workshop"),
+                "building:bridge.building.psionic-mech-factory"),
+            Node(38, "core.research.bridge.high-frequency-sword", "高周波飞剑",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.FlyingSword, 12), Cost(ResourceIds.Alloy, 30)),
+                90f, "跨路线建筑仅预览",
+                Req("core.research.artifact-crafting", "core.research.precision-assembly"),
+                "building:bridge.building.high-frequency-sword-forge"),
+            Node(39, "core.research.bridge.bio-hangar", "生物机库",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BoneSteel, 25), Cost(ResourceIds.Alloy, 25)),
+                90f, "跨路线建筑仅预览",
+                Req("core.research.bio-cultivation", "core.research.precision-assembly"),
+                "building:bridge.building.bio-hangar"),
+            Node(40, "core.research.bridge.spirit-plant", "灵植培育",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.SpiritIron, 20),
+                    Cost(ResourceIds.BiomassConcentrate, 20)),
+                90f, "跨路线建筑仅预览",
+                Req("core.research.artifact-crafting", "core.research.bio-cultivation"),
+                "building:bridge.building.spirit-plant-garden",
+                "recipe:fusion.production.spirit-plant-extract"),
+            Node(41, "core.research.bridge.psionic-pulse", "精神脉冲武器",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.PsionicAmplifier, 20),
+                    Cost(ResourceIds.Ammunition, 30)),
+                90f, "跨路线建筑仅预览",
+                Req("core.research.psionic-workshop", "core.research.precision-assembly"),
+                "building:bridge.building.emp-tower"),
+            Node(42, "core.research.bridge.flesh-elixir", "血肉灵丹",
+                DevelopmentRoute.Bridge, 3, 4, ResearchReleaseState.PreviewOnly,
+                Costs(Cost(ResourceIds.BiomassConcentrate, 25),
+                    Cost(ResourceIds.EnergyCrystal, 25)),
+                90f, "跨路线配方与突变规则仅预览",
+                Req("core.research.bio-cultivation", "core.research.artifact-crafting"),
+                "recipe:fusion.production.flesh-elixir",
+                "rule:bridge.effect.elixir-triple-with-mutation-risk")
         };
-        public static ResearchDefinition[] Starting=>All;
-        public static ResearchDefinition Find(string id)=>All.FirstOrDefault(value=>value.Id.Value==id);
+
+        public static ResearchDefinition[] Starting => All;
+
+        public static ResearchDefinition Find(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return null;
+            ResearchDefinition formal = All.FirstOrDefault(value =>
+                string.Equals(value.Id.Value, id, StringComparison.Ordinal));
+            if (formal != null) return formal;
+            return string.Equals(
+                retiredLegacyAnalysis.Id.Value,
+                id,
+                StringComparison.Ordinal)
+                ? retiredLegacyAnalysis
+                : null;
+        }
+
+        private static ResearchDefinition Node(
+            int catalogOrder,
+            string id,
+            string name,
+            DevelopmentRoute route,
+            int tier,
+            int layoutRow,
+            ResearchReleaseState releaseState,
+            IReadOnlyList<ResourceAmount> costs,
+            float duration,
+            string effectSummary,
+            IReadOnlyList<string> requirements,
+            params string[] effectReferences)
+        {
+            return new ResearchDefinition(
+                id,
+                name,
+                route,
+                costs,
+                duration,
+                requirements,
+                tier,
+                effectSummary,
+                catalogOrder,
+                layoutRow,
+                releaseState,
+                effectReferences);
+        }
+
+        private static ResourceAmount Cost(string resourceId, int amount) =>
+            new ResourceAmount(resourceId, amount);
+
+        private static ResourceAmount[] Costs(params ResourceAmount[] costs) =>
+            costs ?? Array.Empty<ResourceAmount>();
+
+        private static string[] Req(params string[] ids) =>
+            ids ?? Array.Empty<string>();
+
+        private static string[] Effects(params string[] references) =>
+            references ?? Array.Empty<string>();
     }
 
     public sealed class ResearchPersistenceSnapshot
@@ -252,6 +688,7 @@ namespace WasteCity.Research
         {
             if (Active != null || HasMissingActiveResearch ||
                 definition == null || inventory == null ||
+                definition.ReleaseState != ResearchReleaseState.Researchable ||
                 completed.Contains(definition.Id) ||
                 definition.RequiredResearchIds.Any(required =>
                     !completed.Any(id => id.Value == required)) ||
@@ -269,6 +706,7 @@ namespace WasteCity.Research
         {
             if (Active != null || HasMissingActiveResearch ||
                 definition == null || cityStorage == null ||
+                definition.ReleaseState != ResearchReleaseState.Researchable ||
                 completed.Contains(definition.Id) ||
                 definition.RequiredResearchIds.Any(required =>
                     !completed.Any(id => id.Value == required)) ||
@@ -358,7 +796,15 @@ namespace WasteCity.Research
                         error = "科技目录返回了不匹配的定义";
                         return false;
                     }
-                    known.Add(stableId);
+                    if (definition.ReleaseState ==
+                        ResearchReleaseState.RetiredCompatibility)
+                    {
+                        unknown.Add(id);
+                    }
+                    else
+                    {
+                        known.Add(stableId);
+                    }
                 }
                 else
                 {
@@ -401,7 +847,12 @@ namespace WasteCity.Research
                     error = "科技目录返回了不匹配的活动定义";
                     return false;
                 }
-                if (active == null) missingActive = activeResearchId;
+                if (active == null ||
+                    active.ReleaseState != ResearchReleaseState.Researchable)
+                {
+                    active = null;
+                    missingActive = activeResearchId;
+                }
             }
 
             known.Sort((left, right) => string.CompareOrdinal(
@@ -590,9 +1041,30 @@ namespace WasteCity.Research
 
         public void Restore(string[] completedIds,string activeId,float remaining)
         {
-            completed.Clear();if(completedIds!=null)foreach(string id in completedIds){var definition=ResearchCatalog.Find(id);if(definition!=null)completed.Add(definition.Id);}
-            orphanCompletedIds.Clear();missingActiveResearchId=null;
-            Active=ResearchCatalog.Find(activeId);Remaining=Active==null?0f:Math.Max(0.001f,Math.Min(Active.Duration,remaining));persistenceRevision++;
+            completed.Clear();
+            orphanCompletedIds.Clear();
+            if(completedIds!=null)foreach(string id in completedIds)
+            {
+                var definition=ResearchCatalog.Find(id);
+                if(definition!=null&&definition.ReleaseState!=ResearchReleaseState.RetiredCompatibility)
+                    completed.Add(definition.Id);
+                else if(!string.IsNullOrWhiteSpace(id))
+                    orphanCompletedIds.Add(id);
+            }
+            missingActiveResearchId=null;
+            ResearchDefinition restoredActive=ResearchCatalog.Find(activeId);
+            if(restoredActive!=null&&restoredActive.ReleaseState==ResearchReleaseState.Researchable)
+            {
+                Active=restoredActive;
+                Remaining=Math.Max(0.001f,Math.Min(Active.Duration,remaining));
+            }
+            else
+            {
+                Active=null;
+                missingActiveResearchId=string.IsNullOrWhiteSpace(activeId)?null:activeId;
+                Remaining=missingActiveResearchId==null?0f:Math.Max(0.001f,remaining);
+            }
+            persistenceRevision++;
         }
 
         private static bool TryCreateStableId(

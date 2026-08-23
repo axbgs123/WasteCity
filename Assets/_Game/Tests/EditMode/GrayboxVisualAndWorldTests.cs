@@ -216,8 +216,8 @@ namespace WasteCity.Tests
                     definition.Id));
             }
 
-            Assert.That(colorKeys, Has.Count.EqualTo(15));
-            Assert.That(shapeKeys, Has.Count.EqualTo(15));
+            Assert.That(colorKeys, Has.Count.EqualTo(31));
+            Assert.That(shapeKeys, Has.Count.EqualTo(31));
             Assert.That(ResourceIconCatalog3D.Resolve("unknown.resource"),
                 Is.Null);
         }

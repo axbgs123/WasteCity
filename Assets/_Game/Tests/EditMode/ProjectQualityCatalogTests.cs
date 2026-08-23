@@ -737,7 +737,8 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/ResourceDefinitionCatalogTests.cs",
-                });
+                },
+                new[] { "IDEA-0011", "IDEA-0016" });
             AssertReuseContract(
                 FindReuse(catalog, "player-backpack-model"),
                 new[]
@@ -771,7 +772,9 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
-                });
+                    "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs",
+                },
+                new[] { "IDEA-0011", "IDEA-0016" });
             AssertReuseContract(
                 FindReuse(catalog, "crafting-queue-model"),
                 new[]
@@ -1133,7 +1136,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
             }, iconCatalog.RequiredTestFiles);
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0012" },
+                new[] { "IDEA-0012", "IDEA-0016" },
                 iconCatalog.RequirementIds);
 
             ProjectReuseEntry nodeMarkers = FindReuse(

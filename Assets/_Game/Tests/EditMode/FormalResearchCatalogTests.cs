@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using WasteCity.Building;
+using WasteCity.Economy;
 using WasteCity.Research;
 
 namespace WasteCity.Tests
@@ -44,7 +46,9 @@ namespace WasteCity.Tests
             Node(3, "core.research.adaptive-tissue", "Biological", 1, 1,
                 "Researchable", Req(ScrapProcessingId),
                 "building:biological.building.colony-pool",
-                "recipe:biological.production.colony-base"),
+                "recipe:biological.production.biomass-concentrate",
+                "recipe:biological.production.active-biomass",
+                "recipe:biological.production.bone-steel"),
             Node(4, "core.research.mind-resonance", "Psionics", 1, 1,
                 "Researchable", Req(ScrapProcessingId),
                 "building:psionics.building.resonance-furnace",
@@ -61,7 +65,7 @@ namespace WasteCity.Tests
             Node(7, "core.research.thermal-engineering", "Technology", 2, 2,
                 "Researchable", Req("core.research.automated-machinery"),
                 "building:technology.building.power-plant",
-                "recipe:technology.production.power-generation"),
+                "recipe:technology.production.energy-cell"),
             Node(8, "core.research.ballistics", "Technology", 2, 2,
                 "PreviewOnly", Req("core.research.automated-machinery"),
                 "rule:core.effect.ballistics"),
@@ -76,7 +80,7 @@ namespace WasteCity.Tests
             Node(11, "core.research.spirit-gathering", "Cultivation", 2, 2,
                 "Researchable", Req("core.research.spirit-sensing"),
                 "building:cultivation.building.spirit-gathering-array",
-                "recipe:cultivation.production.gather-spirit"),
+                "recipe:cultivation.production.gather-spirit-stone"),
             Node(12, "core.research.talisman-basics", "Cultivation", 2, 2,
                 "PreviewOnly", Req("core.research.spirit-sensing"),
                 "rule:core.effect.wall-talisman"),
@@ -91,7 +95,6 @@ namespace WasteCity.Tests
             Node(15, "core.research.metabolic-acceleration", "Biological", 2, 2,
                 "Researchable", Req("core.research.adaptive-tissue"),
                 "building:biological.building.metabolic-furnace",
-                "recipe:biological.production.metabolic-energy",
                 "rule:biological.effect.corpse-recovery-150-percent"),
             Node(16, "core.research.carapace-growth", "Biological", 2, 2,
                 "Researchable", Req("core.research.adaptive-tissue"),
@@ -107,7 +110,7 @@ namespace WasteCity.Tests
             Node(19, "core.research.consciousness-network", "Psionics", 2, 2,
                 "Researchable", Req("core.research.mind-resonance"),
                 "building:psionics.building.consciousness-network",
-                "recipe:psionics.production.psionic-crystal"),
+                "recipe:psionics.production.consciousness-shard"),
             Node(20, "core.research.thought-acceleration", "Psionics", 2, 2,
                 "Researchable", Req("core.research.mind-resonance"),
                 "rule:psionics.effect.research-speed-125-percent"),
@@ -172,6 +175,7 @@ namespace WasteCity.Tests
                 "rule:psionics.effect.warning-time-150-percent"),
             Node(36, "core.research.collective-consciousness", "Psionics", 3, 3,
                 "PreviewOnly", Req("core.research.thought-acceleration"),
+                "recipe:psionics.production.psionic-crystal",
                 "rule:psionics.effect.multi-city-shared-progress-20-percent"),
 
             Node(37, "core.research.bridge.psionic-mech", "Bridge", 3, 4,
@@ -189,7 +193,8 @@ namespace WasteCity.Tests
             Node(40, "core.research.bridge.spirit-plant", "Bridge", 3, 4,
                 "PreviewOnly", Req("core.research.artifact-crafting",
                     "core.research.bio-cultivation"),
-                "building:bridge.building.spirit-plant-garden"),
+                "building:bridge.building.spirit-plant-garden",
+                "recipe:fusion.production.spirit-plant-extract"),
             Node(41, "core.research.bridge.psionic-pulse", "Bridge", 3, 4,
                 "PreviewOnly", Req("core.research.psionic-workshop",
                     "core.research.precision-assembly"),
@@ -197,7 +202,7 @@ namespace WasteCity.Tests
             Node(42, "core.research.bridge.flesh-elixir", "Bridge", 3, 4,
                 "PreviewOnly", Req("core.research.bio-cultivation",
                     "core.research.artifact-crafting"),
-                "recipe:bridge.production.flesh-elixir",
+                "recipe:fusion.production.flesh-elixir",
                 "rule:bridge.effect.elixir-triple-with-mutation-risk"),
         };
 
@@ -353,6 +358,41 @@ namespace WasteCity.Tests
                     Is.Not.EqualTo("Common").And.Not.EqualTo("Bridge"), bridge.Id.Value);
                 Assert.That(ReadString(second, "Route"),
                     Is.Not.EqualTo("Common").And.Not.EqualTo("Bridge"), bridge.Id.Value);
+            }
+        }
+
+        [Test]
+        public void ReleasedEffectReferencesResolveToFormalContentCatalogs()
+        {
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
+            {
+                string[] effects = ReadStrings(
+                    definition,
+                    "EffectReferences");
+                foreach (string effect in effects)
+                {
+                    if (effect.StartsWith("recipe:", StringComparison.Ordinal))
+                    {
+                        string recipeId = effect.Substring("recipe:".Length);
+                        Assert.That(
+                            ResourceRecipeCatalog.TryGet(
+                                recipeId,
+                                out ResourceRecipeDefinition _),
+                            Is.True,
+                            $"Unknown recipe effect {effect} on {definition.Id.Value}");
+                    }
+
+                    if (effect.StartsWith("building:", StringComparison.Ordinal) &&
+                        ReadString(definition, "ReleaseState") != "PreviewOnly")
+                    {
+                        string buildingId = effect.Substring("building:".Length);
+                        Assert.That(
+                            BuildingCatalog.All.Any(value =>
+                                value.Id.Value == buildingId),
+                            Is.True,
+                            $"Unknown building effect {effect} on {definition.Id.Value}");
+                    }
+                }
             }
         }
 
