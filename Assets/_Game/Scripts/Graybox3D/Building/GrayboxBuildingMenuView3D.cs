@@ -1572,6 +1572,8 @@ namespace WasteCity.Graybox3D.Building
                     return "已完成";
                 case GrayboxBuildingInstanceState.AbandonedRuin:
                     return "废弃遗迹";
+                case GrayboxBuildingInstanceState.DestroyedRuin:
+                    return "战损废墟";
                 default:
                     return state.ToString();
             }

@@ -268,6 +268,73 @@ namespace WasteCity.Economy
             return true;
         }
 
+        public bool TryDestroyWarehouseForCombat(
+            string stableInstanceId,
+            out ResourceAmount[] lostResources)
+        {
+            lostResources = Array.Empty<ResourceAmount>();
+            if (!TryGetWarehouse(
+                    stableInstanceId,
+                    out WarehouseStorageState state))
+            {
+                return false;
+            }
+
+            var lost = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+            Dictionary<string, int> stored = state.CopyAmounts();
+            foreach (KeyValuePair<string, int> item in stored)
+            {
+                if (item.Value > 0) lost.Add(item.Key, item.Value);
+            }
+
+            if (orphanResources.Length > 0)
+            {
+                var retained = new List<CityStorageOrphanResource>(
+                    orphanResources.Length);
+                for (var index = 0; index < orphanResources.Length; index++)
+                {
+                    CityStorageOrphanResource orphan = orphanResources[index];
+                    if (string.Equals(
+                            orphan.OwnerKind,
+                            CityStorageOrphanResource.WarehouseOwnerKind,
+                            StringComparison.Ordinal) &&
+                        string.Equals(
+                            orphan.OwnerStableId,
+                            stableInstanceId,
+                            StringComparison.Ordinal))
+                    {
+                        if (orphan.Amount > 0)
+                        {
+                            lost.TryGetValue(orphan.ResourceId, out int before);
+                            lost[orphan.ResourceId] = before + orphan.Amount;
+                        }
+                        continue;
+                    }
+                    retained.Add(orphan);
+                }
+                if (retained.Count != orphanResources.Length)
+                    orphanResources = retained.ToArray();
+            }
+
+            warehouses.Remove(stableInstanceId);
+            var result = new ResourceAmount[lost.Count];
+            var resultIndex = 0;
+            foreach (KeyValuePair<string, int> item in lost)
+                result[resultIndex++] = new ResourceAmount(item.Key, item.Value);
+            lostResources = result;
+            AdvanceRevision();
+
+            if (state.IsConnected)
+            {
+                foreach (KeyValuePair<string, int> item in stored)
+                {
+                    if (item.Value > 0) PublishChange(item.Key, -item.Value);
+                }
+            }
+            return true;
+        }
+
         public bool CanRemoveWarehouseWithMigration(
             string stableInstanceId,
             out WarehouseRemovalStatus status)

@@ -526,13 +526,28 @@ namespace WasteCity.Persistence
                 if (instance.orientation < 0 || instance.orientation > 3)
                     return Invalid(FormalSaveValidationError.InvalidEnumValue,
                         item + ".orientation");
-                if (instance.state < 0 || instance.state > 2)
+                if (instance.state < 0 || instance.state > 3)
                     return Invalid(FormalSaveValidationError.InvalidEnumValue,
                         item + ".state");
                 FormalSaveValidationResult result = NonNegativeFinite(
                     instance.constructionRemainingSeconds,
                     item + ".constructionRemainingSeconds");
                 if (result != null) return result;
+                if (instance.state == 3)
+                {
+                    if (instance.isPlayerOwned)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidDefense,
+                            item + ".isPlayerOwned");
+                    if (instance.evacuationLockedCrossCheck)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidDefense,
+                            item + ".evacuationLockedCrossCheck");
+                    if (instance.constructionRemainingSeconds != 0f)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidDefense,
+                            item + ".constructionRemainingSeconds");
+                }
                 if (instance.footprintWidth <= 0 ||
                     instance.footprintHeight <= 0)
                     return Invalid(FormalSaveValidationError.InvalidWorld,

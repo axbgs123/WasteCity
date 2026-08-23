@@ -13,9 +13,10 @@ namespace WasteCity.Graybox3D.Building
 {
     public enum GrayboxBuildingInstanceState
     {
-        UnderConstruction,
-        Completed,
-        AbandonedRuin
+        UnderConstruction = 0,
+        Completed = 1,
+        AbandonedRuin = 2,
+        DestroyedRuin = 3
     }
 
     public enum GrayboxEvacuationCommitCode3D
@@ -141,6 +142,13 @@ namespace WasteCity.Graybox3D.Building
         {
             IsPlayerOwned = false;
             State = GrayboxBuildingInstanceState.AbandonedRuin;
+        }
+
+        internal void DestroyForCombat()
+        {
+            IsEvacuationLocked = false;
+            IsPlayerOwned = false;
+            State = GrayboxBuildingInstanceState.DestroyedRuin;
         }
 
         internal void RestoreEvacuationState(
@@ -470,6 +478,34 @@ namespace WasteCity.Graybox3D.Building
                 refund);
             instances.RemoveAt(index);
             AdvancePlacementRevision();
+            return true;
+        }
+
+        public bool TryDestroyBuildingForCombat(
+            string stableInstanceId,
+            IGrayboxBuildingPresentation3D presentation)
+        {
+            if (presentation == null)
+                throw new ArgumentNullException(nameof(presentation));
+            EnsureConfigured();
+            int index = FindInstanceIndex(stableInstanceId);
+            if (index < 0) return false;
+
+            GrayboxBuildingInstance3D instance = instances[index];
+            if (instance.State != GrayboxBuildingInstanceState.Completed ||
+                !instance.IsPlayerOwned ||
+                instance.IsEvacuationLocked)
+            {
+                return false;
+            }
+
+            instance.DestroyForCombat();
+            evacuationLocks.Remove(instance.StableInstanceId);
+            evacuationSnapshots.Remove(instance.StableInstanceId);
+            evacuationWarehouseConnectivity.Remove(instance.StableInstanceId);
+            AdvanceCatalogRevision();
+            AdvancePlacementRevision();
+            presentation.UpdateInstance(instance);
             return true;
         }
 
@@ -1267,13 +1303,18 @@ namespace WasteCity.Graybox3D.Building
                          GrayboxBuildingInstanceState.UnderConstruction &&
                      remaining <= 0f) ||
                     (entry.State == GrayboxBuildingInstanceState.Completed &&
+                     remaining != 0f) ||
+                    (entry.State ==
+                         GrayboxBuildingInstanceState.DestroyedRuin &&
                      remaining != 0f))
                 {
                     error = "建筑状态与施工剩余时间不一致";
                     return false;
                 }
                 bool isRuin = entry.State ==
-                    GrayboxBuildingInstanceState.AbandonedRuin;
+                                  GrayboxBuildingInstanceState.AbandonedRuin ||
+                              entry.State ==
+                                  GrayboxBuildingInstanceState.DestroyedRuin;
                 if (isRuin && entry.IsPlayerOwned)
                 {
                     error = "建筑状态与玩家所有权不一致";

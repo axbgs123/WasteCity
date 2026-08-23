@@ -652,6 +652,7 @@ namespace WasteCity.Graybox3D.Building
                         CompletedColor);
                     break;
                 case GrayboxBuildingInstanceState.AbandonedRuin:
+                case GrayboxBuildingInstanceState.DestroyedRuin:
                     AddSlot(
                         visual,
                         "building.ruin." + instance.StableInstanceId,
@@ -712,6 +713,7 @@ namespace WasteCity.Graybox3D.Building
                         cellSize,
                         instance.StableInstanceId);
                 case GrayboxBuildingInstanceState.AbandonedRuin:
+                case GrayboxBuildingInstanceState.DestroyedRuin:
                     return CreateRuinMesh(
                         width,
                         height,
