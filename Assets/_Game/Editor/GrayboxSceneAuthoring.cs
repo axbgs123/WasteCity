@@ -1166,7 +1166,8 @@ namespace WasteCity.Editor
                 ("buildingPresentation",
                     buildingReferences.BuildingPresentation),
                 ("worldView", buildingReferences.DefenseWorldView),
-                ("hud", defenseHud));
+                ("hud", defenseHud),
+                ("production", buildingReferences.Production));
             SetReferences(
                 operationsController,
                 ("session", buildingReferences.Session),

@@ -669,6 +669,7 @@ MonoBehaviour:
   buildingPresentation: {fileID: 1545501225}
   worldView: {fileID: 836660569}
   hud: {fileID: 1804086897}
+  production: {fileID: 740990735}
 --- !u!4 &293867047
 Transform:
   m_ObjectHideFlags: 0

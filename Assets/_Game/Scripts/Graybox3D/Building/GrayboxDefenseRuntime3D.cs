@@ -292,7 +292,40 @@ namespace WasteCity.Graybox3D.Building
         private readonly Dictionary<string, bool> synchronizedLockById =
             new Dictionary<string, bool>(StringComparer.Ordinal);
         private readonly List<string> removedIds = new List<string>();
+        private readonly Dictionary<string, SingleCityDefenseTowerCombatModel>
+            campaignTowerById =
+                new Dictionary<string, SingleCityDefenseTowerCombatModel>(
+                    StringComparer.Ordinal);
+        private readonly List<SingleCityDefenseTowerCombatModel>
+            campaignTowers =
+                new List<SingleCityDefenseTowerCombatModel>();
+        private readonly HashSet<string> campaignRetainedIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> campaignRunnableIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, GrayboxDefenseTowerStatus3D>
+            campaignStatusById =
+                new Dictionary<string, GrayboxDefenseTowerStatus3D>(
+                    StringComparer.Ordinal);
+        private readonly Func<DefenseBuildingCombatTarget[]>
+            campaignBuildingTargetProvider;
+        private readonly Func<string, string, int, int>
+            campaignBuildingDamageApplier;
+        private readonly Queue<GrayboxCombatDestructionResult3D>
+            pendingPresentationRebuilds =
+                new Queue<GrayboxCombatDestructionResult3D>();
         private TutorialDefenseRuntimeModel tutorial;
+        private SingleCityDefenseCampaignModel campaign;
+        private GrayboxBuildingHealthRuntime3D campaignBuildingHealth;
+        private GrayboxCombatDestructionCoordinator3D
+            campaignDestructionCoordinator;
+        private DefenseBuildingCombatTarget[] campaignBuildingTargets =
+            Array.Empty<DefenseBuildingCombatTarget>();
+        private ulong campaignBuildingTargetFingerprint;
+        private bool hasCampaignBuildingTargetFingerprint;
+        private SingleCityDefenseCampaignSnapshot cachedCampaignSnapshot;
+        private bool campaignSnapshotDirty = true;
+        private bool campaignTriggered;
         private double accumulatorSeconds;
         private int tutorialWaveTriggerCount;
         private float requestedCoreX;
@@ -300,6 +333,7 @@ namespace WasteCity.Graybox3D.Building
         private ulong persistenceGeneration;
         private GrayboxDefenseRuntimeSnapshot3D cachedSnapshot;
         private bool snapshotDirty = true;
+        private Func<string, bool> campaignPresentationRecovery;
 
         public GrayboxDefenseRuntime3D(
             float coreX,
@@ -308,6 +342,8 @@ namespace WasteCity.Graybox3D.Building
             float spawnZ)
         {
             readOnlyTowers = towers.AsReadOnly();
+            campaignBuildingTargetProvider = GetCampaignBuildingTargets;
+            campaignBuildingDamageApplier = ApplyCampaignBuildingDamage;
             tutorial = new TutorialDefenseRuntimeModel(
                 coreX,
                 coreZ,
@@ -319,6 +355,84 @@ namespace WasteCity.Graybox3D.Building
 
         public IReadOnlyList<GrayboxDefenseTowerRuntimeState3D> Towers =>
             readOnlyTowers;
+
+        public GrayboxCombatDestructionResult3D LastDestructionResult
+        {
+            get;
+            private set;
+        }
+
+        public int PendingPresentationRebuildCount =>
+            pendingPresentationRebuilds.Count;
+        public bool HasPresentationRecovery =>
+            campaignPresentationRecovery != null;
+
+        public SingleCityDefenseCampaignSnapshot CampaignSnapshot
+        {
+            get
+            {
+                if (campaign == null) return null;
+                if (cachedCampaignSnapshot == null || campaignSnapshotDirty)
+                {
+                    cachedCampaignSnapshot = campaign.Snapshot;
+                    campaignSnapshotDirty = false;
+                }
+                return cachedCampaignSnapshot;
+            }
+        }
+
+        public void ConfigureFormalCampaign(
+            SingleCityDefenseCampaignModel campaign,
+            GrayboxBuildingHealthRuntime3D buildingHealth,
+            GrayboxCombatDestructionCoordinator3D destructionCoordinator)
+        {
+            this.campaign = campaign ??
+                throw new ArgumentNullException(nameof(campaign));
+            campaignBuildingHealth = buildingHealth ??
+                throw new ArgumentNullException(nameof(buildingHealth));
+            campaignDestructionCoordinator = destructionCoordinator ??
+                throw new ArgumentNullException(nameof(destructionCoordinator));
+            campaignTowerById.Clear();
+            campaignTowers.Clear();
+            campaignRetainedIds.Clear();
+            campaignRunnableIds.Clear();
+            campaignStatusById.Clear();
+            campaignBuildingTargets =
+                Array.Empty<DefenseBuildingCombatTarget>();
+            campaignBuildingTargetFingerprint = 0ul;
+            hasCampaignBuildingTargetFingerprint = false;
+            campaignTriggered = campaign.Snapshot.CurrentWaveNumber > 0;
+            LastDestructionResult = null;
+            pendingPresentationRebuilds.Clear();
+            campaignPresentationRecovery = null;
+            cachedCampaignSnapshot = null;
+            campaignSnapshotDirty = true;
+            cachedSnapshot = null;
+            snapshotDirty = true;
+        }
+
+        public void ConfigurePresentationRecovery(
+            Func<string, bool> tryRebuildPresentation)
+        {
+            campaignPresentationRecovery = tryRebuildPresentation ??
+                throw new ArgumentNullException(
+                    nameof(tryRebuildPresentation));
+        }
+
+        public void DetachPresentationRecovery()
+        {
+            campaignPresentationRecovery = null;
+            pendingPresentationRebuilds.Clear();
+        }
+
+        public bool TryGetCampaignTowerState(
+            string stableInstanceId,
+            out SingleCityDefenseTowerCombatModel state)
+        {
+            state = null;
+            return !string.IsNullOrWhiteSpace(stableInstanceId) &&
+                campaignTowerById.TryGetValue(stableInstanceId, out state);
+        }
 
         public bool TryGetTowerState(
             string stableInstanceId,
@@ -564,9 +678,15 @@ namespace WasteCity.Graybox3D.Building
 
         public void SetCorePosition(float x, float z)
         {
+            if (requestedCoreX == x && requestedCoreZ == z) return;
             requestedCoreX = x;
             requestedCoreZ = z;
-            tutorial.SetCorePosition(x, z);
+            if (campaign == null)
+                tutorial.SetCorePosition(x, z);
+            else
+                campaign.SetCorePosition(x, z);
+            campaignSnapshotDirty = campaign != null;
+            snapshotDirty = true;
             persistenceGeneration++;
         }
 
@@ -577,6 +697,17 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius)
         {
+            if (campaign != null)
+            {
+                SynchronizeCampaign(
+                    instances,
+                    cityMode,
+                    cityX,
+                    cityY,
+                    groundRadius);
+                return;
+            }
+
             persistenceGeneration++;
             bool snapshotChanged = false;
             orderedInstances.Clear();
@@ -695,6 +826,12 @@ namespace WasteCity.Graybox3D.Building
             if (globallyPaused || deltaSeconds <= 0f || cityStorage == null)
                 return;
 
+            if (campaign != null)
+            {
+                TickCampaign(deltaSeconds, cityStorage);
+                return;
+            }
+
             accumulatorSeconds += deltaSeconds;
             persistenceGeneration++;
             bool advancedFixedStep = false;
@@ -719,6 +856,27 @@ namespace WasteCity.Graybox3D.Building
             string stableInstanceId,
             bool paused)
         {
+            if (campaign != null)
+            {
+                if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                    !campaignTowerById.TryGetValue(
+                        stableInstanceId,
+                        out SingleCityDefenseTowerCombatModel campaignTower))
+                {
+                    return false;
+                }
+                if (campaignTower.IsPlayerPaused == paused)
+                    return true;
+                campaignTower.SetPlayerPaused(paused);
+                campaignStatusById[stableInstanceId] = paused
+                    ? GrayboxDefenseTowerStatus3D.PlayerPaused
+                    : GrayboxDefenseTowerStatus3D.NoTarget;
+                campaignSnapshotDirty = true;
+                snapshotDirty = true;
+                persistenceGeneration++;
+                return true;
+            }
+
             if (string.IsNullOrWhiteSpace(stableInstanceId) ||
                 !stateById.TryGetValue(
                     stableInstanceId,
@@ -799,6 +957,30 @@ namespace WasteCity.Graybox3D.Building
             out ResourceAmount[] lostResources)
         {
             lostResources = Array.Empty<ResourceAmount>();
+            if (campaign != null && !string.IsNullOrWhiteSpace(
+                    stableInstanceId) && campaignTowerById.TryGetValue(
+                    stableInstanceId,
+                    out SingleCityDefenseTowerCombatModel campaignTower))
+            {
+                if (campaignTower.LocalConsumableAmount > 0)
+                {
+                    lostResources = new[]
+                    {
+                        new ResourceAmount(
+                            campaignTower.ConsumableId,
+                            campaignTower.LocalConsumableAmount),
+                    };
+                }
+                campaignTowerById.Remove(stableInstanceId);
+                campaignTowers.Remove(campaignTower);
+                campaignRetainedIds.Remove(stableInstanceId);
+                campaignRunnableIds.Remove(stableInstanceId);
+                campaignStatusById.Remove(stableInstanceId);
+                campaignSnapshotDirty = true;
+                snapshotDirty = true;
+                persistenceGeneration++;
+                return true;
+            }
             if (string.IsNullOrWhiteSpace(stableInstanceId) ||
                 !stateById.TryGetValue(
                     stableInstanceId,
@@ -817,6 +999,338 @@ namespace WasteCity.Graybox3D.Building
             }
             RemoveTowerState(stableInstanceId, state);
             return true;
+        }
+
+        private void SynchronizeCampaign(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius)
+        {
+            persistenceGeneration++;
+            bool snapshotChanged = false;
+            orderedInstances.Clear();
+            campaignTowers.Clear();
+            campaignRetainedIds.Clear();
+            campaignRunnableIds.Clear();
+
+            if (instances != null)
+            {
+                campaignBuildingHealth.Synchronize(instances);
+                for (var index = 0; index < instances.Count; index++)
+                {
+                    if (instances[index] != null)
+                        orderedInstances.Add(instances[index]);
+                }
+            }
+            orderedInstances.Sort((left, right) => string.Compare(
+                left.StableInstanceId,
+                right.StableInstanceId,
+                StringComparison.Ordinal));
+
+            for (var index = 0; index < orderedInstances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = orderedInstances[index];
+                if (!GrayboxBuildingOperationalAccess3D.CanRetainState(
+                        instance) ||
+                    !IsFormalCampaignTower(instance) ||
+                    !campaignRetainedIds.Add(instance.StableInstanceId))
+                {
+                    continue;
+                }
+
+                if (!campaignTowerById.TryGetValue(
+                        instance.StableInstanceId,
+                        out SingleCityDefenseTowerCombatModel tower))
+                {
+                    tower = new SingleCityDefenseTowerCombatModel(
+                        instance.StableInstanceId,
+                        instance.Placement.Definition.Id.Value,
+                        instance.Placement.X,
+                        instance.Placement.Y);
+                    campaignTowerById.Add(instance.StableInstanceId, tower);
+                    campaignStatusById[instance.StableInstanceId] =
+                        GrayboxDefenseTowerStatus3D.NoTarget;
+                    snapshotChanged = true;
+                }
+
+                bool canRun =
+                    GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                        instance,
+                        cityMode);
+                bool connected = canRun &&
+                    GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
+                        instance,
+                        cityMode,
+                        cityX,
+                        cityY,
+                        groundRadius);
+                if (tower.IsLogisticsConnected != connected)
+                    snapshotChanged = true;
+                tower.SetLogisticsConnected(connected);
+                if (canRun)
+                {
+                    campaignRunnableIds.Add(instance.StableInstanceId);
+                    if (campaignStatusById[instance.StableInstanceId] ==
+                        GrayboxDefenseTowerStatus3D.Unavailable)
+                    {
+                        campaignStatusById[instance.StableInstanceId] =
+                            tower.IsPlayerPaused
+                                ? GrayboxDefenseTowerStatus3D.PlayerPaused
+                                : GrayboxDefenseTowerStatus3D.NoTarget;
+                        snapshotChanged = true;
+                    }
+                }
+                else
+                {
+                    if (campaignStatusById[instance.StableInstanceId] !=
+                        GrayboxDefenseTowerStatus3D.Unavailable)
+                    {
+                        snapshotChanged = true;
+                    }
+                    campaignStatusById[instance.StableInstanceId] =
+                        GrayboxDefenseTowerStatus3D.Unavailable;
+                }
+                campaignTowers.Add(tower);
+
+                if (!campaignTriggered && campaign.NotifyDefenseTowerCompleted(
+                        instance.StableInstanceId,
+                        instance.Placement.Definition.Id.Value,
+                        isCompleted: true,
+                        isPlayerOwned: true))
+                {
+                    campaignTriggered = true;
+                    snapshotChanged = true;
+                }
+            }
+
+            removedIds.Clear();
+            foreach (string stableInstanceId in campaignTowerById.Keys)
+            {
+                if (!campaignRetainedIds.Contains(stableInstanceId))
+                    removedIds.Add(stableInstanceId);
+            }
+            for (var index = 0; index < removedIds.Count; index++)
+            {
+                string stableInstanceId = removedIds[index];
+                campaignTowerById.Remove(stableInstanceId);
+                campaignStatusById.Remove(stableInstanceId);
+                snapshotChanged = true;
+            }
+
+            if (RefreshCampaignBuildingTargets())
+                snapshotChanged = true;
+            if (snapshotChanged)
+            {
+                campaignSnapshotDirty = true;
+                snapshotDirty = true;
+            }
+        }
+
+        private void TickCampaign(
+            float deltaSeconds,
+            CityResourceStorageModel cityStorage)
+        {
+            RetryPendingPresentationRebuilds();
+            accumulatorSeconds += deltaSeconds;
+            persistenceGeneration++;
+            bool advancedFixedStep = false;
+            while (accumulatorSeconds + StepEpsilon >= StepSeconds)
+            {
+                campaign.Advance(
+                    StepSecondsFloat,
+                    requestedSpeed: 1,
+                    campaignBuildingTargetProvider,
+                    campaignBuildingDamageApplier);
+                for (var index = 0; index < campaignTowers.Count; index++)
+                    TickCampaignTower(campaignTowers[index], cityStorage);
+                accumulatorSeconds -= StepSeconds;
+                if (accumulatorSeconds < 0d &&
+                    accumulatorSeconds > -StepEpsilon)
+                {
+                    accumulatorSeconds = 0d;
+                }
+                advancedFixedStep = true;
+            }
+            if (!advancedFixedStep) return;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+        }
+
+        private void TickCampaignTower(
+            SingleCityDefenseTowerCombatModel tower,
+            CityResourceStorageModel cityStorage)
+        {
+            if (!campaignRunnableIds.Contains(tower.StableInstanceId))
+                return;
+            if (tower.IsPlayerPaused)
+            {
+                campaignStatusById[tower.StableInstanceId] =
+                    GrayboxDefenseTowerStatus3D.PlayerPaused;
+                return;
+            }
+
+            tower.RefillFrom(cityStorage);
+            int damage = tower.Tick(
+                StepSecondsFloat,
+                campaign,
+                globallyPaused: false);
+            if (damage > 0)
+            {
+                campaignStatusById[tower.StableInstanceId] =
+                    GrayboxDefenseTowerStatus3D.Firing;
+                return;
+            }
+            if (string.IsNullOrEmpty(tower.TargetStableEnemyId))
+            {
+                campaignStatusById[tower.StableInstanceId] =
+                    GrayboxDefenseTowerStatus3D.NoTarget;
+                return;
+            }
+            campaignStatusById[tower.StableInstanceId] =
+                !tower.IsLogisticsConnected &&
+                cityStorage.GetNetworkAmount(tower.ConsumableId) > 0
+                    ? GrayboxDefenseTowerStatus3D.OutOfLogistics
+                    : GrayboxDefenseTowerStatus3D.MissingAmmunition;
+        }
+
+        private DefenseBuildingCombatTarget[] GetCampaignBuildingTargets()
+        {
+            return campaignBuildingTargets;
+        }
+
+        private int ApplyCampaignBuildingDamage(
+            string stableEnemyId,
+            string stableBuildingId,
+            int damage)
+        {
+            if (!campaignBuildingHealth.TryApplyDamage(
+                    stableBuildingId,
+                    damage,
+                    out int appliedDamage,
+                    out bool destroyedNow))
+            {
+                return 0;
+            }
+            if (destroyedNow)
+            {
+                LastDestructionResult =
+                    campaignDestructionCoordinator.Commit(stableBuildingId);
+                if (LastDestructionResult.RequiresPresentationRebuild)
+                    pendingPresentationRebuilds.Enqueue(
+                        LastDestructionResult);
+                RefreshCampaignBuildingTargets();
+            }
+            return appliedDamage;
+        }
+
+        private void RetryPendingPresentationRebuilds()
+        {
+            if (campaignPresentationRecovery == null) return;
+            while (pendingPresentationRebuilds.Count > 0)
+            {
+                GrayboxCombatDestructionResult3D pending =
+                    pendingPresentationRebuilds.Peek();
+                bool recovered;
+                try
+                {
+                    recovered = campaignPresentationRecovery(
+                        pending.StableInstanceId);
+                }
+                catch (Exception)
+                {
+                    recovered = false;
+                }
+                if (!recovered) return;
+                pendingPresentationRebuilds.Dequeue();
+            }
+        }
+
+        private bool RefreshCampaignBuildingTargets()
+        {
+            ulong fingerprint = ComputeCampaignBuildingTargetFingerprint();
+            if (hasCampaignBuildingTargetFingerprint &&
+                fingerprint == campaignBuildingTargetFingerprint)
+            {
+                return false;
+            }
+            campaignBuildingTargetFingerprint = fingerprint;
+            hasCampaignBuildingTargetFingerprint = true;
+            if (orderedInstances.Count == 0)
+            {
+                campaignBuildingTargets =
+                    Array.Empty<DefenseBuildingCombatTarget>();
+                return true;
+            }
+
+            var targets = new List<DefenseBuildingCombatTarget>(
+                orderedInstances.Count);
+            for (var index = 0; index < orderedInstances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = orderedInstances[index];
+                if (instance?.Placement?.Definition == null ||
+                    !campaignBuildingHealth.TryGetHealth(
+                        instance.StableInstanceId,
+                        out _,
+                        out _,
+                        out bool destroyed))
+                {
+                    continue;
+                }
+                string buildingId = instance.Placement.Definition.Id.Value;
+                targets.Add(new DefenseBuildingCombatTarget(
+                    instance.StableInstanceId,
+                    buildingId,
+                    instance.Placement.X,
+                    instance.Placement.Y,
+                    instance.State == GrayboxBuildingInstanceState.Completed,
+                    instance.IsPlayerOwned,
+                    destroyed,
+                    instance.IsEvacuationLocked,
+                    FormalProductionDefinitionCatalog.TryGetByBuildingId(
+                        buildingId,
+                        out _)));
+            }
+            campaignBuildingTargets = targets.Count == 0
+                ? Array.Empty<DefenseBuildingCombatTarget>()
+                : targets.ToArray();
+            return true;
+        }
+
+        private ulong ComputeCampaignBuildingTargetFingerprint()
+        {
+            ulong value = 1469598103934665603ul;
+            Mix(ref value, orderedInstances.Count);
+            for (var index = 0; index < orderedInstances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = orderedInstances[index];
+                Mix(ref value, instance?.StableInstanceId);
+                if (instance?.Placement?.Definition == null)
+                {
+                    Mix(ref value, -1);
+                    continue;
+                }
+                string buildingId = instance.Placement.Definition.Id.Value;
+                Mix(ref value, buildingId);
+                Mix(ref value, instance.Placement.X);
+                Mix(ref value, instance.Placement.Y);
+                Mix(ref value, (int)instance.State);
+                Mix(ref value, instance.IsPlayerOwned);
+                Mix(ref value, instance.IsEvacuationLocked);
+                bool hasHealth = campaignBuildingHealth.TryGetHealth(
+                    instance.StableInstanceId,
+                    out _,
+                    out _,
+                    out bool destroyed);
+                Mix(ref value, hasHealth);
+                Mix(ref value, destroyed);
+                Mix(ref value,
+                    FormalProductionDefinitionCatalog.TryGetByBuildingId(
+                        buildingId,
+                        out _));
+            }
+            return value;
         }
 
         private void TickTower(
@@ -861,6 +1375,9 @@ namespace WasteCity.Graybox3D.Building
 
         private GrayboxDefenseRuntimeSnapshot3D CaptureSnapshot()
         {
+            if (campaign != null)
+                return CaptureCampaignSnapshot();
+
             var towerSnapshots =
                 new GrayboxDefenseTowerSnapshot3D[towers.Count];
             for (int index = 0; index < towers.Count; index++)
@@ -914,6 +1431,79 @@ namespace WasteCity.Graybox3D.Building
                     tutorial.SpawnedEnemyCount - tutorial.AliveEnemyCount),
                 tutorial.Core.MaximumHealth,
                 tutorial.Core.CurrentHealth,
+                Array.AsReadOnly(towerSnapshots),
+                Array.AsReadOnly(enemySnapshots));
+        }
+
+        private GrayboxDefenseRuntimeSnapshot3D CaptureCampaignSnapshot()
+        {
+            SingleCityDefenseCampaignSnapshot source = CampaignSnapshot;
+            var towerSnapshots =
+                new GrayboxDefenseTowerSnapshot3D[campaignTowers.Count];
+            for (var index = 0; index < campaignTowers.Count; index++)
+            {
+                SingleCityDefenseTowerCombatModel tower =
+                    campaignTowers[index];
+                bool canRun = campaignRunnableIds.Contains(
+                    tower.StableInstanceId);
+                GrayboxDefenseTowerStatus3D status = canRun &&
+                    campaignStatusById.TryGetValue(
+                        tower.StableInstanceId,
+                        out GrayboxDefenseTowerStatus3D currentStatus)
+                        ? currentStatus
+                        : GrayboxDefenseTowerStatus3D.Unavailable;
+                towerSnapshots[index] = new GrayboxDefenseTowerSnapshot3D(
+                    tower.StableInstanceId,
+                    tower.LocalConsumableAmount,
+                    tower.LocalCapacity,
+                    tower.Range,
+                    tower.IsLogisticsConnected,
+                    canRun,
+                    tower.IsPlayerPaused,
+                    canRun ? tower.TargetStableEnemyId : null,
+                    status);
+            }
+
+            var enemySnapshots =
+                new GrayboxDefenseEnemySnapshot3D[source.Enemies.Count];
+            for (var index = 0; index < source.Enemies.Count; index++)
+            {
+                SingleCityDefenseEnemySnapshot enemy = source.Enemies[index];
+                EnemyDefinition definition = FindEnemyDefinition(
+                    enemy.EnemyDefinitionId);
+                float distanceToCore = Distance(
+                    enemy.X,
+                    enemy.Z,
+                    requestedCoreX,
+                    requestedCoreZ);
+                bool targetsCore = string.Equals(
+                    enemy.TargetStableId,
+                    SingleCityDefenseCampaignModel.CityCoreTargetId,
+                    StringComparison.Ordinal) ||
+                    string.IsNullOrEmpty(enemy.TargetStableId);
+                enemySnapshots[index] = new GrayboxDefenseEnemySnapshot3D(
+                    enemy.StableId,
+                    enemy.SpawnOrder,
+                    enemy.X,
+                    enemy.Z,
+                    enemy.CurrentHealth,
+                    targetsCore
+                        ? DefenseEnemyRuntimeSnapshot.CityCoreTargetName
+                        : enemy.TargetStableId,
+                    distanceToCore,
+                    targetsCore && definition != null &&
+                    distanceToCore <= definition.AttackRange);
+            }
+
+            return new GrayboxDefenseRuntimeSnapshot3D(
+                campaignTriggered ? 1 : 0,
+                ToLegacyWavePhase(source.Phase),
+                source.WarningRemainingSeconds,
+                source.SpawnedEnemyCount,
+                source.AliveEnemyCount,
+                source.Statistics.TotalKillCount,
+                source.CoreMaximumHealth,
+                source.CoreCurrentHealth,
                 Array.AsReadOnly(towerSnapshots),
                 Array.AsReadOnly(enemySnapshots));
         }
@@ -1076,6 +1666,70 @@ namespace WasteCity.Graybox3D.Building
                 instance.Placement.Definition.Id.Value,
                 BuildingCatalog.MachineGunTurret.Id.Value,
                 StringComparison.Ordinal);
+        }
+
+        private static bool IsFormalCampaignTower(
+            GrayboxBuildingInstance3D instance)
+        {
+            if (instance?.Placement?.Definition == null) return false;
+            string buildingId = instance.Placement.Definition.Id.Value;
+            return string.Equals(
+                       buildingId,
+                       BuildingCatalog.MachineGunTurret.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(
+                       buildingId,
+                       BuildingCatalog.LaserTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(
+                       buildingId,
+                       BuildingCatalog.SporeTower.Id.Value,
+                       StringComparison.Ordinal);
+        }
+
+        private static EnemyDefinition FindEnemyDefinition(string stableId)
+        {
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+            {
+                EnemyDefinition definition = EnemyCatalog.All[index];
+                if (string.Equals(
+                        definition.Id.Value,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    return definition;
+                }
+            }
+            return null;
+        }
+
+        private static WavePhase ToLegacyWavePhase(
+            SingleCityDefenseCampaignPhase phase)
+        {
+            switch (phase)
+            {
+                case SingleCityDefenseCampaignPhase.Warning:
+                    return WavePhase.Warning;
+                case SingleCityDefenseCampaignPhase.SpawningAndCombat:
+                    return WavePhase.Spawning;
+                case SingleCityDefenseCampaignPhase.CombatCleanup:
+                case SingleCityDefenseCampaignPhase.Victory:
+                case SingleCityDefenseCampaignPhase.Defeat:
+                    return WavePhase.Active;
+                default:
+                    return WavePhase.Idle;
+            }
+        }
+
+        private static float Distance(
+            float x,
+            float z,
+            float targetX,
+            float targetZ)
+        {
+            float offsetX = x - targetX;
+            float offsetZ = z - targetZ;
+            return (float)Math.Sqrt(offsetX * offsetX + offsetZ * offsetZ);
         }
     }
 }

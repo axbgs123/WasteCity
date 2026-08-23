@@ -252,8 +252,8 @@ namespace WasteCity.Defense
         private const double FixedStepSeconds = .1d;
         private const double StepEpsilon = .0000001d;
 
-        private readonly float coreX;
-        private readonly float coreZ;
+        private float coreX;
+        private float coreZ;
         private readonly List<EnemyState> enemies = new List<EnemyState>();
         private readonly List<SpawnDefinition> spawnSequence =
             new List<SpawnDefinition>();
@@ -291,6 +291,19 @@ namespace WasteCity.Defense
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
         public bool IsTerminal =>
             result != SingleCityDefenseCampaignResult.None;
+
+        public void SetCorePosition(float x, float z)
+        {
+            if (float.IsNaN(x) || float.IsInfinity(x) ||
+                float.IsNaN(z) || float.IsInfinity(z))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(x),
+                    "City core position must be finite.");
+            }
+            coreX = x;
+            coreZ = z;
+        }
 
         public bool NotifyDefenseTowerCompleted(
             string stableInstanceId,

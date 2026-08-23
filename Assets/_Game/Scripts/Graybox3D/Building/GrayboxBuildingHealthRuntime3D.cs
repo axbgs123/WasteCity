@@ -22,27 +22,30 @@ namespace WasteCity.Graybox3D.Building
 
         private readonly SortedDictionary<string, HealthState> states =
             new SortedDictionary<string, HealthState>(StringComparer.Ordinal);
+        private readonly HashSet<string> synchronizedIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> removedIds = new List<string>();
 
         public void Synchronize(
             IReadOnlyList<GrayboxBuildingInstance3D> instances)
         {
             if (instances == null) return;
-            var liveIds = new HashSet<string>(StringComparer.Ordinal);
+            synchronizedIds.Clear();
             for (var index = 0; index < instances.Count; index++)
             {
                 GrayboxBuildingInstance3D instance = instances[index];
                 if (instance != null &&
                     !string.IsNullOrWhiteSpace(instance.StableInstanceId))
                 {
-                    liveIds.Add(instance.StableInstanceId);
+                    synchronizedIds.Add(instance.StableInstanceId);
                 }
             }
             if (states.Count > 0)
             {
-                var removedIds = new List<string>();
+                removedIds.Clear();
                 foreach (string stableInstanceId in states.Keys)
                 {
-                    if (!liveIds.Contains(stableInstanceId))
+                    if (!synchronizedIds.Contains(stableInstanceId))
                         removedIds.Add(stableInstanceId);
                 }
                 for (var index = 0; index < removedIds.Count; index++)

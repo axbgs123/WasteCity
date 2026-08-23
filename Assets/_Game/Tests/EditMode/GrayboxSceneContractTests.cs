@@ -971,6 +971,36 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0017_DefenseUsesTheFormalProductionRuntimeInAuthoringAndScene()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxSceneAuthoring.cs"));
+            string defenseReferences = ExtractMethod(
+                source,
+                "SetReferences(\n" +
+                "                buildingReferences.DefenseController,",
+                "SetReferences(\n" +
+                "                operationsController,");
+            StringAssert.Contains(
+                "(\"production\", buildingReferences.Production)",
+                defenseReferences,
+                "Scene authoring must bind defense to the same formal " +
+                "production controller used by the building runtime.");
+
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GrayboxDefenseController3D defense =
+                Object.FindObjectOfType<GrayboxDefenseController3D>(true);
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>(true);
+
+            Assert.That(defense, Is.Not.Null);
+            Assert.That(production, Is.Not.Null);
+            AssertReference(defense, "production", production);
+        }
+
+        [Test]
         public void IDEA0014_SceneHasOneExplicitEvacuationRuntimeAndInputContract()
         {
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);

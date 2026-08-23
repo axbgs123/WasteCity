@@ -20,8 +20,13 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxBuildingWorldView3D buildingPresentation;
         [SerializeField] private GrayboxDefenseWorldView3D worldView;
         [SerializeField] private GrayboxDefenseHudView3D hud;
+        [SerializeField] private GrayboxProductionController3D production;
 
         private GrayboxDefenseRuntime3D runtime;
+        private GrayboxBuildingHealthRuntime3D buildingHealth =
+            new GrayboxBuildingHealthRuntime3D();
+        private SingleCityDefenseCampaignModel campaign;
+        private GrayboxCombatDestructionCoordinator3D destructionCoordinator;
         private GrayboxDefenseRuntimeSnapshot3D snapshot;
         private GrayboxDefenseRuntimeSnapshot3D presentedSnapshot;
         private PlanarCoordinateMapper3D boundCoordinates;
@@ -36,6 +41,11 @@ namespace WasteCity.Graybox3D.Building
 
         public GrayboxDefenseRuntime3D Runtime => runtime;
         public GrayboxDefenseRuntimeSnapshot3D Snapshot => snapshot;
+        public SingleCityDefenseCampaignSnapshot CampaignSnapshot =>
+            runtime?.CampaignSnapshot;
+        public GrayboxBuildingHealthRuntime3D BuildingHealth => buildingHealth;
+        public GrayboxCombatDestructionResult3D LastDestructionResult =>
+            runtime?.LastDestructionResult;
         public GrayboxDefenseWorldView3D WorldView => worldView;
         public GrayboxDefenseHudView3D Hud => hud;
         public bool HasSelection =>
@@ -64,20 +74,96 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseWorldView3D worldView,
             GrayboxDefenseHudView3D hud)
         {
+            ConfigureDependencies(
+                session,
+                city,
+                world,
+                buildingPresentation,
+                worldView,
+                hud,
+                newProduction: null);
+        }
+
+        public void Configure(
+            GrayboxBuildingSession3D session,
+            GrayboxMobileCityController3D city,
+            GrayboxWorldView3D world,
+            GrayboxBuildingWorldView3D buildingPresentation,
+            GrayboxDefenseWorldView3D worldView,
+            GrayboxDefenseHudView3D hud,
+            GrayboxProductionController3D production)
+        {
+            ConfigureDependencies(
+                session,
+                city,
+                world,
+                buildingPresentation,
+                worldView,
+                hud,
+                production ?? throw new ArgumentNullException(
+                    nameof(production)));
+        }
+
+        private void ConfigureDependencies(
+            GrayboxBuildingSession3D newSession,
+            GrayboxMobileCityController3D newCity,
+            GrayboxWorldView3D newWorld,
+            GrayboxBuildingWorldView3D newBuildingPresentation,
+            GrayboxDefenseWorldView3D newWorldView,
+            GrayboxDefenseHudView3D newHud,
+            GrayboxProductionController3D newProduction)
+        {
+            newSession = newSession ??
+                throw new ArgumentNullException(nameof(newSession));
+            newCity = newCity ??
+                throw new ArgumentNullException(nameof(newCity));
+            newWorld = newWorld ??
+                throw new ArgumentNullException(nameof(newWorld));
+            newBuildingPresentation = newBuildingPresentation ??
+                throw new ArgumentNullException(
+                    nameof(newBuildingPresentation));
+            newWorldView = newWorldView ??
+                throw new ArgumentNullException(nameof(newWorldView));
+            newHud = newHud ?? throw new ArgumentNullException(nameof(newHud));
+
+            bool ownershipChanged =
+                !ReferenceEquals(session, newSession) ||
+                !ReferenceEquals(city, newCity) ||
+                !ReferenceEquals(world, newWorld) ||
+                !ReferenceEquals(
+                    buildingPresentation,
+                    newBuildingPresentation) ||
+                !ReferenceEquals(worldView, newWorldView) ||
+                !ReferenceEquals(hud, newHud) ||
+                !ReferenceEquals(production, newProduction);
+
             UnbindHud();
-            this.session = session ??
-                throw new ArgumentNullException(nameof(session));
-            this.city = city ??
-                throw new ArgumentNullException(nameof(city));
-            this.world = world ??
-                throw new ArgumentNullException(nameof(world));
-            this.buildingPresentation = buildingPresentation ??
-                throw new ArgumentNullException(nameof(buildingPresentation));
-            this.worldView = worldView ??
-                throw new ArgumentNullException(nameof(worldView));
-            this.hud = hud ?? throw new ArgumentNullException(nameof(hud));
+            session = newSession;
+            city = newCity;
+            world = newWorld;
+            buildingPresentation = newBuildingPresentation;
+            worldView = newWorldView;
+            hud = newHud;
+            production = newProduction;
+            if (ownershipChanged)
+                ResetRuntimeOwnership();
             InvalidatePresentation();
             BindHud();
+        }
+
+        private void ResetRuntimeOwnership()
+        {
+            runtime?.DetachPresentationRecovery();
+            runtime = null;
+            campaign = null;
+            destructionCoordinator = null;
+            buildingHealth = new GrayboxBuildingHealthRuntime3D();
+            snapshot = null;
+            boundCoordinates = null;
+            firstMachineGunCheckpointPublished = false;
+            tutorialCombatCheckpointPublished = false;
+            selectedKind = GrayboxDefenseSelectionKind3D.None;
+            selectedStableId = null;
         }
 
         public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
@@ -218,13 +304,17 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             UnbindHud();
+            runtime?.DetachPresentationRecovery();
             session = null;
             city = null;
             world = null;
             buildingPresentation = null;
             worldView = null;
             hud = null;
+            production = null;
             runtime = null;
+            campaign = null;
+            destructionCoordinator = null;
             snapshot = null;
             presentedSnapshot = null;
             boundCoordinates = null;
@@ -253,6 +343,55 @@ namespace WasteCity.Graybox3D.Building
                 coreZ,
                 spawnX,
                 coreZ);
+            if (production == null) return;
+
+            campaign = new SingleCityDefenseCampaignModel(coreX, coreZ);
+            destructionCoordinator =
+                new GrayboxCombatDestructionCoordinator3D(
+                    session,
+                    buildingHealth,
+                    production.Clock.Runtime,
+                    runtime,
+                    campaign,
+                    buildingPresentation);
+            runtime.ConfigureFormalCampaign(
+                campaign,
+                buildingHealth,
+                destructionCoordinator);
+            runtime.ConfigurePresentationRecovery(
+                TryRecoverDestroyedBuildingPresentation);
+        }
+
+        private bool TryRecoverDestroyedBuildingPresentation(
+            string stableInstanceId)
+        {
+            if (session?.Instances == null || buildingPresentation == null ||
+                string.IsNullOrWhiteSpace(stableInstanceId))
+            {
+                return false;
+            }
+            for (var index = 0; index < session.Instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance =
+                    session.Instances[index];
+                if (instance == null || !string.Equals(
+                        instance.StableInstanceId,
+                        stableInstanceId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                try
+                {
+                    buildingPresentation.UpdateInstance(instance);
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            }
+            return false;
         }
 
         private bool TrySynchronizeRuntime(out string error)
