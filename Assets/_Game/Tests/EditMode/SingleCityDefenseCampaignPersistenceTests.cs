@@ -549,7 +549,8 @@ namespace WasteCity.Tests
                     statistics.KillsByTowerBuildingId,
                     statistics.ConsumablesSpentByResourceId,
                     total,
-                    losses);
+                    losses,
+                    statistics.PartialFromMigration);
             return new SingleCityDefenseCampaignPersistenceState(
                 source.CampaignId,
                 source.Phase,

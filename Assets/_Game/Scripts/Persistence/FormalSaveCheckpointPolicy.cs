@@ -12,6 +12,8 @@ namespace WasteCity.Persistence
             "first-machine-gun-complete";
         public const string TutorialCombatStarted =
             "tutorial-combat-started";
+        public const string CampaignWaveWarningStarted =
+            "campaign-wave-warning-started";
         public const string EvacuationBatchConfirmed =
             "evacuation-batch-confirmed";
         public const string EvacuationWorkCommitted =
@@ -351,6 +353,10 @@ namespace WasteCity.Persistence
                 case FormalSaveCheckpointReasonIds.TutorialCombatStarted:
                     priority = 40;
                     oneShot = true;
+                    return true;
+                case FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted:
+                    priority = 45;
+                    oneShot = false;
                     return true;
                 case FormalSaveCheckpointReasonIds.EvacuationBatchConfirmed:
                     priority = 50;

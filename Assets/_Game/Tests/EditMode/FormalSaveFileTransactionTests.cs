@@ -369,6 +369,66 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SaveAfterBackupRecoveryNeverRotatesCorruptPrimaryOverBackup()
+        {
+            using (var directory = new TemporaryDirectory())
+            {
+                var clock = new FakeClock(
+                    new DateTime(2031, 2, 3, 4, 5, 6,
+                        DateTimeKind.Utc));
+                var store = new FormalSaveStore(
+                    directory.Path,
+                    null,
+                    clock);
+                FormalSaveEnvelope envelope = LoadFixtureEnvelope();
+                Assert.That(store.SaveEnvelope(envelope).Success, Is.True);
+                clock.UtcNow = clock.UtcNow.AddMinutes(1);
+                envelope.checkpoint.sequence++;
+                Assert.That(store.SaveEnvelope(envelope).Success, Is.True);
+
+                string primary = Path.Combine(
+                    directory.Path,
+                    FormalSaveStore.FileName);
+                string backup = primary + ".bak";
+                string validRecoveryPoint = File.ReadAllText(backup);
+                File.WriteAllText(primary, "{broken");
+
+                FormalSaveStoreResult recovered = store.Load(
+                    FormalSavePayloadKind.Formal3D);
+                Assert.That(recovered.Code,
+                    Is.EqualTo(FormalSaveStoreCode.BackupRecovered));
+                Assert.That(recovered.Envelope, Is.Not.Null);
+
+                clock.UtcNow = clock.UtcNow.AddMinutes(1);
+                recovered.Envelope.checkpoint.sequence++;
+                FormalSaveStoreResult saved = store.SaveEnvelope(
+                    recovered.Envelope);
+
+                Assert.That(saved.Code,
+                    Is.EqualTo(FormalSaveStoreCode.SaveSucceeded),
+                    saved.Message + " " + saved.Diagnostic);
+                FormalSaveDecodeResult newPrimary = FormalSaveCodec.DecodeAny(
+                    File.ReadAllText(primary));
+                Assert.That(newPrimary.Success, Is.True, newPrimary.Message);
+                Assert.That(
+                    FormalSaveValidator.ValidateDecoded(newPrimary).IsValid,
+                    Is.True);
+                Assert.That(File.ReadAllText(backup),
+                    Is.EqualTo(validRecoveryPoint),
+                    "The corrupt primary must never replace the last valid " +
+                    "recovery point during the next transaction.");
+                FormalSaveDecodeResult preservedBackup =
+                    FormalSaveCodec.DecodeAny(File.ReadAllText(backup));
+                Assert.That(preservedBackup.Success,
+                    Is.True, preservedBackup.Message);
+                Assert.That(
+                    FormalSaveValidator.ValidateDecoded(preservedBackup)
+                        .IsValid,
+                    Is.True);
+            }
+        }
+
+        [Test]
         public void ProbeDistinguishesNoSaveLegacyAndFutureSchema()
         {
             using (var directory = new TemporaryDirectory())

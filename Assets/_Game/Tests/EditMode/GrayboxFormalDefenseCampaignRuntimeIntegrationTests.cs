@@ -156,6 +156,78 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PersistenceSuppressedSynchronizeDefersCampaignStartUntilGameplay()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(
+                includeThreeTowers: false,
+                includeSmelter: false);
+            var announcedWaves = new List<int>();
+            fixture.Campaign.WaveWarningStarted += announcedWaves.Add;
+
+            fixture.Runtime.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                allowCampaignStart: false);
+
+            Assert.That(fixture.Campaign.Snapshot.Phase,
+                Is.EqualTo(SingleCityDefenseCampaignPhase.Idle),
+                "Persistence rebuild adopts restored Idle truth instead of " +
+                "turning topology synchronization into gameplay.");
+            Assert.That(fixture.Campaign.Snapshot.CurrentWaveNumber, Is.Zero);
+            Assert.That(announcedWaves, Is.Empty,
+                "A suppressed restore must not publish a warning checkpoint.");
+            Assert.That(fixture.Health.TryGetHealth(
+                MachineGunId,
+                out int currentHealth,
+                out int maximumHealth,
+                out bool destroyed), Is.True,
+                "Restore rebuild must still synchronize building health.");
+            Assert.That(currentHealth, Is.EqualTo(maximumHealth));
+            Assert.That(destroyed, Is.False);
+            Assert.That(CampaignTower(fixture.Runtime, MachineGunId)
+                .IsLogisticsConnected, Is.True,
+                "Restore rebuild must still synchronize tower logistics.");
+
+            fixture.Runtime.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                allowCampaignStart: false);
+            Assert.That(announcedWaves, Is.Empty,
+                "Repeated suppressed rebuilds remain side-effect free.");
+
+            fixture.Runtime.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                allowCampaignStart: true);
+            Assert.That(fixture.Campaign.Snapshot.Phase,
+                Is.EqualTo(SingleCityDefenseCampaignPhase.Warning));
+            Assert.That(fixture.Campaign.Snapshot.CurrentWaveNumber,
+                Is.EqualTo(1));
+            CollectionAssert.AreEqual(new[] { 1 }, announcedWaves,
+                "The first real gameplay synchronization publishes the " +
+                "deferred checkpoint exactly once.");
+
+            fixture.Runtime.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                allowCampaignStart: true);
+            CollectionAssert.AreEqual(new[] { 1 }, announcedWaves,
+                "Stable topology synchronization cannot duplicate the event.");
+        }
+
+        [Test]
         public void StableFormalControllerTickReusesSnapshotsAndAllocatesZero()
         {
             ControllerFixture fixture = CreateControllerFixture();

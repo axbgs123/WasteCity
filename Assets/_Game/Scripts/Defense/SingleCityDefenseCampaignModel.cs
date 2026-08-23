@@ -143,7 +143,8 @@ namespace WasteCity.Defense
             int buildingLossCount,
             int coreCurrentHealth,
             int coreMaximumHealth,
-            int highestAliveEnemyCount)
+            int highestAliveEnemyCount,
+            bool partialFromMigration = false)
         {
             ElapsedRuleSeconds = Math.Max(0f, elapsedRuleSeconds);
             CompletedWaveCount = Math.Max(0, completedWaveCount);
@@ -157,6 +158,7 @@ namespace WasteCity.Defense
             CoreCurrentHealth = Math.Max(0, coreCurrentHealth);
             CoreMaximumHealth = Math.Max(1, coreMaximumHealth);
             HighestAliveEnemyCount = Math.Max(0, highestAliveEnemyCount);
+            PartialFromMigration = partialFromMigration;
         }
 
         public float ElapsedRuleSeconds { get; }
@@ -179,6 +181,7 @@ namespace WasteCity.Defense
         public int CoreCurrentHealth { get; }
         public int CoreMaximumHealth { get; }
         public int HighestAliveEnemyCount { get; }
+        public bool PartialFromMigration { get; }
 
         private static IReadOnlyDictionary<string, int> Copy(
             IReadOnlyDictionary<string, int> source)
@@ -285,6 +288,7 @@ namespace WasteCity.Defense
         private int nextSpawnIndex;
         private int completedWaveCount;
         private int highestAliveEnemyCount;
+        private bool partialFromMigration;
         private int coreCurrentHealth = CityCoreCombatModel.FormalMaximumHealth;
         private ulong persistenceGeneration;
 
@@ -297,6 +301,8 @@ namespace WasteCity.Defense
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
         public bool IsTerminal =>
             result != SingleCityDefenseCampaignResult.None;
+
+        public event Action<int> WaveWarningStarted;
 
         public SingleCityDefenseCampaignPersistenceState CaptureForPersistence()
         {
@@ -390,7 +396,8 @@ namespace WasteCity.Defense
                     MetricStates(killsByTowerBuildingId),
                     MetricStates(consumablesSpentByResourceId),
                     TotalBuildingLossCount,
-                    MetricStates(buildingLossesByBuildingId)));
+                    MetricStates(buildingLossesByBuildingId),
+                    partialFromMigration));
         }
 
         public bool TryPrepareRestore(
@@ -483,6 +490,7 @@ namespace WasteCity.Defense
             nextSpawnIndex = candidate.NextSpawnIndex;
             completedWaveCount = candidate.CompletedWaveCount;
             highestAliveEnemyCount = candidate.HighestAliveEnemyCount;
+            partialFromMigration = candidate.PartialFromMigration;
             coreCurrentHealth = candidate.CoreCurrentHealth;
             plan.Consumed = true;
             persistenceGeneration++;
@@ -1178,6 +1186,7 @@ namespace WasteCity.Defense
             BuildSpawnSequence(currentWave);
             FreezeSpawnAnchors(currentWave);
             phase = SingleCityDefenseCampaignPhase.Warning;
+            WaveWarningStarted?.Invoke(currentWave.Number);
         }
 
         private void FreezeSpawnAnchors(CampaignWaveDefinition wave)
@@ -1321,7 +1330,8 @@ namespace WasteCity.Defense
                     TotalBuildingLossCount,
                     coreCurrentHealth,
                     CityCoreCombatModel.FormalMaximumHealth,
-                    highestAliveEnemyCount));
+                    highestAliveEnemyCount,
+                    partialFromMigration));
         }
 
         private bool TryBuildRestoreCandidate(
@@ -1589,6 +1599,7 @@ namespace WasteCity.Defense
                 state.NextEnemyOrdinal,
                 statistics.CompletedWaveCount,
                 statistics.HighestAliveEnemyCount,
+                statistics.PartialFromMigration,
                 state.CoreCurrentHealth,
                 sequence,
                 restoredEnemies,
@@ -1959,6 +1970,7 @@ namespace WasteCity.Defense
             MixMetrics(ref hash, statistics.ConsumablesSpentByResourceId);
             Mix(ref hash, statistics.BuildingLossCount);
             MixMetrics(ref hash, statistics.BuildingLossesByBuildingId);
+            Mix(ref hash, statistics.PartialFromMigration ? 1 : 0);
             return hash;
         }
 
@@ -2276,6 +2288,7 @@ namespace WasteCity.Defense
                 int nextSpawnIndex,
                 int completedWaveCount,
                 int highestAliveEnemyCount,
+                bool partialFromMigration,
                 int coreCurrentHealth,
                 List<SpawnDefinition> spawnSequence,
                 List<EnemyState> enemies,
@@ -2299,6 +2312,7 @@ namespace WasteCity.Defense
                 NextSpawnIndex = nextSpawnIndex;
                 CompletedWaveCount = completedWaveCount;
                 HighestAliveEnemyCount = highestAliveEnemyCount;
+                PartialFromMigration = partialFromMigration;
                 CoreCurrentHealth = coreCurrentHealth;
                 SpawnSequence = spawnSequence;
                 Enemies = enemies;
@@ -2321,6 +2335,7 @@ namespace WasteCity.Defense
             public int NextSpawnIndex { get; }
             public int CompletedWaveCount { get; }
             public int HighestAliveEnemyCount { get; }
+            public bool PartialFromMigration { get; }
             public int CoreCurrentHealth { get; }
             public List<SpawnDefinition> SpawnSequence { get; }
             public List<EnemyState> Enemies { get; }

@@ -65,6 +65,7 @@ namespace WasteCity.Graybox3D.Building
 
         public event Action<string> FirstMachineGunCompleted;
         public event Action<string> TutorialCombatStarted;
+        public event Action<int> CampaignWaveWarningStarted;
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -153,6 +154,11 @@ namespace WasteCity.Graybox3D.Building
 
         private void ResetRuntimeOwnership()
         {
+            if (campaign != null)
+            {
+                campaign.WaveWarningStarted -=
+                    HandleCampaignWaveWarningStarted;
+            }
             runtime?.DetachPresentationRecovery();
             runtime = null;
             campaign = null;
@@ -304,6 +310,11 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             UnbindHud();
+            if (campaign != null)
+            {
+                campaign.WaveWarningStarted -=
+                    HandleCampaignWaveWarningStarted;
+            }
             runtime?.DetachPresentationRecovery();
             session = null;
             city = null;
@@ -346,6 +357,8 @@ namespace WasteCity.Graybox3D.Building
             if (production == null) return;
 
             campaign = new SingleCityDefenseCampaignModel(coreX, coreZ);
+            campaign.WaveWarningStarted +=
+                HandleCampaignWaveWarningStarted;
             destructionCoordinator =
                 new GrayboxCombatDestructionCoordinator3D(
                     session,
@@ -360,6 +373,11 @@ namespace WasteCity.Graybox3D.Building
                 destructionCoordinator);
             runtime.ConfigurePresentationRecovery(
                 TryRecoverDestroyedBuildingPresentation);
+        }
+
+        private void HandleCampaignWaveWarningStarted(int waveNumber)
+        {
+            CampaignWaveWarningStarted?.Invoke(waveNumber);
         }
 
         private bool TryRecoverDestroyedBuildingPresentation(
@@ -425,7 +443,8 @@ namespace WasteCity.Graybox3D.Building
                 city.Mode,
                 cityX,
                 cityY,
-                session.GroundBuildRadius);
+                session.GroundBuildRadius,
+                allowCampaignStart: !IsPersistencePaused);
             error = string.Empty;
             return true;
         }

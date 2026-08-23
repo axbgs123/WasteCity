@@ -119,7 +119,8 @@ namespace WasteCity.Defense
                 consumablesSpentByResourceId,
             int buildingLossCount,
             IEnumerable<SingleCityDefenseCampaignMetricPersistenceState>
-                buildingLossesByBuildingId = null)
+                buildingLossesByBuildingId = null,
+            bool partialFromMigration = false)
         {
             ElapsedRuleSeconds = elapsedRuleSeconds;
             SpawnedEnemyCount = spawnedEnemyCount;
@@ -128,6 +129,7 @@ namespace WasteCity.Defense
             HighestAliveEnemyCount = highestAliveEnemyCount;
             CoreDamageTaken = coreDamageTaken;
             BuildingLossCount = buildingLossCount;
+            PartialFromMigration = partialFromMigration;
             this.killsByEnemyId = CopyMetrics(killsByEnemyId);
             this.damageByTowerBuildingId = CopyMetrics(
                 damageByTowerBuildingId);
@@ -155,6 +157,7 @@ namespace WasteCity.Defense
         public IReadOnlyList<SingleCityDefenseCampaignMetricPersistenceState>
             BuildingLossesByBuildingId => buildingLossesByBuildingId;
         public int BuildingLossCount { get; }
+        public bool PartialFromMigration { get; }
 
         private static ReadOnlyCollection<
             SingleCityDefenseCampaignMetricPersistenceState> CopyMetrics(
@@ -252,7 +255,8 @@ namespace WasteCity.Defense
                     statistics.KillsByTowerBuildingId,
                     statistics.ConsumablesSpentByResourceId,
                     statistics.BuildingLossCount,
-                    statistics.BuildingLossesByBuildingId);
+                    statistics.BuildingLossesByBuildingId,
+                    statistics.PartialFromMigration);
         }
 
         public string CampaignId { get; }

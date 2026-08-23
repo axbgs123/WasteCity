@@ -445,6 +445,7 @@ namespace WasteCity.Graybox3D.Building
                     source.DamageByTowerBuildingId),
                 consumablesSpentByResourceId = Metrics(
                     source.ConsumablesSpentByResourceId),
+                partialFromMigration = source.PartialFromMigration,
             };
         }
 
@@ -508,7 +509,8 @@ namespace WasteCity.Graybox3D.Building
                         SingleCityDefenseCampaignMetricPersistenceState>(),
                     Metrics(statistics.consumablesSpentByResourceId),
                     SumMetrics(statistics.buildingLossesByBuildingId),
-                    Metrics(statistics.buildingLossesByBuildingId));
+                    Metrics(statistics.buildingLossesByBuildingId),
+                    statistics.partialFromMigration);
             return new SingleCityDefenseCampaignPersistenceState(
                 source.campaignId,
                 (SingleCityDefenseCampaignPhase)source.phase,

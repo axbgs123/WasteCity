@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.Persistence;
@@ -116,6 +117,15 @@ namespace WasteCity.Graybox3D.Building
             {
                 tacticalPaused = speed.IsPaused(GamePauseReason.User),
             };
+            if (destination.defenseCampaign != null)
+            {
+                destination.defenseCampaign.requestedSpeed =
+                    speed.IsPaused(GamePauseReason.User)
+                        ? 0f
+                        : NormalizeFormalSpeed(speed.RequestedSpeed);
+                destination.defenseCampaign.lastNonZeroSpeed =
+                    NormalizeNonZeroFormalSpeed(speed.LastNonZeroSpeed);
+            }
             error = string.Empty;
             return true;
         }
@@ -129,11 +139,76 @@ namespace WasteCity.Graybox3D.Building
                 error = "正式 3D 暂停状态不能为空";
                 return false;
             }
-            speed.SetPaused(
-                GamePauseReason.User,
-                source.pause.tacticalPaused);
+            if (source.defenseCampaign == null)
+            {
+                speed.SetPaused(
+                    GamePauseReason.User,
+                    source.pause.tacticalPaused);
+                error = string.Empty;
+                return true;
+            }
+
+            float requested = source.defenseCampaign.requestedSpeed;
+            float lastNonZero =
+                source.defenseCampaign.lastNonZeroSpeed;
+            if (!IsFormalRequestedSpeed(requested) ||
+                !IsFormalNonZeroSpeed(lastNonZero))
+            {
+                error = "正式 3D 游戏速度状态无效";
+                return false;
+            }
+            bool tacticalPaused = source.pause.tacticalPaused;
+            bool migratedPausedWithUnderlyingSpeed =
+                tacticalPaused &&
+                requested > 0f &&
+                source.defenseCampaign.statistics != null &&
+                source.defenseCampaign.statistics.partialFromMigration;
+            if (tacticalPaused != (requested == 0f) &&
+                !migratedPausedWithUnderlyingSpeed)
+            {
+                error = "正式 3D 战术暂停与请求速度不一致";
+                return false;
+            }
+
+            float underlyingRequested = tacticalPaused
+                ? migratedPausedWithUnderlyingSpeed
+                    ? requested
+                    : lastNonZero
+                : requested;
+            float restoredLastNonZero = migratedPausedWithUnderlyingSpeed
+                ? requested
+                : lastNonZero;
+            if (!speed.TryRestoreSpeedState(
+                    underlyingRequested,
+                    restoredLastNonZero,
+                    tacticalPaused,
+                    out error))
+            {
+                return false;
+            }
             error = string.Empty;
             return true;
+        }
+
+        private static float NormalizeFormalSpeed(float value)
+        {
+            if (value <= 0f) return 0f;
+            return value < 1.5f ? 1f : 2f;
+        }
+
+        private static float NormalizeNonZeroFormalSpeed(float value)
+        {
+            return value < 1.5f ? 1f : 2f;
+        }
+
+        private static bool IsFormalRequestedSpeed(float value)
+        {
+            return value == 0f || value == 1f || value == 2f;
+        }
+
+        private static bool IsFormalNonZeroSpeed(float value)
+        {
+            return value == 1f || value == 2f;
         }
     }
 
@@ -425,6 +500,8 @@ namespace WasteCity.Graybox3D.Building
                     HandleFirstMachineGunCompleted;
                 defense.TutorialCombatStarted +=
                     HandleTutorialCombatStarted;
+                defense.CampaignWaveWarningStarted +=
+                    HandleCampaignWaveWarningStarted;
             }
             catch
             {
@@ -441,6 +518,8 @@ namespace WasteCity.Graybox3D.Building
                     HandleFirstMachineGunCompleted;
                 checkpointDefense.TutorialCombatStarted -=
                     HandleTutorialCombatStarted;
+                checkpointDefense.CampaignWaveWarningStarted -=
+                    HandleCampaignWaveWarningStarted;
             }
             checkpointPolicy?.Unbind();
             checkpointPolicy = null;
@@ -501,6 +580,16 @@ namespace WasteCity.Graybox3D.Building
             checkpointPolicy?.QueueCheckpoint(
                 FormalSaveCheckpointReasonIds.TutorialCombatStarted,
                 stableEnemyId);
+        }
+
+        private void HandleCampaignWaveWarningStarted(int waveNumber)
+        {
+            if (waveNumber <= 0) return;
+            checkpointPolicy?.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted,
+                "campaign.wave." + waveNumber.ToString(
+                    "D4",
+                    CultureInfo.InvariantCulture) + "|warning");
         }
 
         public GrayboxFormalSaveCoordinatorResult3D RestoreEncoded(

@@ -5,7 +5,10 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.Core;
 using WasteCity.Defense;
+using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 
@@ -426,6 +429,99 @@ namespace WasteCity.Tests
                 Is.EqualTo(8));
         }
 
+        [TestCase("not-triggered", 0, 0, 0, 0, 0)]
+        [TestCase("warning", 1, 1, 0, 0, 0)]
+        [TestCase("spawning", 2, 1, 1, 0, 1)]
+        [TestCase("combat-cleanup", 3, 1, 8, 7, 1)]
+        [TestCase("completed", 1, 2, 0, 0, 0)]
+        public void EverySchemaThirtyOneTutorialStateMigratesThroughFormalPrepare(
+            string legacyState,
+            int expectedPhase,
+            int expectedWave,
+            int expectedWaveSpawned,
+            int expectedWaveDefeated,
+            int expectedAlive)
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            ConfigureLegacyTutorialState(source.formal3D.defense, legacyState);
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+
+            Assert.That(decoded.Success, Is.True,
+                legacyState + ": " + decoded.Message);
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(32));
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            Assert.That(validation.IsValid, Is.True,
+                legacyState + ": " + validation.Message);
+
+            FormalThreeDDefenseCampaignSaveData campaign =
+                decoded.Envelope.formal3D.defenseCampaign;
+            Assert.That(campaign, Is.Not.Null, legacyState);
+            Assert.That(campaign.campaignId,
+                Is.EqualTo("campaign.single-city-defense.v1"), legacyState);
+            Assert.That(campaign.phase, Is.EqualTo(expectedPhase), legacyState);
+            Assert.That(campaign.currentWaveNumber,
+                Is.EqualTo(expectedWave), legacyState);
+            Assert.That(campaign.requestedSpeed, Is.EqualTo(1f), legacyState);
+            Assert.That(campaign.lastNonZeroSpeed,
+                Is.EqualTo(1f), legacyState);
+            Assert.That(campaign.statistics, Is.Not.Null, legacyState);
+            Assert.That(campaign.statistics.partialFromMigration, Is.True,
+                legacyState +
+                " must disclose that schema 31 has only partial history.");
+            Assert.That(campaign.enemyStates, Has.Length.EqualTo(expectedAlive),
+                legacyState);
+            Assert.That(
+                ReadEnemyCount(
+                    campaign,
+                    "spawnedEnemyCountsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.EqualTo(expectedWaveSpawned), legacyState);
+            Assert.That(
+                ReadEnemyCount(
+                    campaign,
+                    "defeatedEnemyCountsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.EqualTo(expectedWaveDefeated), legacyState);
+            for (var index = 0; index < campaign.enemyStates.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData enemy =
+                    campaign.enemyStates[index];
+                Assert.That(
+                    enemy.stableEnemyId,
+                    Is.EqualTo(
+                        "campaign.enemy.wave-01." +
+                        enemy.spawnOrder.ToString("0000")),
+                    legacyState + " must not retain a tutorial-local ID.");
+                Assert.That(enemy.targetStableId,
+                    Is.EqualTo(
+                        SingleCityDefenseCampaignModel.CityCoreTargetId),
+                    legacyState);
+            }
+
+            var restored = new SingleCityDefenseCampaignModel(28f, 28f);
+            Assert.That(restored.TryPrepareRestore(
+                ToCampaignPersistence(campaign),
+                out SingleCityDefenseCampaignRestorePlan plan,
+                out string error), Is.True,
+                legacyState + ": " + error);
+            Assert.That(plan, Is.Not.Null,
+                legacyState +
+                " must reach the formal campaign's transactional prepare.");
+            Assert.That(restored.TryCommitRestore(plan, out error), Is.True,
+                legacyState + ": " + error);
+            SingleCityDefenseCampaignPersistenceState recaptured =
+                restored.CaptureForPersistence();
+            Assert.That(recaptured.Statistics.PartialFromMigration, Is.True,
+                legacyState +
+                " must retain partial statistics after formal prepare.");
+        }
+
         [Test]
         public void ValidatorRejectsMissingDefenseCampaign()
         {
@@ -594,6 +690,41 @@ namespace WasteCity.Tests
                 Is.EqualTo(1f),
                 "Schema 31 did not persist last non-zero speed, so " +
                 "migration must default it to 1x.");
+        }
+
+        [Test]
+        public void PausedSchemaThirtyOneMigrationRestoresItsDefaultResumeSpeed()
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            source.formal3D.pause.tacticalPaused = true;
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+            Assert.That(decoded.Envelope.formal3D.defenseCampaign
+                .requestedSpeed, Is.EqualTo(1f));
+            Assert.That(decoded.Envelope.formal3D.defenseCampaign
+                .lastNonZeroSpeed, Is.EqualTo(1f));
+            Assert.That(decoded.Envelope.formal3D.defenseCampaign.statistics
+                .partialFromMigration, Is.True);
+
+            var speed = new GameSpeedModel();
+            var commands = new GrayboxGameSpeedCommandFacade3D(speed);
+            var pauseDomain = new GrayboxFormalPauseSaveDomain3D(speed);
+            Assert.That(pauseDomain.TryApply(
+                decoded.Envelope.formal3D,
+                out string error), Is.True, error);
+            Assert.That(commands.RequestedSpeed, Is.Zero);
+            Assert.That(commands.LastNonZeroSpeed, Is.EqualTo(1f));
+            commands.ToggleTacticalPause();
+            Assert.That(commands.RequestedSpeed, Is.EqualTo(1f));
+            Assert.That(commands.EffectiveSpeed, Is.EqualTo(1f));
         }
 
         [Test]
@@ -869,19 +1000,28 @@ namespace WasteCity.Tests
                 ToCounts(source.defeatedEnemyCountsByEnemyId),
                 ToAnchors(source.frozenSpawnAnchors),
                 ToEnemies(source.enemyStates),
-                new SingleCityDefenseCampaignStatisticsPersistenceState(
-                    statistics.elapsedRuleSeconds,
-                    statistics.spawnedEnemyCount,
-                    statistics.defeatedEnemyCount,
-                    statistics.completedWaveCount,
-                    ToMetrics(statistics.killsByEnemyId),
-                    statistics.highestAliveEnemyCount,
-                    statistics.coreDamageTaken,
-                    ToMetrics(statistics.damageByTowerBuildingId),
-                    Array.Empty<
-                        SingleCityDefenseCampaignMetricPersistenceState>(),
-                    ToMetrics(statistics.consumablesSpentByResourceId),
-                    SumMetrics(statistics.buildingLossesByBuildingId)));
+                ToCampaignStatisticsPersistence(statistics));
+        }
+
+        private static SingleCityDefenseCampaignStatisticsPersistenceState
+            ToCampaignStatisticsPersistence(
+                FormalThreeDDefenseCampaignStatisticsSaveData source)
+        {
+            return new SingleCityDefenseCampaignStatisticsPersistenceState(
+                source.elapsedRuleSeconds,
+                source.spawnedEnemyCount,
+                source.defeatedEnemyCount,
+                source.completedWaveCount,
+                ToMetrics(source.killsByEnemyId),
+                source.highestAliveEnemyCount,
+                source.coreDamageTaken,
+                ToMetrics(source.damageByTowerBuildingId),
+                Array.Empty<
+                    SingleCityDefenseCampaignMetricPersistenceState>(),
+                ToMetrics(source.consumablesSpentByResourceId),
+                SumMetrics(source.buildingLossesByBuildingId),
+                ToMetrics(source.buildingLossesByBuildingId),
+                source.partialFromMigration);
         }
 
         private static
@@ -982,6 +1122,89 @@ namespace WasteCity.Tests
         {
             envelope.payloadHashSha256 =
                 FormalSaveCodec.ComputePayloadHashSha256(envelope.formal3D);
+        }
+
+        private static void ConfigureLegacyTutorialState(
+            FormalThreeDDefenseSaveData legacy,
+            string state)
+        {
+            legacy.coreCurrentHealth = 1985;
+            legacy.fixedStepAccumulatorSeconds = .05f;
+            legacy.warningRemainingSeconds = 0f;
+            legacy.spawnClockSeconds = 0f;
+            legacy.spawnedEnemyCount = 0;
+            legacy.defeatedEnemyCount = 0;
+            legacy.nextEnemyOrdinal = 0;
+            legacy.enemies =
+                Array.Empty<FormalThreeDDefenseEnemySaveData>();
+
+            switch (state)
+            {
+                case "not-triggered":
+                    legacy.tutorialTriggered = false;
+                    legacy.tutorialWaveTriggerCount = 0;
+                    legacy.wavePhase = 0;
+                    return;
+                case "warning":
+                    legacy.tutorialTriggered = true;
+                    legacy.tutorialWaveTriggerCount = 1;
+                    legacy.wavePhase = 1;
+                    legacy.warningRemainingSeconds = 9f;
+                    return;
+                case "spawning":
+                    legacy.tutorialTriggered = true;
+                    legacy.tutorialWaveTriggerCount = 1;
+                    legacy.wavePhase = 2;
+                    legacy.spawnClockSeconds = 1f;
+                    legacy.spawnedEnemyCount = 1;
+                    legacy.nextEnemyOrdinal = 1;
+                    legacy.enemies = new[]
+                    {
+                        LegacyGnawer(spawnOrder: 0),
+                    };
+                    return;
+                case "combat-cleanup":
+                    legacy.tutorialTriggered = true;
+                    legacy.tutorialWaveTriggerCount = 1;
+                    legacy.wavePhase = 3;
+                    legacy.spawnedEnemyCount = 8;
+                    legacy.defeatedEnemyCount = 7;
+                    legacy.nextEnemyOrdinal = 8;
+                    legacy.enemies = new[]
+                    {
+                        LegacyGnawer(spawnOrder: 7),
+                    };
+                    return;
+                case "completed":
+                    legacy.tutorialTriggered = true;
+                    legacy.tutorialWaveTriggerCount = 1;
+                    legacy.wavePhase = 0;
+                    legacy.spawnedEnemyCount = 8;
+                    legacy.defeatedEnemyCount = 8;
+                    legacy.nextEnemyOrdinal = 8;
+                    return;
+                default:
+                    Assert.Fail("Unknown schema 31 tutorial state: " + state);
+                    return;
+            }
+        }
+
+        private static FormalThreeDDefenseEnemySaveData LegacyGnawer(
+            int spawnOrder)
+        {
+            return new FormalThreeDDefenseEnemySaveData
+            {
+                stableEnemyId =
+                    "core.enemy.gnawer.tutorial." +
+                    spawnOrder.ToString("000"),
+                archetypeId = "core.enemy.gnawer",
+                spawnOrder = spawnOrder,
+                positionX = 29.5f,
+                positionZ = 28f,
+                currentHealth = 60,
+                movementRemainder = 0f,
+                attackDamageRemainder = .5f,
+            };
         }
 
         private static void AddCompletedTower(

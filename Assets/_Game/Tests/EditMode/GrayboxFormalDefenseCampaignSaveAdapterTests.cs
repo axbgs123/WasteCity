@@ -169,6 +169,41 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void PartialMigrationStatisticsRoundTripThroughFormalAdapter()
+        {
+            Fixture source = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            var sourceAdapter = new GrayboxDefenseSaveAdapter3D(source.Runtime);
+            FormalThreeDDefenseCampaignSaveData saved =
+                sourceAdapter.CaptureCampaign();
+            Assert.That(saved.statistics.partialFromMigration, Is.False,
+                "A newly-created formal campaign must own complete stats.");
+            saved.statistics.partialFromMigration = true;
+
+            Fixture target = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            var targetAdapter = new GrayboxDefenseSaveAdapter3D(target.Runtime);
+
+            Assert.That(targetAdapter.TryRestoreCampaign(
+                saved,
+                target.Session.Instances,
+                out string error), Is.True, error);
+            Assert.That(
+                targetAdapter.CaptureCampaign().statistics
+                    .partialFromMigration,
+                Is.True,
+                "DTO restore and recapture must preserve partial history.");
+            Assert.That(target.Campaign.Snapshot.Statistics
+                    .PartialFromMigration,
+                Is.True,
+                "The live campaign snapshot must expose the restored truth.");
+        }
+
+        [Test]
         public void PrepareValidatesWholePayloadWithoutWritingAndCommitAppliesOnce()
         {
             Fixture source = CreateFixture(

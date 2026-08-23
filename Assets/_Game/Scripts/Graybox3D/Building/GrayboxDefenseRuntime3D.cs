@@ -889,6 +889,23 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius)
         {
+            Synchronize(
+                instances,
+                cityMode,
+                cityX,
+                cityY,
+                groundRadius,
+                allowCampaignStart: true);
+        }
+
+        public void Synchronize(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            bool allowCampaignStart = true)
+        {
             if (campaign != null)
             {
                 SynchronizeCampaign(
@@ -896,7 +913,8 @@ namespace WasteCity.Graybox3D.Building
                     cityMode,
                     cityX,
                     cityY,
-                    groundRadius);
+                    groundRadius,
+                    allowCampaignStart);
                 return;
             }
 
@@ -1198,7 +1216,8 @@ namespace WasteCity.Graybox3D.Building
             CityMode cityMode,
             int cityX,
             int cityY,
-            int groundRadius)
+            int groundRadius,
+            bool allowCampaignStart)
         {
             persistenceGeneration++;
             bool snapshotChanged = false;
@@ -1286,7 +1305,9 @@ namespace WasteCity.Graybox3D.Building
                 }
                 campaignTowers.Add(tower);
 
-                if (!campaignTriggered && campaign.NotifyDefenseTowerCompleted(
+                if (allowCampaignStart &&
+                    !campaignTriggered &&
+                    campaign.NotifyDefenseTowerCompleted(
                         instance.StableInstanceId,
                         instance.Placement.Definition.Id.Value,
                         isCompleted: true,
