@@ -823,7 +823,9 @@ namespace WasteCity.Tests
                     new DateTime(2026, 8, 23, 0, 0, 0,
                         DateTimeKind.Utc));
             Assert.That(captured.Success, Is.True, captured.Message);
-            Assert.That(captured.Envelope.saveSchemaVersion, Is.EqualTo(31));
+            Assert.That(
+                captured.Envelope.saveSchemaVersion,
+                Is.EqualTo(FormalSaveEnvelope.CurrentSchemaVersion));
 
             GrayboxBuildingInstance3D targetInstance = CompleteInstance(
                 stableId,

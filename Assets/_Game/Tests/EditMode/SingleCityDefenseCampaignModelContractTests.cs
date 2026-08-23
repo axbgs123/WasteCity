@@ -355,6 +355,38 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void FinalEnemyKillDoesNotCommitVictoryBeforeSameStepCoreDamage()
+        {
+            object model = CreateTriggeredModel(FormalTowerIds[0]);
+            for (var wave = 1; wave < 10; wave++)
+            {
+                Advance(model, 200f, 1);
+                DefeatAllVisibleEnemies(model);
+                Advance(model, .1f, 1);
+            }
+
+            Advance(model, 200f, 1);
+            List<string> finalEnemies = ReadEnemyIds(ReadSnapshot(model));
+            Assert.That(finalEnemies, Has.Count.EqualTo(46));
+            for (var index = 0; index < finalEnemies.Count; index++)
+                Assert.That(DefeatEnemy(model, finalEnemies[index]), Is.True);
+
+            MethodInfo applyCoreDamage = RequireInstanceMethod(
+                model.GetType(),
+                "ApplyCoreDamage",
+                typeof(int),
+                typeof(int));
+            applyCoreDamage.Invoke(model, new object[] { 2000 });
+            Advance(model, .1f, 1);
+
+            Assert.That(
+                ReadString(ReadSnapshot(model), "Result"),
+                Is.EqualTo("Defeat"),
+                "Terminal arbitration must occur after all same-step damage " +
+                "and must prefer core destruction over wave-ten clear.");
+        }
+
+        [Test]
         public void ImmutableSnapshotPublishesRequiredCampaignStatistics()
         {
             Type snapshotType = RequireType(SnapshotTypeName);

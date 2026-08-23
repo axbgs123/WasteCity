@@ -1,4 +1,5 @@
 using System;
+using WasteCity.Combat;
 
 namespace WasteCity.Persistence.ThreeD
 {
@@ -15,6 +16,7 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDResearchSaveData research;
         public FormalThreeDProductionSaveData production;
         public FormalThreeDDefenseSaveData defense;
+        public FormalThreeDDefenseCampaignSaveData defenseCampaign;
         public FormalThreeDEvacuationSaveData evacuation;
         public FormalThreeDPauseSaveData pause;
     }
@@ -238,6 +240,129 @@ namespace WasteCity.Persistence.ThreeD
         public int currentHealth;
         public float movementRemainder;
         public float attackDamageRemainder;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignSaveData
+    {
+        public string campaignId;
+        public int phase;
+        public int currentWaveNumber;
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            plannedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            spawnedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            defeatedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignSpawnAnchorSaveData[]
+            frozenSpawnAnchors =
+                Array.Empty<FormalThreeDDefenseCampaignSpawnAnchorSaveData>();
+        public float warningRemainingSeconds;
+        public float spawnClockSeconds;
+        public float fixedStepAccumulatorSeconds;
+        public int nextEnemyOrdinal;
+        public int coreCurrentHealth;
+        public float requestedSpeed = 1f;
+        public float lastNonZeroSpeed = 1f;
+        public int result;
+        public FormalThreeDDefenseCampaignStatisticsSaveData statistics;
+        public FormalThreeDDefenseCampaignTowerCombatStateSaveData[]
+            towerCombatStates =
+                Array.Empty<
+                    FormalThreeDDefenseCampaignTowerCombatStateSaveData>();
+        public FormalThreeDDefenseCampaignEnemyStateSaveData[] enemyStates =
+            Array.Empty<FormalThreeDDefenseCampaignEnemyStateSaveData>();
+        public FormalThreeDDefenseCampaignBuildingHealthStateSaveData[]
+            buildingHealthStates =
+                Array.Empty<
+                    FormalThreeDDefenseCampaignBuildingHealthStateSaveData>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignStatisticsSaveData
+    {
+        public float elapsedRuleSeconds;
+        public int spawnedEnemyCount;
+        public int defeatedEnemyCount;
+        public int completedWaveCount;
+        public FormalThreeDDefenseCampaignMetricSaveData[] killsByEnemyId =
+            Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
+        public int highestAliveEnemyCount;
+        public int coreDamageTaken;
+        public FormalThreeDDefenseCampaignMetricSaveData[]
+            buildingLossesByBuildingId =
+                Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
+        public FormalThreeDDefenseCampaignMetricSaveData[]
+            damageByTowerBuildingId =
+                Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
+        public FormalThreeDDefenseCampaignMetricSaveData[]
+            consumablesSpentByResourceId =
+                Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
+        public int completedProductionBatchCount;
+        public float productionActiveProgressSeconds;
+        public float productionEligibleSeconds;
+        public bool cityWasPackedAfterCampaignStart;
+        public bool developmentModifierUsed;
+        public bool partialFromMigration;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignEnemyCountSaveData
+    {
+        public string enemyId;
+        public int count;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignSpawnAnchorSaveData
+    {
+        public CampaignSpawnDirection direction;
+        public float positionX;
+        public float positionZ;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignMetricSaveData
+    {
+        public string stableId;
+        public int amount;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignTowerCombatStateSaveData
+    {
+        public string stableInstanceId;
+        public string consumableId;
+        public int amount;
+        public bool isPlayerPaused;
+        public float activeConsumableSeconds;
+        public float damageRemainder;
+        public string targetStableEnemyId;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignEnemyStateSaveData
+    {
+        public string stableEnemyId;
+        public string archetypeId;
+        public int spawnOrder;
+        public float positionX;
+        public float positionZ;
+        public int currentHealth;
+        public float movementRemainder;
+        public float attackDamageRemainder;
+        public string targetStableId;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDDefenseCampaignBuildingHealthStateSaveData
+    {
+        public string stableInstanceId;
+        public int currentHealth;
+        public bool isDestroyed;
     }
 
     [Serializable]

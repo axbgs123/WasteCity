@@ -389,7 +389,7 @@ namespace WasteCity.Tests
                 Assert.That(legacy.Message, Does.Contain("旧版 2D"));
 
                 File.WriteAllText(primary,
-                    ReadFixture("schema-32-future.json"));
+                    FutureSchemaJson());
                 FormalSaveStoreResult future = store.Probe(
                     FormalSavePayloadKind.Formal3D);
                 Assert.That(future.Code,
@@ -407,7 +407,7 @@ namespace WasteCity.Tests
                     directory.Path,
                     FormalSaveStore.FileName);
                 byte[] futureBytes = Encoding.UTF8.GetBytes(
-                    ReadFixture("schema-32-future.json"));
+                    FutureSchemaJson());
                 File.WriteAllBytes(primary, futureBytes);
                 var store = new FormalSaveStore(directory.Path);
 
@@ -420,6 +420,14 @@ namespace WasteCity.Tests
                 Assert.That(File.ReadAllBytes(primary), Is.EqualTo(futureBytes));
                 Assert.That(File.Exists(primary + ".bak"), Is.False);
             }
+        }
+
+        private static string FutureSchemaJson()
+        {
+            return ReadFixture("schema-32-future.json").Replace(
+                "\"saveSchemaVersion\": 32",
+                "\"saveSchemaVersion\": " +
+                (FormalSaveEnvelope.CurrentSchemaVersion + 1));
         }
 
         [Test]

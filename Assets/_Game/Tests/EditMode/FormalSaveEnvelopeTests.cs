@@ -30,7 +30,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void SchemaThirtyOneFixtureHasExplicitFormalThreeDIdentity()
+        public void SchemaThirtyOneFixtureMigratesWithFormalThreeDIdentity()
         {
             FormalSaveDecodeResult result = FormalSaveCodec.DecodeAny(
                 ReadFixture("schema-31-formal-3d.json"));
@@ -41,7 +41,9 @@ namespace WasteCity.Tests
             FormalSaveEnvelope envelope = result.Envelope;
             Assert.That(envelope, Is.Not.Null);
             Assert.That(envelope.gameVersion, Is.EqualTo("0.1.0"));
-            Assert.That(envelope.saveSchemaVersion, Is.EqualTo(31));
+            Assert.That(
+                envelope.saveSchemaVersion,
+                Is.EqualTo(FormalSaveEnvelope.CurrentSchemaVersion));
             Assert.That(envelope.runtimeKind,
                 Is.EqualTo("formal-3d"));
             Assert.That(envelope.createdAt,
@@ -60,6 +62,7 @@ namespace WasteCity.Tests
             Assert.That(checkpoint.completedMilestoneIds,
                 Is.EqualTo(new[] { "first-deployment-complete" }));
             Assert.That(envelope.formal3D, Is.Not.Null);
+            Assert.That(envelope.formal3D.defenseCampaign, Is.Not.Null);
             Assert.That(ReadFixture("schema-31-formal-3d.json"),
                 Does.Not.Contain("\"legacy2D\""));
         }
@@ -352,7 +355,7 @@ namespace WasteCity.Tests
         public void FutureSchemaReturnsStructuredVersionError()
         {
             FormalSaveDecodeResult result = FormalSaveCodec.DecodeAny(
-                ReadFixture("schema-32-future.json"));
+                FutureSchemaJson());
 
             Assert.That(result.Success, Is.False);
             Assert.That(result.Error,
@@ -424,6 +427,14 @@ namespace WasteCity.Tests
             Assert.That(File.Exists(path), Is.True,
                 "Missing fixture: " + path);
             return File.ReadAllText(path);
+        }
+
+        private static string FutureSchemaJson()
+        {
+            return ReadFixture("schema-32-future.json").Replace(
+                "\"saveSchemaVersion\": 32",
+                "\"saveSchemaVersion\": " +
+                (FormalSaveEnvelope.CurrentSchemaVersion + 1));
         }
 
         private static T ReadDefenseField<T>(

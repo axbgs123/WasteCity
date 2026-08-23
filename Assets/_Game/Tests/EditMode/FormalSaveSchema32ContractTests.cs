@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Building;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 
@@ -81,7 +82,25 @@ namespace WasteCity.Tests
             RequireField(campaignType, "fixedStepAccumulatorSeconds");
             RequireField(campaignType, "requestedSpeed");
             RequireField(campaignType, "lastNonZeroSpeed");
+            RequireField(campaignType, "result");
             RequireField(campaignType, "statistics");
+            RequireEnemyCountArray(
+                campaignType,
+                "plannedEnemyCountsByEnemyId");
+            RequireEnemyCountArray(
+                campaignType,
+                "spawnedEnemyCountsByEnemyId");
+            RequireEnemyCountArray(
+                campaignType,
+                "defeatedEnemyCountsByEnemyId");
+
+            FieldInfo frozenAnchors = RequireArrayField(
+                campaignType,
+                "frozenSpawnAnchors");
+            Type anchorType = frozenAnchors.FieldType.GetElementType();
+            RequireField(anchorType, "direction");
+            RequireField(anchorType, "positionX");
+            RequireField(anchorType, "positionZ");
 
             FieldInfo towerStates = RequireArrayField(
                 campaignType,
@@ -90,6 +109,8 @@ namespace WasteCity.Tests
             RequireField(towerStateType, "stableInstanceId");
             RequireField(towerStateType, "consumableId");
             RequireField(towerStateType, "amount");
+            RequireField(towerStateType, "activeConsumableSeconds");
+            RequireField(towerStateType, "targetStableEnemyId");
 
             FieldInfo enemyStates = RequireArrayField(
                 campaignType,
@@ -98,6 +119,7 @@ namespace WasteCity.Tests
             RequireField(enemyStateType, "stableEnemyId");
             RequireField(enemyStateType, "archetypeId");
             RequireField(enemyStateType, "currentHealth");
+            RequireField(enemyStateType, "targetStableId");
 
             FieldInfo buildingHealthStates = RequireArrayField(
                 campaignType,
@@ -107,6 +129,334 @@ namespace WasteCity.Tests
             RequireField(buildingHealthType, "stableInstanceId");
             RequireField(buildingHealthType, "currentHealth");
             RequireField(buildingHealthType, "isDestroyed");
+
+            Type statisticsType = RequireField(
+                campaignType,
+                "statistics").FieldType;
+            RequireField(statisticsType, "elapsedRuleSeconds");
+            RequireField(statisticsType, "completedWaveCount");
+            RequireField(statisticsType, "killsByEnemyId");
+            RequireField(statisticsType, "highestAliveEnemyCount");
+            RequireField(statisticsType, "coreDamageTaken");
+            RequireField(statisticsType, "buildingLossesByBuildingId");
+            RequireField(statisticsType, "damageByTowerBuildingId");
+            RequireField(statisticsType, "consumablesSpentByResourceId");
+            RequireField(statisticsType, "completedProductionBatchCount");
+            RequireField(statisticsType, "productionActiveProgressSeconds");
+            RequireField(statisticsType, "productionEligibleSeconds");
+            RequireField(statisticsType, "cityWasPackedAfterCampaignStart");
+            RequireField(statisticsType, "developmentModifierUsed");
+            RequireField(statisticsType, "partialFromMigration");
+        }
+
+        [Test]
+        public void SchemaThirtyOnePayloadHashDamageCannotBeWashedByMigration()
+        {
+            string valid = ReadFixture("schema-31-formal-3d.json");
+            string tampered = valid.Replace(
+                "\"worldSeed\": 8128",
+                "\"worldSeed\": 8129");
+            Assert.That(tampered, Is.Not.EqualTo(valid));
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                tampered);
+            bool rejected = !decoded.Success ||
+                !FormalSaveValidator.ValidateDecoded(decoded).IsValid;
+
+            Assert.That(rejected, Is.True,
+                "A schema 31 payload must be checked against its original " +
+                "payloadHashSha256 before migration mutates or re-hashes it.");
+        }
+
+        [Test]
+        public void SchemaThirtyOneMigrationPreservesAnchorsHealthTowerCachesAndPartialFlag()
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            AddCompletedTower(
+                source,
+                "building.instance.000004",
+                BuildingCatalog.LaserTower,
+                x: 15,
+                y: 11);
+            AddCompletedTower(
+                source,
+                "building.instance.000005",
+                BuildingCatalog.SporeTower,
+                x: 16,
+                y: 11);
+            source.formal3D.buildings.nextStableInstanceOrdinal = 6;
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            object campaign = RequireCampaignField().GetValue(
+                decoded.Envelope.formal3D);
+            Assert.That(campaign, Is.Not.Null);
+
+            object eastAnchor = FindItemByEnumName(
+                ReadArray(campaign, "frozenSpawnAnchors"),
+                "direction",
+                "East");
+            Assert.That(eastAnchor, Is.Not.Null,
+                "An active schema 31 tutorial must freeze its original " +
+                "spawn origin as the schema 32 east anchor.");
+            Assert.That(ReadSingle(eastAnchor, "positionX"), Is.EqualTo(30f));
+            Assert.That(ReadSingle(eastAnchor, "positionZ"), Is.EqualTo(28f));
+
+            Array healthStates = ReadArray(campaign, "buildingHealthStates");
+            AssertHealth(
+                healthStates,
+                "building.instance.000001",
+                BuildingCatalog.MiningStation.MaximumHealth);
+            AssertHealth(
+                healthStates,
+                "building.instance.000002",
+                BuildingCatalog.Warehouse.MaximumHealth);
+            AssertHealth(
+                healthStates,
+                "building.instance.000003",
+                BuildingCatalog.MachineGunTurret.MaximumHealth);
+            AssertHealth(
+                healthStates,
+                "building.instance.000004",
+                BuildingCatalog.LaserTower.MaximumHealth);
+            AssertHealth(
+                healthStates,
+                "building.instance.000005",
+                BuildingCatalog.SporeTower.MaximumHealth);
+
+            Array towerStates = ReadArray(campaign, "towerCombatStates");
+            AssertTowerCache(
+                towerStates,
+                "building.instance.000003",
+                "technology.resource.ammunition",
+                5);
+            AssertTowerCache(
+                towerStates,
+                "building.instance.000004",
+                "core.resource.energy-crystal",
+                0);
+            AssertTowerCache(
+                towerStates,
+                "building.instance.000005",
+                "biological.resource.weapon",
+                0);
+
+            object statistics = ReadField(campaign, "statistics");
+            Assert.That(ReadBoolean(statistics, "partialFromMigration"), Is.True,
+                "Unavailable pre-schema-32 combat statistics must be marked " +
+                "partial instead of being presented as complete zeroes.");
+        }
+
+        [Test]
+        public void CompletedSchemaThirtyOneTutorialStartsCleanWaveTwoWarning()
+        {
+            FormalSaveEnvelope source = JsonUtility.FromJson<FormalSaveEnvelope>(
+                ReadFixture("schema-31-formal-3d.json"));
+            FormalThreeDDefenseSaveData legacy = source.formal3D.defense;
+            legacy.tutorialTriggered = true;
+            legacy.tutorialWaveTriggerCount = 1;
+            legacy.wavePhase = 0;
+            legacy.warningRemainingSeconds = 0f;
+            legacy.spawnClockSeconds = 0f;
+            legacy.spawnedEnemyCount = 8;
+            legacy.defeatedEnemyCount = 8;
+            legacy.nextEnemyOrdinal = 8;
+            legacy.enemies = Array.Empty<FormalThreeDDefenseEnemySaveData>();
+            source.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(source.formal3D);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(source));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            object campaign = RequireCampaignField().GetValue(
+                decoded.Envelope.formal3D);
+            Assert.That(ReadInteger(campaign, "phase"), Is.EqualTo(1),
+                "Completed tutorial migration must enter Warning.");
+            Assert.That(ReadInteger(campaign, "currentWaveNumber"),
+                Is.EqualTo(2));
+            Assert.That(ReadSingle(campaign, "warningRemainingSeconds"),
+                Is.EqualTo(20f));
+            Assert.That(
+                ReadEnemyCount(
+                    campaign,
+                    "plannedEnemyCountsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.EqualTo(10));
+            Assert.That(
+                ReadEnemyCount(
+                    campaign,
+                    "spawnedEnemyCountsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.Zero,
+                "Wave-one cumulative spawns must not pollute wave two.");
+            Assert.That(
+                ReadEnemyCount(
+                    campaign,
+                    "defeatedEnemyCountsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.Zero,
+                "Wave-one cumulative defeats belong only to statistics.");
+            Assert.That(ReadInteger(campaign, "nextEnemyOrdinal"), Is.Zero,
+                "Wave two has not spawned an enemy yet.");
+
+            object statistics = ReadField(campaign, "statistics");
+            Assert.That(ReadInteger(statistics, "spawnedEnemyCount"),
+                Is.EqualTo(8));
+            Assert.That(ReadInteger(statistics, "defeatedEnemyCount"),
+                Is.EqualTo(8));
+            Assert.That(
+                ReadMetric(
+                    statistics,
+                    "killsByEnemyId",
+                    "core.enemy.gnawer"),
+                Is.EqualTo(8));
+        }
+
+        [Test]
+        public void ValidatorRejectsMissingDefenseCampaign()
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            RequireCampaignField().SetValue(envelope.formal3D, null);
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Schema 32 must require formal3D.defenseCampaign.");
+        }
+
+        [Test]
+        public void ValidatorRejectsInvalidCampaignSpeed()
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            object campaign = RequireCampaignField().GetValue(
+                envelope.formal3D);
+            RequireField(campaign.GetType(), "requestedSpeed").SetValue(
+                campaign,
+                3f);
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Requested speed must be normalized to 0, 1, or 2.");
+        }
+
+        [Test]
+        public void ValidatorRejectsDuplicateCampaignStableIdentity()
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            object campaign = RequireCampaignField().GetValue(
+                envelope.formal3D);
+            FieldInfo towerField = RequireArrayField(
+                campaign.GetType(),
+                "towerCombatStates");
+            Array source = (Array)towerField.GetValue(campaign);
+            Assert.That(source, Is.Not.Null);
+            Assert.That(source.Length, Is.GreaterThan(0));
+            Array duplicate = Array.CreateInstance(
+                towerField.FieldType.GetElementType(),
+                2);
+            duplicate.SetValue(source.GetValue(0), 0);
+            duplicate.SetValue(source.GetValue(0), 1);
+            towerField.SetValue(campaign, duplicate);
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Campaign collections must reject duplicate stable IDs.");
+        }
+
+        [TestCase("fixed-remainder")]
+        [TestCase("defeated-over-spawned")]
+        [TestCase("spawned-over-planned")]
+        [TestCase("alive-count-mismatch")]
+        [TestCase("next-ordinal-too-low")]
+        public void ValidatorRejectsInconsistentCampaignProgress(
+            string mutation)
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            FormalThreeDDefenseCampaignSaveData campaign =
+                envelope.formal3D.defenseCampaign;
+            switch (mutation)
+            {
+                case "fixed-remainder":
+                    campaign.fixedStepAccumulatorSeconds = .1f;
+                    break;
+                case "defeated-over-spawned":
+                    campaign.defeatedEnemyCountsByEnemyId = new[]
+                    {
+                        new FormalThreeDDefenseCampaignEnemyCountSaveData
+                        {
+                            enemyId = "core.enemy.gnawer",
+                            count = 2,
+                        },
+                    };
+                    break;
+                case "spawned-over-planned":
+                    campaign.spawnedEnemyCountsByEnemyId[0].count = 9;
+                    break;
+                case "alive-count-mismatch":
+                    campaign.enemyStates = Array.Empty<
+                        FormalThreeDDefenseCampaignEnemyStateSaveData>();
+                    break;
+                case "next-ordinal-too-low":
+                    campaign.nextEnemyOrdinal = 0;
+                    break;
+                default:
+                    Assert.Fail("Unknown campaign mutation: " + mutation);
+                    break;
+            }
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Validator accepted inconsistent campaign state: " +
+                mutation);
+        }
+
+        [TestCase("plannedEnemyCountsByEnemyId")]
+        [TestCase("spawnedEnemyCountsByEnemyId")]
+        [TestCase("defeatedEnemyCountsByEnemyId")]
+        [TestCase("frozenSpawnAnchors")]
+        [TestCase("towerCombatStates")]
+        [TestCase("enemyStates")]
+        [TestCase("buildingHealthStates")]
+        public void CurrentSchemaSourceRequiresEveryCampaignRootArray(
+            string fieldName)
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            string encoded = FormalSaveCodec.EncodeEnvelope(envelope);
+            string missing = encoded.Replace(
+                "\"" + fieldName + "\":[",
+                "\"removed" + fieldName + "\":[");
+            Assert.That(missing, Is.Not.EqualTo(encoded),
+                "The encoded schema 32 fixture did not contain " + fieldName);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(missing);
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateDecoded(decoded);
+
+            Assert.That(result.IsValid, Is.False);
+            Assert.That(
+                result.Error,
+                Is.EqualTo(FormalSaveValidationError.MissingRequiredValue),
+                "A current-schema campaign array must be explicit even when " +
+                "its value is empty: " + fieldName);
+            Assert.That(
+                result.FieldPath,
+                Is.EqualTo("formal3D.defenseCampaign." + fieldName));
         }
 
         [Test]
@@ -239,6 +589,16 @@ namespace WasteCity.Tests
             return field;
         }
 
+        private static void RequireEnemyCountArray(
+            Type campaignType,
+            string fieldName)
+        {
+            FieldInfo field = RequireArrayField(campaignType, fieldName);
+            Type itemType = field.FieldType.GetElementType();
+            RequireField(itemType, "enemyId");
+            RequireField(itemType, "count");
+        }
+
         private static float ReadSingle(object owner, string fieldName)
         {
             FieldInfo field = RequireField(owner.GetType(), fieldName);
@@ -246,6 +606,185 @@ namespace WasteCity.Tests
                 owner.GetType().FullName + "." + fieldName +
                 " must be a float rule-speed value.");
             return (float)field.GetValue(owner);
+        }
+
+        private static bool ReadBoolean(object owner, string fieldName)
+        {
+            FieldInfo field = RequireField(owner.GetType(), fieldName);
+            Assert.That(field.FieldType, Is.EqualTo(typeof(bool)));
+            return (bool)field.GetValue(owner);
+        }
+
+        private static int ReadInteger(object owner, string fieldName)
+        {
+            FieldInfo field = RequireField(owner.GetType(), fieldName);
+            Assert.That(field.FieldType, Is.EqualTo(typeof(int)));
+            return (int)field.GetValue(owner);
+        }
+
+        private static object ReadField(object owner, string fieldName)
+        {
+            Assert.That(owner, Is.Not.Null);
+            return RequireField(owner.GetType(), fieldName).GetValue(owner);
+        }
+
+        private static Array ReadArray(object owner, string fieldName)
+        {
+            object value = ReadField(owner, fieldName);
+            Assert.That(value, Is.InstanceOf<Array>());
+            return (Array)value;
+        }
+
+        private static object FindItem(
+            Array values,
+            string identityField,
+            string identity)
+        {
+            Assert.That(values, Is.Not.Null);
+            foreach (object value in values)
+            {
+                if (value != null && string.Equals(
+                    ReadField(value, identityField) as string,
+                    identity,
+                    StringComparison.Ordinal))
+                {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        private static object FindItemByEnumName(
+            Array values,
+            string fieldName,
+            string expectedName)
+        {
+            Assert.That(values, Is.Not.Null);
+            foreach (object value in values)
+            {
+                if (value == null) continue;
+                object fieldValue = ReadField(value, fieldName);
+                if (fieldValue != null && string.Equals(
+                    fieldValue.ToString(),
+                    expectedName,
+                    StringComparison.Ordinal))
+                {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        private static int ReadEnemyCount(
+            object campaign,
+            string arrayFieldName,
+            string enemyId)
+        {
+            object value = FindItem(
+                ReadArray(campaign, arrayFieldName),
+                "enemyId",
+                enemyId);
+            return value == null ? 0 : ReadInteger(value, "count");
+        }
+
+        private static int ReadMetric(
+            object statistics,
+            string arrayFieldName,
+            string stableId)
+        {
+            object value = FindItem(
+                ReadArray(statistics, arrayFieldName),
+                "stableId",
+                stableId);
+            return value == null ? 0 : ReadInteger(value, "amount");
+        }
+
+        private static void AssertHealth(
+            Array values,
+            string stableInstanceId,
+            int expectedHealth)
+        {
+            object value = FindItem(
+                values,
+                "stableInstanceId",
+                stableInstanceId);
+            Assert.That(value, Is.Not.Null,
+                "Missing migrated health for " + stableInstanceId + ".");
+            Assert.That(
+                Convert.ToInt32(ReadField(value, "currentHealth")),
+                Is.EqualTo(expectedHealth));
+            Assert.That(
+                Convert.ToBoolean(ReadField(value, "isDestroyed")),
+                Is.False);
+        }
+
+        private static void AssertTowerCache(
+            Array values,
+            string stableInstanceId,
+            string expectedResourceId,
+            int expectedAmount)
+        {
+            object value = FindItem(
+                values,
+                "stableInstanceId",
+                stableInstanceId);
+            Assert.That(value, Is.Not.Null,
+                "Missing migrated tower cache for " + stableInstanceId + ".");
+            Assert.That(
+                ReadField(value, "consumableId"),
+                Is.EqualTo(expectedResourceId));
+            Assert.That(
+                Convert.ToInt32(ReadField(value, "amount")),
+                Is.EqualTo(expectedAmount));
+        }
+
+        private static FormalSaveEnvelope MigratedFixtureEnvelope()
+        {
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                ReadFixture("schema-31-formal-3d.json"));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            Assert.That(decoded.Envelope, Is.Not.Null);
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(32));
+            return decoded.Envelope;
+        }
+
+        private static void Rehash(FormalSaveEnvelope envelope)
+        {
+            envelope.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(envelope.formal3D);
+        }
+
+        private static void AddCompletedTower(
+            FormalSaveEnvelope envelope,
+            string stableInstanceId,
+            BuildingDefinition definition,
+            int x,
+            int y)
+        {
+            FormalThreeDBuildingInstanceSaveData[] source =
+                envelope.formal3D.buildings.instances;
+            var expanded = new FormalThreeDBuildingInstanceSaveData[
+                source.Length + 1];
+            Array.Copy(source, expanded, source.Length);
+            expanded[source.Length] = new FormalThreeDBuildingInstanceSaveData
+            {
+                stableInstanceId = stableInstanceId,
+                definitionId = definition.Id.Value,
+                site = 0,
+                x = x,
+                y = y,
+                orientation = 0,
+                state = 1,
+                constructionRemainingSeconds = 0f,
+                isPlayerOwned = true,
+                boundResourceNodeId = string.Empty,
+                boundNodeX = -1,
+                boundNodeY = -1,
+                footprintWidth = definition.Width,
+                footprintHeight = definition.Height,
+                evacuationLockedCrossCheck = false,
+            };
+            envelope.formal3D.buildings.instances = expanded;
         }
 
         private static object CreateCampaignState(

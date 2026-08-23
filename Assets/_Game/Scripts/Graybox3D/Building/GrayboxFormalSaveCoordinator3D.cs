@@ -196,6 +196,7 @@ namespace WasteCity.Graybox3D.Building
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private GrayboxDefenseController3D checkpointDefense;
         private GrayboxBuildingSession3D checkpointSession;
+        private FormalThreeDDefenseCampaignSaveData retainedCampaign;
 
         public GrayboxFormalSaveCoordinator3D(
             IReadOnlyList<IFormalThreeDSaveDomain> domains,
@@ -564,6 +565,10 @@ namespace WasteCity.Graybox3D.Building
                         failedDomain);
                 }
 
+                FormalSaveCodec.EnsureCurrentCampaignState(
+                    payload,
+                    checkpoint);
+
                 string timestamp = FormalSaveCodec.FormatUtcTimestamp(
                     utcNow.ToUniversalTime());
                 var sources = CopyAndSort(contentSources);
@@ -702,6 +707,8 @@ namespace WasteCity.Graybox3D.Building
                 checkpointSession?.TryRestoreCheckpointRuleTime(
                     envelope.checkpoint.ruleTimeSeconds,
                     out _);
+                retainedCampaign = FormalSaveCodec.CloneCampaignState(
+                    envelope.formal3D.defenseCampaign);
                 try
                 {
                     RestoreCompleted?.Invoke();
@@ -744,6 +751,10 @@ namespace WasteCity.Graybox3D.Building
                     failedDomain);
             }
 
+            FormalSaveCodec.EnsureCurrentCampaignState(
+                payload,
+                target.checkpoint);
+
             return Success(new FormalSaveEnvelope
             {
                 gameVersion = target.gameVersion,
@@ -779,6 +790,11 @@ namespace WasteCity.Graybox3D.Building
                     error = exception.Message;
                     return false;
                 }
+            }
+            if (payload.defenseCampaign == null && retainedCampaign != null)
+            {
+                payload.defenseCampaign = FormalSaveCodec.CloneCampaignState(
+                    retainedCampaign);
             }
             failedDomain = null;
             error = string.Empty;

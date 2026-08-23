@@ -47,7 +47,10 @@ namespace WasteCity.Tests
         public void FutureSchemaKeepsDistinctValidationError()
         {
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
-                ReadFixture("schema-32-future.json"));
+                ReadFixture("schema-32-future.json").Replace(
+                    "\"saveSchemaVersion\": 32",
+                    "\"saveSchemaVersion\": " +
+                    (FormalSaveEnvelope.CurrentSchemaVersion + 1)));
 
             FormalSaveValidationResult result =
                 FormalSaveValidator.ValidateDecoded(decoded);
@@ -119,8 +122,8 @@ namespace WasteCity.Tests
         [Test]
         public void MissingRequiredArrayMemberInSourceJsonIsRejected()
         {
-            string json = ReadFixture("schema-31-formal-3d.json")
-                .Replace("\"warehouses\": [", "\"removedWarehouses\": [");
+            string json = FormalSaveCodec.EncodeEnvelope(LoadValidEnvelope())
+                .Replace("\"warehouses\":[", "\"removedWarehouses\":[");
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(json);
 
             Assert.That(decoded.Success, Is.True, decoded.Message);
@@ -133,8 +136,8 @@ namespace WasteCity.Tests
         [Test]
         public void MissingNestedArrayMemberInSourceJsonIsRejected()
         {
-            string json = ReadFixture("schema-31-formal-3d.json")
-                .Replace("\"amounts\": [", "\"removedAmounts\": [")
+            string json = FormalSaveCodec.EncodeEnvelope(LoadValidEnvelope())
+                .Replace("\"amounts\":[", "\"removedAmounts\":[")
                 .Replace(
                     "\"gameVersion\":",
                     "\"amounts\": [],\n  \"gameVersion\":");

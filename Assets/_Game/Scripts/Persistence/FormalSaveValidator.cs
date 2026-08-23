@@ -146,6 +146,36 @@ namespace WasteCity.Persistence
                             string.Join(".", path));
                     }
                 }
+                if (TryFindJsonPath(
+                        source,
+                        new[] { "formal3D", "defenseCampaign" },
+                        out _,
+                        out _))
+                {
+                    string[][] campaignArrays =
+                    {
+                        new[] { "formal3D", "defenseCampaign", "plannedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "defenseCampaign", "spawnedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "defenseCampaign", "defeatedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "defenseCampaign", "frozenSpawnAnchors" },
+                        new[] { "formal3D", "defenseCampaign", "towerCombatStates" },
+                        new[] { "formal3D", "defenseCampaign", "enemyStates" },
+                        new[] { "formal3D", "defenseCampaign", "buildingHealthStates" },
+                        new[] { "formal3D", "defenseCampaign", "statistics", "killsByEnemyId" },
+                        new[] { "formal3D", "defenseCampaign", "statistics", "buildingLossesByBuildingId" },
+                        new[] { "formal3D", "defenseCampaign", "statistics", "damageByTowerBuildingId" },
+                        new[] { "formal3D", "defenseCampaign", "statistics", "consumablesSpentByResourceId" },
+                    };
+                    for (int index = 0;
+                         index < campaignArrays.Length;
+                         index++)
+                    {
+                        if (!HasJsonPath(source, campaignArrays[index]))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", campaignArrays[index]));
+                    }
+                }
                 FormalThreeDSaveData payload = decoded.Envelope.formal3D;
                 FormalSaveValidationResult nestedArrays =
                     RequireArrayMembersForEveryItem(
@@ -237,6 +267,10 @@ namespace WasteCity.Persistence
             result = ValidateProduction(data.production, buildingIds, nodeIds);
             if (result != null) return result;
             result = ValidateDefense(data.defense, buildingIds);
+            if (result != null) return result;
+            result = ValidateDefenseCampaign(
+                data.defenseCampaign,
+                buildingIds);
             if (result != null) return result;
             result = ValidateEvacuation(data.evacuation, buildingIds);
             if (result != null) return result;
@@ -348,6 +382,8 @@ namespace WasteCity.Persistence
             if (data.research == null) return Missing("formal3D.research");
             if (data.production == null) return Missing("formal3D.production");
             if (data.defense == null) return Missing("formal3D.defense");
+            if (data.defenseCampaign == null)
+                return Missing("formal3D.defenseCampaign");
             if (data.evacuation == null) return Missing("formal3D.evacuation");
             if (data.pause == null) return Missing("formal3D.pause");
             return null;
@@ -1064,6 +1100,415 @@ namespace WasteCity.Persistence
                 return Invalid(
                     FormalSaveValidationError.InvalidHighWaterMark,
                     path + ".nextEnemyOrdinal");
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateDefenseCampaign(
+            FormalThreeDDefenseCampaignSaveData campaign,
+            HashSet<string> buildingIds)
+        {
+            const string path = "formal3D.defenseCampaign";
+            if (campaign == null) return Missing(path);
+            if (!string.Equals(
+                    campaign.campaignId,
+                    CampaignWaveCatalog.Id,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".campaignId");
+            if (campaign.phase < 0 || campaign.phase > 5)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".phase");
+            if (campaign.result < 0 || campaign.result > 2)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".result");
+            if (campaign.currentWaveNumber < 0 ||
+                campaign.currentWaveNumber > CampaignWaveCatalog.All.Count)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".currentWaveNumber");
+            if (campaign.requestedSpeed != 0f &&
+                campaign.requestedSpeed != 1f &&
+                campaign.requestedSpeed != 2f)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".requestedSpeed");
+            if (campaign.lastNonZeroSpeed != 1f &&
+                campaign.lastNonZeroSpeed != 2f)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".lastNonZeroSpeed");
+            FormalSaveValidationResult result = NonNegativeFinite(
+                campaign.warningRemainingSeconds,
+                path + ".warningRemainingSeconds");
+            if (result != null) return result;
+            result = NonNegativeFinite(
+                campaign.spawnClockSeconds,
+                path + ".spawnClockSeconds");
+            if (result != null) return result;
+            result = NonNegativeFinite(
+                campaign.fixedStepAccumulatorSeconds,
+                path + ".fixedStepAccumulatorSeconds");
+            if (result != null) return result;
+            if (campaign.fixedStepAccumulatorSeconds >=
+                SingleCityDefenseCampaignModel.FormalFixedStepSeconds)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".fixedStepAccumulatorSeconds");
+            if (campaign.nextEnemyOrdinal < 0)
+                return Invalid(FormalSaveValidationError.NegativeValue,
+                    path + ".nextEnemyOrdinal");
+            if (campaign.coreCurrentHealth < 0 ||
+                campaign.coreCurrentHealth >
+                    CityCoreCombatModel.FormalMaximumHealth)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".coreCurrentHealth");
+
+            result = ValidateCampaignEnemyCounts(
+                campaign.plannedEnemyCountsByEnemyId,
+                path + ".plannedEnemyCountsByEnemyId");
+            if (result != null) return result;
+            result = ValidateCampaignEnemyCounts(
+                campaign.spawnedEnemyCountsByEnemyId,
+                path + ".spawnedEnemyCountsByEnemyId");
+            if (result != null) return result;
+            result = ValidateCampaignEnemyCounts(
+                campaign.defeatedEnemyCountsByEnemyId,
+                path + ".defeatedEnemyCountsByEnemyId");
+            if (result != null) return result;
+            if (campaign.frozenSpawnAnchors == null)
+                return Invalid(FormalSaveValidationError.InvalidArray,
+                    path + ".frozenSpawnAnchors");
+            var directions = new HashSet<int>();
+            for (int index = 0;
+                 index < campaign.frozenSpawnAnchors.Length;
+                 index++)
+            {
+                FormalThreeDDefenseCampaignSpawnAnchorSaveData anchor =
+                    campaign.frozenSpawnAnchors[index];
+                string item = path + ".frozenSpawnAnchors[" + index + "]";
+                if (anchor == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                int direction = (int)anchor.direction;
+                if (direction < 0 || direction > 3)
+                    return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                        item + ".direction");
+                if (!directions.Add(direction))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        item + ".direction");
+                result = Finite(anchor.positionX, item + ".positionX");
+                if (result != null) return result;
+                result = Finite(anchor.positionZ, item + ".positionZ");
+                if (result != null) return result;
+            }
+
+            result = ValidateCampaignTowerStates(
+                campaign.towerCombatStates,
+                buildingIds,
+                path + ".towerCombatStates");
+            if (result != null) return result;
+            result = ValidateCampaignEnemyStates(
+                campaign.enemyStates,
+                path + ".enemyStates");
+            if (result != null) return result;
+            result = ValidateCampaignCountRelationships(campaign, path);
+            if (result != null) return result;
+            result = ValidateCampaignBuildingHealthStates(
+                campaign.buildingHealthStates,
+                buildingIds,
+                path + ".buildingHealthStates");
+            if (result != null) return result;
+            return ValidateCampaignStatistics(
+                campaign.statistics,
+                path + ".statistics");
+        }
+
+        private static FormalSaveValidationResult
+            ValidateCampaignCountRelationships(
+                FormalThreeDDefenseCampaignSaveData campaign,
+                string path)
+        {
+            if (campaign.phase == 0 && campaign.currentWaveNumber != 0)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".currentWaveNumber");
+            if (campaign.phase >= 1 && campaign.phase <= 3 &&
+                campaign.currentWaveNumber <= 0)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".currentWaveNumber");
+            if ((campaign.phase == 4) != (campaign.result == 1) ||
+                (campaign.phase == 5) != (campaign.result == 2) ||
+                (campaign.phase < 4 && campaign.result != 0))
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".result");
+
+            int totalSpawned = 0;
+            int totalDefeated = 0;
+            for (int index = 0;
+                 index < campaign.spawnedEnemyCountsByEnemyId.Length;
+                 index++)
+            {
+                FormalThreeDDefenseCampaignEnemyCountSaveData spawned =
+                    campaign.spawnedEnemyCountsByEnemyId[index];
+                int planned = FindCampaignCount(
+                    campaign.plannedEnemyCountsByEnemyId,
+                    spawned.enemyId);
+                int defeated = FindCampaignCount(
+                    campaign.defeatedEnemyCountsByEnemyId,
+                    spawned.enemyId);
+                if (spawned.count > planned || defeated > spawned.count)
+                    return Invalid(FormalSaveValidationError.InvalidDefense,
+                        path + ".spawnedEnemyCountsByEnemyId[" + index + "]");
+                totalSpawned += spawned.count;
+                totalDefeated += defeated;
+            }
+            for (int index = 0;
+                 index < campaign.defeatedEnemyCountsByEnemyId.Length;
+                 index++)
+            {
+                FormalThreeDDefenseCampaignEnemyCountSaveData defeated =
+                    campaign.defeatedEnemyCountsByEnemyId[index];
+                if (FindCampaignCount(
+                        campaign.spawnedEnemyCountsByEnemyId,
+                        defeated.enemyId) < defeated.count)
+                    return Invalid(FormalSaveValidationError.InvalidDefense,
+                        path + ".defeatedEnemyCountsByEnemyId[" + index + "]");
+            }
+            if (campaign.enemyStates.Length !=
+                totalSpawned - totalDefeated)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".enemyStates");
+            if (campaign.nextEnemyOrdinal < totalSpawned)
+                return Invalid(FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".nextEnemyOrdinal");
+            return null;
+        }
+
+        private static int FindCampaignCount(
+            FormalThreeDDefenseCampaignEnemyCountSaveData[] values,
+            string enemyId)
+        {
+            for (int index = 0; index < values.Length; index++)
+                if (string.Equals(
+                        values[index].enemyId,
+                        enemyId,
+                        StringComparison.Ordinal))
+                    return values[index].count;
+            return 0;
+        }
+
+        private static FormalSaveValidationResult ValidateCampaignEnemyCounts(
+            FormalThreeDDefenseCampaignEnemyCountSaveData[] values,
+            string path)
+        {
+            if (values == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < values.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyCountSaveData value =
+                    values[index];
+                string item = path + "[" + index + "]";
+                if (value == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                FormalSaveValidationResult result = AddStableId(
+                    ids,
+                    value.enemyId,
+                    item + ".enemyId");
+                if (result != null) return result;
+                if (value.count < 0)
+                    return Invalid(FormalSaveValidationError.NegativeValue,
+                        item + ".count");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateCampaignTowerStates(
+            FormalThreeDDefenseCampaignTowerCombatStateSaveData[] values,
+            HashSet<string> buildingIds,
+            string path)
+        {
+            if (values == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < values.Length; index++)
+            {
+                FormalThreeDDefenseCampaignTowerCombatStateSaveData value =
+                    values[index];
+                string item = path + "[" + index + "]";
+                if (value == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                FormalSaveValidationResult result = AddReference(
+                    ids,
+                    buildingIds,
+                    value.stableInstanceId,
+                    item + ".stableInstanceId");
+                if (result != null) return result;
+                if (!IsStableId(value.consumableId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        item + ".consumableId");
+                if (value.amount < 0)
+                    return Invalid(FormalSaveValidationError.NegativeValue,
+                        item + ".amount");
+                result = NonNegativeFinite(
+                    value.activeConsumableSeconds,
+                    item + ".activeConsumableSeconds");
+                if (result != null) return result;
+                result = NonNegativeFinite(
+                    value.damageRemainder,
+                    item + ".damageRemainder");
+                if (result != null) return result;
+                if (!string.IsNullOrEmpty(value.targetStableEnemyId) &&
+                    !IsStableId(value.targetStableEnemyId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        item + ".targetStableEnemyId");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateCampaignEnemyStates(
+            FormalThreeDDefenseCampaignEnemyStateSaveData[] values,
+            string path)
+        {
+            if (values == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < values.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData value =
+                    values[index];
+                string item = path + "[" + index + "]";
+                if (value == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                FormalSaveValidationResult result = AddStableId(
+                    ids,
+                    value.stableEnemyId,
+                    item + ".stableEnemyId");
+                if (result != null) return result;
+                if (!IsStableId(value.archetypeId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        item + ".archetypeId");
+                if (value.spawnOrder < 0 || value.currentHealth < 0)
+                    return Invalid(FormalSaveValidationError.NegativeValue,
+                        item);
+                result = Finite(value.positionX, item + ".positionX");
+                if (result != null) return result;
+                result = Finite(value.positionZ, item + ".positionZ");
+                if (result != null) return result;
+                result = NonNegativeFinite(
+                    value.movementRemainder,
+                    item + ".movementRemainder");
+                if (result != null) return result;
+                result = NonNegativeFinite(
+                    value.attackDamageRemainder,
+                    item + ".attackDamageRemainder");
+                if (result != null) return result;
+                if (!string.IsNullOrEmpty(value.targetStableId) &&
+                    !IsStableId(value.targetStableId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        item + ".targetStableId");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult
+            ValidateCampaignBuildingHealthStates(
+                FormalThreeDDefenseCampaignBuildingHealthStateSaveData[]
+                    values,
+                HashSet<string> buildingIds,
+                string path)
+        {
+            if (values == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < values.Length; index++)
+            {
+                FormalThreeDDefenseCampaignBuildingHealthStateSaveData value =
+                    values[index];
+                string item = path + "[" + index + "]";
+                if (value == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                FormalSaveValidationResult result = AddReference(
+                    ids,
+                    buildingIds,
+                    value.stableInstanceId,
+                    item + ".stableInstanceId");
+                if (result != null) return result;
+                if (value.currentHealth < 0)
+                    return Invalid(FormalSaveValidationError.NegativeValue,
+                        item + ".currentHealth");
+                if (value.isDestroyed && value.currentHealth != 0)
+                    return Invalid(FormalSaveValidationError.InvalidDefense,
+                        item + ".currentHealth");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateCampaignStatistics(
+            FormalThreeDDefenseCampaignStatisticsSaveData statistics,
+            string path)
+        {
+            if (statistics == null) return Missing(path);
+            FormalSaveValidationResult result = NonNegativeFinite(
+                statistics.elapsedRuleSeconds,
+                path + ".elapsedRuleSeconds");
+            if (result != null) return result;
+            if (statistics.spawnedEnemyCount < 0 ||
+                statistics.defeatedEnemyCount < 0 ||
+                statistics.completedWaveCount < 0 ||
+                statistics.highestAliveEnemyCount < 0 ||
+                statistics.coreDamageTaken < 0 ||
+                statistics.completedProductionBatchCount < 0)
+                return Invalid(FormalSaveValidationError.NegativeValue, path);
+            result = ValidateCampaignMetrics(
+                statistics.killsByEnemyId,
+                path + ".killsByEnemyId");
+            if (result != null) return result;
+            result = ValidateCampaignMetrics(
+                statistics.buildingLossesByBuildingId,
+                path + ".buildingLossesByBuildingId");
+            if (result != null) return result;
+            result = ValidateCampaignMetrics(
+                statistics.damageByTowerBuildingId,
+                path + ".damageByTowerBuildingId");
+            if (result != null) return result;
+            result = ValidateCampaignMetrics(
+                statistics.consumablesSpentByResourceId,
+                path + ".consumablesSpentByResourceId");
+            if (result != null) return result;
+            result = NonNegativeFinite(
+                statistics.productionActiveProgressSeconds,
+                path + ".productionActiveProgressSeconds");
+            if (result != null) return result;
+            return NonNegativeFinite(
+                statistics.productionEligibleSeconds,
+                path + ".productionEligibleSeconds");
+        }
+
+        private static FormalSaveValidationResult ValidateCampaignMetrics(
+            FormalThreeDDefenseCampaignMetricSaveData[] values,
+            string path)
+        {
+            if (values == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < values.Length; index++)
+            {
+                FormalThreeDDefenseCampaignMetricSaveData value = values[index];
+                string item = path + "[" + index + "]";
+                if (value == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                FormalSaveValidationResult result = AddStableId(
+                    ids,
+                    value.stableId,
+                    item + ".stableId");
+                if (result != null) return result;
+                if (value.amount < 0)
+                    return Invalid(FormalSaveValidationError.NegativeValue,
+                        item + ".amount");
+            }
             return null;
         }
 

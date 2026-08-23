@@ -620,6 +620,281 @@ namespace WasteCity.Tests
             Assert.That(runtime.Snapshot.CoreCurrentHealth, Is.Zero);
         }
 
+        [Test]
+        public void SchemaThirtyTwoCoordinatorPreservesAuthoritativeCampaignAfterLegacyDefenseRebuild()
+        {
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                ReadFixture("schema-31-formal-3d.json"));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalSaveEnvelope envelope = CloneEnvelope(decoded.Envelope);
+            envelope.formal3D.defenseCampaign = MixedCampaignState();
+            envelope.formal3D.defense.coreCurrentHealth = 1987;
+            envelope.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(envelope.formal3D);
+
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+            FormalThreeDDefenseCampaignSaveData expected = CloneCampaign(
+                envelope.formal3D.defenseCampaign);
+
+            var authority = new CoordinatorAuthority(
+                ClonePayload(decoded.Envelope.formal3D));
+            var domains = new List<IFormalThreeDSaveDomain>();
+            foreach (GrayboxFormalSaveDomainId3D domainId in
+                     GrayboxFormalSaveCoordinator3D.DomainOrder)
+            {
+                domains.Add(new CoordinatorDomain(authority, domainId));
+            }
+            var rebuilder = new LegacyDefenseRebuilder(authority);
+            var coordinator = new GrayboxFormalSaveCoordinator3D(
+                domains,
+                rebuilder);
+
+            GrayboxFormalSaveCoordinatorResult3D restored =
+                coordinator.RestoreEnvelope(envelope);
+            Assert.That(restored.Success, Is.True, restored.Message);
+            Assert.That(rebuilder.RebuildCount, Is.EqualTo(1));
+
+            envelope.formal3D.defenseCampaign.phase = 0;
+            envelope.formal3D.defenseCampaign.enemyStates[0].currentHealth = 1;
+            envelope.formal3D.defenseCampaign.towerCombatStates[0]
+                .targetStableEnemyId = string.Empty;
+
+            GrayboxFormalSaveCoordinatorResult3D captured =
+                coordinator.CaptureEnvelope(
+                    expected.campaignId + ".session",
+                    decoded.Envelope.gameVersion,
+                    decoded.Envelope.contentSources,
+                    decoded.Envelope.checkpoint,
+                    new DateTime(2026, 8, 24, 12, 0, 0,
+                        DateTimeKind.Utc));
+
+            Assert.That(captured.Success, Is.True, captured.Message);
+            Assert.That(captured.Envelope.formal3D.defense.coreCurrentHealth,
+                Is.EqualTo(LegacyDefenseRebuilder.RebuiltCoreHealth),
+                "The test must exercise a real legacy-defense rebuild.");
+            Assert.That(
+                JsonUtility.ToJson(
+                    captured.Envelope.formal3D.defenseCampaign,
+                    false),
+                Is.EqualTo(JsonUtility.ToJson(expected, false)),
+                "IDEA-0017 campaign truth must survive coordinator restore " +
+                "and capture without being regenerated from legacy defense.");
+        }
+
+        private static FormalThreeDDefenseCampaignSaveData MixedCampaignState()
+        {
+            const string miningId = "building.instance.000001";
+            const string turretId = "building.instance.000003";
+            const string gnawerId = "enemy.campaign.000010";
+            const string crystalId = "enemy.campaign.000011";
+            const string howlerId = "enemy.campaign.000012";
+            return new FormalThreeDDefenseCampaignSaveData
+            {
+                campaignId = CampaignWaveCatalog.Id,
+                phase = (int)SingleCityDefenseCampaignPhase.Defeat,
+                currentWaveNumber = 5,
+                plannedEnemyCountsByEnemyId = new[]
+                {
+                    EnemyCount(EnemyCatalog.CrystalBeast.Id.Value, 4),
+                    EnemyCount(EnemyCatalog.Gnawer.Id.Value, 16),
+                    EnemyCount(EnemyCatalog.Howler.Id.Value, 2),
+                },
+                spawnedEnemyCountsByEnemyId = new[]
+                {
+                    EnemyCount(EnemyCatalog.CrystalBeast.Id.Value, 2),
+                    EnemyCount(EnemyCatalog.Gnawer.Id.Value, 5),
+                    EnemyCount(EnemyCatalog.Howler.Id.Value, 1),
+                },
+                defeatedEnemyCountsByEnemyId = new[]
+                {
+                    EnemyCount(EnemyCatalog.CrystalBeast.Id.Value, 1),
+                    EnemyCount(EnemyCatalog.Gnawer.Id.Value, 4),
+                    EnemyCount(EnemyCatalog.Howler.Id.Value, 0),
+                },
+                frozenSpawnAnchors = new[]
+                {
+                    new FormalThreeDDefenseCampaignSpawnAnchorSaveData
+                    {
+                        direction = CampaignSpawnDirection.East,
+                        positionX = 61.25f,
+                        positionZ = 23.5f,
+                    },
+                    new FormalThreeDDefenseCampaignSpawnAnchorSaveData
+                    {
+                        direction = CampaignSpawnDirection.South,
+                        positionX = 31.75f,
+                        positionZ = 1.5f,
+                    },
+                },
+                warningRemainingSeconds = 3.25f,
+                spawnClockSeconds = 17.75f,
+                fixedStepAccumulatorSeconds = .075f,
+                nextEnemyOrdinal = 13,
+                coreCurrentHealth = 0,
+                requestedSpeed = 0f,
+                lastNonZeroSpeed = 2f,
+                result = (int)SingleCityDefenseCampaignResult.Defeat,
+                towerCombatStates = new[]
+                {
+                    new FormalThreeDDefenseCampaignTowerCombatStateSaveData
+                    {
+                        stableInstanceId = turretId,
+                        consumableId = ResourceIds.Ammunition,
+                        amount = 9,
+                        isPlayerPaused = true,
+                        activeConsumableSeconds = 1.375f,
+                        damageRemainder = .625f,
+                        targetStableEnemyId = crystalId,
+                    },
+                },
+                enemyStates = new[]
+                {
+                    EnemyState(
+                        gnawerId,
+                        EnemyCatalog.Gnawer.Id.Value,
+                        9,
+                        42.75f,
+                        20.5f,
+                        31,
+                        string.Empty),
+                    EnemyState(
+                        crystalId,
+                        EnemyCatalog.CrystalBeast.Id.Value,
+                        10,
+                        44.5f,
+                        18.25f,
+                        137,
+                        miningId),
+                    EnemyState(
+                        howlerId,
+                        EnemyCatalog.Howler.Id.Value,
+                        11,
+                        39.25f,
+                        16.75f,
+                        72,
+                        miningId),
+                },
+                buildingHealthStates = new[]
+                {
+                    new FormalThreeDDefenseCampaignBuildingHealthStateSaveData
+                    {
+                        stableInstanceId = miningId,
+                        currentHealth = 83,
+                        isDestroyed = false,
+                    },
+                    new FormalThreeDDefenseCampaignBuildingHealthStateSaveData
+                    {
+                        stableInstanceId = turretId,
+                        currentHealth = 211,
+                        isDestroyed = false,
+                    },
+                },
+                statistics = new FormalThreeDDefenseCampaignStatisticsSaveData
+                {
+                    elapsedRuleSeconds = 418.375f,
+                    spawnedEnemyCount = 52,
+                    defeatedEnemyCount = 47,
+                    completedWaveCount = 4,
+                    killsByEnemyId = new[]
+                    {
+                        Metric(EnemyCatalog.CrystalBeast.Id.Value, 6),
+                        Metric(EnemyCatalog.Gnawer.Id.Value, 38),
+                        Metric(EnemyCatalog.Howler.Id.Value, 3),
+                    },
+                    highestAliveEnemyCount = 17,
+                    coreDamageTaken = 2000,
+                    buildingLossesByBuildingId = new[]
+                    {
+                        Metric(BuildingCatalog.Wall.Id.Value, 2),
+                    },
+                    damageByTowerBuildingId = new[]
+                    {
+                        Metric(BuildingCatalog.MachineGunTurret.Id.Value, 913),
+                    },
+                    consumablesSpentByResourceId = new[]
+                    {
+                        Metric(ResourceIds.BiologicalWeapon, 3),
+                        Metric(ResourceIds.EnergyCrystal, 7),
+                        Metric(ResourceIds.Ammunition, 19),
+                    },
+                    completedProductionBatchCount = 31,
+                    productionActiveProgressSeconds = 188.5f,
+                    productionEligibleSeconds = 231.75f,
+                    cityWasPackedAfterCampaignStart = true,
+                    developmentModifierUsed = true,
+                    partialFromMigration = false,
+                },
+            };
+        }
+
+        private static FormalThreeDDefenseCampaignEnemyCountSaveData EnemyCount(
+            string enemyId,
+            int count)
+        {
+            return new FormalThreeDDefenseCampaignEnemyCountSaveData
+            {
+                enemyId = enemyId,
+                count = count,
+            };
+        }
+
+        private static FormalThreeDDefenseCampaignMetricSaveData Metric(
+            string stableId,
+            int amount)
+        {
+            return new FormalThreeDDefenseCampaignMetricSaveData
+            {
+                stableId = stableId,
+                amount = amount,
+            };
+        }
+
+        private static FormalThreeDDefenseCampaignEnemyStateSaveData EnemyState(
+            string stableEnemyId,
+            string archetypeId,
+            int spawnOrder,
+            float x,
+            float z,
+            int currentHealth,
+            string targetStableId)
+        {
+            return new FormalThreeDDefenseCampaignEnemyStateSaveData
+            {
+                stableEnemyId = stableEnemyId,
+                archetypeId = archetypeId,
+                spawnOrder = spawnOrder,
+                positionX = x,
+                positionZ = z,
+                currentHealth = currentHealth,
+                movementRemainder = .25f,
+                attackDamageRemainder = .5f,
+                targetStableId = targetStableId,
+            };
+        }
+
+        private static FormalSaveEnvelope CloneEnvelope(
+            FormalSaveEnvelope source)
+        {
+            return JsonUtility.FromJson<FormalSaveEnvelope>(
+                JsonUtility.ToJson(source, false));
+        }
+
+        private static FormalThreeDSaveData ClonePayload(
+            FormalThreeDSaveData source)
+        {
+            return JsonUtility.FromJson<FormalThreeDSaveData>(
+                JsonUtility.ToJson(source, false));
+        }
+
+        private static FormalThreeDDefenseCampaignSaveData CloneCampaign(
+            FormalThreeDDefenseCampaignSaveData source)
+        {
+            return JsonUtility.FromJson<FormalThreeDDefenseCampaignSaveData>(
+                JsonUtility.ToJson(source, false));
+        }
+
         private static GrayboxDefenseRuntime3D Runtime(
             IReadOnlyList<GrayboxBuildingInstance3D> instances,
             float spawnX)
@@ -963,6 +1238,115 @@ namespace WasteCity.Tests
                     Is.EqualTo(expected.Enemies[index].Z).Within(Tolerance));
                 Assert.That(actual.Enemies[index].CurrentHealth,
                     Is.EqualTo(expected.Enemies[index].CurrentHealth));
+            }
+        }
+
+        private sealed class CoordinatorAuthority
+        {
+            public CoordinatorAuthority(FormalThreeDSaveData payload)
+            {
+                Payload = payload ?? throw new ArgumentNullException(
+                    nameof(payload));
+            }
+
+            public FormalThreeDSaveData Payload { get; }
+        }
+
+        private sealed class CoordinatorDomain : IFormalThreeDSaveDomain
+        {
+            private readonly CoordinatorAuthority authority;
+
+            public CoordinatorDomain(
+                CoordinatorAuthority authority,
+                GrayboxFormalSaveDomainId3D domainId)
+            {
+                this.authority = authority ?? throw new ArgumentNullException(
+                    nameof(authority));
+                DomainId = domainId;
+            }
+
+            public GrayboxFormalSaveDomainId3D DomainId { get; }
+
+            public bool TryCapture(
+                FormalThreeDSaveData destination,
+                out string error)
+            {
+                CopyDomain(authority.Payload, destination, DomainId);
+                error = string.Empty;
+                return true;
+            }
+
+            public bool TryApply(
+                FormalThreeDSaveData source,
+                out string error)
+            {
+                CopyDomain(source, authority.Payload, DomainId);
+                error = string.Empty;
+                return true;
+            }
+
+            private static void CopyDomain(
+                FormalThreeDSaveData source,
+                FormalThreeDSaveData destination,
+                GrayboxFormalSaveDomainId3D domainId)
+            {
+                FormalThreeDSaveData copy = ClonePayload(source);
+                switch (domainId)
+                {
+                    case GrayboxFormalSaveDomainId3D.WorldCity:
+                        destination.world = copy.world;
+                        destination.city = copy.city;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.BuildingStorage:
+                        destination.buildings = copy.buildings;
+                        destination.storage = copy.storage;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.Economy:
+                        destination.backpack = copy.backpack;
+                        destination.crafting = copy.crafting;
+                        destination.research = copy.research;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.Production:
+                        destination.production = copy.production;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.Defense:
+                        destination.defense = copy.defense;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.Evacuation:
+                        destination.evacuation = copy.evacuation;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.Pause:
+                        destination.pause = copy.pause;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(
+                            nameof(domainId),
+                            domainId,
+                            null);
+                }
+            }
+        }
+
+        private sealed class LegacyDefenseRebuilder :
+            IFormalThreeDDerivedStateRebuilder
+        {
+            public const int RebuiltCoreHealth = 1777;
+
+            private readonly CoordinatorAuthority authority;
+
+            public LegacyDefenseRebuilder(CoordinatorAuthority authority)
+            {
+                this.authority = authority ?? throw new ArgumentNullException(
+                    nameof(authority));
+            }
+
+            public int RebuildCount { get; private set; }
+
+            public void RebuildDerivedState()
+            {
+                RebuildCount++;
+                authority.Payload.defense.coreCurrentHealth =
+                    RebuiltCoreHealth;
             }
         }
     }
