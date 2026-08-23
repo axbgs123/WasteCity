@@ -794,6 +794,31 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryDestroyTowerForCombat(
+            string stableInstanceId,
+            out ResourceAmount[] lostResources)
+        {
+            lostResources = Array.Empty<ResourceAmount>();
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !stateById.TryGetValue(
+                    stableInstanceId,
+                    out GrayboxDefenseTowerRuntimeState3D state))
+            {
+                return false;
+            }
+
+            int ammunition = state.Combat.Ammo;
+            if (ammunition > 0)
+            {
+                lostResources = new[]
+                {
+                    new ResourceAmount(ResourceIds.Ammunition, ammunition),
+                };
+            }
+            RemoveTowerState(stableInstanceId, state);
+            return true;
+        }
+
         private void TickTower(
             GrayboxDefenseTowerRuntimeState3D state,
             CityResourceStorageModel cityStorage)
@@ -900,6 +925,7 @@ namespace WasteCity.Graybox3D.Building
             stateById.Remove(stableInstanceId);
             retainedIds.Remove(stableInstanceId);
             runnableIds.Remove(stableInstanceId);
+            synchronizedLockById.Remove(stableInstanceId);
             towers.Remove(state);
             snapshotDirty = true;
             persistenceGeneration++;

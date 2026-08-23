@@ -1137,6 +1137,47 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryDestroyStateForCombat(
+            string stableInstanceId,
+            out ResourceAmount[] lostResources)
+        {
+            lostResources = Array.Empty<ResourceAmount>();
+            if (string.IsNullOrWhiteSpace(stableInstanceId))
+                return false;
+
+            bool hasLive = stateById.TryGetValue(
+                stableInstanceId,
+                out BuildingProductionState liveState);
+            bool hasOrphan = orphanStateById.TryGetValue(
+                stableInstanceId,
+                out GrayboxProductionPersistenceState3D orphanState);
+            if (!hasLive && !hasOrphan) return false;
+
+            var totals = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (hasLive)
+            {
+                AddCombatLosses(
+                    totals,
+                    liveState.Input.CapturePositiveAmounts());
+                AddCombatLosses(totals, liveState.ReservedInputs);
+                AddCombatLosses(
+                    totals,
+                    liveState.Output.CapturePositiveAmounts());
+                RemoveState(stableInstanceId, liveState);
+            }
+            if (hasOrphan)
+            {
+                AddCombatLosses(totals, orphanState.Input);
+                AddCombatLosses(totals, orphanState.ReservedInput);
+                AddCombatLosses(totals, orphanState.Output);
+                orphanStateById.Remove(stableInstanceId);
+                retainedOrphanIds.Remove(stableInstanceId);
+            }
+
+            lostResources = OrderedCombatLosses(totals);
+            return true;
+        }
+
         public ProductionObservabilitySnapshot CaptureObservability(
             ulong revision,
             WorldMapModel world)
@@ -1268,6 +1309,59 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < source.Count; index++)
                 values[index] = source[index];
             return values;
+        }
+
+        private static void AddCombatLosses(
+            IDictionary<string, int> totals,
+            IReadOnlyList<ResourceAmount> amounts)
+        {
+            if (totals == null || amounts == null) return;
+            for (var index = 0; index < amounts.Count; index++)
+            {
+                ResourceAmount amount = amounts[index];
+                if (amount.Amount <= 0 ||
+                    string.IsNullOrWhiteSpace(amount.ResourceId))
+                {
+                    continue;
+                }
+                totals.TryGetValue(amount.ResourceId, out int before);
+                totals[amount.ResourceId] = before + amount.Amount;
+            }
+        }
+
+        private static ResourceAmount[] OrderedCombatLosses(
+            IReadOnlyDictionary<string, int> totals)
+        {
+            if (totals == null || totals.Count == 0)
+                return Array.Empty<ResourceAmount>();
+            var result = new List<ResourceAmount>(totals.Count);
+            for (var index = 0; index < ResourceIds.All.Length; index++)
+            {
+                string resourceId = ResourceIds.All[index];
+                if (totals.TryGetValue(resourceId, out int amount) &&
+                    amount > 0)
+                {
+                    result.Add(new ResourceAmount(resourceId, amount));
+                }
+            }
+            var unknownIds = new List<string>();
+            foreach (KeyValuePair<string, int> item in totals)
+            {
+                if (item.Value > 0 &&
+                    Array.IndexOf(ResourceIds.All, item.Key) < 0)
+                {
+                    unknownIds.Add(item.Key);
+                }
+            }
+            unknownIds.Sort(StringComparer.Ordinal);
+            for (var index = 0; index < unknownIds.Count; index++)
+            {
+                string resourceId = unknownIds[index];
+                result.Add(new ResourceAmount(
+                    resourceId,
+                    totals[resourceId]));
+            }
+            return result.ToArray();
         }
 
         private bool PayloadMatches(

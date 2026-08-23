@@ -487,11 +487,26 @@ namespace WasteCity.Graybox3D.Building
         {
             if (presentation == null)
                 throw new ArgumentNullException(nameof(presentation));
+            if (!TryDestroyBuildingTruthForCombat(
+                    stableInstanceId,
+                    out GrayboxBuildingInstance3D instance))
+            {
+                return false;
+            }
+            presentation.UpdateInstance(instance);
+            return true;
+        }
+
+        internal bool TryDestroyBuildingTruthForCombat(
+            string stableInstanceId,
+            out GrayboxBuildingInstance3D instance)
+        {
             EnsureConfigured();
+            instance = null;
             int index = FindInstanceIndex(stableInstanceId);
             if (index < 0) return false;
 
-            GrayboxBuildingInstance3D instance = instances[index];
+            instance = instances[index];
             if (instance.State != GrayboxBuildingInstanceState.Completed ||
                 !instance.IsPlayerOwned ||
                 instance.IsEvacuationLocked)
@@ -505,7 +520,6 @@ namespace WasteCity.Graybox3D.Building
             evacuationWarehouseConnectivity.Remove(instance.StableInstanceId);
             AdvanceCatalogRevision();
             AdvancePlacementRevision();
-            presentation.UpdateInstance(instance);
             return true;
         }
 
