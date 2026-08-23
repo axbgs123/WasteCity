@@ -244,6 +244,8 @@ namespace WasteCity.Defense
         }
 
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
+        public bool IsTerminal =>
+            result != SingleCityDefenseCampaignResult.None;
 
         public bool NotifyDefenseTowerCompleted(
             string stableInstanceId,
@@ -343,6 +345,89 @@ namespace WasteCity.Defense
             return applied;
         }
 
+        internal string AcquireTowerTarget(
+            string lockedStableEnemyId,
+            float towerX,
+            float towerZ,
+            float range)
+        {
+            float safeRange = Math.Max(0f, range);
+            float rangeSquared = safeRange * safeRange;
+            EnemyState locked = FindAliveEnemy(lockedStableEnemyId);
+            if (locked != null && DistanceSquared(
+                    towerX,
+                    towerZ,
+                    locked.X,
+                    locked.Z) <= rangeSquared)
+            {
+                return locked.StableId;
+            }
+
+            EnemyState selected = null;
+            float selectedDistanceSquared = float.MaxValue;
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                EnemyState candidate = enemies[index];
+                if (candidate.CurrentHealth <= 0) continue;
+                float distanceSquared = DistanceSquared(
+                    towerX,
+                    towerZ,
+                    candidate.X,
+                    candidate.Z);
+                if (distanceSquared > rangeSquared) continue;
+                if (selected == null ||
+                    distanceSquared < selectedDistanceSquared ||
+                    distanceSquared == selectedDistanceSquared &&
+                    string.CompareOrdinal(
+                        candidate.StableId,
+                        selected.StableId) < 0)
+                {
+                    selected = candidate;
+                    selectedDistanceSquared = distanceSquared;
+                }
+            }
+            return selected?.StableId;
+        }
+
+        internal float ResolveTowerDamageMultiplier(
+            string stableEnemyId,
+            string towerBuildingId)
+        {
+            EnemyState enemy = FindAliveEnemy(stableEnemyId);
+            DefenseTowerDefinition tower = DefenseTowerCatalog.For(
+                towerBuildingId);
+            return enemy == null || tower == null
+                ? 0f
+                : DamageMatrix.Multiplier(
+                    tower.DamageType,
+                    enemy.Definition.Armor);
+        }
+
+        internal int ApplyResolvedTowerDamage(
+            string stableEnemyId,
+            string towerBuildingId,
+            int resolvedDamage)
+        {
+            if (IsTerminal || resolvedDamage <= 0 ||
+                DefenseTowerCatalog.For(towerBuildingId) == null)
+            {
+                return 0;
+            }
+
+            EnemyState enemy = FindAliveEnemy(stableEnemyId);
+            if (enemy == null) return 0;
+            int applied = Math.Min(enemy.CurrentHealth, resolvedDamage);
+            enemy.CurrentHealth -= applied;
+            RegisterDamage(towerBuildingId, applied);
+            if (enemy.CurrentHealth == 0)
+            {
+                RegisterKill(
+                    enemy.Definition.Id.Value,
+                    towerBuildingId);
+            }
+            return applied;
+        }
+
         public int ApplyCoreDamage(int damage)
         {
             if (IsTerminal || damage <= 0) return 0;
@@ -358,6 +443,7 @@ namespace WasteCity.Defense
 
         public void RegisterConsumableSpent(string resourceId, int amount)
         {
+            if (IsTerminal) return;
             Add(consumablesSpentByResourceId, resourceId, amount);
         }
 
@@ -423,9 +509,6 @@ namespace WasteCity.Defense
             }
             return SingleCityDefenseCampaignResult.None;
         }
-
-        private bool IsTerminal =>
-            result != SingleCityDefenseCampaignResult.None;
 
         private void Step(float deltaSeconds)
         {
@@ -714,6 +797,17 @@ namespace WasteCity.Defense
             return distance != 0
                 ? distance
                 : string.CompareOrdinal(left.StableId, right.StableId);
+        }
+
+        private static float DistanceSquared(
+            float leftX,
+            float leftZ,
+            float rightX,
+            float rightZ)
+        {
+            float offsetX = rightX - leftX;
+            float offsetZ = rightZ - leftZ;
+            return offsetX * offsetX + offsetZ * offsetZ;
         }
 
         private static EnemyDefinition FindEnemyDefinition(string stableId)
