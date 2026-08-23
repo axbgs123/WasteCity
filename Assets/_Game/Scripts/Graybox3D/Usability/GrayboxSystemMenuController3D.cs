@@ -36,6 +36,7 @@ namespace WasteCity.Graybox3D.Usability
         [SerializeField] private GrayboxSystemMenuView3D view;
 
         private GameSpeedModel speed;
+        private GrayboxGameSpeedCommandFacade3D speedCommands;
         private GrayboxDisplaySettingsModel3D settings;
         private IGrayboxApplicationExit applicationExit;
         private IGrayboxFormalSaveExitCommand3D formalSaveExit;
@@ -49,6 +50,14 @@ namespace WasteCity.Graybox3D.Usability
         public GrayboxSystemMenuPage3D Page { get; private set; } =
             GrayboxSystemMenuPage3D.Main;
         public GrayboxDisplaySettingsModel3D Settings => settings;
+        public GrayboxGameSpeedCommandFacade3D SpeedCommands
+        {
+            get
+            {
+                EnsureRuntimeServices();
+                return speedCommands;
+            }
+        }
         public bool CanExitWithoutSaving => canExitWithoutSaving;
         public bool IsTacticalPaused =>
             speed != null && speed.IsPaused(GamePauseReason.User);
@@ -62,6 +71,7 @@ namespace WasteCity.Graybox3D.Usability
             ReleasePauseOwnership();
             this.speed = speed ??
                 throw new ArgumentNullException(nameof(speed));
+            speedCommands = new GrayboxGameSpeedCommandFacade3D(this.speed);
             this.settings = settings ??
                 throw new ArgumentNullException(nameof(settings));
             this.applicationExit = applicationExit ??
@@ -95,14 +105,21 @@ namespace WasteCity.Graybox3D.Usability
             IGrayboxApplicationExit applicationExit,
             GrayboxSystemMenuView3D view = null)
         {
+            settings?.Cancel();
             ReleasePauseOwnership();
             this.speed = speed ??
                 throw new ArgumentNullException(nameof(speed));
+            speedCommands = new GrayboxGameSpeedCommandFacade3D(this.speed);
             this.applicationExit = applicationExit ??
                 throw new ArgumentNullException(nameof(applicationExit));
+            IsOpen = false;
+            Page = GrayboxSystemMenuPage3D.Main;
+            canExitWithoutSaving = false;
+            exitRequested = false;
             if (view != null)
                 this.view = view;
             this.view?.SetController(this);
+            ApplyEffectiveSpeed();
             RenderView();
         }
 
@@ -129,9 +146,14 @@ namespace WasteCity.Graybox3D.Usability
         public void ToggleTacticalPause()
         {
             EnsureRuntimeServices();
-            speed.SetPaused(
-                GamePauseReason.User,
-                !speed.IsPaused(GamePauseReason.User));
+            speedCommands.ToggleTacticalPause();
+            ApplyEffectiveSpeed();
+        }
+
+        public void RequestSpeed(int requestedSpeed)
+        {
+            EnsureRuntimeServices();
+            speedCommands.RequestSpeed(requestedSpeed);
             ApplyEffectiveSpeed();
         }
 
@@ -287,6 +309,7 @@ namespace WasteCity.Graybox3D.Usability
             DiscardOpenMenu();
             view = null;
             speed = null;
+            speedCommands = null;
             settings = null;
             applicationExit = null;
             formalSaveExit = null;
@@ -321,6 +344,8 @@ namespace WasteCity.Graybox3D.Usability
         private void EnsureRuntimeServices()
         {
             speed ??= new GameSpeedModel();
+            speedCommands ??=
+                new GrayboxGameSpeedCommandFacade3D(speed);
             settings ??= new GrayboxDisplaySettingsModel3D(
                 new UnityGrayboxDisplaySettingsPlatform3D(),
                 new PlayerPrefsGrayboxDisplaySettingsStore3D());

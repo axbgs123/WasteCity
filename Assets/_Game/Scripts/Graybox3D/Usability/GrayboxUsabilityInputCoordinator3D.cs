@@ -248,6 +248,19 @@ namespace WasteCity.Graybox3D.Usability
                 buildingSuppression = buildingInput.ProcessCurrentInput();
             }
 
+            bool speedOnePressed = keyboard != null &&
+                keyboard.digit1Key.wasPressedThisFrame;
+            bool speedTwoPressed = keyboard != null &&
+                keyboard.digit2Key.wasPressedThisFrame;
+            if (!buildingSuppression.Destination &&
+                systemMenu != null &&
+                !HasActiveTextInputFocus() &&
+                (speedOnePressed || speedTwoPressed))
+            {
+                systemMenu.RequestSpeed(speedTwoPressed ? 2 : 1);
+                return SuppressAll();
+            }
+
             EnsureDevelopmentPanelAdapter();
             if (developmentPanel != null && developmentPanel.IsOpen)
                 return SuppressAll();
