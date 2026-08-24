@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using WasteCity.Building;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -9,11 +10,21 @@ namespace WasteCity.Graybox3D.Building
         None,
         Tower,
         Enemy,
+        Building,
+        Ruin,
+    }
+
+    public enum GrayboxDefenseTowerVisualKind3D
+    {
+        MachineGun,
+        Laser,
+        Spore,
     }
 
     public sealed class GrayboxDefenseWorldView3D : MonoBehaviour
     {
-        private const int TutorialEnemyPoolCapacity = 8;
+        private const int FormalEnemyPoolCapacity = 46;
+        private const int FormalTowerPoolCapacity = 24;
         private const float EnemyVisualHeight = .55f;
         private const float TowerVisualHeight = .05f;
 
@@ -22,9 +33,13 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private Material sharedMaterial;
 
         private readonly List<EnemyVisual> enemyPool =
-            new List<EnemyVisual>(TutorialEnemyPoolCapacity);
+            new List<EnemyVisual>(FormalEnemyPoolCapacity);
         private readonly Dictionary<string, EnemyVisual> enemyById =
             new Dictionary<string, EnemyVisual>(StringComparer.Ordinal);
+        private readonly Dictionary<string, Vector3> previousEnemyPositionById =
+            new Dictionary<string, Vector3>(
+                FormalEnemyPoolCapacity,
+                StringComparer.Ordinal);
         private readonly Dictionary<string, TowerVisual> towerById =
             new Dictionary<string, TowerVisual>(StringComparer.Ordinal);
         private readonly Dictionary<string, TowerVisual> nextTowerById =
@@ -36,12 +51,18 @@ namespace WasteCity.Graybox3D.Building
         private PlanarCoordinateMapper3D coordinates;
         private Material ownedFallbackMaterial;
         private bool simulationPaused;
+        private ulong lastConsumedAttackEventSequence;
+        private ulong lastConsumedSettlementSequence;
 
         public int EnemyVisualCount { get; private set; }
         public int TowerVisualCount { get; private set; }
         public int PooledEnemyCapacity => enemyPool.Count;
         public int PooledTowerCapacity => towerPool.Count;
+        public int PooledTrajectoryCapacity => towerPool.Count;
         public int VisibleTracerCount { get; private set; }
+        public int VisibleMachineGunTracerCount { get; private set; }
+        public int VisibleLaserBeamCount { get; private set; }
+        public int VisibleSporeTrajectoryCount { get; private set; }
         public GrayboxDefenseRuntimeSnapshot3D LastSnapshot { get; private set; }
         public int RefreshCount { get; private set; }
 
@@ -69,7 +90,8 @@ namespace WasteCity.Graybox3D.Building
             enemyRoot = configuredEnemyRoot;
             towerRoot = configuredTowerRoot;
             sharedMaterial = configuredSharedMaterial;
-            EnsureEnemyPool(TutorialEnemyPoolCapacity);
+            EnsureEnemyPool(FormalEnemyPoolCapacity);
+            EnsureTowerPool(FormalTowerPoolCapacity);
             ApplySharedMaterial();
         }
 
@@ -166,6 +188,21 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryGetTowerVisualKind(
+            string stableId,
+            out GrayboxDefenseTowerVisualKind3D kind)
+        {
+            kind = GrayboxDefenseTowerVisualKind3D.MachineGun;
+            if (string.IsNullOrWhiteSpace(stableId) ||
+                !towerById.TryGetValue(stableId, out TowerVisual visual) ||
+                !visual.Root.activeSelf)
+            {
+                return false;
+            }
+            kind = visual.Kind;
+            return true;
+        }
+
         private bool IsConfigured =>
             enemyRoot != null &&
             towerRoot != null &&
@@ -222,13 +259,23 @@ namespace WasteCity.Graybox3D.Building
 
         private void ApplyEnemies(GrayboxDefenseRuntimeSnapshot3D snapshot)
         {
+            previousEnemyPositionById.Clear();
+            foreach (KeyValuePair<string, EnemyVisual> entry in enemyById)
+            {
+                if (entry.Value.Root.activeSelf)
+                {
+                    previousEnemyPositionById[entry.Key] =
+                        entry.Value.Root.transform.position;
+                }
+            }
             enemyById.Clear();
             int requestedCount = snapshot?.Enemies?.Count ?? 0;
-            EnsureEnemyPool(Math.Max(TutorialEnemyPoolCapacity, requestedCount));
+            EnsureEnemyPool(FormalEnemyPoolCapacity);
+            int visibleCount = Math.Min(requestedCount, enemyPool.Count);
             for (int index = 0; index < enemyPool.Count; index++)
             {
                 EnemyVisual visual = enemyPool[index];
-                if (index >= requestedCount)
+                if (index >= visibleCount)
                 {
                     visual.Target.Configure(
                         this,
@@ -259,6 +306,7 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseRuntimeSnapshot3D snapshot,
             IReadOnlyList<GrayboxBuildingInstance3D> instances)
         {
+            EnsureTowerPool(FormalTowerPoolCapacity);
             retainedTowerIds.Clear();
             nextTowerById.Clear();
             for (int index = 0; index < towerPool.Count; index++)
@@ -309,8 +357,7 @@ namespace WasteCity.Graybox3D.Building
                     visual = FirstAvailableTowerVisual();
                     if (visual == null)
                     {
-                        visual = CreateTowerVisual(towerPool.Count);
-                        towerPool.Add(visual);
+                        continue;
                     }
                     visual.InUse = true;
                     nextTowerById.Add(tower.StableId, visual);
@@ -325,6 +372,7 @@ namespace WasteCity.Graybox3D.Building
                     this,
                     GrayboxDefenseSelectionKind3D.Tower,
                     tower.StableId);
+                visual.SetKind(ResolveTowerVisualKind(instance));
                 visual.Root.SetActive(true);
                 ApplyTowerState(visual, tower);
                 TowerVisualCount++;
@@ -350,6 +398,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void EnsureEnemyPool(int capacity)
         {
+            capacity = Math.Min(capacity, FormalEnemyPoolCapacity);
             while (enemyPool.Count < capacity)
             {
                 int index = enemyPool.Count;
@@ -369,6 +418,13 @@ namespace WasteCity.Graybox3D.Building
                 root.SetActive(false);
                 enemyPool.Add(new EnemyVisual(root, renderer, target));
             }
+        }
+
+        private void EnsureTowerPool(int capacity)
+        {
+            capacity = Math.Min(capacity, FormalTowerPoolCapacity);
+            while (towerPool.Count < capacity)
+                towerPool.Add(CreateTowerVisual(towerPool.Count));
         }
 
         private TowerVisual FirstAvailableTowerVisual()
@@ -393,19 +449,72 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefensePickTarget3D target =
                 root.AddComponent<GrayboxDefensePickTarget3D>();
 
+            var renderers = new List<Renderer>(8);
             GameObject baseVisual = CreatePrimitiveChild(
                 root.transform,
                 "Defense.Tower.Base",
                 PrimitiveType.Cube,
                 new Vector3(0f, .25f, 0f),
                 new Vector3(.75f, .5f, .75f));
-            GameObject barrelVisual = CreatePrimitiveChild(
+            renderers.Add(baseVisual.GetComponent<Renderer>());
+
+            Transform machineGunGroup = CreateGroup(
                 root.transform,
-                "Defense.Tower.Barrel",
+                "Defense.Tower.MachineGun");
+            GameObject leftBarrel = CreatePrimitiveChild(
+                machineGunGroup,
+                "Defense.Tower.MachineGun.Barrel.Left",
                 PrimitiveType.Cube,
-                new Vector3(0f, .7f, .38f),
-                new Vector3(.18f, .18f, .95f));
-            GameObject tracerObject = new GameObject("Defense.Tower.Tracer");
+                new Vector3(-.13f, .7f, .38f),
+                new Vector3(.12f, .12f, .95f));
+            GameObject rightBarrel = CreatePrimitiveChild(
+                machineGunGroup,
+                "Defense.Tower.MachineGun.Barrel.Right",
+                PrimitiveType.Cube,
+                new Vector3(.13f, .7f, .38f),
+                new Vector3(.12f, .12f, .95f));
+            renderers.Add(leftBarrel.GetComponent<Renderer>());
+            renderers.Add(rightBarrel.GetComponent<Renderer>());
+
+            Transform laserGroup = CreateGroup(
+                root.transform,
+                "Defense.Tower.Laser");
+            GameObject laserEmitter = CreatePrimitiveChild(
+                laserGroup,
+                "Defense.Tower.Laser.Emitter",
+                PrimitiveType.Cylinder,
+                new Vector3(0f, .68f, .26f),
+                new Vector3(.18f, .42f, .18f),
+                new Vector3(90f, 0f, 0f));
+            GameObject laserLens = CreatePrimitiveChild(
+                laserGroup,
+                "Defense.Tower.Laser.Lens",
+                PrimitiveType.Sphere,
+                new Vector3(0f, .68f, .7f),
+                new Vector3(.3f, .3f, .16f));
+            renderers.Add(laserEmitter.GetComponent<Renderer>());
+            renderers.Add(laserLens.GetComponent<Renderer>());
+
+            Transform sporeGroup = CreateGroup(
+                root.transform,
+                "Defense.Tower.Spore");
+            GameObject sporeStalk = CreatePrimitiveChild(
+                sporeGroup,
+                "Defense.Tower.Spore.Stalk",
+                PrimitiveType.Cylinder,
+                new Vector3(0f, .55f, 0f),
+                new Vector3(.16f, .32f, .16f));
+            GameObject sporeBulb = CreatePrimitiveChild(
+                sporeGroup,
+                "Defense.Tower.Spore.Bulb",
+                PrimitiveType.Sphere,
+                new Vector3(0f, .92f, 0f),
+                new Vector3(.52f, .38f, .52f));
+            renderers.Add(sporeStalk.GetComponent<Renderer>());
+            renderers.Add(sporeBulb.GetComponent<Renderer>());
+
+            GameObject tracerObject = new GameObject(
+                "Defense.Tower.Trajectory");
             tracerObject.transform.SetParent(root.transform, false);
             LineRenderer tracer = tracerObject.AddComponent<LineRenderer>();
             tracer.useWorldSpace = true;
@@ -414,16 +523,25 @@ namespace WasteCity.Graybox3D.Building
             tracer.endWidth = .025f;
             tracer.sharedMaterial = sharedMaterial;
             tracer.enabled = false;
-            return new TowerVisual(
+            renderers.Add(tracer);
+            var visual = new TowerVisual(
                 root,
                 target,
                 tracer,
-                new[]
-                {
-                    baseVisual.GetComponent<Renderer>(),
-                    barrelVisual.GetComponent<Renderer>(),
-                    tracer,
-                });
+                renderers,
+                machineGunGroup.gameObject,
+                laserGroup.gameObject,
+                sporeGroup.gameObject);
+            visual.SetKind(GrayboxDefenseTowerVisualKind3D.MachineGun);
+            root.SetActive(false);
+            return visual;
+        }
+
+        private static Transform CreateGroup(Transform parent, string name)
+        {
+            var group = new GameObject(name);
+            group.transform.SetParent(parent, false);
+            return group.transform;
         }
 
         private GameObject CreatePrimitiveChild(
@@ -431,12 +549,14 @@ namespace WasteCity.Graybox3D.Building
             string objectName,
             PrimitiveType primitive,
             Vector3 localPosition,
-            Vector3 localScale)
+            Vector3 localScale,
+            Vector3 localEulerAngles = default)
         {
             GameObject child = GameObject.CreatePrimitive(primitive);
             child.name = objectName;
             child.transform.SetParent(parent, false);
             child.transform.localPosition = localPosition;
+            child.transform.localEulerAngles = localEulerAngles;
             child.transform.localScale = localScale;
             Collider collider = child.GetComponent<Collider>();
             if (collider != null)
@@ -462,30 +582,118 @@ namespace WasteCity.Graybox3D.Building
         private void RefreshTracers()
         {
             VisibleTracerCount = 0;
+            VisibleMachineGunTracerCount = 0;
+            VisibleLaserBeamCount = 0;
+            VisibleSporeTrajectoryCount = 0;
             for (int index = 0; index < towerPool.Count; index++)
                 towerPool[index].Tracer.enabled = false;
-            if (simulationPaused || LastSnapshot?.Towers == null)
+            IReadOnlyList<GrayboxDefenseSettledAttackEvent3D> attacks =
+                LastSnapshot?.SettledAttackEvents;
+            if (attacks == null || attacks.Count == 0)
                 return;
 
-            for (int index = 0; index < LastSnapshot.Towers.Count; index++)
+            ulong batchSettlementSequence = 0ul;
+            for (var index = 0; index < attacks.Count; index++)
             {
-                GrayboxDefenseTowerSnapshot3D tower =
-                    LastSnapshot.Towers[index];
-                if (tower.Status != GrayboxDefenseTowerStatus3D.Firing ||
-                    string.IsNullOrWhiteSpace(tower.TargetId) ||
-                    !towerById.TryGetValue(tower.StableId, out TowerVisual visual) ||
-                    !enemyById.TryGetValue(tower.TargetId, out EnemyVisual target) ||
+                batchSettlementSequence = Math.Max(
+                    batchSettlementSequence,
+                    attacks[index].SettlementSequence);
+            }
+            if (batchSettlementSequence < lastConsumedSettlementSequence)
+            {
+                lastConsumedAttackEventSequence = 0ul;
+                lastConsumedSettlementSequence = 0ul;
+            }
+
+            for (int index = 0; index < attacks.Count; index++)
+            {
+                GrayboxDefenseSettledAttackEvent3D attack = attacks[index];
+                if (attack.EventSequence <=
+                    lastConsumedAttackEventSequence)
+                {
+                    continue;
+                }
+                lastConsumedAttackEventSequence = attack.EventSequence;
+                lastConsumedSettlementSequence = Math.Max(
+                    lastConsumedSettlementSequence,
+                    attack.SettlementSequence);
+                if (simulationPaused ||
+                    !towerById.TryGetValue(
+                        attack.TowerStableId,
+                        out TowerVisual visual) ||
                     !visual.Root.activeSelf ||
-                    !target.Root.activeSelf)
+                    !TryResolveAttackEndpoint(
+                        attack.TargetStableId,
+                        out Vector3 end) ||
+                    visual.Tracer.enabled)
                 {
                     continue;
                 }
 
-                visual.Tracer.SetPosition(0, visual.Root.transform.position);
-                visual.Tracer.SetPosition(1, target.Root.transform.position);
+                Vector3 start = visual.Root.transform.position;
+                visual.Tracer.SetPosition(0, start);
+                if (visual.Kind == GrayboxDefenseTowerVisualKind3D.Spore)
+                {
+                    visual.Tracer.SetPosition(
+                        1,
+                        (start + end) * .5f + Vector3.up * 1.4f);
+                    visual.Tracer.SetPosition(2, end);
+                    VisibleSporeTrajectoryCount++;
+                }
+                else
+                {
+                    visual.Tracer.SetPosition(1, end);
+                    if (visual.Kind ==
+                        GrayboxDefenseTowerVisualKind3D.Laser)
+                    {
+                        VisibleLaserBeamCount++;
+                    }
+                    else
+                    {
+                        VisibleMachineGunTracerCount++;
+                    }
+                }
                 visual.Tracer.enabled = true;
                 VisibleTracerCount++;
             }
+        }
+
+        private bool TryResolveAttackEndpoint(
+            string targetStableId,
+            out Vector3 position)
+        {
+            if (enemyById.TryGetValue(
+                    targetStableId,
+                    out EnemyVisual target) &&
+                target.Root.activeSelf)
+            {
+                position = target.Root.transform.position;
+                return true;
+            }
+            return previousEnemyPositionById.TryGetValue(
+                targetStableId,
+                out position);
+        }
+
+        private static GrayboxDefenseTowerVisualKind3D ResolveTowerVisualKind(
+            GrayboxBuildingInstance3D instance)
+        {
+            string buildingId = instance?.Placement?.Definition?.Id.Value;
+            if (string.Equals(
+                    buildingId,
+                    BuildingCatalog.LaserTower.Id.Value,
+                    StringComparison.Ordinal))
+            {
+                return GrayboxDefenseTowerVisualKind3D.Laser;
+            }
+            if (string.Equals(
+                    buildingId,
+                    BuildingCatalog.SporeTower.Id.Value,
+                    StringComparison.Ordinal))
+            {
+                return GrayboxDefenseTowerVisualKind3D.Spore;
+            }
+            return GrayboxDefenseTowerVisualKind3D.MachineGun;
         }
 
         private static void ApplyEnemyState(
@@ -562,6 +770,7 @@ namespace WasteCity.Graybox3D.Building
                 DestroyOwned(towerPool[index].Root);
             enemyPool.Clear();
             enemyById.Clear();
+            previousEnemyPositionById.Clear();
             towerPool.Clear();
             towerById.Clear();
             nextTowerById.Clear();
@@ -602,12 +811,18 @@ namespace WasteCity.Graybox3D.Building
                 GameObject root,
                 GrayboxDefensePickTarget3D target,
                 LineRenderer tracer,
-                IReadOnlyList<Renderer> renderers)
+                IReadOnlyList<Renderer> renderers,
+                GameObject machineGunGroup,
+                GameObject laserGroup,
+                GameObject sporeGroup)
             {
                 Root = root;
                 Target = target;
                 Tracer = tracer;
                 Renderers = renderers;
+                MachineGunGroup = machineGunGroup;
+                LaserGroup = laserGroup;
+                SporeGroup = sporeGroup;
                 Properties = new MaterialPropertyBlock();
             }
 
@@ -617,6 +832,40 @@ namespace WasteCity.Graybox3D.Building
             public IReadOnlyList<Renderer> Renderers { get; }
             public MaterialPropertyBlock Properties { get; }
             public bool InUse { get; set; }
+            public GrayboxDefenseTowerVisualKind3D Kind { get; private set; }
+
+            private GameObject MachineGunGroup { get; }
+            private GameObject LaserGroup { get; }
+            private GameObject SporeGroup { get; }
+
+            public void SetKind(GrayboxDefenseTowerVisualKind3D kind)
+            {
+                Kind = kind;
+                MachineGunGroup.SetActive(
+                    kind == GrayboxDefenseTowerVisualKind3D.MachineGun);
+                LaserGroup.SetActive(
+                    kind == GrayboxDefenseTowerVisualKind3D.Laser);
+                SporeGroup.SetActive(
+                    kind == GrayboxDefenseTowerVisualKind3D.Spore);
+                if (kind == GrayboxDefenseTowerVisualKind3D.Laser)
+                {
+                    Tracer.positionCount = 2;
+                    Tracer.startWidth = .085f;
+                    Tracer.endWidth = .085f;
+                }
+                else if (kind == GrayboxDefenseTowerVisualKind3D.Spore)
+                {
+                    Tracer.positionCount = 3;
+                    Tracer.startWidth = .09f;
+                    Tracer.endWidth = .04f;
+                }
+                else
+                {
+                    Tracer.positionCount = 2;
+                    Tracer.startWidth = .04f;
+                    Tracer.endWidth = .025f;
+                }
+            }
         }
     }
 

@@ -1,12 +1,15 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.Combat;
+using WasteCity.Defense;
+using WasteCity.Economy;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -30,8 +33,13 @@ namespace WasteCity.Graybox3D.Building
         private GameObject fallbackEventSystemObject;
         private GrayboxDefenseSelectionKind3D selectedKind;
         private string selectedStableId;
+        private GrayboxDefenseSelectionSnapshot3D selectedDetails;
+        private bool usesSelectionDetails;
+        private bool selectedCanToggleTowerPause;
         private float requestedSpeed = 1f;
         private float effectiveSpeed = 1f;
+        private bool hasAppliedProjection;
+        private bool hasAppliedSpeed;
 
         public Text SummaryText { get; private set; }
         public Text SpeedText { get; private set; }
@@ -53,9 +61,20 @@ namespace WasteCity.Graybox3D.Building
             float requestedSpeed,
             float effectiveSpeed)
         {
-            this.requestedSpeed = NormalizeDisplaySpeed(requestedSpeed);
-            this.effectiveSpeed = NormalizeDisplaySpeed(effectiveSpeed);
+            float normalizedRequested =
+                NormalizeDisplaySpeed(requestedSpeed);
+            float normalizedEffective =
+                NormalizeDisplaySpeed(effectiveSpeed);
             EnsureFallbackConfiguration();
+            if (hasAppliedSpeed &&
+                this.requestedSpeed == normalizedRequested &&
+                this.effectiveSpeed == normalizedEffective)
+            {
+                return;
+            }
+            this.requestedSpeed = normalizedRequested;
+            this.effectiveSpeed = normalizedEffective;
+            hasAppliedSpeed = true;
             if (SpeedText != null)
             {
                 SpeedText.text = FormatSpeed(
@@ -84,25 +103,87 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseSelectionKind3D selectionKind,
             string stableId)
         {
+            ApplyInternal(
+                snapshot,
+                selectionKind,
+                stableId,
+                details: null,
+                useDetails: false);
+        }
+
+        public void Apply(
+            GrayboxDefenseRuntimeSnapshot3D snapshot,
+            GrayboxDefenseSelectionKind3D selectionKind,
+            string stableId,
+            GrayboxDefenseSelectionSnapshot3D details)
+        {
+            ApplyInternal(
+                snapshot,
+                selectionKind,
+                stableId,
+                details,
+                useDetails: true);
+        }
+
+        private void ApplyInternal(
+            GrayboxDefenseRuntimeSnapshot3D snapshot,
+            GrayboxDefenseSelectionKind3D selectionKind,
+            string stableId,
+            GrayboxDefenseSelectionSnapshot3D details,
+            bool useDetails)
+        {
             using (ApplyMarker.Auto())
             {
+                EnsureFallbackConfiguration();
+                if (hasAppliedProjection &&
+                    ReferenceEquals(LastSnapshot, snapshot) &&
+                    selectedKind == selectionKind &&
+                    usesSelectionDetails == useDetails &&
+                    ReferenceEquals(selectedDetails, details) &&
+                    string.Equals(
+                        selectedStableId,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    return;
+                }
                 LastSnapshot = snapshot;
                 RefreshCount++;
-                EnsureFallbackConfiguration();
+                hasAppliedProjection = true;
                 selectedKind = selectionKind;
                 selectedStableId = stableId;
+                selectedDetails = details;
+                usesSelectionDetails = useDetails;
                 WarningVisible = snapshot != null &&
                     snapshot.WavePhase == WavePhase.Warning;
 
                 string summary = FormatSummary(snapshot);
-                string details = FormatSelection(
-                    snapshot,
-                    selectionKind,
-                    stableId,
-                    out bool visible,
-                    out bool towerSelected,
-                    out bool towerPaused);
+                bool visible;
+                bool towerSelected;
+                bool towerPaused;
+                string selectionText;
+                if (useDetails)
+                {
+                    selectionText = FormatSelection(
+                        details,
+                        selectionKind,
+                        stableId,
+                        out visible,
+                        out towerSelected,
+                        out towerPaused);
+                }
+                else
+                {
+                    selectionText = FormatSelection(
+                        snapshot,
+                        selectionKind,
+                        stableId,
+                        out visible,
+                        out towerSelected,
+                        out towerPaused);
+                }
                 IsSelectionVisible = visible;
+                selectedCanToggleTowerPause = towerSelected;
                 TowerPauseButtonLabel = towerPaused
                     ? "恢复运行"
                     : "暂停运行";
@@ -110,7 +191,7 @@ namespace WasteCity.Graybox3D.Building
                 if (SummaryText != null)
                     SummaryText.text = summary;
                 if (SelectionText != null)
-                    SelectionText.text = details;
+                    SelectionText.text = selectionText;
                 if (selectionGroup != null)
                 {
                     selectionGroup.alpha = visible ? 1f : 0f;
@@ -190,7 +271,7 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f),
                 new Vector2(20f, -70f),
-                new Vector2(360f, 90f));
+                new Vector2(360f, 140f));
             SummaryText = CreateText(
                 SummaryRect,
                 "Defense.Summary.Text",
@@ -263,6 +344,7 @@ namespace WasteCity.Graybox3D.Building
         private void HandlePauseClicked()
         {
             if (selectedKind == GrayboxDefenseSelectionKind3D.Tower &&
+                selectedCanToggleTowerPause &&
                 !string.IsNullOrWhiteSpace(selectedStableId))
             {
                 TowerPauseRequested?.Invoke(selectedStableId);
@@ -273,32 +355,106 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseRuntimeSnapshot3D snapshot)
         {
             if (snapshot == null)
-                return "防御 | 核心 --/-- | 波次 未开始 | 敌人 0";
+                return "防御 | 第 0/10 波\n" +
+                       "阶段 未开始 | 倒计时 --\n" +
+                       "入口 无 | 组成 无\n" +
+                       "已生成 0/0 | 存活 0\n" +
+                       "核心 --/--";
 
-            string wave;
+            string countdown = snapshot.CampaignPhase ==
+                    SingleCityDefenseCampaignPhase.Warning
+                ? snapshot.WarningRemainingSeconds.ToString(
+                      "0.0",
+                      CultureInfo.InvariantCulture) + " 秒"
+                : "--";
+            string core = snapshot.CoreCurrentHealth + "/" +
+                          snapshot.CoreMaximumHealth;
             if (snapshot.IsCoreDestroyed)
+                core += "（城市核心失守）";
+            return "防御 | 第 " + snapshot.CurrentWaveNumber + "/" +
+                   snapshot.TotalWaveCount + " 波\n" +
+                   "阶段 " + PhaseLabel(snapshot.CampaignPhase) +
+                   " | 倒计时 " + countdown + "\n" +
+                   "入口 " + FormatDirections(snapshot.SpawnDirections) +
+                   " | 组成 " +
+                   FormatComposition(snapshot.WaveComposition) + "\n" +
+                   "已生成 " + snapshot.SpawnedEnemyCount + "/" +
+                   snapshot.PlannedEnemyCount + " | 存活敌人 " +
+                   snapshot.AliveEnemyCount + "\n" +
+                   "核心 " + core;
+        }
+
+        private static string PhaseLabel(
+            SingleCityDefenseCampaignPhase phase)
+        {
+            switch (phase)
             {
-                wave = "城市核心失守";
-            }
-            else switch (snapshot.WavePhase)
-            {
-                case WavePhase.Warning:
-                    wave = "预警 " + snapshot.WarningRemainingSeconds
-                        .ToString("0.0", CultureInfo.InvariantCulture) + " 秒";
-                    break;
-                case WavePhase.Spawning:
-                    wave = "敌袭生成中";
-                    break;
-                case WavePhase.Active:
-                    wave = "敌袭进行中";
-                    break;
+                case SingleCityDefenseCampaignPhase.Warning:
+                    return "预警";
+                case SingleCityDefenseCampaignPhase.SpawningAndCombat:
+                    return "生成与战斗";
+                case SingleCityDefenseCampaignPhase.CombatCleanup:
+                    return "战斗清理";
+                case SingleCityDefenseCampaignPhase.Victory:
+                    return "胜利";
+                case SingleCityDefenseCampaignPhase.Defeat:
+                    return "失败";
                 default:
-                    wave = "安全";
-                    break;
+                    return "未开始";
             }
-            return "防御 | 核心 " + snapshot.CoreCurrentHealth + "/" +
-                   snapshot.CoreMaximumHealth + " | " + wave +
-                   " | 敌人 " + snapshot.AliveEnemyCount;
+        }
+
+        private static string FormatComposition(
+            System.Collections.Generic.IReadOnlyList<WaveEntry> entries)
+        {
+            if (entries == null || entries.Count == 0) return "无";
+
+            var result = new StringBuilder(48);
+            for (var index = 0; index < entries.Count; index++)
+            {
+                if (index > 0) result.Append(" / ");
+                WaveEntry entry = entries[index];
+                result.Append(EnemyName(entry.Archetype));
+                result.Append('×');
+                result.Append(entry.Count);
+            }
+            return result.ToString();
+        }
+
+        private static string FormatDirections(
+            System.Collections.Generic.IReadOnlyList<
+                CampaignSpawnDirection> directions)
+        {
+            if (directions == null || directions.Count == 0) return "无";
+            var result = new StringBuilder(16);
+            for (var index = 0; index < directions.Count; index++)
+            {
+                if (index > 0) result.Append(" / ");
+                switch (directions[index])
+                {
+                    case CampaignSpawnDirection.East:
+                        result.Append('东');
+                        break;
+                    case CampaignSpawnDirection.North:
+                        result.Append('北');
+                        break;
+                    case CampaignSpawnDirection.South:
+                        result.Append('南');
+                        break;
+                    case CampaignSpawnDirection.West:
+                        result.Append('西');
+                        break;
+                }
+            }
+            return result.Length == 0 ? "无" : result.ToString();
+        }
+
+        private static string EnemyName(EnemyArchetype archetype)
+        {
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+                if (EnemyCatalog.All[index].Archetype == archetype)
+                    return EnemyCatalog.All[index].Name;
+            return archetype.ToString();
         }
 
         private static string FormatSpeed(
@@ -317,6 +473,329 @@ namespace WasteCity.Graybox3D.Building
         {
             if (float.IsNaN(value) || float.IsInfinity(value)) return 0f;
             return Mathf.Clamp(value, 0f, 2f);
+        }
+
+        private static string FormatSelection(
+            GrayboxDefenseSelectionSnapshot3D details,
+            GrayboxDefenseSelectionKind3D kind,
+            string stableId,
+            out bool visible,
+            out bool towerSelected,
+            out bool towerPaused)
+        {
+            visible = false;
+            towerSelected = false;
+            towerPaused = false;
+            if (details == null ||
+                kind == GrayboxDefenseSelectionKind3D.None ||
+                details.Kind != kind ||
+                string.IsNullOrWhiteSpace(stableId) ||
+                !string.Equals(
+                    details.StableId,
+                    stableId,
+                    StringComparison.Ordinal))
+            {
+                return string.Empty;
+            }
+
+            visible = true;
+            towerSelected = kind == GrayboxDefenseSelectionKind3D.Tower &&
+                details.CanToggleTowerPause;
+            towerPaused = details.Tower != null &&
+                details.Tower.PlayerPaused;
+
+            var result = new StringBuilder(160);
+            result.Append(string.IsNullOrWhiteSpace(details.DisplayName)
+                ? "未知目标"
+                : details.DisplayName);
+            result.Append("\n生命 ");
+            result.Append(kind == GrayboxDefenseSelectionKind3D.Ruin
+                ? 0
+                : details.CurrentHealth);
+            result.Append('/');
+            result.Append(details.MaximumHealth);
+            result.Append("\n状态 ");
+            result.Append(string.IsNullOrWhiteSpace(details.StatusText)
+                ? "未知"
+                : details.StatusText);
+
+            if (kind == GrayboxDefenseSelectionKind3D.Ruin)
+            {
+                result.Append("\n损失 ");
+                if (details.LostResources == null ||
+                    details.LostResources.Count == 0)
+                {
+                    result.Append("无物资损失或明细不可用");
+                }
+                else
+                {
+                    for (var index = 0;
+                         index < details.LostResources.Count;
+                         index++)
+                    {
+                        if (index > 0) result.Append(" / ");
+                        ResourceAmount amount = details.LostResources[index];
+                        result.Append(ResourceName(amount.ResourceId));
+                        result.Append('×');
+                        result.Append(amount.Amount);
+                    }
+                }
+                result.Append("；内部库存与预留已清空");
+                return result.ToString();
+            }
+
+            if (kind == GrayboxDefenseSelectionKind3D.Building)
+            {
+                AppendProductionDetails(
+                    result,
+                    details.Production);
+                return result.ToString();
+            }
+
+            if (kind == GrayboxDefenseSelectionKind3D.Tower)
+            {
+                GrayboxDefenseTowerSnapshot3D tower = details.Tower;
+                AppendTowerCombatDetails(
+                    result,
+                    details.DefinitionId,
+                    tower);
+                if (tower != null)
+                {
+                    DefenseTowerDefinition definition =
+                        DefenseTowerCatalog.For(details.DefinitionId);
+                    result.Append("\n射程 ");
+                    result.Append(tower.Range.ToString(
+                        "0.#",
+                        CultureInfo.InvariantCulture));
+                    result.Append(" 格\n本地 ");
+                    result.Append(ResourceName(
+                        definition?.ConsumableId ?? ResourceIds.Ammunition));
+                    result.Append(' ');
+                    result.Append(tower.Ammo);
+                    result.Append('/');
+                    result.Append(tower.AmmoCapacity);
+                    result.Append("\n物流 ");
+                    result.Append(tower.Connected ? "已连接" : "已断开");
+                }
+                result.Append("\n目标 ");
+                result.Append(string.IsNullOrWhiteSpace(
+                        details.TargetDisplayName)
+                    ? string.IsNullOrWhiteSpace(details.TargetStableId)
+                    ? "无"
+                    : details.TargetStableId
+                    : details.TargetDisplayName);
+                return result.ToString();
+            }
+
+            if (kind == GrayboxDefenseSelectionKind3D.Enemy)
+            {
+                AppendEnemyCombatDetails(result, details.DefinitionId);
+                result.Append("\n当前目标 ");
+                result.Append(string.IsNullOrWhiteSpace(
+                        details.TargetDisplayName)
+                    ? string.IsNullOrWhiteSpace(details.TargetStableId)
+                    ? "无"
+                    : details.TargetStableId
+                    : details.TargetDisplayName);
+                if (details.Enemy != null)
+                {
+                    result.Append("\n距目标 ");
+                    result.Append(details.Enemy.DistanceToTarget.ToString(
+                        "0.0",
+                        CultureInfo.InvariantCulture));
+                    result.Append(" 格");
+                }
+                return result.ToString();
+            }
+
+            visible = false;
+            return string.Empty;
+        }
+
+        private static void AppendProductionDetails(
+            StringBuilder result,
+            ProductionBuildingObservability production)
+        {
+            if (production == null) return;
+            result.Append("\n配方 ");
+            result.Append(ResourceRecipeCatalog.DisplayName(
+                production.ProductionDefinitionId));
+            result.Append('：');
+            AppendRecipeChannels(result, production.Inputs, "无");
+            result.Append(" → ");
+            AppendRecipeChannels(result, production.Outputs, "无");
+            result.Append('（');
+            result.Append(production.DurationSeconds.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append("秒）");
+            result.Append("\n内部输入 ");
+            AppendInventoryChannels(result, production.Inputs);
+            result.Append("\n内部输出 ");
+            AppendInventoryChannels(result, production.Outputs);
+            result.Append("\n物流 ");
+            result.Append(production.IsLogisticsConnected
+                ? "已连接"
+                : "已断开");
+            result.Append("\n停工原因 ");
+            result.Append(GrayboxDefenseSelectionProjection3D
+                .ProductionStopReasonText(
+                    production.IsPlayerPaused
+                        ? ProductionStopReason.PlayerPaused
+                        : production.StopReason));
+        }
+
+        private static void AppendTowerCombatDetails(
+            StringBuilder result,
+            string buildingDefinitionId,
+            GrayboxDefenseTowerSnapshot3D tower)
+        {
+            DefenseTowerDefinition definition =
+                DefenseTowerCatalog.For(buildingDefinitionId);
+            if (definition == null) return;
+            result.Append("\n伤害 ");
+            result.Append(DamageTypeLabel(definition.DamageType));
+            result.Append(" | DPS ");
+            result.Append(definition.DamagePerSecond.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append("\n耗材 ");
+            result.Append(ResourceName(definition.ConsumableId));
+            result.Append(" | 每 ");
+            result.Append(definition.SecondsPerConsumable.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append(" 秒 1");
+            if (tower == null) return;
+            result.Append("\n预计续航 ");
+            result.Append((tower.Ammo * definition.SecondsPerConsumable +
+                    tower.ActiveConsumableSeconds)
+                .ToString("0.#", CultureInfo.InvariantCulture));
+            result.Append(" 秒");
+        }
+
+        private static void AppendEnemyCombatDetails(
+            StringBuilder result,
+            string enemyDefinitionId)
+        {
+            EnemyDefinition definition = null;
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+            {
+                if (!string.Equals(
+                        EnemyCatalog.All[index].Id.Value,
+                        enemyDefinitionId,
+                        StringComparison.Ordinal))
+                    continue;
+                definition = EnemyCatalog.All[index];
+                break;
+            }
+            if (definition == null) return;
+            result.Append("\n移速 ");
+            result.Append(definition.MoveSpeed.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append(" | DPS ");
+            result.Append(definition.DamagePerSecond.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append(" | 射程 ");
+            result.Append(definition.AttackRange.ToString(
+                "0.#",
+                CultureInfo.InvariantCulture));
+            result.Append(" 格\n护甲 ");
+            result.Append(ArmorLabel(definition.Armor));
+        }
+
+        private static void AppendRecipeChannels(
+            StringBuilder result,
+            System.Collections.Generic.IReadOnlyList<
+                ProductionResourceObservability> channels,
+            string emptyLabel)
+        {
+            if (channels == null || channels.Count == 0)
+            {
+                result.Append(emptyLabel);
+                return;
+            }
+            for (var index = 0; index < channels.Count; index++)
+            {
+                if (index > 0) result.Append(" + ");
+                ProductionResourceObservability channel = channels[index];
+                result.Append(ResourceName(channel.ResourceId));
+                result.Append('×');
+                result.Append(channel.AmountPerCycle);
+            }
+        }
+
+        private static void AppendInventoryChannels(
+            StringBuilder result,
+            System.Collections.Generic.IReadOnlyList<
+                ProductionResourceObservability> channels)
+        {
+            if (channels == null || channels.Count == 0)
+            {
+                result.Append('无');
+                return;
+            }
+            for (var index = 0; index < channels.Count; index++)
+            {
+                if (index > 0) result.Append(" / ");
+                ProductionResourceObservability channel = channels[index];
+                result.Append(ResourceName(channel.ResourceId));
+                result.Append(' ');
+                result.Append(channel.CurrentAmount);
+                result.Append('/');
+                result.Append(channel.Capacity);
+            }
+        }
+
+        private static string ResourceName(string resourceId)
+        {
+            return ResourceDefinitionCatalog.TryGet(
+                resourceId,
+                out ResourceDefinition definition)
+                    ? definition.ChineseName
+                    : string.IsNullOrWhiteSpace(resourceId)
+                        ? "无"
+                        : resourceId;
+        }
+
+        private static string DamageTypeLabel(DamageType damageType)
+        {
+            switch (damageType)
+            {
+                case DamageType.Physical:
+                    return "物理";
+                case DamageType.Energy:
+                    return "能量";
+                case DamageType.Psionic:
+                    return "灵能";
+                case DamageType.Biological:
+                    return "生物";
+                case DamageType.TrueEssence:
+                    return "真元";
+                default:
+                    return damageType.ToString();
+            }
+        }
+
+        private static string ArmorLabel(ArmorType armor)
+        {
+            switch (armor)
+            {
+                case ArmorType.Light:
+                    return "轻型";
+                case ArmorType.Heavy:
+                    return "重型";
+                case ArmorType.PsionicShield:
+                    return "灵能护盾";
+                case ArmorType.BiologicalShell:
+                    return "生物甲壳";
+                case ArmorType.SpiritualBarrier:
+                    return "灵力屏障";
+                default:
+                    return armor.ToString();
+            }
         }
 
         private static string FormatSelection(
@@ -370,17 +849,33 @@ namespace WasteCity.Graybox3D.Building
                 if (enemy == null)
                     return string.Empty;
                 visible = true;
-                return "啃噬者\n生命 " + enemy.CurrentHealth + "/" +
-                       EnemyCatalog.Gnawer.MaximumHealth +
+                return EnemyName(enemy.EnemyDefinitionId) +
+                       "\n生命 " + enemy.CurrentHealth + "/" +
+                       enemy.MaximumHealth +
                        "\n目标 " + enemy.TargetName +
-                       "\n距离 " + enemy.DistanceToCore.ToString(
+                       "\n距核心 " + enemy.DistanceToCore.ToString(
                            "0.0",
-                           CultureInfo.InvariantCulture) + "格" +
+                           CultureInfo.InvariantCulture) + " 格" +
                        "\n状态 " + (enemy.IsAttackingCore
                            ? "攻击城市核心"
                            : "接近城市核心");
             }
             return string.Empty;
+        }
+
+        private static string EnemyName(string definitionId)
+        {
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+                if (string.Equals(
+                        EnemyCatalog.All[index].Id.Value,
+                        definitionId,
+                        StringComparison.Ordinal))
+                {
+                    return EnemyCatalog.All[index].Name;
+                }
+            return string.IsNullOrWhiteSpace(definitionId)
+                ? "未知敌人"
+                : definitionId;
         }
 
         private static string TowerStatusLabel(

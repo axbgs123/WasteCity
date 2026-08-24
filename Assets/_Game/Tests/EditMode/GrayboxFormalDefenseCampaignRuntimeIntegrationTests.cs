@@ -704,6 +704,54 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void DestructionHistoryKeepsEachRuinLossAfterLaterBuildingsFall()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(
+                includeThreeTowers: false,
+                includeSmelter: true);
+            fixture.Production.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius,
+                fixture.Session.CityStorage);
+            Assert.That(fixture.Production.TryGetState(
+                SmelterId,
+                out BuildingProductionState productionState), Is.True);
+            Assert.That(productionState.Input.Add(ResourceIds.Iron, 4),
+                Is.EqualTo(4));
+
+            Assert.That(ApplyCampaignBuildingDamage(
+                fixture.Runtime,
+                SmelterId,
+                BuildingCatalog.Smelter.MaximumHealth),
+                Is.EqualTo(BuildingCatalog.Smelter.MaximumHealth));
+            Assert.That(ApplyCampaignBuildingDamage(
+                fixture.Runtime,
+                MachineGunId,
+                BuildingCatalog.MachineGunTurret.MaximumHealth),
+                Is.EqualTo(BuildingCatalog.MachineGunTurret.MaximumHealth));
+
+            Assert.That(fixture.Runtime.TryGetDestructionResult(
+                SmelterId,
+                out GrayboxCombatDestructionResult3D smelterLoss), Is.True);
+            Assert.That(smelterLoss.StableInstanceId, Is.EqualTo(SmelterId));
+            Assert.That(smelterLoss.TotalLostResources.Single().ResourceId,
+                Is.EqualTo(ResourceIds.Iron));
+            Assert.That(smelterLoss.TotalLostResources.Single().Amount,
+                Is.EqualTo(4));
+            Assert.That(fixture.Runtime.TryGetDestructionResult(
+                MachineGunId,
+                out GrayboxCombatDestructionResult3D towerLoss), Is.True);
+            Assert.That(towerLoss.StableInstanceId, Is.EqualTo(MachineGunId));
+            Assert.That(fixture.Runtime.LastDestructionResult,
+                Is.SameAs(towerLoss),
+                "The legacy latest-result view remains compatible while " +
+                "older ruins keep their own loss summaries.");
+        }
+
+        [Test]
         public void BuildingTargetProjectionIsReusedAcrossFixedSteps()
         {
             RuntimeFixture fixture = CreateRuntimeFixture(

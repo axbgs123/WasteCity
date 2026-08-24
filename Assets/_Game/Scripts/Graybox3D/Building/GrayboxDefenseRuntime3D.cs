@@ -73,7 +73,8 @@ namespace WasteCity.Graybox3D.Building
                 canRunLocally: true,
                 playerPaused,
                 targetId,
-                status)
+                status,
+                activeConsumableSeconds: 0f)
         {
         }
 
@@ -87,6 +88,31 @@ namespace WasteCity.Graybox3D.Building
             bool playerPaused,
             string targetId,
             GrayboxDefenseTowerStatus3D status)
+            : this(
+                stableId,
+                ammo,
+                ammoCapacity,
+                range,
+                connected,
+                canRunLocally,
+                playerPaused,
+                targetId,
+                status,
+                activeConsumableSeconds: 0f)
+        {
+        }
+
+        public GrayboxDefenseTowerSnapshot3D(
+            string stableId,
+            int ammo,
+            int ammoCapacity,
+            float range,
+            bool connected,
+            bool canRunLocally,
+            bool playerPaused,
+            string targetId,
+            GrayboxDefenseTowerStatus3D status,
+            float activeConsumableSeconds)
         {
             StableId = stableId;
             Ammo = ammo;
@@ -97,6 +123,7 @@ namespace WasteCity.Graybox3D.Building
             PlayerPaused = playerPaused;
             TargetId = targetId;
             Status = status;
+            ActiveConsumableSeconds = Math.Max(0f, activeConsumableSeconds);
         }
 
         public string StableId { get; }
@@ -108,6 +135,7 @@ namespace WasteCity.Graybox3D.Building
         public bool PlayerPaused { get; }
         public string TargetId { get; }
         public GrayboxDefenseTowerStatus3D Status { get; }
+        public float ActiveConsumableSeconds { get; }
     }
 
     public sealed class GrayboxDefenseEnemySnapshot3D
@@ -121,10 +149,16 @@ namespace WasteCity.Graybox3D.Building
             bool isAttackingCore)
             : this(
                 stableId,
+                EnemyCatalog.Gnawer.Id.Value,
                 spawnOrder,
                 x,
                 z,
                 currentHealth,
+                EnemyCatalog.Gnawer.MaximumHealth,
+                DefenseEnemyRuntimeSnapshot.CityCoreTargetName,
+                Distance(x, z, 0f, 0f),
+                isAttackingCore,
+                SingleCityDefenseCampaignModel.CityCoreTargetId,
                 DefenseEnemyRuntimeSnapshot.CityCoreTargetName,
                 Distance(x, z, 0f, 0f),
                 isAttackingCore)
@@ -140,25 +174,109 @@ namespace WasteCity.Graybox3D.Building
             string targetName,
             float distanceToCore,
             bool isAttackingCore)
+            : this(
+                stableId,
+                EnemyCatalog.Gnawer.Id.Value,
+                spawnOrder,
+                x,
+                z,
+                currentHealth,
+                EnemyCatalog.Gnawer.MaximumHealth,
+                targetName,
+                distanceToCore,
+                isAttackingCore,
+                CoreTargetIdFor(targetName),
+                targetName,
+                distanceToCore,
+                isAttackingCore)
+        {
+        }
+
+        public GrayboxDefenseEnemySnapshot3D(
+            string stableId,
+            string enemyDefinitionId,
+            int spawnOrder,
+            float x,
+            float z,
+            int currentHealth,
+            int maximumHealth,
+            string targetName,
+            float distanceToCore,
+            bool isAttackingCore)
+            : this(
+                stableId,
+                enemyDefinitionId,
+                spawnOrder,
+                x,
+                z,
+                currentHealth,
+                maximumHealth,
+                targetName,
+                distanceToCore,
+                isAttackingCore,
+                CoreTargetIdFor(targetName),
+                targetName,
+                distanceToCore,
+                isAttackingCore)
+        {
+        }
+
+        public GrayboxDefenseEnemySnapshot3D(
+            string stableId,
+            string enemyDefinitionId,
+            int spawnOrder,
+            float x,
+            float z,
+            int currentHealth,
+            int maximumHealth,
+            string targetName,
+            float distanceToCore,
+            bool isAttackingCore,
+            string targetStableId,
+            string targetDisplayName,
+            float distanceToTarget,
+            bool isAttackingTarget)
         {
             StableId = stableId;
+            EnemyDefinitionId = enemyDefinitionId ?? string.Empty;
             SpawnOrder = spawnOrder;
             X = x;
             Z = z;
-            CurrentHealth = currentHealth;
+            CurrentHealth = Math.Max(0, currentHealth);
+            MaximumHealth = Math.Max(1, maximumHealth);
             TargetName = targetName;
             DistanceToCore = distanceToCore;
             IsAttackingCore = isAttackingCore;
+            TargetStableId = targetStableId ?? string.Empty;
+            TargetDisplayName = targetDisplayName ?? string.Empty;
+            DistanceToTarget = Math.Max(0f, distanceToTarget);
+            IsAttackingTarget = isAttackingTarget;
         }
 
         public string StableId { get; }
+        public string EnemyDefinitionId { get; }
         public int SpawnOrder { get; }
         public float X { get; }
         public float Z { get; }
         public int CurrentHealth { get; }
+        public int MaximumHealth { get; }
         public string TargetName { get; }
         public float DistanceToCore { get; }
         public bool IsAttackingCore { get; }
+        public string TargetStableId { get; }
+        public string TargetDisplayName { get; }
+        public float DistanceToTarget { get; }
+        public bool IsAttackingTarget { get; }
+
+        private static string CoreTargetIdFor(string targetName)
+        {
+            return string.Equals(
+                    targetName,
+                    DefenseEnemyRuntimeSnapshot.CityCoreTargetName,
+                    StringComparison.Ordinal)
+                ? SingleCityDefenseCampaignModel.CityCoreTargetId
+                : string.Empty;
+        }
 
         private static float Distance(
             float x,
@@ -170,6 +288,45 @@ namespace WasteCity.Graybox3D.Building
             float offsetZ = z - targetZ;
             return (float)Math.Sqrt(offsetX * offsetX + offsetZ * offsetZ);
         }
+    }
+
+    public readonly struct GrayboxDefenseSettledAttackEvent3D
+    {
+        public GrayboxDefenseSettledAttackEvent3D(
+            ulong eventSequence,
+            ulong settlementSequence,
+            string towerStableId,
+            string targetStableId,
+            int appliedDamage)
+        {
+            if (eventSequence == 0ul)
+                throw new ArgumentOutOfRangeException(nameof(eventSequence));
+            if (settlementSequence == 0ul)
+                throw new ArgumentOutOfRangeException(
+                    nameof(settlementSequence));
+            if (string.IsNullOrWhiteSpace(towerStableId))
+                throw new ArgumentException(
+                    "A tower stable ID is required.",
+                    nameof(towerStableId));
+            if (string.IsNullOrWhiteSpace(targetStableId))
+                throw new ArgumentException(
+                    "A target stable ID is required.",
+                    nameof(targetStableId));
+            if (appliedDamage <= 0)
+                throw new ArgumentOutOfRangeException(nameof(appliedDamage));
+
+            EventSequence = eventSequence;
+            SettlementSequence = settlementSequence;
+            TowerStableId = towerStableId;
+            TargetStableId = targetStableId;
+            AppliedDamage = appliedDamage;
+        }
+
+        public ulong EventSequence { get; }
+        public ulong SettlementSequence { get; }
+        public string TowerStableId { get; }
+        public string TargetStableId { get; }
+        public int AppliedDamage { get; }
     }
 
     public sealed class GrayboxDefenseRuntimeSnapshot3D
@@ -185,22 +342,148 @@ namespace WasteCity.Graybox3D.Building
             int coreCurrentHealth,
             IReadOnlyList<GrayboxDefenseTowerSnapshot3D> towers,
             IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies)
+            : this(
+                tutorialWaveTriggerCount,
+                wavePhase,
+                warningRemainingSeconds,
+                spawnedEnemyCount,
+                aliveEnemyCount,
+                defeatedEnemyCount,
+                coreMaximumHealth,
+                coreCurrentHealth,
+                towers,
+                enemies,
+                settledAttackEvents: null,
+                spawnDirections: null,
+                waveComposition: tutorialWaveTriggerCount > 0
+                    ? WaveCatalog.Tutorial.Entries
+                    : Array.Empty<WaveEntry>())
         {
-            TutorialWaveTriggerCount = tutorialWaveTriggerCount;
+        }
+
+        public GrayboxDefenseRuntimeSnapshot3D(
+            int tutorialWaveTriggerCount,
+            WavePhase wavePhase,
+            float warningRemainingSeconds,
+            int spawnedEnemyCount,
+            int aliveEnemyCount,
+            int defeatedEnemyCount,
+            int coreMaximumHealth,
+            int coreCurrentHealth,
+            IReadOnlyList<GrayboxDefenseTowerSnapshot3D> towers,
+            IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies,
+            IReadOnlyList<GrayboxDefenseSettledAttackEvent3D>
+                settledAttackEvents = null,
+            IReadOnlyList<CampaignSpawnDirection> spawnDirections = null,
+            IReadOnlyList<WaveEntry> waveComposition = null)
+            : this(
+                tutorialWaveTriggerCount,
+                tutorialWaveTriggerCount > 0 ? 1 : 0,
+                CampaignWaveCatalog.All.Count,
+                ToCampaignPhase(wavePhase, coreCurrentHealth),
+                wavePhase,
+                warningRemainingSeconds,
+                tutorialWaveTriggerCount > 0
+                    ? CampaignWaveCatalog.All[0].TotalCount
+                    : 0,
+                spawnedEnemyCount,
+                aliveEnemyCount,
+                defeatedEnemyCount,
+                coreMaximumHealth,
+                coreCurrentHealth,
+                towers,
+                enemies,
+                settledAttackEvents,
+                spawnDirections,
+                waveComposition)
+        {
+        }
+
+        public GrayboxDefenseRuntimeSnapshot3D(
+            int tutorialWaveTriggerCount,
+            int currentWaveNumber,
+            int totalWaveCount,
+            SingleCityDefenseCampaignPhase campaignPhase,
+            WavePhase wavePhase,
+            float warningRemainingSeconds,
+            int plannedEnemyCount,
+            int spawnedEnemyCount,
+            int aliveEnemyCount,
+            int defeatedEnemyCount,
+            int coreMaximumHealth,
+            int coreCurrentHealth,
+            IReadOnlyList<GrayboxDefenseTowerSnapshot3D> towers,
+            IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies)
+            : this(
+                tutorialWaveTriggerCount,
+                currentWaveNumber,
+                totalWaveCount,
+                campaignPhase,
+                wavePhase,
+                warningRemainingSeconds,
+                plannedEnemyCount,
+                spawnedEnemyCount,
+                aliveEnemyCount,
+                defeatedEnemyCount,
+                coreMaximumHealth,
+                coreCurrentHealth,
+                towers,
+                enemies,
+                settledAttackEvents: null,
+                spawnDirections: CatalogDirections(currentWaveNumber),
+                waveComposition: CatalogComposition(currentWaveNumber))
+        {
+        }
+
+        public GrayboxDefenseRuntimeSnapshot3D(
+            int tutorialWaveTriggerCount,
+            int currentWaveNumber,
+            int totalWaveCount,
+            SingleCityDefenseCampaignPhase campaignPhase,
+            WavePhase wavePhase,
+            float warningRemainingSeconds,
+            int plannedEnemyCount,
+            int spawnedEnemyCount,
+            int aliveEnemyCount,
+            int defeatedEnemyCount,
+            int coreMaximumHealth,
+            int coreCurrentHealth,
+            IReadOnlyList<GrayboxDefenseTowerSnapshot3D> towers,
+            IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies,
+            IReadOnlyList<GrayboxDefenseSettledAttackEvent3D>
+                settledAttackEvents = null,
+            IReadOnlyList<CampaignSpawnDirection> spawnDirections = null,
+            IReadOnlyList<WaveEntry> waveComposition = null)
+        {
+            TutorialWaveTriggerCount = Math.Max(0, tutorialWaveTriggerCount);
+            TotalWaveCount = Math.Max(1, totalWaveCount);
+            CurrentWaveNumber = Math.Max(
+                0,
+                Math.Min(TotalWaveCount, currentWaveNumber));
+            CampaignPhase = campaignPhase;
             WavePhase = wavePhase;
-            WarningRemainingSeconds = warningRemainingSeconds;
-            SpawnedEnemyCount = spawnedEnemyCount;
-            AliveEnemyCount = aliveEnemyCount;
-            DefeatedEnemyCount = defeatedEnemyCount;
-            CoreMaximumHealth = coreMaximumHealth;
-            CoreCurrentHealth = coreCurrentHealth;
+            WarningRemainingSeconds = Math.Max(0f, warningRemainingSeconds);
+            PlannedEnemyCount = Math.Max(0, plannedEnemyCount);
+            SpawnedEnemyCount = Math.Max(0, spawnedEnemyCount);
+            AliveEnemyCount = Math.Max(0, aliveEnemyCount);
+            DefeatedEnemyCount = Math.Max(0, defeatedEnemyCount);
+            CoreMaximumHealth = Math.Max(1, coreMaximumHealth);
+            CoreCurrentHealth = Math.Max(0, coreCurrentHealth);
             Towers = towers ?? throw new ArgumentNullException(nameof(towers));
             Enemies = enemies ?? throw new ArgumentNullException(nameof(enemies));
+            SettledAttackEvents = CopySettledAttackEvents(
+                settledAttackEvents);
+            SpawnDirections = FreezeSpawnDirections(spawnDirections);
+            WaveComposition = FreezeWaveComposition(waveComposition);
         }
 
         public int TutorialWaveTriggerCount { get; }
+        public int CurrentWaveNumber { get; }
+        public int TotalWaveCount { get; }
+        public SingleCityDefenseCampaignPhase CampaignPhase { get; }
         public WavePhase WavePhase { get; }
         public float WarningRemainingSeconds { get; }
+        public int PlannedEnemyCount { get; }
         public int SpawnedEnemyCount { get; }
         public int AliveEnemyCount { get; }
         public int DefeatedEnemyCount { get; }
@@ -209,6 +492,105 @@ namespace WasteCity.Graybox3D.Building
         public bool IsCoreDestroyed => CoreCurrentHealth <= 0;
         public IReadOnlyList<GrayboxDefenseTowerSnapshot3D> Towers { get; }
         public IReadOnlyList<GrayboxDefenseEnemySnapshot3D> Enemies { get; }
+        public IReadOnlyList<GrayboxDefenseSettledAttackEvent3D>
+            SettledAttackEvents { get; }
+        public IReadOnlyList<CampaignSpawnDirection> SpawnDirections { get; }
+        public IReadOnlyList<WaveEntry> WaveComposition { get; }
+
+        private static IReadOnlyList<GrayboxDefenseSettledAttackEvent3D>
+            CopySettledAttackEvents(
+                IReadOnlyList<GrayboxDefenseSettledAttackEvent3D> source)
+        {
+            if (source == null || source.Count == 0)
+                return Array.Empty<GrayboxDefenseSettledAttackEvent3D>();
+            var copy = new GrayboxDefenseSettledAttackEvent3D[source.Count];
+            for (var index = 0; index < copy.Length; index++)
+                copy[index] = source[index];
+            return Array.AsReadOnly(copy);
+        }
+
+        private static IReadOnlyList<CampaignSpawnDirection>
+            FreezeSpawnDirections(
+                IReadOnlyList<CampaignSpawnDirection> source)
+        {
+            if (source == null || source.Count == 0)
+                return Array.Empty<CampaignSpawnDirection>();
+            for (var waveIndex = 0;
+                 waveIndex < CampaignWaveCatalog.All.Count;
+                 waveIndex++)
+            {
+                if (ReferenceEquals(
+                        source,
+                        CampaignWaveCatalog.All[waveIndex].Directions))
+                {
+                    return source;
+                }
+            }
+            var copy = new CampaignSpawnDirection[source.Count];
+            for (var index = 0; index < copy.Length; index++)
+                copy[index] = source[index];
+            return Array.AsReadOnly(copy);
+        }
+
+        private static IReadOnlyList<WaveEntry> FreezeWaveComposition(
+            IReadOnlyList<WaveEntry> source)
+        {
+            if (source == null || source.Count == 0)
+                return Array.Empty<WaveEntry>();
+            if (ReferenceEquals(source, WaveCatalog.Tutorial.Entries))
+                return source;
+            for (var waveIndex = 0;
+                 waveIndex < CampaignWaveCatalog.All.Count;
+                 waveIndex++)
+            {
+                if (ReferenceEquals(
+                        source,
+                        CampaignWaveCatalog.All[waveIndex].Entries))
+                {
+                    return source;
+                }
+            }
+            var copy = new WaveEntry[source.Count];
+            for (var index = 0; index < copy.Length; index++)
+                copy[index] = source[index];
+            return Array.AsReadOnly(copy);
+        }
+
+        private static IReadOnlyList<CampaignSpawnDirection>
+            CatalogDirections(int currentWaveNumber)
+        {
+            return currentWaveNumber > 0 &&
+                currentWaveNumber <= CampaignWaveCatalog.All.Count
+                    ? CampaignWaveCatalog.All[currentWaveNumber - 1].Directions
+                    : Array.Empty<CampaignSpawnDirection>();
+        }
+
+        private static IReadOnlyList<WaveEntry> CatalogComposition(
+            int currentWaveNumber)
+        {
+            return currentWaveNumber > 0 &&
+                currentWaveNumber <= CampaignWaveCatalog.All.Count
+                    ? CampaignWaveCatalog.All[currentWaveNumber - 1].Entries
+                    : Array.Empty<WaveEntry>();
+        }
+
+        private static SingleCityDefenseCampaignPhase ToCampaignPhase(
+            WavePhase wavePhase,
+            int coreCurrentHealth)
+        {
+            if (coreCurrentHealth <= 0)
+                return SingleCityDefenseCampaignPhase.Defeat;
+            switch (wavePhase)
+            {
+                case WavePhase.Warning:
+                    return SingleCityDefenseCampaignPhase.Warning;
+                case WavePhase.Spawning:
+                case WavePhase.Active:
+                    return SingleCityDefenseCampaignPhase.SpawningAndCombat;
+                default:
+                    return SingleCityDefenseCampaignPhase.Idle;
+            }
+        }
     }
 
     public sealed class GrayboxDefensePersistenceState3D
@@ -308,6 +690,9 @@ namespace WasteCity.Graybox3D.Building
             campaignStatusById =
                 new Dictionary<string, GrayboxDefenseTowerStatus3D>(
                     StringComparer.Ordinal);
+        private readonly List<GrayboxDefenseSettledAttackEvent3D>
+            settledAttackEvents =
+                new List<GrayboxDefenseSettledAttackEvent3D>(24);
         private readonly Func<DefenseBuildingCombatTarget[]>
             campaignBuildingTargetProvider;
         private readonly Func<string, string, int, int>
@@ -315,6 +700,10 @@ namespace WasteCity.Graybox3D.Building
         private readonly Queue<GrayboxCombatDestructionResult3D>
             pendingPresentationRebuilds =
                 new Queue<GrayboxCombatDestructionResult3D>();
+        private readonly Dictionary<string, GrayboxCombatDestructionResult3D>
+            destructionResultsByStableId =
+                new Dictionary<string, GrayboxCombatDestructionResult3D>(
+                    StringComparer.Ordinal);
         private TutorialDefenseRuntimeModel tutorial;
         private SingleCityDefenseCampaignModel campaign;
         private GrayboxBuildingHealthRuntime3D campaignBuildingHealth;
@@ -335,6 +724,8 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxDefenseRuntimeSnapshot3D cachedSnapshot;
         private bool snapshotDirty = true;
         private Func<string, bool> campaignPresentationRecovery;
+        private ulong settledAttackEventSequence;
+        private ulong settlementSequence;
 
         public GrayboxDefenseRuntime3D(
             float coreX,
@@ -398,12 +789,14 @@ namespace WasteCity.Graybox3D.Building
             campaignRetainedIds.Clear();
             campaignRunnableIds.Clear();
             campaignStatusById.Clear();
+            settledAttackEvents.Clear();
             campaignBuildingTargets =
                 Array.Empty<DefenseBuildingCombatTarget>();
             campaignBuildingTargetFingerprint = 0ul;
             hasCampaignBuildingTargetFingerprint = false;
             campaignTriggered = campaign.Snapshot.CurrentWaveNumber > 0;
             LastDestructionResult = null;
+            destructionResultsByStableId.Clear();
             pendingPresentationRebuilds.Clear();
             campaignPresentationRecovery = null;
             cachedCampaignSnapshot = null;
@@ -424,6 +817,17 @@ namespace WasteCity.Graybox3D.Building
         {
             campaignPresentationRecovery = null;
             pendingPresentationRebuilds.Clear();
+        }
+
+        public bool TryGetDestructionResult(
+            string stableInstanceId,
+            out GrayboxCombatDestructionResult3D result)
+        {
+            result = null;
+            return !string.IsNullOrWhiteSpace(stableInstanceId) &&
+                destructionResultsByStableId.TryGetValue(
+                    stableInstanceId,
+                    out result);
         }
 
         public bool TryGetCampaignTowerState(
@@ -629,6 +1033,10 @@ namespace WasteCity.Graybox3D.Building
             campaignTowers.Clear();
             campaignRetainedIds.Clear();
             campaignStatusById.Clear();
+            settledAttackEvents.Clear();
+            LastDestructionResult = null;
+            destructionResultsByStableId.Clear();
+            pendingPresentationRebuilds.Clear();
             for (var index = 0; index < plan.Towers.Length; index++)
             {
                 SingleCityDefenseTowerCombatModel tower = plan.Towers[index];
@@ -831,6 +1239,7 @@ namespace WasteCity.Graybox3D.Building
             tutorialWaveTriggerCount =
                 plan.Snapshot.TutorialWaveTriggerCount;
             accumulatorSeconds = plan.Snapshot.FixedStepAccumulatorSeconds;
+            settledAttackEvents.Clear();
             cachedSnapshot = null;
             snapshotDirty = true;
             plan.Consumed = true;
@@ -1033,6 +1442,7 @@ namespace WasteCity.Graybox3D.Building
             bool globallyPaused,
             CityResourceStorageModel cityStorage)
         {
+            BeginSettlementBatch();
             if (globallyPaused || deltaSeconds <= 0f || cityStorage == null)
                 return;
 
@@ -1391,6 +1801,10 @@ namespace WasteCity.Graybox3D.Building
                 globallyPaused: false);
             if (damage > 0)
             {
+                AppendSettledAttack(
+                    tower.StableInstanceId,
+                    tower.TargetStableEnemyId,
+                    damage);
                 campaignStatusById[tower.StableInstanceId] =
                     GrayboxDefenseTowerStatus3D.Firing;
                 return;
@@ -1430,6 +1844,11 @@ namespace WasteCity.Graybox3D.Building
             {
                 LastDestructionResult =
                     campaignDestructionCoordinator.Commit(stableBuildingId);
+                if (LastDestructionResult.IsCommitted)
+                {
+                    destructionResultsByStableId[stableBuildingId] =
+                        LastDestructionResult;
+                }
                 if (LastDestructionResult.RequiresPresentationRebuild)
                     pendingPresentationRebuilds.Enqueue(
                         LastDestructionResult);
@@ -1576,6 +1995,10 @@ namespace WasteCity.Graybox3D.Building
                 globallyPaused: false);
             if (damage > 0)
             {
+                AppendSettledAttack(
+                    state.StableId,
+                    target.StableId,
+                    damage);
                 state.Status = GrayboxDefenseTowerStatus3D.Firing;
                 return;
             }
@@ -1584,6 +2007,36 @@ namespace WasteCity.Graybox3D.Building
                 cityStorage.GetNetworkAmount(ResourceIds.Ammunition) > 0
                     ? GrayboxDefenseTowerStatus3D.OutOfLogistics
                     : GrayboxDefenseTowerStatus3D.MissingAmmunition;
+        }
+
+        private void BeginSettlementBatch()
+        {
+            settlementSequence++;
+            if (settledAttackEvents.Count == 0)
+                return;
+            settledAttackEvents.Clear();
+            snapshotDirty = true;
+        }
+
+        private void AppendSettledAttack(
+            string towerStableId,
+            string targetStableId,
+            int appliedDamage)
+        {
+            if (appliedDamage <= 0 ||
+                string.IsNullOrWhiteSpace(towerStableId) ||
+                string.IsNullOrWhiteSpace(targetStableId))
+            {
+                return;
+            }
+            settledAttackEventSequence++;
+            settledAttackEvents.Add(
+                new GrayboxDefenseSettledAttackEvent3D(
+                    settledAttackEventSequence,
+                    settlementSequence,
+                    towerStableId,
+                    targetStableId,
+                    appliedDamage));
         }
 
         private GrayboxDefenseRuntimeSnapshot3D CaptureSnapshot()
@@ -1612,7 +2065,8 @@ namespace WasteCity.Graybox3D.Building
                     state.CanRunLocally,
                     state.Combat.IsPlayerPaused,
                     visibleTargetId,
-                    visibleStatus);
+                    visibleStatus,
+                    state.Combat.ActiveAmmunitionSeconds);
             }
 
             IReadOnlyList<DefenseEnemyCombatModel> activeEnemies =
@@ -1624,10 +2078,16 @@ namespace WasteCity.Graybox3D.Building
                 DefenseEnemyCombatModel enemy = activeEnemies[index];
                 enemySnapshots[index] = new GrayboxDefenseEnemySnapshot3D(
                     enemy.StableId,
+                    EnemyCatalog.Gnawer.Id.Value,
                     enemy.SpawnOrder,
                     enemy.X,
                     enemy.Z,
                     enemy.CurrentHealth,
+                    EnemyCatalog.Gnawer.MaximumHealth,
+                    DefenseEnemyRuntimeSnapshot.CityCoreTargetName,
+                    tutorial.DistanceToCore(enemy),
+                    tutorial.IsWithinAttackRange(enemy),
+                    SingleCityDefenseCampaignModel.CityCoreTargetId,
                     DefenseEnemyRuntimeSnapshot.CityCoreTargetName,
                     tutorial.DistanceToCore(enemy),
                     tutorial.IsWithinAttackRange(enemy));
@@ -1645,7 +2105,12 @@ namespace WasteCity.Graybox3D.Building
                 tutorial.Core.MaximumHealth,
                 tutorial.Core.CurrentHealth,
                 Array.AsReadOnly(towerSnapshots),
-                Array.AsReadOnly(enemySnapshots));
+                Array.AsReadOnly(enemySnapshots),
+                settledAttackEvents,
+                Array.Empty<CampaignSpawnDirection>(),
+                tutorialWaveTriggerCount > 0
+                    ? WaveCatalog.Tutorial.Entries
+                    : Array.Empty<WaveEntry>());
         }
 
         private GrayboxDefenseRuntimeSnapshot3D CaptureCampaignSnapshot()
@@ -1674,7 +2139,8 @@ namespace WasteCity.Graybox3D.Building
                     canRun,
                     tower.IsPlayerPaused,
                     canRun ? tower.TargetStableEnemyId : null,
-                    status);
+                    status,
+                    tower.ActiveConsumableSeconds);
             }
 
             var enemySnapshots =
@@ -1694,31 +2160,149 @@ namespace WasteCity.Graybox3D.Building
                     SingleCityDefenseCampaignModel.CityCoreTargetId,
                     StringComparison.Ordinal) ||
                     string.IsNullOrEmpty(enemy.TargetStableId);
+                ResolveCampaignEnemyTarget(
+                    enemy,
+                    targetsCore,
+                    out string targetStableId,
+                    out string targetDisplayName,
+                    out float distanceToTarget);
+                bool isAttackingTarget = definition != null &&
+                    distanceToTarget <= definition.AttackRange;
                 enemySnapshots[index] = new GrayboxDefenseEnemySnapshot3D(
                     enemy.StableId,
+                    enemy.EnemyDefinitionId,
                     enemy.SpawnOrder,
                     enemy.X,
                     enemy.Z,
                     enemy.CurrentHealth,
+                    definition?.MaximumHealth ??
+                        Math.Max(1, enemy.CurrentHealth),
                     targetsCore
                         ? DefenseEnemyRuntimeSnapshot.CityCoreTargetName
                         : enemy.TargetStableId,
                     distanceToCore,
                     targetsCore && definition != null &&
-                    distanceToCore <= definition.AttackRange);
+                    distanceToCore <= definition.AttackRange,
+                    targetStableId,
+                    targetDisplayName,
+                    distanceToTarget,
+                    isAttackingTarget);
             }
+
+            IReadOnlyList<CampaignSpawnDirection> spawnDirections =
+                ResolveCampaignSpawnDirections(source.CurrentWaveNumber);
 
             return new GrayboxDefenseRuntimeSnapshot3D(
                 campaignTriggered ? 1 : 0,
+                source.CurrentWaveNumber,
+                CampaignWaveCatalog.All.Count,
+                source.Phase,
                 ToLegacyWavePhase(source.Phase),
                 source.WarningRemainingSeconds,
+                source.PlannedEnemyCount,
                 source.SpawnedEnemyCount,
                 source.AliveEnemyCount,
                 source.Statistics.TotalKillCount,
                 source.CoreMaximumHealth,
                 source.CoreCurrentHealth,
                 Array.AsReadOnly(towerSnapshots),
-                Array.AsReadOnly(enemySnapshots));
+                Array.AsReadOnly(enemySnapshots),
+                settledAttackEvents,
+                spawnDirections,
+                ResolveCampaignWaveComposition(source.CurrentWaveNumber));
+        }
+
+        private void ResolveCampaignEnemyTarget(
+            SingleCityDefenseEnemySnapshot enemy,
+            bool targetsCore,
+            out string targetStableId,
+            out string targetDisplayName,
+            out float distanceToTarget)
+        {
+            if (targetsCore)
+            {
+                targetStableId =
+                    SingleCityDefenseCampaignModel.CityCoreTargetId;
+                targetDisplayName =
+                    DefenseEnemyRuntimeSnapshot.CityCoreTargetName;
+                distanceToTarget = Distance(
+                    enemy.X,
+                    enemy.Z,
+                    requestedCoreX,
+                    requestedCoreZ);
+                return;
+            }
+
+            targetStableId = enemy.TargetStableId;
+            targetDisplayName = enemy.TargetStableId;
+            distanceToTarget = Distance(
+                enemy.X,
+                enemy.Z,
+                requestedCoreX,
+                requestedCoreZ);
+            for (var index = 0;
+                 index < campaignBuildingTargets.Length;
+                 index++)
+            {
+                DefenseBuildingCombatTarget target =
+                    campaignBuildingTargets[index];
+                if (!string.Equals(
+                        target.StableId,
+                        targetStableId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                distanceToTarget = Distance(
+                    enemy.X,
+                    enemy.Z,
+                    target.X,
+                    target.Z);
+                targetDisplayName = BuildingDisplayName(
+                    target.BuildingId,
+                    target.StableId);
+                return;
+            }
+        }
+
+        private static string BuildingDisplayName(
+            string buildingId,
+            string fallback)
+        {
+            for (var index = 0; index < BuildingCatalog.All.Length; index++)
+            {
+                BuildingDefinition definition = BuildingCatalog.All[index];
+                if (string.Equals(
+                        definition.Id.Value,
+                        buildingId,
+                        StringComparison.Ordinal))
+                {
+                    return definition.Name;
+                }
+            }
+            return fallback ?? string.Empty;
+        }
+
+        private static IReadOnlyList<CampaignSpawnDirection>
+            ResolveCampaignSpawnDirections(int currentWaveNumber)
+        {
+            if (currentWaveNumber <= 0 ||
+                currentWaveNumber > CampaignWaveCatalog.All.Count)
+            {
+                return Array.Empty<CampaignSpawnDirection>();
+            }
+            return CampaignWaveCatalog.All[currentWaveNumber - 1].Directions;
+        }
+
+        private static IReadOnlyList<WaveEntry>
+            ResolveCampaignWaveComposition(int currentWaveNumber)
+        {
+            if (currentWaveNumber <= 0 ||
+                currentWaveNumber > CampaignWaveCatalog.All.Count)
+            {
+                return Array.Empty<WaveEntry>();
+            }
+            return CampaignWaveCatalog.All[currentWaveNumber - 1].Entries;
         }
 
         private void RemoveTowerState(

@@ -437,6 +437,8 @@ namespace WasteCity.Tests
                 "FormalThreeDProductionSaveData",
                 "FormalThreeDProductionStateSaveData",
                 "FormalThreeDDefenseSaveData",
+                "FormalThreeDDefenseCampaignSaveData",
+                "FormalThreeDDefenseCampaignStatisticsSaveData",
                 "FormalThreeDEvacuationSaveData",
                 "FormalThreeDEvacuationRuntimePayloadSaveData",
             }, envelope.TypeNames);
@@ -462,6 +464,14 @@ namespace WasteCity.Tests
                 "FormalThreeDDefenseSaveData",
                 "FormalThreeDDefenseTowerSaveData",
                 "FormalThreeDDefenseEnemySaveData",
+                "FormalThreeDDefenseCampaignSaveData",
+                "FormalThreeDDefenseCampaignStatisticsSaveData",
+                "FormalThreeDDefenseCampaignEnemyCountSaveData",
+                "FormalThreeDDefenseCampaignSpawnAnchorSaveData",
+                "FormalThreeDDefenseCampaignMetricSaveData",
+                "FormalThreeDDefenseCampaignTowerCombatStateSaveData",
+                "FormalThreeDDefenseCampaignEnemyStateSaveData",
+                "FormalThreeDDefenseCampaignBuildingHealthStateSaveData",
                 "FormalThreeDEvacuationSaveData",
                 "FormalThreeDEvacuationBatchContextSaveData",
                 "FormalThreeDEvacuationWorkSaveData",
@@ -484,7 +494,7 @@ namespace WasteCity.Tests
             CollectionAssert.AreEqual(
                 expectedFormalThreeDDtoTypes,
                 actualFormalThreeDDtoTypes,
-                "The source-level schema 31 DTO inventory must remain " +
+                "The source-level current formal 3D DTO inventory must remain " +
                 "complete even when field-only DTOs are not emitted by " +
                 "the project snapshot scanner.");
             CollectionAssert.DoesNotContain(
@@ -929,6 +939,7 @@ namespace WasteCity.Tests
                 {
                     "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
@@ -939,6 +950,7 @@ namespace WasteCity.Tests
                     "IDEA-0012",
                     "IDEA-0014",
                     "IDEA-0015",
+                    "IDEA-0017",
                 });
             ProjectReuseEntry saveAdapter = FindReuse(
                 catalog,
@@ -1088,11 +1100,18 @@ namespace WasteCity.Tests
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+                    "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 },
-                new[] { "IDEA-0012", "IDEA-0014", "IDEA-0015" });
+                new[]
+                {
+                    "IDEA-0012",
+                    "IDEA-0014",
+                    "IDEA-0015",
+                    "IDEA-0017",
+                });
             AssertReuseContract(
                 FindReuse(catalog, "warehouse-storage-state"),
                 new[]
@@ -1347,6 +1366,7 @@ namespace WasteCity.Tests
                     "GrayboxDefenseTowerRuntimeState3D",
                     "GrayboxDefenseTowerSnapshot3D",
                     "GrayboxDefenseEnemySnapshot3D",
+                    "GrayboxDefenseSettledAttackEvent3D",
                     "GrayboxDefenseRuntimeSnapshot3D",
                     "GrayboxDefensePersistenceState3D",
                     "GrayboxDefenseRestorePlan3D",
@@ -1359,16 +1379,29 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
                 },
-                new[] { "IDEA-0013", "IDEA-0014", "IDEA-0015" });
+                new[]
+                {
+                    "IDEA-0013",
+                    "IDEA-0014",
+                    "IDEA-0015",
+                    "IDEA-0017",
+                });
             AssertDefenseReuse(
                 FindReuse(catalog, "graybox-defense-save-adapter-3d"),
                 "persistence-migration",
                 ProjectReuseLevel.ReviewBeforeReuse,
                 new[] { "GrayboxDefenseSaveAdapter3D" },
                 new[] { "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs" },
-                new[] { "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs" },
-                new[] { "IDEA-0013", "IDEA-0015" });
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+                    "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+                },
+                new[] { "IDEA-0013", "IDEA-0015", "IDEA-0017" });
             AssertDefenseReuse(
                 FindReuse(catalog, "graybox-defense-scene-presentation-3d"),
                 "ui-input",
@@ -1392,8 +1425,11 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
                     "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
-                });
+                },
+                new[] { "IDEA-0013", "IDEA-0017" });
 
             ProjectUiEntry hud = FindUi(catalog, "graybox-defense-hud");
             Assert.That(hud.OwnerTypeName, Is.EqualTo("GrayboxDefenseHudView3D"));
@@ -1404,6 +1440,176 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
             }, hud.RequiredTestFiles);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0017CampaignOwnershipAndReuse()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+
+            foreach (string featureId in new[]
+            {
+                "foundation-clock",
+                "city-navigation-deployment",
+                "building-construction-evacuation",
+                "ui-input",
+                "economy-production-logistics",
+                "combat-routes",
+                "persistence-migration",
+                "scene-editor-build-performance",
+            })
+            {
+                CollectionAssert.Contains(
+                    FindFeature(catalog, featureId).RequirementIds,
+                    "IDEA-0017",
+                    featureId);
+            }
+
+            ProjectFeatureGroup foundation = FindFeature(
+                catalog,
+                "foundation-clock");
+            CollectionAssert.Contains(
+                foundation.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs");
+            var expectedTestOwnership = new Dictionary<string, string[]>
+            {
+                {
+                    "foundation-clock",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/GrayboxUnifiedRuleClockContractTests.cs",
+                    }
+                },
+                {
+                    "building-construction-evacuation",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxBuildingHealthRuntime3DTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxCombatDestructionCoordinator3DTests.cs",
+                    }
+                },
+                {
+                    "ui-input",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
+                    }
+                },
+                {
+                    "economy-production-logistics",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
+                    }
+                },
+                {
+                    "combat-routes",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxDefenseTowerCombatLossTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCatalogTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignModelContractTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignPersistenceTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseEnemyCampaignCombatTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerCombatModelTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerPersistenceTests.cs",
+                        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs",
+                    }
+                },
+                {
+                    "persistence-migration",
+                    new[]
+                    {
+                        "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
+                        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+                        "Assets/_Game/Tests/EditMode/GrayboxFormalGameSpeedPersistenceTests.cs",
+                    }
+                },
+            };
+            foreach (KeyValuePair<string, string[]> owner in
+                     expectedTestOwnership)
+            {
+                ProjectFeatureGroup feature = FindFeature(catalog, owner.Key);
+                CollectionAssert.IsSubsetOf(
+                    owner.Value,
+                    feature.TestFileGlobs,
+                    owner.Key);
+            }
+
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "single-city-defense-campaign-model"),
+                "combat-routes",
+                ProjectReuseLevel.Recommended,
+                "Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs",
+                "SingleCityDefenseCampaignModel",
+                "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignModelContractTests.cs",
+                "不读取 Unity 时间",
+                "不直接摧毁建筑");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "graybox-building-health-runtime-3d"),
+                "building-construction-evacuation",
+                ProjectReuseLevel.ReviewBeforeReuse,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingHealthRuntime3D.cs",
+                "GrayboxBuildingHealthRuntime3D",
+                "Assets/_Game/Tests/EditMode/GrayboxBuildingHealthRuntime3DTests.cs",
+                "生命真值",
+                "统一战斗摧毁协调器");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "graybox-combat-destruction-coordinator-3d"),
+                "building-construction-evacuation",
+                ProjectReuseLevel.ReviewBeforeReuse,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs",
+                "GrayboxCombatDestructionCoordinator3D",
+                "Assets/_Game/Tests/EditMode/GrayboxCombatDestructionCoordinator3DTests.cs",
+                "幂等",
+                "不计算攻击命中");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "formal-defense-campaign-persistence-3d"),
+                "persistence-migration",
+                ProjectReuseLevel.ReviewBeforeReuse,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalDefenseCampaignPersistence3D.cs",
+                "GrayboxFormalDefenseCampaignRestorePlan3D",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+                "零写入恢复计划",
+                "保守默认值");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "graybox-formal-rule-clock-3d"),
+                "foundation-clock",
+                ProjectReuseLevel.SceneOnly,
+                "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs",
+                "GrayboxFormalRuleClock3D",
+                "Assets/_Game/Tests/EditMode/GrayboxUnifiedRuleClockContractTests.cs",
+                "唯一有效规则时间",
+                "另起 Update 时钟");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(
+                    catalog,
+                    "graybox-defense-settled-attack-presentation-3d"),
+                "combat-routes",
+                ProjectReuseLevel.SceneOnly,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs",
+                "GrayboxDefenseSettledAttackEvent3D",
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
+                "已结算",
+                "不得反向决定命中");
+            AssertIdea0017ReuseBoundary(
+                FindReuse(catalog, "graybox-defense-selection-hud-3d"),
+                "ui-input",
+                ProjectReuseLevel.SceneOnly,
+                "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs",
+                "GrayboxDefenseSelectionProjection3D",
+                "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
+                "只读投影",
+                "不伪造废墟库存数量");
         }
 
         [Test]
@@ -1522,6 +1728,33 @@ namespace WasteCity.Tests
                 entry.Id);
             CollectionAssert.Contains(entry.RequirementIds, "IDEA-0014", entry.Id);
             string guidance = entry.UseSummary + "\n" + entry.BoundarySummary;
+            foreach (string term in boundaryTerms)
+                StringAssert.Contains(term, guidance, entry.Id);
+        }
+
+        private static void AssertIdea0017ReuseBoundary(
+            ProjectReuseEntry entry,
+            string featureGroupId,
+            ProjectReuseLevel reuseLevel,
+            string assetPath,
+            string typeName,
+            string requiredTestFile,
+            params string[] boundaryTerms)
+        {
+            Assert.That(entry.FeatureGroupId, Is.EqualTo(featureGroupId));
+            Assert.That(entry.ReuseLevel, Is.EqualTo(reuseLevel));
+            CollectionAssert.Contains(entry.AssetPaths, assetPath, entry.Id);
+            CollectionAssert.Contains(entry.TypeNames, typeName, entry.Id);
+            CollectionAssert.Contains(
+                entry.RequiredTestFiles,
+                requiredTestFile,
+                entry.Id);
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0017" },
+                entry.RequirementIds,
+                entry.Id);
+            string guidance = entry.UseSummary + "\n" +
+                              entry.BoundarySummary;
             foreach (string term in boundaryTerms)
                 StringAssert.Contains(term, guidance, entry.Id);
         }

@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`7a28baf9647bfa5db3ee279c737dbd50af3b48391523e16336b915860a9ee926`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`cfc90ae00beb05b5c43de53226e5e683dee3ee7950ac69121c371fc5b462bbf8`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -31,6 +31,7 @@
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Building/RepairProcess.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingHealthRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInteractionModel3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
@@ -40,12 +41,15 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCampaignTerminalSpeedGate3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
@@ -53,6 +57,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalDefenseCampaignPersistence3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
@@ -83,6 +88,7 @@
 - 战斗与路线（`combat-routes`）：
 - `Assets/_Game/Scripts/Combat/BehemothBreedingModel.cs`
 - `Assets/_Game/Scripts/Combat/BossEncounterModel.cs`
+- `Assets/_Game/Scripts/Combat/CampaignWaveCatalog.cs`
 - `Assets/_Game/Scripts/Combat/DamageMatrix.cs`
 - `Assets/_Game/Scripts/Combat/DefenseTowerCatalog.cs`
 - `Assets/_Game/Scripts/Combat/EnemyDefinition.cs`
@@ -105,11 +111,16 @@
 - `Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs`
 - `Assets/_Game/Scripts/Defense/FirstDefenseCombatModels.cs`
 - `Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignPersistenceState.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerCombatModel.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerPersistenceState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - 经济生产与物流（`economy-production-logistics`）：
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
@@ -147,6 +158,7 @@
 - `Assets/_Game/Scripts/Core/GameSessionStateModel.cs`
 - `Assets/_Game/Scripts/Core/GameSpeedModel.cs`
 - `Assets/_Game/Scripts/Core/SessionStatisticsModel.cs`
+- `Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs`
 - 领袖直接控制（`leader-direct-control`）：
 - `Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs`
@@ -265,6 +277,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsModel3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxGameSpeedCommandFacade3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxGameSpeedPersistenceState3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxSystemMenuView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`

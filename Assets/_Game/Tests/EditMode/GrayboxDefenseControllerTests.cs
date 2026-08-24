@@ -304,6 +304,105 @@ namespace WasteCity.Tests
                 Is.EqualTo(enemyId));
         }
 
+        [Test]
+        public void StableBuildingSelectionCreatesUnifiedCatalogProjection()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            CreateCompletedDefenseChain(fixture);
+            GrayboxBuildingInstance3D wall = BeginBuilding(
+                fixture.Session,
+                BuildingCatalog.Wall,
+                10,
+                10);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                NullPresentation.Instance);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            fixture.Controller.Tick(.1f, paused: false);
+
+            Assert.That(fixture.Controller.TrySelectBuilding(
+                wall.StableInstanceId), Is.True);
+            Assert.That(fixture.Controller.SelectedKind,
+                Is.EqualTo(GrayboxDefenseSelectionKind3D.Building));
+            Assert.That(fixture.Controller.SelectionSnapshot, Is.Not.Null);
+            Assert.That(fixture.Controller.SelectionSnapshot.DefinitionId,
+                Is.EqualTo(BuildingCatalog.Wall.Id.Value));
+            Assert.That(fixture.Controller.SelectionSnapshot.DisplayName,
+                Is.EqualTo("城墙"));
+            Assert.That(fixture.Controller.TrySelectBuilding("missing"),
+                Is.False);
+            Assert.That(fixture.Controller.SelectedStableId,
+                Is.EqualTo(wall.StableInstanceId));
+        }
+
+        [Test]
+        public void GlobalPauseReprojectsSelectedTowerStopReason()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            GrayboxBuildingInstance3D tower =
+                CreateCompletedDefenseChain(fixture);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            fixture.Controller.Tick(.1f, paused: false);
+            Assert.That(fixture.Controller.TrySelectBuilding(
+                tower.StableInstanceId), Is.True);
+
+            fixture.Controller.Tick(.1f, paused: true);
+
+            Assert.That(fixture.Controller.SelectionSnapshot.StatusText,
+                Is.EqualTo("游戏暂停"));
+            Assert.That(fixture.Hud.SelectionText.text,
+                Does.Contain("状态 游戏暂停"));
+        }
+
+        [Test]
+        public void UnderConstructionFormalTowerKeepsTowerIdentityWithoutPause()
+        {
+            RuntimeFixture fixture = CreateGeneratedRuntime();
+            BeginBuilding(fixture.Session, BuildingCatalog.Smelter, 14, 14);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                NullPresentation.Instance);
+            BeginBuilding(fixture.Session, BuildingCatalog.Assembler, 16, 14);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                NullPresentation.Instance);
+            GrayboxBuildingInstance3D tower = BeginBuilding(
+                fixture.Session,
+                BuildingCatalog.LaserTower,
+                14,
+                12);
+            fixture.Controller.Configure(
+                fixture.Session,
+                fixture.City,
+                fixture.World,
+                fixture.BuildingPresentation,
+                fixture.DefenseWorldView,
+                fixture.Hud);
+            fixture.Controller.Tick(.1f, paused: false);
+
+            Assert.That(fixture.Controller.TrySelectBuilding(
+                tower.StableInstanceId), Is.True);
+            Assert.That(fixture.Controller.SelectedKind,
+                Is.EqualTo(GrayboxDefenseSelectionKind3D.Tower));
+            Assert.That(fixture.Controller.SelectionSnapshot.DisplayName,
+                Is.EqualTo("激光塔"));
+            Assert.That(fixture.Controller.SelectionSnapshot.StatusText,
+                Is.EqualTo("施工中"));
+            Assert.That(fixture.Controller.SelectionSnapshot.Tower, Is.Null);
+            Assert.That(
+                fixture.Controller.SelectionSnapshot.CanToggleTowerPause,
+                Is.False);
+        }
+
         private RuntimeFixture CreateGeneratedRuntime()
         {
             GrayboxBuildingSession3D session =

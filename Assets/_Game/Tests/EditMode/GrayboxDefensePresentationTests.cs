@@ -32,13 +32,16 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void EnemyPoolPrebuildsEightAndReusesSharedMaterialVisuals()
+        public void FormalPoolsPrebuildAndReuseSharedMaterialVisuals()
         {
             WorldFixture fixture = CreateWorldFixture();
             Transform[] prebuilt = Children(fixture.EnemyRoot);
 
-            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(8));
-            Assert.That(prebuilt, Has.Length.EqualTo(8));
+            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(46));
+            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
+            Assert.That(fixture.View.PooledTrajectoryCapacity, Is.EqualTo(24));
+            Assert.That(prebuilt, Has.Length.EqualTo(46));
+            Assert.That(Children(fixture.TowerRoot), Has.Length.EqualTo(24));
             Assert.That(fixture.View.EnemyVisualCount, Is.Zero);
 
             GrayboxDefenseRuntimeSnapshot3D eightEnemies = Snapshot(
@@ -69,7 +72,7 @@ namespace WasteCity.Tests
                 Array.Empty<GrayboxBuildingInstance3D>());
 
             Assert.That(Children(fixture.EnemyRoot), Is.EqualTo(prebuilt));
-            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(8));
+            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(46));
             Assert.That(
                 Resources.FindObjectsOfTypeAll<Material>().Count(material =>
                     material.name.StartsWith(
@@ -77,6 +80,46 @@ namespace WasteCity.Tests
                         StringComparison.Ordinal)),
                 Is.EqualTo(1),
                 "Defense placeholders must use sharedMaterial without clones.");
+        }
+
+        [Test]
+        public void SerializedSceneConfigurationBuildsTowerPoolOnFirstApply()
+        {
+            GameObject root = Track(new GameObject(
+                "DefensePresentation.Serialized"));
+            Transform enemyRoot = NewChild(root.transform, "Enemies");
+            Transform towerRoot = NewChild(root.transform, "Towers");
+            Material material = Track(CreateMaterial());
+            GrayboxDefenseWorldView3D view =
+                root.AddComponent<GrayboxDefenseWorldView3D>();
+            SetField(view, "enemyRoot", enemyRoot);
+            SetField(view, "towerRoot", towerRoot);
+            SetField(view, "sharedMaterial", material);
+            view.BindCoordinates(new PlanarCoordinateMapper3D(32, 24));
+            GrayboxBuildingInstance3D tower = CompletedTurret(
+                "building.instance.serialized-first-apply",
+                8,
+                8);
+
+            view.Apply(
+                Snapshot(towers: new[] { Tower(tower.StableInstanceId) }),
+                new[] { tower });
+
+            Assert.That(view.PooledTowerCapacity, Is.EqualTo(24));
+            Assert.That(view.TryGetTowerObject(
+                tower.StableInstanceId,
+                out GameObject towerObject), Is.True);
+            Assert.That(towerObject.activeSelf, Is.True);
+        }
+
+        [Test]
+        public void SelectionKindExtendsExistingOrdinalsWithBuildingAndRuin()
+        {
+            Assert.That((int)GrayboxDefenseSelectionKind3D.None, Is.EqualTo(0));
+            Assert.That((int)GrayboxDefenseSelectionKind3D.Tower, Is.EqualTo(1));
+            Assert.That((int)GrayboxDefenseSelectionKind3D.Enemy, Is.EqualTo(2));
+            Assert.That((int)GrayboxDefenseSelectionKind3D.Building, Is.EqualTo(3));
+            Assert.That((int)GrayboxDefenseSelectionKind3D.Ruin, Is.EqualTo(4));
         }
 
         [Test]
@@ -168,7 +211,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void FiringTowerShowsOneTracerBetweenTowerAndTargetWithoutMaterialClone()
+        public void SettledAttackShowsOneTracerBetweenTowerAndTargetWithoutMaterialClone()
         {
             WorldFixture fixture = CreateWorldFixture();
             GrayboxBuildingInstance3D turret = CompletedTurret(
@@ -188,6 +231,14 @@ namespace WasteCity.Tests
                     enemies: new[]
                     {
                         Enemy(enemyId, 0, x: 10, z: 7, health: 60),
+                    },
+                    settledAttacks: new[]
+                    {
+                        SettledAttack(
+                            1ul,
+                            1ul,
+                            turret.StableInstanceId,
+                            enemyId),
                     }),
                 new[] { turret });
 
@@ -234,7 +285,107 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void NonFiringStatesAndGlobalPauseHideTracer()
+        public void ThreeTowerArchetypesUseDistinctPlaceholdersAndSettledTrajectories()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            GrayboxBuildingInstance3D[] towers =
+            {
+                CompletedTurret("building.instance.visual-machine-gun", 5, 7,
+                    BuildingCatalog.MachineGunTurret),
+                CompletedTurret("building.instance.visual-laser", 7, 7,
+                    BuildingCatalog.LaserTower),
+                CompletedTurret("building.instance.visual-spore", 9, 7,
+                    BuildingCatalog.SporeTower),
+            };
+            const string enemyId = "enemy.visual.target.000";
+            fixture.View.Apply(
+                Snapshot(
+                    towers: towers.Select(instance => Tower(
+                        instance.StableInstanceId,
+                        targetId: enemyId,
+                        status: GrayboxDefenseTowerStatus3D.Firing)).ToArray(),
+                    enemies: new[]
+                    {
+                        Enemy(enemyId, 0, x: 12, z: 7, health: 60),
+                    },
+                    settledAttacks: towers.Select((instance, index) =>
+                        SettledAttack(
+                            (ulong)(index + 1),
+                            1ul,
+                            instance.StableInstanceId,
+                            enemyId)).ToArray()),
+                towers);
+
+            Assert.That(fixture.View.VisibleTracerCount, Is.EqualTo(3));
+            Assert.That(fixture.View.VisibleMachineGunTracerCount, Is.EqualTo(1));
+            Assert.That(fixture.View.VisibleLaserBeamCount, Is.EqualTo(1));
+            Assert.That(fixture.View.VisibleSporeTrajectoryCount, Is.EqualTo(1));
+            AssertTowerVisual(
+                fixture.View,
+                towers[0].StableInstanceId,
+                GrayboxDefenseTowerVisualKind3D.MachineGun,
+                "Defense.Tower.MachineGun",
+                trajectoryPositionCount: 2);
+            AssertTowerVisual(
+                fixture.View,
+                towers[1].StableInstanceId,
+                GrayboxDefenseTowerVisualKind3D.Laser,
+                "Defense.Tower.Laser",
+                trajectoryPositionCount: 2);
+            AssertTowerVisual(
+                fixture.View,
+                towers[2].StableInstanceId,
+                GrayboxDefenseTowerVisualKind3D.Spore,
+                "Defense.Tower.Spore",
+                trajectoryPositionCount: 3);
+        }
+
+        [Test]
+        public void PoolExhaustionClipsPresentationWithoutMutatingSettledSnapshot()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            GrayboxBuildingInstance3D[] towers = Enumerable.Range(0, 25)
+                .Select(index => CompletedTurret(
+                    "building.instance.overflow-" + index,
+                    2 + index % 10,
+                    2 + index / 10,
+                    DefenseTowerDefinition(index)))
+                .ToArray();
+            GrayboxDefenseEnemySnapshot3D[] enemies = Enumerable.Range(0, 47)
+                .Select(index => Enemy(
+                    "enemy.overflow-" + index,
+                    index,
+                    x: 10 + index * .1f,
+                    z: 10,
+                    health: 60))
+                .ToArray();
+            GrayboxDefenseRuntimeSnapshot3D settled = Snapshot(
+                towers: towers.Select((tower, index) => Tower(
+                    tower.StableInstanceId,
+                    targetId: enemies[index].StableId,
+                    status: GrayboxDefenseTowerStatus3D.Firing)).ToArray(),
+                enemies: enemies);
+            int overflowEnemyHealth = settled.Enemies[46].CurrentHealth;
+
+            fixture.View.Apply(settled, towers);
+            fixture.View.enabled = false;
+            fixture.View.SetSimulationPaused(true);
+
+            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(46));
+            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
+            Assert.That(fixture.View.PooledTrajectoryCapacity, Is.EqualTo(24));
+            Assert.That(fixture.View.EnemyVisualCount, Is.EqualTo(46));
+            Assert.That(fixture.View.TowerVisualCount, Is.EqualTo(24));
+            Assert.That(fixture.View.VisibleTracerCount, Is.Zero);
+            Assert.That(settled.Enemies.Count, Is.EqualTo(47));
+            Assert.That(settled.Towers.Count, Is.EqualTo(25));
+            Assert.That(settled.Enemies[46].CurrentHealth,
+                Is.EqualTo(overflowEnemyHealth));
+            Assert.That(fixture.View.LastSnapshot, Is.SameAs(settled));
+        }
+
+        [Test]
+        public void OnlySettledEventsShowAndGlobalPauseDoesNotReplayTracer()
         {
             WorldFixture fixture = CreateWorldFixture();
             GrayboxBuildingInstance3D turret = CompletedTurret(
@@ -281,14 +432,23 @@ namespace WasteCity.Tests
                             targetId: enemyId,
                             status: GrayboxDefenseTowerStatus3D.Firing),
                     },
-                    enemies: enemy),
+                    enemies: enemy,
+                    settledAttacks: new[]
+                    {
+                        SettledAttack(
+                            1ul,
+                            1ul,
+                            turret.StableInstanceId,
+                            enemyId),
+                    }),
                 new[] { turret });
             Assert.That(fixture.View.VisibleTracerCount, Is.EqualTo(1));
 
             fixture.View.SetSimulationPaused(true);
             Assert.That(fixture.View.VisibleTracerCount, Is.Zero);
             fixture.View.SetSimulationPaused(false);
-            Assert.That(fixture.View.VisibleTracerCount, Is.EqualTo(1));
+            Assert.That(fixture.View.VisibleTracerCount, Is.Zero,
+                "Unpausing must not replay an already consumed attack.");
         }
 
         [Test]
@@ -307,7 +467,7 @@ namespace WasteCity.Tests
                     first.StableInstanceId,
                     out GameObject firstObject),
                 Is.True);
-            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(1));
+            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
 
             fixture.View.Apply(
                 Snapshot(),
@@ -330,28 +490,30 @@ namespace WasteCity.Tests
                     out GameObject secondObject),
                 Is.True);
             Assert.That(secondObject, Is.SameAs(firstObject));
-            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(1));
+            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
             Assert.That(fixture.View.TowerVisualCount, Is.EqualTo(1));
         }
 
         [Test]
-        public void EightEnemiesAndMultipleTowersKeepPeakObjectsForThreeHundredRefreshes()
+        public void FormalWaveAndTowerBudgetKeepPeakObjectsForThreeHundredRefreshes()
         {
             WorldFixture fixture = CreateWorldFixture();
-            GrayboxBuildingInstance3D[] cohortA = Enumerable.Range(0, 4)
+            GrayboxBuildingInstance3D[] cohortA = Enumerable.Range(0, 24)
                 .Select(index => CompletedTurret(
                     "building.instance.pool-long-a-" + index,
-                    x: 5 + index,
-                    y: 7))
+                    x: 5 + index % 8,
+                    y: 7 + index / 8,
+                    DefenseTowerDefinition(index)))
                 .ToArray();
-            GrayboxBuildingInstance3D[] cohortB = Enumerable.Range(0, 4)
+            GrayboxBuildingInstance3D[] cohortB = Enumerable.Range(0, 24)
                 .Select(index => CompletedTurret(
                     "building.instance.pool-long-b-" + index,
-                    x: 5 + index,
-                    y: 7))
+                    x: 5 + index % 8,
+                    y: 7 + index / 8,
+                    DefenseTowerDefinition(index)))
                 .ToArray();
             GrayboxDefenseEnemySnapshot3D[] initialEnemies =
-                Enumerable.Range(0, 8)
+                Enumerable.Range(0, 46)
                     .Select(index => Enemy(
                         "enemy.pool-long-a-" + index,
                         index,
@@ -376,11 +538,11 @@ namespace WasteCity.Tests
             int towerRootChildren = fixture.TowerRoot.childCount;
             int namedMaterialCount = CountNamedMaterials(
                 fixture.SharedMaterial.name);
-            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(8));
-            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(4));
-            Assert.That(enemyRootChildren, Is.EqualTo(8));
-            Assert.That(towerRootChildren, Is.EqualTo(4));
-            Assert.That(tracerIds, Has.Length.EqualTo(4));
+            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(46));
+            Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
+            Assert.That(enemyRootChildren, Is.EqualTo(46));
+            Assert.That(towerRootChildren, Is.EqualTo(24));
+            Assert.That(tracerIds, Has.Length.EqualTo(24));
 
             for (int refresh = 0; refresh < 300; refresh++)
             {
@@ -390,7 +552,7 @@ namespace WasteCity.Tests
                     : cohortB;
                 string enemyCohort = useA ? "a" : "b";
                 GrayboxDefenseEnemySnapshot3D[] enemies =
-                    Enumerable.Range(0, 8)
+                    Enumerable.Range(0, 46)
                         .Select(index => Enemy(
                             "enemy.pool-long-" + enemyCohort + "-" + index,
                             index,
@@ -406,13 +568,25 @@ namespace WasteCity.Tests
                             ? GrayboxDefenseTowerStatus3D.Firing
                             : GrayboxDefenseTowerStatus3D.NoTarget))
                     .ToArray();
+                GrayboxDefenseSettledAttackEvent3D[] attacks = towers
+                    .Where(tower => tower.Status ==
+                        GrayboxDefenseTowerStatus3D.Firing)
+                    .Select((tower, eventIndex) => SettledAttack(
+                        (ulong)(refresh * 24 + eventIndex + 1),
+                        (ulong)(refresh + 1),
+                        tower.StableId,
+                        tower.TargetId))
+                    .ToArray();
 
                 fixture.View.Apply(
-                    Snapshot(towers: towers, enemies: enemies),
+                    Snapshot(
+                        towers: towers,
+                        enemies: enemies,
+                        settledAttacks: attacks),
                     instances);
 
-                Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(8));
-                Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(4));
+                Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(46));
+                Assert.That(fixture.View.PooledTowerCapacity, Is.EqualTo(24));
                 Assert.That(fixture.EnemyRoot.childCount,
                     Is.EqualTo(enemyRootChildren));
                 Assert.That(fixture.TowerRoot.childCount,
@@ -422,7 +596,13 @@ namespace WasteCity.Tests
                     Is.EqualTo(rendererIds));
                 Assert.That(ComponentIds<LineRenderer>(fixture.View),
                     Is.EqualTo(tracerIds));
-                Assert.That(fixture.View.VisibleTracerCount, Is.EqualTo(2));
+                Assert.That(fixture.View.VisibleTracerCount, Is.EqualTo(12));
+                Assert.That(fixture.View.VisibleMachineGunTracerCount,
+                    Is.EqualTo(4));
+                Assert.That(fixture.View.VisibleLaserBeamCount,
+                    Is.EqualTo(4));
+                Assert.That(fixture.View.VisibleSporeTrajectoryCount,
+                    Is.EqualTo(4));
                 Assert.That(
                     fixture.View.GetComponentsInChildren<Renderer>(true),
                     Is.All.Matches<Renderer>(renderer => ReferenceEquals(
@@ -478,7 +658,9 @@ namespace WasteCity.Tests
             Assert.That(fixture.View.SummaryText.text, Does.Contain("1984/2000"));
             Assert.That(fixture.View.SummaryText.text, Does.Contain("预警"));
             Assert.That(fixture.View.SummaryText.text, Does.Contain("12.5"));
-            Assert.That(fixture.View.SummaryText.text, Does.Contain("敌人 1"));
+            Assert.That(
+                fixture.View.SummaryText.text,
+                Does.Contain("存活敌人 1"));
             Assert.That(fixture.View.IsSelectionVisible, Is.True);
             Assert.That(fixture.View.SelectionText.text, Does.Contain("250/250"));
             Assert.That(fixture.View.SelectionText.text, Does.Contain("7/30"));
@@ -521,7 +703,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void PassiveHudDoesNotBlockInputOrOverlapExistingBars()
+        public void PassiveHudFitsFormal1920x1080WithoutOverlappingExistingUi()
         {
             HudFixture fixture = CreateHudFixture();
             fixture.View.Apply(
@@ -542,16 +724,29 @@ namespace WasteCity.Tests
                 passiveGraphics,
                 Is.All.Matches<Graphic>(graphic => !graphic.raycastTarget));
 
-            var resourceBar = Rect.MinMaxRect(250f, 842f, 1350f, 900f);
-            var quickbarCenter = Rect.MinMaxRect(400f, 0f, 1200f, 150f);
-            Rect summary = CanvasRect(fixture.Canvas, fixture.View.SummaryRect);
-            Rect selection = CanvasRect(
-                fixture.Canvas,
-                fixture.View.SelectionRect);
-            Assert.That(summary.Overlaps(resourceBar), Is.False);
-            Assert.That(selection.Overlaps(resourceBar), Is.False);
-            Assert.That(summary.Overlaps(quickbarCenter), Is.False);
-            Assert.That(selection.Overlaps(quickbarCenter), Is.False);
+            Assert.That(
+                fixture.Canvas.GetComponent<RectTransform>().rect.size,
+                Is.EqualTo(new Vector2(1920f, 1080f)));
+            Rect[] defensePanels =
+            {
+                CanvasRect(fixture.Canvas, fixture.View.SummaryRect),
+                CanvasRect(fixture.Canvas, fixture.View.SpeedRect),
+                CanvasRect(fixture.Canvas, fixture.View.SelectionRect),
+            };
+            Rect[] productionUi =
+            {
+                Rect.MinMaxRect(410f, 1014f, 1510f, 1072f),
+                Rect.MinMaxRect(650f, 8f, 1270f, 62f),
+                Rect.MinMaxRect(720f, 66f, 1200f, 104f),
+                Rect.MinMaxRect(1722f, 8f, 1912f, 110f),
+            };
+            foreach (Rect defensePanel in defensePanels)
+                foreach (Rect existingPanel in productionUi)
+                    Assert.That(
+                        defensePanel.Overlaps(existingPanel),
+                        Is.False,
+                        "Defense HUD must not move or cover the resource " +
+                        "bar, build bar, shortage feedback, or construction controls.");
         }
 
         [Test]
@@ -605,7 +800,7 @@ namespace WasteCity.Tests
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.GetComponent<RectTransform>().sizeDelta =
-                new Vector2(1600f, 900f);
+                new Vector2(1920f, 1080f);
 
             GameObject eventObject = Track(new GameObject("DefenseEventSystem"));
             EventSystem eventSystem = eventObject.AddComponent<EventSystem>();
@@ -621,7 +816,9 @@ namespace WasteCity.Tests
             float warningSeconds = 0f,
             int coreHealth = 2000,
             IReadOnlyList<GrayboxDefenseTowerSnapshot3D> towers = null,
-            IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies = null)
+            IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies = null,
+            IReadOnlyList<GrayboxDefenseSettledAttackEvent3D>
+                settledAttacks = null)
         {
             towers = towers ?? Array.Empty<GrayboxDefenseTowerSnapshot3D>();
             enemies = enemies ?? Array.Empty<GrayboxDefenseEnemySnapshot3D>();
@@ -635,7 +832,22 @@ namespace WasteCity.Tests
                 2000,
                 coreHealth,
                 towers,
-                enemies);
+                enemies,
+                settledAttackEvents: settledAttacks);
+        }
+
+        private static GrayboxDefenseSettledAttackEvent3D SettledAttack(
+            ulong eventSequence,
+            ulong settlementSequence,
+            string towerStableId,
+            string targetStableId)
+        {
+            return new GrayboxDefenseSettledAttackEvent3D(
+                eventSequence,
+                settlementSequence,
+                towerStableId,
+                targetStableId,
+                appliedDamage: 1);
         }
 
         private static GrayboxDefenseTowerSnapshot3D Tower(
@@ -676,8 +888,10 @@ namespace WasteCity.Tests
         private static GrayboxBuildingInstance3D CompletedTurret(
             string stableId,
             int x,
-            int y)
+            int y,
+            BuildingDefinition definition = null)
         {
+            definition = definition ?? BuildingCatalog.MachineGunTurret;
             ConstructorInfo constructor = typeof(GrayboxBuildingInstance3D)
                 .GetConstructor(
                     BindingFlags.Instance | BindingFlags.NonPublic,
@@ -701,17 +915,73 @@ namespace WasteCity.Tests
                 {
                     stableId,
                     new PlacedBuilding(
-                        BuildingCatalog.MachineGunTurret,
+                        definition,
                         x,
                         y,
                         BuildingSite.Ground,
                         BuildingOrientation.North),
                     new ConstructionProgress(
-                        BuildingCatalog.MachineGunTurret.BuildSeconds),
+                        definition.BuildSeconds),
                     ResourceNodeBinding.None,
                 });
             complete.Invoke(instance, null);
             return instance;
+        }
+
+        private static void SetField<T>(
+            object target,
+            string fieldName,
+            T value)
+        {
+            FieldInfo field = target.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(target, value);
+        }
+
+        private static BuildingDefinition DefenseTowerDefinition(int index)
+        {
+            switch (index % 3)
+            {
+                case 1:
+                    return BuildingCatalog.LaserTower;
+                case 2:
+                    return BuildingCatalog.SporeTower;
+                default:
+                    return BuildingCatalog.MachineGunTurret;
+            }
+        }
+
+        private static void AssertTowerVisual(
+            GrayboxDefenseWorldView3D view,
+            string stableId,
+            GrayboxDefenseTowerVisualKind3D expectedKind,
+            string activeGroupName,
+            int trajectoryPositionCount)
+        {
+            Assert.That(view.TryGetTowerVisualKind(stableId, out var kind),
+                Is.True);
+            Assert.That(kind, Is.EqualTo(expectedKind));
+            Assert.That(view.TryGetTowerObject(stableId, out GameObject root),
+                Is.True);
+            Transform activeGroup = root.transform.Find(activeGroupName);
+            Assert.That(activeGroup, Is.Not.Null, activeGroupName);
+            Assert.That(activeGroup.gameObject.activeSelf, Is.True);
+            GameObject[] inactiveGroups =
+            {
+                root.transform.Find("Defense.Tower.MachineGun")?.gameObject,
+                root.transform.Find("Defense.Tower.Laser")?.gameObject,
+                root.transform.Find("Defense.Tower.Spore")?.gameObject,
+            };
+            Assert.That(inactiveGroups.Count(group =>
+                group != null && group.activeSelf), Is.EqualTo(1));
+            LineRenderer trajectory = root
+                .GetComponentsInChildren<LineRenderer>(true)
+                .Single();
+            Assert.That(trajectory.enabled, Is.True);
+            Assert.That(trajectory.positionCount,
+                Is.EqualTo(trajectoryPositionCount));
         }
 
         private static Rect CanvasRect(Canvas canvas, RectTransform target)

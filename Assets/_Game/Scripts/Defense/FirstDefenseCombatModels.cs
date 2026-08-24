@@ -66,6 +66,7 @@ namespace WasteCity.Defense
         public int AmmoCapacity =>
             DefenseTowerCatalog.MachineGunAmmunitionCapacity;
         public int Ammo { get; private set; }
+        public float ActiveAmmunitionSeconds => activeAmmunitionSeconds;
         public bool IsLogisticsConnected { get; private set; } = true;
         public bool IsPlayerPaused { get; private set; }
 

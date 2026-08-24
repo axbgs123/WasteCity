@@ -6,7 +6,8 @@
       "ChineseName": "基础时钟与会话",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Core/**",
-        "Assets/_Game/Scripts/Content/StableId.cs"
+        "Assets/_Game/Scripts/Content/StableId.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Core/**",
@@ -18,13 +19,15 @@
         "Assets/_Game/Tests/EditMode/GameClockAndForesightTests.cs",
         "Assets/_Game/Tests/EditMode/GameSessionStateTests.cs",
         "Assets/_Game/Tests/EditMode/GameSpeedTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxUnifiedRuleClockContractTests.cs",
         "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -110,7 +113,8 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0014"
+        "IDEA-0014",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -168,9 +172,12 @@
         "Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
         "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingHealthRuntime3DTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCombatDestructionCoordinator3DTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
@@ -195,7 +202,8 @@
         "IDEA-0012",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -233,6 +241,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
@@ -256,7 +266,8 @@
         "IDEA-0012",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -286,6 +297,7 @@
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/AlchemyTests.cs",
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+        "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
@@ -293,6 +305,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
@@ -318,7 +331,8 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0015",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -393,12 +407,16 @@
         "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
         "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseTowerCombatLossTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/InfectionModelTests.cs",
         "Assets/_Game/Tests/EditMode/InfectionSpreadRulesTests.cs",
         "Assets/_Game/Tests/EditMode/MindControlTests.cs",
@@ -409,6 +427,14 @@
         "Assets/_Game/Tests/EditMode/RouteContentDisplayTests.cs",
         "Assets/_Game/Tests/EditMode/RouteDefenseTowerTests.cs",
         "Assets/_Game/Tests/EditMode/SwordIntentTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignModelContractTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignPersistenceTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseEnemyCampaignCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerCombatModelTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerPersistenceTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs",
         "Assets/_Game/Tests/EditMode/TechnologyOverloadTests.cs",
         "Assets/_Game/Tests/EditMode/WaveDirectorTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
@@ -420,7 +446,8 @@
         "DOC-0001",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -452,6 +479,8 @@
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
@@ -459,6 +488,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalGameSpeedPersistenceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
@@ -473,7 +504,8 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -588,7 +620,8 @@
         "DOC-0001",
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0017"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json"
@@ -1042,6 +1075,7 @@
       "BoundarySummary": "不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；不从场景搜索建筑、不重新支付建造成本，也不从当前实例推导并复用历史高水位。仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有；schema 31 只保存权威建筑状态，连接和表现仍为派生状态。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
@@ -1050,7 +1084,8 @@
         "DOC-0001",
         "IDEA-0012",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -1129,14 +1164,17 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在正式三维防御运行时的持久化快照与 schema 31 防御 DTO 之间执行确定性映射，保留配置签名、冻结出生点、波次计数与时钟余量、塔弹药租约、活动敌人和核心状态，并把恢复委托给运行时的零写入预检与单次提交。",
-      "BoundarySummary": "只负责防御领域快照与 FormalThreeD DTO 映射及精确配置签名兼容；不拥有文件 IO、场景搜索、规则 tick、城市库存、目标选择、UI 或表现对象。FormalSaveValidator 只验证结构与高价值语义；目标、状态文案和 tracer 等派生状态不入档。",
+      "UseSummary": "在正式三维防御运行时、十波战役持久状态与当前 FormalThreeD 防御 DTO 之间执行确定性映射，保留配置签名、出生锚点、波次阶段、战役统计、塔攻击余量、活动敌人、建筑生命和核心状态，并通过零写入计划迁移 schema 31 后统一提交。",
+      "BoundarySummary": "只负责防御领域快照、迁移兼容与 FormalThreeD DTO 映射；不拥有文件 IO、场景搜索、规则 tick、城市库存、UI 或表现对象。FormalSaveValidator 只验证结构与高价值跨引用；目标缓存、状态文案、攻击事件和表现池不入档。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0013",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -1610,9 +1648,10 @@
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "Recommended",
       "UseSummary": "作为正式 3D 城市库存唯一聚合入口，按稳定仓库 ID 处理联网数量、确定性存取和不可变快照；撤离及 schema 31 恢复都使用绑定 owner/revision 的预检计划和单次原子提交。恢复可深拷贝保留未知孤立资源，并在配置签名变化时保留超额资产为只出不进。",
-      "BoundarySummary": "不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；调用方必须先验证仓库与建筑实例的交叉引用，并在恢复后由正式运行时重算连接。容量、连接、聚合快照和 revision 不入档；本模型不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
+      "BoundarySummary": "不决定建筑处理、完成状态、玩家所有权、物流距离或交互资格；战损只提供绑定 revision 的原子损失预检与提交，不决定摧毁目标或损失比例。调用方必须验证建筑交叉引用并在恢复后重算连接；本模型不替代 WorldMapModel、ResourceInventory 或 WarehouseStorageState。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/CityResourceStorageModelTests.cs",
+        "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
@@ -1620,7 +1659,8 @@
       "RequirementIds": [
         "IDEA-0012",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -1816,6 +1856,7 @@
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
@@ -1824,7 +1865,8 @@
         "IDEA-0011",
         "IDEA-0012",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -2087,6 +2129,190 @@
       ]
     },
     {
+      "Id": "single-city-defense-campaign-model",
+      "ChineseName": "单城市十波防御战役模型",
+      "TypeNames": [
+        "CampaignWaveDefinition",
+        "CampaignWaveCatalog",
+        "DefenseBuildingTargetCandidate",
+        "DefenseBuildingCombatTarget",
+        "SingleCityDefenseEnemySnapshot",
+        "SingleCityDefenseCampaignStatisticsSnapshot",
+        "SingleCityDefenseCampaignSnapshot",
+        "SingleCityDefenseCampaignModel",
+        "SingleCityDefenseTowerCombatModel",
+        "SingleCityDefenseTowerPersistenceState"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Combat/CampaignWaveCatalog.cs",
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs",
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseTowerCombatModel.cs",
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseTowerPersistenceState.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "以正式十波目录推进预警、生成、清场和胜负阶段，按稳定目标与正式敌塔配置结算移动、索敌、攻击、耗材、建筑受击和战役统计；塔战斗余量可独立持久化并确定性恢复。",
+      "BoundarySummary": "只拥有纯战役与塔战斗规则状态；不读取 Unity 时间、场景对象、城市库存或建筑会话，不直接摧毁建筑、不写 schema DTO，也不创建 HUD、轨迹或伤害表现。调用方必须提供稳定建筑目标、核心位置和已批准配置。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignModelContractTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseEnemyCampaignCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerCombatModelTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerPersistenceTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-building-health-runtime-3d",
+      "ChineseName": "三维建筑战斗生命运行时",
+      "TypeNames": [
+        "GrayboxBuildingHealthRuntime3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingHealthRuntime3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按稳定建筑实例维护正式最大生命、当前生命与战斗摧毁边界，并从建筑会话同步新建、施工、完成、遗迹和战损废墟状态。",
+      "BoundarySummary": "只拥有当前三维会话的建筑生命真值；不决定敌人目标、伤害数值、建筑移除、库存损失、生产状态、撤离规则或视觉样式。摧毁后的跨域提交必须交给统一战斗摧毁协调器。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingHealthRuntime3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-combat-destruction-coordinator-3d",
+      "ChineseName": "三维建筑战损原子结算协调器",
+      "TypeNames": [
+        "GrayboxCombatDestructionResult3D",
+        "GrayboxCombatDestructionCoordinator3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以稳定建筑实例和结算序号协调建筑生命、内部生产或塔库存损失、城市库存转移、会话战损废墟转换与派生状态刷新，重复结算保持幂等。",
+      "BoundarySummary": "只协调一次已确认的建筑摧毁事务；不计算攻击命中、伤害、索敌、掉落或退款，不绕过 CityResourceStorageModel、生产运行时、塔运行时和建筑会话各自的预检与提交边界。失败结果不得伪装成已摧毁。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCombatDestructionCoordinator3DTests.cs",
+        "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseTowerCombatLossTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "formal-defense-campaign-persistence-3d",
+      "ChineseName": "正式防御战役迁移与恢复边界",
+      "TypeNames": [
+        "SingleCityDefenseCampaignPersistenceState",
+        "SingleCityDefenseCampaignRestorePlan",
+        "GrayboxFormalDefenseCampaignPersistenceState3D",
+        "GrayboxFormalDefenseCampaignRestorePlan3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignPersistenceState.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalDefenseCampaignPersistence3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "冻结十波战役、塔战斗余量、活动敌人、建筑生命、统计、出生锚点与规则时钟状态，通过绑定当前配置和运行时所有者的零写入恢复计划统一迁移并提交。",
+      "BoundarySummary": "只拥有战役领域持久状态、schema 31 到当前战役结构的兼容迁移和恢复预检；不执行文件 IO，不搜索场景，不保存 HUD、目标缓存、轨迹池或派生连接。迁移缺失的历史信息必须显式采用受测试的保守默认值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignPersistenceTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-formal-rule-clock-3d",
+      "ChineseName": "三维统一正式规则时钟",
+      "TypeNames": [
+        "GrayboxFormalRuleClock3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs"
+      ],
+      "FeatureGroupId": "foundation-clock",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "在正式三维场景把玩家请求速度、系统菜单暂停、终局强制暂停和固定步余量合并为唯一有效规则时间，再按固定顺序推进城市、施工、生产、防御和撤离。",
+      "BoundarySummary": "只作为 GrayboxPrototype3D 的规则时钟组合根；不拥有各领域玩法状态，不使用 Unity 表现时间替代规则时间，不允许领域控制器另起 Update 时钟。暂停和速度输入仍由正式命令门发布。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxUnifiedRuleClockContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-defense-settled-attack-presentation-3d",
+      "ChineseName": "三维已结算攻击事件与表现池",
+      "TypeNames": [
+        "GrayboxDefenseSettledAttackEvent3D",
+        "GrayboxDefenseWorldView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "把规则层已经结算的稳定攻击事件投影到固定容量的敌人、塔和轨迹表现池，并按事件序号只消费一次机枪 tracer、激光束或孢子抛物线。",
+      "BoundarySummary": "事件只携带已结算攻击身份与伤害结果，表现池不得反向决定命中、伤害、目标或耗材；静止快照不得重复播放，池容量与回收仅属表现优化，不能丢失领域真值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-defense-selection-hud-3d",
+      "ChineseName": "三维防御统一选择详情与 HUD",
+      "TypeNames": [
+        "GrayboxDefenseSelectionSnapshot3D",
+        "GrayboxDefenseSelectionProjection3D",
+        "GrayboxDefenseHudView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "从建筑会话、生命、生产和防御不可变快照生成统一 Tower、Enemy、Building、Ruin 详情，并由 HUD 精确显示战役波次、速度、生命、战斗参数、生产配方、内部库存和稳定停工原因。",
+      "BoundarySummary": "只读投影和显示当前正式快照；不搜索场景、不修改领域状态、不复制放置、物流或生产规则，不伪造废墟库存数量，也不把距核心误写成距当前目标。塔暂停命令只在统一详情明确允许时发布。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
       "Id": "graybox-building-operational-access-3d",
       "ChineseName": "三维建筑共享运行与物流资格",
       "TypeNames": [
@@ -2115,6 +2341,7 @@
         "GrayboxDefenseTowerRuntimeState3D",
         "GrayboxDefenseTowerSnapshot3D",
         "GrayboxDefenseEnemySnapshot3D",
+        "GrayboxDefenseSettledAttackEvent3D",
         "GrayboxDefenseRuntimeSnapshot3D",
         "GrayboxDefensePersistenceState3D",
         "GrayboxDefenseRestorePlan3D",
@@ -2125,18 +2352,21 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定建筑实例同步机枪塔、补给本地弹药并组合教学波；撤离时拥有并捕获塔内弹药载荷，持久化时确定性保留外层固定步余量与全部防御领域状态，并以运行时所有者、generation 和 fingerprint 绑定零写入预检及单次提交。",
-      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储和首版防御领域，并拥有领域恢复事务；存档适配器负责 schema DTO 与配置签名，撤离协调器不拥有塔内载荷。本运行时不执行文件 IO 或场景搜索，不复制物流范围、建筑资格、库存事务、目标或表现状态，不进入 schema 30。",
+      "UseSummary": "按稳定建筑实例同步三类正式塔、塔内耗材、十波战役、活动敌人与已结算攻击事件，并组合建筑生命和原子摧毁边界，按废墟稳定 ID 保留当前运行时会话的实际战损摘要；持久化时确定性保留固定步余量与全部既有防御领域状态。",
+      "BoundarySummary": "只桥接正式 3D 建筑会话、城市仓储与纯战役模型，并拥有防御运行时事务；不执行文件 IO 或场景搜索，不复制物流范围、建筑资格、库存事务或表现状态。攻击事件只发布已结算事实，表现层不得借此成为第二套战斗真值；废墟损失摘要不进入现有 schema 32，存档恢复后必须明确显示明细不可用。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFirstDefenseRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0013",
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -2156,16 +2386,19 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "用于在 GrayboxPrototype3D 中连接规则时钟、全局暂停、HUD、真实选择输入、敌塔表现池与 tracer。",
-      "BoundarySummary": "仅限当前正式 3D 场景适配；UI 只读快照，表现对象不持有目标、伤害、耗弹或波次真值，不接入冻结 2D。",
+      "UseSummary": "用于在 GrayboxPrototype3D 中连接统一规则时钟、十波战役、全局暂停、统一选择 HUD、真实输入以及固定容量的三敌三塔和已结算攻击表现池。",
+      "BoundarySummary": "仅限当前正式 3D 场景适配；HUD 只读统一快照，表现对象不持有目标、伤害、耗材、建筑生命或波次真值，攻击轨迹只消费已结算事件且不得重复播放，不接入冻结 2D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0013"
+        "IDEA-0013",
+        "IDEA-0017"
       ]
     },
     {
@@ -2597,6 +2830,8 @@
         "FormalThreeDProductionSaveData",
         "FormalThreeDProductionStateSaveData",
         "FormalThreeDDefenseSaveData",
+        "FormalThreeDDefenseCampaignSaveData",
+        "FormalThreeDDefenseCampaignStatisticsSaveData",
         "FormalThreeDEvacuationSaveData",
         "FormalThreeDEvacuationRuntimePayloadSaveData"
       ],
@@ -2608,15 +2843,18 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31 和未来版本，提供确定性编码、payload hash、结构校验与高价值跨引用语义校验；复用固定 fixtures 验证兼容、损坏和未来版本边界。",
-      "BoundarySummary": "只定义存档身份、DTO 信封、codec 与纯验证，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；schema 31 不写入 FormalSaveData，schema 1 与 30 不升级成正式 3D，当前不提供旧档迁移。",
+      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31、当前 schema 32 和未来版本，提供确定性编码、payload hash、结构校验、高价值跨引用语义校验及 schema 31 到当前十波战役结构的受控迁移。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，schema 31 迁移不得伪造完整历史统计。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {

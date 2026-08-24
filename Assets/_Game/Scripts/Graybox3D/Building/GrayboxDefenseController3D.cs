@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
+using WasteCity.Combat;
 using WasteCity.Core;
 using WasteCity.Defense;
 
@@ -35,6 +36,11 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxDefenseSelectionKind3D presentedKind;
         private string selectedStableId;
         private string presentedStableId;
+        private GrayboxDefenseSelectionSnapshot3D selectionSnapshot;
+        private uint presentedPlacementRevision;
+        private ulong presentedProductionRevision;
+        private bool simulationPaused;
+        private bool presentedSimulationPaused;
         private Func<bool> persistencePauseSource;
         private GameSpeedModel formalSpeed;
         private GrayboxFormalRuleClock3D formalRuleClock;
@@ -57,6 +63,8 @@ namespace WasteCity.Graybox3D.Building
             !string.IsNullOrWhiteSpace(selectedStableId);
         public GrayboxDefenseSelectionKind3D SelectedKind => selectedKind;
         public string SelectedStableId => selectedStableId;
+        public GrayboxDefenseSelectionSnapshot3D SelectionSnapshot =>
+            selectionSnapshot;
         public bool IsPersistencePaused =>
             persistencePauseSource != null && persistencePauseSource();
         public bool IsConfigured =>
@@ -176,6 +184,8 @@ namespace WasteCity.Graybox3D.Building
             tutorialCombatCheckpointPublished = false;
             selectedKind = GrayboxDefenseSelectionKind3D.None;
             selectedStableId = null;
+            selectionSnapshot = null;
+            simulationPaused = false;
         }
 
         public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
@@ -214,12 +224,14 @@ namespace WasteCity.Graybox3D.Building
             using (TickMarker.Auto())
             {
                 bool effectivePaused = paused || IsPersistencePaused;
+                simulationPaused = effectivePaused;
                 worldView?.SetSimulationPaused(effectivePaused);
                 if (effectivePaused)
                 {
                     ApplySpeedPresentation();
-                    return true;
+                    ApplyPresentation();
                 }
+                if (effectivePaused) return true;
                 int previousTutorialWaveTriggerCount =
                     snapshot?.TutorialWaveTriggerCount ?? 0;
                 int previousSpawnedEnemyCount =
@@ -303,10 +315,37 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TrySelectBuilding(string stableInstanceId)
+        {
+            if (!IsConfigured || snapshot == null ||
+                !TryFindBuildingInstance(
+                    stableInstanceId,
+                    out GrayboxBuildingInstance3D instance))
+            {
+                return false;
+            }
+
+            bool isRuin =
+                instance.State == GrayboxBuildingInstanceState.AbandonedRuin ||
+                instance.State == GrayboxBuildingInstanceState.DestroyedRuin;
+            bool isFormalTower = DefenseTowerCatalog.For(
+                instance.Placement.Definition.Id.Value) != null;
+            GrayboxDefenseSelectionKind3D kind = isRuin
+                ? GrayboxDefenseSelectionKind3D.Ruin
+                : isFormalTower
+                    ? GrayboxDefenseSelectionKind3D.Tower
+                    : GrayboxDefenseSelectionKind3D.Building;
+            selectedKind = kind;
+            selectedStableId = stableInstanceId;
+            ApplyPresentation(force: true);
+            return true;
+        }
+
         public void CloseSelection()
         {
             selectedKind = GrayboxDefenseSelectionKind3D.None;
             selectedStableId = null;
+            selectionSnapshot = null;
             ApplyPresentation(force: true);
         }
 
@@ -377,8 +416,11 @@ namespace WasteCity.Graybox3D.Building
             tutorialCombatCheckpointPublished = false;
             selectedStableId = null;
             presentedStableId = null;
+            selectionSnapshot = null;
             selectedKind = GrayboxDefenseSelectionKind3D.None;
             presentedKind = GrayboxDefenseSelectionKind3D.None;
+            simulationPaused = false;
+            presentedSimulationPaused = false;
         }
 
         private void EnsureRuntime(float coreX, float coreZ)
@@ -568,6 +610,11 @@ namespace WasteCity.Graybox3D.Building
             if (snapshot == null) return;
             if (!force && ReferenceEquals(snapshot, presentedSnapshot) &&
                 selectedKind == presentedKind &&
+                (session?.PlacementRevision ?? 0) ==
+                    presentedPlacementRevision &&
+                (production?.Revision ?? 0) ==
+                    presentedProductionRevision &&
+                simulationPaused == presentedSimulationPaused &&
                 string.Equals(
                     selectedStableId,
                     presentedStableId,
@@ -575,11 +622,33 @@ namespace WasteCity.Graybox3D.Building
             {
                 return;
             }
+            GrayboxCombatDestructionResult3D selectedDestructionResult = null;
+            runtime?.TryGetDestructionResult(
+                selectedStableId,
+                out selectedDestructionResult);
+            selectionSnapshot =
+                GrayboxDefenseSelectionProjection3D.Capture(
+                    selectedKind,
+                    selectedStableId,
+                    snapshot,
+                    session?.Instances,
+                    buildingHealth,
+                    production?.Snapshot ??
+                        ProductionObservabilitySnapshot.Empty,
+                    simulationPaused,
+                    selectedDestructionResult);
             worldView?.Apply(snapshot, session.Instances);
-            hud?.Apply(snapshot, selectedKind, selectedStableId);
+            hud?.Apply(
+                snapshot,
+                selectedKind,
+                selectedStableId,
+                selectionSnapshot);
             presentedSnapshot = snapshot;
             presentedKind = selectedKind;
             presentedStableId = selectedStableId;
+            presentedPlacementRevision = session?.PlacementRevision ?? 0;
+            presentedProductionRevision = production?.Revision ?? 0;
+            presentedSimulationPaused = simulationPaused;
         }
 
         private void InvalidatePresentation()
@@ -587,6 +656,9 @@ namespace WasteCity.Graybox3D.Building
             presentedSnapshot = null;
             presentedKind = GrayboxDefenseSelectionKind3D.None;
             presentedStableId = null;
+            presentedPlacementRevision = 0;
+            presentedProductionRevision = 0;
+            presentedSimulationPaused = false;
         }
 
         private void ValidateSelection()
@@ -610,7 +682,17 @@ namespace WasteCity.Graybox3D.Building
             switch (kind)
             {
                 case GrayboxDefenseSelectionKind3D.Tower:
-                    return TryFindTower(stableId, out _);
+                    if (TryFindTower(stableId, out _)) return true;
+                    return TryFindBuildingInstance(
+                            stableId,
+                            out GrayboxBuildingInstance3D towerInstance) &&
+                        towerInstance.State !=
+                            GrayboxBuildingInstanceState.AbandonedRuin &&
+                        towerInstance.State !=
+                            GrayboxBuildingInstanceState.DestroyedRuin &&
+                        DefenseTowerCatalog.For(
+                            towerInstance.Placement.Definition.Id.Value) !=
+                            null;
                 case GrayboxDefenseSelectionKind3D.Enemy:
                     IReadOnlyList<GrayboxDefenseEnemySnapshot3D> enemies =
                         snapshot.Enemies;
@@ -625,9 +707,53 @@ namespace WasteCity.Graybox3D.Building
                         }
                     }
                     return false;
+                case GrayboxDefenseSelectionKind3D.Building:
+                    return TryFindBuildingInstance(
+                            stableId,
+                            out GrayboxBuildingInstance3D building) &&
+                        building.State !=
+                            GrayboxBuildingInstanceState.AbandonedRuin &&
+                        building.State !=
+                            GrayboxBuildingInstanceState.DestroyedRuin;
+                case GrayboxDefenseSelectionKind3D.Ruin:
+                    return TryFindBuildingInstance(
+                            stableId,
+                            out GrayboxBuildingInstance3D ruin) &&
+                        (ruin.State ==
+                             GrayboxBuildingInstanceState.AbandonedRuin ||
+                         ruin.State ==
+                             GrayboxBuildingInstanceState.DestroyedRuin);
                 default:
                     return false;
             }
+        }
+
+        private bool TryFindBuildingInstance(
+            string stableId,
+            out GrayboxBuildingInstance3D instance)
+        {
+            instance = null;
+            if (session?.Instances == null ||
+                string.IsNullOrWhiteSpace(stableId))
+            {
+                return false;
+            }
+            IReadOnlyList<GrayboxBuildingInstance3D> instances =
+                session.Instances;
+            for (int index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D candidate = instances[index];
+                if (!string.Equals(
+                        candidate?.StableInstanceId,
+                        stableId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                instance = candidate;
+                return true;
+            }
+            return false;
         }
 
         private bool TryFindTower(

@@ -323,6 +323,52 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SuccessfulRestoreClearsFutureTimelineRuinLossDetails()
+        {
+            string[] towerIds =
+            {
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020",
+            };
+            Fixture fixture = CreateFixture(towerIds);
+            var adapter = new GrayboxDefenseSaveAdapter3D(fixture.Runtime);
+            FormalThreeDDefenseCampaignSaveData checkpoint =
+                adapter.CaptureCampaign();
+
+            Assert.That(ApplyCampaignBuildingDamage(
+                fixture.Runtime,
+                towerIds[0],
+                BuildingCatalog.MachineGunTurret.MaximumHealth),
+                Is.EqualTo(BuildingCatalog.MachineGunTurret.MaximumHealth));
+            Assert.That(fixture.Runtime.TryGetDestructionResult(
+                towerIds[0],
+                out _), Is.True);
+            Assert.That(fixture.Runtime.LastDestructionResult, Is.Not.Null);
+
+            RestoreCompletedTowers(fixture.Session, towerIds);
+            fixture.Runtime.Synchronize(
+                fixture.Session.Instances,
+                CityMode.Fortress,
+                10,
+                10,
+                fixture.Session.GroundBuildRadius);
+            Assert.That(adapter.TryRestoreCampaign(
+                checkpoint,
+                fixture.Session.Instances,
+                out string error), Is.True, error);
+
+            Assert.That(fixture.Runtime.TryGetDestructionResult(
+                towerIds[0],
+                out _), Is.False,
+                "A checkpoint restore must not leak ruin losses from the " +
+                "discarded future timeline.");
+            Assert.That(fixture.Runtime.LastDestructionResult, Is.Null);
+            Assert.That(fixture.Runtime.PendingPresentationRebuildCount,
+                Is.Zero);
+        }
+
+        [Test]
         public void SchemaThirtyTwoCoordinatorDoesNotRetainCampaignShadowTruth()
         {
             FieldInfo retained = typeof(GrayboxFormalSaveCoordinator3D)
@@ -349,33 +395,7 @@ namespace WasteCity.Tests
                 owner.AddComponent<GrayboxBuildingSession3D>();
             session.ConfigureDevelopmentFixture();
 
-            BuildingDefinition[] definitions =
-            {
-                BuildingCatalog.MachineGunTurret,
-                BuildingCatalog.LaserTower,
-                BuildingCatalog.SporeTower,
-            };
-            var restored = new GrayboxBuildingRestoreEntry3D[towerIds.Length];
-            for (var index = 0; index < towerIds.Length; index++)
-            {
-                restored[index] = new GrayboxBuildingRestoreEntry3D(
-                    towerIds[index],
-                    definitions[index],
-                    BuildingSite.Ground,
-                    10 + index * 2,
-                    10,
-                    BuildingOrientation.North,
-                    GrayboxBuildingInstanceState.Completed,
-                    0f,
-                    isPlayerOwned: true,
-                    isEvacuationLocked: false,
-                    ResourceNodeBinding.None);
-            }
-            Assert.That(session.TryRestoreBuildings(
-                restored,
-                100,
-                new NoOpPresentation(),
-                out string restoreError), Is.True, restoreError);
+            RestoreCompletedTowers(session, towerIds);
 
             var health = new GrayboxBuildingHealthRuntime3D();
             health.Synchronize(session.Instances);
@@ -396,6 +416,57 @@ namespace WasteCity.Tests
                 10,
                 session.GroundBuildRadius);
             return new Fixture(session, runtime, health, campaign);
+        }
+
+        private static void RestoreCompletedTowers(
+            GrayboxBuildingSession3D session,
+            IReadOnlyList<string> towerIds)
+        {
+
+            BuildingDefinition[] definitions =
+            {
+                BuildingCatalog.MachineGunTurret,
+                BuildingCatalog.LaserTower,
+                BuildingCatalog.SporeTower,
+            };
+            var restored = new GrayboxBuildingRestoreEntry3D[towerIds.Count];
+            for (var index = 0; index < towerIds.Count; index++)
+            {
+                restored[index] = new GrayboxBuildingRestoreEntry3D(
+                    towerIds[index],
+                    definitions[index],
+                    BuildingSite.Ground,
+                    10 + index * 2,
+                    10,
+                    BuildingOrientation.North,
+                    GrayboxBuildingInstanceState.Completed,
+                    0f,
+                    isPlayerOwned: true,
+                    isEvacuationLocked: false,
+                    ResourceNodeBinding.None);
+            }
+            Assert.That(session.TryRestoreBuildings(
+                restored,
+                100,
+                new NoOpPresentation(),
+                out string restoreError), Is.True, restoreError);
+        }
+
+        private static int ApplyCampaignBuildingDamage(
+            GrayboxDefenseRuntime3D runtime,
+            string stableInstanceId,
+            int damage)
+        {
+            MethodInfo apply = typeof(GrayboxDefenseRuntime3D).GetMethod(
+                "ApplyCampaignBuildingDamage",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(apply, Is.Not.Null);
+            return (int)apply.Invoke(runtime, new object[]
+            {
+                "campaign.enemy.restore-history-probe",
+                stableInstanceId,
+                damage,
+            });
         }
 
         private static FormalThreeDDefenseCampaignSaveData Capture(

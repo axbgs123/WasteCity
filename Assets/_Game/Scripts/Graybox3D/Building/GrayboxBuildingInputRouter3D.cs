@@ -260,12 +260,18 @@ namespace WasteCity.Graybox3D.Building
                 else if (productionPresentation != null &&
                          productionPresentation.TryPickInstance(
                              pointerRay,
-                             out string selectedStableId) &&
-                         operations != null &&
-                         operations.TryOpenBuildingDetail(selectedStableId))
+                             out string selectedStableId))
                 {
-                    defense?.CloseSelection();
-                    buildInputOwnedThisFrame = true;
+                    bool selected = defense != null &&
+                        defense.TrySelectBuilding(selectedStableId);
+                    bool openedOperations = operations != null &&
+                        operations.TryOpenBuildingDetail(selectedStableId);
+                    if (selected || openedOperations)
+                    {
+                        if (!selected)
+                            defense?.CloseSelection();
+                        buildInputOwnedThisFrame = true;
+                    }
                 }
             }
 

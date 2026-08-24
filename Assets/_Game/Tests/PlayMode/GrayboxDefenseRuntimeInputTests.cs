@@ -156,6 +156,8 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxOperationsView3D>();
             GrayboxProductionController3D production =
                 Object.FindObjectOfType<GrayboxProductionController3D>();
+            GrayboxBuildingWorldView3D buildingWorldView =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
             GrayboxBuildingInstance3D turret = CreateDefenseChain();
             yield return WaitForTower(controller, turret.StableInstanceId);
             Assert.That(production.Tick(.1f, paused: false), Is.True);
@@ -177,13 +179,19 @@ namespace WasteCity.Tests
                 value => value.Placement.Definition == BuildingCatalog.Warehouse);
             yield return ClickBuildingObject(
                 RequireSceneObject(smelter.StableInstanceId),
-                Object.FindObjectOfType<GrayboxBuildingWorldView3D>(),
+                buildingWorldView,
                 worldView,
                 smelter.StableInstanceId);
             Assert.That(operationsView.IsLedgerOpen, Is.True);
-            Assert.That(controller.HasSelection, Is.False);
-            Assert.That(hud.DetailsVisible, Is.False);
+            Assert.That(controller.HasSelection, Is.True);
+            Assert.That(controller.SelectedKind,
+                Is.EqualTo(GrayboxDefenseSelectionKind3D.Building));
+            Assert.That(hud.DetailsVisible, Is.True);
+            Assert.That(hud.SelectionText.text, Does.Contain("冶炼厂"));
 
+            yield return TapKey(Key.Escape);
+            Assert.That(controller.HasSelection, Is.False);
+            Assert.That(operationsView.IsLedgerOpen, Is.True);
             yield return TapKey(Key.Escape);
             Assert.That(operationsView.IsLedgerOpen, Is.False);
             yield return ClickWorldObject(towerObject);
@@ -191,14 +199,21 @@ namespace WasteCity.Tests
             Assert.That(operationsView.IsLedgerOpen, Is.False);
             yield return ClickBuildingObject(
                 RequireSceneObject(warehouse.StableInstanceId),
-                Object.FindObjectOfType<GrayboxBuildingWorldView3D>(),
+                buildingWorldView,
                 worldView,
                 warehouse.StableInstanceId);
             Assert.That(operationsView.IsLedgerOpen, Is.True);
-            Assert.That(controller.HasSelection, Is.False);
-            Assert.That(hud.DetailsVisible, Is.False);
+            Assert.That(controller.HasSelection, Is.True);
+            Assert.That(controller.SelectedKind,
+                Is.EqualTo(GrayboxDefenseSelectionKind3D.Building));
+            Assert.That(hud.DetailsVisible, Is.True);
+            Assert.That(hud.SelectionText.text, Does.Contain("仓库"));
 
             yield return TapKey(Key.Escape);
+            Assert.That(controller.HasSelection, Is.False);
+            Assert.That(operationsView.IsLedgerOpen, Is.True);
+            yield return TapKey(Key.Escape);
+            Assert.That(operationsView.IsLedgerOpen, Is.False);
             yield return ClickWorldObject(towerObject);
             Assert.That(controller.HasSelection, Is.True);
             Assert.That(operationsView.IsLedgerOpen, Is.False);
@@ -244,7 +259,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(GrayboxDefenseSelectionKind3D.Enemy));
             Assert.That(controller.SelectedStableId, Is.EqualTo(enemyId));
             Assert.That(hud.SelectionText.text, Does.Contain("目标 城市核心"));
-            Assert.That(hud.SelectionText.text, Does.Contain("距离 "));
+            Assert.That(hud.SelectionText.text, Does.Contain("距目标 "));
             Assert.That(hud.SelectionText.text, Does.Contain("格"));
         }
 
