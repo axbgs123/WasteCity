@@ -104,6 +104,44 @@ namespace WasteCity.Tests
                     FormalUiLayoutProfile3D.Standard.FontDescription));
         }
 
+        [Test]
+        public void IDEA0019_BuildingCatalogUsesHeroIconSemanticSize()
+        {
+            Canvas canvas = CreateCanvas(1920f, 1080f);
+            EventSystem eventSystem = CreateEventSystem();
+            var sessionObject = Track(new GameObject("FormalBuildingSession"));
+            GrayboxBuildingSession3D session =
+                sessionObject.AddComponent<GrayboxBuildingSession3D>();
+            session.ConfigureDevelopmentFixture();
+            var interactionObject = Track(
+                new GameObject("FormalBuildingInteraction"));
+            GrayboxBuildingInteractionModel3D interaction =
+                interactionObject.AddComponent<
+                    GrayboxBuildingInteractionModel3D>();
+            var menuObject = Track(new GameObject("FormalBuildingMenu"));
+            GrayboxBuildingMenuView3D menu =
+                menuObject.AddComponent<GrayboxBuildingMenuView3D>();
+            menu.Configure(canvas, eventSystem, session, interaction);
+            interaction.ToggleCatalog();
+            menu.SetCategory(BuildingMenuCategory.Production);
+            Canvas.ForceUpdateCanvases();
+
+            RectTransform card = Required(
+                canvas.transform,
+                "Catalog.Card.core.building.smelter");
+            RectTransform icon = Required(
+                card,
+                "Catalog.Card.core.building.smelter.BuildingIcon");
+            float hero = FormalUiLayoutProfile3D.Standard.IconHero;
+
+            Assert.That(icon.rect.width, Is.EqualTo(hero).Within(.01f));
+            Assert.That(icon.rect.height, Is.EqualTo(hero).Within(.01f));
+            Assert.That(
+                icon.rect.width / card.rect.height,
+                Is.LessThanOrEqualTo(.65f),
+                "The catalog hero must not dominate the building row.");
+        }
+
         private Canvas CreateCanvas(float width, float height)
         {
             var canvasObject = Track(new GameObject(

@@ -306,9 +306,9 @@ namespace WasteCity.Tests
             Assert.That(fixture, Is.Not.Null);
             Assert.That(fixture.boolValue, Is.True);
 
-            Assert.That(city.transform.position.x, Is.EqualTo(-9f));
+            Assert.That(city.transform.position.x, Is.EqualTo(-22f));
             Assert.That(city.transform.position.y, Is.EqualTo(.5f));
-            Assert.That(city.transform.position.z, Is.EqualTo(-4f));
+            Assert.That(city.transform.position.z, Is.EqualTo(-15f));
             var coordinates = new PlanarCoordinateMapper3D(
                 GrayboxSceneBootstrap.WorldWidth,
                 GrayboxSceneBootstrap.WorldHeight);
@@ -318,7 +318,11 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
-            Assert.That((cityX, cityY), Is.EqualTo((23, 20)));
+            Assert.That(
+                (cityX, cityY),
+                Is.EqualTo((
+                    GrayboxWorldLayout3D.StartCellX,
+                    GrayboxWorldLayout3D.StartCellY)));
             WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
             Assert.That(
                 CityDeploymentRules.Validate(world, cityX, cityY),
@@ -367,7 +371,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void SceneAuthoring_UsesApprovedSparseLayoutFactory()
+        public void IDEA0019_SceneAuthoringUsesFormalV2StartWithoutLegacyOffset()
         {
             string source = File.ReadAllText(
                 Path.Combine(
@@ -377,17 +381,42 @@ namespace WasteCity.Tests
                 "GrayboxWorldLayout3D.CreateDefault()",
                 source);
             StringAssert.Contains(
-                "GrayboxWorldLayout3D.ToExpandedX(7)",
+                "GrayboxWorldLayout3D.StartCellX",
                 source);
             StringAssert.Contains(
-                "GrayboxWorldLayout3D.ToExpandedY(8)",
+                "GrayboxWorldLayout3D.StartCellY",
                 source);
+            StringAssert.DoesNotContain("ToExpandedX(7)", source);
+            StringAssert.DoesNotContain("ToExpandedY(8)", source);
             string compact = source.Replace("\r", string.Empty)
                 .Replace("\n", string.Empty)
                 .Replace(" ", string.Empty);
             StringAssert.DoesNotContain(
                 "newWorldMapModel(GrayboxSceneBootstrap.WorldWidth",
                 compact);
+        }
+
+        [Test]
+        public void IDEA0019_FormalSceneWorldProjectsAllTwentyFourResourceMarkers()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GrayboxWorldView3D worldView =
+                Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
+
+            Assert.That(worldView, Is.Not.Null);
+            Assert.That(world.ResourceNodeCount, Is.EqualTo(24));
+            try
+            {
+                worldView.Generate(world);
+                Assert.That(worldView.Model, Is.SameAs(world));
+                Assert.That(worldView.ResourceNodeMarkerCount, Is.EqualTo(24));
+            }
+            finally
+            {
+                if (worldView != null)
+                    worldView.ClearGenerated();
+            }
         }
 
         [Test]

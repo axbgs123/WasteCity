@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
@@ -306,13 +307,13 @@ namespace WasteCity.Tests
             GameObject markerObject = marker.gameObject;
             int markerCount = view.ResourceNodeMarkerCount;
 
-            Assert.That(view.RefreshResourceNodeMarkerLod(13f), Is.True);
+            Assert.That(view.RefreshResourceNodeMarkerLod(8f), Is.True);
             Assert.That(marker.DisplayLod,
                 Is.EqualTo(ResourceNodeMarkerLod3D.Near));
             Assert.That(marker.DisplayText, Does.Contain("石料"));
             Assert.That(marker.DisplayText, Does.Contain("100"));
 
-            Assert.That(view.RefreshResourceNodeMarkerLod(18f), Is.True);
+            Assert.That(view.RefreshResourceNodeMarkerLod(13f), Is.True);
             Assert.That(marker.DisplayLod,
                 Is.EqualTo(ResourceNodeMarkerLod3D.Mid));
             Assert.That(marker.DisplayText, Is.EqualTo("100"));
@@ -349,6 +350,98 @@ namespace WasteCity.Tests
             Assert.That(
                 view.ClearResourceMarkerGuidanceOverrides(),
                 Is.False);
+        }
+
+        [Test]
+        public void IDEA0019_DefaultOrthographicSizeUsesMidMarkerWithoutNameThroughWorldView()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+            ScriptableObject scaleProfile = CreateWorldScaleProfile();
+            ConfigureWorldPresentation(view, scaleProfile);
+            view.Generate(model);
+            Assert.That(view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+
+            Assert.That(
+                view.RefreshResourceNodeMarkerLod(13f),
+                Is.True);
+
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Mid));
+            Assert.That(marker.DisplayText, Is.EqualTo("100"));
+            Assert.That(marker.DisplayText, Does.Not.Contain("石料"));
+        }
+
+        [Test]
+        public void IDEA0019_WorldViewAppliesRendererSizeAndVisibilityForEveryMarkerLod()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+            ScriptableObject scaleProfile = CreateWorldScaleProfile();
+            ConfigureWorldPresentation(view, scaleProfile);
+            view.Generate(model);
+            Assert.That(view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            MethodInfo refresh = RequireMethod(
+                typeof(GrayboxWorldView3D),
+                "RefreshResourceNodeMarkerPresentation",
+                typeof(bool),
+                typeof(float),
+                typeof(int),
+                typeof(int));
+
+            Assert.That(
+                refresh.Invoke(view, new object[] { 8f, 1920, 1080 }),
+                Is.EqualTo(true));
+            AssertMarkerPresentation(
+                marker,
+                ResourceNodeMarkerLod3D.Near,
+                true,
+                true,
+                true,
+                36f * 16f / 1080f,
+                26f * 16f / 1080f,
+                16f * 16f / 1080f,
+                "石料\n100");
+
+            Assert.That(
+                refresh.Invoke(view, new object[] { 13f, 1920, 1080 }),
+                Is.EqualTo(true));
+            AssertMarkerPresentation(
+                marker,
+                ResourceNodeMarkerLod3D.Mid,
+                true,
+                true,
+                true,
+                28f * 26f / 1080f,
+                20f * 26f / 1080f,
+                13f * 26f / 1080f,
+                "100");
+
+            Assert.That(
+                refresh.Invoke(view, new object[] { 26f, 1920, 1080 }),
+                Is.EqualTo(true));
+            AssertMarkerPresentation(
+                marker,
+                ResourceNodeMarkerLod3D.Far,
+                false,
+                true,
+                false,
+                0f,
+                18f * 52f / 1080f,
+                0f,
+                string.Empty);
+            Assert.That(
+                refresh.Invoke(view, new object[] { 26f, 1920, 1080 }),
+                Is.EqualTo(false),
+                "A stable presentation refresh must not rewrite renderers.");
         }
 
         [Test]
@@ -663,6 +756,86 @@ namespace WasteCity.Tests
         {
             cleanup.Add(value);
             return value;
+        }
+
+        private ScriptableObject CreateWorldScaleProfile()
+        {
+            Type profileType = typeof(GrayboxWorldView3D).Assembly.GetType(
+                "WasteCity.Graybox3D." +
+                "FormalWorldPresentationScaleProfile3D");
+            Assert.That(profileType, Is.Not.Null);
+            Assert.That(
+                profileType.IsSubclassOf(typeof(ScriptableObject)),
+                Is.True);
+            return Track(ScriptableObject.CreateInstance(profileType));
+        }
+
+        private static void ConfigureWorldPresentation(
+            GrayboxWorldView3D view,
+            ScriptableObject profile)
+        {
+            MethodInfo configure = RequireMethod(
+                typeof(GrayboxWorldView3D),
+                "ConfigureWorldPresentation",
+                typeof(void),
+                profile.GetType());
+            configure.Invoke(view, new object[] { profile });
+        }
+
+        private static MethodInfo RequireMethod(
+            Type owner,
+            string methodName,
+            Type returnType,
+            params Type[] parameterTypes)
+        {
+            MethodInfo method = owner.GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.Public,
+                null,
+                parameterTypes,
+                null);
+            Assert.That(method, Is.Not.Null, owner.FullName + "." + methodName);
+            Assert.That(method.ReturnType, Is.EqualTo(returnType));
+            return method;
+        }
+
+        private static void AssertMarkerPresentation(
+            GrayboxResourceNodeMarker3D marker,
+            ResourceNodeMarkerLod3D expectedLod,
+            bool frameVisible,
+            bool iconVisible,
+            bool textVisible,
+            float frameWorldHeight,
+            float iconWorldHeight,
+            float textWorldHeight,
+            string expectedText)
+        {
+            Transform frame = marker.transform.Find("Frame");
+            Transform icon = marker.transform.Find("Icon");
+            Transform label = marker.transform.Find("NameAndAmount");
+            Assert.That(frame, Is.Not.Null);
+            Assert.That(icon, Is.Not.Null);
+            Assert.That(label, Is.Not.Null);
+            Assert.That(marker.DisplayLod, Is.EqualTo(expectedLod));
+            Assert.That(marker.DisplayText, Is.EqualTo(expectedText));
+            Assert.That(
+                frame.GetComponent<MeshRenderer>().enabled,
+                Is.EqualTo(frameVisible));
+            Assert.That(
+                icon.GetComponent<MeshRenderer>().enabled,
+                Is.EqualTo(iconVisible));
+            Assert.That(
+                label.GetComponent<MeshRenderer>().enabled,
+                Is.EqualTo(textVisible));
+            Assert.That(
+                frame.localScale.y,
+                Is.EqualTo(frameWorldHeight).Within(.0001f));
+            Assert.That(
+                icon.localScale.y,
+                Is.EqualTo(iconWorldHeight).Within(.0001f));
+            Assert.That(
+                label.GetComponent<TextMesh>().characterSize,
+                Is.EqualTo(textWorldHeight).Within(.0001f));
         }
 
         private static WorldCell[,] Capture(WorldMapModel model)

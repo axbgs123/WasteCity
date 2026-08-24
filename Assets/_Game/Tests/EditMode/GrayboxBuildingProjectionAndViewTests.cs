@@ -2400,6 +2400,263 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0019_InnerAndGroundHousingShareProfileProportions()
+        {
+            WorldFixture ground = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            GrayboxBuildingInstance3D groundInstance = Begin(
+                ground,
+                BuildingCatalog.Housing,
+                BuildingSite.Ground,
+                20,
+                15,
+                CityMode.Fortress);
+            ground.Session.CompleteAllConstructionForDevelopment(
+                ground.Presentation);
+            Bounds groundBounds = InstanceBounds(ground, groundInstance);
+
+            WorldFixture inner = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Mobile);
+            GrayboxBuildingInstance3D innerInstance = Begin(
+                inner,
+                BuildingCatalog.Housing,
+                BuildingSite.InnerCity,
+                0,
+                0,
+                CityMode.Mobile);
+            inner.Session.CompleteAllConstructionForDevelopment(
+                inner.Presentation);
+            Bounds innerBounds = InstanceBounds(inner, innerInstance);
+            FormalBuildingVisualMetrics3D metrics = BuildingMetrics(
+                BuildingCatalog.Housing);
+
+            float expectedGroundWidth =
+                BuildingCatalog.Housing.Width * metrics.FootprintFillRatio;
+            float expectedGroundHeight = metrics.VisualHeightInCells;
+            float expectedInnerWidth = expectedGroundWidth * .32f;
+            float expectedInnerHeight = expectedGroundHeight * .32f * 1.15f;
+            Assert.That(
+                groundBounds.size.x,
+                Is.EqualTo(expectedGroundWidth).Within(.02f));
+            Assert.That(
+                groundBounds.size.z,
+                Is.EqualTo(expectedGroundWidth).Within(.02f));
+            Assert.That(
+                groundBounds.size.y,
+                Is.EqualTo(expectedGroundHeight).Within(.02f));
+            Assert.That(
+                innerBounds.size.x,
+                Is.EqualTo(expectedInnerWidth).Within(.02f));
+            Assert.That(
+                innerBounds.size.z,
+                Is.EqualTo(expectedInnerWidth).Within(.02f));
+            Assert.That(
+                innerBounds.size.y,
+                Is.EqualTo(expectedInnerHeight).Within(.02f));
+            Assert.That(
+                innerBounds.size.y / groundBounds.size.y,
+                Is.EqualTo(.32f * 1.15f).Within(.02f));
+        }
+
+        [Test]
+        public void IDEA0019_CanonicalArchetypesProduceDistinctWorldBounds()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            var definitions = new[]
+            {
+                BuildingCatalog.Housing,
+                BuildingCatalog.Warehouse,
+                BuildingCatalog.Smelter,
+                BuildingCatalog.MindSpire,
+                BuildingCatalog.BehemothPen,
+            };
+            var anchors = new[]
+            {
+                new Vector2Int(10, 9),
+                new Vector2Int(13, 9),
+                new Vector2Int(18, 9),
+                new Vector2Int(12, 12),
+                new Vector2Int(18, 12),
+            };
+            var instances = new GrayboxBuildingInstance3D[definitions.Length];
+            for (var index = 0; index < definitions.Length; index++)
+            {
+                instances[index] = Begin(
+                    fixture,
+                    definitions[index],
+                    BuildingSite.Ground,
+                    anchors[index].x,
+                    anchors[index].y,
+                    CityMode.Fortress);
+            }
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+
+            var heights = new HashSet<int>();
+            for (var index = 0; index < definitions.Length; index++)
+            {
+                BuildingDefinition definition = definitions[index];
+                Bounds bounds = InstanceBounds(fixture, instances[index]);
+                FormalBuildingVisualMetrics3D metrics =
+                    BuildingMetrics(definition);
+                Assert.That(
+                    bounds.size.x,
+                    Is.EqualTo(
+                        definition.Width * metrics.FootprintFillRatio)
+                        .Within(.02f),
+                    definition.Name);
+                Assert.That(
+                    bounds.size.z,
+                    Is.EqualTo(
+                        definition.Height * metrics.FootprintFillRatio)
+                        .Within(.02f),
+                    definition.Name);
+                Assert.That(
+                    bounds.size.y,
+                    Is.EqualTo(metrics.VisualHeightInCells).Within(.02f),
+                    definition.Name);
+                heights.Add(Mathf.RoundToInt(bounds.size.y * 100f));
+            }
+            Assert.That(
+                heights,
+                Has.Count.EqualTo(definitions.Length),
+                "Residential, storage, processor, tower, and large " +
+                "archetypes require distinct heights.");
+        }
+
+        [Test]
+        public void IDEA0019_FormalDefenseTowersUseOnlyLowBuildingFoundation()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            var definitions = new[]
+            {
+                BuildingCatalog.MachineGunTurret,
+                BuildingCatalog.LaserTower,
+                BuildingCatalog.SporeTower,
+            };
+            var instances = new GrayboxBuildingInstance3D[definitions.Length];
+            for (var index = 0; index < definitions.Length; index++)
+            {
+                instances[index] = Begin(
+                    fixture,
+                    definitions[index],
+                    BuildingSite.Ground,
+                    13 + index * 3,
+                    9,
+                    CityMode.Fortress);
+            }
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+
+            for (var index = 0; index < definitions.Length; index++)
+            {
+                FormalBuildingVisualMetrics3D metrics =
+                    BuildingMetrics(definitions[index]);
+                Bounds bounds = InstanceBounds(fixture, instances[index]);
+                Assert.That(metrics.DefenseOwnsSuperstructure, Is.True);
+                Assert.That(
+                    bounds.size.x,
+                    Is.EqualTo(metrics.FootprintFillRatio).Within(.02f));
+                Assert.That(
+                    bounds.size.z,
+                    Is.EqualTo(metrics.FootprintFillRatio).Within(.02f));
+                Assert.That(
+                    bounds.size.y,
+                    Is.EqualTo(metrics.VisualHeightInCells).Within(.02f));
+                Assert.That(bounds.size.y, Is.LessThanOrEqualTo(.16f));
+            }
+        }
+
+        [Test]
+        public void IDEA0019_RotatedLargeBuildingKeepsHeightCenterAndFootprint()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(),
+                CityMode.Fortress);
+            BuildingOrientation[] orientations =
+            {
+                BuildingOrientation.North,
+                BuildingOrientation.East,
+                BuildingOrientation.South,
+                BuildingOrientation.West,
+            };
+            Vector2Int[] anchors =
+            {
+                new Vector2Int(10, 8),
+                new Vector2Int(14, 8),
+                new Vector2Int(17, 8),
+                new Vector2Int(21, 8),
+            };
+            var instances = new GrayboxBuildingInstance3D[orientations.Length];
+            for (var index = 0; index < orientations.Length; index++)
+            {
+                instances[index] = Begin(
+                    fixture,
+                    BuildingCatalog.BehemothPen,
+                    BuildingSite.Ground,
+                    anchors[index].x,
+                    anchors[index].y,
+                    CityMode.Fortress,
+                    orientations[index]);
+            }
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            FormalBuildingVisualMetrics3D metrics = BuildingMetrics(
+                BuildingCatalog.BehemothPen);
+
+            for (var index = 0; index < orientations.Length; index++)
+            {
+                int width = BuildingOrientationRules.Width(
+                    BuildingCatalog.BehemothPen,
+                    orientations[index]);
+                int height = BuildingOrientationRules.Height(
+                    BuildingCatalog.BehemothPen,
+                    orientations[index]);
+                Bounds bounds = InstanceBounds(fixture, instances[index]);
+                float expectedCenterX = anchors[index].x - 16f +
+                    (width - 1) * .5f;
+                float expectedCenterZ = anchors[index].y - 12f +
+                    (height - 1) * .5f;
+                Assert.That(
+                    bounds.center.x,
+                    Is.EqualTo(expectedCenterX).Within(.02f),
+                    orientations[index].ToString());
+                Assert.That(
+                    bounds.center.z,
+                    Is.EqualTo(expectedCenterZ).Within(.02f),
+                    orientations[index].ToString());
+                Assert.That(
+                    bounds.size.x,
+                    Is.EqualTo(width * metrics.FootprintFillRatio)
+                        .Within(.02f));
+                Assert.That(
+                    bounds.size.z,
+                    Is.EqualTo(height * metrics.FootprintFillRatio)
+                        .Within(.02f));
+                Assert.That(
+                    bounds.size.y,
+                    Is.EqualTo(metrics.VisualHeightInCells).Within(.02f));
+
+                for (var offsetX = 0; offsetX < width; offsetX++)
+                for (var offsetY = 0; offsetY < height; offsetY++)
+                {
+                    Assert.That(
+                        fixture.Session.GroundGrid.IsOccupied(
+                            anchors[index].x + offsetX,
+                            anchors[index].y + offsetY),
+                        Is.True,
+                        orientations[index] + " logical footprint");
+                }
+            }
+        }
+
+        [Test]
         public void WorldView_InstanceKeepsOneRootAndRendererAcrossAllStableStates()
         {
             WorldFixture fixture = CreateWorldFixture(
@@ -2895,6 +3152,31 @@ namespace WasteCity.Tests
                 Is.True,
                 evaluation.PrimaryFailure.ToString());
             return instance;
+        }
+
+        private static Bounds InstanceBounds(
+            WorldFixture fixture,
+            GrayboxBuildingInstance3D instance)
+        {
+            Transform root = fixture.InstanceRoot
+                .Cast<Transform>()
+                .Single(value => value.name == instance.StableInstanceId);
+            Physics.SyncTransforms();
+            return root.GetComponent<MeshRenderer>().bounds;
+        }
+
+        private static FormalBuildingVisualMetrics3D BuildingMetrics(
+            BuildingDefinition definition)
+        {
+            FormalWorldPresentationScaleProfile3D profile = Resources.Load<
+                FormalWorldPresentationScaleProfile3D>(
+                FormalWorldPresentationScaleProfile3D.ResourcesPath);
+            Assert.That(profile, Is.Not.Null);
+            Assert.That(
+                profile.TryResolveBuilding(definition, out var metrics),
+                Is.True,
+                definition.Id.Value);
+            return metrics;
         }
 
         private static IEnumerable<GrayboxVisualSlot> NodeSlots(
