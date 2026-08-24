@@ -852,6 +852,20 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void RuntimeContext_ValidatesTheFormalSurfaceWithoutRejectingRuinsCliffBatches()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FirstArtTerrainEvidenceCapture.cs"));
+
+            StringAssert.Contains("presenter.SurfaceRenderer", source);
+            StringAssert.DoesNotContain(
+                "GetComponentsInChildren<MeshRenderer>(true).Length != 1",
+                source);
+        }
+
+        [Test]
         public void Idea0018ZoomEvidence_UsesFormalProfileAndCrossesEveryLodMonotonically()
         {
             var profile = ScriptableObject.CreateInstance<

@@ -1320,8 +1320,13 @@ namespace WasteCity.Editor
                 throw new InvalidOperationException(
                     "Approved first terrain profile is not presented: " + profileError);
             }
-            if (presenter.GetComponentsInChildren<MeshRenderer>(true).Length != 1)
-                throw new InvalidOperationException("Evidence capture requires one formal terrain Renderer.");
+            if (presenter.SurfaceRenderer == null ||
+                presenter.SurfaceRenderer.transform.parent !=
+                presenter.transform)
+            {
+                throw new InvalidOperationException(
+                    "Evidence capture requires the formal terrain surface Renderer.");
+            }
 
             Camera camera = Camera.main;
             if (camera == null || !camera.orthographic || camera.transform.parent == null)
