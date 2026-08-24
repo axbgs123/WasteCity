@@ -1105,7 +1105,7 @@ namespace WasteCity.Graybox3D.Building
             PlaceFixed(
                 buildingIcon.rectTransform,
                 new Vector2(6f, 4f),
-                new Vector2(88f, 88f));
+                Vector2.one * FormalUiLayoutProfile3D.Standard.IconHero);
 
             RectTransform summary = CreateRect(rect, "Summary");
             PlaceFixed(summary, new Vector2(100f, 0f), new Vector2(126f, 96f));

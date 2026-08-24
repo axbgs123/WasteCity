@@ -13,8 +13,10 @@ namespace WasteCity.Graybox3D.Building
         private const int GroundHeight = GrayboxWorldLayout3D.WorldHeight;
         private const float InnerAnchorX = -1.28f;
         private const float InnerAnchorZ = -.96f;
-        private const float InnerCellSize = .32f;
-        private const float GroundCellSize = 1f;
+        private const float InnerCellSize =
+            FormalWorldPresentationScaleProfile3D.InnerCellSize;
+        private const float GroundCellSize =
+            FormalWorldPresentationScaleProfile3D.GroundCellSize;
 
         private static readonly Color GridColor =
             new Color(.45f, .48f, .42f, .35f);
@@ -49,11 +51,36 @@ namespace WasteCity.Graybox3D.Building
             public GrayboxBuildingInstanceState State;
         }
 
+        private readonly struct BuildingVisualDimensions
+        {
+            public BuildingVisualDimensions(
+                float xSize,
+                float zSize,
+                float visualHeight,
+                float cellSize,
+                FormalBuildingVisualMetrics3D metrics)
+            {
+                XSize = xSize;
+                ZSize = zSize;
+                VisualHeight = visualHeight;
+                CellSize = cellSize;
+                Metrics = metrics;
+            }
+
+            public float XSize { get; }
+            public float ZSize { get; }
+            public float VisualHeight { get; }
+            public float CellSize { get; }
+            public FormalBuildingVisualMetrics3D Metrics { get; }
+        }
+
         [SerializeField] private Transform instanceRoot;
         [SerializeField] private Transform infrastructureRoot;
         [SerializeField] private Material sharedMaterial;
         [SerializeField] private Material previewMaterial;
         [SerializeField] private GrayboxMobileCityController3D city;
+        [SerializeField]
+        private FormalWorldPresentationScaleProfile3D presentationScaleProfile;
         [SerializeField, HideInInspector]
         private List<GameObject> ownedVisualRoots =
             new List<GameObject>();
@@ -80,6 +107,7 @@ namespace WasteCity.Graybox3D.Building
         private int previewWidth;
         private int previewHeight;
         private BuildingSite previewSite;
+        private string previewGeometryStableId;
         private bool hasPreviewGeometry;
         private BuildingDefinition previewDefinition;
         private string previewStableId;
@@ -281,6 +309,7 @@ namespace WasteCity.Graybox3D.Building
                     stableId,
                     infrastructureRoot,
                     CreatePreviewMesh(
+                        definition,
                         meshWidth,
                         meshHeight,
                         hit.Site,
@@ -288,7 +317,11 @@ namespace WasteCity.Graybox3D.Building
                     color,
                     false,
                     previewMaterial);
-                SetPreviewGeometry(meshWidth, meshHeight, hit.Site);
+                SetPreviewGeometry(
+                    meshWidth,
+                    meshHeight,
+                    hit.Site,
+                    stableId);
             }
             else
             {
@@ -296,16 +329,22 @@ namespace WasteCity.Graybox3D.Building
                 if (!MatchesPreviewGeometry(
                         meshWidth,
                         meshHeight,
-                        hit.Site))
+                        hit.Site,
+                        stableId))
                 {
                     ReplaceMesh(
                         preview,
                         CreatePreviewMesh(
+                            definition,
                             meshWidth,
                             meshHeight,
                             hit.Site,
                             stableId));
-                    SetPreviewGeometry(meshWidth, meshHeight, hit.Site);
+                    SetPreviewGeometry(
+                        meshWidth,
+                        meshHeight,
+                        hit.Site,
+                        stableId);
                 }
                 ConfigureSingleSlot(
                     preview,
@@ -698,66 +737,143 @@ namespace WasteCity.Graybox3D.Building
         {
             BuildingDefinition definition =
                 instance.Placement.Definition;
-            int width = definition.Width;
-            int height = definition.Height;
-            float cellSize =
-                instance.Placement.Site == BuildingSite.InnerCity
-                    ? InnerCellSize
-                    : GroundCellSize;
+            BuildingVisualDimensions dimensions = ResolveDimensions(
+                definition,
+                instance.Placement.Site);
             switch (instance.State)
             {
                 case GrayboxBuildingInstanceState.Completed:
                     return CreateCompletedMesh(
-                        width,
-                        height,
-                        cellSize,
+                        dimensions,
                         instance.StableInstanceId);
                 case GrayboxBuildingInstanceState.AbandonedRuin:
                 case GrayboxBuildingInstanceState.DestroyedRuin:
                     return CreateRuinMesh(
-                        width,
-                        height,
-                        cellSize,
+                        dimensions,
                         instance.StableInstanceId);
                 default:
                     return CreateConstructionMesh(
-                        width,
-                        height,
-                        cellSize,
+                        dimensions,
                         instance.StableInstanceId);
             }
         }
 
+        private BuildingVisualDimensions ResolveDimensions(
+            BuildingDefinition definition,
+            BuildingSite site)
+        {
+            FormalWorldPresentationScaleProfile3D profile =
+                ResolvePresentationScaleProfile();
+            float cellSize = site == BuildingSite.InnerCity
+                ? InnerCellSize
+                : GroundCellSize;
+            FormalBuildingVisualMetrics3D metrics = default;
+            bool usesFormalMetrics = profile != null &&
+                profile.TryResolveBuilding(definition, out metrics);
+            if (!usesFormalMetrics)
+            {
+                metrics = new FormalBuildingVisualMetrics3D(
+                    FormalBuildingVisualArchetype3D.Processor,
+                    .92f,
+                    .9f,
+                    2f / 3f,
+                    .65f,
+                    .18f,
+                    false);
+            }
+
+            float xSize = usesFormalMetrics
+                ? definition.Width * cellSize * metrics.FootprintFillRatio
+                : definition.Width * cellSize - cellSize * .08f;
+            float zSize = usesFormalMetrics
+                ? definition.Height * cellSize * metrics.FootprintFillRatio
+                : definition.Height * cellSize - cellSize * .08f;
+            float verticalEmphasis = usesFormalMetrics &&
+                site == BuildingSite.InnerCity
+                    ? profile.InnerVerticalEmphasis
+                    : 1f;
+            float visualHeight = usesFormalMetrics
+                ? metrics.VisualHeightInCells * cellSize * verticalEmphasis
+                : .9f;
+            return new BuildingVisualDimensions(
+                xSize,
+                zSize,
+                visualHeight,
+                cellSize,
+                metrics);
+        }
+
+        private FormalWorldPresentationScaleProfile3D
+            ResolvePresentationScaleProfile()
+        {
+            if (presentationScaleProfile == null)
+            {
+                presentationScaleProfile = Resources.Load<
+                    FormalWorldPresentationScaleProfile3D>(
+                    FormalWorldPresentationScaleProfile3D.ResourcesPath);
+            }
+            return presentationScaleProfile;
+        }
+
         private static Mesh CreateConstructionMesh(
-            int width,
-            int height,
-            float cellSize,
+            in BuildingVisualDimensions dimensions,
             string stableId)
         {
-            float xSize = width * cellSize - cellSize * .08f;
-            float zSize = height * cellSize - cellSize * .08f;
-            float post = Math.Max(.035f, cellSize * .1f);
+            float baseHeight = Mathf.Min(
+                dimensions.VisualHeight,
+                Mathf.Max(
+                    dimensions.CellSize * .04f,
+                    dimensions.VisualHeight * .12f));
+            float frameHeight = Mathf.Max(
+                0f,
+                dimensions.VisualHeight - baseHeight);
+            float post = Mathf.Min(
+                Mathf.Min(dimensions.XSize, dimensions.ZSize) * .15f,
+                Mathf.Max(
+                    dimensions.CellSize * .045f,
+                    dimensions.XSize * .055f));
             var matrices = new List<Matrix4x4>(6)
             {
                 Matrix4x4.TRS(
-                    new Vector3(0f, .04f, 0f),
+                    new Vector3(0f, baseHeight * .5f, 0f),
                     Quaternion.identity,
-                    new Vector3(xSize, .08f, zSize))
+                    new Vector3(
+                        dimensions.XSize,
+                        baseHeight,
+                        dimensions.ZSize))
             };
-            float x = Math.Max(0f, xSize * .5f - post * .5f);
-            float z = Math.Max(0f, zSize * .5f - post * .5f);
-            for (var signX = -1; signX <= 1; signX += 2)
-            for (var signZ = -1; signZ <= 1; signZ += 2)
+            if (frameHeight > 0f)
+            {
+                float x = Math.Max(
+                    0f,
+                    dimensions.XSize * .5f - post * .5f);
+                float z = Math.Max(
+                    0f,
+                    dimensions.ZSize * .5f - post * .5f);
+                for (var signX = -1; signX <= 1; signX += 2)
+                for (var signZ = -1; signZ <= 1; signZ += 2)
+                {
+                    matrices.Add(
+                        Matrix4x4.TRS(
+                            new Vector3(
+                                signX * x,
+                                baseHeight + frameHeight * .5f,
+                                signZ * z),
+                            Quaternion.identity,
+                            new Vector3(post, frameHeight, post)));
+                }
                 matrices.Add(
                     Matrix4x4.TRS(
-                        new Vector3(signX * x, .3f, signZ * z),
+                        new Vector3(
+                            0f,
+                            dimensions.VisualHeight - post * .5f,
+                            z),
                         Quaternion.identity,
-                        new Vector3(post, .6f, post)));
-            matrices.Add(
-                Matrix4x4.TRS(
-                    new Vector3(0f, .48f, zSize * .38f),
-                    Quaternion.identity,
-                    new Vector3(xSize * .42f, post, post)));
+                        new Vector3(
+                            dimensions.XSize,
+                            Mathf.Min(post, frameHeight),
+                            post)));
+            }
             return GrayboxMeshBuilder.CombinePrimitive(
                 PrimitiveType.Cube,
                 matrices,
@@ -765,86 +881,97 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private static Mesh CreateCompletedMesh(
-            int width,
-            int height,
-            float cellSize,
+            in BuildingVisualDimensions dimensions,
             string stableId)
         {
-            float xSize = width * cellSize - cellSize * .08f;
-            float zSize = height * cellSize - cellSize * .08f;
+            FormalBuildingVisualMetrics3D metrics = dimensions.Metrics;
+            float foundationHeight = dimensions.VisualHeight *
+                metrics.FoundationHeightRatio;
+            float crownHeight = dimensions.VisualHeight *
+                metrics.CrownHeightRatio;
+            float bodyHeight = Mathf.Max(
+                0f,
+                dimensions.VisualHeight - foundationHeight - crownHeight);
+            var matrices = new List<Matrix4x4>(3)
+            {
+                Matrix4x4.TRS(
+                    new Vector3(0f, foundationHeight * .5f, 0f),
+                    Quaternion.identity,
+                    new Vector3(
+                        dimensions.XSize,
+                        foundationHeight,
+                        dimensions.ZSize))
+            };
+            if (bodyHeight > 0f)
+            {
+                matrices.Add(
+                    Matrix4x4.TRS(
+                        new Vector3(
+                            0f,
+                            foundationHeight + bodyHeight * .5f,
+                            0f),
+                        Quaternion.identity,
+                        new Vector3(
+                            dimensions.XSize * metrics.UpperBodyWidthRatio,
+                            bodyHeight,
+                            dimensions.ZSize * metrics.UpperBodyWidthRatio)));
+            }
+            if (crownHeight > 0f)
+            {
+                float crownWidth = Mathf.Max(
+                    metrics.UpperBodyWidthRatio * .62f,
+                    .18f);
+                matrices.Add(
+                    Matrix4x4.TRS(
+                        new Vector3(
+                            0f,
+                            dimensions.VisualHeight - crownHeight * .5f,
+                            dimensions.ZSize * .12f),
+                        Quaternion.identity,
+                        new Vector3(
+                            dimensions.XSize * crownWidth,
+                            crownHeight,
+                            dimensions.ZSize * crownWidth)));
+            }
             return GrayboxMeshBuilder.CombinePrimitive(
                 PrimitiveType.Cube,
-                new[]
-                {
-                    Matrix4x4.TRS(
-                        new Vector3(0f, .3f, 0f),
-                        Quaternion.identity,
-                        new Vector3(xSize, .6f, zSize)),
-                    Matrix4x4.TRS(
-                        new Vector3(0f, .72f, 0f),
-                        Quaternion.identity,
-                        new Vector3(xSize * .65f, .24f, zSize * .65f)),
-                    Matrix4x4.TRS(
-                        new Vector3(0f, .82f, zSize * .34f),
-                        Quaternion.identity,
-                        new Vector3(xSize * .28f, .16f, zSize * .12f))
-                },
+                matrices,
                 "building.complete.mesh." + stableId);
         }
 
         private static Mesh CreateRuinMesh(
-            int width,
-            int height,
-            float cellSize,
+            in BuildingVisualDimensions dimensions,
             string stableId)
         {
-            float xSize = width * cellSize - cellSize * .12f;
-            float zSize = height * cellSize - cellSize * .12f;
+            float baseHeight = dimensions.VisualHeight * .32f;
+            float debrisHeight = dimensions.VisualHeight * .28f;
             return GrayboxMeshBuilder.CombinePrimitive(
                 PrimitiveType.Cube,
                 new[]
                 {
                     Matrix4x4.TRS(
-                        new Vector3(0f, .13f, 0f),
-                        Quaternion.Euler(0f, 9f, 4f),
-                        new Vector3(xSize, .26f, zSize)),
+                        new Vector3(0f, baseHeight * .5f, 0f),
+                        Quaternion.identity,
+                        new Vector3(
+                            dimensions.XSize,
+                            baseHeight,
+                            dimensions.ZSize)),
                     Matrix4x4.TRS(
                         new Vector3(
-                            xSize * .18f,
-                            .32f,
-                            -zSize * .15f),
-                        Quaternion.Euler(12f, -15f, 8f),
+                            dimensions.XSize * .12f,
+                            baseHeight + debrisHeight * .5f,
+                            -dimensions.ZSize * .1f),
+                        Quaternion.Euler(0f, -15f, 0f),
                         new Vector3(
-                            xSize * .45f,
-                            .28f,
-                            zSize * .35f))
+                            dimensions.XSize * .32f,
+                            debrisHeight,
+                            dimensions.ZSize * .28f))
                 },
                 "building.ruin.mesh." + stableId);
         }
 
-        private static Mesh CreateBlockMesh(
-            int width,
-            int height,
-            float cellSize,
-            float visualHeight,
-            string stableId)
-        {
-            return GrayboxMeshBuilder.CombinePrimitive(
-                PrimitiveType.Cube,
-                new[]
-                {
-                    Matrix4x4.TRS(
-                        Vector3.zero,
-                        Quaternion.identity,
-                        new Vector3(
-                            width * cellSize - cellSize * .08f,
-                            visualHeight,
-                            height * cellSize - cellSize * .08f))
-                },
-                stableId + ".mesh");
-        }
-
-        private static Mesh CreatePreviewMesh(
+        private Mesh CreatePreviewMesh(
+            BuildingDefinition definition,
             int width,
             int height,
             BuildingSite site,
@@ -855,6 +982,12 @@ namespace WasteCity.Graybox3D.Building
                 : GroundCellSize;
             float xSize = width * cellSize - cellSize * .08f;
             float zSize = height * cellSize - cellSize * .08f;
+            BuildingVisualDimensions dimensions = ResolveDimensions(
+                definition,
+                site);
+            float baseHeight = Mathf.Min(
+                dimensions.VisualHeight,
+                Mathf.Max(cellSize * .04f, dimensions.VisualHeight * .1f));
             float shaftWidth = Mathf.Min(xSize * .18f, cellSize * .28f);
             float shaftLength = Mathf.Min(zSize * .46f, cellSize * .72f);
             float headWidth = Mathf.Min(xSize * .48f, cellSize * .62f);
@@ -866,17 +999,39 @@ namespace WasteCity.Graybox3D.Building
                 new[]
                 {
                     Matrix4x4.TRS(
-                        Vector3.zero,
+                        new Vector3(0f, baseHeight * .5f, 0f),
                         Quaternion.identity,
-                        new Vector3(xSize, .12f, zSize)),
+                        new Vector3(xSize, baseHeight, zSize)),
                     Matrix4x4.TRS(
-                        new Vector3(0f, .09f, shaftZ),
+                        new Vector3(
+                            0f,
+                            dimensions.VisualHeight * .5f,
+                            0f),
                         Quaternion.identity,
-                        new Vector3(shaftWidth, .06f, shaftLength)),
+                        new Vector3(
+                            dimensions.XSize,
+                            dimensions.VisualHeight,
+                            dimensions.ZSize)),
                     Matrix4x4.TRS(
-                        new Vector3(0f, .09f, headZ),
+                        new Vector3(
+                            0f,
+                            dimensions.VisualHeight + cellSize * .025f,
+                            shaftZ),
                         Quaternion.identity,
-                        new Vector3(headWidth, .06f, headDepth))
+                        new Vector3(
+                            shaftWidth,
+                            cellSize * .05f,
+                            shaftLength)),
+                    Matrix4x4.TRS(
+                        new Vector3(
+                            0f,
+                            dimensions.VisualHeight + cellSize * .025f,
+                            headZ),
+                        Quaternion.identity,
+                        new Vector3(
+                            headWidth,
+                            cellSize * .05f,
+                            headDepth))
                 },
                 stableId + ".mesh");
         }
@@ -884,22 +1039,29 @@ namespace WasteCity.Graybox3D.Building
         private bool MatchesPreviewGeometry(
             int width,
             int height,
-            BuildingSite site)
+            BuildingSite site,
+            string stableId)
         {
             return hasPreviewGeometry &&
                 previewWidth == width &&
                 previewHeight == height &&
-                previewSite == site;
+                previewSite == site &&
+                string.Equals(
+                    previewGeometryStableId,
+                    stableId,
+                    StringComparison.Ordinal);
         }
 
         private void SetPreviewGeometry(
             int width,
             int height,
-            BuildingSite site)
+            BuildingSite site,
+            string stableId)
         {
             previewWidth = width;
             previewHeight = height;
             previewSite = site;
+            previewGeometryStableId = stableId;
             hasPreviewGeometry = true;
         }
 
@@ -1279,6 +1441,7 @@ namespace WasteCity.Graybox3D.Building
             infrastructure.Clear();
             preview = null;
             hasPreviewGeometry = false;
+            previewGeometryStableId = null;
             previewDefinition = null;
             previewStableId = null;
             groundGrid = null;

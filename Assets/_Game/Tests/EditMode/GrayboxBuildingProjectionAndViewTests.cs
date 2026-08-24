@@ -2466,12 +2466,13 @@ namespace WasteCity.Tests
             WorldFixture fixture = CreateWorldFixture(
                 OpenCells(),
                 CityMode.Fortress);
+            PrepareFormalVisualFixture(fixture);
             var definitions = new[]
             {
                 BuildingCatalog.Housing,
                 BuildingCatalog.Warehouse,
                 BuildingCatalog.Smelter,
-                BuildingCatalog.MindSpire,
+                BuildingCatalog.HeavyMachineGunTurret,
                 BuildingCatalog.BehemothPen,
             };
             var anchors = new[]
@@ -2534,6 +2535,7 @@ namespace WasteCity.Tests
             WorldFixture fixture = CreateWorldFixture(
                 OpenCells(),
                 CityMode.Fortress);
+            PrepareFormalVisualFixture(fixture);
             var definitions = new[]
             {
                 BuildingCatalog.MachineGunTurret,
@@ -2579,6 +2581,7 @@ namespace WasteCity.Tests
             WorldFixture fixture = CreateWorldFixture(
                 OpenCells(),
                 CityMode.Fortress);
+            PrepareFormalVisualFixture(fixture);
             BuildingOrientation[] orientations =
             {
                 BuildingOrientation.North,
@@ -2619,9 +2622,11 @@ namespace WasteCity.Tests
                     BuildingCatalog.BehemothPen,
                     orientations[index]);
                 Bounds bounds = InstanceBounds(fixture, instances[index]);
-                float expectedCenterX = anchors[index].x - 16f +
+                float expectedCenterX = anchors[index].x -
+                    GrayboxWorldLayout3D.WorldWidth * .5f +
                     (width - 1) * .5f;
-                float expectedCenterZ = anchors[index].y - 12f +
+                float expectedCenterZ = anchors[index].y -
+                    GrayboxWorldLayout3D.WorldHeight * .5f +
                     (height - 1) * .5f;
                 Assert.That(
                     bounds.center.x,
@@ -3177,6 +3182,57 @@ namespace WasteCity.Tests
                 Is.True,
                 definition.Id.Value);
             return metrics;
+        }
+
+        private static void PrepareFormalVisualFixture(WorldFixture fixture)
+        {
+            fixture.Session.UnlockAllResearchForDevelopment();
+            fixture.Session.SetPopulationForDevelopment(2000);
+            fixture.Session.Inventory.Set(ResourceIds.Stone, 150);
+            fixture.Session.Inventory.Set(ResourceIds.Alloy, 150);
+            fixture.Session.Inventory.Set(ResourceIds.Biomass, 150);
+            fixture.Session.Inventory.Set(ResourceIds.BoneSteel, 150);
+            fixture.Session.Inventory.Set(
+                ResourceIds.BiomassConcentrate,
+                150);
+            fixture.Session.Inventory.Set(ResourceIds.SpiritIron, 150);
+
+            Begin(
+                fixture,
+                BuildingCatalog.Smelter,
+                BuildingSite.Ground,
+                10,
+                16,
+                CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Begin(
+                fixture,
+                BuildingCatalog.Assembler,
+                BuildingSite.Ground,
+                13,
+                16,
+                CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Begin(
+                fixture,
+                BuildingCatalog.ColonyPool,
+                BuildingSite.Ground,
+                16,
+                16,
+                CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Begin(
+                fixture,
+                BuildingCatalog.BreedingChamber,
+                BuildingSite.Ground,
+                19,
+                16,
+                CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
         }
 
         private static IEnumerable<GrayboxVisualSlot> NodeSlots(

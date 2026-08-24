@@ -2061,8 +2061,8 @@ namespace WasteCity.Editor
                 GrayboxSceneBootstrap.WorldWidth,
                 GrayboxSceneBootstrap.WorldHeight);
             coordinates.TryCellToWorld(
-                GrayboxWorldLayout3D.ToExpandedX(7),
-                GrayboxWorldLayout3D.ToExpandedY(8),
+                GrayboxWorldLayout3D.StartCellX,
+                GrayboxWorldLayout3D.StartCellY,
                 .5f,
                 out Vector3 cityPosition);
             cityTransform.position = cityPosition;
@@ -2117,12 +2117,8 @@ namespace WasteCity.Editor
                 return;
             }
 
-            const int approvedLegacyX = 7;
-            const int approvedLegacyY = 8;
-            int approvedX =
-                GrayboxWorldLayout3D.ToExpandedX(approvedLegacyX);
-            int approvedY =
-                GrayboxWorldLayout3D.ToExpandedY(approvedLegacyY);
+            int approvedX = GrayboxWorldLayout3D.StartCellX;
+            int approvedY = GrayboxWorldLayout3D.StartCellY;
             if (CityDeploymentRules.Validate(
                     world,
                     approvedX,

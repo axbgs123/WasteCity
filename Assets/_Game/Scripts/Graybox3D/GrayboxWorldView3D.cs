@@ -50,6 +50,9 @@ namespace WasteCity.Graybox3D
         [SerializeField] private ResourceIconCatalog3D resourceIconCatalog;
         [SerializeField]
         private FormalMapNavigationProfile3D mapNavigationProfile;
+        [SerializeField]
+        private FormalWorldPresentationScaleProfile3D
+            worldPresentationScaleProfile;
 
         private readonly Dictionary<string, Group> groups =
             new Dictionary<string, Group>();
@@ -75,6 +78,14 @@ namespace WasteCity.Graybox3D
         private bool hasResourceNodeFacingRotation;
         private ResourceNodeMarkerLod3D resourceNodeMarkerLod;
         private bool hasResourceNodeMarkerLod;
+        private FormalWorldMarkerMetrics3D resourceNodeMarkerMetrics;
+        private float resourceNodeFrameWorldHeight;
+        private float resourceNodeIconWorldHeight;
+        private float resourceNodeTextWorldHeight;
+        private float lastMarkerOrthographicSize;
+        private int lastMarkerPixelWidth;
+        private int lastMarkerPixelHeight;
+        private bool hasResourceNodeMarkerPresentation;
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
@@ -110,6 +121,10 @@ namespace WasteCity.Graybox3D
                 mapNavigationProfile = Resources.Load<
                     FormalMapNavigationProfile3D>(
                     FormalMapNavigationProfile3D.ResourcesPath);
+            if (worldPresentationScaleProfile == null)
+                worldPresentationScaleProfile = Resources.Load<
+                    FormalWorldPresentationScaleProfile3D>(
+                    FormalWorldPresentationScaleProfile3D.ResourcesPath);
         }
 
         public bool IsTerrainPresentationActive(
@@ -164,6 +179,19 @@ namespace WasteCity.Graybox3D
                 throw new ArgumentException(error, nameof(profile));
             mapNavigationProfile = profile;
             hasResourceNodeMarkerLod = false;
+            hasResourceNodeMarkerPresentation = false;
+        }
+
+        public void ConfigureWorldPresentation(
+            FormalWorldPresentationScaleProfile3D profile)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+            if (!profile.TryValidate(out string error))
+                throw new ArgumentException(error, nameof(profile));
+            worldPresentationScaleProfile = profile;
+            hasResourceNodeMarkerLod = false;
+            hasResourceNodeMarkerPresentation = false;
         }
 
         public void Generate(WorldMapModel model)
@@ -208,6 +236,7 @@ namespace WasteCity.Graybox3D
                 ResourceNodeRefreshIntervalSeconds;
             hasResourceNodeFacingRotation = false;
             hasResourceNodeMarkerLod = false;
+            hasResourceNodeMarkerPresentation = false;
         }
 
         public void AttachTerrainPresentation(
@@ -336,38 +365,76 @@ namespace WasteCity.Graybox3D
             {
                 FaceResourceNodeMarkers(camera.transform);
                 if (camera.orthographic)
-                    RefreshResourceNodeMarkerLod(
-                        camera.orthographicSize);
+                    RefreshResourceNodeMarkerPresentation(
+                        camera.orthographicSize,
+                        camera.pixelWidth,
+                        camera.pixelHeight);
             }
         }
 
         public bool RefreshResourceNodeMarkerLod(float orthographicSize)
         {
-            ResourceNodeMarkerLod3D lod = mapNavigationProfile != null
-                ? mapNavigationProfile.ResolveMarkerLod(orthographicSize)
-                : orthographicSize <= FormalMapNavigationProfile3D
-                    .DefaultNearMarkerMaximumSize
-                    ? ResourceNodeMarkerLod3D.Near
-                    : orthographicSize <= FormalMapNavigationProfile3D
-                        .DefaultMidMarkerMaximumSize
-                        ? ResourceNodeMarkerLod3D.Mid
-                        : ResourceNodeMarkerLod3D.Far;
-            bool wasInitialized = hasResourceNodeMarkerLod;
-            if (wasInitialized && resourceNodeMarkerLod == lod)
+            return RefreshResourceNodeMarkerPresentation(
+                orthographicSize,
+                EffectivePixelSize(Screen.width, 1920),
+                EffectivePixelSize(Screen.height, 1080));
+        }
+
+        public bool RefreshResourceNodeMarkerPresentation(
+            float orthographicSize,
+            int pixelWidth,
+            int pixelHeight)
+        {
+            EnsureWorldPresentationProfile();
+            if (worldPresentationScaleProfile == null)
                 return false;
-            resourceNodeMarkerLod = lod;
+            if (!IsFinitePositive(orthographicSize))
+            {
+                orthographicSize = mapNavigationProfile == null
+                    ? FormalMapNavigationProfile3D.DefaultOrthographicSize
+                    : mapNavigationProfile.DefaultSize;
+            }
+            pixelWidth = EffectivePixelSize(pixelWidth, 1920);
+            pixelHeight = EffectivePixelSize(pixelHeight, 1080);
+            if (hasResourceNodeMarkerPresentation &&
+                Mathf.Approximately(
+                    lastMarkerOrthographicSize,
+                    orthographicSize) &&
+                lastMarkerPixelWidth == pixelWidth &&
+                lastMarkerPixelHeight == pixelHeight)
+            {
+                return false;
+            }
+
+            resourceNodeMarkerMetrics =
+                worldPresentationScaleProfile.ResolveMarker(
+                    FormalWorldPresentationScalePolicy3D
+                        .WorldUnitScreenHeight(orthographicSize));
+            ResolveMarkerWorldHeights(
+                resourceNodeMarkerMetrics,
+                orthographicSize,
+                pixelWidth,
+                pixelHeight,
+                out resourceNodeFrameWorldHeight,
+                out resourceNodeIconWorldHeight,
+                out resourceNodeTextWorldHeight);
+            resourceNodeMarkerLod = resourceNodeMarkerMetrics.Lod;
             hasResourceNodeMarkerLod = true;
-            bool changed = false;
+            lastMarkerOrthographicSize = orthographicSize;
+            lastMarkerPixelWidth = pixelWidth;
+            lastMarkerPixelHeight = pixelHeight;
+            hasResourceNodeMarkerPresentation = true;
+
             for (var index = 0; index < resourceNodeMarkers.Count; index++)
             {
                 GrayboxResourceNodeMarker3D marker =
                     resourceNodeMarkers[index];
                 if (marker != null)
-                    changed |= marker.ApplyDisplayLod(
-                        lod,
+                    ApplyResourceNodeMarkerPresentation(
+                        marker,
                         marker.GuidanceOverride);
             }
-            return changed || !wasInitialized;
+            return true;
         }
 
         public bool SetResourceMarkerGuidanceOverride(
@@ -382,10 +449,15 @@ namespace WasteCity.Graybox3D
                 marker == null ||
                 marker.GuidanceOverride == enabled)
                 return false;
-            ResourceNodeMarkerLod3D lod = hasResourceNodeMarkerLod
-                ? resourceNodeMarkerLod
-                : ResourceNodeMarkerLod3D.Near;
-            marker.ApplyDisplayLod(lod, enabled);
+            if (hasResourceNodeMarkerPresentation)
+                ApplyResourceNodeMarkerPresentation(marker, enabled);
+            else
+            {
+                ResourceNodeMarkerLod3D lod = hasResourceNodeMarkerLod
+                    ? resourceNodeMarkerLod
+                    : ResourceNodeMarkerLod3D.Near;
+                marker.ApplyDisplayLod(lod, enabled);
+            }
             if (enabled)
                 guidedResourceNodeMarkers.Add(marker);
             else
@@ -397,9 +469,6 @@ namespace WasteCity.Graybox3D
         {
             if (guidedResourceNodeMarkers.Count == 0)
                 return false;
-            ResourceNodeMarkerLod3D lod = hasResourceNodeMarkerLod
-                ? resourceNodeMarkerLod
-                : ResourceNodeMarkerLod3D.Near;
             for (var index = 0;
                  index < guidedResourceNodeMarkers.Count;
                  index++)
@@ -407,7 +476,18 @@ namespace WasteCity.Graybox3D
                 GrayboxResourceNodeMarker3D marker =
                     guidedResourceNodeMarkers[index];
                 if (marker != null)
-                    marker.ApplyDisplayLod(lod, false);
+                {
+                    if (hasResourceNodeMarkerPresentation)
+                        ApplyResourceNodeMarkerPresentation(marker, false);
+                    else
+                    {
+                        ResourceNodeMarkerLod3D lod =
+                            hasResourceNodeMarkerLod
+                                ? resourceNodeMarkerLod
+                                : ResourceNodeMarkerLod3D.Near;
+                        marker.ApplyDisplayLod(lod, false);
+                    }
+                }
             }
             guidedResourceNodeMarkers.Clear();
             return true;
@@ -455,6 +535,7 @@ namespace WasteCity.Graybox3D
             nextResourceNodeRefreshAt = 0f;
             hasResourceNodeFacingRotation = false;
             hasResourceNodeMarkerLod = false;
+            hasResourceNodeMarkerPresentation = false;
             groups.Clear();
             Model = null;
             Coordinates = null;
@@ -737,6 +818,114 @@ namespace WasteCity.Graybox3D
             return resourceIconCatalog == null
                 ? ResourceIconCatalog3D.Resolve(resourceId)
                 : resourceIconCatalog.ResolveIcon(resourceId);
+        }
+
+        private void EnsureWorldPresentationProfile()
+        {
+            if (worldPresentationScaleProfile == null)
+            {
+                worldPresentationScaleProfile = Resources.Load<
+                    FormalWorldPresentationScaleProfile3D>(
+                    FormalWorldPresentationScaleProfile3D.ResourcesPath);
+            }
+        }
+
+        private void ApplyResourceNodeMarkerPresentation(
+            GrayboxResourceNodeMarker3D marker,
+            bool guidanceOverride)
+        {
+            FormalWorldMarkerMetrics3D metrics = resourceNodeMarkerMetrics;
+            float frameHeight = resourceNodeFrameWorldHeight;
+            float iconHeight = resourceNodeIconWorldHeight;
+            float textHeight = resourceNodeTextWorldHeight;
+            if (guidanceOverride &&
+                worldPresentationScaleProfile != null)
+            {
+                metrics = worldPresentationScaleProfile.ResolveMarker(
+                    worldPresentationScaleProfile.NearUnitScreenHeight);
+                ResolveMarkerWorldHeights(
+                    metrics,
+                    lastMarkerOrthographicSize,
+                    lastMarkerPixelWidth,
+                    lastMarkerPixelHeight,
+                    out frameHeight,
+                    out iconHeight,
+                    out textHeight);
+            }
+            marker.ApplyPresentation(
+                metrics,
+                frameHeight,
+                iconHeight,
+                textHeight,
+                true,
+                guidanceOverride);
+        }
+
+        private static void ResolveMarkerWorldHeights(
+            FormalWorldMarkerMetrics3D metrics,
+            float orthographicSize,
+            int pixelWidth,
+            int pixelHeight,
+            out float frameHeight,
+            out float iconHeight,
+            out float textHeight)
+        {
+            frameHeight = metrics.ShowFrame
+                ? ResolveMarkerWorldHeight(
+                    metrics.FrameReferencePixels,
+                    metrics,
+                    orthographicSize,
+                    pixelWidth,
+                    pixelHeight)
+                : 0f;
+            iconHeight = ResolveMarkerWorldHeight(
+                metrics.IconReferencePixels,
+                metrics,
+                orthographicSize,
+                pixelWidth,
+                pixelHeight);
+            textHeight = metrics.ShowName || metrics.ShowAmount
+                ? ResolveMarkerWorldHeight(
+                    metrics.TextReferencePixels,
+                    metrics,
+                    orthographicSize,
+                    pixelWidth,
+                    pixelHeight)
+                : 0f;
+        }
+
+        private static float ResolveMarkerWorldHeight(
+            float referencePixels,
+            FormalWorldMarkerMetrics3D metrics,
+            float orthographicSize,
+            int pixelWidth,
+            int pixelHeight)
+        {
+            float physicalPixels =
+                FormalWorldPresentationScalePolicy3D.ResolvePhysicalPixels(
+                    referencePixels,
+                    Mathf.Min(
+                        referencePixels,
+                        metrics.MinimumPhysicalPixels),
+                    metrics.MaximumPhysicalPixels,
+                    pixelWidth,
+                    pixelHeight);
+            return FormalWorldPresentationScalePolicy3D.WorldUnitsForPixels(
+                physicalPixels,
+                orthographicSize,
+                pixelHeight);
+        }
+
+        private static int EffectivePixelSize(int value, int fallback)
+        {
+            return value > 0 ? value : fallback;
+        }
+
+        private static bool IsFinitePositive(float value)
+        {
+            return value > 0f &&
+                !float.IsNaN(value) &&
+                !float.IsInfinity(value);
         }
 
         private static long CellKey(int worldX, int worldY)
