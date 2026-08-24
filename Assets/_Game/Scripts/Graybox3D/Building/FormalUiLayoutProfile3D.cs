@@ -40,6 +40,13 @@ namespace WasteCity.Graybox3D.Building
         public float FontSubtitle => 20f;
         public float FontTitle => 28f;
 
+        public float IconInline => 16f;
+        public float IconCompact => 20f;
+        public float IconRow => 24f;
+        public float IconSlot => 32f;
+        public float IconNode => 48f;
+        public float IconHero => 64f;
+
         public float StandardButtonMinimumHeight => 36f;
         public float PrimaryButtonMinimumHeight => 44f;
 

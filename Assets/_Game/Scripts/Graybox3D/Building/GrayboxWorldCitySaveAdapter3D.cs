@@ -10,9 +10,10 @@ namespace WasteCity.Graybox3D.Building
     public sealed class GrayboxWorldCitySaveAdapter3D
     {
         public const string WorldDefinitionId = "core.world.formal-3d";
-        public const int WorldGenerationVersion = 1;
+        public const int WorldGenerationVersion =
+            FormalWorldGenerationCatalog3D.WorldGenerationVersion;
         public const string WorldConfigurationSignature =
-            "core.world.formal-3d.v1.64x48";
+            FormalWorldGenerationCatalog3D.WorldConfigurationSignature;
 
         private readonly GrayboxSceneBootstrap bootstrap;
         private readonly GrayboxMobileCityController3D city;

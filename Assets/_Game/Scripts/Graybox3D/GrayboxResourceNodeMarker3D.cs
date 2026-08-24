@@ -108,6 +108,36 @@ namespace WasteCity.Graybox3D
             return true;
         }
 
+        public void ApplyPresentation(
+            FormalWorldMarkerMetrics3D metrics,
+            float frameWorldHeight,
+            float iconWorldHeight,
+            float textWorldHeight,
+            bool layoutVisible,
+            bool guidanceOverride)
+        {
+            EnsurePresentation();
+            GuidanceOverride = guidanceOverride;
+            DisplayLod = guidanceOverride
+                ? ResourceNodeMarkerLod3D.Near
+                : metrics.Lod;
+
+            frameRenderer.enabled = layoutVisible &&
+                metrics.ShowFrame && frame != null;
+            iconRenderer.enabled = layoutVisible && icon != null;
+            MeshRenderer textRenderer =
+                amountLabel.GetComponent<MeshRenderer>();
+            textRenderer.enabled = layoutVisible &&
+                (metrics.ShowName || metrics.ShowAmount);
+
+            frameRenderer.transform.localScale = Vector3.one *
+                FiniteNonNegative(frameWorldHeight);
+            iconRenderer.transform.localScale = Vector3.one *
+                FiniteNonNegative(iconWorldHeight);
+            amountLabel.characterSize = FiniteNonNegative(textWorldHeight);
+            UpdateDisplayText();
+        }
+
         public void SetIcon(Sprite icon)
         {
             EnsurePresentation();
@@ -263,6 +293,13 @@ namespace WasteCity.Graybox3D
                 material.SetTexture("_BaseMap", texture);
             IconMaterials.Add(texture, material);
             return material;
+        }
+
+        private static float FiniteNonNegative(float value)
+        {
+            return float.IsNaN(value) || float.IsInfinity(value)
+                ? 0f
+                : Mathf.Max(0f, value);
         }
     }
 }
