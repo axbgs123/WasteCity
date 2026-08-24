@@ -163,10 +163,10 @@ namespace WasteCity.Tests
         {
             yield return StartNewGame();
             GrayboxMobileCityController3D city = RequireCity();
-            Time.timeScale = FastRuleTimeScale;
+            SetDevelopmentRuleTime(FastRuleTimeScale);
             yield return TapKey(Key.F);
             yield return WaitForCityMode(city, CityMode.Fortress, 4f);
-            Time.timeScale = 1f;
+            SetDevelopmentRuleTime(1f);
 
             yield return TapKey(Key.F);
             Assert.That(city.Mode, Is.EqualTo(CityMode.Packing));
@@ -203,8 +203,11 @@ namespace WasteCity.Tests
             yield return EnsureSystemMenuOpen();
             GrayboxDefensePersistenceState3D before =
                 defense.Runtime.CaptureForPersistence();
+            GrayboxFormalDefenseCampaignPersistenceState3D beforeCampaign =
+                defense.Runtime.CaptureFormalCampaignForPersistence();
             FormalThreeDSaveData beforeAuthority = CaptureFullAuthority();
-            Assert.That(before.Tutorial.Enemies, Has.Count.EqualTo(8));
+            Assert.That(beforeCampaign.Campaign.Enemies,
+                Has.Count.EqualTo(8));
 
             yield return SaveThroughRealMenu();
             yield return ReloadAndContinue();
@@ -212,6 +215,8 @@ namespace WasteCity.Tests
             defense = RequireDefense();
             GrayboxDefensePersistenceState3D after =
                 defense.Runtime.CaptureForPersistence();
+            GrayboxFormalDefenseCampaignPersistenceState3D afterCampaign =
+                defense.Runtime.CaptureFormalCampaignForPersistence();
 
             AssertDefenseAuthorityEquivalent(before, after);
             AssertFullAuthorityEquivalent(beforeAuthority,
@@ -221,8 +226,10 @@ namespace WasteCity.Tests
             Assert.That(defense.HasSelection, Is.False,
                 "Transient world selection must be rebuilt, not persisted.");
             worldView = defense.WorldView;
-            foreach (DefenseEnemyPersistenceState enemy in
-                     after.Tutorial.Enemies)
+            Assert.That(afterCampaign.Campaign.Enemies,
+                Has.Count.EqualTo(beforeCampaign.Campaign.Enemies.Count));
+            foreach (SingleCityDefenseCampaignEnemyPersistenceState enemy in
+                     afterCampaign.Campaign.Enemies)
             {
                 Assert.That(worldView.TryGetEnemyObject(
                     enemy.StableId,
@@ -274,7 +281,8 @@ namespace WasteCity.Tests
             Assert.That(tower.Status,
                 Is.EqualTo(GrayboxDefenseTowerStatus3D.Firing));
             Assert.That(
-                after.Tutorial.Enemies.Select(value => value.StableId),
+                afterCampaign.Campaign.Enemies.Select(
+                    value => value.StableId),
                 Does.Contain(tower.TargetId),
                 "The target is derived again from restored combat truth.");
             Assert.That(
@@ -291,7 +299,7 @@ namespace WasteCity.Tests
                 value => wall = value);
             GrayboxEvacuationController3D evacuation = RequireEvacuation();
 
-            Time.timeScale = 1f;
+            SetDevelopmentRuleTime(1f);
             yield return TapKey(Key.F);
             Assert.That(evacuation.IsManifestOpen, Is.True);
             yield return SubmitButton(
@@ -359,7 +367,7 @@ namespace WasteCity.Tests
             GrayboxEvacuationController3D evacuation = RequireEvacuation();
             GrayboxDeveloperModifier3D fixture = RequireModifier();
 
-            Time.timeScale = 1f;
+            SetDevelopmentRuleTime(1f);
             yield return TapKey(Key.F);
             Assert.That(evacuation.IsManifestOpen, Is.True);
             yield return SubmitButton(
@@ -474,7 +482,7 @@ namespace WasteCity.Tests
                 yield return ClickButton("Start.NewGameConfirm");
             Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
             Assert.That(entry.IsStartPageOpen, Is.False);
-            Time.timeScale = 1f;
+            SetDevelopmentRuleTime(1f);
         }
 
         private IEnumerator PrepareSingleWallThroughRealInput(
@@ -543,7 +551,7 @@ namespace WasteCity.Tests
             Assert.That(fixture.SetConstructionSpeed(
                 DevelopmentConstructionSpeed.Fast100), Is.True);
             yield return EnterFortressThroughRealInput();
-            Time.timeScale = FastRuleTimeScale;
+            SetDevelopmentRuleTime(FastRuleTimeScale);
 
             GrayboxMobileCityController3D city = RequireCity();
             GrayboxWorldView3D world = RequireWorld();
@@ -640,14 +648,14 @@ namespace WasteCity.Tests
             }
             Assert.That(defense.Snapshot.SpawnedEnemyCount, Is.EqualTo(8));
             Assert.That(defense.Snapshot.AliveEnemyCount, Is.EqualTo(8));
-            Time.timeScale = 1f;
+            SetDevelopmentRuleTime(1f);
         }
 
         private IEnumerator EnterFortressThroughRealInput()
         {
             GrayboxMobileCityController3D city = RequireCity();
             Assert.That(city.Mode, Is.EqualTo(CityMode.Mobile));
-            Time.timeScale = FastRuleTimeScale;
+            SetDevelopmentRuleTime(FastRuleTimeScale);
             yield return TapKey(Key.F);
             Assert.That(city.Mode,
                 Is.EqualTo(CityMode.Deploying).Or.EqualTo(CityMode.Fortress));
@@ -1382,6 +1390,18 @@ namespace WasteCity.Tests
                 GrayboxFormalSaveRuntimeHost3D>();
             Assert.That(value, Is.Not.Null);
             return value;
+        }
+
+        private static void SetDevelopmentRuleTime(float targetMultiplier)
+        {
+            GrayboxFormalSaveRuntimeHost3D host = RequireSaveHost();
+            float formalSpeed = targetMultiplier > 1f ? 2f : 1f;
+            host.Speed.Set(formalSpeed);
+            host.RuleClock.SetDevelopmentAcceleration(
+                targetMultiplier > 1f
+                    ? targetMultiplier / formalSpeed
+                    : 1f);
+            Time.timeScale = host.RuleClock.EffectiveSpeed;
         }
 
         private static GrayboxSystemMenuController3D RequireSystemMenu()

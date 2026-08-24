@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
+using WasteCity.Core;
 using WasteCity.Defense;
 
 namespace WasteCity.Graybox3D.Building
@@ -35,6 +36,9 @@ namespace WasteCity.Graybox3D.Building
         private string selectedStableId;
         private string presentedStableId;
         private Func<bool> persistencePauseSource;
+        private GameSpeedModel formalSpeed;
+        private GrayboxFormalRuleClock3D formalRuleClock;
+        private GrayboxCampaignTerminalSpeedGate3D terminalSpeedGate;
         private bool hudBound;
         private bool firstMachineGunCheckpointPublished;
         private bool tutorialCombatCheckpointPublished;
@@ -154,6 +158,8 @@ namespace WasteCity.Graybox3D.Building
 
         private void ResetRuntimeOwnership()
         {
+            terminalSpeedGate?.Synchronize(null);
+            formalRuleClock?.SetTerminal(false);
             if (campaign != null)
             {
                 campaign.WaveWarningStarted -=
@@ -177,13 +183,43 @@ namespace WasteCity.Graybox3D.Building
             persistencePauseSource = pauseSource;
         }
 
-        public bool Tick(float deltaSeconds, bool paused)
+        public void ConfigureFormalSpeedRuntime(
+            GameSpeedModel speed,
+            GrayboxFormalRuleClock3D ruleClock,
+            GrayboxCampaignTerminalSpeedGate3D terminalGate)
+        {
+            formalSpeed = speed ??
+                throw new ArgumentNullException(nameof(speed));
+            formalRuleClock = ruleClock ??
+                throw new ArgumentNullException(nameof(ruleClock));
+            terminalSpeedGate = terminalGate ??
+                throw new ArgumentNullException(nameof(terminalGate));
+            SynchronizeFormalSpeedRuntime();
+        }
+
+        public bool TryContinueCampaignSandbox()
+        {
+            if (terminalSpeedGate == null ||
+                !terminalSpeedGate.TryContinueSandbox())
+            {
+                return false;
+            }
+            formalRuleClock?.SetTerminal(false);
+            ApplySpeedPresentation();
+            return true;
+        }
+
+        public bool Tick(float ruleDeltaSeconds, bool paused)
         {
             using (TickMarker.Auto())
             {
                 bool effectivePaused = paused || IsPersistencePaused;
                 worldView?.SetSimulationPaused(effectivePaused);
-                if (effectivePaused) return true;
+                if (effectivePaused)
+                {
+                    ApplySpeedPresentation();
+                    return true;
+                }
                 int previousTutorialWaveTriggerCount =
                     snapshot?.TutorialWaveTriggerCount ?? 0;
                 int previousSpawnedEnemyCount =
@@ -192,10 +228,11 @@ namespace WasteCity.Graybox3D.Building
                     !TrySynchronizeRuntime(out _))
                     return false;
                 runtime.Tick(
-                    deltaSeconds,
+                    ruleDeltaSeconds,
                     effectivePaused,
                     session.CityStorage);
                 snapshot = runtime.Snapshot;
+                SynchronizeFormalSpeedRuntime();
                 if (!firstMachineGunCheckpointPublished &&
                     previousTutorialWaveTriggerCount == 0 &&
                     snapshot.TutorialWaveTriggerCount > 0 &&
@@ -227,6 +264,7 @@ namespace WasteCity.Graybox3D.Building
                 if (!TrySynchronizeRuntime(out error))
                     return false;
                 snapshot = runtime.Snapshot;
+                SynchronizeFormalSpeedRuntime();
                 firstMachineGunCheckpointPublished =
                     snapshot.TutorialWaveTriggerCount > 0;
                 tutorialCombatCheckpointPublished =
@@ -294,7 +332,10 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
-            Tick(Time.deltaTime, Time.timeScale <= 0f);
+            float ruleDeltaSeconds = session == null
+                ? 0f
+                : session.ResolveRuleDelta(Time.unscaledDeltaTime);
+            Tick(ruleDeltaSeconds, paused: ruleDeltaSeconds <= 0f);
         }
 
         private void OnEnable()
@@ -310,6 +351,8 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             UnbindHud();
+            terminalSpeedGate?.Synchronize(null);
+            formalRuleClock?.SetTerminal(false);
             if (campaign != null)
             {
                 campaign.WaveWarningStarted -=
@@ -378,6 +421,47 @@ namespace WasteCity.Graybox3D.Building
         private void HandleCampaignWaveWarningStarted(int waveNumber)
         {
             CampaignWaveWarningStarted?.Invoke(waveNumber);
+        }
+
+        private void SynchronizeFormalSpeedRuntime()
+        {
+            if (terminalSpeedGate == null || formalRuleClock == null)
+            {
+                ApplySpeedPresentation();
+                return;
+            }
+            SingleCityDefenseCampaignSnapshot campaignSnapshot =
+                CampaignSnapshot;
+            terminalSpeedGate.Synchronize(campaignSnapshot);
+            formalRuleClock.SetTerminal(
+                terminalSpeedGate.BlocksRuleProgress);
+            ApplySpeedPresentation();
+        }
+
+        private void ApplySpeedPresentation()
+        {
+            if (formalSpeed == null) return;
+            float requested = formalSpeed.IsPaused(GamePauseReason.User)
+                ? 0f
+                : NormalizeFormalSpeed(formalSpeed.RequestedSpeed);
+            float effective = formalRuleClock == null
+                ? NormalizeFormalSpeed(formalSpeed.Speed)
+                : formalRuleClock.EffectiveSpeed;
+            Time.timeScale = effective;
+            if (hud != null)
+            {
+                hud.ApplySpeed(requested, effective);
+            }
+        }
+
+        private static float NormalizeFormalSpeed(float value)
+        {
+            if (value <= 0f || float.IsNaN(value) ||
+                float.IsInfinity(value))
+            {
+                return 0f;
+            }
+            return value < 1.5f ? 1f : 2f;
         }
 
         private bool TryRecoverDestroyedBuildingPresentation(

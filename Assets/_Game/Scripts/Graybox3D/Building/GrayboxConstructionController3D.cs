@@ -151,13 +151,13 @@ namespace WasteCity.Graybox3D.Building
             return cancelled;
         }
 
-        public void TickConstruction(float unscaledDeltaTime)
+        public void TickConstruction(float ruleDeltaSeconds)
         {
             if (!IsConfigured) return;
             session.TickConstruction(
-                unscaledDeltaTime,
+                ruleDeltaSeconds,
                 city.Mode,
-                Time.timeScale <= 0f,
+                ruleDeltaSeconds <= 0f,
                 presentation);
         }
 
@@ -171,7 +171,10 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
-            TickConstruction(Time.deltaTime);
+            float ruleDeltaSeconds = session == null
+                ? 0f
+                : session.ResolveRuleDelta(Time.unscaledDeltaTime);
+            TickConstruction(ruleDeltaSeconds);
         }
 
         private void OnEnable()

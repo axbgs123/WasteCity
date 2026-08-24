@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
+using UnityEngine.UI;
 using WasteCity.Core;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
@@ -155,28 +157,216 @@ namespace WasteCity.Tests
                 Is.EqualTo(1f));
         }
 
-        [Test]
-        public void ModalInputConsumesDigitBeforeFormalSpeedCommands()
+        [TestCase(Key.Digit1, 2f)]
+        [TestCase(Key.Digit2, 1f)]
+        [TestCase(Key.Space, 2f)]
+        public void HigherPriorityModalConsumesEveryFormalSpeedKey(
+            Key key,
+            float initialSpeed)
         {
             var modal = new FakeDevelopmentPanel { IsOpen = true };
             CoordinatorFixture fixture = CreateCoordinator(modal);
-            fixture.Speed.Set(1f);
-            Time.timeScale = 1f;
+            fixture.Speed.Set(initialSpeed);
+            Time.timeScale = initialSpeed;
 
             GrayboxInputSuppression suppression = Press(
                 fixture.Coordinator,
-                Key.Digit2);
+                key);
 
             AssertSuppressed(suppression);
-            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f),
-                "A higher-priority modal must consume numeric input before " +
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(initialSpeed),
+                "A higher-priority modal must consume speed input before " +
                 "the formal speed command sees it.");
-            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(Time.timeScale, Is.EqualTo(initialSpeed));
+        }
 
-            modal.IsOpen = false;
+        [TestCase("Catalog.Search")]
+        [TestCase("Research.Search")]
+        [TestCase("Developer.Resource.Search")]
+        [TestCase("Developer.Research.Search")]
+        [TestCase("Inventory.Crafting.Search")]
+        public void ActiveTextSearchConsumesSpaceAndDigitsBeforeSpeed(
+            string inputName)
+        {
+            CoordinatorFixture fixture = CreateCoordinator();
+            EventSystem eventSystem = CreateObject(
+                    inputName + ".EventSystem",
+                    typeof(EventSystem))
+                .GetComponent<EventSystem>();
+            InputField input = CreateObject(
+                    inputName,
+                    typeof(RectTransform),
+                    typeof(InputField))
+                .GetComponent<InputField>();
+            eventSystem.SetSelectedGameObject(input.gameObject);
+
             Press(fixture.Coordinator, Key.Digit2);
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f));
+            Press(fixture.Coordinator, Key.Space);
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f));
+
+            fixture.Menu.RequestSpeed(2);
+            Press(fixture.Coordinator, Key.Digit1);
             Assert.That(fixture.Speed.Speed, Is.EqualTo(2f));
             Assert.That(Time.timeScale, Is.EqualTo(2f));
+        }
+
+        [Test]
+        public void DeveloperTextSearchDoesNotReachBuildingShortcuts()
+        {
+            var development = new FakeDevelopmentPanel { IsOpen = true };
+            CoordinatorFixture fixture = CreateCoordinator(development);
+            GrayboxBuildingInteractionModel3D interaction = CreateObject(
+                    "DeveloperTextFocusBuildingInteraction")
+                .AddComponent<GrayboxBuildingInteractionModel3D>();
+            fixture.BuildingInput.Configure(
+                null,
+                interaction,
+                null,
+                null,
+                null,
+                null);
+            interaction.ToggleCatalog();
+            EventSystem eventSystem = CreateObject(
+                    "DeveloperTextFocus.EventSystem",
+                    typeof(EventSystem))
+                .GetComponent<EventSystem>();
+            InputField input = CreateObject(
+                    "Developer.Resource.Search",
+                    typeof(RectTransform),
+                    typeof(InputField))
+                .GetComponent<InputField>();
+            eventSystem.SetSelectedGameObject(input.gameObject);
+
+            uint invocationsBefore = fixture.Coordinator
+                .BuildingInputInvocationCount;
+            AssertSuppressed(Press(fixture.Coordinator, Key.Digit1));
+
+            Assert.That(fixture.Coordinator.BuildingInputInvocationCount,
+                Is.EqualTo(invocationsBefore),
+                "Developer search digits must not reach building input.");
+            Assert.That(development.IsOpen, Is.True);
+            Assert.That(interaction.State,
+                Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
+        }
+
+        [Test]
+        public void BuildQuickbarConsumesDigitsBeforeFormalSpeedCommands()
+        {
+            CoordinatorFixture fixture = CreateCoordinator();
+            GrayboxBuildingInteractionModel3D interaction = CreateObject(
+                    "FormalSpeedBuildingInteraction")
+                .AddComponent<GrayboxBuildingInteractionModel3D>();
+            fixture.BuildingInput.Configure(
+                null,
+                interaction,
+                null,
+                null,
+                null,
+                null);
+            interaction.ToggleCatalog();
+
+            fixture.Menu.RequestSpeed(2);
+            GrayboxInputSuppression digitOne = Press(
+                fixture.Coordinator,
+                Key.Digit1);
+            Assert.That(digitOne.Destination, Is.True);
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(2f));
+
+            fixture.Menu.RequestSpeed(1);
+            GrayboxInputSuppression digitTwo = Press(
+                fixture.Coordinator,
+                Key.Digit2);
+            Assert.That(digitTwo.Destination, Is.True);
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f));
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void BackpackOrCraftingPanelConsumesDigitsButAllowsSpacePause()
+        {
+            CoordinatorFixture fixture = CreateCoordinator();
+            GrayboxOperationsView3D view = CreateObject(
+                    "FormalSpeedOperationsView")
+                .AddComponent<GrayboxOperationsView3D>();
+            RectTransform inventoryPanel = CreateObject(
+                    "InventoryCrafting.Panel",
+                    typeof(RectTransform))
+                .GetComponent<RectTransform>();
+            SetPrivateField(view, "inventoryCraftingPanel", inventoryPanel);
+            GrayboxOperationsController3D operations = CreateObject(
+                    "FormalSpeedOperationsController")
+                .AddComponent<GrayboxOperationsController3D>();
+            SetPrivateField(operations, "view", view);
+            SetPrivateField(fixture.Coordinator, "operations", operations);
+
+            AssertSuppressed(Press(fixture.Coordinator, Key.Digit2));
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f),
+                "Inventory and crafting own digit input above speed.");
+
+            AssertSuppressed(Press(fixture.Coordinator, Key.Space));
+            Assert.That(fixture.Speed.Speed, Is.Zero,
+                "GDD keeps tactical pause legal while ordinary operations " +
+                "panels are open.");
+        }
+
+        [Test]
+        public void ScreenSpeedButtonsSubmitThroughKeyboardCommandFacade()
+        {
+            CoordinatorFixture fixture = CreateCoordinator();
+            object sharedCommands = fixture.Menu.SpeedCommands;
+            Canvas canvas = CreateObject(
+                    "FormalSpeedCanvas",
+                    typeof(RectTransform),
+                    typeof(Canvas))
+                .GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            EventSystem eventSystem = CreateObject(
+                    "FormalSpeedEventSystem",
+                    typeof(EventSystem))
+                .GetComponent<EventSystem>();
+            GrayboxSystemMenuView3D view = CreateObject(
+                    "FormalSpeedSystemMenuView")
+                .AddComponent<GrayboxSystemMenuView3D>();
+            view.Configure(canvas, eventSystem, fixture.Menu);
+            fixture.Menu.SetView(view);
+
+            Button speedTwo = FindButton(canvas.transform, "Speed.2x");
+            Button speedPause = FindButton(
+                canvas.transform,
+                "Speed.Pause");
+            Button speedOne = FindButton(canvas.transform, "Speed.1x");
+            Assert.That(speedTwo.gameObject.activeInHierarchy, Is.True);
+            Assert.That(speedTwo.interactable, Is.True);
+
+            speedTwo.onClick.Invoke();
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(2f));
+            Assert.That(Time.timeScale, Is.EqualTo(2f));
+
+            speedPause.onClick.Invoke();
+            Assert.That(fixture.Speed.Speed, Is.Zero);
+            Assert.That(Time.timeScale, Is.Zero);
+            Assert.That(fixture.Menu.SpeedCommands, Is.SameAs(sharedCommands));
+            Assert.That(ReadFloat(sharedCommands, "LastNonZeroSpeed"),
+                Is.EqualTo(2f));
+
+            speedOne.onClick.Invoke();
+            Assert.That(fixture.Speed.Speed, Is.EqualTo(1f));
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(fixture.Menu.SpeedCommands, Is.SameAs(sharedCommands));
+
+            fixture.Menu.Open();
+            Assert.That(speedTwo.gameObject.activeInHierarchy, Is.False,
+                "The higher-priority system modal hides persistent controls.");
+            Assert.That(speedPause.interactable, Is.False);
+            Assert.That(speedOne.interactable, Is.False);
+            Assert.That(speedTwo.interactable, Is.False);
+            fixture.Menu.Close();
+            Assert.That(speedTwo.gameObject.activeInHierarchy, Is.True,
+                "The persistent speed HUD returns when the menu closes.");
+            Assert.That(speedPause.interactable, Is.True);
+            Assert.That(speedOne.interactable, Is.True);
+            Assert.That(speedTwo.interactable, Is.True);
         }
 
         [Test]
@@ -299,7 +489,11 @@ namespace WasteCity.Tests
                 buildingInput,
                 menu,
                 development ?? new FakeDevelopmentPanel());
-            return new CoordinatorFixture(coordinator, menu, speed);
+            return new CoordinatorFixture(
+                coordinator,
+                buildingInput,
+                menu,
+                speed);
         }
 
         private GrayboxInputSuppression Press(
@@ -354,19 +548,52 @@ namespace WasteCity.Tests
             return result;
         }
 
+        private GameObject CreateObject(
+            string name,
+            params Type[] components)
+        {
+            var result = new GameObject(name, components);
+            createdObjects.Add(result);
+            return result;
+        }
+
+        private static Button FindButton(Transform root, string name)
+        {
+            foreach (Button button in root.GetComponentsInChildren<Button>(true))
+                if (button.name == name)
+                    return button;
+            Assert.Fail("Missing formal game-speed screen control: " + name);
+            return null;
+        }
+
+        private static void SetPrivateField(
+            object owner,
+            string fieldName,
+            object value)
+        {
+            FieldInfo field = owner.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null, fieldName);
+            field.SetValue(owner, value);
+        }
+
         private sealed class CoordinatorFixture
         {
             public CoordinatorFixture(
                 GrayboxUsabilityInputCoordinator3D coordinator,
+                GrayboxBuildingInputRouter3D buildingInput,
                 GrayboxSystemMenuController3D menu,
                 GameSpeedModel speed)
             {
                 Coordinator = coordinator;
+                BuildingInput = buildingInput;
                 Menu = menu;
                 Speed = speed;
             }
 
             public GrayboxUsabilityInputCoordinator3D Coordinator { get; }
+            public GrayboxBuildingInputRouter3D BuildingInput { get; }
             public GrayboxSystemMenuController3D Menu { get; }
             public GameSpeedModel Speed { get; }
         }

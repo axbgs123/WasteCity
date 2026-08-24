@@ -156,7 +156,7 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
-        public bool Tick(float deltaSeconds, bool paused)
+        public bool Tick(float ruleDeltaSeconds, bool paused)
         {
             using (TickMarker.Auto())
             {
@@ -175,7 +175,7 @@ namespace WasteCity.Graybox3D.Building
                 }
 
                 Clock.Tick(
-                    deltaSeconds,
+                    ruleDeltaSeconds,
                     paused || IsPersistencePaused,
                     session.Instances,
                     city.Mode,
@@ -190,9 +190,12 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
+            float ruleDeltaSeconds = session == null
+                ? 0f
+                : session.ResolveRuleDelta(Time.unscaledDeltaTime);
             Tick(
-                Time.deltaTime,
-                Time.timeScale <= 0f);
+                ruleDeltaSeconds,
+                paused: ruleDeltaSeconds <= 0f);
         }
     }
 }

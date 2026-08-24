@@ -516,15 +516,29 @@ namespace WasteCity.Tests
             Assert.That(modifier.SetResource(ResourceIds.Alloy, 0), Is.True);
             Assert.That(modifier.SetResource(ResourceIds.Ammunition, 0), Is.True);
 
-            Time.timeScale = 20f;
-            float deadline = Time.realtimeSinceStartup + 4f;
+            GrayboxSystemMenuController3D speedController =
+                Object.FindObjectOfType<GrayboxSystemMenuController3D>();
+            Assert.That(speedController, Is.Not.Null);
+            GrayboxFormalSaveRuntimeHost3D speedHost =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxProductionController3D production =
+                Object.FindObjectOfType<GrayboxProductionController3D>();
+            Assert.That(speedHost, Is.Not.Null);
+            Assert.That(production, Is.Not.Null);
+            speedController.RequestSpeed(2);
+            Assert.That(speedHost.Speed.Speed, Is.EqualTo(2f));
+            float deadline = Time.realtimeSinceStartup + 15f;
             while (session.Inventory.Get(ResourceIds.Ammunition) < 2 &&
                    Time.realtimeSinceStartup < deadline)
                 yield return null;
-            Time.timeScale = 1f;
+            speedController.RequestSpeed(1);
 
             Assert.That(session.Inventory.Get(ResourceIds.Ammunition),
-                Is.GreaterThanOrEqualTo(2));
+                Is.GreaterThanOrEqualTo(2),
+                string.Join(", ", production.Snapshot.Entries.Select(
+                    entry => entry.BuildingDefinitionId + ":" +
+                             entry.StopReason + ":" +
+                             entry.ProgressSeconds.ToString("0.##"))));
             Text amount = Object.FindObjectsOfType<Text>(true)
                 .First(value => value.name ==
                     "ResourceStatus.Item." + ResourceIds.Ammunition +
@@ -1715,7 +1729,8 @@ namespace WasteCity.Tests
                     warehouseQuick.StableInstanceId).Treatment,
                 Is.EqualTo(BuildingEvacuationTreatment.QuickDismantle));
 
-            Time.timeScale = 0f;
+            yield return TapKey(Key.Space);
+            Assert.That(Time.timeScale, Is.Zero);
             for (var frame = 0; frame < 20; frame++)
                 yield return null;
             Assert.That(evacuation.IsProcessing, Is.True);
@@ -1723,7 +1738,8 @@ namespace WasteCity.Tests
                 session.Instances.Contains(warehouseFull),
                 Is.True);
 
-            Time.timeScale = 1f;
+            yield return TapKey(Key.Space);
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
             float deadline = Time.realtimeSinceStartup +
                 evacuation.Work.Where(value => value.Treatment ==
                     BuildingEvacuationTreatment.FullDismantle)
@@ -1809,6 +1825,8 @@ namespace WasteCity.Tests
             Assert.That(
                 instance.State,
                 Is.EqualTo(GrayboxBuildingInstanceState.Completed));
+            Assert.That(modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True);
 
             yield return TapKey(Key.F);
             Assert.That(evacuation.IsManifestOpen, Is.True);
@@ -2389,6 +2407,12 @@ namespace WasteCity.Tests
             Assert.That(button.gameObject.activeInHierarchy, Is.True, name);
             EventSystem.current.SetSelectedGameObject(button.gameObject);
             yield return null;
+            if (button == null)
+            {
+                button = FindButton(name);
+                Assert.That(button, Is.Not.Null, name + " after refresh");
+                EventSystem.current.SetSelectedGameObject(button.gameObject);
+            }
             Assert.That(
                 EventSystem.current.currentSelectedGameObject,
                 Is.SameAs(button.gameObject));

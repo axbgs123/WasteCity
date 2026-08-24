@@ -30,10 +30,14 @@ namespace WasteCity.Graybox3D.Building
         private GameObject fallbackEventSystemObject;
         private GrayboxDefenseSelectionKind3D selectedKind;
         private string selectedStableId;
+        private float requestedSpeed = 1f;
+        private float effectiveSpeed = 1f;
 
         public Text SummaryText { get; private set; }
+        public Text SpeedText { get; private set; }
         public Text SelectionText { get; private set; }
         public RectTransform SummaryRect { get; private set; }
+        public RectTransform SpeedRect { get; private set; }
         public RectTransform SelectionRect { get; private set; }
         public bool IsSelectionVisible { get; private set; }
         public bool DetailsVisible => IsSelectionVisible;
@@ -44,6 +48,21 @@ namespace WasteCity.Graybox3D.Building
         public int RefreshCount { get; private set; }
 
         public event Action<string> TowerPauseRequested;
+
+        public void ApplySpeed(
+            float requestedSpeed,
+            float effectiveSpeed)
+        {
+            this.requestedSpeed = NormalizeDisplaySpeed(requestedSpeed);
+            this.effectiveSpeed = NormalizeDisplaySpeed(effectiveSpeed);
+            EnsureFallbackConfiguration();
+            if (SpeedText != null)
+            {
+                SpeedText.text = FormatSpeed(
+                    this.requestedSpeed,
+                    this.effectiveSpeed);
+            }
+        }
 
         public void Configure(
             Canvas configuredCanvas,
@@ -180,6 +199,22 @@ namespace WasteCity.Graybox3D.Building
                 16,
                 TextAnchor.MiddleLeft);
 
+            SpeedRect = CreatePanel(
+                uiRoot,
+                "DefenseSpeedStatus",
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(390f, -70f),
+                new Vector2(230f, 46f));
+            SpeedText = CreateText(
+                SpeedRect,
+                "Defense.Speed.Text",
+                new Vector2(10f, 6f),
+                new Vector2(-20f, -12f),
+                15,
+                TextAnchor.MiddleLeft);
+
             SelectionRect = CreatePanel(
                 uiRoot,
                 "DefenseDetailsPanel",
@@ -219,6 +254,7 @@ namespace WasteCity.Graybox3D.Building
             towerPauseButton.onClick.AddListener(HandlePauseClicked);
 
             SummaryText.text = FormatSummary(LastSnapshot);
+            SpeedText.text = FormatSpeed(requestedSpeed, effectiveSpeed);
             selectionGroup.alpha = 0f;
             selectionGroup.interactable = false;
             selectionGroup.blocksRaycasts = false;
@@ -263,6 +299,24 @@ namespace WasteCity.Graybox3D.Building
             return "防御 | 核心 " + snapshot.CoreCurrentHealth + "/" +
                    snapshot.CoreMaximumHealth + " | " + wave +
                    " | 敌人 " + snapshot.AliveEnemyCount;
+        }
+
+        private static string FormatSpeed(
+            float requested,
+            float effective)
+        {
+            return "速度 | 请求 " + requested.ToString(
+                       "0.#",
+                       CultureInfo.InvariantCulture) +
+                   "× | 有效 " + effective.ToString(
+                       "0.#",
+                       CultureInfo.InvariantCulture) + "×";
+        }
+
+        private static float NormalizeDisplaySpeed(float value)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value)) return 0f;
+            return Mathf.Clamp(value, 0f, 2f);
         }
 
         private static string FormatSelection(

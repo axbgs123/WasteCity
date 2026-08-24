@@ -243,6 +243,38 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void JsonEmptyTowerTargetRestoresAsUnlockedTarget()
+        {
+            Fixture source = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            FormalThreeDDefenseCampaignSaveData saved = Capture(
+                new GrayboxDefenseSaveAdapter3D(source.Runtime));
+            for (var index = 0;
+                 index < saved.towerCombatStates.Length;
+                 index++)
+            {
+                saved.towerCombatStates[index].targetStableEnemyId =
+                    string.Empty;
+            }
+
+            Fixture target = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            var adapter = new GrayboxDefenseSaveAdapter3D(target.Runtime);
+
+            Assert.That(adapter.TryRestoreCampaign(
+                saved,
+                target.Session.Instances,
+                out string error), Is.True, error);
+            Assert.That(adapter.CaptureCampaign().towerCombatStates.All(
+                tower => string.IsNullOrEmpty(
+                    tower.targetStableEnemyId)), Is.True);
+        }
+
+        [Test]
         public void RestorePlanRejectsStaleAndForeignRuntimeCommits()
         {
             Fixture source = CreateFixture(

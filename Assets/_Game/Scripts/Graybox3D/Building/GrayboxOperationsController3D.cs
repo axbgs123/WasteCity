@@ -206,11 +206,12 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!EnsureReady()) return;
 
-            bool paused = Time.timeScale <= 0f;
-            float deltaSeconds = Mathf.Max(0f, Time.deltaTime);
-            crafting.Tick(deltaSeconds, paused);
+            float ruleDeltaSeconds = session.ResolveRuleDelta(
+                Time.unscaledDeltaTime);
+            bool paused = ruleDeltaSeconds <= 0f;
+            crafting.Tick(ruleDeltaSeconds, paused);
             research.Tick(
-                deltaSeconds,
+                ruleDeltaSeconds,
                 city.Mode,
                 paused,
                 HasEligibleResearchStation());

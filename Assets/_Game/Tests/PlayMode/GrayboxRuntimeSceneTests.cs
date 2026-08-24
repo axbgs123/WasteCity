@@ -444,7 +444,8 @@ namespace WasteCity.Tests
                 Screen.width * .5f,
                 Screen.height * .5f);
             Vector2 end = start + new Vector2(100f, 40f);
-            Time.timeScale = 0f;
+            yield return TapKey(Key.Space);
+            Assert.That(Time.timeScale, Is.Zero);
 
             QueueKeyboard(Key.W);
             yield return null;

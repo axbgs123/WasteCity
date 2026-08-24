@@ -48,7 +48,7 @@ namespace WasteCity.Tests
             previousEditorInputBehavior =
                 InputSystem.settings.editorInputBehaviorInPlayMode;
 
-            Time.timeScale = RuleTimeScale;
+            Time.timeScale = 1f;
             InputSystem.settings.updateMode =
                 InputSettings.UpdateMode.ProcessEventsManually;
             InputSystem.settings.backgroundBehavior =
@@ -67,7 +67,12 @@ namespace WasteCity.Tests
                 LoadSceneMode.Single);
             yield return GrayboxFormalPlayModeEntryFixture
                 .StartNewProgressThroughRealUi(mouse);
-            Time.timeScale = RuleTimeScale;
+            GrayboxFormalSaveRuntimeHost3D runtimeHost =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(runtimeHost, Is.Not.Null);
+            runtimeHost.Speed.Set(2f);
+            runtimeHost.RuleClock.SetDevelopmentAcceleration(
+                RuleTimeScale / 2f);
 
             GrayboxBuildingSession3D session =
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();

@@ -53,6 +53,8 @@ namespace WasteCity.Graybox3D.Building
             new GrayboxFormalSaveWriteIntentLatch3D();
         private FormalSaveStore store;
         private GameSpeedModel speed;
+        private GrayboxFormalRuleClock3D ruleClock;
+        private GrayboxCampaignTerminalSpeedGate3D terminalSpeedGate;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -60,6 +62,11 @@ namespace WasteCity.Graybox3D.Building
         private ulong automaticCheckpointFailureRevision;
 
         public GameSpeedModel Speed => speed ??= new GameSpeedModel();
+        public GrayboxFormalRuleClock3D RuleClock =>
+            ruleClock ??= new GrayboxFormalRuleClock3D(Speed);
+        public GrayboxCampaignTerminalSpeedGate3D TerminalSpeedGate =>
+            terminalSpeedGate ??=
+                new GrayboxCampaignTerminalSpeedGate3D(Speed);
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public GrayboxFormalSaveCoordinatorResult3D LastCoordinatorResult
@@ -95,6 +102,8 @@ namespace WasteCity.Graybox3D.Building
             {
                 return false;
             }
+
+            BindRuleClock();
 
             if (!production.TryRebuildAfterPersistenceRestore(out _) ||
                 !defense.TryRebuildAfterPersistenceRestore(out _))
@@ -269,6 +278,7 @@ namespace WasteCity.Graybox3D.Building
         {
             EnsureStore();
             _ = Speed;
+            BindRuleClock();
         }
 
         private void Start()
@@ -302,6 +312,9 @@ namespace WasteCity.Graybox3D.Building
             checkpointPolicy = null;
             coordinator = null;
             store = null;
+            ruleClock = null;
+            terminalSpeedGate?.Synchronize(null);
+            terminalSpeedGate = null;
             speed = null;
             IsInitialized = false;
             CheckpointWarningChanged = null;
@@ -382,6 +395,21 @@ namespace WasteCity.Graybox3D.Building
                    production != null &&
                    defense != null &&
                    evacuation != null;
+        }
+
+        private void BindRuleClock()
+        {
+            if (session != null)
+                session.ConfigureRuleClock(RuleClock);
+            if (city != null)
+                city.ConfigureRuleClock(RuleClock);
+            if (defense != null)
+            {
+                defense.ConfigureFormalSpeedRuntime(
+                    Speed,
+                    RuleClock,
+                    TerminalSpeedGate);
+            }
         }
 
         private void EnsureStore()

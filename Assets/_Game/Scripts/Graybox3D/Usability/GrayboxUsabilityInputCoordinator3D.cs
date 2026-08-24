@@ -122,10 +122,10 @@ namespace WasteCity.Graybox3D.Usability
             EnsureDevelopmentPanelAdapter();
             if (developmentPanel != null && developmentPanel.IsOpen)
             {
-                if (buildingInput != null && HasActiveTextInputFocus())
+                if (HasActiveTextInputFocus())
                 {
-                    unchecked { BuildingInputInvocationCount++; }
-                    buildingInput.ProcessCurrentInput();
+                    if (escapePressed)
+                        ClearActiveTextInputFocus();
                     return SuppressAll();
                 }
 
@@ -348,12 +348,43 @@ namespace WasteCity.Graybox3D.Usability
             GameObject selected = eventSystem == null
                 ? null
                 : eventSystem.currentSelectedGameObject;
+            if (IsActiveTextInput(selected)) return true;
+
+            EventSystem[] eventSystems = FindObjectsOfType<EventSystem>();
+            for (var index = 0; index < eventSystems.Length; index++)
+            {
+                if (eventSystems[index] != null &&
+                    IsActiveTextInput(
+                        eventSystems[index].currentSelectedGameObject))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool IsActiveTextInput(GameObject selected)
+        {
             if (selected == null || !selected.activeInHierarchy)
                 return false;
             InputField input = selected.GetComponentInParent<InputField>();
             return input != null &&
                    input.IsActive() &&
                    input.IsInteractable();
+        }
+
+        private static void ClearActiveTextInputFocus()
+        {
+            EventSystem[] eventSystems = FindObjectsOfType<EventSystem>();
+            for (var index = 0; index < eventSystems.Length; index++)
+            {
+                EventSystem eventSystem = eventSystems[index];
+                if (eventSystem != null && IsActiveTextInput(
+                        eventSystem.currentSelectedGameObject))
+                {
+                    eventSystem.SetSelectedGameObject(null);
+                }
+            }
         }
 
         private void BindDevelopmentTextInput()

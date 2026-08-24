@@ -3901,7 +3901,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void ConstructionController_UpdateUsesScaledDeltaTime()
+        public void ConstructionController_UpdateUsesUnifiedUnscaledRuleTime()
         {
             string source = File.ReadAllText(Path.Combine(
                 Application.dataPath,
@@ -3910,11 +3910,10 @@ namespace WasteCity.Tests
 
             Assert.That(
                 source,
-                Does.Contain("TickConstruction(Time.deltaTime);"));
+                Does.Contain("session.ResolveRuleDelta(Time.unscaledDeltaTime)"));
             Assert.That(
                 source,
-                Does.Not.Contain(
-                    "TickConstruction(Time.unscaledDeltaTime);"));
+                Does.Not.Contain("TickConstruction(Time.deltaTime);"));
         }
 
         private static void AssertIDEA0008OverlayVisibility(

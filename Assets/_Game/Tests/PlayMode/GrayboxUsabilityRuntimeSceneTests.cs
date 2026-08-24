@@ -144,6 +144,30 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0017_RealSpeedButtonsShareFormalCommands()
+        {
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+
+            yield return ClickButton("Speed.2x");
+            Assert.That(host.Speed.RequestedSpeed, Is.EqualTo(2f));
+            Assert.That(host.Speed.Speed, Is.EqualTo(2f));
+            Assert.That(Time.timeScale, Is.EqualTo(2f));
+
+            yield return ClickButton("Speed.Pause");
+            Assert.That(host.Speed.IsPaused(GamePauseReason.User), Is.True);
+            Assert.That(host.Speed.Speed, Is.Zero);
+            Assert.That(Time.timeScale, Is.Zero);
+
+            yield return ClickButton("Speed.1x");
+            Assert.That(host.Speed.IsPaused(GamePauseReason.User), Is.False);
+            Assert.That(host.Speed.RequestedSpeed, Is.EqualTo(1f));
+            Assert.That(host.Speed.Speed, Is.EqualTo(1f));
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+        }
+
+        [UnityTest]
         public IEnumerator IDEA0007_RealEscapeClosesCatalogThenOpensMenu()
         {
             GrayboxBuildingInteractionModel3D interaction =
@@ -253,7 +277,10 @@ namespace WasteCity.Tests
             var platform = new FakeDisplayPlatform();
             var store = new FakeDisplayStore();
             var exit = new FakeExit();
-            var speed = new GameSpeedModel();
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            GameSpeedModel speed = host.Speed;
             speed.Set(2f);
             menu.Configure(
                 speed,

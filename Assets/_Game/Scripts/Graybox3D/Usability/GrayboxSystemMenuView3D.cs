@@ -16,6 +16,9 @@ namespace WasteCity.Graybox3D.Usability
             "Start.NewGameCancel",
             "FormalSave.Feedback",
             "FormalSave.CheckpointWarning",
+            "Speed.Pause",
+            "Speed.1x",
+            "Speed.2x",
             "Main.Continue",
             "Main.Settings",
             "Main.Quit",
@@ -36,6 +39,7 @@ namespace WasteCity.Graybox3D.Usability
         [SerializeField] private GrayboxSystemMenuController3D controller;
 
         private RectTransform uiRoot;
+        private RectTransform speedControlsRoot;
         private Image blocker;
         private Text pausedTitle;
         private RectTransform startPage;
@@ -56,6 +60,9 @@ namespace WasteCity.Graybox3D.Usability
         private Text formalSaveFeedback;
         private RectTransform checkpointWarningRoot;
         private Text checkpointWarning;
+        private Button speedPauseButton;
+        private Button speedOneButton;
+        private Button speedTwoButton;
         private bool isOpen;
         private bool isStartPageOpen;
         private bool isNewGameConfirmationOpen;
@@ -227,6 +234,8 @@ namespace WasteCity.Graybox3D.Usability
             isNewGameConfirmationOpen = false;
             if (uiRoot != null)
                 uiRoot.gameObject.SetActive(false);
+            if (speedControlsRoot != null)
+                speedControlsRoot.gameObject.SetActive(false);
             if (checkpointWarningRoot != null)
                 checkpointWarningRoot.gameObject.SetActive(false);
             if (eventSystem != null)
@@ -255,6 +264,45 @@ namespace WasteCity.Graybox3D.Usability
 
         private void BuildUi()
         {
+            speedControlsRoot = CreateRect(
+                canvas.transform,
+                "GrayboxFormalSpeedControls.Root");
+            speedControlsRoot.sizeDelta = new Vector2(286f, 44f);
+            UpdateSpeedControlsLayout();
+            speedControlsRoot.SetAsFirstSibling();
+            var speedCanvas =
+                speedControlsRoot.gameObject.AddComponent<Canvas>();
+            speedCanvas.overrideSorting = true;
+            speedCanvas.sortingOrder = -1;
+            speedControlsRoot.gameObject.AddComponent<GraphicRaycaster>();
+            var speedBackground =
+                speedControlsRoot.gameObject.AddComponent<Image>();
+            speedBackground.color = new Color(.05f, .07f, .09f, .92f);
+            speedBackground.raycastTarget = false;
+            var speedLayout =
+                speedControlsRoot.gameObject
+                    .AddComponent<HorizontalLayoutGroup>();
+            speedLayout.padding = new RectOffset(6, 6, 4, 4);
+            speedLayout.spacing = 6f;
+            speedLayout.childAlignment = TextAnchor.MiddleCenter;
+            speedLayout.childForceExpandWidth = true;
+            speedLayout.childForceExpandHeight = true;
+            speedPauseButton = CreateButton(
+                speedControlsRoot,
+                "Speed.Pause",
+                "暂停",
+                () => controller?.ToggleTacticalPause());
+            speedOneButton = CreateButton(
+                speedControlsRoot,
+                "Speed.1x",
+                "1×",
+                () => controller?.RequestSpeed(1));
+            speedTwoButton = CreateButton(
+                speedControlsRoot,
+                "Speed.2x",
+                "2×",
+                () => controller?.RequestSpeed(2));
+
             uiRoot = CreateRect(
                 canvas.transform,
                 "GrayboxSystemMenuUi.Root");
@@ -455,6 +503,7 @@ namespace WasteCity.Graybox3D.Usability
 
             startPage.gameObject.SetActive(false);
             newGameConfirmPage.gameObject.SetActive(false);
+            speedControlsRoot.gameObject.SetActive(true);
         }
 
         private void SyncSettings(GrayboxDisplaySettingsModel3D settings)
@@ -516,14 +565,37 @@ namespace WasteCity.Graybox3D.Usability
         private void UpdateRootVisibility()
         {
             if (uiRoot == null) return;
+            UpdateSpeedControlsLayout();
             bool visible = isOpen || isStartPageOpen;
             uiRoot.gameObject.SetActive(visible);
+            if (speedControlsRoot != null)
+            {
+                speedControlsRoot.gameObject.SetActive(!visible);
+                speedPauseButton.interactable = !visible;
+                speedOneButton.interactable = !visible;
+                speedTwoButton.interactable = !visible;
+            }
             if (formalSaveFeedback != null)
             {
                 formalSaveFeedback.gameObject.SetActive(
                     visible &&
                     !string.IsNullOrWhiteSpace(formalSaveFeedback.text));
             }
+        }
+
+        private void UpdateSpeedControlsLayout()
+        {
+            if (speedControlsRoot == null || canvas == null) return;
+            bool narrow = canvas.pixelRect.width < 1280f;
+            Vector2 anchor = narrow
+                ? new Vector2(.5f, 0f)
+                : Vector2.zero;
+            speedControlsRoot.anchorMin = anchor;
+            speedControlsRoot.anchorMax = anchor;
+            speedControlsRoot.pivot = anchor;
+            speedControlsRoot.anchoredPosition = narrow
+                ? new Vector2(0f, 70f)
+                : new Vector2(20f, 20f);
         }
 
         private void RetireStaleRoots()
@@ -535,7 +607,8 @@ namespace WasteCity.Graybox3D.Usability
                 Transform child = canvas.transform.GetChild(index);
                 if (child.name != "GrayboxSystemMenuUi.Root" &&
                     child.name !=
-                        "GrayboxFormalSaveCheckpointWarning.Root")
+                        "GrayboxFormalSaveCheckpointWarning.Root" &&
+                    child.name != "GrayboxFormalSpeedControls.Root")
                     continue;
                 child.gameObject.SetActive(false);
                 DestroyGenerated(child.gameObject);
@@ -554,7 +627,13 @@ namespace WasteCity.Graybox3D.Usability
                 checkpointWarningRoot.gameObject.SetActive(false);
                 DestroyGenerated(checkpointWarningRoot.gameObject);
             }
+            if (speedControlsRoot != null)
+            {
+                speedControlsRoot.gameObject.SetActive(false);
+                DestroyGenerated(speedControlsRoot.gameObject);
+            }
             uiRoot = null;
+            speedControlsRoot = null;
             blocker = null;
             pausedTitle = null;
             startPage = null;
@@ -575,6 +654,9 @@ namespace WasteCity.Graybox3D.Usability
             formalSaveFeedback = null;
             checkpointWarningRoot = null;
             checkpointWarning = null;
+            speedPauseButton = null;
+            speedOneButton = null;
+            speedTwoButton = null;
             isOpen = false;
             isStartPageOpen = false;
             isNewGameConfirmationOpen = false;

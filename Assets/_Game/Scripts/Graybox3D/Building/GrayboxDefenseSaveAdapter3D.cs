@@ -203,7 +203,9 @@ namespace WasteCity.Graybox3D.Building
                     saved.amount,
                     saved.activeConsumableSeconds,
                     saved.damageRemainder,
-                    saved.targetStableEnemyId,
+                    string.IsNullOrEmpty(saved.targetStableEnemyId)
+                        ? null
+                        : saved.targetStableEnemyId,
                     topology.IsLogisticsConnected,
                     saved.isPlayerPaused);
             }

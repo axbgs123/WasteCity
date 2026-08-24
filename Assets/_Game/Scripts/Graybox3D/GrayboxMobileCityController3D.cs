@@ -91,6 +91,7 @@ namespace WasteCity.Graybox3D
         private bool presentationCaptured;
         private MaterialPropertyBlock visualBlock;
         private IGrayboxRuleTimeSource3D configuredRuleTimeSource;
+        private GrayboxFormalRuleClock3D formalRuleClock;
         private Func<int> aliveEnemyCountSource;
 
         public CityDeploymentModel Deployment
@@ -158,6 +159,12 @@ namespace WasteCity.Graybox3D
             configuredRuleTimeSource = ruleTimeSource;
             if (ruleTimeSource is MonoBehaviour behaviour)
                 ruleTimeSourceBehaviour = behaviour;
+        }
+
+        public void ConfigureRuleClock(GrayboxFormalRuleClock3D ruleClock)
+        {
+            formalRuleClock = ruleClock ??
+                throw new ArgumentNullException(nameof(ruleClock));
         }
 
         public void ConfigureAliveEnemyCountSource(
@@ -336,13 +343,14 @@ namespace WasteCity.Graybox3D
                 AdvanceReachedWaypoints(candidate);
         }
 
-        public void TickDeployment(float deltaTime)
+        public void TickDeployment(float ruleDeltaSeconds)
         {
             EnsureDeployment();
             int aliveEnemyCount = Math.Max(
                 0,
                 aliveEnemyCountSource?.Invoke() ?? 0);
-            float advance = ResolveRuleTimeContext().Advance(deltaTime);
+            float advance = ResolveRuleTimeContext().Advance(
+                ruleDeltaSeconds);
             if (Mode == CityMode.Packing &&
                 aliveEnemyCount > 0)
             {
@@ -504,14 +512,25 @@ namespace WasteCity.Graybox3D
 
         private void Update()
         {
-            if (Time.timeScale > 0f)
-                TickDeployment(Time.deltaTime);
+            float ruleDeltaSeconds = ResolveRuleDelta(
+                Time.unscaledDeltaTime);
+            TickDeployment(ruleDeltaSeconds);
         }
 
         private void FixedUpdate()
         {
-            if (Time.timeScale > 0f)
-                TickMovement(Time.fixedDeltaTime);
+            float ruleDeltaSeconds = ResolveRuleDelta(
+                Time.fixedUnscaledDeltaTime);
+            TickMovement(ruleDeltaSeconds);
+        }
+
+        private float ResolveRuleDelta(float unscaledDeltaSeconds)
+        {
+            if (formalRuleClock != null)
+                return formalRuleClock.ResolveRuleDelta(
+                    unscaledDeltaSeconds);
+            return GrayboxFormalRuleClock3D
+                .ResolveCompatibilityRuleDelta(unscaledDeltaSeconds);
         }
 
         private void EnsureDeployment()

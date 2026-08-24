@@ -199,6 +199,7 @@ namespace WasteCity.Graybox3D.Building
         private uint placementRevision;
         private PopulationModel population;
         private float checkpointRuleTimeSeconds;
+        private GrayboxFormalRuleClock3D formalRuleClock;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -224,6 +225,20 @@ namespace WasteCity.Graybox3D.Building
         public float CheckpointRuleTimeSeconds => checkpointRuleTimeSeconds;
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
+
+        public void ConfigureRuleClock(GrayboxFormalRuleClock3D ruleClock)
+        {
+            formalRuleClock = ruleClock ??
+                throw new ArgumentNullException(nameof(ruleClock));
+        }
+
+        public float ResolveRuleDelta(float unscaledDeltaSeconds)
+        {
+            if (formalRuleClock != null)
+                return formalRuleClock.ResolveRuleDelta(unscaledDeltaSeconds);
+            return GrayboxFormalRuleClock3D
+                .ResolveCompatibilityRuleDelta(unscaledDeltaSeconds);
+        }
 
         public int GetCityResourceAmount(string resourceId)
         {
@@ -330,6 +345,7 @@ namespace WasteCity.Graybox3D.Building
                 Research.Completed -= HandleResearchCompleted;
             CityStorage?.Dispose();
             CityStorage = null;
+            formalRuleClock = null;
         }
 
         private void HandleResearchCompleted(ResearchDefinition definition)
@@ -524,7 +540,7 @@ namespace WasteCity.Graybox3D.Building
         }
 
         public void TickConstruction(
-            float unscaledDeltaTime,
+            float ruleDeltaSeconds,
             CityMode mode,
             bool paused,
             IGrayboxBuildingPresentation3D presentation)
@@ -532,9 +548,9 @@ namespace WasteCity.Graybox3D.Building
             if (presentation == null)
                 throw new ArgumentNullException(nameof(presentation));
             EnsureConfigured();
-            if (paused || unscaledDeltaTime <= 0f) return;
+            if (paused || ruleDeltaSeconds <= 0f) return;
 
-            float ruleAdvance = RuleTimeContext.Advance(unscaledDeltaTime);
+            float ruleAdvance = RuleTimeContext.Advance(ruleDeltaSeconds);
             double nextRuleTime =
                 (double)checkpointRuleTimeSeconds + ruleAdvance;
             checkpointRuleTimeSeconds = nextRuleTime >= float.MaxValue
@@ -554,7 +570,7 @@ namespace WasteCity.Graybox3D.Building
 
                 float remainingBefore = instance.Progress.Remaining;
                 bool completed = instance.Progress.Tick(
-                    unscaledDeltaTime,
+                    ruleDeltaSeconds,
                     RuleTimeContext.EffectiveMultiplier);
                 if (instance.Progress.Remaining >= remainingBefore) continue;
                 if (completed) instance.Complete();

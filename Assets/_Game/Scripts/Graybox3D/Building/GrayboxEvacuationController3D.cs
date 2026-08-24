@@ -610,7 +610,7 @@ namespace WasteCity.Graybox3D.Building
             return advanced;
         }
 
-        public void Tick(float unscaledDeltaTime, bool paused)
+        public void Tick(float ruleDeltaSeconds, bool paused)
         {
             using (TickMarker.Auto())
             {
@@ -619,13 +619,13 @@ namespace WasteCity.Graybox3D.Building
                 if (IsManifestOpen && !IsProcessing)
                     menu.ShowEvacuationManifest(CaptureManifestView());
                 if (!IsProcessing || IsBlocked || effectivePaused ||
-                    unscaledDeltaTime <= 0f)
+                    ruleDeltaSeconds <= 0f)
                 {
                     if (IsProcessing)
                         menu.ShowEvacuationQueue(CaptureQueueView());
                     return;
                 }
-                remainingSeconds -= unscaledDeltaTime *
+                remainingSeconds -= ruleDeltaSeconds *
                     Math.Max(0f, session.DevelopmentRuleTimeMultiplier);
                 if (remainingSeconds <= 0f &&
                     TryCommitCurrent() == CommitCurrentResult.Succeeded)
@@ -1366,7 +1366,10 @@ namespace WasteCity.Graybox3D.Building
 
         private void Update()
         {
-            Tick(Time.deltaTime, Time.timeScale <= 0f);
+            float ruleDeltaSeconds = session == null
+                ? 0f
+                : session.ResolveRuleDelta(Time.unscaledDeltaTime);
+            Tick(ruleDeltaSeconds, paused: ruleDeltaSeconds <= 0f);
         }
 
         private void OnEnable()
