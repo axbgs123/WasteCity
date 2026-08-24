@@ -430,6 +430,30 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0018_RealMouseWheelZoomsWorldAndModalConsumesIt()
+        {
+            Camera camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+            Assert.That(camera.orthographic, Is.True);
+            GrayboxCameraController3D controller =
+                Object.FindObjectOfType<GrayboxCameraController3D>();
+            Assert.That(controller, Is.Not.Null);
+            Assert.That(controller.MapNavigationProfile, Is.Not.Null);
+            float initial = camera.orthographicSize;
+            Vector2 center = new Vector2(
+                Screen.width * .5f,
+                Screen.height * .5f);
+
+            yield return ScrollMouse(center, 120f);
+
+            Assert.That(camera.orthographicSize, Is.LessThan(initial));
+            float zoomed = camera.orthographicSize;
+            yield return TapKey(Key.Escape);
+            yield return ScrollMouse(center, -120f);
+            Assert.That(camera.orthographicSize, Is.EqualTo(zoomed));
+        }
+
+        [UnityTest]
         public IEnumerator Pause_StopsGameplayButAllowsFreeDragAndHome()
         {
             GrayboxMobileCityController3D city =
@@ -537,6 +561,24 @@ namespace WasteCity.Tests
                 expectPressedThisFrame: false);
             yield return null;
             QueueMouse(end);
+            yield return null;
+        }
+
+        private IEnumerator ScrollMouse(Vector2 position, float deltaY)
+        {
+            InputSystem.QueueStateEvent(
+                mouse,
+                new MouseState
+                {
+                    position = position,
+                    scroll = new Vector2(0f, deltaY)
+                });
+            InputSystem.Update();
+            yield return null;
+            InputSystem.QueueStateEvent(
+                mouse,
+                new MouseState { position = position });
+            InputSystem.Update();
             yield return null;
         }
 

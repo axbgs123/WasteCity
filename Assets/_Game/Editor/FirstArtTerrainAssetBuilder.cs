@@ -31,12 +31,16 @@ namespace WasteCity.Editor
 
         private const string TerrainRoot =
             "Assets/_Game/Art/FirstPass/Environment/Terrain";
+        private const string CartographicConceptRoot =
+            "ArtSource/FirstPass/Environment/Terrain";
         private const string RuntimeFolder = TerrainRoot + "/Runtime";
         private const string GeneratedFolder = RuntimeFolder + "/Generated";
         private const string MaterialsFolder = RuntimeFolder + "/Materials";
         private const string ProfilesFolder = RuntimeFolder + "/Profiles";
         private const string ShadersFolder = RuntimeFolder + "/Shaders";
         private const int SourceTextureSize = 2048;
+        private const int CartographicConceptTextureSize = 1254;
+        private const int CartographicSeamBlendWidth = 96;
         private const int HeightTextureSize = 1024;
 
         internal static Action<string> HeightSourceReadableCheckpoint;
@@ -69,6 +73,7 @@ namespace WasteCity.Editor
             material.SetTexture("_NormalArray", normal);
             material.SetTexture("_MaskArray", mask);
             material.SetTexture("_HeightArray", height);
+            ApplyCartographicVisualStyle(material);
             EditorUtility.SetDirty(material);
 
             FirstArtTerrainProfile3D profile = LoadOrCreateProfile();
@@ -88,6 +93,699 @@ namespace WasteCity.Editor
                 throw new InvalidOperationException("Generated terrain Material or Profile could not be reloaded.");
             if (!reloadedProfile.TryValidate(out validationError))
                 throw new InvalidOperationException(validationError);
+        }
+
+        [MenuItem("WasteCity/Art/Rebuild IDEA-0018 Terrain Source Channels")]
+        public static void RebuildCartographicSourceChannels()
+        {
+            var originalFiles = new Dictionary<string, byte[]>(
+                StringComparer.Ordinal);
+            var originalMetaFiles = new Dictionary<string, byte[]>(
+                StringComparer.Ordinal);
+            var originalGuids = new Dictionary<string, string>(
+                StringComparer.Ordinal);
+            IReadOnlyDictionary<string, byte[]> generated =
+                GenerateCartographicSourceFilesFromConcepts();
+
+            for (int layer = 0;
+                 layer < FirstArtTerrainCatalog3D.LayerCount;
+                 layer++)
+            {
+                var terrainLayer = (FirstArtTerrainLayer3D)layer;
+                string terrainName = TerrainName(terrainLayer);
+                AddGeneratedSource(
+                    originalFiles,
+                    originalMetaFiles,
+                    originalGuids,
+                    SourcePath(terrainName, SourceChannel.BaseColor));
+                AddGeneratedSource(
+                    originalFiles,
+                    originalMetaFiles,
+                    originalGuids,
+                    SourcePath(terrainName, SourceChannel.Height));
+                AddGeneratedSource(
+                    originalFiles,
+                    originalMetaFiles,
+                    originalGuids,
+                    SourcePath(terrainName, SourceChannel.Normal));
+                AddGeneratedSource(
+                    originalFiles,
+                    originalMetaFiles,
+                    originalGuids,
+                    SourcePath(terrainName, SourceChannel.Mask));
+            }
+
+            try
+            {
+                foreach (KeyValuePair<string, byte[]> pair in generated)
+                    File.WriteAllBytes(AbsoluteProjectPath(pair.Key), pair.Value);
+                ReimportGeneratedSources(generated.Keys);
+                ValidatePreservedSourceIdentity(
+                    originalMetaFiles,
+                    originalGuids);
+                BuildTextureArrays();
+            }
+            catch
+            {
+                foreach (KeyValuePair<string, byte[]> pair in originalFiles)
+                    File.WriteAllBytes(AbsoluteProjectPath(pair.Key), pair.Value);
+                ReimportGeneratedSources(originalFiles.Keys);
+                throw;
+            }
+        }
+
+        private static void AddGeneratedSource(
+            IDictionary<string, byte[]> originals,
+            IDictionary<string, byte[]> originalMetaFiles,
+            IDictionary<string, string> originalGuids,
+            string path)
+        {
+            string absolutePath = AbsoluteProjectPath(path);
+            string absoluteMetaPath = absolutePath + ".meta";
+            if (!File.Exists(absolutePath) || !File.Exists(absoluteMetaPath))
+            {
+                throw new FileNotFoundException(
+                    "IDEA-0018 source channel or meta is missing: " + path,
+                    path);
+            }
+            originals.Add(path, File.ReadAllBytes(absolutePath));
+            originalMetaFiles.Add(path, File.ReadAllBytes(absoluteMetaPath));
+            originalGuids.Add(path, AssetDatabase.AssetPathToGUID(path));
+        }
+
+        internal static IReadOnlyDictionary<string, byte[]>
+            GenerateCartographicSourceFilesFromConcepts()
+        {
+            var generated = new Dictionary<string, byte[]>(
+                FirstArtTerrainCatalog3D.LayerCount * 4,
+                StringComparer.Ordinal);
+            for (int layer = 0;
+                 layer < FirstArtTerrainCatalog3D.LayerCount;
+                 layer++)
+            {
+                var terrainLayer = (FirstArtTerrainLayer3D)layer;
+                string terrainName = TerrainName(terrainLayer);
+                CartographicSourceChannels channels =
+                    GenerateCartographicSourceChannels(
+                        ConceptPath(terrainName),
+                        terrainLayer);
+                generated.Add(
+                    SourcePath(terrainName, SourceChannel.BaseColor),
+                    channels.BaseColorPng);
+                generated.Add(
+                    SourcePath(terrainName, SourceChannel.Height),
+                    channels.HeightPng);
+                generated.Add(
+                    SourcePath(terrainName, SourceChannel.Normal),
+                    channels.NormalPng);
+                generated.Add(
+                    SourcePath(terrainName, SourceChannel.Mask),
+                    channels.MaskPng);
+            }
+            return generated;
+        }
+
+        private static CartographicSourceChannels
+            GenerateCartographicSourceChannels(
+                string conceptPath,
+                FirstArtTerrainLayer3D layer)
+        {
+            var concept = new Texture2D(
+                2,
+                2,
+                TextureFormat.RGBA32,
+                false,
+                false);
+            try
+            {
+                if (!concept.LoadImage(
+                        File.ReadAllBytes(
+                            AbsoluteProjectPath(conceptPath)),
+                        false) ||
+                    concept.width != CartographicConceptTextureSize ||
+                    concept.height != CartographicConceptTextureSize)
+                {
+                    throw new InvalidOperationException(
+                        "IDEA-0018 immutable concept must decode as " +
+                        CartographicConceptTextureSize + "x" +
+                        CartographicConceptTextureSize + ": " + conceptPath);
+                }
+
+                Color32[] basePixels = BlendOppositeEdgeBands(
+                    ResampleBilinearCpu(
+                        concept.GetPixels32(),
+                        concept.width,
+                        concept.height,
+                        SourceTextureSize,
+                        SourceTextureSize),
+                    SourceTextureSize,
+                    CartographicSeamBlendWidth);
+                int pixelCount = basePixels.Length;
+                var luminance = new float[pixelCount];
+                for (int index = 0; index < pixelCount; index++)
+                {
+                    Color32 color = basePixels[index];
+                    luminance[index] =
+                        (color.r * .2126f +
+                         color.g * .7152f +
+                         color.b * .0722f) / 255f;
+                }
+
+                float[] broad = PeriodicBoxBlur(
+                    luminance,
+                    SourceTextureSize,
+                    SourceTextureSize,
+                    16);
+                float[] local = PeriodicBoxBlur(
+                    luminance,
+                    SourceTextureSize,
+                    SourceTextureSize,
+                    3);
+                ushort[] height = BuildCartographicHeight(broad, layer);
+                Color32[] normal = BuildCartographicNormal(height, layer);
+                Color32[] mask = BuildCartographicMask(
+                    luminance,
+                    local,
+                    height,
+                    layer);
+                return new CartographicSourceChannels(
+                    EncodeColorPng(basePixels, TextureFormat.RGB24),
+                    EncodeHeightPng(height),
+                    EncodeColorPng(normal, TextureFormat.RGB24),
+                    EncodeColorPng(mask, TextureFormat.RGBA32));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(concept);
+            }
+        }
+
+        private static Color32[] ResampleBilinearCpu(
+            Color32[] source,
+            int sourceWidth,
+            int sourceHeight,
+            int destinationWidth,
+            int destinationHeight)
+        {
+            if (source == null ||
+                sourceWidth <= 0 ||
+                sourceHeight <= 0 ||
+                source.Length != sourceWidth * sourceHeight)
+            {
+                throw new ArgumentException(
+                    "Cartographic concept pixel count does not match size.",
+                    nameof(source));
+            }
+            if (destinationWidth <= 0 || destinationHeight <= 0)
+                throw new ArgumentOutOfRangeException(nameof(destinationWidth));
+
+            var horizontal = new Color32[destinationWidth * sourceHeight];
+            var xSample = BuildResampleAxis(sourceWidth, destinationWidth);
+            for (int y = 0; y < sourceHeight; y++)
+            {
+                int sourceRow = y * sourceWidth;
+                int destinationRow = y * destinationWidth;
+                for (int x = 0; x < destinationWidth; x++)
+                {
+                    ResampleCoordinate sample = xSample[x];
+                    horizontal[destinationRow + x] = InterpolateColor(
+                        source[sourceRow + sample.Lower],
+                        source[sourceRow + sample.Upper],
+                        sample.Fraction);
+                }
+            }
+
+            var output = new Color32[destinationWidth * destinationHeight];
+            var ySample = BuildResampleAxis(sourceHeight, destinationHeight);
+            for (int y = 0; y < destinationHeight; y++)
+            {
+                ResampleCoordinate sample = ySample[y];
+                int lowerRow = sample.Lower * destinationWidth;
+                int upperRow = sample.Upper * destinationWidth;
+                int destinationRow = y * destinationWidth;
+                for (int x = 0; x < destinationWidth; x++)
+                {
+                    output[destinationRow + x] = InterpolateColor(
+                        horizontal[lowerRow + x],
+                        horizontal[upperRow + x],
+                        sample.Fraction);
+                }
+            }
+            return output;
+        }
+
+        private static ResampleCoordinate[] BuildResampleAxis(
+            int sourceSize,
+            int destinationSize)
+        {
+            const int fractionScale = 65536;
+            var samples = new ResampleCoordinate[destinationSize];
+            long divisor = 2L * destinationSize;
+            long maximum = (long)(sourceSize - 1) * fractionScale;
+            for (int destination = 0;
+                 destination < destinationSize;
+                 destination++)
+            {
+                long numerator =
+                    ((2L * destination + 1L) * sourceSize - destinationSize) *
+                    fractionScale;
+                long fixedCoordinate = FloorDivide(numerator, divisor);
+                fixedCoordinate = Math.Max(0L, Math.Min(maximum, fixedCoordinate));
+                int lower = (int)(fixedCoordinate / fractionScale);
+                int fraction = (int)(fixedCoordinate % fractionScale);
+                samples[destination] = new ResampleCoordinate(
+                    lower,
+                    Math.Min(lower + 1, sourceSize - 1),
+                    fraction);
+            }
+            return samples;
+        }
+
+        private static long FloorDivide(long numerator, long denominator)
+        {
+            long quotient = numerator / denominator;
+            long remainder = numerator % denominator;
+            return remainder < 0L ? quotient - 1L : quotient;
+        }
+
+        private static Color32 InterpolateColor(
+            Color32 lower,
+            Color32 upper,
+            int fraction)
+        {
+            const int fractionScale = 65536;
+            int inverse = fractionScale - fraction;
+            return new Color32(
+                InterpolateByte(lower.r, upper.r, inverse, fraction),
+                InterpolateByte(lower.g, upper.g, inverse, fraction),
+                InterpolateByte(lower.b, upper.b, inverse, fraction),
+                InterpolateByte(lower.a, upper.a, inverse, fraction));
+        }
+
+        private static byte InterpolateByte(
+            byte lower,
+            byte upper,
+            int inverse,
+            int fraction)
+        {
+            return (byte)((lower * inverse + upper * fraction + 32768) >> 16);
+        }
+
+        private static Color32[] BlendOppositeEdgeBands(
+            Color32[] source,
+            int size,
+            int blendWidth)
+        {
+            if (source == null || source.Length != size * size)
+                throw new ArgumentException(
+                    "Cartographic BaseColor pixel count does not match size.",
+                    nameof(source));
+            if (blendWidth < 2 || blendWidth * 2 >= size)
+                throw new ArgumentOutOfRangeException(nameof(blendWidth));
+
+            var horizontal = (Color32[])source.Clone();
+            for (int y = 0; y < size; y++)
+            {
+                int row = y * size;
+                Color32 seam = Average(source[row], source[row + size - 1]);
+                for (int distance = 0; distance < blendWidth; distance++)
+                {
+                    float normalized = distance / (float)(blendWidth - 1);
+                    float weight = 1f - Mathf.SmoothStep(0f, 1f, normalized);
+                    int left = row + distance;
+                    int right = row + size - 1 - distance;
+                    horizontal[left] = BlendColor(source[left], seam, weight);
+                    horizontal[right] = BlendColor(source[right], seam, weight);
+                }
+            }
+
+            var output = (Color32[])horizontal.Clone();
+            for (int x = 0; x < size; x++)
+            {
+                Color32 seam = Average(
+                    horizontal[x],
+                    horizontal[(size - 1) * size + x]);
+                for (int distance = 0; distance < blendWidth; distance++)
+                {
+                    float normalized = distance / (float)(blendWidth - 1);
+                    float weight = 1f - Mathf.SmoothStep(0f, 1f, normalized);
+                    int bottom = distance * size + x;
+                    int top = (size - 1 - distance) * size + x;
+                    output[bottom] = BlendColor(
+                        horizontal[bottom],
+                        seam,
+                        weight);
+                    output[top] = BlendColor(horizontal[top], seam, weight);
+                }
+            }
+            return output;
+        }
+
+        private static Color32 BlendColor(
+            Color32 source,
+            Color32 target,
+            float weight)
+        {
+            return new Color32(
+                (byte)Mathf.RoundToInt(Mathf.Lerp(source.r, target.r, weight)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(source.g, target.g, weight)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(source.b, target.b, weight)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(source.a, target.a, weight)));
+        }
+
+        private static float[] PeriodicBoxBlur(
+            float[] source,
+            int width,
+            int height,
+            int radius)
+        {
+            int diameter = radius * 2 + 1;
+            var horizontal = new float[source.Length];
+            var output = new float[source.Length];
+            for (int y = 0; y < height; y++)
+            {
+                int row = y * width;
+                double sum = 0d;
+                for (int offset = -radius; offset <= radius; offset++)
+                    sum += source[row + PositiveModulo(offset, width)];
+                for (int x = 0; x < width; x++)
+                {
+                    horizontal[row + x] = (float)(sum / diameter);
+                    sum -= source[row + PositiveModulo(x - radius, width)];
+                    sum += source[row + PositiveModulo(
+                        x + radius + 1,
+                        width)];
+                }
+            }
+            for (int x = 0; x < width; x++)
+            {
+                double sum = 0d;
+                for (int offset = -radius; offset <= radius; offset++)
+                {
+                    sum += horizontal[
+                        PositiveModulo(offset, height) * width + x];
+                }
+                for (int y = 0; y < height; y++)
+                {
+                    output[y * width + x] = (float)(sum / diameter);
+                    sum -= horizontal[
+                        PositiveModulo(y - radius, height) * width + x];
+                    sum += horizontal[
+                        PositiveModulo(y + radius + 1, height) * width + x];
+                }
+            }
+            return output;
+        }
+
+        private static ushort[] BuildCartographicHeight(
+            float[] broad,
+            FirstArtTerrainLayer3D layer)
+        {
+            double mean = 0d;
+            for (int index = 0; index < broad.Length; index++)
+                mean += broad[index];
+            mean /= broad.Length;
+            double variance = 0d;
+            for (int index = 0; index < broad.Length; index++)
+            {
+                double difference = broad[index] - mean;
+                variance += difference * difference;
+            }
+            float deviation = (float)Math.Sqrt(variance / broad.Length);
+            deviation = Mathf.Max(deviation, .02f);
+            float amplitude = layer == FirstArtTerrainLayer3D.DeepWater
+                ? .035f
+                : .06f;
+            var height = new ushort[broad.Length];
+            for (int index = 0; index < height.Length; index++)
+            {
+                float value = Mathf.Clamp(
+                    .5f + (broad[index] - (float)mean) /
+                    deviation * amplitude,
+                    .36f,
+                    .64f);
+                height[index] = (ushort)Mathf.RoundToInt(value * 65535f);
+            }
+            AverageOppositeEdges(height, SourceTextureSize);
+            return height;
+        }
+
+        private static Color32[] BuildCartographicNormal(
+            ushort[] height,
+            FirstArtTerrainLayer3D layer)
+        {
+            float strength = layer == FirstArtTerrainLayer3D.DeepWater
+                ? 8f
+                : 12f;
+            var normal = new Color32[height.Length];
+            for (int y = 0; y < SourceTextureSize; y++)
+            for (int x = 0; x < SourceTextureSize; x++)
+            {
+                float left = HeightAt(height, x - 1, y);
+                float right = HeightAt(height, x + 1, y);
+                float down = HeightAt(height, x, y - 1);
+                float up = HeightAt(height, x, y + 1);
+                Vector3 value = new Vector3(
+                    -(right - left) * strength,
+                    -(up - down) * strength,
+                    1f).normalized;
+                normal[y * SourceTextureSize + x] = new Color32(
+                    QuantizeUnit(value.x * .5f + .5f),
+                    QuantizeUnit(value.y * .5f + .5f),
+                    QuantizeUnit(value.z * .5f + .5f),
+                    255);
+            }
+            AverageOppositeEdges(normal, SourceTextureSize);
+            return normal;
+        }
+
+        private static Color32[] BuildCartographicMask(
+            float[] luminance,
+            float[] local,
+            ushort[] height,
+            FirstArtTerrainLayer3D layer)
+        {
+            double detailMean = 0d;
+            for (int index = 0; index < luminance.Length; index++)
+                detailMean += Math.Abs(luminance[index] - local[index]);
+            detailMean = Math.Max(detailMean / luminance.Length, .002d);
+            var mask = new Color32[luminance.Length];
+            for (int index = 0; index < mask.Length; index++)
+            {
+                float detail = Mathf.Clamp(
+                    .32f + (float)(
+                        Math.Abs(luminance[index] - local[index]) /
+                        detailMean - 1d) * .16f,
+                    .12f,
+                    .82f);
+                float normalizedHeight = height[index] / 65535f;
+                float ao = Mathf.Clamp(
+                    .9f + (normalizedHeight - .5f) * .55f,
+                    .78f,
+                    1f);
+                float metallic = 0f;
+                if (layer == FirstArtTerrainLayer3D.Ruins)
+                {
+                    metallic = Mathf.Clamp01(Mathf.Max(
+                        0f,
+                        luminance[index] - local[index]) * 5f);
+                }
+                float smoothness = SmoothnessFor(
+                    layer,
+                    detail,
+                    luminance[index]);
+                mask[index] = new Color32(
+                    QuantizeUnit(metallic),
+                    QuantizeUnit(ao),
+                    QuantizeUnit(detail),
+                    QuantizeUnit(smoothness));
+            }
+            AverageOppositeEdges(mask, SourceTextureSize);
+            return mask;
+        }
+
+        private static float SmoothnessFor(
+            FirstArtTerrainLayer3D layer,
+            float detail,
+            float luminance)
+        {
+            float inverseDetail = 1f - detail;
+            switch (layer)
+            {
+                case FirstArtTerrainLayer3D.Wetland:
+                    return Mathf.Lerp(.24f, .56f, inverseDetail);
+                case FirstArtTerrainLayer3D.Crystal:
+                    return Mathf.Lerp(.22f, .62f, inverseDetail);
+                case FirstArtTerrainLayer3D.Ruins:
+                    return Mathf.Lerp(.12f, .3f, inverseDetail);
+                case FirstArtTerrainLayer3D.DeepWater:
+                    return Mathf.Lerp(.78f, .92f,
+                        Mathf.Clamp01(inverseDetail * .75f + luminance * .25f));
+                case FirstArtTerrainLayer3D.Rocky:
+                case FirstArtTerrainLayer3D.Cliff:
+                    return Mathf.Lerp(.07f, .17f, inverseDetail);
+                default:
+                    return Mathf.Lerp(.08f, .2f, inverseDetail);
+            }
+        }
+
+        private static byte[] EncodeHeightPng(ushort[] pixels)
+        {
+            var texture = new Texture2D(
+                SourceTextureSize,
+                SourceTextureSize,
+                TextureFormat.R16,
+                false,
+                true);
+            try
+            {
+                texture.SetPixelData(pixels, 0);
+                texture.Apply(false, false);
+                return texture.EncodeToPNG();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static byte[] EncodeColorPng(
+            Color32[] pixels,
+            TextureFormat format)
+        {
+            var texture = new Texture2D(
+                SourceTextureSize,
+                SourceTextureSize,
+                format,
+                false,
+                true);
+            try
+            {
+                texture.SetPixels32(pixels);
+                texture.Apply(false, false);
+                return texture.EncodeToPNG();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static float HeightAt(ushort[] height, int x, int y)
+        {
+            int wrappedX = PositiveModulo(x, SourceTextureSize);
+            int wrappedY = PositiveModulo(y, SourceTextureSize);
+            return height[wrappedY * SourceTextureSize + wrappedX] /
+                65535f;
+        }
+
+        private static int PositiveModulo(int value, int modulus)
+        {
+            int remainder = value % modulus;
+            return remainder < 0 ? remainder + modulus : remainder;
+        }
+
+        private static byte QuantizeUnit(float value)
+        {
+            return (byte)Mathf.RoundToInt(Mathf.Clamp01(value) * 255f);
+        }
+
+        private static void AverageOppositeEdges(
+            ushort[] values,
+            int size)
+        {
+            for (int coordinate = 0; coordinate < size; coordinate++)
+            {
+                int horizontalA = coordinate * size;
+                int horizontalB = horizontalA + size - 1;
+                ushort horizontal = (ushort)(
+                    (values[horizontalA] + values[horizontalB] + 1) / 2);
+                values[horizontalA] = horizontal;
+                values[horizontalB] = horizontal;
+
+                int verticalA = coordinate;
+                int verticalB = (size - 1) * size + coordinate;
+                ushort vertical = (ushort)(
+                    (values[verticalA] + values[verticalB] + 1) / 2);
+                values[verticalA] = vertical;
+                values[verticalB] = vertical;
+            }
+        }
+
+        private static void AverageOppositeEdges(
+            Color32[] values,
+            int size)
+        {
+            for (int coordinate = 0; coordinate < size; coordinate++)
+            {
+                int horizontalA = coordinate * size;
+                int horizontalB = horizontalA + size - 1;
+                Color32 horizontal = Average(
+                    values[horizontalA],
+                    values[horizontalB]);
+                values[horizontalA] = horizontal;
+                values[horizontalB] = horizontal;
+
+                int verticalA = coordinate;
+                int verticalB = (size - 1) * size + coordinate;
+                Color32 vertical = Average(
+                    values[verticalA],
+                    values[verticalB]);
+                values[verticalA] = vertical;
+                values[verticalB] = vertical;
+            }
+        }
+
+        private static Color32 Average(Color32 left, Color32 right)
+        {
+            return new Color32(
+                (byte)((left.r + right.r + 1) / 2),
+                (byte)((left.g + right.g + 1) / 2),
+                (byte)((left.b + right.b + 1) / 2),
+                (byte)((left.a + right.a + 1) / 2));
+        }
+
+        private static void ReimportGeneratedSources(
+            IEnumerable<string> paths)
+        {
+            foreach (string path in paths)
+            {
+                AssetDatabase.ImportAsset(
+                    path,
+                    ImportAssetOptions.ForceUpdate |
+                    ImportAssetOptions.ForceSynchronousImport);
+            }
+        }
+
+        private static void ValidatePreservedSourceIdentity(
+            IReadOnlyDictionary<string, byte[]> originalMetaFiles,
+            IReadOnlyDictionary<string, string> originalGuids)
+        {
+            foreach (KeyValuePair<string, byte[]> pair in originalMetaFiles)
+            {
+                string path = pair.Key;
+                if (!string.Equals(
+                        AssetDatabase.AssetPathToGUID(path),
+                        originalGuids[path],
+                        StringComparison.Ordinal) ||
+                    !ByteArraysEqual(
+                        File.ReadAllBytes(AbsoluteProjectPath(path) + ".meta"),
+                        pair.Value))
+                {
+                    throw new InvalidOperationException(
+                        "IDEA-0018 source GUID/meta changed: " + path);
+                }
+            }
+        }
+
+        private static bool ByteArraysEqual(byte[] left, byte[] right)
+        {
+            if (ReferenceEquals(left, right)) return true;
+            if (left == null || right == null || left.Length != right.Length)
+                return false;
+            for (int index = 0; index < left.Length; index++)
+                if (left[index] != right[index]) return false;
+            return true;
         }
 
         [MenuItem("WasteCity/Art/Build First Terrain Texture Arrays")]
@@ -736,6 +1434,23 @@ namespace WasteCity.Editor
             }
         }
 
+        private static void ApplyCartographicVisualStyle(Material material)
+        {
+            material.SetFloat("_MacroVariation", .08f);
+            material.SetColor("_WastelandTint", TerrainTint(FirstArtTerrainLayer3D.Wasteland));
+            material.SetColor("_RockyTint", TerrainTint(FirstArtTerrainLayer3D.Rocky));
+            material.SetColor("_WetlandTint", TerrainTint(FirstArtTerrainLayer3D.Wetland));
+            material.SetColor("_CrystalTint", TerrainTint(FirstArtTerrainLayer3D.Crystal));
+            material.SetColor("_RuinsTint", TerrainTint(FirstArtTerrainLayer3D.Ruins));
+            material.SetColor("_DeepWaterTint", TerrainTint(FirstArtTerrainLayer3D.DeepWater));
+            material.SetColor("_CliffTint", TerrainTint(FirstArtTerrainLayer3D.Cliff));
+        }
+
+        private static Color TerrainTint(FirstArtTerrainLayer3D layer)
+        {
+            return FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(layer);
+        }
+
         private static FirstArtTerrainProfile3D LoadOrCreateProfile()
         {
             FirstArtTerrainProfile3D profile =
@@ -851,6 +1566,12 @@ namespace WasteCity.Editor
             return $"{TerrainRoot}/{terrainName}/T_Terrain_{terrainName}_{channel}.png";
         }
 
+        private static string ConceptPath(string terrainName)
+        {
+            return $"{CartographicConceptRoot}/{terrainName}/References/" +
+                $"{terrainName}_IDEA0018_Cartographic_Concept_v001.png";
+        }
+
         private static string TerrainName(FirstArtTerrainLayer3D layer)
         {
             switch (layer)
@@ -880,6 +1601,20 @@ namespace WasteCity.Editor
             Normal = 1,
             Mask = 2,
             Height = 3,
+        }
+
+        private readonly struct ResampleCoordinate
+        {
+            public ResampleCoordinate(int lower, int upper, int fraction)
+            {
+                Lower = lower;
+                Upper = upper;
+                Fraction = fraction;
+            }
+
+            public int Lower { get; }
+            public int Upper { get; }
+            public int Fraction { get; }
         }
 
         private sealed class ArrayDestinationTransaction : IDisposable
@@ -1095,6 +1830,30 @@ namespace WasteCity.Editor
                 public string AssetBackupPath { get; }
                 public string MetaBackupPath { get; }
             }
+        }
+
+        private sealed class CartographicSourceChannels
+        {
+            public CartographicSourceChannels(
+                byte[] baseColorPng,
+                byte[] heightPng,
+                byte[] normalPng,
+                byte[] maskPng)
+            {
+                BaseColorPng = baseColorPng ??
+                    throw new ArgumentNullException(nameof(baseColorPng));
+                HeightPng = heightPng ??
+                    throw new ArgumentNullException(nameof(heightPng));
+                NormalPng = normalPng ??
+                    throw new ArgumentNullException(nameof(normalPng));
+                MaskPng = maskPng ??
+                    throw new ArgumentNullException(nameof(maskPng));
+            }
+
+            public byte[] BaseColorPng { get; }
+            public byte[] HeightPng { get; }
+            public byte[] NormalPng { get; }
+            public byte[] MaskPng { get; }
         }
 
         private sealed class SourceAsset

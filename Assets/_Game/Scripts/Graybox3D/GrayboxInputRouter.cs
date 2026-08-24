@@ -8,6 +8,7 @@ namespace WasteCity.Graybox3D
     {
         public Vector2 Move { get; }
         public Vector2 PointerPosition { get; }
+        public Vector2 ScrollDelta { get; }
         public bool ToggleDeploymentPressed { get; }
         public bool DestinationPressed { get; }
         public bool MiddlePressed { get; }
@@ -18,6 +19,7 @@ namespace WasteCity.Graybox3D
         public GrayboxInputFrame(
             Vector2 move,
             Vector2 pointerPosition,
+            Vector2 scrollDelta,
             bool toggleDeploymentPressed,
             bool destinationPressed,
             bool middlePressed,
@@ -27,6 +29,7 @@ namespace WasteCity.Graybox3D
         {
             Move = move;
             PointerPosition = pointerPosition;
+            ScrollDelta = scrollDelta;
             ToggleDeploymentPressed =
                 toggleDeploymentPressed;
             DestinationPressed = destinationPressed;
@@ -34,6 +37,28 @@ namespace WasteCity.Graybox3D
             MiddleHeld = middleHeld;
             MiddleReleased = middleReleased;
             HomePressed = homePressed;
+        }
+
+        public GrayboxInputFrame(
+            Vector2 move,
+            Vector2 pointerPosition,
+            bool toggleDeploymentPressed,
+            bool destinationPressed,
+            bool middlePressed,
+            bool middleHeld,
+            bool middleReleased,
+            bool homePressed)
+            : this(
+                move,
+                pointerPosition,
+                Vector2.zero,
+                toggleDeploymentPressed,
+                destinationPressed,
+                middlePressed,
+                middleHeld,
+                middleReleased,
+                homePressed)
+        {
         }
     }
 
@@ -112,6 +137,7 @@ namespace WasteCity.Graybox3D
             }
 
             Vector2 pointerPosition = Vector2.zero;
+            Vector2 scrollDelta = Vector2.zero;
             bool destinationPressed = false;
             bool middlePressed = false;
             bool middleHeld = false;
@@ -119,6 +145,7 @@ namespace WasteCity.Graybox3D
             if (mouse != null)
             {
                 pointerPosition = mouse.position.ReadValue();
+                scrollDelta = mouse.scroll.ReadValue();
                 destinationPressed =
                     mouse.rightButton.wasPressedThisFrame;
                 middlePressed =
@@ -131,6 +158,7 @@ namespace WasteCity.Graybox3D
             return new GrayboxInputFrame(
                 new Vector2(horizontal, vertical),
                 pointerPosition,
+                scrollDelta,
                 toggleDeploymentPressed,
                 destinationPressed,
                 middlePressed,
@@ -245,6 +273,9 @@ namespace WasteCity.Graybox3D
         {
             if (cameraController == null)
                 return;
+
+            if (!suppression.Zoom)
+                cameraController.ApplyScrollZoom(frame.ScrollDelta.y);
 
             if (!suppression.CameraDrag &&
                 frame.MiddlePressed)

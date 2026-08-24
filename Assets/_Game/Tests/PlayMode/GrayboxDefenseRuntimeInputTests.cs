@@ -155,9 +155,25 @@ namespace WasteCity.Tests
 
             Assert.That(controller.Open(CreateVictorySettlement()), Is.True);
             yield return null;
+            ScrollRect statisticsScroll = Object
+                .FindObjectsOfType<ScrollRect>(true)
+                .Single(value => value.name ==
+                    "Defense.Settlement.Statistics.Scroll");
             Button button = Object.FindObjectsOfType<Button>(true)
                 .Single(value => value.name ==
                     "Defense.Settlement.Action.ContinueSandbox");
+            Assert.That(
+                button.transform.IsChildOf(statisticsScroll.content),
+                Is.False,
+                "Settlement actions stay fixed while statistics scroll.");
+
+            float beforeScroll = statisticsScroll.verticalNormalizedPosition;
+            yield return ScrollUiElement(
+                statisticsScroll.viewport,
+                -120f);
+            Assert.That(
+                statisticsScroll.verticalNormalizedPosition,
+                Is.LessThan(beforeScroll));
 
             yield return ClickUiElement(button.gameObject);
 
@@ -714,6 +730,29 @@ namespace WasteCity.Tests
             QueueMouse(screen);
             yield return null;
             QueueMouse(screen, MouseButton.Left);
+            yield return null;
+            QueueMouse(screen);
+            yield return null;
+        }
+
+        private IEnumerator ScrollUiElement(
+            RectTransform target,
+            float deltaY)
+        {
+            Assert.That(target, Is.Not.Null);
+            Canvas.ForceUpdateCanvases();
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(
+                null,
+                target.TransformPoint(target.rect.center));
+            QueueMouse(screen);
+            yield return null;
+            var state = new MouseState
+            {
+                position = screen,
+                scroll = new Vector2(0f, deltaY),
+            };
+            InputSystem.QueueStateEvent(mouse, state);
+            InputSystem.Update();
             yield return null;
             QueueMouse(screen);
             yield return null;

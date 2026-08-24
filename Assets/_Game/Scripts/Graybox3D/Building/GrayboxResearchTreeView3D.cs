@@ -1075,7 +1075,11 @@ namespace WasteCity.Graybox3D.Building
             var text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = fontSize;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                Mathf.Max(
+                    fontSize,
+                    FormalUiLayoutProfile3D.Standard.FontDescription));
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
             text.text = value ?? string.Empty;

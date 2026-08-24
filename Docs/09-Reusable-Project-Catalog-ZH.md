@@ -402,6 +402,14 @@
 
 能解决什么：把 `WorldMapModel` 的真实资源节点投影为带稳定 ID 和共享资源图标的可回收场景标记。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs` 与 `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`。怎么复用：在 GrayboxPrototype3D 中以世界坐标生成稳定矿点 ID，并把 WorldMapModel 的真实资源节点投影为复用共享资源图标的可回收标记。不能负责什么：只属于当前 3D 世界表现与对象复用层；不创建资源节点、不决定节点类型、储量、采矿合法性或枯竭规则，所有真值必须继续来自 WorldMapModel。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxResourceNodeIdentity3D`、`GrayboxResourceNodeMarker3D`。
 
+### 正式三维地图导航与矿点层级（复用前审查）
+
+能解决什么：统一正式三维地图的正交缩放边界、滚轮步长与资源矿点 Near/Mid/Far 显示层级。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`、`Assets/_Game/Resources/Presentation/FormalMapNavigationProfile3D.asset`。怎么复用：相机、世界视图和证据捕获共同读取该正式配置；采矿指引只对当前范围内兼容候选临时覆盖为 Near。不能负责什么：不修改地图尺寸、地形、资源节点、储量或输入焦点真值，模态抑制仍须经过正式输入协调器。改后跑哪组测试：`GrayboxCameraAndInputTests`、`GrayboxVisualAndWorldTests`、`GrayboxRuntimeSceneTests`。代码名：`FormalMapNavigationProfile3D`、`ResourceNodeMarkerLod3D`。
+
+### 正式三维响应式界面布局（复用前审查）
+
+能解决什么：统一 1920×1080 参考分辨率、`ScaleWithScreenSize + Expand`、安全区、语义槽位、间距、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`、`FormalUiLayoutPolicy3D.cs`、`FormalUiCanvasConfiguration3D.cs`。怎么复用：正式 3D Canvas 和主要 HUD/大面板消费同一布局真值；长内容使用滚动或受测的固定容器，禁止整体缩小面板。不能负责什么：不拥有玩法数据、输入命令或窗口生命周期；建造栏继续保持批准的 `620×54` 尺寸和位置。改后跑哪组测试：`FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests`、`GrayboxSceneContractTests`、`GrayboxDeveloperModifierRuntimeInputTests`、`GrayboxDefenseRuntimeInputTests`。代码名：`FormalUiLayoutProfile3D`、`FormalUiLayoutPolicy3D`、`FormalUiLayout3D`、`FormalUiCanvasConfiguration3D`、`FormalUiCanvasMetrics3D`、`FormalUiReadableText3D`。
+
 ### 三维灰盒视觉槽位（仅限场景）
 
 能解决什么：把灰盒视觉绑定到当前场景。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs`。怎么复用：用于场景内灰盒视觉绑定。只在该三维场景内使用。不能负责什么：不作为二维槽位替代。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxVisualSlot`。
@@ -409,6 +417,10 @@
 ### 首版三维地形配置（复用前审查）
 
 能解决什么：定义首版地形参数。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`。怎么复用：用于定义首版地形参数。修改前需要导入策略复核。不能负责什么：不直接决定资源导入。改后跑哪组测试：`FirstArtTerrainProfileTests`。代码名：`FirstArtTerrainProfile3D`。
+
+### 文明式三维地形视觉样式（复用前审查）
+
+能解决什么：冻结七类地形的制图式综合色、宏观变化强度和首轮原创色板。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`。怎么复用：资产生成器和正式 Shader 必须共同消费该目录，保持七层顺序与远距离辨认色族一致。不能负责什么：只拥有表现参数，不改变 `WorldMapModel`、控制图、可通行性、资源节点或 Ruins/Cliff 几何；替换底色必须运行 `TerrainAssetDeep`。改后跑哪组测试：`FirstArtTerrainVisualStyleTests`、`FirstArtTerrainShaderTests`。代码名：`FirstArtTerrainVisualStyleCatalog3D`。
 
 ### 首版三维地形渲染（仅限场景）
 
@@ -427,6 +439,14 @@
 能解决什么：在唯一正式三维地形 presenter 中呈现 Ruins/Cliff，并在类别失败时恢复对应灰盒。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`。怎么复用：用于在正式三维地形 presenter 中呈现废墟与悬崖并保留分类回退。不能负责什么：必须复用唯一地形 presenter；不得增加第二个场景 owner 或绕过分类回退。改后跑哪组测试：`FirstArtRuinsCliffEvidenceCaptureTests`、`FirstArtRuinsCliffPresentationTests`、`FirstArtRuinsCliffSceneContractTests`。代码名：`FirstArtTerrainRenderer3D`。
 
 ## 场景、构建与检查工具
+
+### 文明式地形四通道生成器（复用前审查）
+
+能解决什么：从七份不可变概念源确定性重采样、平滑接缝并派生 BaseColor、Height、Normal、Mask，再事务式重建四个 Texture2DArray。在哪里：`Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs`。怎么复用：只从 `ArtSource/FirstPass/Environment/Terrain/**/References/*_IDEA0018_*.png` 读取冻结概念，使用固定点 CPU 双线性重采样和 96 像素平滑边缘带；连续生成必须逐字节一致。不能负责什么：不得读取已生成 BaseColor 作为再次生成输入，不改变控制图、地图真值或玩法规则。改后跑哪组测试：`FirstArtTerrainVisualStyleTests`、`FirstArtTerrainAssetBuilderTests`，并完整运行 `TerrainAssetDeep`。代码名：`FirstArtTerrainAssetBuilder`。
+
+### 首版三维地形与界面固定证据捕获（复用前审查）
+
+能解决什么：采集地图总览、地形交界、资源标记三档、主 HUD、科技树、动态水与十帧缩放轨迹。在哪里：`Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs`。怎么复用：在唯一正式 3D 场景以固定 `1920×1080` 捕获，并把相机尺寸、LOD、UI 状态和 SHA-256 写入 manifest。不能负责什么：仅用于 Editor 验证；必须恢复相机、Canvas、矿点 LOD 和面板状态，不修改地图或 UI 真值，也不能把自动截图写成人工视觉验收。改后跑哪组测试：`FirstArtTerrainEvidenceCaptureTests`，并实际运行一次 GUI 捕获核对 manifest。代码名：`FirstArtTerrainEvidenceCapture`。
 
 ### 正式二维图类级导入规则（复用前审查）
 

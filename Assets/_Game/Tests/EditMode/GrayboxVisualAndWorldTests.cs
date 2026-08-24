@@ -288,6 +288,70 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0018_ResourceMarkersUseNearMidFarWithoutChangingIdentity()
+        {
+            WorldMapModel model = CreateCatalogMap();
+            GrayboxWorldView3D view = CreateView();
+            FormalMapNavigationProfile3D profile = Track(
+                ScriptableObject.CreateInstance<
+                    FormalMapNavigationProfile3D>());
+            profile.Configure(8f, 13f, 26f, 1f / 120f, 15f, 21f);
+            view.ConfigureMapNavigation(profile);
+            view.Generate(model);
+            Assert.That(view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            GameObject markerObject = marker.gameObject;
+            int markerCount = view.ResourceNodeMarkerCount;
+
+            Assert.That(view.RefreshResourceNodeMarkerLod(13f), Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Near));
+            Assert.That(marker.DisplayText, Does.Contain("石料"));
+            Assert.That(marker.DisplayText, Does.Contain("100"));
+
+            Assert.That(view.RefreshResourceNodeMarkerLod(18f), Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Mid));
+            Assert.That(marker.DisplayText, Is.EqualTo("100"));
+
+            Assert.That(view.RefreshResourceNodeMarkerLod(24f), Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            Assert.That(marker.DisplayText, Is.Empty);
+            Assert.That(marker.Icon, Is.Not.Null);
+
+            Assert.That(
+                view.SetResourceMarkerGuidanceOverride(9, 0, true),
+                Is.True);
+            Assert.That(marker.GuidanceOverride, Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Near));
+            Assert.That(marker.DisplayText, Does.Contain("石料"));
+            Assert.That(marker.DisplayText, Does.Contain("100"));
+            Assert.That(view.ResourceNodeMarkerCount, Is.EqualTo(markerCount));
+            Assert.That(view.TryGetResourceNodeMarker(9, 0, out var same),
+                Is.True);
+            Assert.That(same.gameObject, Is.SameAs(markerObject));
+
+            Assert.That(
+                view.SetResourceMarkerGuidanceOverride(9, 0, true),
+                Is.False);
+            Assert.That(view.RefreshResourceNodeMarkerLod(24f), Is.False);
+            Assert.That(
+                view.ClearResourceMarkerGuidanceOverrides(),
+                Is.True);
+            Assert.That(marker.GuidanceOverride, Is.False);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            Assert.That(
+                view.ClearResourceMarkerGuidanceOverrides(),
+                Is.False);
+        }
+
+        [Test]
         public void IDEA0012_StableMarkerRefreshAndCameraDoNotAllocateOrRewrite()
         {
             WorldMapModel model = CreateCatalogMap();

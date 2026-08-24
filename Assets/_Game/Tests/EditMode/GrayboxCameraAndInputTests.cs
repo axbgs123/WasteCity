@@ -134,6 +134,7 @@ namespace WasteCity.Tests
             object frame = CreateInputFrame(
                 new Vector2(.25f, -.75f),
                 new Vector2(320f, 180f),
+                scrollDelta: new Vector2(0f, 120f),
                 toggleDeploymentPressed: true,
                 destinationPressed: false,
                 middlePressed: true,
@@ -149,12 +150,115 @@ namespace WasteCity.Tests
                 frame,
                 "PointerPosition",
                 new Vector2(320f, 180f));
+            AssertFrameProperty(
+                frame,
+                "ScrollDelta",
+                new Vector2(0f, 120f));
             AssertFrameProperty(frame, "ToggleDeploymentPressed", true);
             AssertFrameProperty(frame, "DestinationPressed", false);
             AssertFrameProperty(frame, "MiddlePressed", true);
             AssertFrameProperty(frame, "MiddleHeld", true);
             AssertFrameProperty(frame, "MiddleReleased", false);
             AssertFrameProperty(frame, "HomePressed", true);
+        }
+
+        [Test]
+        public void IDEA0018_MapNavigationProfileOwnsZoomAndMarkerThresholds()
+        {
+            Assert.That(
+                Resources.Load<FormalMapNavigationProfile3D>(
+                    FormalMapNavigationProfile3D.ResourcesPath),
+                Is.Not.Null,
+                "The formal scene must resolve one shared navigation profile.");
+            FormalMapNavigationProfile3D profile = Track(
+                ScriptableObject.CreateInstance<
+                    FormalMapNavigationProfile3D>());
+            profile.Configure(
+                minimumOrthographicSize: 8f,
+                defaultOrthographicSize: 13f,
+                maximumOrthographicSize: 26f,
+                zoomSensitivity: 1f / 120f,
+                nearMarkerMaximumSize: 15f,
+                midMarkerMaximumSize: 21f);
+
+            Assert.That(profile.TryValidate(out string error), Is.True, error);
+            Assert.That(
+                profile.ResolveOrthographicSize(13f, 120f),
+                Is.EqualTo(12f).Within(.0001f));
+            Assert.That(
+                profile.ResolveOrthographicSize(8f, 120f),
+                Is.EqualTo(8f));
+            Assert.That(
+                profile.ResolveOrthographicSize(26f, -120f),
+                Is.EqualTo(26f));
+            Assert.That(profile.ResolveMarkerLod(13f),
+                Is.EqualTo(ResourceNodeMarkerLod3D.Near));
+            Assert.That(profile.ResolveMarkerLod(18f),
+                Is.EqualTo(ResourceNodeMarkerLod3D.Mid));
+            Assert.That(profile.ResolveMarkerLod(24f),
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+        }
+
+        [Test]
+        public void IDEA0018_ScrollZoomClampsWithoutChangingCameraPoseOrRig()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            FormalMapNavigationProfile3D profile = Track(
+                ScriptableObject.CreateInstance<
+                    FormalMapNavigationProfile3D>());
+            profile.Configure(8f, 13f, 26f, 1f / 120f, 15f, 21f);
+            fixture.CameraController.ConfigureMapNavigation(profile);
+            Vector3 rigPosition = fixture.CameraRig.position;
+            Vector3 cameraLocalPosition = fixture.Camera.transform.localPosition;
+            Quaternion cameraLocalRotation = fixture.Camera.transform.localRotation;
+
+            Assert.That(
+                fixture.CameraController.ApplyScrollZoom(120f),
+                Is.True);
+            Assert.That(fixture.Camera.orthographicSize,
+                Is.EqualTo(12f).Within(.0001f));
+            Assert.That(fixture.CameraRig.position, Is.EqualTo(rigPosition));
+            Assert.That(fixture.Camera.transform.localPosition,
+                Is.EqualTo(cameraLocalPosition));
+            Assert.That(fixture.Camera.transform.localRotation,
+                Is.EqualTo(cameraLocalRotation));
+
+            for (var index = 0; index < 40; index++)
+                fixture.CameraController.ApplyScrollZoom(120f);
+            Assert.That(fixture.Camera.orthographicSize, Is.EqualTo(8f));
+            for (var index = 0; index < 40; index++)
+                fixture.CameraController.ApplyScrollZoom(-120f);
+            Assert.That(fixture.Camera.orthographicSize, Is.EqualTo(26f));
+        }
+
+        [Test]
+        public void IDEA0018_ProcessFrameRoutesZoomUnlessSuppressed()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            float initial = fixture.Camera.orthographicSize;
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.zero,
+                    new Vector2(640f, 360f),
+                    scrollDelta: new Vector2(0f, 120f)),
+                new GrayboxInputSuppression(
+                    move: false,
+                    deployment: false,
+                    destination: false,
+                    cameraDrag: false,
+                    home: false,
+                    zoom: true));
+            Assert.That(fixture.Camera.orthographicSize, Is.EqualTo(initial));
+
+            fixture.Router.ProcessFrame(
+                (GrayboxInputFrame)CreateInputFrame(
+                    Vector2.zero,
+                    new Vector2(640f, 360f),
+                    scrollDelta: new Vector2(0f, 120f)),
+                default);
+            Assert.That(fixture.Camera.orthographicSize,
+                Is.LessThan(initial));
         }
 
         [Test]
@@ -1230,6 +1334,7 @@ namespace WasteCity.Tests
         private static object CreateInputFrame(
             Vector2 move,
             Vector2 pointerPosition,
+            Vector2 scrollDelta = default,
             bool toggleDeploymentPressed = false,
             bool destinationPressed = false,
             bool middlePressed = false,
@@ -1242,6 +1347,7 @@ namespace WasteCity.Tests
                 frameType,
                 move,
                 pointerPosition,
+                scrollDelta,
                 toggleDeploymentPressed,
                 destinationPressed,
                 middlePressed,

@@ -13,19 +13,22 @@ namespace WasteCity.Graybox3D
         public bool Destination { get; }
         public bool CameraDrag { get; }
         public bool Home { get; }
+        public bool Zoom { get; }
 
         public GrayboxInputSuppression(
             bool move,
             bool deployment,
             bool destination,
             bool cameraDrag,
-            bool home)
+            bool home,
+            bool zoom = false)
         {
             Move = move;
             Deployment = deployment;
             Destination = destination;
             CameraDrag = cameraDrag;
             Home = home;
+            Zoom = zoom;
         }
     }
 

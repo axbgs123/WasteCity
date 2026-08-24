@@ -119,18 +119,24 @@ namespace WasteCity.Tests
                 .Find("Graybox Developer Modifier")
                 .GetComponent<RectTransform>();
             Canvas developerCanvas = developerPanel.GetComponentInParent<Canvas>();
-            const float panelMargin = 16f;
-            float expectedScale = Mathf.Clamp(Mathf.Min(
-                Mathf.Max(0f, developerCanvas.pixelRect.width - panelMargin) /
-                    developerPanel.rect.width,
-                Mathf.Max(0f, developerCanvas.pixelRect.height - panelMargin) /
-                    developerPanel.rect.height),
-                .25f,
-                1f);
-            Assert.That(developerPanel.localScale.x,
-                Is.EqualTo(expectedScale).Within(.0001f));
-            Assert.That(developerPanel.rect.height * developerPanel.localScale.y,
-                Is.LessThanOrEqualTo(developerCanvas.pixelRect.height - 16f));
+            Assert.That(developerPanel.localScale, Is.EqualTo(Vector3.one),
+                "The developer drawer must preserve readable text size.");
+            Assert.That(developerPanel.anchorMin.x, Is.EqualTo(1f));
+            Assert.That(developerPanel.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(
+                developerPanel.rect.height,
+                Is.LessThanOrEqualTo(
+                    developerCanvas.GetComponent<RectTransform>()
+                        .rect.height - 32f));
+            Transform developerScrollRoot = developerPanel.Find(
+                "Developer.Panel.Scroll");
+            Assert.That(developerScrollRoot, Is.Not.Null);
+            ScrollRect developerScroll = developerScrollRoot
+                .GetComponent<ScrollRect>();
+            Assert.That(developerScroll, Is.Not.Null);
+            Assert.That(developerScroll.vertical, Is.True);
+            Assert.That(developerScroll.content, Is.Not.Null);
+            Assert.That(developerScroll.viewport, Is.Not.Null);
             yield return null;
 
             yield return TapKey(Key.B);

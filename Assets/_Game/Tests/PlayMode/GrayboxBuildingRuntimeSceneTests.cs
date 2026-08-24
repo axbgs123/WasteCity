@@ -2424,7 +2424,7 @@ namespace WasteCity.Tests
             Canvas.ForceUpdateCanvases();
             Vector2 screen = RectTransformUtility.WorldToScreenPoint(
                 null,
-                rect.position);
+                rect.TransformPoint(rect.rect.center));
             yield return MoveMouse(screen);
             yield return ClickMouse(MouseButton.Left, screen);
         }

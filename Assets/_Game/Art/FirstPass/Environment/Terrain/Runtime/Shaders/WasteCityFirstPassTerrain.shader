@@ -12,18 +12,18 @@ Shader "WasteCity/Terrain/FirstPassBlend"
         _WorldSizeXZ("World Size XZ", Vector) = (1,1,0,0)
         _CellsPerTexture("Cells Per Texture", Float) = 4
         _HeightBlendStrength("Height Blend Strength", Float) = 1
-        _MacroVariation("Macro Variation", Float) = 0.05
+        _MacroVariation("Macro Variation", Float) = 0.08
         _WaterVelocityA("Water Velocity A", Vector) = (0.006,0.002,0,0)
         _WaterVelocityB("Water Velocity B", Vector) = (-0.003,0.005,0,0)
         _WaterNormalScaleB("Water Normal Scale B", Float) = 1.35
         _WaterHighlightStrength("Water Highlight Strength", Float) = 0.21
-        _WastelandTint("Wasteland Tint", Color) = (0.52,0.38,0.22,0.00)
-        _RockyTint("Rocky Tint", Color) = (0.42,0.39,0.34,0.35)
-        _WetlandTint("Wetland Tint", Color) = (0.28,0.40,0.22,0.42)
-        _CrystalTint("Crystal Tint", Color) = (0.30,0.52,0.56,0.46)
-        _RuinsTint("Ruins Tint", Color) = (0.38,0.36,0.34,0.42)
-        _DeepWaterTint("Deep Water Tint", Color) = (0.06,0.18,0.28,0.82)
-        _CliffTint("Cliff Tint", Color) = (0.30,0.28,0.26,0.50)
+        _WastelandTint("Wasteland Tint", Color) = (0.58,0.35,0.14,0.18)
+        _RockyTint("Rocky Tint", Color) = (0.33,0.37,0.42,0.26)
+        _WetlandTint("Wetland Tint", Color) = (0.31,0.40,0.20,0.30)
+        _CrystalTint("Crystal Tint", Color) = (0.38,0.66,0.70,0.24)
+        _RuinsTint("Ruins Tint", Color) = (0.43,0.40,0.37,0.22)
+        _DeepWaterTint("Deep Water Tint", Color) = (0.04,0.12,0.22,0.62)
+        _CliffTint("Cliff Tint", Color) = (0.24,0.19,0.15,0.30)
         _DeepWaterNormalStrength("Deep Water Normal Strength", Float) = 1.45
     }
 
@@ -349,7 +349,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                     sin(input.positionWS.z * 0.053) * 0.35 +
                     sin((input.positionWS.x + input.positionWS.z) * 0.031) * 0.15;
                 float macroTint =
-                    1.0 + macroWave * min(saturate(_MacroVariation), 0.05);
+                    1.0 + macroWave * min(saturate(_MacroVariation), 0.08);
                 blendedBaseColor.rgb *= macroTint;
 
                 half3 bitangentWS =

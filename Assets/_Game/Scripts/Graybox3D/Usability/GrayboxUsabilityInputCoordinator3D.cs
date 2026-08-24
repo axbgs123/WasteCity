@@ -572,7 +572,8 @@ namespace WasteCity.Graybox3D.Usability
                 deployment: true,
                 destination: true,
                 cameraDrag: true,
-                home: true);
+                home: true,
+                zoom: true);
         }
 
         private sealed class DevelopmentPanelAdapter :

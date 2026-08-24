@@ -79,18 +79,18 @@ namespace WasteCity.Tests
             AssertVectorProperty(shader, "_WorldSizeXZ", new Vector4(1f, 1f, 0f, 0f));
             AssertFloatProperty(shader, "_CellsPerTexture", 4f);
             AssertFloatProperty(shader, "_HeightBlendStrength", 1f);
-            AssertFloatProperty(shader, "_MacroVariation", 0.05f);
+            AssertFloatProperty(shader, "_MacroVariation", 0.08f);
             AssertVectorProperty(shader, "_WaterVelocityA", new Vector4(0.006f, 0.002f, 0f, 0f));
             AssertVectorProperty(shader, "_WaterVelocityB", new Vector4(-0.003f, 0.005f, 0f, 0f));
             AssertFloatProperty(shader, "_WaterNormalScaleB", 1.35f);
             AssertFloatProperty(shader, "_WaterHighlightStrength", 0.21f);
-            AssertColorProperty(shader, "_WastelandTint", new Color(.52f, .38f, .22f, 0f));
-            AssertColorProperty(shader, "_RockyTint", new Color(.42f, .39f, .34f, .35f));
-            AssertColorProperty(shader, "_WetlandTint", new Color(.28f, .40f, .22f, .42f));
-            AssertColorProperty(shader, "_CrystalTint", new Color(.30f, .52f, .56f, .46f));
-            AssertColorProperty(shader, "_RuinsTint", new Color(.38f, .36f, .34f, .42f));
-            AssertColorProperty(shader, "_DeepWaterTint", new Color(.06f, .18f, .28f, .82f));
-            AssertColorProperty(shader, "_CliffTint", new Color(.30f, .28f, .26f, .50f));
+            AssertColorProperty(shader, "_WastelandTint", new Color(.58f, .35f, .14f, .18f));
+            AssertColorProperty(shader, "_RockyTint", new Color(.33f, .37f, .42f, .26f));
+            AssertColorProperty(shader, "_WetlandTint", new Color(.31f, .40f, .20f, .30f));
+            AssertColorProperty(shader, "_CrystalTint", new Color(.38f, .66f, .70f, .24f));
+            AssertColorProperty(shader, "_RuinsTint", new Color(.43f, .40f, .37f, .22f));
+            AssertColorProperty(shader, "_DeepWaterTint", new Color(.04f, .12f, .22f, .62f));
+            AssertColorProperty(shader, "_CliffTint", new Color(.24f, .19f, .15f, .30f));
             AssertFloatProperty(shader, "_DeepWaterNormalStrength", 1.45f);
         }
 
@@ -101,13 +101,13 @@ namespace WasteCity.Tests
                 FirstArtTerrainAssetBuilder.MaterialPath);
             var expected = new Dictionary<string, Color>
             {
-                { "_WastelandTint", new Color(.52f, .38f, .22f, 0f) },
-                { "_RockyTint", new Color(.42f, .39f, .34f, .35f) },
-                { "_WetlandTint", new Color(.28f, .40f, .22f, .42f) },
-                { "_CrystalTint", new Color(.30f, .52f, .56f, .46f) },
-                { "_RuinsTint", new Color(.38f, .36f, .34f, .42f) },
-                { "_DeepWaterTint", new Color(.06f, .18f, .28f, .82f) },
-                { "_CliffTint", new Color(.30f, .28f, .26f, .50f) },
+                { "_WastelandTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Wasteland) },
+                { "_RockyTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Rocky) },
+                { "_WetlandTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Wetland) },
+                { "_CrystalTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Crystal) },
+                { "_RuinsTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Ruins) },
+                { "_DeepWaterTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.DeepWater) },
+                { "_CliffTint", FirstArtTerrainVisualStyleCatalog3D.MaterialTintOf(FirstArtTerrainLayer3D.Cliff) },
             };
 
             foreach (KeyValuePair<string, Color> pair in expected)
@@ -116,7 +116,7 @@ namespace WasteCity.Tests
                 Assert.That(material.GetColor(pair.Key), Is.EqualTo(pair.Value), pair.Key);
             }
             Assert.That(expected.Values, Is.Unique);
-            Assert.That(material.GetColor("_WastelandTint").a, Is.Zero);
+            Assert.That(material.GetColor("_WastelandTint").a, Is.EqualTo(.18f));
             Assert.That(
                 material.GetFloat("_DeepWaterNormalStrength"),
                 Is.EqualTo(1.45f).Within(.000001f));
@@ -161,6 +161,10 @@ namespace WasteCity.Tests
                 source,
                 Does.Contain(
                     "return lerp(sourceColor, graded, saturate(tint.a));"));
+            Assert.That(
+                source,
+                Does.Contain(
+                    "min(saturate(_MacroVariation), 0.08)"));
 
             Color sourceColor = new Color(.4f, .3f, .2f, .73f);
             Color neutral = GradeLayerReference(

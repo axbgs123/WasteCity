@@ -847,9 +847,9 @@ namespace WasteCity.Editor
             canvasTransform.gameObject.layer = 5;
             Canvas canvas = EnsureComponent<Canvas>(canvasTransform);
             canvasTransform = canvas.transform;
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 0;
-            EnsureComponent<CanvasScaler>(canvasTransform);
+            FormalUiCanvasConfiguration3D.Apply(
+                canvas,
+                FormalUiLayoutProfile3D.Standard.BuildingSortingOrder);
             GraphicRaycaster raycaster =
                 EnsureComponent<GraphicRaycaster>(canvasTransform);
             raycaster.enabled = true;
@@ -1052,18 +1052,10 @@ namespace WasteCity.Editor
             Canvas operationsCanvas = EnsureComponent<Canvas>(
                 operationsTransform);
             operationsTransform = operationsCanvas.transform;
-            operationsCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            operationsCanvas.sortingOrder =
-                buildingReferences.BuildingCanvas.sortingOrder + 50;
-            CanvasScaler operationsScaler =
-                EnsureComponent<CanvasScaler>(operationsTransform);
-            operationsScaler.uiScaleMode =
-                CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            operationsScaler.referenceResolution =
-                new Vector2(1600f, 900f);
-            operationsScaler.screenMatchMode =
-                CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            operationsScaler.matchWidthOrHeight = .5f;
+            FormalUiCanvasConfiguration3D.Apply(
+                operationsCanvas,
+                FormalUiLayoutProfile3D.Standard
+                    .OperationsSortingOrder);
             GraphicRaycaster operationsRaycaster =
                 EnsureComponent<GraphicRaycaster>(operationsTransform);
             operationsRaycaster.enabled = true;
@@ -1089,10 +1081,10 @@ namespace WasteCity.Editor
             Canvas systemMenuCanvas = EnsureComponent<Canvas>(
                 systemMenuTransform);
             systemMenuTransform = systemMenuCanvas.transform;
-            systemMenuCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            systemMenuCanvas.sortingOrder =
-                buildingReferences.BuildingCanvas.sortingOrder + 100;
-            EnsureComponent<CanvasScaler>(systemMenuTransform);
+            FormalUiCanvasConfiguration3D.Apply(
+                systemMenuCanvas,
+                FormalUiLayoutProfile3D.Standard
+                    .SystemMenuSortingOrder);
             GraphicRaycaster raycaster =
                 EnsureComponent<GraphicRaycaster>(systemMenuTransform);
             raycaster.enabled = true;

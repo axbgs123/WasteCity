@@ -39,11 +39,13 @@
       "ChineseName": "世界地图与地形",
       "SourceGlobs": [
         "Assets/_Game/Scripts/World/**",
-        "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
+        "Assets/_Game/Art/FirstPass/Environment/Terrain/**",
+        "ArtSource/FirstPass/Environment/Terrain/**"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/World/**",
-        "Assets/_Game/Art/FirstPass/Environment/Terrain/**"
+        "Assets/_Game/Art/FirstPass/Environment/Terrain/**",
+        "ArtSource/FirstPass/Environment/Terrain/**"
       ],
       "FailureLocationSummary": "先检查地图模型、地形规则和世界投影",
       "TestFileGlobs": [
@@ -69,16 +71,20 @@
         "Assets/_Game/Tests/EditMode/FirstArtTerrainRendererTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs",
         "Assets/_Game/Tests/PlayMode/FirstArtTerrainRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0018"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
       ],
       "MinimumVerification": "Performance"
     },
@@ -224,6 +230,9 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlement*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**",
@@ -243,6 +252,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalUiLayoutPolicy3DTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalUiResponsiveLayout3DTests.cs",
         "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
@@ -270,10 +281,12 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0016",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0018"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -528,6 +541,7 @@
         "Assets/_Game/Scripts/ArtIntegration3D/**",
         "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs",
@@ -541,6 +555,7 @@
         "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs",
         "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset",
         "Assets/_Game/Resources/Production2D/**",
+        "Assets/_Game/Resources/Presentation/**",
         "Assets/_Game/Art/Production2D/**"
       ],
       "PrimarySourceGlobs": [
@@ -550,6 +565,8 @@
       "FailureLocationSummary": "先检查视觉槽、材质接入、投影与相机场景引用",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
@@ -563,13 +580,16 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0012",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0018"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/Engineering/idea-0016-visual-assets.json",
         "Docs/Art/IDEA-0016/IDEA0016-2D-Visual-Content-Catalog-ZH.md",
-        "Docs/superpowers/specs/2026-08-23-idea-0016-production-2d-art-pipeline-design.md"
+        "Docs/superpowers/specs/2026-08-23-idea-0016-production-2d-art-pipeline-design.md",
+        "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -618,7 +638,9 @@
         "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
-        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -629,10 +651,13 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0016",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0018"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
       ],
       "MinimumVerification": "WindowsBuilds"
     },
@@ -1364,7 +1389,8 @@
       "RequirementIds": [
         "IDEA-0011",
         "IDEA-0012",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0018"
       ]
     },
     {
@@ -1452,7 +1478,8 @@
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0007"
+        "IDEA-0007",
+        "IDEA-0018"
       ]
     },
     {
@@ -2375,7 +2402,8 @@
         "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0018"
       ]
     },
     {
@@ -2488,7 +2516,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0018"
       ]
     },
     {
@@ -2661,7 +2690,62 @@
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0018"
+      ]
+    },
+    {
+      "Id": "formal-map-navigation-profile-3d",
+      "ChineseName": "正式三维地图导航与矿点层级",
+      "TypeNames": [
+        "FormalMapNavigationProfile3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "统一正式三维地图的正交缩放边界、滚轮步长与资源矿点近中远显示层级。",
+      "BoundarySummary": "只拥有导航和标记表现配置；不修改地图尺寸、地形、资源节点、储量或输入焦点真值，模态抑制必须继续经过正式输入协调器。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0018"
+      ]
+    },
+    {
+      "Id": "formal-ui-layout-3d",
+      "ChineseName": "正式三维响应式界面布局",
+    "TypeNames": [
+      "FormalUiLayoutProfile3D",
+      "FormalUiLayoutPolicy3D",
+      "FormalUiLayout3D",
+      "FormalUiCanvasConfiguration3D",
+      "FormalUiCanvasMetrics3D",
+      "FormalUiReadableText3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+    "UseSummary": "统一 1920×1080 参考分辨率、Expand 缩放、安全区、语义槽位、间距、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。",
+    "BoundarySummary": "只负责 UGUI 画布与布局表现；布局以 Canvas 本地矩形为真值，字体下限才读取物理像素缩放；不拥有玩法数据、输入命令或窗口生命周期，既有建造栏继续保持 620×54 的批准尺寸与位置。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalUiLayoutPolicy3DTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalUiResponsiveLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "BUG-0007",
+        "IDEA-0018"
       ]
     },
     {
@@ -2723,7 +2807,70 @@
         "Assets/_Game/Tests/EditMode/FirstArtTerrainProfileTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0018"
+      ]
+    },
+    {
+      "Id": "first-art-terrain-visual-style-3d",
+      "ChineseName": "文明式三维地形视觉样式",
+      "TypeNames": [
+        "FirstArtTerrainVisualStyleCatalog3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "冻结七类地形的制图式综合色、宏观变化强度和首轮原创建议色板，供资产生成器与 Shader 共同消费。",
+      "BoundarySummary": "只拥有地形表现参数，不改变 WorldMapModel、控制图、可通行性、资源节点或 Ruins/Cliff 几何；替换底色仍须运行 TerrainAssetDeep。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0018"
+      ]
+    },
+    {
+      "Id": "first-art-terrain-cartographic-source-builder",
+      "ChineseName": "文明式地形四通道生成器",
+      "TypeNames": [
+        "FirstArtTerrainAssetBuilder"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/FirstArtTerrainAssetBuilder.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从七份不可变概念源确定性重采样、平滑接缝并派生 BaseColor、Height、Normal、Mask，再事务式重建四个 Texture2DArray。",
+      "BoundarySummary": "仅供 Editor 生成已批准的正式地形表现；不得读取已生成 BaseColor 作为再次生成输入，不改变控制图、地图真值或玩法规则，改后必须运行 TerrainAssetDeep。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs",
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainAssetBuilderTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0018"
+      ]
+    },
+    {
+      "Id": "first-art-terrain-evidence-capture",
+      "ChineseName": "首版三维地形与界面固定证据捕获",
+      "TypeNames": [
+        "FirstArtTerrainEvidenceCapture"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Editor/FirstArtTerrainEvidenceCapture.cs"
+      ],
+      "FeatureGroupId": "scene-editor-build-performance",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在唯一正式 3D 场景采集地图总览、地形交界、资源标记三档、主 HUD、科技树、动态水与十帧缩放轨迹，并写入固定分辨率、相机、LOD、UI 状态和 SHA-256 清单。",
+      "BoundarySummary": "仅用于 Editor 验证；必须恢复相机、Canvas、矿点 LOD 和面板状态，不修改地图或 UI 真值，也不把自动截图写成人工视觉验收。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FirstArtTerrainEvidenceCaptureTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0018"
       ]
     },
     {

@@ -73,6 +73,7 @@ namespace WasteCity.Editor
             public int width;
             public int height;
             public CaptureRecord[] captures;
+            public ZoomEvidenceRecord zoom;
             public VideoRecord video;
             public WaterEvidenceRecord water;
             public bool technicalVisualGatePassed;
@@ -110,6 +111,36 @@ namespace WasteCity.Editor
             public Vector3 cameraLocalPosition;
             public Quaternion cameraLocalRotation;
             public float orthographicSize;
+            public string resourceMarkerLod;
+            public string uiPanelState;
+            public int width;
+            public int height;
+            public string sha256;
+        }
+
+        [Serializable]
+        private sealed class ZoomEvidenceRecord
+        {
+            public string frameDirectory;
+            public int frameCount;
+            public int width;
+            public int height;
+            public float originalOrthographicSize;
+            public string originalResourceMarkerLod;
+            public float restoredOrthographicSize;
+            public string restoredResourceMarkerLod;
+            public bool frameHashesVary;
+            public ZoomFrameRecord[] frames;
+        }
+
+        [Serializable]
+        private sealed class ZoomFrameRecord
+        {
+            public int index;
+            public float scrollDeltaY;
+            public float orthographicSize;
+            public string resourceMarkerLod;
+            public string filename;
             public int width;
             public int height;
             public string sha256;
@@ -190,6 +221,139 @@ namespace WasteCity.Editor
             public int SecondaryX { get; }
             public int SecondaryY { get; }
             public FirstArtTerrainLayer3D SecondaryLayer { get; }
+        }
+
+        internal readonly struct ZoomFrameSpec
+        {
+            public ZoomFrameSpec(
+                int index,
+                float scrollDeltaY,
+                float orthographicSize,
+                ResourceNodeMarkerLod3D lod)
+            {
+                Index = index;
+                ScrollDeltaY = scrollDeltaY;
+                OrthographicSize = orthographicSize;
+                Lod = lod;
+            }
+
+            public int Index { get; }
+            public float ScrollDeltaY { get; }
+            public float OrthographicSize { get; }
+            public ResourceNodeMarkerLod3D Lod { get; }
+        }
+
+        internal static IReadOnlyList<ZoomFrameSpec> BuildZoomFrameSpecs(
+            FormalMapNavigationProfile3D profile)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+            if (!profile.TryValidate(out string error))
+                throw new ArgumentException(error, nameof(profile));
+
+            const int frameCount = 10;
+            var frames = new ZoomFrameSpec[frameCount];
+            float size = profile.DefaultSize;
+            for (var index = 0; index < frames.Length; index++)
+            {
+                float scrollDeltaY = index == 0 ? 0f : -120f;
+                if (index > 0)
+                {
+                    size = profile.ResolveOrthographicSize(
+                        size,
+                        scrollDeltaY);
+                }
+                frames[index] = new ZoomFrameSpec(
+                    index,
+                    scrollDeltaY,
+                    size,
+                    profile.ResolveMarkerLod(size));
+            }
+            return frames;
+        }
+
+        internal static void ValidateZoomFrameSpecs(
+            FormalMapNavigationProfile3D profile,
+            IReadOnlyList<ZoomFrameSpec> frames)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+            if (frames == null || frames.Count == 0)
+                throw new ArgumentException(
+                    "A non-empty zoom evidence trace is required.",
+                    nameof(frames));
+
+            var lods = new HashSet<ResourceNodeMarkerLod3D>();
+            float previous = 0f;
+            for (var index = 0; index < frames.Count; index++)
+            {
+                ZoomFrameSpec frame = frames[index];
+                lods.Add(frame.Lod);
+                if (frame.Index != index ||
+                    frame.Lod != profile.ResolveMarkerLod(
+                        frame.OrthographicSize))
+                {
+                    throw new InvalidOperationException(
+                        "Zoom evidence indices and LOD must match the formal profile.");
+                }
+                if (index == 0)
+                {
+                    if (!Mathf.Approximately(frame.ScrollDeltaY, 0f) ||
+                        !Mathf.Approximately(
+                            frame.OrthographicSize,
+                            profile.DefaultSize))
+                    {
+                        throw new InvalidOperationException(
+                            "Zoom evidence must start at the formal default size.");
+                    }
+                }
+                else
+                {
+                    float expected = profile.ResolveOrthographicSize(
+                        previous,
+                        frame.ScrollDeltaY);
+                    if (frame.ScrollDeltaY >= 0f ||
+                        frame.OrthographicSize <= previous ||
+                        !Mathf.Approximately(
+                            frame.OrthographicSize,
+                            expected))
+                    {
+                        throw new InvalidOperationException(
+                            "Zoom evidence sizes must increase monotonically " +
+                            "through formal scroll steps.");
+                    }
+                }
+                previous = frame.OrthographicSize;
+            }
+
+            if (!lods.Contains(ResourceNodeMarkerLod3D.Near) ||
+                !lods.Contains(ResourceNodeMarkerLod3D.Mid) ||
+                !lods.Contains(ResourceNodeMarkerLod3D.Far))
+            {
+                throw new InvalidOperationException(
+                    "Zoom evidence must cross Near, Mid and Far marker LODs.");
+            }
+            if (frames.Count != 10)
+            {
+                throw new InvalidOperationException(
+                    "Zoom evidence requires exactly ten fixed frames.");
+            }
+        }
+
+        internal static void ValidateZoomRestoration(
+            float originalOrthographicSize,
+            float restoredOrthographicSize,
+            ResourceNodeMarkerLod3D originalLod,
+            ResourceNodeMarkerLod3D restoredLod)
+        {
+            if (!Mathf.Approximately(
+                    originalOrthographicSize,
+                    restoredOrthographicSize) ||
+                originalLod != restoredLod)
+            {
+                throw new InvalidOperationException(
+                    "Zoom evidence failed to restore the camera size and marker LOD.");
+            }
         }
 
         internal readonly struct AcceptedWaterEvidence
@@ -999,6 +1163,103 @@ namespace WasteCity.Editor
             return bytesPerSlice * array.depth;
         }
 
+        internal static IDisposable PrepareUiCanvasesForCameraRender(
+            Camera camera,
+            IReadOnlyList<Canvas> canvases)
+        {
+            return new UiCanvasRenderScope(camera, canvases);
+        }
+
+        private sealed class UiCanvasRenderScope : IDisposable
+        {
+            private readonly Camera camera;
+            private readonly int originalCullingMask;
+            private readonly CanvasRenderState[] states;
+            private bool disposed;
+
+            public UiCanvasRenderScope(
+                Camera camera,
+                IReadOnlyList<Canvas> canvases)
+            {
+                this.camera = camera != null
+                    ? camera
+                    : throw new ArgumentNullException(nameof(camera));
+                if (canvases == null)
+                    throw new ArgumentNullException(nameof(canvases));
+
+                originalCullingMask = camera.cullingMask;
+                states = canvases
+                    .Where(canvas => canvas != null)
+                    .Distinct()
+                    .Select(canvas => new CanvasRenderState(canvas))
+                    .ToArray();
+                if (states.Length == 0)
+                {
+                    throw new InvalidOperationException(
+                        "UI evidence requires at least one formal Canvas.");
+                }
+
+                for (var index = 0; index < states.Length; index++)
+                {
+                    Canvas canvas = states[index].Canvas;
+                    foreach (Transform child in
+                             canvas.GetComponentsInChildren<Transform>(true))
+                    {
+                        camera.cullingMask |= 1 << child.gameObject.layer;
+                    }
+                    canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                    canvas.worldCamera = camera;
+                    canvas.planeDistance = Math.Max(
+                        1f,
+                        camera.nearClipPlane + .1f);
+                }
+                Canvas.ForceUpdateCanvases();
+            }
+
+            public void Dispose()
+            {
+                if (disposed)
+                    return;
+                disposed = true;
+                try
+                {
+                    for (var index = states.Length - 1; index >= 0; index--)
+                        states[index].Restore();
+                }
+                finally
+                {
+                    camera.cullingMask = originalCullingMask;
+                    Canvas.ForceUpdateCanvases();
+                }
+            }
+        }
+
+        private readonly struct CanvasRenderState
+        {
+            private readonly RenderMode renderMode;
+            private readonly Camera worldCamera;
+            private readonly float planeDistance;
+
+            public CanvasRenderState(Canvas canvas)
+            {
+                Canvas = canvas;
+                renderMode = canvas.renderMode;
+                worldCamera = canvas.worldCamera;
+                planeDistance = canvas.planeDistance;
+            }
+
+            public Canvas Canvas { get; }
+
+            public void Restore()
+            {
+                if (Canvas == null)
+                    return;
+                Canvas.renderMode = renderMode;
+                Canvas.worldCamera = worldCamera;
+                Canvas.planeDistance = planeDistance;
+            }
+        }
+
         private static CaptureContext ResolveAndValidateContext()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -1023,14 +1284,20 @@ namespace WasteCity.Editor
                 UnityEngine.Object.FindObjectsOfType<GrayboxBuildingWorldView3D>(true);
             GrayboxBuildingInputRouter3D[] buildingRouters =
                 UnityEngine.Object.FindObjectsOfType<GrayboxBuildingInputRouter3D>(true);
+            GrayboxOperationsView3D[] operationsViews =
+                UnityEngine.Object.FindObjectsOfType<GrayboxOperationsView3D>(true);
+            Canvas[] canvases =
+                UnityEngine.Object.FindObjectsOfType<Canvas>(true);
             if (bootstraps.Length != 1 || worlds.Length != 1 ||
                 presenters.Length != 1 || scopes.Length != 1 ||
                 buildingInteractions.Length != 1 || buildingWorlds.Length != 1 ||
-                buildingRouters.Length != 1)
+                buildingRouters.Length != 1 || operationsViews.Length != 1 ||
+                canvases.Length < 3)
             {
                 throw new InvalidOperationException(
                     "Evidence capture requires exactly one bootstrap, world, presenter, " +
-                    "URP scope and serialized building runtime chain.");
+                    "URP scope, operations view and serialized building runtime chain, " +
+                    "plus the three formal Canvas roots.");
             }
 
             GrayboxSceneBootstrap bootstrap = bootstraps[0];
@@ -1062,6 +1329,24 @@ namespace WasteCity.Editor
 
             GrayboxCameraController3D cameraController =
                 camera.transform.parent.GetComponent<GrayboxCameraController3D>();
+            FormalMapNavigationProfile3D mapNavigationProfile =
+                cameraController != null
+                    ? cameraController.MapNavigationProfile
+                    : null;
+            if (mapNavigationProfile == null)
+            {
+                mapNavigationProfile = Resources.Load<
+                    FormalMapNavigationProfile3D>(
+                    FormalMapNavigationProfile3D.ResourcesPath);
+            }
+            string navigationError = string.Empty;
+            if (mapNavigationProfile == null ||
+                !mapNavigationProfile.TryValidate(out navigationError))
+            {
+                throw new InvalidOperationException(
+                    "Formal map navigation profile is unavailable: " +
+                    navigationError);
+            }
             return new CaptureContext(
                 bootstrap,
                 world,
@@ -1069,8 +1354,11 @@ namespace WasteCity.Editor
                 camera,
                 camera.transform.parent,
                 cameraController,
+                mapNavigationProfile,
                 buildingInteractions[0],
                 buildingWorlds[0],
+                operationsViews[0],
+                canvases,
                 FindRequiredCaptureSites(bootstrap.World));
         }
 
@@ -1326,8 +1614,11 @@ namespace WasteCity.Editor
                 Camera camera,
                 Transform rig,
                 GrayboxCameraController3D cameraController,
+                FormalMapNavigationProfile3D mapNavigationProfile,
                 GrayboxBuildingInteractionModel3D buildingInteraction,
                 GrayboxBuildingWorldView3D buildingWorld,
+                GrayboxOperationsView3D operationsView,
+                IReadOnlyList<Canvas> canvases,
                 IReadOnlyList<CaptureSite> sites)
             {
                 Bootstrap = bootstrap;
@@ -1336,8 +1627,11 @@ namespace WasteCity.Editor
                 Camera = camera;
                 Rig = rig;
                 CameraController = cameraController;
+                MapNavigationProfile = mapNavigationProfile;
                 BuildingInteraction = buildingInteraction;
                 BuildingWorld = buildingWorld;
+                OperationsView = operationsView;
+                Canvases = canvases;
                 Sites = sites;
             }
 
@@ -1347,8 +1641,11 @@ namespace WasteCity.Editor
             public Camera Camera { get; }
             public Transform Rig { get; }
             public GrayboxCameraController3D CameraController { get; }
+            public FormalMapNavigationProfile3D MapNavigationProfile { get; }
             public GrayboxBuildingInteractionModel3D BuildingInteraction { get; }
             public GrayboxBuildingWorldView3D BuildingWorld { get; }
+            public GrayboxOperationsView3D OperationsView { get; }
+            public IReadOnlyList<Canvas> Canvases { get; }
             public IReadOnlyList<CaptureSite> Sites { get; }
         }
 
@@ -1373,10 +1670,15 @@ namespace WasteCity.Editor
             private readonly InputSettings.BackgroundBehavior originalBackgroundBehavior;
             private readonly InputSettings.EditorInputBehaviorInPlayMode
                 originalEditorInputBehavior;
-            private readonly List<CaptureRecord> captures = new List<CaptureRecord>(10);
+            private readonly bool originalInventoryOpen;
+            private readonly bool originalResearchOpen;
+            private readonly bool originalLedgerOpen;
+            private readonly List<CaptureRecord> captures = new List<CaptureRecord>(16);
             private readonly List<int> frameNumbers = new List<int>(VideoFrameCount);
             private readonly HashSet<string> frameHashes = new HashSet<string>(StringComparer.Ordinal);
             private readonly string frameDirectory = Path.Combine(OutputRoot, "deep-water-frames");
+            private readonly string zoomFrameDirectory =
+                Path.Combine(OutputRoot, "zoom-frames");
             private readonly Color32[][] waterMetricFrames = new Color32[3][];
             private Matrix4x4 firstWorldToCamera;
             private Matrix4x4 firstProjection;
@@ -1398,6 +1700,7 @@ namespace WasteCity.Editor
             private Vector2[] waterInsetVertices;
             private WaterEvidenceRecord waterEvidence;
             private AcceptedWaterEvidence acceptedWaterEvidence;
+            private ZoomEvidenceRecord zoomEvidence;
 
             private enum BuildGridDiagnosticPhase
             {
@@ -1433,6 +1736,9 @@ namespace WasteCity.Editor
                 originalBackgroundBehavior = InputSystem.settings.backgroundBehavior;
                 originalEditorInputBehavior =
                     InputSystem.settings.editorInputBehaviorInPlayMode;
+                originalInventoryOpen = context.OperationsView.IsInventoryOpen;
+                originalResearchOpen = context.OperationsView.IsResearchOpen;
+                originalLedgerOpen = context.OperationsView.IsLedgerOpen;
             }
 
             public void Begin()
@@ -1510,6 +1816,9 @@ namespace WasteCity.Editor
                     context.Camera.transform.localRotation = originalCameraLocalRotation;
                     context.Rig.position = originalRigPosition;
                     context.Rig.rotation = originalRigRotation;
+                    context.World.RefreshResourceNodeMarkerLod(
+                        originalOrthographicSize);
+                    RestoreUiPanelState();
                     context.Presenter.enabled = originalPresenterEnabled;
                     if (context.CameraController != null)
                         context.CameraController.enabled = originalCameraControllerEnabled;
@@ -1565,6 +1874,10 @@ namespace WasteCity.Editor
 
                 RestoreDefaultCamera();
                 CaptureComparison("10-graybox-formal-comparison.png");
+
+                CaptureResourceMarkerLodStills();
+                CaptureZoomEvidence();
+                CaptureUiEvidence();
             }
 
             private void StartBuildGridDiagnostic()
@@ -1693,7 +2006,10 @@ namespace WasteCity.Editor
                 CapturePng(filename, site);
             }
 
-            private void CapturePng(string filename, CaptureSite? site)
+            private void CapturePng(
+                string filename,
+                CaptureSite? site,
+                string uiPanelState = "world-only")
             {
                 byte[] bytes = RenderCameraPng(context.Camera, CaptureWidth, CaptureHeight);
                 ValidateNonBlackTerrainCoverage(
@@ -1702,7 +2018,183 @@ namespace WasteCity.Editor
                     CaptureHeight,
                     filename);
                 File.WriteAllBytes(Path.Combine(OutputRoot, filename), bytes);
-                captures.Add(NewCaptureRecord(filename, site, bytes));
+                captures.Add(NewCaptureRecord(
+                    filename,
+                    site,
+                    bytes,
+                    uiPanelState));
+            }
+
+            private void CaptureResourceMarkerLodStills()
+            {
+                RestoreDefaultCamera();
+                CaptureResourceMarkerLod(
+                    "13-resource-marker-near.png",
+                    context.MapNavigationProfile.DefaultSize,
+                    ResourceNodeMarkerLod3D.Near);
+                CaptureResourceMarkerLod(
+                    "14-resource-marker-mid.png",
+                    (context.MapNavigationProfile.NearMarkerMaximumSize +
+                     context.MapNavigationProfile.MidMarkerMaximumSize) * .5f,
+                    ResourceNodeMarkerLod3D.Mid);
+                CaptureResourceMarkerLod(
+                    "15-resource-marker-far.png",
+                    (context.MapNavigationProfile.MidMarkerMaximumSize +
+                     context.MapNavigationProfile.MaximumOrthographicSize) * .5f,
+                    ResourceNodeMarkerLod3D.Far);
+                RestoreDefaultCamera();
+                context.World.RefreshResourceNodeMarkerLod(
+                    context.Camera.orthographicSize);
+            }
+
+            private void CaptureResourceMarkerLod(
+                string filename,
+                float orthographicSize,
+                ResourceNodeMarkerLod3D expectedLod)
+            {
+                context.Camera.orthographicSize = orthographicSize;
+                ResourceNodeMarkerLod3D actual = context.MapNavigationProfile
+                    .ResolveMarkerLod(orthographicSize);
+                if (actual != expectedLod)
+                {
+                    throw new InvalidOperationException(
+                        filename + " resolved unexpected marker LOD " +
+                        actual + ".");
+                }
+                context.World.RefreshResourceNodeMarkerLod(orthographicSize);
+                CapturePng(filename, null, "world-markers:" + actual);
+            }
+
+            private void CaptureZoomEvidence()
+            {
+                RestoreDefaultCamera();
+                float originalSize = context.Camera.orthographicSize;
+                ResourceNodeMarkerLod3D originalLod =
+                    context.MapNavigationProfile.ResolveMarkerLod(originalSize);
+                IReadOnlyList<ZoomFrameSpec> specs = BuildZoomFrameSpecs(
+                    context.MapNavigationProfile);
+                ValidateZoomFrameSpecs(context.MapNavigationProfile, specs);
+                var records = new ZoomFrameRecord[specs.Count];
+                var hashes = new HashSet<string>(StringComparer.Ordinal);
+                try
+                {
+                    for (var index = 0; index < specs.Count; index++)
+                    {
+                        ZoomFrameSpec spec = specs[index];
+                        context.Camera.orthographicSize = spec.OrthographicSize;
+                        context.World.RefreshResourceNodeMarkerLod(
+                            spec.OrthographicSize);
+                        byte[] bytes = RenderCameraPng(
+                            context.Camera,
+                            CaptureWidth,
+                            CaptureHeight);
+                        ValidateNonBlackTerrainCoverage(
+                            DecodePng(bytes),
+                            CaptureWidth,
+                            CaptureHeight,
+                            "zoom frame " + index);
+                        string relativePath = Path.Combine(
+                            "zoom-frames",
+                            "frame-" + index.ToString("000") + ".png");
+                        File.WriteAllBytes(
+                            Path.Combine(OutputRoot, relativePath),
+                            bytes);
+                        string hash = Sha256(bytes);
+                        hashes.Add(hash);
+                        records[index] = new ZoomFrameRecord
+                        {
+                            index = spec.Index,
+                            scrollDeltaY = spec.ScrollDeltaY,
+                            orthographicSize = spec.OrthographicSize,
+                            resourceMarkerLod = spec.Lod.ToString(),
+                            filename = relativePath,
+                            width = CaptureWidth,
+                            height = CaptureHeight,
+                            sha256 = hash,
+                        };
+                    }
+                    if (hashes.Count < 2)
+                    {
+                        throw new InvalidOperationException(
+                            "Zoom evidence frame hashes do not vary.");
+                    }
+                }
+                finally
+                {
+                    context.Camera.orthographicSize = originalSize;
+                    context.World.RefreshResourceNodeMarkerLod(originalSize);
+                }
+
+                ResourceNodeMarkerLod3D restoredLod =
+                    context.MapNavigationProfile.ResolveMarkerLod(
+                        context.Camera.orthographicSize);
+                ValidateZoomRestoration(
+                    originalSize,
+                    context.Camera.orthographicSize,
+                    originalLod,
+                    restoredLod);
+                zoomEvidence = new ZoomEvidenceRecord
+                {
+                    frameDirectory = zoomFrameDirectory,
+                    frameCount = records.Length,
+                    width = CaptureWidth,
+                    height = CaptureHeight,
+                    originalOrthographicSize = originalSize,
+                    originalResourceMarkerLod = originalLod.ToString(),
+                    restoredOrthographicSize = context.Camera.orthographicSize,
+                    restoredResourceMarkerLod = restoredLod.ToString(),
+                    frameHashesVary = true,
+                    frames = records,
+                };
+            }
+
+            private void CaptureUiEvidence()
+            {
+                bool inventoryOpen = context.OperationsView.IsInventoryOpen;
+                bool researchOpen = context.OperationsView.IsResearchOpen;
+                bool ledgerOpen = context.OperationsView.IsLedgerOpen;
+                RestoreDefaultCamera();
+                context.World.RefreshResourceNodeMarkerLod(
+                    context.Camera.orthographicSize);
+                try
+                {
+                    context.OperationsView.SetInventoryOpen(false);
+                    context.OperationsView.SetResearchOpen(false);
+                    context.OperationsView.SetLedgerOpen(false);
+                    Canvas.ForceUpdateCanvases();
+                    using (PrepareUiCanvasesForCameraRender(
+                               context.Camera,
+                               context.Canvases))
+                    {
+                        CapturePng(
+                            "20-ui-main-hud.png",
+                            null,
+                            "hud:main;inventory:closed;research:closed;ledger:closed");
+
+                        context.OperationsView.SetResearchOpen(true);
+                        context.OperationsView.FitResearchTree();
+                        Canvas.ForceUpdateCanvases();
+                        CapturePng(
+                            "21-ui-research-tree.png",
+                            null,
+                            "hud:main;inventory:closed;research:open;ledger:closed");
+                    }
+                }
+                finally
+                {
+                    context.OperationsView.SetInventoryOpen(inventoryOpen);
+                    context.OperationsView.SetResearchOpen(researchOpen);
+                    context.OperationsView.SetLedgerOpen(ledgerOpen);
+                    Canvas.ForceUpdateCanvases();
+                }
+            }
+
+            private void RestoreUiPanelState()
+            {
+                context.OperationsView.SetInventoryOpen(originalInventoryOpen);
+                context.OperationsView.SetResearchOpen(originalResearchOpen);
+                context.OperationsView.SetLedgerOpen(originalLedgerOpen);
+                Canvas.ForceUpdateCanvases();
             }
 
             private void CaptureComparison(string filename)
@@ -1751,7 +2243,11 @@ namespace WasteCity.Editor
                     comparison.Apply(false, false);
                     byte[] comparisonBytes = comparison.EncodeToPNG();
                     File.WriteAllBytes(Path.Combine(OutputRoot, filename), comparisonBytes);
-                    captures.Add(NewCaptureRecord(filename, null, comparisonBytes));
+                    captures.Add(NewCaptureRecord(
+                        filename,
+                        null,
+                        comparisonBytes,
+                        "world-comparison"));
                 }
                 finally
                 {
@@ -1976,7 +2472,8 @@ namespace WasteCity.Editor
             private CaptureRecord NewCaptureRecord(
                 string filename,
                 CaptureSite? site,
-                byte[] bytes)
+                byte[] bytes,
+                string uiPanelState)
             {
                 CaptureSite value = site.GetValueOrDefault();
                 return new CaptureRecord
@@ -1994,6 +2491,11 @@ namespace WasteCity.Editor
                     cameraLocalPosition = context.Camera.transform.localPosition,
                     cameraLocalRotation = context.Camera.transform.localRotation,
                     orthographicSize = context.Camera.orthographicSize,
+                    resourceMarkerLod = context.MapNavigationProfile
+                        .ResolveMarkerLod(
+                            context.Camera.orthographicSize)
+                        .ToString(),
+                    uiPanelState = uiPanelState ?? string.Empty,
                     width = CaptureWidth,
                     height = CaptureHeight,
                     sha256 = Sha256(bytes),
@@ -2016,6 +2518,8 @@ namespace WasteCity.Editor
                     width = CaptureWidth,
                     height = CaptureHeight,
                     captures = captures.OrderBy(capture => capture.filename).ToArray(),
+                    zoom = zoomEvidence ?? throw new InvalidOperationException(
+                        "IDEA-0018 zoom evidence is incomplete."),
                     video = new VideoRecord
                     {
                         filename = Path.GetFileName(videoPath),
@@ -2117,6 +2621,7 @@ namespace WasteCity.Editor
                     Directory.Delete(OutputRoot, true);
                 Directory.CreateDirectory(OutputRoot);
                 Directory.CreateDirectory(Path.Combine(OutputRoot, "deep-water-frames"));
+                Directory.CreateDirectory(Path.Combine(OutputRoot, "zoom-frames"));
             }
 
             private static int WaterMetricSlot(int capturedFrameOffset)

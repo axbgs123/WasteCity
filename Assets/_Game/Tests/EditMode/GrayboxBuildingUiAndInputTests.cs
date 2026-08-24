@@ -2307,6 +2307,10 @@ namespace WasteCity.Tests
             Assert.That(quickbar.anchorMax, Is.EqualTo(new Vector2(.5f, 0f)));
             Assert.That(quickbar.anchoredPosition,
                 Is.EqualTo(new Vector2(0f, 8f)));
+            Assert.That(
+                quickbar.sizeDelta,
+                Is.EqualTo(new Vector2(620f, 54f)),
+                "BUG-0007 keeps the accepted build bar unchanged.");
             Assert.That(catalog.anchorMin, Is.EqualTo(new Vector2(.5f, 0f)));
             Assert.That(catalog.anchorMax, Is.EqualTo(new Vector2(.5f, 0f)));
             Assert.That(catalog.anchoredPosition,

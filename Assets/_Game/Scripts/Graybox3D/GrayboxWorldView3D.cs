@@ -48,6 +48,8 @@ namespace WasteCity.Graybox3D
         [SerializeField] private Transform obstacleRoot;
         [SerializeField] private Material sharedMaterial;
         [SerializeField] private ResourceIconCatalog3D resourceIconCatalog;
+        [SerializeField]
+        private FormalMapNavigationProfile3D mapNavigationProfile;
 
         private readonly Dictionary<string, Group> groups =
             new Dictionary<string, Group>();
@@ -62,12 +64,17 @@ namespace WasteCity.Graybox3D
         private readonly Dictionary<long, GrayboxResourceNodeMarker3D>
             resourceNodeMarkersByCell =
                 new Dictionary<long, GrayboxResourceNodeMarker3D>();
+        private readonly List<GrayboxResourceNodeMarker3D>
+            guidedResourceNodeMarkers =
+                new List<GrayboxResourceNodeMarker3D>();
         private readonly Dictionary<string, bool> surfaceFallbackVisibility =
             CreateSurfaceFallbackVisibility();
         private IGrayboxTerrainPresentation3D activeTerrainPresentation;
         private float nextResourceNodeRefreshAt;
         private Quaternion lastResourceNodeFacingRotation;
         private bool hasResourceNodeFacingRotation;
+        private ResourceNodeMarkerLod3D resourceNodeMarkerLod;
+        private bool hasResourceNodeMarkerLod;
 
         public WorldMapModel Model { get; private set; }
         public PlanarCoordinateMapper3D Coordinates { get; private set; }
@@ -96,6 +103,14 @@ namespace WasteCity.Graybox3D
             PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 4;
         public bool HasActiveTerrainPresentation =>
             IsPresentationAlive(activeTerrainPresentation);
+
+        private void Awake()
+        {
+            if (mapNavigationProfile == null)
+                mapNavigationProfile = Resources.Load<
+                    FormalMapNavigationProfile3D>(
+                    FormalMapNavigationProfile3D.ResourcesPath);
+        }
 
         public bool IsTerrainPresentationActive(
             IGrayboxTerrainPresentation3D presentation)
@@ -140,6 +155,17 @@ namespace WasteCity.Graybox3D
             }
         }
 
+        public void ConfigureMapNavigation(
+            FormalMapNavigationProfile3D profile)
+        {
+            if (profile == null)
+                throw new ArgumentNullException(nameof(profile));
+            if (!profile.TryValidate(out string error))
+                throw new ArgumentException(error, nameof(profile));
+            mapNavigationProfile = profile;
+            hasResourceNodeMarkerLod = false;
+        }
+
         public void Generate(WorldMapModel model)
         {
             if (model == null)
@@ -181,6 +207,7 @@ namespace WasteCity.Graybox3D
             nextResourceNodeRefreshAt = Time.unscaledTime +
                 ResourceNodeRefreshIntervalSeconds;
             hasResourceNodeFacingRotation = false;
+            hasResourceNodeMarkerLod = false;
         }
 
         public void AttachTerrainPresentation(
@@ -306,7 +333,84 @@ namespace WasteCity.Graybox3D
             }
             Camera camera = Camera.main;
             if (camera != null)
+            {
                 FaceResourceNodeMarkers(camera.transform);
+                if (camera.orthographic)
+                    RefreshResourceNodeMarkerLod(
+                        camera.orthographicSize);
+            }
+        }
+
+        public bool RefreshResourceNodeMarkerLod(float orthographicSize)
+        {
+            ResourceNodeMarkerLod3D lod = mapNavigationProfile != null
+                ? mapNavigationProfile.ResolveMarkerLod(orthographicSize)
+                : orthographicSize <= FormalMapNavigationProfile3D
+                    .DefaultNearMarkerMaximumSize
+                    ? ResourceNodeMarkerLod3D.Near
+                    : orthographicSize <= FormalMapNavigationProfile3D
+                        .DefaultMidMarkerMaximumSize
+                        ? ResourceNodeMarkerLod3D.Mid
+                        : ResourceNodeMarkerLod3D.Far;
+            bool wasInitialized = hasResourceNodeMarkerLod;
+            if (wasInitialized && resourceNodeMarkerLod == lod)
+                return false;
+            resourceNodeMarkerLod = lod;
+            hasResourceNodeMarkerLod = true;
+            bool changed = false;
+            for (var index = 0; index < resourceNodeMarkers.Count; index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    resourceNodeMarkers[index];
+                if (marker != null)
+                    changed |= marker.ApplyDisplayLod(
+                        lod,
+                        marker.GuidanceOverride);
+            }
+            return changed || !wasInitialized;
+        }
+
+        public bool SetResourceMarkerGuidanceOverride(
+            int worldX,
+            int worldY,
+            bool enabled)
+        {
+            if (!TryGetResourceNodeMarker(
+                    worldX,
+                    worldY,
+                    out GrayboxResourceNodeMarker3D marker) ||
+                marker == null ||
+                marker.GuidanceOverride == enabled)
+                return false;
+            ResourceNodeMarkerLod3D lod = hasResourceNodeMarkerLod
+                ? resourceNodeMarkerLod
+                : ResourceNodeMarkerLod3D.Near;
+            marker.ApplyDisplayLod(lod, enabled);
+            if (enabled)
+                guidedResourceNodeMarkers.Add(marker);
+            else
+                guidedResourceNodeMarkers.Remove(marker);
+            return true;
+        }
+
+        public bool ClearResourceMarkerGuidanceOverrides()
+        {
+            if (guidedResourceNodeMarkers.Count == 0)
+                return false;
+            ResourceNodeMarkerLod3D lod = hasResourceNodeMarkerLod
+                ? resourceNodeMarkerLod
+                : ResourceNodeMarkerLod3D.Near;
+            for (var index = 0;
+                 index < guidedResourceNodeMarkers.Count;
+                 index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    guidedResourceNodeMarkers[index];
+                if (marker != null)
+                    marker.ApplyDisplayLod(lod, false);
+            }
+            guidedResourceNodeMarkers.Clear();
+            return true;
         }
 
         public bool FaceResourceNodeMarkers(Transform cameraTransform)
@@ -347,8 +451,10 @@ namespace WasteCity.Graybox3D
             surfaceSlots.Clear();
             resourceNodeMarkers.Clear();
             resourceNodeMarkersByCell.Clear();
+            guidedResourceNodeMarkers.Clear();
             nextResourceNodeRefreshAt = 0f;
             hasResourceNodeFacingRotation = false;
+            hasResourceNodeMarkerLod = false;
             groups.Clear();
             Model = null;
             Coordinates = null;

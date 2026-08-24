@@ -449,19 +449,33 @@ namespace WasteCity.Tests
 
                 Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
                 Assert.That(fixture.Bootstrap.IsPanelOpen, Is.True);
-                InputField resourceSearch = panel.transform
-                    .Find("Resource Search")
+                Assert.That(panel.transform.localScale,
+                    Is.EqualTo(Vector3.one));
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Developer.Panel.Scroll")
+                    .GetComponent<ScrollRect>(), Is.Not.Null);
+                InputField resourceSearch = DescendantNamed(
+                        panel.transform,
+                        "Resource Search")
                     .GetComponent<InputField>();
-                InputField researchSearch = panel.transform
-                    .Find("Research Search")
+                InputField researchSearch = DescendantNamed(
+                        panel.transform,
+                        "Research Search")
                     .GetComponent<InputField>();
                 Assert.That(resourceSearch, Is.Not.Null);
                 Assert.That(researchSearch, Is.Not.Null);
-                Assert.That(panel.transform.Find("Resource Results")
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Resource Results")
                     .GetComponent<ScrollRect>(), Is.Not.Null);
-                Assert.That(panel.transform.Find("Research Results")
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Research Results")
                     .GetComponent<ScrollRect>(), Is.Not.Null);
-                Assert.That(panel.transform.Find("Developer Feedback")
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Developer Feedback")
                     .GetComponentInChildren<Text>(true).text,
                     Is.EqualTo("请选择物品或科技"));
                 Button[] catalogButtons =
@@ -498,7 +512,9 @@ namespace WasteCity.Tests
                 ButtonNamed(panel, "Resource +100").onClick.Invoke();
                 Assert.That(fixture.Session.Inventory.Get(
                     ResourceIds.HybridCore), Is.EqualTo(100));
-                Assert.That(panel.transform.Find("Developer Feedback")
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Developer Feedback")
                     .GetComponentInChildren<Text>(true).text,
                     Does.Contain("融合核心 已增加 100"));
                 ButtonNamed(
@@ -551,8 +567,9 @@ namespace WasteCity.Tests
                 Assert.That(
                     fixture.Session.Inventory.Get(ResourceIds.Iron),
                     Is.EqualTo(130));
-                InputField population = panel.transform
-                    .Find("Population Amount")
+                InputField population = DescendantNamed(
+                        panel.transform,
+                        "Population Amount")
                     .GetComponent<InputField>();
                 Assert.That(population, Is.Not.Null);
                 population.text = "2000";
@@ -1385,6 +1402,21 @@ namespace WasteCity.Tests
                 ? null
                 : canvas.transform.Find("Graybox Developer Modifier");
             return panel == null ? null : panel.gameObject;
+        }
+
+        private static Transform DescendantNamed(
+            Transform root,
+            string objectName)
+        {
+            Transform match = root == null
+                ? null
+                : root.GetComponentsInChildren<Transform>(true)
+                    .FirstOrDefault(candidate => string.Equals(
+                        candidate.name,
+                        objectName,
+                        StringComparison.Ordinal));
+            Assert.That(match, Is.Not.Null, objectName);
+            return match;
         }
 
         private static int PanelCount()

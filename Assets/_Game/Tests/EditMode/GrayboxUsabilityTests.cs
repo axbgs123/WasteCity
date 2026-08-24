@@ -699,6 +699,56 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0018_SystemMenuUsesFormalTopRightControlsAndSafePages()
+        {
+            MenuFixture fixture = CreateMenuControllerFixture(withView: true);
+            fixture.Controller.Open();
+            Canvas.ForceUpdateCanvases();
+
+            RectTransform speed = NamedTransforms(
+                    fixture.Canvas.transform,
+                    "GrayboxFormalSpeedControls.Root")
+                .Single()
+                .GetComponent<RectTransform>();
+            Assert.That(speed.anchorMin, Is.EqualTo(Vector2.one));
+            Assert.That(speed.anchorMax, Is.EqualTo(Vector2.one));
+            Assert.That(speed.pivot, Is.EqualTo(Vector2.one));
+            Assert.That(speed.localScale, Is.EqualTo(Vector3.one));
+
+            FormalUiLayoutProfile3D profile =
+                FormalUiLayoutProfile3D.Standard;
+            foreach (string pageName in new[]
+                     {
+                         "Page.Start",
+                         "Page.StartNewGameConfirm",
+                         "Page.Main",
+                         "Page.Settings",
+                         "Page.OperationGuide",
+                         "Page.ExitConfirm"
+                     })
+            {
+                RectTransform page = NamedTransforms(
+                        fixture.Canvas.transform,
+                        pageName)
+                    .Single()
+                    .GetComponent<RectTransform>();
+                Assert.That(page.localScale, Is.EqualTo(Vector3.one));
+                Assert.That(page.rect.width,
+                    Is.LessThanOrEqualTo(620f));
+                Assert.That(page.rect.height,
+                    Is.LessThanOrEqualTo(460f));
+                foreach (Text label in page.GetComponentsInChildren<Text>(
+                             true))
+                {
+                    Assert.That(
+                        label.fontSize,
+                        Is.GreaterThanOrEqualTo(profile.FontDescription),
+                        label.name);
+                }
+            }
+        }
+
+        [Test]
         public void IDEA0007_IdleEscapeOpensMenuAfterOneBuildingInputCall()
         {
             CoordinatorFixture fixture = CreateCoordinatorFixture();

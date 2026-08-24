@@ -828,7 +828,7 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(.5f, 0f),
                 new Vector2(.5f, 0f),
                 new Vector2(0f, 66f),
-                new Vector2(620f, 350f));
+                new Vector2(620f, 570f));
             BuildCatalogChrome();
 
             constructionRoot = CreatePanel(
@@ -892,7 +892,9 @@ namespace WasteCity.Graybox3D.Building
                 placementStatusRoot,
                 "Placement.Status.Text",
                 string.Empty);
-            placementStatusText.fontSize = 15;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                placementStatusText,
+                15f);
             placementStatusText.rectTransform.offsetMin =
                 new Vector2(40f, 0f);
             RectTransform reticleRect = CreateRect(
@@ -923,7 +925,9 @@ namespace WasteCity.Graybox3D.Building
                 "Mining.Guidance.Legend.Text",
                 "绿色：当前可建造位置\n" +
                 "暗黄色：资源兼容，但当前条件不满足");
-            miningLegend.fontSize = 14;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                miningLegend,
+                14f);
             miningGuidanceLegendRoot.gameObject.SetActive(false);
         }
 
@@ -987,10 +991,10 @@ namespace WasteCity.Graybox3D.Building
             RectTransform scrollRoot = CreateRect(
                 catalogRoot,
                 "Catalog.Scroll");
-            scrollRoot.sizeDelta = new Vector2(596f, 224f);
-            SetLayout(scrollRoot, 596f, 224f, 0f);
+            scrollRoot.sizeDelta = new Vector2(596f, 440f);
+            SetLayout(scrollRoot, 596f, 440f, 0f);
             scrollRoot.GetComponent<LayoutElement>().minWidth = 596f;
-            scrollRoot.GetComponent<LayoutElement>().minHeight = 224f;
+            scrollRoot.GetComponent<LayoutElement>().minHeight = 440f;
             Image scrollImage =
                 scrollRoot.gameObject.AddComponent<Image>();
             scrollImage.color = new Color(1f, 1f, 1f, .01f);
@@ -1020,6 +1024,7 @@ namespace WasteCity.Graybox3D.Building
             var cardLayout =
                 catalogCardsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             cardLayout.spacing = 3f;
+            cardLayout.childControlHeight = false;
             cardLayout.childForceExpandHeight = false;
             cardLayout.childForceExpandWidth = true;
             cardLayout.childControlWidth = true;
@@ -1086,7 +1091,10 @@ namespace WasteCity.Graybox3D.Building
                     ? ButtonColor
                     : LockedColor;
             RectTransform rect = card.GetComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(596f, 108f);
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(.5f, 1f);
+            rect.sizeDelta = new Vector2(0f, 108f);
             SetLayout(rect, 596f, 108f, 0f);
             rect.GetComponent<LayoutElement>().minWidth = 596f;
 
@@ -1164,8 +1172,11 @@ namespace WasteCity.Graybox3D.Building
             float detailsHeight = Mathf.Max(
                 96f,
                 Mathf.Ceil(detailsText.preferredHeight) + 4f);
-            float cardHeight = detailsHeight + 12f;
-            rect.sizeDelta = new Vector2(596f, cardHeight);
+            const float maximumCardHeight = 216f;
+            float cardHeight = Mathf.Min(
+                detailsHeight + 12f,
+                maximumCardHeight);
+            rect.sizeDelta = new Vector2(0f, cardHeight);
             SetLayout(rect, 596f, cardHeight, 0f);
             PlaceFixed(
                 details,
@@ -1816,7 +1827,9 @@ namespace WasteCity.Graybox3D.Building
             var text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = 12;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                FormalUiLayoutProfile3D.Standard.FontDescription);
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
             text.text = value ?? string.Empty;

@@ -194,6 +194,27 @@ namespace WasteCity.Tests
             ProjectFeatureGroup presentation = FindFeature(catalog, "presentation-art-integration");
             CollectionAssert.Contains(presentation.SourceGlobs,
                 "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs");
+            ProjectFeatureGroup terrain = FindFeature(
+                catalog,
+                "world-terrain");
+            CollectionAssert.Contains(
+                terrain.SourceGlobs,
+                "ArtSource/FirstPass/Environment/Terrain/**");
+            CollectionAssert.Contains(
+                terrain.PrimarySourceGlobs,
+                "ArtSource/FirstPass/Environment/Terrain/**");
+            CollectionAssert.Contains(
+                terrain.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs");
+            CollectionAssert.Contains(
+                terrain.RequirementIds,
+                "IDEA-0018");
+            CollectionAssert.Contains(
+                terrain.HumanDocumentPaths,
+                "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md");
+            CollectionAssert.Contains(
+                terrain.HumanDocumentPaths,
+                "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md");
             ProjectFeatureGroup editor = FindFeature(catalog, "scene-editor-build-performance");
             CollectionAssert.Contains(editor.TestFileGlobs,
                 "Assets/_Game/Tests/EditMode/ProjectQualityCatalogTests.cs");
@@ -203,7 +224,7 @@ namespace WasteCity.Tests
             string[] expectedFailureLocations =
             {
                 "foundation-clock|先检查时钟、会话、资源与稳定标识|Assets/_Game/Scripts/Core/**|Assets/_Game/Scripts/Content/StableId.cs",
-                "world-terrain|先检查地图模型、地形规则和世界投影|Assets/_Game/Scripts/World/**|Assets/_Game/Art/FirstPass/Environment/Terrain/**",
+                "world-terrain|先检查地图模型、地形规则和世界投影|Assets/_Game/Scripts/World/**|Assets/_Game/Art/FirstPass/Environment/Terrain/**|ArtSource/FirstPass/Environment/Terrain/**",
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
@@ -354,7 +375,13 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsView.RequiredTestFiles);
-            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
+            CollectionAssert.AreEqual(new[]
+            {
+                "IDEA-0011",
+                "IDEA-0012",
+                "IDEA-0016",
+                "IDEA-0018",
+            },
                 operationsView.RequirementIds);
 
             ProjectUiEntry systemMenu = FindUi(catalog, "graybox-system-menu");
@@ -1195,7 +1222,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
             }, nodeMarkers.RequiredTestFiles);
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0012" },
+                new[] { "IDEA-0012", "IDEA-0018" },
                 nodeMarkers.RequirementIds);
 
             ProjectReuseEntry legacyCapacity = FindReuse(
@@ -1222,7 +1249,13 @@ namespace WasteCity.Tests
                 catalog,
                 "graybox-operations-view-3d");
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
+                new[]
+                {
+                    "IDEA-0011",
+                    "IDEA-0012",
+                    "IDEA-0016",
+                    "IDEA-0018",
+                },
                 operationsView.RequirementIds);
             CollectionAssert.Contains(
                 operationsView.RequiredTestFiles,
@@ -1754,7 +1787,9 @@ namespace WasteCity.Tests
                 requiredTestFile,
                 entry.Id);
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0017" },
+                entry.Id == "graybox-defense-selection-hud-3d"
+                    ? new[] { "IDEA-0017", "IDEA-0018" }
+                    : new[] { "IDEA-0017" },
                 entry.RequirementIds,
                 entry.Id);
             string guidance = entry.UseSummary + "\n" +

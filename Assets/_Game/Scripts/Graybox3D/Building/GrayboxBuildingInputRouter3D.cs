@@ -151,7 +151,10 @@ namespace WasteCity.Graybox3D.Building
                  mouse.rightButton.wasPressedThisFrame ||
                  mouse.middleButton.wasPressedThisFrame ||
                  mouse.middleButton.isPressed ||
-                 mouse.middleButton.wasReleasedThisFrame);
+                 mouse.middleButton.wasReleasedThisFrame ||
+                 !Mathf.Approximately(
+                     mouse.scroll.ReadValue().y,
+                     0f));
             bool pointerClassified =
                 pointerActive &&
                 menu != null;
@@ -170,7 +173,8 @@ namespace WasteCity.Graybox3D.Building
                     deployment: true,
                     destination: pointerOverUi || wasBuildMode,
                     cameraDrag: pointerOverUi,
-                    home: true);
+                    home: true,
+                    zoom: pointerOverUi);
             }
 
             if (interaction != null &&
@@ -321,7 +325,8 @@ namespace WasteCity.Graybox3D.Building
                     buildInputOwnedThisFrame ||
                     isBuildMode,
                 cameraDrag: pointerOverUi,
-                home: false);
+                home: false,
+                zoom: pointerOverUi);
         }
 
         private bool ProcessKeyboardActions(Keyboard keyboard)
@@ -409,7 +414,8 @@ namespace WasteCity.Graybox3D.Building
                 deployment: true,
                 destination: true,
                 cameraDrag: true,
-                home: true);
+                home: true,
+                zoom: true);
         }
     }
 }

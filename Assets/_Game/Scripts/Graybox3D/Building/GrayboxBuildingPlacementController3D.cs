@@ -224,6 +224,7 @@ namespace WasteCity.Graybox3D.Building
                     out int cityY))
             {
                 hasMiningGuidanceKey = false;
+                world?.ClearResourceMarkerGuidanceOverrides();
                 presentation?.HideMiningGuidance();
                 return;
             }
@@ -480,6 +481,7 @@ namespace WasteCity.Graybox3D.Building
             miningAnchors.Clear();
             miningAnchorIndices.Clear();
             presentation.HideMiningGuidance();
+            world.ClearResourceMarkerGuidanceOverrides();
             EnsureResourceNodeIdentityWorkspace();
 
             for (var x = 0; x < worldWidth; x++)
@@ -560,6 +562,10 @@ namespace WasteCity.Graybox3D.Building
                     worldWidth,
                     worldHeight,
                     node.HasLegalAnchor);
+                world.SetResourceMarkerGuidanceOverride(
+                    node.X,
+                    node.Y,
+                    true);
             }
 
             int width = BuildingOrientationRules.Width(
@@ -864,6 +870,7 @@ namespace WasteCity.Graybox3D.Building
             highlightedNodeId = null;
             presentation?.HideMiningGuidance();
             presentation?.HidePreview();
+            world?.ClearResourceMarkerGuidanceOverrides();
             hasPointer = false;
             lastScreenPosition = default;
             CurrentHit = BuildingSurfaceHit.Invalid;

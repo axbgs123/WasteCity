@@ -124,6 +124,11 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
         }
 
+        private void OnRectTransformDimensionsChange()
+        {
+            RefreshFormalLayout();
+        }
+
         private void OnDestroy()
         {
             DestroyUi();
@@ -348,10 +353,11 @@ namespace WasteCity.Graybox3D.Building
                         : ButtonColor;
                 Text label = backpackSlotLabels[index];
                 if (label != null)
-                    label.fontSize = index == selectedBackpackSlot &&
-                        placesOne
-                        ? 10
-                        : 14;
+                    FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                        label,
+                        index == selectedBackpackSlot && placesOne
+                            ? 10f
+                            : 14f);
             }
             if (placesOne && selectedBackpackSlot >= 0 &&
                 oneByOneAmount > 0 &&
@@ -740,6 +746,7 @@ namespace WasteCity.Graybox3D.Building
             SetInventoryOpen(false);
             SetResearchOpen(false);
             SetLedgerOpen(false);
+            RefreshFormalLayout();
         }
 
         private void BuildResourceBar()
@@ -890,7 +897,7 @@ namespace WasteCity.Graybox3D.Building
             RectTransform body = CreateRect(
                 resourceLedgerPanel,
                 "ResourceLedger.Body");
-            SetLayout(body, 0f, 534f, 1f);
+            SetLayout(body, 0f, 534f, 1f, 1f);
             var bodyLayout = body.gameObject.AddComponent<HorizontalLayoutGroup>();
             bodyLayout.spacing = 10f;
             bodyLayout.childForceExpandWidth = false;
@@ -1311,7 +1318,7 @@ namespace WasteCity.Graybox3D.Building
             RectTransform pages = CreateRect(
                 inventoryCraftingPanel,
                 "InventoryCrafting.Pages");
-            SetLayout(pages, 0f, 470f, 1f);
+            SetLayout(pages, 0f, 470f, 1f, 1f);
             cityPage = CreatePage(pages, "InventoryCrafting.Page.City");
             backpackPage = CreatePage(
                 pages,
@@ -1874,7 +1881,9 @@ namespace WasteCity.Graybox3D.Building
                     ProductionTransferButtonHeight,
                     1f);
                 Text label = button.GetComponentInChildren<Text>(true);
-                label.fontSize = 10;
+                FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                    label,
+                    10f);
                 label.alignment = TextAnchor.MiddleLeft;
                 buttons.Add(new ProductionTransferButton(button, label));
             }
@@ -1901,7 +1910,9 @@ namespace WasteCity.Graybox3D.Building
                     44f,
                     1f);
                 Text label = button.GetComponentInChildren<Text>(true);
-                label.fontSize = 10;
+                FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                    label,
+                    10f);
                 label.alignment = TextAnchor.MiddleLeft;
                 row.RecipeButtons.Add(new ProductionRecipeButton(
                     button,
@@ -2000,6 +2011,61 @@ namespace WasteCity.Graybox3D.Building
                 child.gameObject.SetActive(false);
                 DestroyGenerated(child.gameObject);
             }
+        }
+
+        private void RefreshFormalLayout()
+        {
+            if (canvas == null || uiRoot == null) return;
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            Vector2 size = canvasRect == null
+                ? FormalUiLayoutProfile3D.Standard.ReferenceResolution
+                : canvasRect.rect.size;
+            if (size.x <= 0f || size.y <= 0f)
+                size = FormalUiLayoutProfile3D.Standard.ReferenceResolution;
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, size.x, size.y));
+
+            ApplyCanvasRect(resourceStatusBar, layout.ResourceStatusSlot);
+            ApplyCenteredPanel(
+                resourceLedgerPanel,
+                layout.MainModalArea,
+                new Vector2(1240f, 690f));
+            ApplyCenteredPanel(
+                inventoryCraftingPanel,
+                layout.MainModalArea,
+                new Vector2(920f, 610f));
+            ApplyCenteredPanel(
+                researchTreePanel,
+                layout.MainModalArea,
+                new Vector2(1500f, 850f));
+        }
+
+        private static void ApplyCenteredPanel(
+            RectTransform panel,
+            Rect available,
+            Vector2 maximumSize)
+        {
+            if (panel == null) return;
+            Vector2 size = new Vector2(
+                Mathf.Min(maximumSize.x, available.width),
+                Mathf.Min(maximumSize.y, available.height));
+            Rect target = new Rect(
+                available.center.x - size.x * .5f,
+                available.center.y - size.y * .5f,
+                size.x,
+                size.y);
+            ApplyCanvasRect(panel, target);
+        }
+
+        private static void ApplyCanvasRect(RectTransform target, Rect rect)
+        {
+            if (target == null) return;
+            target.anchorMin = Vector2.zero;
+            target.anchorMax = Vector2.zero;
+            target.pivot = Vector2.zero;
+            target.anchoredPosition = rect.position;
+            target.sizeDelta = rect.size;
+            target.localScale = Vector3.one;
         }
 
         private void DestroyUi()
@@ -2196,7 +2262,11 @@ namespace WasteCity.Graybox3D.Building
             var text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = fontSize;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                Mathf.Max(
+                    fontSize,
+                    FormalUiLayoutProfile3D.Standard.FontDescription));
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
             text.text = value ?? string.Empty;
@@ -2232,13 +2302,16 @@ namespace WasteCity.Graybox3D.Building
             RectTransform rect,
             float preferredWidth,
             float preferredHeight,
-            float flexibleWidth)
+            float flexibleWidth,
+            float flexibleHeight = -1f)
         {
             LayoutElement element = rect.GetComponent<LayoutElement>() ??
                 rect.gameObject.AddComponent<LayoutElement>();
             element.preferredWidth = preferredWidth;
             element.preferredHeight = preferredHeight;
             element.flexibleWidth = flexibleWidth;
+            if (flexibleHeight >= 0f)
+                element.flexibleHeight = flexibleHeight;
         }
 
         private static void AddTrigger(

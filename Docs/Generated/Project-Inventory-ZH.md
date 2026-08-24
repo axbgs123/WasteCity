@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`4df6c2c034a9e4042c49e93c07026a04bd74089e49091b4061c2732719632747`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`41e2a67d0059336ede73b7596c68a845373c2146c75f00c2cb2c307862923ead`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -30,6 +30,9 @@
 - `Assets/_Game/Scripts/Building/ConstructionRefundRules.cs`
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Building/RepairProcess.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingHealthRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
@@ -213,7 +216,9 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainMeshBuilder3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
@@ -267,6 +272,9 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxSceneBootstrap.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxUrpScope.cs`
 - 界面与输入（`ui-input`）：
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
@@ -300,6 +308,7 @@
 - `Assets/_Game/Scripts/World/WorldSeed.cs`
 ## 5. MonoBehaviour 组件
 - `WasteCity.ArtIntegration3D.FirstArtTerrainRenderer3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
+- `WasteCity.Graybox3D.Building.FormalUiReadableText3D`：`Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingInputRouter3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingInteractionModel3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInteractionModel3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingMenuView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
@@ -345,6 +354,7 @@
 - `WasteCity.ArtIntegration3D.FirstArtRuinsCliffProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffProfile3D.cs`
 - `WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `WasteCity.Graybox3D.BuildingIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `WasteCity.Graybox3D.FormalMapNavigationProfile3D`：`Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
 - `WasteCity.Graybox3D.Production2DVisualCatalog3D`：`Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
 - `WasteCity.Graybox3D.ResearchIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `WasteCity.Graybox3D.ResourceIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
@@ -361,6 +371,7 @@
 ## 8. 编辑器、构建与性能入口
 - `WasteCity.Editor.FirstArtTerrainAssetBuilder.BuildRuntimeAssets`
 - `WasteCity.Editor.FirstArtTerrainAssetBuilder.BuildTextureArrays`
+- `WasteCity.Editor.FirstArtTerrainAssetBuilder.RebuildCartographicSourceChannels`
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.CancelCapture`
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.CaptureAll`
 - `WasteCity.Editor.FirstArtTerrainEvidenceCapture.CaptureAllAcceptedDeviationFromEnvironment`
@@ -399,7 +410,9 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainMeshBuilder3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
+- `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`

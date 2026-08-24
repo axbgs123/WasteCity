@@ -21,6 +21,7 @@ namespace WasteCity.Graybox3D
         private Sprite icon;
         private Sprite frame;
         private TextMesh amountLabel;
+        private string resourceDisplayName;
 
         public string StableId { get; private set; }
         public string ResourceId { get; private set; }
@@ -32,6 +33,9 @@ namespace WasteCity.Graybox3D
             : amountLabel.text;
         public Sprite Icon => icon;
         public Sprite Frame => frame;
+        public ResourceNodeMarkerLod3D DisplayLod { get; private set; } =
+            ResourceNodeMarkerLod3D.Near;
+        public bool GuidanceOverride { get; private set; }
 
         public void Configure(
             string stableId,
@@ -53,6 +57,7 @@ namespace WasteCity.Graybox3D
                     nameof(resourceId));
             StableId = stableId;
             ResourceId = definition.Id;
+            resourceDisplayName = definition.ChineseName;
             WorldX = worldX;
             WorldY = worldY;
             transform.position = worldPosition + Vector3.up * 1.05f;
@@ -73,10 +78,7 @@ namespace WasteCity.Graybox3D
             int amount = Math.Max(0, cell.ResourceAmount);
             if (amount == DisplayedAmount) return false;
             DisplayedAmount = amount;
-            ResourceDefinitionCatalog.TryGet(
-                ResourceId,
-                out ResourceDefinition definition);
-            amountLabel.text = definition.ChineseName + "\n" + amount;
+            UpdateDisplayText();
             amountLabel.color = amount > 0
                 ? Color.white
                 : new Color(.58f, .58f, .58f, 1f);
@@ -87,6 +89,22 @@ namespace WasteCity.Graybox3D
             iconProperties.SetColor("_Color", iconColor);
             iconProperties.SetColor("_BaseColor", iconColor);
             iconRenderer.SetPropertyBlock(iconProperties);
+            return true;
+        }
+
+        public bool ApplyDisplayLod(
+            ResourceNodeMarkerLod3D lod,
+            bool guidanceOverride)
+        {
+            ResourceNodeMarkerLod3D effective = guidanceOverride
+                ? ResourceNodeMarkerLod3D.Near
+                : lod;
+            if (DisplayLod == effective &&
+                GuidanceOverride == guidanceOverride)
+                return false;
+            DisplayLod = effective;
+            GuidanceOverride = guidanceOverride;
+            UpdateDisplayText();
             return true;
         }
 
@@ -159,6 +177,25 @@ namespace WasteCity.Graybox3D
                 MeshRenderer renderer =
                     labelObject.GetComponent<MeshRenderer>();
                 renderer.sortingOrder = 31;
+            }
+        }
+
+        private void UpdateDisplayText()
+        {
+            if (amountLabel == null || DisplayedAmount < 0)
+                return;
+            switch (DisplayLod)
+            {
+                case ResourceNodeMarkerLod3D.Near:
+                    amountLabel.text = resourceDisplayName + "\n" +
+                        DisplayedAmount;
+                    break;
+                case ResourceNodeMarkerLod3D.Mid:
+                    amountLabel.text = DisplayedAmount.ToString();
+                    break;
+                default:
+                    amountLabel.text = string.Empty;
+                    break;
             }
         }
 

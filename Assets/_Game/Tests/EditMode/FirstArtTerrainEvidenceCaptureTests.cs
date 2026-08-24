@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using WasteCity.ArtIntegration3D;
 using WasteCity.Editor;
+using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.World;
 
@@ -848,6 +849,183 @@ namespace WasteCity.Tests
                 Throws.TypeOf<TimeoutException>()
                     .With.Message.Contains("bootstrapExists=False")
                     .And.Message.Contains("presenterExists=False"));
+        }
+
+        [Test]
+        public void Idea0018ZoomEvidence_UsesFormalProfileAndCrossesEveryLodMonotonically()
+        {
+            var profile = ScriptableObject.CreateInstance<
+                FormalMapNavigationProfile3D>();
+            try
+            {
+                profile.Configure(
+                    8f,
+                    13f,
+                    26f,
+                    1f / 120f,
+                    15f,
+                    21f);
+
+                IReadOnlyList<FirstArtTerrainEvidenceCapture.ZoomFrameSpec>
+                    frames = FirstArtTerrainEvidenceCapture
+                        .BuildZoomFrameSpecs(profile);
+
+                Assert.That(frames.Count, Is.EqualTo(10));
+                Assert.That(frames[0].Index, Is.EqualTo(0));
+                Assert.That(frames[0].ScrollDeltaY, Is.EqualTo(0f));
+                Assert.That(frames[0].OrthographicSize, Is.EqualTo(13f));
+                Assert.That(frames[frames.Count - 1].OrthographicSize,
+                    Is.EqualTo(22f));
+                Assert.That(
+                    frames.Select(frame => frame.Lod),
+                    Is.EqualTo(new[]
+                    {
+                        ResourceNodeMarkerLod3D.Near,
+                        ResourceNodeMarkerLod3D.Near,
+                        ResourceNodeMarkerLod3D.Near,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Mid,
+                        ResourceNodeMarkerLod3D.Far,
+                    }));
+                for (var index = 1; index < frames.Count; index++)
+                {
+                    Assert.That(frames[index].Index, Is.EqualTo(index));
+                    Assert.That(frames[index].ScrollDeltaY, Is.EqualTo(-120f));
+                    Assert.That(frames[index].OrthographicSize,
+                        Is.GreaterThan(frames[index - 1].OrthographicSize));
+                }
+
+                Assert.That(
+                    () => FirstArtTerrainEvidenceCapture
+                        .ValidateZoomFrameSpecs(profile, frames),
+                    Throws.Nothing);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void Idea0018ZoomEvidence_RejectsMissingLodAndConfirmsCameraRestoration()
+        {
+            var profile = ScriptableObject.CreateInstance<
+                FormalMapNavigationProfile3D>();
+            try
+            {
+                profile.Configure(
+                    8f,
+                    13f,
+                    26f,
+                    1f / 120f,
+                    15f,
+                    21f);
+                var invalid = new[]
+                {
+                    new FirstArtTerrainEvidenceCapture.ZoomFrameSpec(
+                        0,
+                        0f,
+                        13f,
+                        ResourceNodeMarkerLod3D.Near),
+                    new FirstArtTerrainEvidenceCapture.ZoomFrameSpec(
+                        1,
+                        -120f,
+                        14f,
+                        ResourceNodeMarkerLod3D.Near),
+                };
+
+                Assert.That(
+                    () => FirstArtTerrainEvidenceCapture
+                        .ValidateZoomFrameSpecs(profile, invalid),
+                    Throws.TypeOf<InvalidOperationException>()
+                        .With.Message.Contains("Near, Mid and Far"));
+                Assert.That(
+                    () => FirstArtTerrainEvidenceCapture
+                        .ValidateZoomRestoration(
+                            13f,
+                            13f,
+                            ResourceNodeMarkerLod3D.Near,
+                            ResourceNodeMarkerLod3D.Near),
+                    Throws.Nothing);
+                Assert.That(
+                    () => FirstArtTerrainEvidenceCapture
+                        .ValidateZoomRestoration(
+                            13f,
+                            14f,
+                            ResourceNodeMarkerLod3D.Near,
+                            ResourceNodeMarkerLod3D.Near),
+                    Throws.TypeOf<InvalidOperationException>()
+                        .With.Message.Contains("restore"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+            }
+        }
+
+        [Test]
+        public void Idea0018UiRenderScope_RestoresOverlayCanvasAndCameraState()
+        {
+            var cameraObject = new GameObject("idea0018-ui-camera");
+            var canvasObject = new GameObject("idea0018-overlay-canvas");
+            Camera camera = cameraObject.AddComponent<Camera>();
+            Canvas canvas = canvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 50;
+            camera.cullingMask = 1 << 0;
+            canvasObject.layer = 5;
+            int originalMask = camera.cullingMask;
+            try
+            {
+                using (FirstArtTerrainEvidenceCapture
+                           .PrepareUiCanvasesForCameraRender(
+                               camera,
+                               new[] { canvas }))
+                {
+                    Assert.That(canvas.renderMode,
+                        Is.EqualTo(RenderMode.ScreenSpaceCamera));
+                    Assert.That(canvas.worldCamera, Is.SameAs(camera));
+                    Assert.That(camera.cullingMask & (1 << canvasObject.layer),
+                        Is.Not.Zero);
+                }
+
+                Assert.That(canvas.renderMode,
+                    Is.EqualTo(RenderMode.ScreenSpaceOverlay));
+                Assert.That(canvas.worldCamera, Is.Null);
+                Assert.That(canvas.sortingOrder, Is.EqualTo(50));
+                Assert.That(camera.cullingMask, Is.EqualTo(originalMask));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvasObject);
+                UnityEngine.Object.DestroyImmediate(cameraObject);
+            }
+        }
+
+        [Test]
+        public void Idea0018CaptureManifest_RecordsLodUiStateResolutionAndHashes()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FirstArtTerrainEvidenceCapture.cs"));
+
+            StringAssert.Contains("13-resource-marker-near.png", source);
+            StringAssert.Contains("14-resource-marker-mid.png", source);
+            StringAssert.Contains("15-resource-marker-far.png", source);
+            StringAssert.Contains("20-ui-main-hud.png", source);
+            StringAssert.Contains("21-ui-research-tree.png", source);
+            StringAssert.Contains("zoom-frames", source);
+            StringAssert.Contains("resourceMarkerLod", source);
+            StringAssert.Contains("uiPanelState", source);
+            StringAssert.Contains("orthographicSize", source);
+            StringAssert.Contains("sha256", source);
+            StringAssert.Contains("SetResearchOpen(true)", source);
+            StringAssert.Contains("PrepareUiCanvasesForCameraRender", source);
         }
     }
 }

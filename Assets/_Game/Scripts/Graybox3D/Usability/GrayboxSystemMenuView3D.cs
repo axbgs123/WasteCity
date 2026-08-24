@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using WasteCity.Graybox3D.Building;
 
 namespace WasteCity.Graybox3D.Usability
 {
@@ -242,6 +243,11 @@ namespace WasteCity.Graybox3D.Usability
                 eventSystem.SetSelectedGameObject(null);
         }
 
+        private void OnRectTransformDimensionsChange()
+        {
+            RefreshFormalLayout();
+        }
+
         private void OnDestroy()
         {
             DestroyUi();
@@ -323,7 +329,7 @@ namespace WasteCity.Graybox3D.Usability
                 checkpointWarningRoot,
                 "FormalSave.CheckpointWarning",
                 string.Empty);
-            checkpointWarning.fontSize = 17;
+            SetReadableFontSize(checkpointWarning, 17f);
             checkpointWarningRoot.gameObject.SetActive(false);
 
             RectTransform blockerRect = CreateRect(
@@ -338,7 +344,7 @@ namespace WasteCity.Graybox3D.Usability
                 uiRoot,
                 "Paused.Title",
                 "游戏已暂停");
-            pausedTitle.fontSize = 28;
+            SetReadableFontSize(pausedTitle, 28f);
             PlaceFixed(
                 (RectTransform)pausedTitle.transform,
                 new Vector2(0f, 260f),
@@ -350,7 +356,7 @@ namespace WasteCity.Graybox3D.Usability
                 startPage,
                 "Start.Title",
                 "废土移动城");
-            startTitle.fontSize = 26;
+            SetReadableFontSize(startTitle, 26f);
             startContinueButton = CreateButton(
                 startPage,
                 "Start.Continue",
@@ -370,7 +376,7 @@ namespace WasteCity.Graybox3D.Usability
                 "Start.NewGameWarning",
                 "开始新的 3D 游戏将覆盖当前进度。\n" +
                 "旧版 2D 存档会先安全归档。是否继续？");
-            newGameWarning.fontSize = 18;
+            SetReadableFontSize(newGameWarning, 18f);
             SetLayout(
                 (RectTransform)newGameWarning.transform,
                 0f,
@@ -472,7 +478,7 @@ namespace WasteCity.Graybox3D.Usability
                 "Exit.Warning",
                 "保存并退出会写入当前完整 3D 进度。\n" +
                 "保存失败时游戏会继续运行。");
-            warning.fontSize = 18;
+            SetReadableFontSize(warning, 18f);
             SetLayout((RectTransform)warning.transform, 0f, 100f, 1f);
             CreateButton(
                 exitConfirmPage,
@@ -494,7 +500,7 @@ namespace WasteCity.Graybox3D.Usability
                 uiRoot,
                 "FormalSave.Feedback",
                 string.Empty);
-            formalSaveFeedback.fontSize = 17;
+            SetReadableFontSize(formalSaveFeedback, 17f);
             PlaceFixed(
                 (RectTransform)formalSaveFeedback.transform,
                 new Vector2(0f, -300f),
@@ -504,6 +510,7 @@ namespace WasteCity.Graybox3D.Usability
             startPage.gameObject.SetActive(false);
             newGameConfirmPage.gameObject.SetActive(false);
             speedControlsRoot.gameObject.SetActive(true);
+            RefreshFormalLayout();
         }
 
         private void SyncSettings(GrayboxDisplaySettingsModel3D settings)
@@ -586,16 +593,63 @@ namespace WasteCity.Graybox3D.Usability
         private void UpdateSpeedControlsLayout()
         {
             if (speedControlsRoot == null || canvas == null) return;
-            bool narrow = canvas.pixelRect.width < 1280f;
-            Vector2 anchor = narrow
-                ? new Vector2(.5f, 0f)
-                : Vector2.zero;
-            speedControlsRoot.anchorMin = anchor;
-            speedControlsRoot.anchorMax = anchor;
-            speedControlsRoot.pivot = anchor;
-            speedControlsRoot.anchoredPosition = narrow
-                ? new Vector2(0f, 70f)
-                : new Vector2(20f, 20f);
+            Vector2 canvasSize = ResolveCanvasSize();
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, canvasSize.x, canvasSize.y));
+            Rect slot = layout.SpeedAndMenuSlot;
+            Vector2 size = new Vector2(
+                Mathf.Min(286f, slot.width),
+                Mathf.Min(44f, slot.height));
+            speedControlsRoot.anchorMin = Vector2.one;
+            speedControlsRoot.anchorMax = Vector2.one;
+            speedControlsRoot.pivot = Vector2.one;
+            speedControlsRoot.anchoredPosition = new Vector2(
+                slot.xMax - canvasSize.x,
+                slot.yMax - canvasSize.y);
+            speedControlsRoot.sizeDelta = size;
+            speedControlsRoot.localScale = Vector3.one;
+        }
+
+        private void RefreshFormalLayout()
+        {
+            if (canvas == null) return;
+            UpdateSpeedControlsLayout();
+            Vector2 canvasSize = ResolveCanvasSize();
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, canvasSize.x, canvasSize.y));
+            foreach (RectTransform page in new[]
+                     {
+                         startPage,
+                         newGameConfirmPage,
+                         mainPage,
+                         settingsPage,
+                         operationGuidePage,
+                         exitConfirmPage
+                     })
+            {
+                if (page == null) continue;
+                page.anchorMin = Vector2.one * .5f;
+                page.anchorMax = Vector2.one * .5f;
+                page.pivot = Vector2.one * .5f;
+                page.anchoredPosition = Vector2.zero;
+                page.sizeDelta = new Vector2(
+                    Mathf.Min(620f, layout.MainModalArea.width),
+                    Mathf.Min(460f, layout.MainModalArea.height));
+                page.localScale = Vector3.one;
+            }
+        }
+
+        private Vector2 ResolveCanvasSize()
+        {
+            RectTransform rect = canvas == null
+                ? null
+                : canvas.GetComponent<RectTransform>();
+            Vector2 size = rect == null ? Vector2.zero : rect.rect.size;
+            if (size.x <= 0f || size.y <= 0f)
+                size = canvas != null ? canvas.pixelRect.size : Vector2.zero;
+            if (size.x <= 0f || size.y <= 0f)
+                size = FormalUiLayoutProfile3D.Standard.ReferenceResolution;
+            return size;
         }
 
         private void RetireStaleRoots()
@@ -697,7 +751,7 @@ namespace WasteCity.Graybox3D.Usability
             if (callback != null)
                 button.onClick.AddListener(() => callback());
             Text text = CreateLabel(rect, "Label", label);
-            text.fontSize = 16;
+            SetReadableFontSize(text, 16f);
             return button;
         }
 
@@ -771,12 +825,19 @@ namespace WasteCity.Graybox3D.Usability
             var text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = 15;
+            SetReadableFontSize(text, 15f);
             text.color = Color.white;
             text.alignment = TextAnchor.MiddleCenter;
             text.text = value ?? string.Empty;
             text.raycastTarget = false;
             return text;
+        }
+
+        private static void SetReadableFontSize(Text text, float designSize)
+        {
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                designSize);
         }
 
         private static RectTransform CreateRect(

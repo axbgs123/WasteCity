@@ -733,9 +733,11 @@ namespace WasteCity.Tests
                 CanvasRect(fixture.Canvas, fixture.View.SpeedRect),
                 CanvasRect(fixture.Canvas, fixture.View.SelectionRect),
             };
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, 1920f, 1080f));
             Rect[] productionUi =
             {
-                Rect.MinMaxRect(410f, 1014f, 1510f, 1072f),
+                layout.ResourceStatusSlot,
                 Rect.MinMaxRect(650f, 8f, 1270f, 62f),
                 Rect.MinMaxRect(720f, 66f, 1200f, 104f),
                 Rect.MinMaxRect(1722f, 8f, 1912f, 110f),

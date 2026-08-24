@@ -13,6 +13,8 @@ namespace WasteCity.Graybox3D
         [SerializeField]
         private GrayboxDirectControlCoordinator directControl;
         [SerializeField] private GrayboxGroundProjector groundProjector;
+        [SerializeField]
+        private FormalMapNavigationProfile3D mapNavigationProfile;
 
         private readonly CameraFollowModel followModel =
             new CameraFollowModel();
@@ -28,6 +30,16 @@ namespace WasteCity.Graybox3D
             city != null &&
             directControl != null &&
             groundProjector != null;
+        public FormalMapNavigationProfile3D MapNavigationProfile =>
+            mapNavigationProfile;
+
+        private void Awake()
+        {
+            if (mapNavigationProfile == null)
+                mapNavigationProfile = Resources.Load<
+                    FormalMapNavigationProfile3D>(
+                    FormalMapNavigationProfile3D.ResourcesPath);
+        }
 
         public void Configure(
             Camera camera,
@@ -43,6 +55,43 @@ namespace WasteCity.Graybox3D
             this.leader = leader;
             this.directControl = directControl;
             this.groundProjector = groundProjector;
+        }
+
+        public void ConfigureMapNavigation(
+            FormalMapNavigationProfile3D profile)
+        {
+            if (profile == null)
+                throw new System.ArgumentNullException(nameof(profile));
+            if (!profile.TryValidate(out string error))
+                throw new System.ArgumentException(error, nameof(profile));
+            mapNavigationProfile = profile;
+        }
+
+        public bool ApplyScrollZoom(float scrollDeltaY)
+        {
+            if (controlledCamera == null ||
+                !controlledCamera.orthographic ||
+                Mathf.Approximately(scrollDeltaY, 0f) ||
+                float.IsNaN(scrollDeltaY) ||
+                float.IsInfinity(scrollDeltaY))
+                return false;
+
+            float current = controlledCamera.orthographicSize;
+            float next = mapNavigationProfile != null
+                ? mapNavigationProfile.ResolveOrthographicSize(
+                    current,
+                    scrollDeltaY)
+                : Mathf.Clamp(
+                    current - scrollDeltaY *
+                    FormalMapNavigationProfile3D.DefaultZoomSensitivity,
+                    FormalMapNavigationProfile3D
+                        .DefaultMinimumOrthographicSize,
+                    FormalMapNavigationProfile3D
+                        .DefaultMaximumOrthographicSize);
+            if (Mathf.Approximately(current, next))
+                return false;
+            controlledCamera.orthographicSize = next;
+            return true;
         }
 
         public void BeginFreeDrag(Vector2 screenPosition)

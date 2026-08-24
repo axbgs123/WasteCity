@@ -25,6 +25,7 @@ namespace WasteCity.Graybox3D.Building
         private readonly List<ButtonBinding> buttonBindings =
             new List<ButtonBinding>();
         private GameObject blockerRoot;
+        private RectTransform panelRoot;
         private Text titleLabel;
         private Text statisticsLabel;
         private Text feedbackLabel;
@@ -119,6 +120,7 @@ namespace WasteCity.Graybox3D.Building
                     DestroyImmediate(blockerRoot);
             }
             blockerRoot = null;
+            panelRoot = null;
             titleLabel = null;
             statisticsLabel = null;
             feedbackLabel = null;
@@ -134,6 +136,13 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             Close();
+        }
+
+        private void OnRectTransformDimensionsChange()
+        {
+            if (panelRoot == null || canvas == null) return;
+            panelRoot.sizeDelta = ResolvePanelSize();
+            panelRoot.localScale = Vector3.one;
         }
 
         private void BuildRuntimeUi()
@@ -167,7 +176,9 @@ namespace WasteCity.Graybox3D.Building
             panel.anchorMax = new Vector2(.5f, .5f);
             panel.pivot = new Vector2(.5f, .5f);
             panel.anchoredPosition = Vector2.zero;
-            panel.sizeDelta = new Vector2(860f, 760f);
+            panel.sizeDelta = ResolvePanelSize();
+            panel.localScale = Vector3.one;
+            panelRoot = panel;
             Image panelImage = panel.gameObject.AddComponent<Image>();
             panelImage.color = PanelColor;
             panelImage.raycastTarget = true;
@@ -179,14 +190,50 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(-32f, -20f),
                 32,
                 TextAnchor.MiddleCenter);
-            statisticsLabel = CreateText(
+            RectTransform statisticsScrollRoot = CreateRect(
                 panel,
+                "Defense.Settlement.Statistics.Scroll");
+            statisticsScrollRoot.anchorMin = Vector2.zero;
+            statisticsScrollRoot.anchorMax = Vector2.one;
+            statisticsScrollRoot.offsetMin = new Vector2(48f, 146f);
+            statisticsScrollRoot.offsetMax = new Vector2(-48f, -92f);
+            var statisticsScroll = statisticsScrollRoot.gameObject
+                .AddComponent<ScrollRect>();
+            statisticsScroll.horizontal = false;
+            statisticsScroll.vertical = true;
+            statisticsScroll.movementType =
+                ScrollRect.MovementType.Clamped;
+            statisticsScroll.scrollSensitivity = 32f;
+
+            RectTransform statisticsViewport = CreateRect(
+                statisticsScrollRoot,
+                "Defense.Settlement.Statistics.Viewport");
+            statisticsViewport.anchorMin = Vector2.zero;
+            statisticsViewport.anchorMax = Vector2.one;
+            statisticsViewport.offsetMin = Vector2.zero;
+            statisticsViewport.offsetMax = Vector2.zero;
+            Image statisticsMaskImage = statisticsViewport.gameObject
+                .AddComponent<Image>();
+            statisticsMaskImage.color = new Color(1f, 1f, 1f, .01f);
+            statisticsViewport.gameObject.AddComponent<RectMask2D>();
+
+            statisticsLabel = CreateText(
+                statisticsViewport,
                 "Defense.Settlement.Statistics",
-                new Vector2(48f, 146f),
-                new Vector2(-48f, -92f),
+                Vector2.zero,
+                Vector2.zero,
                 18,
                 TextAnchor.UpperLeft);
+            RectTransform statisticsContent =
+                statisticsLabel.rectTransform;
+            statisticsContent.anchorMin = new Vector2(0f, 1f);
+            statisticsContent.anchorMax = Vector2.one;
+            statisticsContent.pivot = new Vector2(.5f, 1f);
+            statisticsContent.anchoredPosition = Vector2.zero;
+            statisticsContent.sizeDelta = new Vector2(0f, 620f);
             statisticsLabel.lineSpacing = 1.05f;
+            statisticsScroll.viewport = statisticsViewport;
+            statisticsScroll.content = statisticsContent;
             feedbackLabel = CreateText(
                 panel,
                 "Defense.Settlement.Feedback",
@@ -220,6 +267,29 @@ namespace WasteCity.Graybox3D.Building
                 button.onClick.AddListener(callback);
                 buttonBindings.Add(new ButtonBinding(button, callback));
             }
+        }
+
+        private Vector2 ResolvePanelSize()
+        {
+            RectTransform canvasRect = canvas == null
+                ? null
+                : canvas.GetComponent<RectTransform>();
+            Vector2 canvasSize = canvasRect == null
+                ? Vector2.zero
+                : canvasRect.rect.size;
+            if (canvasSize.x <= 0f || canvasSize.y <= 0f)
+                canvasSize = canvas == null
+                    ? Vector2.zero
+                    : canvas.pixelRect.size;
+            if (canvasSize.x <= 0f || canvasSize.y <= 0f)
+                canvasSize = FormalUiLayoutProfile3D.Standard
+                    .ReferenceResolution;
+            Rect modal = FormalUiLayoutPolicy3D.Calculate(
+                    new Rect(0f, 0f, canvasSize.x, canvasSize.y))
+                .MainModalArea;
+            return new Vector2(
+                Mathf.Min(860f, modal.width),
+                Mathf.Min(760f, modal.height));
         }
 
         private void ApplyText()
@@ -440,7 +510,9 @@ namespace WasteCity.Graybox3D.Building
             Text text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = fontSize;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                fontSize);
             text.alignment = alignment;
             text.color = Color.white;
             text.raycastTarget = false;

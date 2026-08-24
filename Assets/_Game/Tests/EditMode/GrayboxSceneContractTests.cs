@@ -779,6 +779,66 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0018_SceneUsesOneFormalCanvasScaleContract()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            GameObject root = GameObject.Find("GrayboxPrototype3D");
+            Transform ui = RequiredChild(root, "GrayboxUI");
+            string[] canvasNames =
+            {
+                "BuildingCanvas",
+                "ProductionObservabilityCanvas",
+                "SystemMenuCanvas",
+            };
+            int[] expectedSortingOrders = { 0, 50, 100 };
+
+            for (var index = 0; index < canvasNames.Length; index++)
+            {
+                Transform canvasTransform = RequiredChild(
+                    ui.gameObject,
+                    canvasNames[index]);
+                Canvas canvas = canvasTransform.GetComponent<Canvas>();
+                CanvasScaler scaler =
+                    canvasTransform.GetComponent<CanvasScaler>();
+
+                Assert.That(canvas, Is.Not.Null, canvasNames[index]);
+                Assert.That(scaler, Is.Not.Null, canvasNames[index]);
+                Assert.That(
+                    canvas.renderMode,
+                    Is.EqualTo(RenderMode.ScreenSpaceOverlay),
+                    canvasNames[index]);
+                Assert.That(
+                    canvas.sortingOrder,
+                    Is.EqualTo(expectedSortingOrders[index]),
+                    canvasNames[index]);
+                Assert.That(
+                    scaler.uiScaleMode,
+                    Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize),
+                    canvasNames[index]);
+                Assert.That(
+                    scaler.referenceResolution,
+                    Is.EqualTo(new Vector2(1920f, 1080f)),
+                    canvasNames[index]);
+                Assert.That(
+                    scaler.screenMatchMode,
+                    Is.EqualTo(CanvasScaler.ScreenMatchMode.Expand),
+                    canvasNames[index]);
+                Assert.That(
+                    scaler.matchWidthOrHeight,
+                    Is.EqualTo(.5f),
+                    canvasNames[index]);
+                Assert.That(
+                    scaler.referencePixelsPerUnit,
+                    Is.EqualTo(100f),
+                    canvasNames[index]);
+            }
+
+            Assert.That(
+                Object.FindObjectsOfType<EventSystem>(true),
+                Has.Length.EqualTo(1));
+        }
+
+        [Test]
         public void IDEA0011_SceneHasSerializedOperationsUiContract()
         {
             EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);

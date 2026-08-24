@@ -213,6 +213,11 @@ namespace WasteCity.Graybox3D.Building
                 towerPauseButton.onClick.RemoveListener(HandlePauseClicked);
         }
 
+        private void OnRectTransformDimensionsChange()
+        {
+            RefreshFormalLayout();
+        }
+
         private void EnsureFallbackConfiguration()
         {
             if (canvas == null)
@@ -339,6 +344,61 @@ namespace WasteCity.Graybox3D.Building
             selectionGroup.alpha = 0f;
             selectionGroup.interactable = false;
             selectionGroup.blocksRaycasts = false;
+            RefreshFormalLayout();
+        }
+
+        private void RefreshFormalLayout()
+        {
+            if (canvas == null || uiRoot == null) return;
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            Vector2 canvasSize = canvasRect == null
+                ? FormalUiLayoutProfile3D.Standard.ReferenceResolution
+                : canvasRect.rect.size;
+            if (canvasSize.x <= 0f || canvasSize.y <= 0f)
+                canvasSize = FormalUiLayoutProfile3D.Standard
+                    .ReferenceResolution;
+            uiRoot.anchorMin = Vector2.one * .5f;
+            uiRoot.anchorMax = Vector2.one * .5f;
+            uiRoot.pivot = Vector2.one * .5f;
+            uiRoot.anchoredPosition = Vector2.zero;
+            uiRoot.sizeDelta = canvasSize;
+            uiRoot.localScale = Vector3.one;
+
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, canvasSize.x, canvasSize.y));
+            FormalUiLayoutProfile3D profile =
+                FormalUiLayoutProfile3D.Standard;
+            Rect danger = layout.DangerAndCoreSlot;
+            Rect summary = new Rect(
+                danger.xMin,
+                danger.yMax - 140f,
+                danger.width,
+                140f);
+            Rect speed = new Rect(
+                summary.xMin,
+                summary.yMin - profile.SpaceSmall - 46f,
+                Mathf.Min(230f, summary.width),
+                46f);
+            Rect drawer = layout.SelectionDrawerSlot;
+            Rect selection = new Rect(
+                drawer.xMax - Mathf.Min(310f, drawer.width),
+                drawer.center.y - Mathf.Min(300f, drawer.height) * .5f,
+                Mathf.Min(310f, drawer.width),
+                Mathf.Min(300f, drawer.height));
+            ApplyCanvasRect(SummaryRect, summary);
+            ApplyCanvasRect(SpeedRect, speed);
+            ApplyCanvasRect(SelectionRect, selection);
+        }
+
+        private static void ApplyCanvasRect(RectTransform target, Rect rect)
+        {
+            if (target == null) return;
+            target.anchorMin = Vector2.zero;
+            target.anchorMax = Vector2.zero;
+            target.pivot = Vector2.zero;
+            target.anchoredPosition = rect.position;
+            target.sizeDelta = rect.size;
+            target.localScale = Vector3.one;
         }
 
         private void HandlePauseClicked()
@@ -967,7 +1027,9 @@ namespace WasteCity.Graybox3D.Building
             Text text = rect.gameObject.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = fontSize;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                fontSize);
             text.alignment = alignment;
             text.color = Color.white;
             text.raycastTarget = false;

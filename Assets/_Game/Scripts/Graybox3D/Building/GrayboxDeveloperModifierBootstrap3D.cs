@@ -214,48 +214,44 @@ namespace WasteCity.Graybox3D.Building
                 typeof(RectTransform));
             panelRoot.transform.SetParent(canvas.transform, false);
             RectTransform root = (RectTransform)panelRoot.transform;
-            root.anchorMin = new Vector2(1f, .5f);
-            root.anchorMax = new Vector2(1f, .5f);
+            root.anchorMin = new Vector2(1f, 0f);
+            root.anchorMax = Vector2.one;
             root.pivot = new Vector2(1f, .5f);
             root.anchoredPosition = new Vector2(-16f, 0f);
-            root.sizeDelta = new Vector2(420f, 1040f);
-            ApplyResponsivePanelScale();
+            root.sizeDelta = new Vector2(420f, -32f);
+            root.localScale = Vector3.one;
             Image background = panelRoot.AddComponent<Image>();
             background.color = new Color(.08f, .1f, .11f, .94f);
-            var layout = panelRoot.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.spacing = 3f;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            RectTransform content = CreateScrollablePanelContent(root);
 
-            CreateLabel(root, "Development Mode Label", "开发模式");
-            CreateLabel(root, "Resource Catalog Label", "物品目录（中文搜索）");
+            CreateLabel(content, "Development Mode Label", "开发模式");
+            CreateLabel(content, "Resource Catalog Label", "物品目录（中文搜索）");
             InputField resourceSearch = CreateInput(
-                root, "Resource Search", string.Empty);
+                content, "Resource Search", string.Empty);
             resourceRows = CreateCatalogResults(
-                root,
+                content,
                 "Resource Results",
                 GrayboxDeveloperCatalogQuery3D.ResourceEntries,
                 entry => SelectResource(entry));
             selectedResourceId =
                 GrayboxDeveloperCatalogQuery3D.ResourceEntries[0].StableId;
             selectedResourceLabel = CreateLabel(
-                root,
+                content,
                 "Selected Resource",
                 "当前物品：" +
                 GrayboxDeveloperCatalogQuery3D.ResourceEntries[0]
                     .DisplayName);
             resourceSearch.onValueChanged.AddListener(value =>
                 ApplyCatalogFilter(resourceRows, value));
-            CreateButton(root, "Resource +100", "资源 +100", () =>
+            CreateButton(content, "Resource +100", "资源 +100", () =>
                 SetFeedback(modifier.AddResourceWithFeedback(
                     selectedResourceId,
                     100).Message));
-            CreateButton(root, "Resource +1000", "资源 +1000", () =>
+            CreateButton(content, "Resource +1000", "资源 +1000", () =>
                 SetFeedback(modifier.AddResourceWithFeedback(
                     selectedResourceId,
                     1000).Message));
-            CreateButton(root, "Clear Resource", "资源清零", () =>
+            CreateButton(content, "Clear Resource", "资源清零", () =>
             {
                 bool cleared = modifier.ClearResource(selectedResourceId);
                 SetFeedback(cleared
@@ -263,8 +259,8 @@ namespace WasteCity.Graybox3D.Building
                     : "物品清零失败");
             });
             InputField resourceAmount = CreateInput(
-                root, "Resource Amount", "0");
-            CreateButton(root, "Set Resource", "设置资源", () =>
+                content, "Resource Amount", "0");
+            CreateButton(content, "Set Resource", "设置资源", () =>
             {
                 if (int.TryParse(resourceAmount.text, out int amount))
                 {
@@ -278,13 +274,13 @@ namespace WasteCity.Graybox3D.Building
                 }
             });
 
-            CreateLabel(root, "Research Catalog Label", "科技目录（中文搜索）");
+            CreateLabel(content, "Research Catalog Label", "科技目录（中文搜索）");
             InputField researchSearch = CreateInput(
-                root,
+                content,
                 "Research Search",
                 string.Empty);
             researchRows = CreateCatalogResults(
-                root,
+                content,
                 "Research Results",
                 GrayboxDeveloperCatalogQuery3D.ResearchEntries,
                 entry => SelectResearch(entry));
@@ -296,38 +292,38 @@ namespace WasteCity.Graybox3D.Building
                     initialResearchIndex];
             selectedResearchId = initialResearch.StableId;
             selectedResearchLabel = CreateLabel(
-                root,
+                content,
                 "Selected Research",
                 "当前科技：" + initialResearch.DisplayName);
             researchSearch.onValueChanged.AddListener(value =>
                 ApplyCatalogFilter(researchRows, value));
-            CreateButton(root, "Unlock Research", "解锁当前科技", () =>
+            CreateButton(content, "Unlock Research", "解锁当前科技", () =>
                 SetFeedback(modifier.UnlockResearchWithFeedback(
                     selectedResearchId).Message));
-            CreateButton(root, "Unlock Technology", "解锁科技路线", () =>
+            CreateButton(content, "Unlock Technology", "解锁科技路线", () =>
                 SetFeedback(modifier.UnlockRouteWithFeedback(
                     ContentRoute.Technology).Message));
-            CreateButton(root, "Unlock Cultivation", "解锁修仙路线", () =>
+            CreateButton(content, "Unlock Cultivation", "解锁修仙路线", () =>
                 SetFeedback(modifier.UnlockRouteWithFeedback(
                     ContentRoute.Cultivation).Message));
-            CreateButton(root, "Unlock Biological Ascension", "解锁血肉路线", () =>
+            CreateButton(content, "Unlock Biological Ascension", "解锁血肉路线", () =>
                 SetFeedback(modifier.UnlockRouteWithFeedback(
                     ContentRoute.BiologicalAscension).Message));
-            CreateButton(root, "Unlock Psionics", "解锁灵能路线", () =>
+            CreateButton(content, "Unlock Psionics", "解锁灵能路线", () =>
                 SetFeedback(modifier.UnlockRouteWithFeedback(
                     ContentRoute.Psionics).Message));
-            CreateButton(root, "Unlock All", "解锁全部研究", () =>
+            CreateButton(content, "Unlock All", "解锁全部研究", () =>
                 SetFeedback(modifier.UnlockAllResearchWithFeedback().Message));
 
             feedbackLabel = CreateLabel(
-                root,
+                content,
                 "Developer Feedback",
                 "请选择物品或科技");
 
-            CreateLabel(root, "Session Tools Label", "城市与施工");
+            CreateLabel(content, "Session Tools Label", "城市与施工");
             InputField populationAmount = CreateInput(
-                root, "Population Amount", "200");
-            CreateButton(root, "Set Population", "设置人口", () =>
+                content, "Population Amount", "200");
+            CreateButton(content, "Set Population", "设置人口", () =>
             {
                 if (int.TryParse(populationAmount.text, out int amount))
                 {
@@ -341,80 +337,122 @@ namespace WasteCity.Graybox3D.Building
                 }
             });
 
-            CreateButton(root, "Set Mobile", "切换移动形态", () =>
+            CreateButton(content, "Set Mobile", "切换移动形态", () =>
                 SetFeedback(modifier.SetCityMode(CityMode.Mobile)
                     ? "已切换为移动形态"
                     : "无法切换为移动形态"));
-            CreateButton(root, "Set Fortress", "切换堡垒形态", () =>
+            CreateButton(content, "Set Fortress", "切换堡垒形态", () =>
                 SetFeedback(modifier.SetCityMode(CityMode.Fortress)
                     ? "已切换为堡垒形态"
                     : "无法切换为堡垒形态"));
-            CreateButton(root, "Complete Transition", "完成形态转换", () =>
+            CreateButton(content, "Complete Transition", "完成形态转换", () =>
                 SetFeedback(modifier.CompleteCityTransition()
                     ? "形态转换已完成"
                     : "当前没有可完成的形态转换"));
-            CreateButton(root, "Multiplier 1x", "施工 1×", () =>
+            CreateButton(content, "Multiplier 1x", "施工 1×", () =>
             {
                 modifier.SetConstructionSpeed(
                     DevelopmentConstructionSpeed.Normal);
                 SetFeedback("施工速度已设置为 1×");
             });
-            CreateButton(root, "Multiplier 10x", "施工 10×", () =>
+            CreateButton(content, "Multiplier 10x", "施工 10×", () =>
             {
                 modifier.SetConstructionSpeed(
                     DevelopmentConstructionSpeed.Fast10);
                 SetFeedback("施工速度已设置为 10×");
             });
-            CreateButton(root, "Multiplier 100x", "施工 100×", () =>
+            CreateButton(content, "Multiplier 100x", "施工 100×", () =>
             {
                 modifier.SetConstructionSpeed(
                     DevelopmentConstructionSpeed.Fast100);
                 SetFeedback("施工速度已设置为 100×");
             });
-            CreateButton(root, "Complete Construction", "立即完成施工", () =>
+            CreateButton(content, "Complete Construction", "立即完成施工", () =>
             {
                 modifier.CompleteAllConstruction();
                 SetFeedback("已完成全部施工");
             });
+            ApplyResponsivePanelLayout();
             panelRoot.SetActive(false);
         }
 
-        private static float CalculateResponsivePanelScale(
-            float viewportWidth,
-            float viewportHeight,
-            float panelWidth,
-            float panelHeight)
+        private static RectTransform CreateScrollablePanelContent(
+            RectTransform root)
         {
-            if (viewportWidth <= 0f || viewportHeight <= 0f ||
-                panelWidth <= 0f || panelHeight <= 0f)
-            {
-                return 1f;
-            }
+            var scrollObject = new GameObject(
+                "Developer.Panel.Scroll",
+                typeof(RectTransform));
+            scrollObject.transform.SetParent(root, false);
+            RectTransform scrollRoot =
+                (RectTransform)scrollObject.transform;
+            Stretch(scrollRoot);
+            scrollRoot.offsetMin = new Vector2(8f, 8f);
+            scrollRoot.offsetMax = new Vector2(-8f, -8f);
+            var scroll = scrollObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 28f;
 
-            const float margin = 16f;
-            float widthScale = Mathf.Max(0f, viewportWidth - margin) /
-                panelWidth;
-            float heightScale = Mathf.Max(0f, viewportHeight - margin) /
-                panelHeight;
-            return Mathf.Clamp(Mathf.Min(widthScale, heightScale), .25f, 1f);
+            var viewportObject = new GameObject(
+                "Developer.Panel.Viewport",
+                typeof(RectTransform));
+            viewportObject.transform.SetParent(scrollRoot, false);
+            RectTransform viewport =
+                (RectTransform)viewportObject.transform;
+            Stretch(viewport);
+            Image viewportImage = viewportObject.AddComponent<Image>();
+            viewportImage.color = new Color(1f, 1f, 1f, .01f);
+            viewportObject.AddComponent<RectMask2D>();
+
+            var contentObject = new GameObject(
+                "Developer.Panel.Content",
+                typeof(RectTransform));
+            contentObject.transform.SetParent(viewport, false);
+            RectTransform content = (RectTransform)contentObject.transform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            var layout = contentObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(4, 4, 4, 4);
+            layout.spacing = 3f;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            ContentSizeFitter fitter =
+                contentObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            scroll.viewport = viewport;
+            scroll.content = content;
+            return content;
         }
 
-        private void ApplyResponsivePanelScale()
+        private void ApplyResponsivePanelLayout()
         {
             if (panelRoot == null || canvas == null) return;
             RectTransform root = panelRoot.transform as RectTransform;
             if (root == null) return;
-            float scale = CalculateResponsivePanelScale(
-                canvas.pixelRect.width,
-                canvas.pixelRect.height,
-                root.rect.width,
-                root.rect.height);
-            root.localScale = Vector3.one * scale;
+            RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+            float width = canvasRect == null
+                ? canvas.pixelRect.width
+                : canvasRect.rect.width;
+            if (width <= 0f)
+                width = FormalUiLayoutProfile3D.Standard
+                    .ReferenceResolution.x;
+            root.anchorMin = new Vector2(1f, 0f);
+            root.anchorMax = Vector2.one;
+            root.pivot = new Vector2(1f, .5f);
+            root.anchoredPosition = new Vector2(-16f, 0f);
+            root.sizeDelta = new Vector2(
+                Mathf.Min(420f, Mathf.Max(240f, width - 32f)),
+                -32f);
+            root.localScale = Vector3.one;
         }
 
         private void OnRectTransformDimensionsChange()
         {
-            ApplyResponsivePanelScale();
+            ApplyResponsivePanelLayout();
         }
 
         private CatalogRow[] CreateCatalogResults(
@@ -583,7 +621,9 @@ namespace WasteCity.Graybox3D.Building
             var text = root.AddComponent<Text>();
             text.font = Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf");
-            text.fontSize = 12;
+            FormalUiCanvasConfiguration3D.ApplyReadableFontSize(
+                text,
+                FormalUiLayoutProfile3D.Standard.FontDescription);
             text.alignment = TextAnchor.MiddleCenter;
             text.color = Color.white;
             text.raycastTarget = false;

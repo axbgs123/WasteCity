@@ -486,6 +486,66 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0018_MiningGuidanceOverridesAndRestoresMarkerLod()
+        {
+            WorldCell[,] cells = OpenCells();
+            cells[20, 16] = Cell(ResourceIds.Iron);
+            cells[18, 16] = Cell(ResourceIds.Stone);
+            cells[19, 16] = Cell(ResourceIds.Biomass);
+            cells[27, 12] = Cell(ResourceIds.Iron);
+            WorldFixture fixture = CreateWorldFixture(
+                cells,
+                CityMode.Fortress);
+            fixture.World.RefreshResourceNodeMarkerLod(24f);
+            Assert.That(fixture.World.TryGetResourceNodeMarker(
+                    20,
+                    16,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            Assert.That(fixture.World.TryGetResourceNodeMarker(
+                    18,
+                    16,
+                    out GrayboxResourceNodeMarker3D stone),
+                Is.True);
+            Assert.That(fixture.World.TryGetResourceNodeMarker(
+                    19,
+                    16,
+                    out GrayboxResourceNodeMarker3D incompatible),
+                Is.True);
+            Assert.That(fixture.World.TryGetResourceNodeMarker(
+                    27,
+                    12,
+                    out GrayboxResourceNodeMarker3D outsideRange),
+                Is.True);
+
+            fixture.Interaction.Select(BuildingCatalog.MiningStation);
+            fixture.Placement.RefreshMiningGuidance();
+
+            Assert.That(marker.GuidanceOverride, Is.True);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Near));
+            Assert.That(stone.GuidanceOverride, Is.True);
+            Assert.That(stone.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Near));
+            Assert.That(incompatible.GuidanceOverride, Is.False);
+            Assert.That(incompatible.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            Assert.That(outsideRange.GuidanceOverride, Is.False);
+            Assert.That(outsideRange.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            fixture.Interaction.Select(BuildingCatalog.Wall);
+            fixture.Placement.RefreshMiningGuidance();
+            Assert.That(marker.GuidanceOverride, Is.False);
+            Assert.That(marker.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+            Assert.That(stone.GuidanceOverride, Is.False);
+            Assert.That(stone.DisplayLod,
+                Is.EqualTo(ResourceNodeMarkerLod3D.Far));
+        }
+
+        [Test]
         public void IDEA0010_NonSquareCandidateEnumeratorUsesRotatedFootprint()
         {
             var synthetic = new BuildingDefinition(
