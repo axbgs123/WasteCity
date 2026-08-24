@@ -50,7 +50,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _CellsPerTexture: 4
-    - _DeepWaterNormalStrength: 1.45
+    - _DeepWaterNormalStrength: 8
     - _HeightBlendStrength: 1
     - _MacroVariation: 0.08
     - _WaterHighlightStrength: 0.21

@@ -91,7 +91,7 @@ namespace WasteCity.Tests
             AssertColorProperty(shader, "_RuinsTint", new Color(.43f, .40f, .37f, .22f));
             AssertColorProperty(shader, "_DeepWaterTint", new Color(.025f, .07f, .25f, .82f));
             AssertColorProperty(shader, "_CliffTint", new Color(.24f, .19f, .15f, .30f));
-            AssertFloatProperty(shader, "_DeepWaterNormalStrength", 1.45f);
+            AssertFloatProperty(shader, "_DeepWaterNormalStrength", 8f);
         }
 
         [Test]
@@ -119,7 +119,7 @@ namespace WasteCity.Tests
             Assert.That(material.GetColor("_WastelandTint").a, Is.EqualTo(.18f));
             Assert.That(
                 material.GetFloat("_DeepWaterNormalStrength"),
-                Is.EqualTo(1.45f).Within(.000001f));
+                Is.EqualTo(8f).Within(.000001f));
         }
 
         [Test]
@@ -315,7 +315,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(.21f).Within(.000001f));
             Assert.That(
                 material.GetFloat("_DeepWaterNormalStrength"),
-                Is.EqualTo(1.45f).Within(.000001f));
+                Is.EqualTo(8f).Within(.000001f));
             Assert.That(
                 material.GetVector("_WaterVelocityA"),
                 Is.EqualTo(new Vector4(.006f, .002f, 0f, 0f)));
@@ -339,13 +339,13 @@ namespace WasteCity.Tests
             Assert.That(
                 source,
                 Does.Contain(
-                    "clamp(_DeepWaterNormalStrength, 1.0, 1.6)"));
+                    "clamp(_DeepWaterNormalStrength, 1.0, 8.0)"));
             int deepWaterBranch = source.IndexOf(
                 "if (layerIndex == 5u)",
                 source.IndexOf("half3 combinedNormalTS", StringComparison.Ordinal),
                 StringComparison.Ordinal);
             int strengthUse = source.IndexOf(
-                "clamp(_DeepWaterNormalStrength, 1.0, 1.6)",
+                "clamp(_DeepWaterNormalStrength, 1.0, 8.0)",
                 StringComparison.Ordinal);
             int branchClose = source.IndexOf(
                 "sample.normalTS = ApplyDetailMaskToNormal",

@@ -24,7 +24,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
         _RuinsTint("Ruins Tint", Color) = (0.43,0.40,0.37,0.22)
         _DeepWaterTint("Deep Water Tint", Color) = (0.025,0.07,0.25,0.82)
         _CliffTint("Cliff Tint", Color) = (0.24,0.19,0.15,0.30)
-        _DeepWaterNormalStrength("Deep Water Normal Strength", Float) = 1.45
+        _DeepWaterNormalStrength("Deep Water Normal Strength", Float) = 8
     }
 
     SubShader
@@ -247,7 +247,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
                         normalUVB,
                         layerIndex));
                     float waterNormalStrength =
-                        clamp(_DeepWaterNormalStrength, 1.0, 1.6);
+                        clamp(_DeepWaterNormalStrength, 1.0, 8.0);
                     combinedNormalTS = SafeNormalizeTangentNormal(half3(
                         (normalA.xy + normalB.xy) * waterNormalStrength,
                         max(0.001h, normalA.z * normalB.z)));
