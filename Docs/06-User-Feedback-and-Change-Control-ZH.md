@@ -952,6 +952,7 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 不包含的范围：`96×64` 扩图、六角格、迷雾、区块流送、随机多世界、新资源、新建筑、新敌人、新炮塔、新模型/动画、复杂 NavMesh、跨城市运输、UI Toolkit 重写、v1 地图存档迁移、正式发布，以及自动宣称用户试玩或真实 Windows 验收完成。
 - 影响系统：正式地图生成与世界签名、城市出生/部署/路径、资源节点与采矿绑定、地表控制图、Ruins/Cliff 布局、建筑/防御世界表现、资源 Marker、镜头 LOD、正式 UI 图标层级、存档兼容、项目质量/复用目录、固定视觉证据和三项现役构建。
 - 关联正式文档：`Docs/01-Game-Design-Document-ZH.md` A4.3、A7.2、A9.1、A16.3、A16.9；`Docs/05-Formal-Development-Roadmap-ZH.md` F1K；`IDEA-0004`、`IDEA-0006`、`IDEA-0012`、`IDEA-0016`、`IDEA-0018`、`DOC-0001`。
+- 设计规格与实施计划：`Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md`；`Docs/superpowers/plans/2026-08-24-idea-0019-map-generation-scale.md`。
 - 关联提交：需求登记与正式文档提交待本次独立提交后填写；实现提交不得提前虚构。
 - 验收条件：严格先写失败测试，再做最小实现。自动验证至少覆盖 `64×48/3072`、seed 确定性、宏区占比与连通性、特殊地形非盐胡椒、出生保护和双通路、`24` 节点精确配额/储量/间距/区域亲和、真实 `2×2` 采矿锚点、v2 capture/roundtrip 与 v1 明确拒绝、schema `32` 不变；覆盖全部建筑 ID 的表现分类、Ground/Inner 同比、1×1/2×2/3×2 与四向 bounds、炮塔单一基础座、选择框和 Marker 屏幕像素尺度、标签避让、UI 图标语义档位，以及真实滚轮/选择/建造输入。完成前运行相关聚焦测试、`TerrainAssetDeep`、日常完整 EditMode、完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、macOS universal 3D、固定 GUI 证据、官方文档生成/校验和 `RecordVerification`。用户对地形、矿区、路线、建筑和图标比例的视觉试玩与真实 Windows 10/11 GPU/显存/内存验收仍只能由实际结果确认。
 - 验证证据：2026-08-24 已完成只读审计和联网/GitHub 参考。审计确认当前全图 `3072` 格中外围 `2304` 格为空荒地；中央 `768` 格有 `156` 个节点，地形/Traversal/资源由逐格独立 hash 产生。用户查看包含范围、原文差异、数据所有权、v2 存档边界和验收方式的最终摘要后明确回复“确认”，批准进入正式文档与 TDD 开发。当前尚无实现、测试、构建或人工验收证据。
