@@ -1840,6 +1840,7 @@ namespace WasteCity.Editor
                 AwaitOpen,
                 AwaitOpenRelease,
                 AwaitClose,
+                AwaitClosedPresentation,
                 Complete,
             }
 
@@ -2095,6 +2096,16 @@ namespace WasteCity.Editor
                                 false);
                             QueueDiagnosticB(false);
                             RemoveDiagnosticKeyboard();
+                            diagnosticQueuedAtFrame = Time.frameCount;
+                            diagnosticPhase =
+                                BuildGridDiagnosticPhase.AwaitClosedPresentation;
+                            return;
+
+                        case BuildGridDiagnosticPhase.AwaitClosedPresentation:
+                            ValidateBuildGridDiagnosticState(
+                                context.BuildingInteraction.State,
+                                context.BuildingWorld.IsBuildGridVisible,
+                                false);
                             diagnosticPhase = BuildGridDiagnosticPhase.Complete;
                             EditorApplication.update -= TickBuildGridDiagnostic;
                             diagnosticCallbackRegistered = false;
@@ -2556,6 +2567,8 @@ namespace WasteCity.Editor
                 context.Camera.transform.localPosition = originalCameraLocalPosition;
                 context.Camera.transform.localRotation = originalCameraLocalRotation;
                 context.Camera.orthographicSize = originalOrthographicSize;
+                context.World.RefreshResourceNodeMarkerLod(
+                    originalOrthographicSize);
             }
 
             private void FocusMapOverview()
@@ -2566,6 +2579,8 @@ namespace WasteCity.Editor
                     -.5f);
                 context.Rig.rotation = originalRigRotation;
                 context.Camera.orthographicSize = OverviewOrthographicSize;
+                context.World.RefreshResourceNodeMarkerLod(
+                    OverviewOrthographicSize);
             }
 
             private void FocusSite(CaptureSite site, float orthographicSize)
@@ -2592,6 +2607,7 @@ namespace WasteCity.Editor
                     midpoint.z);
                 context.Rig.rotation = originalRigRotation;
                 context.Camera.orthographicSize = orthographicSize;
+                context.World.RefreshResourceNodeMarkerLod(orthographicSize);
             }
 
             private void RestorePresentation()

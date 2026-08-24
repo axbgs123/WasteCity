@@ -1095,6 +1095,10 @@ namespace WasteCity.Tests
             StringAssert.Contains("sha256", source);
             StringAssert.Contains("SetResearchOpen(true)", source);
             StringAssert.Contains("PrepareUiCanvasesForCameraRender", source);
+            StringAssert.Contains("AwaitClosedPresentation", source);
+            StringAssert.Contains(
+                "RefreshResourceNodeMarkerLod(\n                    OverviewOrthographicSize)",
+                source);
         }
     }
 }
