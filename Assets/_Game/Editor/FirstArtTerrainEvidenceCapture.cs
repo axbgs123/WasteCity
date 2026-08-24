@@ -1170,6 +1170,43 @@ namespace WasteCity.Editor
             }
         }
 
+        internal static void ValidateUiEvidenceCoverage(
+            IReadOnlyList<Color32> pixels,
+            int width,
+            int height,
+            string label)
+        {
+            if (pixels == null)
+                throw new ArgumentNullException(nameof(pixels));
+            if (width < 4 || height < 4 || pixels.Count != width * height)
+            {
+                throw new ArgumentException(
+                    "UI luminance validation requires a complete image " +
+                    "at least 4x4 pixels.");
+            }
+
+            long luminanceSum = 0L;
+            var minimum = 255;
+            var maximum = 0;
+            for (var index = 0; index < pixels.Count; index++)
+            {
+                Color32 pixel = pixels[index];
+                int luminance =
+                    (54 * pixel.r + 183 * pixel.g + 19 * pixel.b) >> 8;
+                luminanceSum += luminance;
+                minimum = Math.Min(minimum, luminance);
+                maximum = Math.Max(maximum, luminance);
+            }
+
+            double average = (double)luminanceSum / pixels.Count;
+            if (average < 10d || maximum < 64 || maximum - minimum < 24)
+            {
+                throw new InvalidOperationException(
+                    $"{label} failed the non-black UI gate: average " +
+                    $"luminance {average:F2}, range {minimum}-{maximum}.");
+            }
+        }
+
         internal static IReadOnlyList<CaptureSite> FindRequiredCaptureSites(
             WorldMapModel model)
         {
@@ -2102,11 +2139,23 @@ namespace WasteCity.Editor
                 string uiPanelState = "world-only")
             {
                 byte[] bytes = RenderCameraPng(context.Camera, CaptureWidth, CaptureHeight);
-                ValidateNonBlackTerrainCoverage(
-                    DecodePng(bytes),
-                    CaptureWidth,
-                    CaptureHeight,
-                    filename);
+                Color32[] pixels = DecodePng(bytes);
+                if (uiPanelState.StartsWith("hud:", StringComparison.Ordinal))
+                {
+                    ValidateUiEvidenceCoverage(
+                        pixels,
+                        CaptureWidth,
+                        CaptureHeight,
+                        filename);
+                }
+                else
+                {
+                    ValidateNonBlackTerrainCoverage(
+                        pixels,
+                        CaptureWidth,
+                        CaptureHeight,
+                        filename);
+                }
                 File.WriteAllBytes(Path.Combine(OutputRoot, filename), bytes);
                 captures.Add(NewCaptureRecord(
                     filename,

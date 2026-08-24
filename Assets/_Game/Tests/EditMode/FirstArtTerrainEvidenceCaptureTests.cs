@@ -106,6 +106,37 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void UiLuminanceGate_AcceptsDarkPanelsWithReadableContrast()
+        {
+            const int width = 8;
+            const int height = 8;
+            Color32[] black = Enumerable.Repeat(
+                new Color32(0, 0, 0, 255),
+                width * height).ToArray();
+            Assert.That(
+                () => FirstArtTerrainEvidenceCapture
+                    .ValidateUiEvidenceCoverage(
+                        black,
+                        width,
+                        height,
+                        "synthetic black UI"),
+                Throws.TypeOf<InvalidOperationException>());
+
+            Color32[] darkPanel = Enumerable.Repeat(
+                new Color32(18, 18, 20, 255),
+                width * height).ToArray();
+            darkPanel[width * 3 + 3] = new Color32(220, 220, 220, 255);
+            Assert.That(
+                () => FirstArtTerrainEvidenceCapture
+                    .ValidateUiEvidenceCoverage(
+                        darkPanel,
+                        width,
+                        height,
+                        "synthetic readable UI"),
+                Throws.Nothing);
+        }
+
+        [Test]
         public void Seed8128BoundarySearch_FindsEveryNamedCaptureSite()
         {
             var model = new WorldMapModel(32, 24, new WorldSeed(8128));
