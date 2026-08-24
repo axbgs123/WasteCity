@@ -405,20 +405,34 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0004_DefaultSeed8128HasOnePlacementPerRuinsAndCliffRuleCell()
+        public void IDEA0019_DefaultSeed8128HasOnePlacementPerV2RuinsAndCliffRuleCell()
         {
             WorldMapModel map = GrayboxWorldLayout3D.CreateDefault();
             IList placements = Project(map);
-
-            Assert.That(placements.Count, Is.EqualTo(108));
+            var expectedRuins = 0;
+            var expectedCliffs = 0;
+            for (var x = 0; x < map.Width; x++)
+            for (var y = 0; y < map.Height; y++)
+            {
+                if (map.Get(x, y).Traversal == WorldTraversalKind.Ruins)
+                    expectedRuins++;
+                if (map.Get(x, y).Traversal == WorldTraversalKind.Cliff)
+                    expectedCliffs++;
+            }
+            Assert.That(expectedRuins, Is.EqualTo(36));
+            Assert.That(expectedCliffs, Is.EqualTo(37));
+            Assert.That(expectedRuins + expectedCliffs, Is.EqualTo(73));
+            Assert.That(
+                placements.Count,
+                Is.EqualTo(expectedRuins + expectedCliffs));
             Assert.That(
                 placements.Cast<object>().Count(value =>
                     Read<object>(value, "Family").ToString() == "Ruins"),
-                Is.EqualTo(76));
+                Is.EqualTo(expectedRuins));
             Assert.That(
                 placements.Cast<object>().Count(value =>
                     Read<object>(value, "Family").ToString() == "Cliff"),
-                Is.EqualTo(32));
+                Is.EqualTo(expectedCliffs));
         }
 
         [Test]
