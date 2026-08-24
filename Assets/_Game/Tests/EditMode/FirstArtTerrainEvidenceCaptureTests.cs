@@ -874,6 +874,22 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void AutomatedCapture_EntersGameplayThroughAnIsolatedTemporarySave()
+        {
+            string source = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/FirstArtTerrainEvidenceCapture.cs"));
+
+            StringAssert.Contains("EnterIsolatedGameplayForEvidence", source);
+            StringAssert.Contains("new FormalSaveStore(root)", source);
+            StringAssert.Contains("new FormalSaveWaveRetryStore(root)", source);
+            StringAssert.Contains("slotRequiresOverwriteConfirmation", source);
+            StringAssert.Contains("RequestNewGame()", source);
+            StringAssert.Contains("DeleteEvidenceSaveRoot", source);
+        }
+
+        [Test]
         public void Idea0018ZoomEvidence_UsesFormalProfileAndCrossesEveryLodMonotonically()
         {
             var profile = ScriptableObject.CreateInstance<

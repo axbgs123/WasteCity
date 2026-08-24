@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -16,6 +17,8 @@ using UnityEngine.SceneManagement;
 using WasteCity.ArtIntegration3D;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
+using WasteCity.Persistence;
 using WasteCity.World;
 using Debug = UnityEngine.Debug;
 
@@ -402,20 +405,98 @@ namespace WasteCity.Editor
                     "First terrain evidence capture is already running.");
             }
 
-            CaptureContext context = ResolveAndValidateContext();
-            GrayboxPerformanceProbe.RecordFirstArtTerrainRuntimeEvidence();
-            activeSession = new CaptureSession(context, acceptedDeviation, decision);
+            string evidenceSaveRoot =
+                EnterIsolatedGameplayForEvidence();
+            CaptureContext context;
             try
             {
+                context = ResolveAndValidateContext();
+                GrayboxPerformanceProbe.RecordFirstArtTerrainRuntimeEvidence();
+                activeSession = new CaptureSession(
+                    context,
+                    acceptedDeviation,
+                    decision,
+                    evidenceSaveRoot);
                 activeSession.Begin();
             }
             catch
             {
                 CaptureSession failed = activeSession;
                 activeSession = null;
-                failed.Dispose(false);
+                if (failed != null)
+                    failed.Dispose(false);
+                else
+                    DeleteEvidenceSaveRoot(evidenceSaveRoot);
                 throw;
             }
+        }
+
+        private static string EnterIsolatedGameplayForEvidence()
+        {
+            GrayboxFormalSaveRuntimeHost3D[] hosts =
+                UnityEngine.Object.FindObjectsOfType<
+                    GrayboxFormalSaveRuntimeHost3D>(true);
+            GrayboxFormalSaveEntryController3D[] entries =
+                UnityEngine.Object.FindObjectsOfType<
+                    GrayboxFormalSaveEntryController3D>(true);
+            if (hosts.Length != 1 || entries.Length != 1)
+            {
+                throw new InvalidOperationException(
+                    "Evidence capture requires one formal save host and entry controller.");
+            }
+
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "wastecity-first-terrain-evidence-save-" +
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                const BindingFlags instancePrivate =
+                    BindingFlags.Instance | BindingFlags.NonPublic;
+                FieldInfo storeField = typeof(GrayboxFormalSaveRuntimeHost3D)
+                    .GetField("store", instancePrivate);
+                FieldInfo retryField = typeof(GrayboxFormalSaveRuntimeHost3D)
+                    .GetField("waveRetryStore", instancePrivate);
+                FieldInfo overwriteField = typeof(
+                        GrayboxFormalSaveEntryController3D)
+                    .GetField(
+                        "slotRequiresOverwriteConfirmation",
+                        instancePrivate);
+                if (storeField == null || retryField == null ||
+                    overwriteField == null)
+                {
+                    throw new InvalidOperationException(
+                        "Formal save isolation reflection contract is unavailable.");
+                }
+
+                storeField.SetValue(hosts[0], new FormalSaveStore(root));
+                retryField.SetValue(
+                    hosts[0],
+                    new FormalSaveWaveRetryStore(root));
+                overwriteField.SetValue(entries[0], false);
+                entries[0].RequestNewGame();
+                if (entries[0].IsNewGameConfirmationOpen)
+                    entries[0].ConfirmNewGame();
+                if (entries[0].BlocksGameplayInput ||
+                    !entries[0].IsRuntimeReady)
+                {
+                    throw new InvalidOperationException(
+                        "Evidence capture could not enter isolated gameplay.");
+                }
+                return root;
+            }
+            catch
+            {
+                DeleteEvidenceSaveRoot(root);
+                throw;
+            }
+        }
+
+        private static void DeleteEvidenceSaveRoot(string root)
+        {
+            if (!string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
+                Directory.Delete(root, true);
         }
 
         public static void StartAutomatedCapture()
@@ -1659,6 +1740,7 @@ namespace WasteCity.Editor
             private readonly CaptureContext context;
             private readonly bool acceptedDeviation;
             private readonly string acceptedDecision;
+            private readonly string evidenceSaveRoot;
             private readonly Vector3 originalRigPosition;
             private readonly Quaternion originalRigRotation;
             private readonly Vector3 originalCameraLocalPosition;
@@ -1719,11 +1801,13 @@ namespace WasteCity.Editor
             public CaptureSession(
                 CaptureContext context,
                 bool acceptedDeviation,
-                string acceptedDecision)
+                string acceptedDecision,
+                string evidenceSaveRoot)
             {
                 this.context = context;
                 this.acceptedDeviation = acceptedDeviation;
                 this.acceptedDecision = acceptedDecision;
+                this.evidenceSaveRoot = evidenceSaveRoot;
                 originalRigPosition = context.Rig.position;
                 originalRigRotation = context.Rig.rotation;
                 originalCameraLocalPosition = context.Camera.transform.localPosition;
@@ -1856,6 +1940,7 @@ namespace WasteCity.Editor
                                 originalBackgroundBehavior;
                             if (!completed && Directory.Exists(OutputRoot))
                                 Directory.Delete(OutputRoot, true);
+                            DeleteEvidenceSaveRoot(evidenceSaveRoot);
                         }
                     }
                 }
