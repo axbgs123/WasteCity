@@ -960,8 +960,16 @@ namespace WasteCity.Editor
                     pairs[index].P95Delta >= minimumP95)
                     return;
             }
+            string observed = string.Join(
+                "; ",
+                pairs.Select((pair, index) =>
+                    index + ":mean=" +
+                    pair.MeanDelta.ToString("F6", CultureInfo.InvariantCulture) +
+                    ",p95=" +
+                    pair.P95Delta.ToString("F6", CultureInfo.InvariantCulture)));
             throw new InvalidOperationException(
-                "DeepWater ROI motion did not meet the mean and nearest-rank P95 thresholds in one exact pair.");
+                "DeepWater ROI motion did not meet the mean and nearest-rank " +
+                "P95 thresholds in one exact pair. Observed " + observed + ".");
         }
 
         internal static AcceptedWaterEvidence EvaluateAcceptedWaterEvidence(
