@@ -329,6 +329,71 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0019_WorldIdentityUsesGenerationTwoWithoutSchemaChange()
+        {
+            Assert.That(
+                GrayboxWorldCitySaveAdapter3D.WorldGenerationVersion,
+                Is.EqualTo(2),
+                "IDEA-0019 requires a distinct generation identity for " +
+                "the authoritative v2 64x48 layout.");
+            Assert.That(
+                GrayboxWorldCitySaveAdapter3D
+                    .WorldConfigurationSignature,
+                Is.EqualTo("core.world.formal-3d.v2.64x48"),
+                "The new layout must not reuse the v1 world signature.");
+        }
+
+        [Test]
+        public void IDEA0019_FormalEnvelopeSchemaRemainsThirtyTwo()
+        {
+            Assert.That(
+                WasteCity.Persistence.FormalSaveEnvelope
+                    .CurrentSchemaVersion,
+                Is.EqualTo(32),
+                "IDEA-0019 changes world content identity, not the " +
+                "Formal3D envelope schema.");
+        }
+
+        [Test]
+        public void IDEA0019_CapturePublishesGenerationTwoIdentity()
+        {
+            WorldCityFixture fixture = CreateWorldCityFixture();
+
+            FormalThreeDWorldSaveData captured =
+                fixture.Adapter.CaptureWorld();
+
+            Assert.That(captured.worldGenerationVersion, Is.EqualTo(2));
+            Assert.That(
+                captured.configurationSignature,
+                Is.EqualTo("core.world.formal-3d.v2.64x48"));
+            Assert.That(captured.width, Is.EqualTo(64));
+            Assert.That(captured.height, Is.EqualTo(48));
+            Assert.That(captured.worldSeed, Is.EqualTo(8128));
+        }
+
+        [Test]
+        public void IDEA0019_VersionOneWorldIsRejectedWithoutRuntimeMutation()
+        {
+            WorldCityFixture fixture = CreateWorldCityFixture();
+            FormalThreeDWorldSaveData versionOne =
+                CreateVersionOneWorldSave();
+            FormalThreeDCitySaveData city =
+                CloneCity(fixture.Adapter.CaptureCity());
+            RuntimeFingerprint before = RuntimeFingerprint.Capture(fixture);
+
+            bool restored = fixture.Adapter.TryRestore(
+                versionOne,
+                city,
+                out string error);
+
+            Assert.That(restored, Is.False);
+            Assert.That(
+                error,
+                Is.EqualTo("存档世界配置与当前正式世界不兼容"));
+            before.AssertUnchanged(fixture);
+        }
+
+        [Test]
         public void CaptureDisturbRestoreRoundTripsWorldCityNavigationAndPopulation()
         {
             WorldCityFixture fixture = CreateWorldCityFixture();
@@ -836,6 +901,70 @@ namespace WasteCity.Tests
             }
             Assert.Fail("Expected a captured resource node at the selected cell.");
             return null;
+        }
+
+        private static FormalThreeDWorldSaveData CreateVersionOneWorldSave()
+        {
+            const int legacyWidth = 32;
+            const int legacyHeight = 24;
+            const int worldWidth = 64;
+            const int worldHeight = 48;
+            const int legacyOffsetX = 16;
+            const int legacyOffsetY = 12;
+            const int seedValue = 8128;
+            var legacy = new WorldMapModel(
+                legacyWidth,
+                legacyHeight,
+                new WorldSeed(seedValue));
+            var cells = new WorldCell[worldWidth, worldHeight];
+            var sparseCell = new WorldCell(
+                TerrainKind.Wasteland,
+                null,
+                0,
+                WorldTraversalKind.Open);
+            for (var x = 0; x < worldWidth; x++)
+            for (var y = 0; y < worldHeight; y++)
+                cells[x, y] = sparseCell;
+            for (var x = 0; x < legacyWidth; x++)
+            for (var y = 0; y < legacyHeight; y++)
+                cells[x + legacyOffsetX, y + legacyOffsetY] =
+                    legacy.Get(x, y);
+            var versionOne = new WorldMapModel(cells);
+            var nodes = new List<FormalThreeDResourceNodeSaveData>(
+                versionOne.ResourceNodeCount);
+            for (var x = 0; x < versionOne.Width; x++)
+            for (var y = 0; y < versionOne.Height; y++)
+            {
+                WorldCell cell = versionOne.Get(x, y);
+                if (!cell.HasResource) continue;
+                nodes.Add(new FormalThreeDResourceNodeSaveData
+                {
+                    stableNodeId =
+                        GrayboxResourceNodeIdentity3D.Create(x, y),
+                    x = x,
+                    y = y,
+                    resourceId = cell.ResourceId,
+                    remainingAmount = cell.ResourceAmount,
+                    isDepleted = cell.ResourceAmount == 0,
+                });
+            }
+            nodes.Sort((left, right) => string.CompareOrdinal(
+                left.stableNodeId,
+                right.stableNodeId));
+            return new FormalThreeDWorldSaveData
+            {
+                worldDefinitionId =
+                    GrayboxWorldCitySaveAdapter3D.WorldDefinitionId,
+                worldGenerationVersion = 1,
+                worldSeed = seedValue,
+                width = worldWidth,
+                height = worldHeight,
+                configurationSignature =
+                    "core.world.formal-3d.v1.64x48",
+                resourceNodes = nodes.ToArray(),
+                orphanResources =
+                    Array.Empty<FormalThreeDOrphanResourceSaveData>(),
+            };
         }
 
         private static ResourceCell FindResourceCell(WorldMapModel world)

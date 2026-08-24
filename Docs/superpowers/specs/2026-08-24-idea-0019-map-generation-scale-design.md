@@ -45,7 +45,7 @@ FormalWorldGenerationCatalog3D（v2 不可变配置）
 稳定身份：
 
 - generation version：`2`；
-- signature：`core.world.formal-3d.v2.64x48.macro-regions`；
+- signature：`core.world.formal-3d.v2.64x48`；
 - width/height：`64×48`；
 - default seed：`8128`；
 - start cell：`(10,9)`；
