@@ -1549,8 +1549,8 @@ namespace WasteCity.Editor
                 worktreePath = Path.GetFullPath(Path.Combine(Application.dataPath, "..")),
                 gameViewTargetWidth = 1920,
                 gameViewTargetHeight = 1080,
-                formalRendererCount = presenter
-                    .GetComponentsInChildren<MeshRenderer>(true).Length,
+                formalRendererCount =
+                    presenter.SurfaceRenderer != null ? 1 : 0,
                 profileAssetPath = profilePath,
                 profileGuid = AssetDatabase.AssetPathToGUID(profilePath),
                 materialAssetPath = materialPath,

@@ -863,6 +863,14 @@ namespace WasteCity.Tests
             StringAssert.DoesNotContain(
                 "GetComponentsInChildren<MeshRenderer>(true).Length != 1",
                 source);
+
+            string performanceSource = File.ReadAllText(
+                Path.Combine(
+                    Application.dataPath,
+                    "_Game/Editor/GrayboxPerformanceProbe.cs"));
+            StringAssert.Contains(
+                "presenter.SurfaceRenderer != null ? 1 : 0",
+                performanceSource);
         }
 
         [Test]
