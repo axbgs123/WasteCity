@@ -979,14 +979,16 @@ namespace WasteCity.Tests
                 },
                 new[]
                 {
+                    "ProductionStatisticsDelta",
                     "GrayboxProductionClock3D",
                 },
                 new[]
                 {
                     "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxProductionStatisticsDeltaTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 },
-                new[] { "IDEA-0011", "IDEA-0012" });
+                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0017" });
             AssertReuseContract(
                 FindReuse(catalog, "production-observability-boundary-3d"),
                 new[]
@@ -1400,6 +1402,7 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
                     "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+                    "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs",
                 },
                 new[] { "IDEA-0013", "IDEA-0015", "IDEA-0017" });
             AssertDefenseReuse(
@@ -1428,6 +1431,7 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
                     "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
                     "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+                    "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
                 },
                 new[] { "IDEA-0013", "IDEA-0017" });
 

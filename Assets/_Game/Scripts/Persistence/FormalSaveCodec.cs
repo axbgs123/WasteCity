@@ -392,6 +392,8 @@ namespace WasteCity.Persistence
                     source.buildingLossesByBuildingId),
                 damageByTowerBuildingId = SortedMetrics(
                     source.damageByTowerBuildingId),
+                killsByTowerBuildingId = SortedMetrics(
+                    source.killsByTowerBuildingId),
                 consumablesSpentByResourceId = SortedMetrics(
                     source.consumablesSpentByResourceId),
                 completedProductionBatchCount =

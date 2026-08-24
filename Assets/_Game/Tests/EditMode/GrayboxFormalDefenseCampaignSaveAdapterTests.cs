@@ -6,6 +6,7 @@ using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence.ThreeD;
@@ -201,6 +202,96 @@ namespace WasteCity.Tests
                     .PartialFromMigration,
                 Is.True,
                 "The live campaign snapshot must expose the restored truth.");
+        }
+
+        [Test]
+        public void StatisticsAdapterRoundTripsTowerKillsAndSessionFields()
+        {
+            Type metricStateType = typeof(
+                SingleCityDefenseCampaignMetricPersistenceState);
+            Type metricEnumerableType = typeof(IEnumerable<>).MakeGenericType(
+                metricStateType);
+            Type[] constructorTypes =
+            {
+                typeof(float), typeof(int), typeof(int), typeof(int),
+                metricEnumerableType, typeof(int), typeof(int),
+                metricEnumerableType, metricEnumerableType,
+                metricEnumerableType, typeof(int), metricEnumerableType,
+                typeof(bool), typeof(int), typeof(float), typeof(float),
+                typeof(bool), typeof(bool),
+            };
+            ConstructorInfo constructor = typeof(
+                    SingleCityDefenseCampaignStatisticsPersistenceState)
+                .GetConstructor(constructorTypes);
+            Assert.That(constructor, Is.Not.Null,
+                "Campaign statistics persistence must carry all schema 32 " +
+                "session fields without a second DTO-only truth.");
+
+            var towerKills = new[]
+            {
+                new SingleCityDefenseCampaignMetricPersistenceState(
+                    BuildingCatalog.MachineGunTurret.Id.Value,
+                    2),
+            };
+            var enemyKills = new[]
+            {
+                new SingleCityDefenseCampaignMetricPersistenceState(
+                    EnemyCatalog.Gnawer.Id.Value,
+                    2),
+            };
+            object persistence = constructor.Invoke(new object[]
+            {
+                12f, 2, 2, 1, enemyKills, 2, 7,
+                Array.Empty<
+                    SingleCityDefenseCampaignMetricPersistenceState>(),
+                towerKills,
+                Array.Empty<
+                    SingleCityDefenseCampaignMetricPersistenceState>(),
+                0,
+                Array.Empty<
+                    SingleCityDefenseCampaignMetricPersistenceState>(),
+                false, 9, 4.5f, 6f, true, true,
+            });
+
+            MethodInfo toDto = typeof(GrayboxDefenseSaveAdapter3D).GetMethod(
+                "Statistics",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(toDto, Is.Not.Null);
+            object dto = toDto.Invoke(null, new[] { persistence });
+            AssertStatisticFields(dto, 9, 4.5f, 6f, true, true);
+            AssertMetric(
+                ReadArrayField(dto, "killsByTowerBuildingId"),
+                BuildingCatalog.MachineGunTurret.Id.Value,
+                2);
+
+            var campaignDto = new FormalThreeDDefenseCampaignSaveData
+            {
+                campaignId = CampaignWaveCatalog.Id,
+                statistics = (FormalThreeDDefenseCampaignStatisticsSaveData)dto,
+            };
+            MethodInfo toPersistence = typeof(GrayboxDefenseSaveAdapter3D)
+                .GetMethod("Campaign", BindingFlags.Static |
+                    BindingFlags.NonPublic);
+            Assert.That(toPersistence, Is.Not.Null);
+            object restoredCampaign = toPersistence.Invoke(
+                null,
+                new object[] { campaignDto });
+            object restoredStatistics = restoredCampaign.GetType()
+                .GetProperty("Statistics")?.GetValue(restoredCampaign);
+            Assert.That(restoredStatistics, Is.Not.Null);
+            AssertStatisticProperties(
+                restoredStatistics,
+                9,
+                4.5f,
+                6f,
+                true,
+                true);
+            AssertMetric(
+                ReadMetricProperty(
+                    restoredStatistics,
+                    "KillsByTowerBuildingId"),
+                BuildingCatalog.MachineGunTurret.Id.Value,
+                2);
         }
 
         [Test]
@@ -540,6 +631,127 @@ namespace WasteCity.Tests
             {
                 throw exception.InnerException ?? exception;
             }
+        }
+
+        private static Array ReadArrayField(object owner, string fieldName)
+        {
+            FieldInfo field = owner?.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(field, Is.Not.Null, fieldName);
+            object value = field.GetValue(owner);
+            Assert.That(value, Is.InstanceOf<Array>(), fieldName);
+            return (Array)value;
+        }
+
+        private static System.Collections.IEnumerable ReadMetricProperty(
+            object owner,
+            string propertyName)
+        {
+            PropertyInfo property = owner?.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, propertyName);
+            object value = property.GetValue(owner);
+            Assert.That(value, Is.InstanceOf<System.Collections.IEnumerable>(),
+                propertyName);
+            return (System.Collections.IEnumerable)value;
+        }
+
+        private static void AssertStatisticFields(
+            object owner,
+            int completedBatches,
+            float activeSeconds,
+            float eligibleSeconds,
+            bool packed,
+            bool modifierUsed)
+        {
+            Assert.That(ReadPublicField<int>(owner,
+                "completedProductionBatchCount"), Is.EqualTo(completedBatches));
+            Assert.That(ReadPublicField<float>(owner,
+                "productionActiveProgressSeconds"), Is.EqualTo(activeSeconds));
+            Assert.That(ReadPublicField<float>(owner,
+                "productionEligibleSeconds"), Is.EqualTo(eligibleSeconds));
+            Assert.That(ReadPublicField<bool>(owner,
+                "cityWasPackedAfterCampaignStart"), Is.EqualTo(packed));
+            Assert.That(ReadPublicField<bool>(owner,
+                "developmentModifierUsed"), Is.EqualTo(modifierUsed));
+        }
+
+        private static void AssertStatisticProperties(
+            object owner,
+            int completedBatches,
+            float activeSeconds,
+            float eligibleSeconds,
+            bool packed,
+            bool modifierUsed)
+        {
+            Assert.That(ReadPublicProperty<int>(owner,
+                "CompletedProductionBatchCount"), Is.EqualTo(completedBatches));
+            Assert.That(ReadPublicProperty<float>(owner,
+                "ProductionActiveProgressSeconds"), Is.EqualTo(activeSeconds));
+            Assert.That(ReadPublicProperty<float>(owner,
+                "ProductionEligibleSeconds"), Is.EqualTo(eligibleSeconds));
+            Assert.That(ReadPublicProperty<bool>(owner,
+                "CityWasPackedAfterCampaignStart"), Is.EqualTo(packed));
+            Assert.That(ReadPublicProperty<bool>(owner,
+                "DevelopmentModifierUsed"), Is.EqualTo(modifierUsed));
+        }
+
+        private static T ReadPublicField<T>(object owner, string fieldName)
+        {
+            FieldInfo field = owner?.GetType().GetField(
+                fieldName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(field, Is.Not.Null, fieldName);
+            return (T)field.GetValue(owner);
+        }
+
+        private static T ReadPublicProperty<T>(object owner, string propertyName)
+        {
+            PropertyInfo property = owner?.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(property, Is.Not.Null, propertyName);
+            return (T)property.GetValue(owner);
+        }
+
+        private static void AssertMetric(
+            System.Collections.IEnumerable values,
+            string stableId,
+            int amount)
+        {
+            object match = null;
+            foreach (object item in values)
+            {
+                MemberInfo stableIdMember = item.GetType().GetField(
+                        "stableId",
+                        BindingFlags.Instance | BindingFlags.Public) ??
+                    (MemberInfo)item.GetType().GetProperty(
+                        "StableId",
+                        BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(stableIdMember, Is.Not.Null);
+                string actualId = stableIdMember is FieldInfo field
+                    ? field.GetValue(item) as string
+                    : ((PropertyInfo)stableIdMember).GetValue(item) as string;
+                if (string.Equals(actualId, stableId, StringComparison.Ordinal))
+                {
+                    match = item;
+                    break;
+                }
+            }
+            Assert.That(match, Is.Not.Null, stableId);
+            MemberInfo amountMember = match.GetType().GetField(
+                    "amount",
+                    BindingFlags.Instance | BindingFlags.Public) ??
+                (MemberInfo)match.GetType().GetProperty(
+                    "Amount",
+                    BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(amountMember, Is.Not.Null);
+            int actualAmount = amountMember is FieldInfo amountField
+                ? (int)amountField.GetValue(match)
+                : (int)((PropertyInfo)amountMember).GetValue(match);
+            Assert.That(actualAmount, Is.EqualTo(amount));
         }
 
         private static void AssertReadOnlyProperty(Type type, string name)

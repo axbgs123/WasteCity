@@ -148,6 +148,7 @@ namespace WasteCity.Graybox3D.Building
                 data.statistics.killsByEnemyId == null ||
                 data.statistics.buildingLossesByBuildingId == null ||
                 data.statistics.damageByTowerBuildingId == null ||
+                data.statistics.killsByTowerBuildingId == null ||
                 data.statistics.consumablesSpentByResourceId == null ||
                 data.towerCombatStates == null || data.enemyStates == null ||
                 data.buildingHealthStates == null || instances == null)
@@ -445,8 +446,19 @@ namespace WasteCity.Graybox3D.Building
                     source.BuildingLossesByBuildingId),
                 damageByTowerBuildingId = Metrics(
                     source.DamageByTowerBuildingId),
+                killsByTowerBuildingId = Metrics(
+                    source.KillsByTowerBuildingId),
                 consumablesSpentByResourceId = Metrics(
                     source.ConsumablesSpentByResourceId),
+                completedProductionBatchCount =
+                    source.CompletedProductionBatchCount,
+                productionActiveProgressSeconds =
+                    source.ProductionActiveProgressSeconds,
+                productionEligibleSeconds =
+                    source.ProductionEligibleSeconds,
+                cityWasPackedAfterCampaignStart =
+                    source.CityWasPackedAfterCampaignStart,
+                developmentModifierUsed = source.DevelopmentModifierUsed,
                 partialFromMigration = source.PartialFromMigration,
             };
         }
@@ -507,12 +519,16 @@ namespace WasteCity.Graybox3D.Building
                     statistics.highestAliveEnemyCount,
                     statistics.coreDamageTaken,
                     Metrics(statistics.damageByTowerBuildingId),
-                    Array.Empty<
-                        SingleCityDefenseCampaignMetricPersistenceState>(),
+                    Metrics(statistics.killsByTowerBuildingId),
                     Metrics(statistics.consumablesSpentByResourceId),
                     SumMetrics(statistics.buildingLossesByBuildingId),
                     Metrics(statistics.buildingLossesByBuildingId),
-                    statistics.partialFromMigration);
+                    statistics.partialFromMigration,
+                    statistics.completedProductionBatchCount,
+                    statistics.productionActiveProgressSeconds,
+                    statistics.productionEligibleSeconds,
+                    statistics.cityWasPackedAfterCampaignStart,
+                    statistics.developmentModifierUsed);
             return new SingleCityDefenseCampaignPersistenceState(
                 source.campaignId,
                 (SingleCityDefenseCampaignPhase)source.phase,

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using WasteCity.Defense;
 using WasteCity.Graybox3D.Building;
 
 namespace WasteCity.Graybox3D.Usability
@@ -16,7 +17,8 @@ namespace WasteCity.Graybox3D.Usability
 
     public sealed class GrayboxUsabilityInputCoordinator3D :
         MonoBehaviour,
-        IGrayboxInputInterceptor
+        IGrayboxInputInterceptor,
+        IGrayboxDefenseSettlementCommands3D
     {
         [SerializeField]
         private GrayboxBuildingInputRouter3D buildingInput;
@@ -84,6 +86,7 @@ namespace WasteCity.Graybox3D.Usability
                 operations);
             this.defense = defense;
             buildingInput.ConfigureDefense(defense);
+            ConfigureDefenseRuntimeBindings();
         }
 
         public void Configure(
@@ -116,6 +119,13 @@ namespace WasteCity.Graybox3D.Usability
             {
                 if (escapePressed)
                     ProcessMenuEscape();
+                return SuppressAll();
+            }
+
+            if (defense != null && defense.IsSettlementOpen)
+            {
+                if (escapePressed && systemMenu != null)
+                    systemMenu.Open();
                 return SuppressAll();
             }
 
@@ -279,9 +289,44 @@ namespace WasteCity.Graybox3D.Usability
             return SuppressAll();
         }
 
+        public GrayboxDefenseSettlementCommandResult3D Execute(
+            SingleCityDefenseSettlementAction action)
+        {
+            switch (action)
+            {
+                case SingleCityDefenseSettlementAction.ContinueSandbox:
+                    return new GrayboxDefenseSettlementCommandResult3D(
+                        defense != null &&
+                        defense.TryContinueCampaignSandbox(),
+                        "已继续沙盒模式");
+                case SingleCityDefenseSettlementAction.RetryWaveCheckpoint:
+                    GrayboxFormalSaveUiResult3D retry =
+                        formalSaveEntry?.RetryWaveCheckpoint() ??
+                        new GrayboxFormalSaveUiResult3D(
+                            false,
+                            "正式 3D 存档服务尚未就绪");
+                    return new GrayboxDefenseSettlementCommandResult3D(
+                        retry.Success,
+                        retry.Message);
+                case SingleCityDefenseSettlementAction.ReturnToTitle:
+                    bool returned = formalSaveEntry != null &&
+                        formalSaveEntry.ReturnToTitle();
+                    return new GrayboxDefenseSettlementCommandResult3D(
+                        returned,
+                        returned
+                            ? "正在返回标题界面"
+                            : "无法返回标题界面");
+                default:
+                    return new GrayboxDefenseSettlementCommandResult3D(
+                        false,
+                        "未知的结算操作");
+            }
+        }
+
         private void Awake()
         {
             EnsureDevelopmentPanelAdapter();
+            ConfigureDefenseRuntimeBindings();
             BindDevelopmentTextInput();
         }
 
@@ -340,6 +385,15 @@ namespace WasteCity.Graybox3D.Usability
             if (developmentPanel == null && developer != null)
                 developmentPanel =
                     new DevelopmentPanelAdapter(developer);
+        }
+
+        private void ConfigureDefenseRuntimeBindings()
+        {
+            if (defense == null) return;
+            defense.ConfigureSettlementCommands(this);
+            defense.ConfigureDevelopmentModifierUsageSource(
+                () => developer != null &&
+                    developer.HasModifiedGameState);
         }
 
         private static bool HasActiveTextInputFocus()

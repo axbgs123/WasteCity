@@ -1493,6 +1493,10 @@ namespace WasteCity.Persistence
                 path + ".damageByTowerBuildingId");
             if (result != null) return result;
             result = ValidateCampaignMetrics(
+                statistics.killsByTowerBuildingId,
+                path + ".killsByTowerBuildingId");
+            if (result != null) return result;
+            result = ValidateCampaignMetrics(
                 statistics.consumablesSpentByResourceId,
                 path + ".consumablesSpentByResourceId");
             if (result != null) return result;
@@ -1500,9 +1504,31 @@ namespace WasteCity.Persistence
                 statistics.productionActiveProgressSeconds,
                 path + ".productionActiveProgressSeconds");
             if (result != null) return result;
-            return NonNegativeFinite(
+            result = NonNegativeFinite(
                 statistics.productionEligibleSeconds,
                 path + ".productionEligibleSeconds");
+            if (result != null) return result;
+            if (statistics.productionActiveProgressSeconds >
+                statistics.productionEligibleSeconds)
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".productionActiveProgressSeconds");
+            if (!statistics.partialFromMigration &&
+                SumCampaignMetrics(statistics.killsByTowerBuildingId) !=
+                statistics.defeatedEnemyCount)
+                return Invalid(
+                    FormalSaveValidationError.InvalidDefense,
+                    path + ".killsByTowerBuildingId");
+            return null;
+        }
+
+        private static int SumCampaignMetrics(
+            FormalThreeDDefenseCampaignMetricSaveData[] values)
+        {
+            var total = 0;
+            for (var index = 0; index < values.Length; index++)
+                total += values[index].amount;
+            return total;
         }
 
         private static FormalSaveValidationResult ValidateCampaignMetrics(

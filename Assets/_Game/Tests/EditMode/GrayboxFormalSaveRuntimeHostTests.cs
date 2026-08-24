@@ -74,9 +74,14 @@ namespace WasteCity.Tests
                 host,
                 "LastCoordinatorResult",
                 typeof(GrayboxFormalSaveCoordinatorResult3D));
+            AssertProperty(
+                host,
+                "LastWaveRetryStoreResult",
+                typeof(FormalSaveWaveRetryStoreResult));
             AssertMethod(host, "Probe", typeof(FormalSaveStoreResult));
             AssertMethod(host, "TryStartNewProgress", typeof(bool));
             AssertMethod(host, "TryContinue", typeof(bool));
+            AssertMethod(host, "TryRetryWaveCheckpoint", typeof(bool));
             AssertMethod(host, "TrySaveAndExit", typeof(bool));
             AssertMethod(host, "FlushPendingCheckpoint", typeof(bool));
         }
@@ -162,6 +167,54 @@ namespace WasteCity.Tests
             Assert.That(load, Is.GreaterThanOrEqualTo(0));
             Assert.That(restore, Is.GreaterThan(load));
             StringAssert.DoesNotContain("Legacy2D", method);
+        }
+
+        [Test]
+        public void IDEA0017_WaveRetryUsesDedicatedValidatedArtifactAndFullRestore()
+        {
+            string source = File.ReadAllText(SourcePath);
+            string retry = ExtractMethod(
+                source,
+                "public bool TryRetryWaveCheckpoint(");
+            int load = retry.IndexOf(
+                "waveRetryStore.Load()",
+                StringComparison.Ordinal);
+            int restore = retry.IndexOf(
+                "coordinator.RestoreEnvelope(",
+                StringComparison.Ordinal);
+            Assert.That(load, Is.GreaterThanOrEqualTo(0));
+            Assert.That(restore, Is.GreaterThan(load));
+            StringAssert.DoesNotContain("ApplyCoreDamage", retry);
+            StringAssert.DoesNotContain("RestoreCore", retry);
+            StringAssert.Contains("currentSessionId", retry);
+            StringAssert.Contains("CampaignWaveWarningStarted", retry);
+            StringAssert.Contains("CurrentWaveNumber", retry);
+            StringAssert.Contains(
+                "SingleCityDefenseCampaignPhase.Warning",
+                retry,
+                "A retry artifact must be a true wave-front snapshot, not a later state carrying the old reason id.");
+
+            string write = ExtractMethod(
+                source,
+                "private bool TryWriteCheckpoint(");
+            StringAssert.Contains(
+                "FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted",
+                write);
+            StringAssert.Contains("waveRetryStore.Save(", write);
+            Assert.That(
+                write.IndexOf("store.SaveEnvelope(",
+                    StringComparison.Ordinal),
+                Is.LessThan(write.IndexOf("waveRetryStore.Save(",
+                    StringComparison.Ordinal)),
+                "The player save must commit before its internal retry copy.");
+            StringAssert.Contains("LastWaveRetryStoreResult.Success", write);
+            StringAssert.Contains("retryArtifactSucceeded", write);
+            StringAssert.Contains("SetCheckpointWarning(true)", write);
+            StringAssert.DoesNotContain(
+                "checkpointSucceeded =\n                        LastWaveRetryStoreResult.Success",
+                write,
+                "A failed internal retry copy must not requeue the already committed player checkpoint for recapture.");
+            StringAssert.Contains("return checkpointSucceeded", write);
         }
 
         [Test]
@@ -364,6 +417,44 @@ namespace WasteCity.Tests
                 Assert.That(policy.HasPending, Is.False);
                 Assert.That(policy.HasFailureWarning, Is.False);
                 Assert.That(host.HasCheckpointWarning, Is.False);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void IDEA0017_SuccessfulPlayerCheckpointPreservesRetryArtifactWarning()
+        {
+            var root = new GameObject("FormalSaveHost.RetryArtifactWarning");
+            root.SetActive(false);
+            try
+            {
+                GrayboxFormalSaveRuntimeHost3D host =
+                    root.AddComponent<GrayboxFormalSaveRuntimeHost3D>();
+                var policy = new FormalSaveCheckpointPolicy(
+                    _ => true,
+                    () => 18f);
+                SetPrivateField(host, "checkpointPolicy", policy);
+                SetPrivateField(
+                    host,
+                    "<IsInitialized>k__BackingField",
+                    true);
+                SetPrivateField(
+                    host,
+                    "lastCheckpointHadRetryArtifactFailure",
+                    true);
+                Assert.That(policy.QueueCheckpoint(
+                    FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted,
+                    "campaign.wave.000005.warning"), Is.True);
+
+                Assert.That(host.FlushPendingCheckpoint(), Is.True);
+
+                Assert.That(host.HasCheckpointWarning, Is.True,
+                    "A successful player save must not hide the failed internal retry artifact warning.");
+                Assert.That(policy.HasPending, Is.False,
+                    "The committed player checkpoint must not be recaptured.");
             }
             finally
             {

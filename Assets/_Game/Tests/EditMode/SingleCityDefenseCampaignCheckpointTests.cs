@@ -21,6 +21,107 @@ namespace WasteCity.Tests
             "CampaignWaveWarningStarted";
         private const string WarningReasonFieldName =
             "CampaignWaveWarningStarted";
+        private const string TerminalEventName = "TerminalCommitted";
+
+        [Test]
+        public void LiveTerminalTransitionPublishesExactlyOnceAndThenFreezesStats()
+        {
+            var victory = new SingleCityDefenseCampaignModel(12f, 18f);
+            var victoryResults = new List<SingleCityDefenseCampaignResult>();
+            BindTerminal(victory, victoryResults.Add);
+            Assert.That(TriggerCampaign(victory), Is.True);
+
+            var guard = 0;
+            while (!victory.IsTerminal && guard++ < 20)
+            {
+                victory.Advance(500f, 1);
+                DefeatAllVisibleEnemies(victory);
+                victory.Advance(.1f, 1);
+            }
+
+            CollectionAssert.AreEqual(
+                new[] { SingleCityDefenseCampaignResult.Victory },
+                victoryResults);
+            SingleCityDefenseCampaignStatisticsSnapshot before =
+                victory.Snapshot.Statistics;
+            victory.RegisterConsumableSpent("core.resource.ammunition", 5);
+            victory.RegisterBuildingLoss(BuildingCatalog.Wall.Id.Value);
+            victory.Advance(500f, 2);
+            SingleCityDefenseCampaignStatisticsSnapshot after =
+                victory.Snapshot.Statistics;
+
+            Assert.That(after.ElapsedRuleSeconds,
+                Is.EqualTo(before.ElapsedRuleSeconds));
+            Assert.That(after.BuildingLossCount,
+                Is.EqualTo(before.BuildingLossCount));
+            Assert.That(after.ConsumablesSpentByResourceId,
+                Is.EqualTo(before.ConsumablesSpentByResourceId));
+            Assert.That(victoryResults, Has.Count.EqualTo(1));
+
+            var defeat = new SingleCityDefenseCampaignModel(12f, 18f);
+            var defeatResults = new List<SingleCityDefenseCampaignResult>();
+            BindTerminal(defeat, defeatResults.Add);
+            Assert.That(TriggerCampaign(defeat), Is.True);
+            defeat.ApplyCoreDamage(int.MaxValue);
+            defeat.ApplyCoreDamage(int.MaxValue);
+            defeat.Advance(500f, 2);
+            CollectionAssert.AreEqual(
+                new[] { SingleCityDefenseCampaignResult.Defeat },
+                defeatResults);
+        }
+
+        [Test]
+        public void RestoreAdoptsTerminalTruthWithoutRepublishingSettlement()
+        {
+            var source = new SingleCityDefenseCampaignModel(7f, 9f);
+            Assert.That(TriggerCampaign(source), Is.True);
+            source.ApplyCoreDamage(int.MaxValue);
+            SingleCityDefenseCampaignPersistenceState saved =
+                source.CaptureForPersistence();
+
+            var restored = new SingleCityDefenseCampaignModel(7f, 9f);
+            var results = new List<SingleCityDefenseCampaignResult>();
+            BindTerminal(restored, results.Add);
+            Assert.That(restored.TryPrepareRestore(
+                saved,
+                out SingleCityDefenseCampaignRestorePlan plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(restored.TryCommitRestore(plan, out string commitError),
+                Is.True, commitError);
+            Assert.That(restored.Snapshot.Result,
+                Is.EqualTo(SingleCityDefenseCampaignResult.Defeat));
+            Assert.That(results, Is.Empty,
+                "Persistence restore adopts terminal truth and must not " +
+                "replay a live settlement event.");
+        }
+
+        [Test]
+        public void WaveRetryKeepsTerminalRevisionMonotonicForNextSettlement()
+        {
+            var campaign = new SingleCityDefenseCampaignModel(7f, 9f);
+            Assert.That(TriggerCampaign(campaign), Is.True);
+            SingleCityDefenseCampaignPersistenceState waveFront =
+                campaign.CaptureForPersistence();
+            campaign.ApplyCoreDamage(int.MaxValue);
+            Assert.That(campaign.TerminalRevision, Is.EqualTo(1ul));
+
+            Assert.That(campaign.TryPrepareRestore(
+                waveFront,
+                out SingleCityDefenseCampaignRestorePlan plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(campaign.TryCommitRestore(plan, out string commitError),
+                Is.True, commitError);
+            Assert.That(campaign.Snapshot.Result,
+                Is.EqualTo(SingleCityDefenseCampaignResult.None));
+            Assert.That(campaign.TerminalRevision, Is.EqualTo(1ul),
+                "波次重试不得让后续结算复用已经发布过的 revision。");
+
+            campaign.ApplyCoreDamage(int.MaxValue);
+
+            Assert.That(campaign.TerminalRevision, Is.EqualTo(2ul));
+            Assert.That(campaign.Snapshot.Result,
+                Is.EqualTo(SingleCityDefenseCampaignResult.Defeat));
+        }
 
         [Test]
         public void CampaignPublishesEachWarningBoundaryOnceWithLiveTruth()
@@ -292,6 +393,22 @@ namespace WasteCity.Tests
                 "transition instead of requiring snapshot polling.");
             Assert.That(warning.EventHandlerType, Is.EqualTo(typeof(Action<int>)));
             warning.AddEventHandler(campaign, listener);
+        }
+
+        private static void BindTerminal(
+            SingleCityDefenseCampaignModel campaign,
+            Action<SingleCityDefenseCampaignResult> listener)
+        {
+            EventInfo terminal = typeof(SingleCityDefenseCampaignModel)
+                .GetEvent(
+                    TerminalEventName,
+                    BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(terminal, Is.Not.Null,
+                "The campaign must publish one authoritative live terminal " +
+                "transition for settlement consumers.");
+            Assert.That(terminal.EventHandlerType,
+                Is.EqualTo(typeof(Action<SingleCityDefenseCampaignResult>)));
+            terminal.AddEventHandler(campaign, listener);
         }
 
         private static void DefeatAllVisibleEnemies(

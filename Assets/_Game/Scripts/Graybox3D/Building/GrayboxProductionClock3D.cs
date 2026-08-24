@@ -6,6 +6,35 @@ using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public readonly struct ProductionStatisticsDelta
+    {
+        public static readonly ProductionStatisticsDelta Empty =
+            new ProductionStatisticsDelta(0, 0f, 0f);
+
+        public ProductionStatisticsDelta(
+            int completedProductionBatchCount,
+            float productionActiveProgressSeconds,
+            float productionEligibleSeconds)
+        {
+            CompletedProductionBatchCount = Math.Max(
+                0,
+                completedProductionBatchCount);
+            ProductionActiveProgressSeconds = Math.Max(
+                0f,
+                productionActiveProgressSeconds);
+            ProductionEligibleSeconds = Math.Max(
+                ProductionActiveProgressSeconds,
+                productionEligibleSeconds);
+        }
+
+        public int CompletedProductionBatchCount { get; }
+        public float ProductionActiveProgressSeconds { get; }
+        public float ProductionEligibleSeconds { get; }
+        public bool IsEmpty => CompletedProductionBatchCount == 0 &&
+            ProductionActiveProgressSeconds == 0f &&
+            ProductionEligibleSeconds == 0f;
+    }
+
     public sealed class GrayboxProductionClock3D
     {
         public const float StepSeconds = .1f;
@@ -22,6 +51,8 @@ namespace WasteCity.Graybox3D.Building
         private CityResourceStorageModel latestCityStorage;
         private ulong publishedContentHash;
         private bool hasPublishedContentHash;
+        private readonly List<ProductionStateMeasurement> stepMeasurements =
+            new List<ProductionStateMeasurement>();
 
         public GrayboxProductionRuntime3D Runtime { get; } =
             new GrayboxProductionRuntime3D();
@@ -30,6 +61,9 @@ namespace WasteCity.Graybox3D.Building
         public ulong Revision => snapshot.Revision;
         public uint ObservabilityCaptureCount { get; private set; }
         public float AccumulatorSeconds => accumulatorSeconds;
+        public ulong StatisticsRevision { get; private set; }
+        public ProductionStatisticsDelta LastStatisticsDelta { get; private set; } =
+            ProductionStatisticsDelta.Empty;
         internal WorldMapModel LatestWorld => latestWorld;
         internal CityResourceStorageModel LatestCityStorage =>
             latestCityStorage;
@@ -50,6 +84,7 @@ namespace WasteCity.Graybox3D.Building
             WorldMapModel world,
             ResourceInventory cityInventory)
         {
+            LastStatisticsDelta = ProductionStatisticsDelta.Empty;
             if (paused || cityInventory == null)
                 return;
 
@@ -57,6 +92,9 @@ namespace WasteCity.Graybox3D.Building
             latestCityStorage = null;
             accumulatorSeconds += Math.Max(0f, deltaSeconds);
             bool stepped = false;
+            int completedProductionBatchCount = 0;
+            float productionActiveProgressSeconds = 0f;
+            float productionEligibleSeconds = 0f;
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
                 Runtime.Synchronize(
@@ -65,6 +103,8 @@ namespace WasteCity.Graybox3D.Building
                     cityX,
                     cityY,
                     groundRadius);
+                CaptureStepMeasurements(
+                    ref productionEligibleSeconds);
                 simulation.Tick(
                     Runtime.RunnableStates,
                     StepSeconds,
@@ -73,11 +113,18 @@ namespace WasteCity.Graybox3D.Building
                     cityCapacity,
                     Runtime.ActiveWarehouseCount,
                     globallyPaused: false);
+                CompleteStepMeasurements(
+                    ref completedProductionBatchCount,
+                    ref productionActiveProgressSeconds);
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < StepEpsilon)
                     accumulatorSeconds = 0f;
                 stepped = true;
             }
+            PublishStatisticsDelta(new ProductionStatisticsDelta(
+                completedProductionBatchCount,
+                productionActiveProgressSeconds,
+                productionEligibleSeconds));
             if (stepped)
                 PublishObservabilityIfChanged();
         }
@@ -93,12 +140,16 @@ namespace WasteCity.Graybox3D.Building
             WorldMapModel world,
             CityResourceStorageModel cityStorage)
         {
+            LastStatisticsDelta = ProductionStatisticsDelta.Empty;
             if (paused || cityStorage == null) return;
 
             latestWorld = world;
             latestCityStorage = cityStorage;
             accumulatorSeconds += Math.Max(0f, deltaSeconds);
             bool stepped = false;
+            int completedProductionBatchCount = 0;
+            float productionActiveProgressSeconds = 0f;
+            float productionEligibleSeconds = 0f;
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
                 Runtime.Synchronize(
@@ -108,18 +159,74 @@ namespace WasteCity.Graybox3D.Building
                     cityY,
                     groundRadius,
                     cityStorage);
+                CaptureStepMeasurements(
+                    ref productionEligibleSeconds);
                 simulation.Tick(
                     Runtime.RunnableStates,
                     StepSeconds,
                     world,
                     cityStorage,
                     globallyPaused: false);
+                CompleteStepMeasurements(
+                    ref completedProductionBatchCount,
+                    ref productionActiveProgressSeconds);
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < StepEpsilon)
                     accumulatorSeconds = 0f;
                 stepped = true;
             }
+            PublishStatisticsDelta(new ProductionStatisticsDelta(
+                completedProductionBatchCount,
+                productionActiveProgressSeconds,
+                productionEligibleSeconds));
             if (stepped) PublishObservabilityIfChanged();
+        }
+
+        private void PublishStatisticsDelta(ProductionStatisticsDelta delta)
+        {
+            LastStatisticsDelta = delta;
+            if (delta.IsEmpty) return;
+            unchecked { StatisticsRevision++; }
+        }
+
+        private void CaptureStepMeasurements(
+            ref float productionEligibleSeconds)
+        {
+            stepMeasurements.Clear();
+            IReadOnlyList<BuildingProductionState> runnableStates =
+                Runtime.RunnableStates;
+            for (var index = 0; index < runnableStates.Count; index++)
+            {
+                BuildingProductionState state = runnableStates[index];
+                if (state == null || state.IsPlayerPaused) continue;
+                productionEligibleSeconds += StepSeconds;
+                stepMeasurements.Add(new ProductionStateMeasurement(
+                    state,
+                    state.CompletionRevision,
+                    state.ProgressSeconds));
+            }
+        }
+
+        private void CompleteStepMeasurements(
+            ref int completedProductionBatchCount,
+            ref float productionActiveProgressSeconds)
+        {
+            for (var index = 0; index < stepMeasurements.Count; index++)
+            {
+                ProductionStateMeasurement measurement =
+                    stepMeasurements[index];
+                ulong completedCycles =
+                    measurement.State.CompletionRevision -
+                    measurement.CompletionRevision;
+                completedProductionBatchCount += (int)completedCycles;
+                float activeSeconds =
+                    (completedCycles * measurement.State.Definition.DurationSeconds) +
+                    measurement.State.ProgressSeconds -
+                    measurement.ProgressSeconds;
+                productionActiveProgressSeconds += Math.Max(
+                    0f,
+                    Math.Min(StepSeconds, activeSeconds));
+            }
         }
 
         internal void PublishObservabilityIfChanged()
@@ -146,6 +253,23 @@ namespace WasteCity.Graybox3D.Building
             publishedContentHash = contentHash;
             hasPublishedContentHash = true;
             unchecked { ObservabilityCaptureCount++; }
+        }
+
+        private readonly struct ProductionStateMeasurement
+        {
+            public ProductionStateMeasurement(
+                BuildingProductionState state,
+                ulong completionRevision,
+                float progressSeconds)
+            {
+                State = state;
+                CompletionRevision = completionRevision;
+                ProgressSeconds = progressSeconds;
+            }
+
+            public BuildingProductionState State { get; }
+            public ulong CompletionRevision { get; }
+            public float ProgressSeconds { get; }
         }
     }
 }

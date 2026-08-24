@@ -813,6 +813,10 @@ namespace WasteCity.Tests
                     {
                         Metric(BuildingCatalog.MachineGunTurret.Id.Value, 913),
                     },
+                    killsByTowerBuildingId = new[]
+                    {
+                        Metric(BuildingCatalog.MachineGunTurret.Id.Value, 47),
+                    },
                     consumablesSpentByResourceId = new[]
                     {
                         Metric(ResourceIds.BiologicalWeapon, 3),

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using WasteCity.Building;
 using WasteCity.Combat;
+using WasteCity.Core;
 
 namespace WasteCity.Defense
 {
@@ -260,16 +261,8 @@ namespace WasteCity.Defense
         private readonly List<EnemyState> enemies = new List<EnemyState>();
         private readonly List<SpawnDefinition> spawnSequence =
             new List<SpawnDefinition>();
-        private readonly Dictionary<string, int> killsByEnemyId =
-            new Dictionary<string, int>(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> damageByTowerBuildingId =
-            new Dictionary<string, int>(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> killsByTowerBuildingId =
-            new Dictionary<string, int>(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> consumablesSpentByResourceId =
-            new Dictionary<string, int>(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> buildingLossesByBuildingId =
-            new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly SessionStatisticsModel statistics =
+            new SessionStatisticsModel();
         private readonly Dictionary<CampaignSpawnDirection,
             SingleCityDefenseCampaignSpawnAnchorPersistenceState>
             frozenSpawnAnchors = new Dictionary<CampaignSpawnDirection,
@@ -278,7 +271,6 @@ namespace WasteCity.Defense
         private double fixedStepAccumulatorSeconds;
         private double warningRemainingSeconds;
         private double spawnClockSeconds;
-        private double elapsedRuleSeconds;
         private CampaignWaveDefinition currentWave;
         private SingleCityDefenseCampaignPhase phase =
             SingleCityDefenseCampaignPhase.Idle;
@@ -286,11 +278,9 @@ namespace WasteCity.Defense
             SingleCityDefenseCampaignResult.None;
         private bool campaignTriggered;
         private int nextSpawnIndex;
-        private int completedWaveCount;
-        private int highestAliveEnemyCount;
-        private bool partialFromMigration;
         private int coreCurrentHealth = CityCoreCombatModel.FormalMaximumHealth;
         private ulong persistenceGeneration;
+        private ulong terminalRevision;
 
         public SingleCityDefenseCampaignModel(float coreX, float coreZ)
         {
@@ -299,13 +289,20 @@ namespace WasteCity.Defense
         }
 
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
+        public SessionStatisticsSnapshot SessionStatistics =>
+            statistics.Capture();
         public bool IsTerminal =>
             result != SingleCityDefenseCampaignResult.None;
+        public ulong TerminalRevision => terminalRevision;
 
         public event Action<int> WaveWarningStarted;
+        public event Action<SingleCityDefenseCampaignResult>
+            TerminalCommitted;
 
         public SingleCityDefenseCampaignPersistenceState CaptureForPersistence()
         {
+            SessionStatisticsSnapshot capturedStatistics =
+                statistics.Capture();
             var planned = new Dictionary<string, int>(StringComparer.Ordinal);
             if (currentWave != null)
             {
@@ -384,20 +381,28 @@ namespace WasteCity.Defense
                 anchors,
                 persistedEnemies,
                 new SingleCityDefenseCampaignStatisticsPersistenceState(
-                    (float)elapsedRuleSeconds,
+                    capturedStatistics.ElapsedRuleSeconds,
                     TotalSpawnedEnemyCount,
-                    TotalKillCount,
-                    completedWaveCount,
-                    MetricStates(killsByEnemyId),
-                    highestAliveEnemyCount,
+                    capturedStatistics.TotalKillCount,
+                    capturedStatistics.CompletedWaveCount,
+                    MetricStates(capturedStatistics.KillsByEnemyId),
+                    capturedStatistics.HighestAliveEnemyCount,
                     CityCoreCombatModel.FormalMaximumHealth -
                         coreCurrentHealth,
-                    MetricStates(damageByTowerBuildingId),
-                    MetricStates(killsByTowerBuildingId),
-                    MetricStates(consumablesSpentByResourceId),
-                    TotalBuildingLossCount,
-                    MetricStates(buildingLossesByBuildingId),
-                    partialFromMigration));
+                    MetricStates(
+                        capturedStatistics.DamageByTowerBuildingId),
+                    MetricStates(capturedStatistics.KillsByTowerBuildingId),
+                    MetricStates(
+                        capturedStatistics.ConsumablesSpentByResourceId),
+                    capturedStatistics.TotalBuildingLossCount,
+                    MetricStates(
+                        capturedStatistics.BuildingLossesByBuildingId),
+                    capturedStatistics.PartialFromMigration,
+                    capturedStatistics.CompletedProductionBatchCount,
+                    capturedStatistics.ProductionActiveProgressSeconds,
+                    capturedStatistics.ProductionEligibleSeconds,
+                    capturedStatistics.CityWasPackedAfterCampaignStart,
+                    capturedStatistics.DevelopmentModifierUsed));
         }
 
         public bool TryPrepareRestore(
@@ -457,19 +462,6 @@ namespace WasteCity.Defense
             enemies.AddRange(candidate.Enemies);
             spawnSequence.Clear();
             spawnSequence.AddRange(candidate.SpawnSequence);
-            CopyDictionary(candidate.KillsByEnemyId, killsByEnemyId);
-            CopyDictionary(
-                candidate.DamageByTowerBuildingId,
-                damageByTowerBuildingId);
-            CopyDictionary(
-                candidate.KillsByTowerBuildingId,
-                killsByTowerBuildingId);
-            CopyDictionary(
-                candidate.ConsumablesSpentByResourceId,
-                consumablesSpentByResourceId);
-            CopyDictionary(
-                candidate.BuildingLossesByBuildingId,
-                buildingLossesByBuildingId);
             frozenSpawnAnchors.Clear();
             foreach (KeyValuePair<CampaignSpawnDirection,
                      SingleCityDefenseCampaignSpawnAnchorPersistenceState> pair
@@ -486,12 +478,36 @@ namespace WasteCity.Defense
             spawnClockSeconds = candidate.SpawnClockSeconds;
             fixedStepAccumulatorSeconds =
                 candidate.FixedStepAccumulatorSeconds;
-            elapsedRuleSeconds = candidate.ElapsedRuleSeconds;
             nextSpawnIndex = candidate.NextSpawnIndex;
-            completedWaveCount = candidate.CompletedWaveCount;
-            highestAliveEnemyCount = candidate.HighestAliveEnemyCount;
-            partialFromMigration = candidate.PartialFromMigration;
             coreCurrentHealth = candidate.CoreCurrentHealth;
+            var restoredStatistics = new SessionStatisticsSnapshot(
+                (float)candidate.ElapsedRuleSeconds,
+                candidate.CompletedWaveCount,
+                0,
+                SessionMetrics(candidate.KillsByEnemyId),
+                SessionMetrics(candidate.DamageByTowerBuildingId),
+                SessionMetrics(candidate.KillsByTowerBuildingId),
+                SessionMetrics(candidate.ConsumablesSpentByResourceId),
+                0,
+                SessionMetrics(candidate.BuildingLossesByBuildingId),
+                candidate.HighestAliveEnemyCount,
+                candidate.CompletedProductionBatchCount,
+                candidate.ProductionActiveProgressSeconds,
+                candidate.ProductionEligibleSeconds,
+                candidate.CityWasPackedAfterCampaignStart,
+                candidate.DevelopmentModifierUsed,
+                candidate.PartialFromMigration,
+                candidate.Result != SingleCityDefenseCampaignResult.None,
+                0f,
+                0,
+                0,
+                false);
+            if (!statistics.TryRestore(restoredStatistics, out error))
+                return false;
+            if (candidate.Result != SingleCityDefenseCampaignResult.None)
+            {
+                unchecked { terminalRevision++; }
+            }
             plan.Consumed = true;
             persistenceGeneration++;
             error = null;
@@ -738,8 +754,8 @@ namespace WasteCity.Defense
             coreCurrentHealth -= applied;
             if (coreCurrentHealth == 0)
             {
-                result = SingleCityDefenseCampaignResult.Defeat;
-                phase = SingleCityDefenseCampaignPhase.Defeat;
+                CommitTerminalResult(
+                    SingleCityDefenseCampaignResult.Defeat);
             }
             persistenceGeneration++;
             return applied;
@@ -749,14 +765,43 @@ namespace WasteCity.Defense
         {
             if (IsTerminal) return;
             if (string.IsNullOrWhiteSpace(resourceId) || amount <= 0) return;
-            Add(consumablesSpentByResourceId, resourceId, amount);
+            statistics.RegisterConsumableSpent(resourceId, amount);
             persistenceGeneration++;
         }
 
         public void RegisterBuildingLoss(string buildingId)
         {
-            if (FindBuildingDefinition(buildingId) == null) return;
-            Add(buildingLossesByBuildingId, buildingId, 1);
+            if (IsTerminal || FindBuildingDefinition(buildingId) == null)
+                return;
+            statistics.RegisterBuildingLoss(buildingId, 1);
+            persistenceGeneration++;
+        }
+
+        public void RegisterProductionStatistics(
+            int completedBatchCount,
+            float activeProgressSeconds,
+            float eligibleSeconds)
+        {
+            if (IsTerminal) return;
+            statistics.RegisterCompletedProductionBatches(
+                completedBatchCount);
+            statistics.RegisterProductionTime(
+                activeProgressSeconds,
+                eligibleSeconds);
+            persistenceGeneration++;
+        }
+
+        public void MarkCityPackedAfterCampaignStart()
+        {
+            if (IsTerminal) return;
+            statistics.MarkCityPackedAfterCampaignStart();
+            persistenceGeneration++;
+        }
+
+        public void MarkDevelopmentModifierUsed()
+        {
+            if (IsTerminal) return;
+            statistics.MarkDevelopmentModifierUsed();
             persistenceGeneration++;
         }
 
@@ -824,7 +869,7 @@ namespace WasteCity.Defense
             Func<string, string, int, int> applyBuildingDamage,
             bool advanceEnemyCombat)
         {
-            elapsedRuleSeconds += deltaSeconds;
+            statistics.AdvanceRuleTime(deltaSeconds);
             if (phase == SingleCityDefenseCampaignPhase.Warning)
             {
                 double consumed = Math.Min(
@@ -1104,9 +1149,7 @@ namespace WasteCity.Defense
                 spawnOrder,
                 x,
                 z));
-            highestAliveEnemyCount = Math.Max(
-                highestAliveEnemyCount,
-                AliveEnemyCount);
+            statistics.ObserveAliveEnemyCount(AliveEnemyCount);
         }
 
         private void ResolveSpawnPosition(
@@ -1158,15 +1201,12 @@ namespace WasteCity.Defense
                 coreCurrentHealth);
             if (terminal != SingleCityDefenseCampaignResult.None)
             {
-                result = terminal;
-                phase = terminal == SingleCityDefenseCampaignResult.Defeat
-                    ? SingleCityDefenseCampaignPhase.Defeat
-                    : SingleCityDefenseCampaignPhase.Victory;
-                completedWaveCount++;
+                statistics.RegisterCompletedWaves(1);
+                CommitTerminalResult(terminal);
                 return;
             }
 
-            completedWaveCount++;
+            statistics.RegisterCompletedWaves(1);
             BeginWave(currentWave.Number);
         }
 
@@ -1187,6 +1227,25 @@ namespace WasteCity.Defense
             FreezeSpawnAnchors(currentWave);
             phase = SingleCityDefenseCampaignPhase.Warning;
             WaveWarningStarted?.Invoke(currentWave.Number);
+        }
+
+        private bool CommitTerminalResult(
+            SingleCityDefenseCampaignResult terminal)
+        {
+            if (result != SingleCityDefenseCampaignResult.None ||
+                terminal == SingleCityDefenseCampaignResult.None)
+            {
+                return false;
+            }
+
+            result = terminal;
+            phase = terminal == SingleCityDefenseCampaignResult.Defeat
+                ? SingleCityDefenseCampaignPhase.Defeat
+                : SingleCityDefenseCampaignPhase.Victory;
+            statistics.FreezeAtTerminal();
+            unchecked { terminalRevision++; }
+            TerminalCommitted?.Invoke(terminal);
+            return true;
         }
 
         private void FreezeSpawnAnchors(CampaignWaveDefinition wave)
@@ -1293,6 +1352,8 @@ namespace WasteCity.Defense
 
         private SingleCityDefenseCampaignSnapshot CreateSnapshot()
         {
+            SessionStatisticsSnapshot capturedStatistics =
+                statistics.Capture();
             var snapshots = new List<SingleCityDefenseEnemySnapshot>();
             for (var index = 0; index < enemies.Count; index++)
             {
@@ -1320,18 +1381,21 @@ namespace WasteCity.Defense
                 result,
                 snapshots,
                 new SingleCityDefenseCampaignStatisticsSnapshot(
-                    (float)elapsedRuleSeconds,
-                    completedWaveCount,
-                    TotalKillCount,
-                    killsByEnemyId,
-                    damageByTowerBuildingId,
-                    killsByTowerBuildingId,
-                    consumablesSpentByResourceId,
-                    TotalBuildingLossCount,
+                    capturedStatistics.ElapsedRuleSeconds,
+                    capturedStatistics.CompletedWaveCount,
+                    capturedStatistics.TotalKillCount,
+                    MetricDictionary(capturedStatistics.KillsByEnemyId),
+                    MetricDictionary(
+                        capturedStatistics.DamageByTowerBuildingId),
+                    MetricDictionary(
+                        capturedStatistics.KillsByTowerBuildingId),
+                    MetricDictionary(
+                        capturedStatistics.ConsumablesSpentByResourceId),
+                    capturedStatistics.TotalBuildingLossCount,
                     coreCurrentHealth,
                     CityCoreCombatModel.FormalMaximumHealth,
-                    highestAliveEnemyCount,
-                    partialFromMigration));
+                    capturedStatistics.HighestAliveEnemyCount,
+                    capturedStatistics.PartialFromMigration));
         }
 
         private bool TryBuildRestoreCandidate(
@@ -1600,6 +1664,11 @@ namespace WasteCity.Defense
                 statistics.CompletedWaveCount,
                 statistics.HighestAliveEnemyCount,
                 statistics.PartialFromMigration,
+                statistics.CompletedProductionBatchCount,
+                statistics.ProductionActiveProgressSeconds,
+                statistics.ProductionEligibleSeconds,
+                statistics.CityWasPackedAfterCampaignStart,
+                statistics.DevelopmentModifierUsed,
                 state.CoreCurrentHealth,
                 sequence,
                 restoredEnemies,
@@ -1637,6 +1706,13 @@ namespace WasteCity.Defense
                 statistics.CompletedWaveCount < 0 ||
                 statistics.BuildingLossCount < 0 ||
                 statistics.CoreDamageTaken < 0 ||
+                statistics.CompletedProductionBatchCount < 0 ||
+                !IsFiniteNonNegative(
+                    statistics.ProductionActiveProgressSeconds) ||
+                !IsFiniteNonNegative(
+                    statistics.ProductionEligibleSeconds) ||
+                statistics.ProductionActiveProgressSeconds >
+                    statistics.ProductionEligibleSeconds ||
                 statistics.HighestAliveEnemyCount < aliveEnemyCount)
             {
                 return Fail("Campaign statistics are invalid.", out error);
@@ -1682,6 +1758,12 @@ namespace WasteCity.Defense
             if (Sum(restoredKills) != statistics.DefeatedEnemyCount)
                 return Fail("Defeated enemy statistics are inconsistent.",
                     out error);
+            if (!statistics.PartialFromMigration &&
+                Sum(restoredTowerKills) != statistics.DefeatedEnemyCount)
+            {
+                return Fail("Tower kill statistics are inconsistent.",
+                    out error);
+            }
             if (Sum(restoredBuildingLosses) != statistics.BuildingLossCount)
                 return Fail("Building loss statistics are inconsistent.",
                     out error);
@@ -1836,6 +1918,58 @@ namespace WasteCity.Defense
             return result;
         }
 
+        private static IReadOnlyList<
+            SingleCityDefenseCampaignMetricPersistenceState> MetricStates(
+                IReadOnlyList<SessionStatisticsMetric> source)
+        {
+            var result = new List<
+                SingleCityDefenseCampaignMetricPersistenceState>();
+            if (source == null) return result;
+            for (var index = 0; index < source.Count; index++)
+            {
+                SessionStatisticsMetric item = source[index];
+                if (item == null) continue;
+                result.Add(
+                    new SingleCityDefenseCampaignMetricPersistenceState(
+                        item.StableId,
+                        item.Amount));
+            }
+            return result;
+        }
+
+        private static SessionStatisticsMetric[] SessionMetrics(
+            IReadOnlyDictionary<string, int> source)
+        {
+            if (source == null || source.Count == 0)
+                return Array.Empty<SessionStatisticsMetric>();
+            var keys = new List<string>(source.Keys);
+            keys.Sort(StringComparer.Ordinal);
+            var result = new SessionStatisticsMetric[keys.Count];
+            for (var index = 0; index < keys.Count; index++)
+            {
+                string key = keys[index];
+                result[index] = new SessionStatisticsMetric(
+                    key,
+                    source[key]);
+            }
+            return result;
+        }
+
+        private static IReadOnlyDictionary<string, int> MetricDictionary(
+            IReadOnlyList<SessionStatisticsMetric> source)
+        {
+            var result = new SortedDictionary<string, int>(
+                StringComparer.Ordinal);
+            if (source == null) return result;
+            for (var index = 0; index < source.Count; index++)
+            {
+                SessionStatisticsMetric item = source[index];
+                if (item != null)
+                    result[item.StableId] = item.Amount;
+            }
+            return result;
+        }
+
         private int TotalSpawnedEnemyCount =>
             SpawnedBeforeWave(currentWave == null ? 0 : currentWave.Number) +
             nextSpawnIndex;
@@ -1971,6 +2105,12 @@ namespace WasteCity.Defense
             Mix(ref hash, statistics.BuildingLossCount);
             MixMetrics(ref hash, statistics.BuildingLossesByBuildingId);
             Mix(ref hash, statistics.PartialFromMigration ? 1 : 0);
+            Mix(ref hash, statistics.CompletedProductionBatchCount);
+            Mix(ref hash, statistics.ProductionActiveProgressSeconds);
+            Mix(ref hash, statistics.ProductionEligibleSeconds);
+            Mix(ref hash,
+                statistics.CityWasPackedAfterCampaignStart ? 1 : 0);
+            Mix(ref hash, statistics.DevelopmentModifierUsed ? 1 : 0);
             return hash;
         }
 
@@ -2032,18 +2172,7 @@ namespace WasteCity.Defense
             }
         }
 
-        private int TotalKillCount
-        {
-            get
-            {
-                int total = 0;
-                foreach (KeyValuePair<string, int> pair in killsByEnemyId)
-                    total += pair.Value;
-                return total;
-            }
-        }
-
-        private int TotalBuildingLossCount => Sum(buildingLossesByBuildingId);
+        private int TotalKillCount => statistics.Capture().TotalKillCount;
 
         private static bool IsFormalDefenseTower(string buildingId)
         {
@@ -2161,15 +2290,16 @@ namespace WasteCity.Defense
 
         private void RegisterDamage(string towerBuildingId, int amount)
         {
-            Add(damageByTowerBuildingId, towerBuildingId, amount);
+            statistics.RegisterTowerDamage(towerBuildingId, amount);
         }
 
         private void RegisterKill(
             string enemyDefinitionId,
             string towerBuildingId)
         {
-            Add(killsByEnemyId, enemyDefinitionId, 1);
-            Add(killsByTowerBuildingId, towerBuildingId, 1);
+            statistics.RegisterEnemyKill(
+                enemyDefinitionId,
+                towerBuildingId);
         }
 
         private static void Add(
@@ -2289,6 +2419,11 @@ namespace WasteCity.Defense
                 int completedWaveCount,
                 int highestAliveEnemyCount,
                 bool partialFromMigration,
+                int completedProductionBatchCount,
+                float productionActiveProgressSeconds,
+                float productionEligibleSeconds,
+                bool cityWasPackedAfterCampaignStart,
+                bool developmentModifierUsed,
                 int coreCurrentHealth,
                 List<SpawnDefinition> spawnSequence,
                 List<EnemyState> enemies,
@@ -2313,6 +2448,14 @@ namespace WasteCity.Defense
                 CompletedWaveCount = completedWaveCount;
                 HighestAliveEnemyCount = highestAliveEnemyCount;
                 PartialFromMigration = partialFromMigration;
+                CompletedProductionBatchCount =
+                    completedProductionBatchCount;
+                ProductionActiveProgressSeconds =
+                    productionActiveProgressSeconds;
+                ProductionEligibleSeconds = productionEligibleSeconds;
+                CityWasPackedAfterCampaignStart =
+                    cityWasPackedAfterCampaignStart;
+                DevelopmentModifierUsed = developmentModifierUsed;
                 CoreCurrentHealth = coreCurrentHealth;
                 SpawnSequence = spawnSequence;
                 Enemies = enemies;
@@ -2336,6 +2479,11 @@ namespace WasteCity.Defense
             public int CompletedWaveCount { get; }
             public int HighestAliveEnemyCount { get; }
             public bool PartialFromMigration { get; }
+            public int CompletedProductionBatchCount { get; }
+            public float ProductionActiveProgressSeconds { get; }
+            public float ProductionEligibleSeconds { get; }
+            public bool CityWasPackedAfterCampaignStart { get; }
+            public bool DevelopmentModifierUsed { get; }
             public int CoreCurrentHealth { get; }
             public List<SpawnDefinition> SpawnSequence { get; }
             public List<EnemyState> Enemies { get; }

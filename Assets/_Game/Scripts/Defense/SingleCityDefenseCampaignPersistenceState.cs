@@ -120,7 +120,12 @@ namespace WasteCity.Defense
             int buildingLossCount,
             IEnumerable<SingleCityDefenseCampaignMetricPersistenceState>
                 buildingLossesByBuildingId = null,
-            bool partialFromMigration = false)
+            bool partialFromMigration = false,
+            int completedProductionBatchCount = 0,
+            float productionActiveProgressSeconds = 0f,
+            float productionEligibleSeconds = 0f,
+            bool cityWasPackedAfterCampaignStart = false,
+            bool developmentModifierUsed = false)
         {
             ElapsedRuleSeconds = elapsedRuleSeconds;
             SpawnedEnemyCount = spawnedEnemyCount;
@@ -130,6 +135,11 @@ namespace WasteCity.Defense
             CoreDamageTaken = coreDamageTaken;
             BuildingLossCount = buildingLossCount;
             PartialFromMigration = partialFromMigration;
+            CompletedProductionBatchCount = completedProductionBatchCount;
+            ProductionActiveProgressSeconds = productionActiveProgressSeconds;
+            ProductionEligibleSeconds = productionEligibleSeconds;
+            CityWasPackedAfterCampaignStart = cityWasPackedAfterCampaignStart;
+            DevelopmentModifierUsed = developmentModifierUsed;
             this.killsByEnemyId = CopyMetrics(killsByEnemyId);
             this.damageByTowerBuildingId = CopyMetrics(
                 damageByTowerBuildingId);
@@ -158,6 +168,11 @@ namespace WasteCity.Defense
             BuildingLossesByBuildingId => buildingLossesByBuildingId;
         public int BuildingLossCount { get; }
         public bool PartialFromMigration { get; }
+        public int CompletedProductionBatchCount { get; }
+        public float ProductionActiveProgressSeconds { get; }
+        public float ProductionEligibleSeconds { get; }
+        public bool CityWasPackedAfterCampaignStart { get; }
+        public bool DevelopmentModifierUsed { get; }
 
         private static ReadOnlyCollection<
             SingleCityDefenseCampaignMetricPersistenceState> CopyMetrics(
@@ -256,7 +271,12 @@ namespace WasteCity.Defense
                     statistics.ConsumablesSpentByResourceId,
                     statistics.BuildingLossCount,
                     statistics.BuildingLossesByBuildingId,
-                    statistics.PartialFromMigration);
+                    statistics.PartialFromMigration,
+                    statistics.CompletedProductionBatchCount,
+                    statistics.ProductionActiveProgressSeconds,
+                    statistics.ProductionEligibleSeconds,
+                    statistics.CityWasPackedAfterCampaignStart,
+                    statistics.DevelopmentModifierUsed);
         }
 
         public string CampaignId { get; }

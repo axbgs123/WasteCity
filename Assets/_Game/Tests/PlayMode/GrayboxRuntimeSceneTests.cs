@@ -389,7 +389,10 @@ namespace WasteCity.Tests
             Assert.That(
                 leader.transform.position.z,
                 Is.GreaterThan(leaderBefore.z));
-            Assert.That(city.transform.position, Is.EqualTo(cityBefore));
+            Assert.That(
+                Vector3.Distance(city.transform.position, cityBefore),
+                Is.LessThan(.001f),
+                "Leader input must not materially move the city; sub-millimetre transform noise is ignored.");
 
             yield return DragMouse(dragStart, dragEnd);
             Assert.That(

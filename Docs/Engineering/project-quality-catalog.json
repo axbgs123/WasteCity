@@ -223,6 +223,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/ResearchTree*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlement*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**",
@@ -241,6 +242,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
         "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
@@ -250,6 +252,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
@@ -303,6 +306,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionStatisticsDeltaTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
@@ -408,6 +412,8 @@
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
         "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseSettlementTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
@@ -437,7 +443,8 @@
         "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs",
         "Assets/_Game/Tests/EditMode/TechnologyOverloadTests.cs",
         "Assets/_Game/Tests/EditMode/WaveDirectorTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -481,6 +488,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
@@ -1164,12 +1172,13 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在正式三维防御运行时、十波战役持久状态与当前 FormalThreeD 防御 DTO 之间执行确定性映射，保留配置签名、出生锚点、波次阶段、战役统计、塔攻击余量、活动敌人、建筑生命和核心状态，并通过零写入计划迁移 schema 31 后统一提交。",
-      "BoundarySummary": "只负责防御领域快照、迁移兼容与 FormalThreeD DTO 映射；不拥有文件 IO、场景搜索、规则 tick、城市库存、UI 或表现对象。FormalSaveValidator 只验证结构与高价值跨引用；目标缓存、状态文案、攻击事件和表现池不入档。",
+      "UseSummary": "在正式三维防御运行时、十波战役持久状态与当前 FormalThreeD 防御 DTO 之间执行确定性映射，保留配置签名、出生锚点、波次阶段、完整会话统计、塔攻击余量、活动敌人、建筑生命和核心状态，并通过零写入计划把 schema 31 的可确认统计迁移为显式部分统计后统一提交。",
+      "BoundarySummary": "只负责防御领域快照、迁移兼容与 FormalThreeD DTO 映射；不拥有文件 IO、场景搜索、规则 tick、城市库存、UI 或表现对象。FormalSaveValidator 只验证结构与高价值跨引用；目标缓存、状态文案、攻击事件和表现池不入档，迁移不得伪造完整历史统计。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveDefenseTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0013",
@@ -1457,14 +1466,16 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在灰盒场景内按既有取消链、开发面板和系统菜单优先级分发输入。",
-      "BoundarySummary": "只协调当前场景输入消费者，不复制建筑规则，也不作为全项目通用输入总线。",
+      "UseSummary": "结算打开时先阻断全部世界输入并只分发继续沙盒、最近波前重试、返回标题和允许的关闭命令；无结算时再按既有取消链、开发面板和系统菜单优先级分发输入。",
+      "BoundarySummary": "只协调当前场景输入消费者，不判断结算动作是否合法、不复制建筑或存档规则，也不作为全项目通用输入总线。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0007"
+        "IDEA-0007",
+        "IDEA-0017"
       ]
     },
     {
@@ -1873,6 +1884,7 @@
       "Id": "graybox-production-clock-3d",
       "ChineseName": "三维生产固定时钟",
       "TypeNames": [
+        "ProductionStatisticsDelta",
         "GrayboxProductionClock3D"
       ],
       "AssetPaths": [
@@ -1880,15 +1892,17 @@
       ],
       "FeatureGroupId": "economy-production-logistics",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶。",
-      "BoundarySummary": "只拥有会话级余量并组合运行时、模拟和 CityResourceStorageModel；不读取 Unity Time，不决定建筑资格，不处理 UI，也不进入 schema 30。旧 ResourceInventory 重载仅用于兼容回归。",
+      "UseSummary": "用 0.1 秒固定步长驱动运行时与正式生产模拟，保证分帧确定性和暂停无追赶；结算统计只消费 `ProductionStatisticsDelta`，玩家暂停时不计生产合格时间。",
+      "BoundarySummary": "只拥有会话级余量、上一轮统计增量并组合运行时、模拟和 CityResourceStorageModel；不读取 Unity Time，不决定建筑资格，不累计完整会话统计，不处理 UI。旧 ResourceInventory 重载仅用于兼容回归。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionStatisticsDeltaTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0011",
-        "IDEA-0012"
+        "IDEA-0012",
+        "IDEA-0017"
       ]
     },
     {
@@ -2129,6 +2143,30 @@
       ]
     },
     {
+      "Id": "session-statistics-model",
+      "ChineseName": "通用会话统计模型",
+      "TypeNames": [
+        "SessionStatisticsMetric",
+        "SessionStatisticsSnapshot",
+        "SessionStatisticsModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Core/SessionStatisticsModel.cs"
+      ],
+      "FeatureGroupId": "foundation-clock",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "各正式领域只提交已结算事实增量，模型负责非负验证、原子恢复、终局冻结、部分迁移标记与生产效率所需原始统计；结算层只读快照。",
+      "BoundarySummary": "不读取 Unity 时间、不推断未发生事件、不拥有战役胜负、UI、DTO 或文件 IO；schema 31 缺失历史不得伪造成完整统计。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProductionStatisticsDeltaTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
       "Id": "single-city-defense-campaign-model",
       "ChineseName": "单城市十波防御战役模型",
       "TypeNames": [
@@ -2151,15 +2189,42 @@
       ],
       "FeatureGroupId": "combat-routes",
       "ReuseLevel": "Recommended",
-      "UseSummary": "以正式十波目录推进预警、生成、清场和胜负阶段，按稳定目标与正式敌塔配置结算移动、索敌、攻击、耗材、建筑受击和战役统计；塔战斗余量可独立持久化并确定性恢复。",
-      "BoundarySummary": "只拥有纯战役与塔战斗规则状态；不读取 Unity 时间、场景对象、城市库存或建筑会话，不直接摧毁建筑、不写 schema DTO，也不创建 HUD、轨迹或伤害表现。调用方必须提供稳定建筑目标、核心位置和已批准配置。",
+      "UseSummary": "以正式十波目录推进预警、生成、清场和胜负阶段，按稳定目标与正式敌塔配置结算移动、索敌、攻击、耗材、建筑受击，并由唯一 `SessionStatisticsModel` 聚合生产、防御、战损、暂停和修改器事实；塔战斗余量可独立持久化并确定性恢复。",
+      "BoundarySummary": "只拥有纯战役、塔战斗和会话统计规则状态；不读取 Unity 时间、场景对象、城市库存或建筑会话，不直接摧毁建筑、不写 schema DTO，也不创建 HUD、轨迹或伤害表现。调用方必须提供稳定建筑目标、核心位置和已批准配置。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignModelContractTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseEnemyCampaignCombatTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerCombatModelTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerPersistenceTests.cs",
-        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs"
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseTowerTargetingTests.cs",
+        "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "single-city-defense-settlement-model",
+      "ChineseName": "单城市防御终局结算模型",
+      "TypeNames": [
+        "SingleCityDefenseSettlementMetric",
+        "SingleCityDefenseSettlementSessionStatistics",
+        "SingleCityDefenseSettlementSnapshot",
+        "SingleCityDefenseSettlementModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseSettlement.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "终局 revision 变化时发布一次结算；胜利允许继续沙盒或返回标题，失败允许最近波前重试或返回标题，缺少生产合格时间时明确显示无数据，迁移统计明确标为部分统计。",
+      "BoundarySummary": "不推进战役、不修改会话统计、不读写重试档、不持有 Unity UI 或输入焦点；人工试玩确认前只能标记为已实现待验证。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseSettlementTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0017"
@@ -2226,11 +2291,12 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "冻结十波战役、塔战斗余量、活动敌人、建筑生命、统计、出生锚点与规则时钟状态，通过绑定当前配置和运行时所有者的零写入恢复计划统一迁移并提交。",
-      "BoundarySummary": "只拥有战役领域持久状态、schema 31 到当前战役结构的兼容迁移和恢复预检；不执行文件 IO，不搜索场景，不保存 HUD、目标缓存、轨迹池或派生连接。迁移缺失的历史信息必须显式采用受测试的保守默认值。",
+      "UseSummary": "schema 32 冻结并完整往返十波战役、塔战斗余量、活动敌人、建筑生命、完整会话统计、出生锚点与规则时钟状态；schema 31 只迁移可确认历史值并显式标为部分统计，所有恢复先生成零写入恢复计划，预检后单次提交。",
+      "BoundarySummary": "只拥有战役领域持久状态、schema 31 到当前战役结构的兼容迁移和恢复预检；不执行文件 IO，不搜索场景，不保存 HUD、目标缓存、轨迹池或派生连接。迁移缺失的历史信息必须采用受测试的保守默认值并标为部分统计，不得伪造成完整统计。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignPersistenceTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/SessionStatisticsTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs"
@@ -2386,18 +2452,42 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "用于在 GrayboxPrototype3D 中连接统一规则时钟、十波战役、全局暂停、统一选择 HUD、真实输入以及固定容量的三敌三塔和已结算攻击表现池。",
-      "BoundarySummary": "仅限当前正式 3D 场景适配；HUD 只读统一快照，表现对象不持有目标、伤害、耗材、建筑生命或波次真值，攻击轨迹只消费已结算事件且不得重复播放，不接入冻结 2D。",
+      "UseSummary": "用于在 GrayboxPrototype3D 中连接统一规则时钟、十波战役、终局强制暂停、结算发布、统一选择 HUD、真实输入以及固定容量的三敌三塔和已结算攻击表现池。",
+      "BoundarySummary": "仅限当前正式 3D 场景适配；结算模型与会话统计是规则真值，HUD 和表现对象不持有目标、伤害、耗材、建筑生命、波次或结算真值，攻击轨迹只消费已结算事件且不得重复播放，不接入冻结 2D。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDefenseControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSelectionProjectionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0013",
+        "IDEA-0017"
+      ]
+    },
+    {
+      "Id": "graybox-defense-settlement-modal-3d",
+      "ChineseName": "三维防御终局结算模态",
+      "TypeNames": [
+        "GrayboxDefenseSettlementController3D",
+        "GrayboxDefenseSettlementView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "由防御控制器发布一次终局快照，控制器把继续沙盒、最近波前重试、返回标题与关闭失败反馈映射为正式命令，视图只渲染快照和命令状态。",
+      "BoundarySummary": "只拥有 GrayboxPrototype3D 的模态展示与命令路由；不判断胜负、不计算统计、不读写存档、不直接恢复战役，也不接入冻结 2D。当前自动化通过，仍待人工试玩验证文案、焦点与真实操作体验。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
+      ],
+      "RequirementIds": [
         "IDEA-0017"
       ]
     },
@@ -2843,13 +2933,14 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31、当前 schema 32 和未来版本，提供确定性编码、payload hash、结构校验、高价值跨引用语义校验及 schema 31 到当前十波战役结构的受控迁移。",
+      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31、当前 schema 32 和未来版本，提供确定性编码、payload hash、结构校验、高价值跨引用语义校验、schema 32 完整统计往返及 schema 31 的受控部分统计迁移。",
       "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，schema 31 迁移不得伪造完整历史统计。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -2882,6 +2973,29 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "formal-save-wave-retry-store",
+      "ChineseName": "正式最近波前内部重试档",
+      "TypeNames": [
+        "FormalSaveWaveRetryStoreResult",
+        "FormalSaveWaveRetryStore"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalSaveWaveRetryStore.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "正式运行时在受控波前边界保存内部快照，失败结算只通过结构化结果加载并恢复最近有效波前；损坏、缺失或不兼容时返回稳定失败而不破坏玩家主档。",
+      "BoundarySummary": "不是第二个玩家可见存档槽，不接受 schema 31 或 legacy 2D，不决定何时可重试、不生成结算文案，也不绕过领域协调器。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0017"
       ]
     },
     {
@@ -2962,15 +3076,17 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 组合统一 store、七领域 coordinator、自动检查点、继续游戏、新游戏和保存退出，并在无待处理检查点时保持 LateUpdate 零写盘。",
-      "BoundarySummary": "只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案、领域 DTO 规则或第二套存档；测试路径覆盖必须外置并恢复，自动检查点失败不能伪装成已保存。",
+      "UseSummary": "在 GrayboxPrototype3D 组合统一玩家 store、七领域 coordinator、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。",
+      "BoundarySummary": "只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案或领域 DTO 规则；内部波前重试档不是第二玩家槽，失败不能伪装成已保存或已恢复。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -2984,15 +3100,18 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "把正式 store/coordinator 的结构化结果映射为启动页继续、新游戏覆盖确认、自动存档警告和保存退出反馈，并通过既有系统菜单与输入协调器阻断未进入游戏时的世界输入。",
-      "BoundarySummary": "只拥有 GrayboxPrototype3D 的玩家入口状态与中文反馈，不读写文件、不持有 schema DTO、不绕过 runtime host，也不接入冻结 2D；继续、覆盖与退出必须经过真实 UGUI 输入主循环验证。",
+      "UseSummary": "把正式 store/coordinator/runtime host 的结构化结果映射为启动页继续、新游戏覆盖确认、自动存档警告、保存退出、最近波前重试和返回标题反馈，并通过既有系统菜单与输入协调器阻断未进入游戏时的世界输入。",
+      "BoundarySummary": "只拥有 GrayboxPrototype3D 的玩家入口状态与中文反馈，不读写文件、不持有 schema DTO、不绕过 runtime host，也不接入冻结 2D；继续、覆盖、重试与退出必须经过真实 UGUI 输入主循环验证。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0017"
       ]
     },
     {
@@ -3112,11 +3231,24 @@
       "ChineseName": "正式三维存档启动与退出入口",
       "OwnerTypeName": "GrayboxFormalSaveEntryController3D",
       "SceneId": "graybox-prototype-3d",
-      "InputPrioritySummary": "启动页打开时阻断世界输入，只允许继续、新游戏和覆盖确认；进入游戏后保存退出复用系统菜单，并显示结构化错误与自动检查点警告。",
+      "InputPrioritySummary": "启动页打开时阻断世界输入，只允许继续、新游戏和覆盖确认；进入游戏后保存退出复用系统菜单，终局失败可接收最近波前重试或返回标题，并显示结构化错误与自动检查点警告。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
+      ]
+    },
+    {
+      "Id": "graybox-defense-settlement",
+      "ChineseName": "灰盒防御终局结算模态",
+      "OwnerTypeName": "GrayboxDefenseSettlementController3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "结算打开时位于所有世界输入之前；胜利只允许继续沙盒或返回标题，失败只允许最近波前重试或返回标题，命令失败时保持模态并显示反馈。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs"
       ]
     },
     {
@@ -3136,10 +3268,11 @@
       "ChineseName": "灰盒易用性输入协调器",
       "OwnerTypeName": "GrayboxUsabilityInputCoordinator3D",
       "SceneId": "graybox-prototype-3d",
-      "InputPrioritySummary": "先完成撤离、背包、科技与建造的既有 Esc 取消链，再打开系统菜单；系统菜单统一屏蔽世界输入，撤离态仍允许 Space 战术暂停。",
+      "InputPrioritySummary": "终局结算模态最先阻断世界输入并只接收结算命令；无结算时先完成撤离、背包、科技与建造的既有 Esc 取消链，再打开系统菜单，撤离态仍允许 Space 战术暂停。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ]

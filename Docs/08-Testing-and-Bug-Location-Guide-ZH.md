@@ -40,6 +40,25 @@
 
 真实 UI 回归统一补跑 `GrayboxProductionObservabilityRuntimeInputTests` 与受影响的建筑运行时输入测试，至少检查全部配方可滚动、只有两条应急手工配方可排队、资源账本筛选、机器配方选择、科技图标、建筑图标和所有文字输入焦点不穿透。最终仍须按顺序完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役 3D 构建、官方文档生成/验证和 `RecordVerification`；在这些门完成前，不得把 IDEA-0016 写成“已验证”。本轮未修改地形源、地形导入规则、Texture2DArray Builder 或数组生成，因此日常回归不运行 `TerrainAssetDeep`；只有真正进入发布准备时才单独补跑。
 
+## IDEA-0017 终局结算、会话统计与波前重试检查边界
+
+`IDEA-0017` 当前为“已实现待验证/完整自动化与三项构建通过待人工”。测试必须把五层所有权分开：`SessionStatisticsModel` 是完整会话统计真值；生产时钟只发布单 tick 的批次、active 和 eligible 增量；战役模型拥有 terminal revision、胜负与统计冻结；结算 model/view/controller 只投影不可变终局快照并提交命令；内部最近波前 Store 只做完整 schema `32` Formal3D envelope 的文件读写与验证。UI、存档适配器和测试夹具都不得重新计算胜负、效率、修改器使用或迁移历史。
+
+聚焦 EditMode 入口按失败类型选择：
+
+- 会话统计的稳定排序、原子恢复、终局冻结、部分迁移和单向修改器标记：`SessionStatisticsTests`；
+- 生产完成批次、有效推进时间、符合运行资格时间以及暂停/停工边界：`GrayboxProductionStatisticsDeltaTests`；
+- 唯一胜负结算、完整统计目录顺序、效率无数据、坚守/机动和 terminal revision 幂等：`SingleCityDefenseSettlementTests`；
+- 全屏 blocker、标题与完整统计、按钮许可、命令防重、失败保留、关闭释放：`GrayboxDefenseSettlementUi3DTests`；
+- DefenseController 组合、正式 Input System 的建造键阻断、继续沙盒、失败重试和返回标题路由：`GrayboxDefenseSettlementRuntimeIntegrationTests`；
+- 独立内部路径、schema `32` 完整验证、未来/损坏/空档结构化失败、原子替换和失败保留旧档：`FormalSaveWaveRetryStoreTests`；
+- 战役检查点与完整统计持久化：`SingleCityDefenseCampaignCheckpointTests`；schema `32` DTO、codec、validator 和 schema `31→32` 部分统计迁移：`FormalSaveSchema32ContractTests`；防御 DTO 适配和运行时主机重试入口：`GrayboxFormalDefenseCampaignSaveAdapterTests`、`GrayboxFormalSaveRuntimeHostTests`；
+- 开发修改器只有成功且实际改变玩法状态才标记本局：`GrayboxDeveloperModifierTests`。
+
+定位顺序：数值重复、总数漂移、恢复后继续累计错误先查 `SessionStatisticsModel` 与 `SingleCityDefenseCampaignModel`；效率分母、玩家暂停或停工资格错误先查 `BuildingProductionState`、`GrayboxProductionClock3D`；标题、条目、按钮或重复点击先查 `SingleCityDefenseSettlement`、`GrayboxDefenseSettlementView3D`、`GrayboxDefenseSettlementController3D`；模态打开后建造/世界输入穿透先查 `GrayboxDefenseController3D` 与 `GrayboxUsabilityInputCoordinator3D`；继续沙盒、重试或返回标题失败先查 `GrayboxFormalSaveEntryController3D`、`GrayboxFormalSaveRuntimeHost3D`；重试档空、损坏、未来 schema 或原子写失败先查 `FormalSaveWaveRetryStore` 的结构化 code，不能从 UI 文案猜测；统计字段往返、hash 或迁移标记错误再查 `GrayboxDefenseSaveAdapter3D`、`FormalSaveCodec`、`FormalSaveValidator` 和 `FormalThreeDSaveData`。
+
+自动化通过仍不证明人工体验。最终验收至少实际操作一次胜利继续沙盒、一次失败读取最近波前、一次失败返回标题，确认结算只出现一次、标题没有写成整个游戏通关、长统计可读、失败反馈保留、关闭后世界输入恢复；再在真实 Windows 10 和 Windows 11 检查输入、视觉、GPU、显存和内存。当前地图、seed、资源节点和三维模型未改变；退役 2D 没有接入结算 UI，只保留 schema `1–30` decoder、迁移与固定样本回归。本阶段未修改地形源、导入规则、Texture2DArray Builder 或数组生成，日常 EditMode 不运行 `TerrainAssetDeep`；只有准备发布时按总门补跑。
+
 ## BUG-0007 自然开局研究站与统一放置失败反馈
 
 先用失败测试固定两个真实问题：正式 3D 会话保持人口 `100`、不调用开发人口修改时，研究站当前被目录中的 `200` 人口门槛锁定；可见但锁定的目录卡或快捷栏当前不可点击，因此不会在固定建造反馈条显示原因。最小实现只把研究站首轮最低人口改为 `0`，保留 `PopulationRequired` 和其他建筑既有门槛；同时让所有可见锁定选择和全部蓝图放置失败读取统一解锁/放置评估，并显示到位置不变、背景不接收射线的 `Placement.Status`。隐藏内容不得因本修复提前显示，研究站成本和 schema `30` 不得改变。冻结 2D 不接新 UI 或新功能，但因复用共享稳定 `BuildingCatalog`，研究站解锁配置同步采用门槛 `0` 并只做回归验证。

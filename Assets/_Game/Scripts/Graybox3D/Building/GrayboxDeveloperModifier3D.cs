@@ -13,6 +13,9 @@ namespace WasteCity.Graybox3D.Building
         private readonly GrayboxBuildingSession3D session;
         private readonly GrayboxMobileCityController3D city;
         private readonly GrayboxBuildingWorldView3D presentation;
+        private bool hasModifiedGameState;
+
+        public bool HasModifiedGameState => hasModifiedGameState;
 
         public GrayboxDeveloperModifier3D(
             GrayboxBuildingSession3D session,
@@ -30,7 +33,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!IsKnownResource(resourceId) || amount <= 0)
                 return false;
-            session.Inventory.Add(resourceId, amount);
+            RecordChange(session.Inventory.Add(resourceId, amount) > 0);
             return true;
         }
 
@@ -59,6 +62,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             int applied = session.Inventory.Add(entry.StableId, amount);
+            RecordChange(applied > 0);
             if (applied == amount)
             {
                 return Result(
@@ -92,7 +96,9 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!IsKnownResource(resourceId) || amount < 0)
                 return false;
+            int before = session.Inventory.Get(resourceId);
             session.Inventory.Set(resourceId, amount);
+            RecordChange(session.Inventory.Get(resourceId) != before);
             return true;
         }
 
@@ -120,8 +126,10 @@ namespace WasteCity.Graybox3D.Building
                     message: "设置数量必须是非负整数");
             }
 
+            int before = session.Inventory.Get(entry.StableId);
             session.Inventory.Set(entry.StableId, amount);
             int actual = session.Inventory.Get(entry.StableId);
+            RecordChange(actual != before);
             if (actual == amount)
             {
                 return Result(
@@ -146,7 +154,9 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!IsKnownResource(resourceId))
                 return false;
+            int before = session.Inventory.Get(resourceId);
             session.Inventory.Set(resourceId, 0);
+            RecordChange(before != session.Inventory.Get(resourceId));
             return true;
         }
 
@@ -154,7 +164,10 @@ namespace WasteCity.Graybox3D.Building
         {
             if (ResearchCatalog.Find(researchId) == null)
                 return false;
+            bool wasCompleted = session.IsResearchCompleted(researchId);
             session.UnlockResearchForDevelopment(researchId);
+            RecordChange(
+                !wasCompleted && session.IsResearchCompleted(researchId));
             return true;
         }
 
@@ -182,6 +195,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             session.UnlockResearchForDevelopment(entry.StableId);
+            RecordChange(session.IsResearchCompleted(entry.StableId));
             return Result(
                 GrayboxDeveloperCommandCode3D.Success,
                 true,
@@ -197,7 +211,9 @@ namespace WasteCity.Graybox3D.Building
                 route != ContentRoute.BiologicalAscension &&
                 route != ContentRoute.Psionics)
                 return false;
+            uint revision = session.CatalogRevision;
             session.UnlockRouteForDevelopment(route);
+            RecordChange(session.CatalogRevision != revision);
             return true;
         }
 
@@ -212,11 +228,13 @@ namespace WasteCity.Graybox3D.Building
                     message: "无法解锁未知路线");
             }
 
+            uint revision = session.CatalogRevision;
             int before = session.Research.CompletedCount;
             session.UnlockRouteForDevelopment(route);
             int affected = Math.Max(
                 0,
                 session.Research.CompletedCount - before);
+            RecordChange(session.CatalogRevision != revision);
             return Result(
                 affected > 0
                     ? GrayboxDeveloperCommandCode3D.Success
@@ -229,17 +247,21 @@ namespace WasteCity.Graybox3D.Building
 
         public void UnlockAllResearch()
         {
+            uint revision = session.CatalogRevision;
             session.UnlockAllResearchForDevelopment();
+            RecordChange(session.CatalogRevision != revision);
         }
 
         public GrayboxDeveloperCommandResult3D
             UnlockAllResearchWithFeedback()
         {
+            uint revision = session.CatalogRevision;
             int before = session.Research.CompletedCount;
             session.UnlockAllResearchForDevelopment();
             int affected = Math.Max(
                 0,
                 session.Research.CompletedCount - before);
+            RecordChange(session.CatalogRevision != revision);
             return Result(
                 affected > 0
                     ? GrayboxDeveloperCommandCode3D.Success
@@ -253,19 +275,30 @@ namespace WasteCity.Graybox3D.Building
         {
             if (mode != CityMode.Mobile && mode != CityMode.Fortress)
                 return false;
-            return city.RestoreDeploymentForDevelopment(mode);
+            CityMode beforeMode = city.Mode;
+            float beforeRemaining = city.Deployment.Remaining;
+            bool changed = city.RestoreDeploymentForDevelopment(mode);
+            RecordChange(
+                changed &&
+                (city.Mode != beforeMode ||
+                 city.Deployment.Remaining != beforeRemaining));
+            return changed;
         }
 
         public bool CompleteCityTransition()
         {
-            return city.CompleteDeploymentTransitionForDevelopment();
+            bool changed = city.CompleteDeploymentTransitionForDevelopment();
+            RecordChange(changed);
+            return changed;
         }
 
         public bool SetPopulation(int value)
         {
             if (value < 0)
                 return false;
+            int before = session.Population;
             session.SetPopulationForDevelopment(value);
+            RecordChange(session.Population != before);
             return true;
         }
 
@@ -275,13 +308,22 @@ namespace WasteCity.Graybox3D.Building
                 speed != DevelopmentConstructionSpeed.Fast10 &&
                 speed != DevelopmentConstructionSpeed.Fast100)
                 return false;
+            float before = session.ConstructionMultiplier;
             session.SetConstructionMultiplierForDevelopment((float)speed);
+            RecordChange(session.ConstructionMultiplier != before);
             return true;
         }
 
         public void CompleteAllConstruction()
         {
+            uint revision = session.CatalogRevision;
             session.CompleteAllConstructionForDevelopment(presentation);
+            RecordChange(session.CatalogRevision != revision);
+        }
+
+        private void RecordChange(bool changed)
+        {
+            if (changed) hasModifiedGameState = true;
         }
 
         private static bool IsKnownResource(string resourceId)

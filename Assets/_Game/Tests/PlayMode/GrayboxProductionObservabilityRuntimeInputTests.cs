@@ -1719,13 +1719,20 @@ namespace WasteCity.Tests
                 paused: false), Is.True);
             operations.RefreshIfChanged();
 
-            leader.transform.position += new Vector3(20f, 0f, 20f);
+            Vector3 inaccessibleOffset = new Vector3(20f, 0f, 20f);
+            leader.transform.position += inaccessibleOffset;
+            city.transform.position += inaccessibleOffset;
+            Assert.That(production.Tick(
+                GrayboxProductionClock3D.StepSeconds,
+                paused: false), Is.True);
+            operations.RefreshIfChanged();
             state.Input.Set(ResourceIds.Iron, 0);
             state.Output.Set(ResourceIds.Alloy, 1);
             operations.Backpack.Add(ResourceIds.Iron, 3);
             int cityAlloyBeforeDenied =
                 session.Inventory.Get(ResourceIds.Alloy);
             yield return ShiftClickUiElement(input);
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
             yield return ClickUiElement(output, MouseButton.Left);
             Assert.That(state.Input.Get(ResourceIds.Iron), Is.Zero);
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
@@ -2021,12 +2028,28 @@ namespace WasteCity.Tests
 
         private IEnumerator ShiftClickUiElement(GameObject target)
         {
+            Assert.That(target.activeInHierarchy, Is.True, target.name);
+            RectTransform rect = target.GetComponent<RectTransform>();
+            Assert.That(rect, Is.Not.Null, target.name);
+            Canvas.ForceUpdateCanvases();
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(
+                null,
+                rect.TransformPoint(rect.rect.center));
+            QueueMouse(position);
+            yield return null;
+
+            keyboard.MakeCurrent();
             InputSystem.QueueStateEvent(
                 keyboard,
                 new KeyboardState(Key.LeftShift));
             InputSystem.Update();
+            Assert.That(Keyboard.current, Is.SameAs(keyboard));
+            Assert.That(keyboard.leftShiftKey.isPressed, Is.True);
+            QueueMouse(position, MouseButton.Left);
             yield return null;
-            yield return ClickUiElement(target, MouseButton.Left);
+            QueueMouse(position);
+            yield return null;
+
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             InputSystem.Update();
             yield return null;

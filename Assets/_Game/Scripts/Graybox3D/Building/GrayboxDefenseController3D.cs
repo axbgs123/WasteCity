@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
+using UnityEngine.UI;
 using WasteCity.Combat;
 using WasteCity.Core;
 using WasteCity.Defense;
@@ -48,6 +49,13 @@ namespace WasteCity.Graybox3D.Building
         private bool hudBound;
         private bool firstMachineGunCheckpointPublished;
         private bool tutorialCombatCheckpointPublished;
+        private Func<bool> developmentModifierUsageSource;
+        private ulong lastConsumedProductionStatisticsRevision;
+        private readonly SingleCityDefenseSettlementModel settlementModel =
+            new SingleCityDefenseSettlementModel();
+        private IGrayboxDefenseSettlementCommands3D settlementCommands;
+        private GrayboxDefenseSettlementController3D settlementController;
+        private GameObject settlementRuntimeRoot;
 
         public GrayboxDefenseRuntime3D Runtime => runtime;
         public GrayboxDefenseRuntimeSnapshot3D Snapshot => snapshot;
@@ -67,6 +75,8 @@ namespace WasteCity.Graybox3D.Building
             selectionSnapshot;
         public bool IsPersistencePaused =>
             persistencePauseSource != null && persistencePauseSource();
+        public bool IsSettlementOpen =>
+            settlementController != null && settlementController.IsOpen;
         public bool IsConfigured =>
             session != null &&
             city != null &&
@@ -172,8 +182,11 @@ namespace WasteCity.Graybox3D.Building
             {
                 campaign.WaveWarningStarted -=
                     HandleCampaignWaveWarningStarted;
+                campaign.TerminalCommitted -=
+                    HandleCampaignTerminalCommitted;
             }
             runtime?.DetachPresentationRecovery();
+            DisposeSettlementPresentation();
             runtime = null;
             campaign = null;
             destructionCoordinator = null;
@@ -182,6 +195,7 @@ namespace WasteCity.Graybox3D.Building
             boundCoordinates = null;
             firstMachineGunCheckpointPublished = false;
             tutorialCombatCheckpointPublished = false;
+            lastConsumedProductionStatisticsRevision = 0ul;
             selectedKind = GrayboxDefenseSelectionKind3D.None;
             selectedStableId = null;
             selectionSnapshot = null;
@@ -191,6 +205,27 @@ namespace WasteCity.Graybox3D.Building
         public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
         {
             persistencePauseSource = pauseSource;
+        }
+
+        public void ConfigureDevelopmentModifierUsageSource(
+            Func<bool> usageSource)
+        {
+            developmentModifierUsageSource = usageSource;
+        }
+
+        public void ConfigureSettlementCommands(
+            IGrayboxDefenseSettlementCommands3D commands)
+        {
+            settlementCommands = commands;
+            if (settlementController != null && commands != null)
+            {
+                GrayboxDefenseSettlementView3D view =
+                    settlementController.GetComponent<
+                        GrayboxDefenseSettlementView3D>();
+                if (view != null)
+                    settlementController.Configure(view, commands);
+            }
+            TryPresentTerminalSettlement();
         }
 
         public void ConfigureFormalSpeedRuntime(
@@ -239,12 +274,14 @@ namespace WasteCity.Graybox3D.Building
                 if (session?.CityStorage == null ||
                     !TrySynchronizeRuntime(out _))
                     return false;
+                RegisterCrossDomainStatistics();
                 runtime.Tick(
                     ruleDeltaSeconds,
                     effectivePaused,
                     session.CityStorage);
                 snapshot = runtime.Snapshot;
                 SynchronizeFormalSpeedRuntime();
+                TryPresentTerminalSettlement();
                 if (!firstMachineGunCheckpointPublished &&
                     previousTutorialWaveTriggerCount == 0 &&
                     snapshot.TutorialWaveTriggerCount > 0 &&
@@ -277,6 +314,7 @@ namespace WasteCity.Graybox3D.Building
                     return false;
                 snapshot = runtime.Snapshot;
                 SynchronizeFormalSpeedRuntime();
+                TryPresentTerminalSettlement();
                 firstMachineGunCheckpointPublished =
                     snapshot.TutorialWaveTriggerCount > 0;
                 tutorialCombatCheckpointPublished =
@@ -396,8 +434,11 @@ namespace WasteCity.Graybox3D.Building
             {
                 campaign.WaveWarningStarted -=
                     HandleCampaignWaveWarningStarted;
+                campaign.TerminalCommitted -=
+                    HandleCampaignTerminalCommitted;
             }
             runtime?.DetachPresentationRecovery();
+            DisposeSettlementPresentation();
             session = null;
             city = null;
             world = null;
@@ -412,8 +453,10 @@ namespace WasteCity.Graybox3D.Building
             presentedSnapshot = null;
             boundCoordinates = null;
             persistencePauseSource = null;
+            developmentModifierUsageSource = null;
             firstMachineGunCheckpointPublished = false;
             tutorialCombatCheckpointPublished = false;
+            lastConsumedProductionStatisticsRevision = 0ul;
             selectedStableId = null;
             presentedStableId = null;
             selectionSnapshot = null;
@@ -444,6 +487,8 @@ namespace WasteCity.Graybox3D.Building
             campaign = new SingleCityDefenseCampaignModel(coreX, coreZ);
             campaign.WaveWarningStarted +=
                 HandleCampaignWaveWarningStarted;
+            campaign.TerminalCommitted +=
+                HandleCampaignTerminalCommitted;
             destructionCoordinator =
                 new GrayboxCombatDestructionCoordinator3D(
                     session,
@@ -463,6 +508,115 @@ namespace WasteCity.Graybox3D.Building
         private void HandleCampaignWaveWarningStarted(int waveNumber)
         {
             CampaignWaveWarningStarted?.Invoke(waveNumber);
+        }
+
+        private void HandleCampaignTerminalCommitted(
+            SingleCityDefenseCampaignResult result)
+        {
+            TryPresentTerminalSettlement();
+        }
+
+        public void NotifyDevelopmentModifierUsed()
+        {
+            campaign?.MarkDevelopmentModifierUsed();
+        }
+
+        private bool TryPresentTerminalSettlement()
+        {
+            if (campaign == null || settlementCommands == null)
+                return false;
+            SingleCityDefenseCampaignSnapshot campaignSnapshot =
+                campaign.Snapshot;
+            if (campaignSnapshot.Result ==
+                SingleCityDefenseCampaignResult.None)
+            {
+                return false;
+            }
+            if (!TryEnsureSettlementPresentation()) return false;
+
+            SessionStatisticsSnapshot sessionStatistics =
+                campaign.SessionStatistics;
+            var settlementStatistics =
+                new SingleCityDefenseSettlementSessionStatistics(
+                    sessionStatistics.CompletedProductionBatchCount,
+                    sessionStatistics.ProductionActiveProgressSeconds,
+                    sessionStatistics.ProductionEligibleSeconds,
+                    sessionStatistics.CityWasPackedAfterCampaignStart,
+                    sessionStatistics.DevelopmentModifierUsed);
+            if (!settlementModel.TryPublish(
+                    campaign.TerminalRevision,
+                    campaignSnapshot,
+                    settlementStatistics,
+                    out SingleCityDefenseSettlementSnapshot settlement))
+            {
+                return false;
+            }
+            return settlementController.Open(settlement);
+        }
+
+        private bool TryEnsureSettlementPresentation()
+        {
+            if (settlementController != null) return true;
+            Canvas canvas = hud == null
+                ? null
+                : hud.GetComponentInParent<Canvas>();
+            if (canvas == null) return false;
+
+            settlementRuntimeRoot = new GameObject(
+                "Defense.Settlement.Runtime");
+            settlementRuntimeRoot.transform.SetParent(
+                canvas.transform,
+                false);
+            var view = settlementRuntimeRoot.AddComponent<
+                GrayboxDefenseSettlementView3D>();
+            settlementController = settlementRuntimeRoot.AddComponent<
+                GrayboxDefenseSettlementController3D>();
+            view.Configure(canvas);
+            settlementController.Configure(view, settlementCommands);
+            return true;
+        }
+
+        private void DisposeSettlementPresentation()
+        {
+            settlementController?.Close();
+            settlementController = null;
+            if (settlementRuntimeRoot == null) return;
+            if (Application.isPlaying)
+                Destroy(settlementRuntimeRoot);
+            else
+                DestroyImmediate(settlementRuntimeRoot);
+            settlementRuntimeRoot = null;
+        }
+
+        private void RegisterCrossDomainStatistics()
+        {
+            if (campaign == null || campaign.IsTerminal ||
+                campaign.Snapshot.CurrentWaveNumber <= 0)
+            {
+                return;
+            }
+
+            if (developmentModifierUsageSource?.Invoke() == true)
+                campaign.MarkDevelopmentModifierUsed();
+
+            ProductionStatisticsDelta productionDelta =
+                production?.Clock.LastStatisticsDelta ??
+                ProductionStatisticsDelta.Empty;
+            ulong productionStatisticsRevision =
+                production?.Clock.StatisticsRevision ?? 0ul;
+            if (!productionDelta.IsEmpty &&
+                productionStatisticsRevision !=
+                    lastConsumedProductionStatisticsRevision)
+            {
+                campaign.RegisterProductionStatistics(
+                    productionDelta.CompletedProductionBatchCount,
+                    productionDelta.ProductionActiveProgressSeconds,
+                    productionDelta.ProductionEligibleSeconds);
+                lastConsumedProductionStatisticsRevision =
+                    productionStatisticsRevision;
+            }
+            if (city.Mode == WasteCity.City.CityMode.Mobile)
+                campaign.MarkCityPackedAfterCampaignStart();
         }
 
         private void SynchronizeFormalSpeedRuntime()

@@ -65,6 +65,7 @@ namespace WasteCity.Economy
         public bool IsLogisticsConnected { get; private set; }
         public bool IsPlayerPaused { get; private set; }
         public ProductionStopReason StopReason { get; private set; }
+        public ulong CompletionRevision { get; private set; }
 
         public void SetLogisticsConnected(bool connected)
         {
@@ -100,6 +101,7 @@ namespace WasteCity.Economy
             HasReservedInputs = false;
             reservedInputs = EmptyAmounts;
             ProgressSeconds = 0f;
+            unchecked { CompletionRevision++; }
         }
 
         public bool TryRestoreForPersistence(

@@ -87,7 +87,8 @@ namespace WasteCity.Tests
                 Is.EquivalentTo(new[]
                 {
                     "IsRuntimeAvailable",
-                    "IsPanelOpen"
+                    "IsPanelOpen",
+                    "HasModifiedGameState"
                 }));
             foreach (PropertyInfo property in bootstrapProperties)
             {
@@ -151,13 +152,18 @@ namespace WasteCity.Tests
                     typeof(GrayboxMobileCityController3D),
                     typeof(GrayboxBuildingWorldView3D)
                 }));
+            PropertyInfo[] modifierProperties = modifierType.GetProperties(
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.Public |
+                BindingFlags.DeclaredOnly);
             Assert.That(
-                modifierType.GetProperties(
-                    BindingFlags.Instance |
-                    BindingFlags.Static |
-                    BindingFlags.Public |
-                    BindingFlags.DeclaredOnly),
-                Is.Empty);
+                modifierProperties.Select(property => property.Name),
+                Is.EquivalentTo(new[] { "HasModifiedGameState" }));
+            Assert.That(modifierProperties[0].PropertyType,
+                Is.EqualTo(typeof(bool)));
+            Assert.That(modifierProperties[0].CanRead, Is.True);
+            Assert.That(modifierProperties[0].CanWrite, Is.False);
             Assert.That(
                 PublicMethodSignatures(modifierType),
                 Is.EquivalentTo(new[]
@@ -216,6 +222,11 @@ namespace WasteCity.Tests
                 NormalizeWhitespace(ExtractMemberBody(
                     releaseSource,
                     "public bool IsPanelOpen")),
+                Is.EqualTo("{ get { return false; } }"));
+            Assert.That(
+                NormalizeWhitespace(ExtractMemberBody(
+                    releaseSource,
+                    "public bool HasModifiedGameState")),
                 Is.EqualTo("{ get { return false; } }"));
             Assert.That(
                 NormalizeWhitespace(ExtractMemberBody(
@@ -781,6 +792,134 @@ namespace WasteCity.Tests
             fixture.Modifier.AddResource(ResourceIds.Iron, 1000);
             Assert.That(fixture.Session.Inventory.Get(ResourceIds.Iron),
                 Is.EqualTo(5000));
+        }
+
+        [Test]
+        public void UsageFlag_IgnoresRejectedAndSuccessfulNoChangeCommands()
+        {
+            ModifierFixture fixture = CreateFixture();
+            fixture.Session.Inventory.Set(ResourceIds.Iron, 5000);
+            fixture.Session.Inventory.Set(ResourceIds.Alloy, 0);
+            fixture.Session.UnlockAllResearchForDevelopment();
+
+            Assert.That(fixture.Modifier.HasModifiedGameState, Is.False);
+            Assert.That(fixture.Modifier.AddResource("unknown.resource", 10),
+                Is.False);
+            Assert.That(fixture.Modifier.AddResource(ResourceIds.Iron, 10),
+                Is.True);
+            Assert.That(fixture.Modifier.SetResource(ResourceIds.Iron, 5000),
+                Is.True);
+            Assert.That(fixture.Modifier.ClearResource(ResourceIds.Alloy),
+                Is.True);
+            Assert.That(fixture.Modifier.UnlockResearch(
+                "core.research.automated-machinery"), Is.True);
+            Assert.That(fixture.Modifier.UnlockRoute(ContentRoute.Technology),
+                Is.True);
+            fixture.Modifier.UnlockAllResearch();
+            Assert.That(fixture.Modifier.SetCityMode(CityMode.Mobile), Is.True);
+            Assert.That(fixture.Modifier.CompleteCityTransition(), Is.False);
+            Assert.That(fixture.Modifier.SetPopulation(
+                fixture.Session.Population), Is.True);
+            Assert.That(fixture.Modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Normal), Is.True);
+            fixture.Modifier.CompleteAllConstruction();
+
+            Assert.That(fixture.Modifier.HasModifiedGameState, Is.False);
+        }
+
+        [Test]
+        public void UsageFlag_IsMonotonicAcrossEveryMutationFamily()
+        {
+            ModifierFixture resource = CreateFixture();
+            Assert.That(resource.Modifier.AddResourceWithFeedback(
+                "铁矿", 1).AppliedAmount, Is.EqualTo(1));
+            Assert.That(resource.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture research = CreateFixture();
+            Assert.That(research.Modifier.UnlockResearchWithFeedback(
+                "基础冶金").AffectedCount, Is.EqualTo(1));
+            Assert.That(research.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture route = CreateFixture();
+            Assert.That(route.Modifier.UnlockRouteWithFeedback(
+                ContentRoute.Technology).AffectedCount, Is.GreaterThan(0));
+            Assert.That(route.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture allResearch = CreateFixture();
+            Assert.That(allResearch.Modifier.UnlockAllResearchWithFeedback()
+                .AffectedCount, Is.GreaterThan(0));
+            Assert.That(allResearch.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture city = CreateFixture();
+            Assert.That(city.Modifier.SetCityMode(CityMode.Fortress), Is.True);
+            Assert.That(city.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture population = CreateFixture();
+            Assert.That(population.Modifier.SetPopulation(201), Is.True);
+            Assert.That(population.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture speed = CreateFixture();
+            Assert.That(speed.Modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Fast10), Is.True);
+            Assert.That(speed.Modifier.HasModifiedGameState, Is.True);
+
+            ModifierFixture construction = CreateFixture();
+            Begin(construction.Session, 10, 10, construction.Presentation);
+            construction.Modifier.CompleteAllConstruction();
+            Assert.That(construction.Modifier.HasModifiedGameState, Is.True);
+
+            Assert.That(resource.Modifier.AddResource("unknown.resource", 1),
+                Is.False);
+            Assert.That(resource.Modifier.HasModifiedGameState, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator
+            Bootstrap_SearchAndPanelToggleDoNotCountButUiMutationDoes()
+        {
+            yield return new EnterPlayMode();
+            var owned = new List<UnityEngine.Object>();
+            try
+            {
+                RuntimeBootstrapFixture fixture =
+                    CreateRuntimeBootstrapFixture(owned);
+                fixture.Bootstrap.Configure(
+                    fixture.Session,
+                    fixture.City,
+                    fixture.Presentation,
+                    fixture.Canvas);
+
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.False);
+                Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
+                GameObject panel = FindPanel(fixture.Canvas);
+                InputNamed(panel, "Resource Search").text = "铁";
+                InputNamed(panel, "Research Search").text = "自动";
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.False);
+
+                ButtonNamed(panel, "Resource +100").onClick.Invoke();
+
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.True);
+                Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.True);
+
+                fixture.Bootstrap.enabled = false;
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.True);
+                fixture.Bootstrap.enabled = true;
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.True);
+
+                GrayboxBuildingSession3D replacementSession =
+                    CreateRuntimeSession(owned, "Replacement Session");
+                fixture.Bootstrap.Configure(
+                    replacementSession,
+                    fixture.City,
+                    fixture.Presentation,
+                    fixture.Canvas);
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.False);
+            }
+            finally
+            {
+                DestroyRuntimeObjects(owned);
+            }
         }
 
         [Test]

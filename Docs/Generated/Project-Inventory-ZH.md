@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`cfc90ae00beb05b5c43de53226e5e683dee3ee7950ac69121c371fc5b462bbf8`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`4df6c2c034a9e4042c49e93c07026a04bd74089e49091b4061c2732719632747`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -50,6 +50,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
@@ -113,6 +115,7 @@
 - `Assets/_Game/Scripts/Defense/FirstDefenseWaveRuntime.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignPersistenceState.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseSettlement.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerCombatModel.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerPersistenceState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
@@ -121,6 +124,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSelectionProjection3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - 经济生产与物流（`economy-production-logistics`）：
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
@@ -192,6 +197,7 @@
 - `Assets/_Game/Scripts/Persistence/FormalSaveFileTransaction.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveStore.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs`
+- `Assets/_Game/Scripts/Persistence/FormalSaveWaveRetryStore.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/BuildingSnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/EnemySnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/FriendlyUnitSnapshot.cs`
@@ -263,6 +269,8 @@
 - 界面与输入（`ui-input`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
@@ -304,6 +312,8 @@
 - `WasteCity.Graybox3D.Building.GrayboxDefenseHud3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseHudView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefensePickTarget3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxDefenseSettlementController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxDefenseSettlementView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
@@ -343,6 +353,7 @@
 ## 7. 界面所有者
 - 灰盒建筑菜单：`GrayboxBuildingMenuView3D`，场景 `graybox-prototype-3d`
 - 灰盒首版防御 HUD：`GrayboxDefenseHudView3D`，场景 `graybox-prototype-3d`
+- 灰盒防御终局结算模态：`GrayboxDefenseSettlementController3D`，场景 `graybox-prototype-3d`
 - 正式三维存档启动与退出入口：`GrayboxFormalSaveEntryController3D`，场景 `graybox-prototype-3d`
 - 灰盒输入路由：`GrayboxInputRouter`，场景 `graybox-prototype-3d`
 - 灰盒系统菜单：`GrayboxSystemMenuView3D`，场景 `graybox-prototype-3d`

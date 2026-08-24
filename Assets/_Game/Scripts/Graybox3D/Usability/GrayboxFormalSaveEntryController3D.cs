@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using WasteCity.Core;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
@@ -102,6 +103,44 @@ namespace WasteCity.Graybox3D.Usability
                 runtimeHost.LastCoordinatorResult);
             RefreshView();
             return result;
+        }
+
+        public GrayboxFormalSaveUiResult3D RetryWaveCheckpoint()
+        {
+            if (!IsRuntimeReady || runtimeHost == null)
+            {
+                return new GrayboxFormalSaveUiResult3D(
+                    false,
+                    "正式 3D 存档服务尚未就绪");
+            }
+
+            bool succeeded = runtimeHost.TryRetryWaveCheckpoint();
+            GrayboxFormalSaveUiResult3D result =
+                !succeeded && runtimeHost.LastCoordinatorResult != null &&
+                !runtimeHost.LastCoordinatorResult.Success
+                    ? MapCoordinatorResult(
+                        runtimeHost.LastCoordinatorResult)
+                    : new GrayboxFormalSaveUiResult3D(
+                        succeeded,
+                        runtimeHost.LastWaveRetryStoreResult?.Message);
+            FeedbackMessage = result.Message;
+            RefreshView();
+            return result;
+        }
+
+        public bool ReturnToTitle()
+        {
+            if (runtimeHost == null) return false;
+            runtimeHost.Speed.SetPaused(GamePauseReason.Title, true);
+            Time.timeScale = runtimeHost.Speed.Speed;
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (activeScene.buildIndex >= 0)
+                SceneManager.LoadScene(activeScene.buildIndex);
+            else if (!string.IsNullOrWhiteSpace(activeScene.name))
+                SceneManager.LoadScene(activeScene.name);
+            else
+                return false;
+            return true;
         }
 
         private void Awake()

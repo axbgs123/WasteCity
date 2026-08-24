@@ -12,6 +12,7 @@ using UnityEngine.TestTools;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
@@ -135,6 +136,64 @@ namespace WasteCity.Tests
             Assert.That(huds[0].WarningVisible, Is.True);
             Assert.That(RequireSceneObject(WarningName).activeInHierarchy,
                 Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator SettlementContinueButtonUsesRealPointerInputLoop()
+        {
+            GrayboxDefenseController3D defense =
+                Object.FindObjectOfType<GrayboxDefenseController3D>();
+            Canvas canvas = defense.Hud.GetComponentInParent<Canvas>();
+            var root = new GameObject("Defense.Settlement.PointerTest");
+            root.transform.SetParent(canvas.transform, false);
+            var view = root.AddComponent<GrayboxDefenseSettlementView3D>();
+            var controller = root.AddComponent<
+                GrayboxDefenseSettlementController3D>();
+            var commands = new SuccessfulSettlementCommands();
+            view.Configure(canvas);
+            controller.Configure(view, commands);
+
+            Assert.That(controller.Open(CreateVictorySettlement()), Is.True);
+            yield return null;
+            Button button = Object.FindObjectsOfType<Button>(true)
+                .Single(value => value.name ==
+                    "Defense.Settlement.Action.ContinueSandbox");
+
+            yield return ClickUiElement(button.gameObject);
+
+            Assert.That(commands.CallCount, Is.EqualTo(1));
+            Assert.That(commands.LastAction, Is.EqualTo(
+                SingleCityDefenseSettlementAction.ContinueSandbox));
+            Assert.That(controller.IsOpen, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator SettlementRetryButtonUsesRealPointerInputLoop()
+        {
+            GrayboxDefenseController3D defense =
+                Object.FindObjectOfType<GrayboxDefenseController3D>();
+            Canvas canvas = defense.Hud.GetComponentInParent<Canvas>();
+            var root = new GameObject("Defense.Settlement.RetryPointerTest");
+            root.transform.SetParent(canvas.transform, false);
+            var view = root.AddComponent<GrayboxDefenseSettlementView3D>();
+            var controller = root.AddComponent<
+                GrayboxDefenseSettlementController3D>();
+            var commands = new SuccessfulSettlementCommands();
+            view.Configure(canvas);
+            controller.Configure(view, commands);
+
+            Assert.That(controller.Open(CreateDefeatSettlement()), Is.True);
+            yield return null;
+            Button button = Object.FindObjectsOfType<Button>(true)
+                .Single(value => value.name ==
+                    "Defense.Settlement.Action.RetryWaveCheckpoint");
+
+            yield return ClickUiElement(button.gameObject);
+
+            Assert.That(commands.CallCount, Is.EqualTo(1));
+            Assert.That(commands.LastAction, Is.EqualTo(
+                SingleCityDefenseSettlementAction.RetryWaveCheckpoint));
+            Assert.That(controller.IsOpen, Is.False);
         }
 
         [UnityTest]
@@ -671,6 +730,94 @@ namespace WasteCity.Tests
             InputSystem.Update();
         }
 
+        private static SingleCityDefenseSettlementSnapshot
+            CreateVictorySettlement()
+        {
+            var metrics = new Dictionary<string, int>();
+            var statistics =
+                new SingleCityDefenseCampaignStatisticsSnapshot(
+                    42f,
+                    10,
+                    0,
+                    metrics,
+                    metrics,
+                    metrics,
+                    metrics,
+                    0,
+                    2000,
+                    2000,
+                    0,
+                    false);
+            var campaign = new SingleCityDefenseCampaignSnapshot(
+                10,
+                SingleCityDefenseCampaignPhase.Victory,
+                0f,
+                0,
+                0,
+                0,
+                2000,
+                2000,
+                SingleCityDefenseCampaignResult.Victory,
+                null,
+                statistics);
+            var model = new SingleCityDefenseSettlementModel();
+            Assert.That(model.TryPublish(
+                1ul,
+                campaign,
+                new SingleCityDefenseSettlementSessionStatistics(
+                    0,
+                    0f,
+                    0f,
+                    false,
+                    false),
+                out SingleCityDefenseSettlementSnapshot snapshot), Is.True);
+            return snapshot;
+        }
+
+        private static SingleCityDefenseSettlementSnapshot
+            CreateDefeatSettlement()
+        {
+            var metrics = new Dictionary<string, int>();
+            var statistics =
+                new SingleCityDefenseCampaignStatisticsSnapshot(
+                    42f,
+                    4,
+                    0,
+                    metrics,
+                    metrics,
+                    metrics,
+                    metrics,
+                    1,
+                    0,
+                    2000,
+                    0,
+                    false);
+            var campaign = new SingleCityDefenseCampaignSnapshot(
+                5,
+                SingleCityDefenseCampaignPhase.Defeat,
+                0f,
+                0,
+                0,
+                0,
+                0,
+                2000,
+                SingleCityDefenseCampaignResult.Defeat,
+                null,
+                statistics);
+            var model = new SingleCityDefenseSettlementModel();
+            Assert.That(model.TryPublish(
+                1ul,
+                campaign,
+                new SingleCityDefenseSettlementSessionStatistics(
+                    0,
+                    0f,
+                    0f,
+                    false,
+                    false),
+                out SingleCityDefenseSettlementSnapshot snapshot), Is.True);
+            return snapshot;
+        }
+
         private static GameObject RequireSceneObject(
             string name,
             bool includeInactive = false)
@@ -700,6 +847,27 @@ namespace WasteCity.Tests
             public int CoreHealth { get; }
             public float EnemyX { get; }
             public float EnemyZ { get; }
+        }
+
+        private sealed class SuccessfulSettlementCommands :
+            IGrayboxDefenseSettlementCommands3D
+        {
+            public int CallCount { get; private set; }
+            public SingleCityDefenseSettlementAction LastAction
+            {
+                get;
+                private set;
+            }
+
+            public GrayboxDefenseSettlementCommandResult3D Execute(
+                SingleCityDefenseSettlementAction action)
+            {
+                CallCount++;
+                LastAction = action;
+                return new GrayboxDefenseSettlementCommandResult3D(
+                    true,
+                    "已继续沙盒模式");
+            }
         }
     }
 }

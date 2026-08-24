@@ -25,6 +25,7 @@ namespace WasteCity.Graybox3D.Building
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private GrayboxDeveloperModifier3D modifier;
+        private bool retainedModifiedGameState;
         private GameObject panelRoot;
         private CatalogRow[] resourceRows;
         private CatalogRow[] researchRows;
@@ -65,6 +66,19 @@ namespace WasteCity.Graybox3D.Building
             }
         }
 
+        public bool HasModifiedGameState
+        {
+            get
+            {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                return retainedModifiedGameState ||
+                    (modifier != null && modifier.HasModifiedGameState);
+#else
+                return false;
+#endif
+            }
+        }
+
         public static bool ResolveRuntimeAvailability(
             bool isEditor,
             bool isDevelopmentBuild)
@@ -78,6 +92,7 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingWorldView3D presentation,
             Canvas canvas)
         {
+            bool sessionChanged = this.session != session;
             if (this.session == session &&
                 this.city == city &&
                 this.presentation == presentation &&
@@ -85,6 +100,8 @@ namespace WasteCity.Graybox3D.Building
                 return;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DisposeDevelopmentSurface();
+            if (sessionChanged)
+                retainedModifiedGameState = false;
 #endif
             this.session = session;
             this.city = city;
@@ -161,6 +178,8 @@ namespace WasteCity.Graybox3D.Building
 
         private void DisposeDevelopmentSurface()
         {
+            if (modifier != null && modifier.HasModifiedGameState)
+                retainedModifiedGameState = true;
             modifier = null;
             if (panelRoot == null)
                 return;

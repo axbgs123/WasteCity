@@ -145,6 +145,7 @@ namespace WasteCity.Tests
             RequireField(statisticsType, "coreDamageTaken");
             RequireField(statisticsType, "buildingLossesByBuildingId");
             RequireField(statisticsType, "damageByTowerBuildingId");
+            RequireField(statisticsType, "killsByTowerBuildingId");
             RequireField(statisticsType, "consumablesSpentByResourceId");
             RequireField(statisticsType, "completedProductionBatchCount");
             RequireField(statisticsType, "productionActiveProgressSeconds");
@@ -254,6 +255,24 @@ namespace WasteCity.Tests
             Assert.That(ReadBoolean(statistics, "partialFromMigration"), Is.True,
                 "Unavailable pre-schema-32 combat statistics must be marked " +
                 "partial instead of being presented as complete zeroes.");
+            Assert.That(
+                ReadArray(statistics, "killsByTowerBuildingId").Length,
+                Is.Zero);
+            Assert.That(
+                ReadInteger(statistics, "completedProductionBatchCount"),
+                Is.Zero);
+            Assert.That(
+                ReadSingle(statistics, "productionActiveProgressSeconds"),
+                Is.Zero);
+            Assert.That(
+                ReadSingle(statistics, "productionEligibleSeconds"),
+                Is.Zero);
+            Assert.That(
+                ReadBoolean(statistics, "cityWasPackedAfterCampaignStart"),
+                Is.False);
+            Assert.That(
+                ReadBoolean(statistics, "developmentModifierUsed"),
+                Is.False);
         }
 
         [Test]
@@ -552,6 +571,49 @@ namespace WasteCity.Tests
 
             Assert.That(result.IsValid, Is.False,
                 "Requested speed must be normalized to 0, 1, or 2.");
+        }
+
+        [Test]
+        public void ValidatorRejectsProductionActiveTimeAboveEligibleTime()
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            FormalThreeDDefenseCampaignStatisticsSaveData statistics =
+                envelope.formal3D.defenseCampaign.statistics;
+            statistics.productionActiveProgressSeconds = 3f;
+            statistics.productionEligibleSeconds = 2f;
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Production active time cannot exceed eligible time.");
+        }
+
+        [Test]
+        public void ValidatorRejectsCompleteTowerKillTotalMismatch()
+        {
+            FormalSaveEnvelope envelope = MigratedFixtureEnvelope();
+            FormalThreeDDefenseCampaignStatisticsSaveData statistics =
+                envelope.formal3D.defenseCampaign.statistics;
+            statistics.partialFromMigration = false;
+            statistics.defeatedEnemyCount = 2;
+            statistics.killsByTowerBuildingId = new[]
+            {
+                new FormalThreeDDefenseCampaignMetricSaveData
+                {
+                    stableId = BuildingCatalog.MachineGunTurret.Id.Value,
+                    amount = 1,
+                },
+            };
+            Rehash(envelope);
+
+            FormalSaveValidationResult result =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(result.IsValid, Is.False,
+                "Complete schema 32 statistics cannot claim a tower kill " +
+                "total different from total defeated enemies.");
         }
 
         [Test]

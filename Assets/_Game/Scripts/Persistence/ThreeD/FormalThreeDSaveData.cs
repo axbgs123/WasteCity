@@ -299,6 +299,9 @@ namespace WasteCity.Persistence.ThreeD
             damageByTowerBuildingId =
                 Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
         public FormalThreeDDefenseCampaignMetricSaveData[]
+            killsByTowerBuildingId =
+                Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
+        public FormalThreeDDefenseCampaignMetricSaveData[]
             consumablesSpentByResourceId =
                 Array.Empty<FormalThreeDDefenseCampaignMetricSaveData>();
         public int completedProductionBatchCount;

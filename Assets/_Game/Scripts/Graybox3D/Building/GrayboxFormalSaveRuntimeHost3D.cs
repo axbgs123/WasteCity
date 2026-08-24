@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Core;
+using WasteCity.Defense;
 using WasteCity.Persistence;
 
 namespace WasteCity.Graybox3D.Building
@@ -52,6 +53,7 @@ namespace WasteCity.Graybox3D.Building
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
             new GrayboxFormalSaveWriteIntentLatch3D();
         private FormalSaveStore store;
+        private FormalSaveWaveRetryStore waveRetryStore;
         private GameSpeedModel speed;
         private GrayboxFormalRuleClock3D ruleClock;
         private GrayboxCampaignTerminalSpeedGate3D terminalSpeedGate;
@@ -60,6 +62,7 @@ namespace WasteCity.Graybox3D.Building
         private string currentSessionId = string.Empty;
         private bool automaticCheckpointFailureBlocked;
         private ulong automaticCheckpointFailureRevision;
+        private bool lastCheckpointHadRetryArtifactFailure;
 
         public GameSpeedModel Speed => speed ??= new GameSpeedModel();
         public GrayboxFormalRuleClock3D RuleClock =>
@@ -69,6 +72,11 @@ namespace WasteCity.Graybox3D.Building
                 new GrayboxCampaignTerminalSpeedGate3D(Speed);
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
+        public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
+        {
+            get;
+            private set;
+        }
         public GrayboxFormalSaveCoordinatorResult3D LastCoordinatorResult
         {
             get;
@@ -227,6 +235,58 @@ namespace WasteCity.Graybox3D.Building
             return true;
         }
 
+        public bool TryRetryWaveCheckpoint()
+        {
+            if (!TryInitialize() || HasCoordinatorSafetyBarrier())
+                return false;
+
+            LastWaveRetryStoreResult = waveRetryStore.Load();
+            if (!LastWaveRetryStoreResult.Success ||
+                LastWaveRetryStoreResult.Envelope == null)
+            {
+                return false;
+            }
+
+            FormalSaveEnvelope retryEnvelope =
+                LastWaveRetryStoreResult.Envelope;
+            int currentWaveNumber =
+                defense?.CampaignSnapshot?.CurrentWaveNumber ?? 0;
+            if (string.IsNullOrWhiteSpace(currentSessionId) ||
+                !string.Equals(
+                    retryEnvelope.formal3D?.sessionId,
+                    currentSessionId,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    retryEnvelope.checkpoint?.reasonId,
+                    FormalSaveCheckpointReasonIds
+                        .CampaignWaveWarningStarted,
+                    StringComparison.Ordinal) ||
+                retryEnvelope.formal3D?.defenseCampaign == null ||
+                currentWaveNumber <= 0 ||
+                retryEnvelope.formal3D.defenseCampaign.currentWaveNumber !=
+                    currentWaveNumber ||
+                retryEnvelope.formal3D.defenseCampaign.phase !=
+                    (int)SingleCityDefenseCampaignPhase.Warning)
+            {
+                LastWaveRetryStoreResult =
+                    FormalSaveWaveRetryStoreResult.InvalidCurrentCampaign(
+                        "最近波前重试档不属于当前战役波次");
+                return false;
+            }
+
+            LastCoordinatorResult = coordinator.RestoreEnvelope(
+                retryEnvelope);
+            if (!LastCoordinatorResult.Success) return false;
+
+            currentSessionId =
+                retryEnvelope.formal3D.sessionId;
+            writeIntent.AdoptContinuedProgress();
+            automaticCheckpointFailureBlocked = false;
+            automaticCheckpointFailureRevision = 0;
+            SetCheckpointWarning(false);
+            return true;
+        }
+
         public bool TrySaveAndExit()
         {
             if (!TryInitialize() ||
@@ -269,7 +329,8 @@ namespace WasteCity.Graybox3D.Building
             else if (succeeded)
             {
                 automaticCheckpointFailureRevision = 0;
-                SetCheckpointWarning(false);
+                SetCheckpointWarning(
+                    lastCheckpointHadRetryArtifactFailure);
             }
             return succeeded;
         }
@@ -312,6 +373,7 @@ namespace WasteCity.Graybox3D.Building
             checkpointPolicy = null;
             coordinator = null;
             store = null;
+            waveRetryStore = null;
             ruleClock = null;
             terminalSpeedGate?.Synchronize(null);
             terminalSpeedGate = null;
@@ -324,6 +386,7 @@ namespace WasteCity.Graybox3D.Building
             FormalSaveCheckpointMetadata checkpoint)
         {
             LastStoreResult = null;
+            lastCheckpointHadRetryArtifactFailure = false;
             string gameVersion = ResolveGameVersion();
             LastCoordinatorResult = coordinator.CaptureEnvelope(
                 currentSessionId,
@@ -339,13 +402,33 @@ namespace WasteCity.Graybox3D.Building
                 writeIntent.ArchiveLegacy2D,
                 writeIntent.Intent);
             writeIntent.CompleteWrite(LastStoreResult.Success);
+            bool checkpointSucceeded = LastStoreResult.Success;
+            bool retryArtifactSucceeded = true;
             if (LastStoreResult.Success)
             {
-                automaticCheckpointFailureBlocked = false;
-                automaticCheckpointFailureRevision = 0;
-                SetCheckpointWarning(false);
+                if (string.Equals(
+                        checkpoint.reasonId,
+                        FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted,
+                        StringComparison.Ordinal))
+                {
+                    LastWaveRetryStoreResult = waveRetryStore.Save(
+                        LastCoordinatorResult.Envelope);
+                    retryArtifactSucceeded =
+                        LastWaveRetryStoreResult.Success;
+                }
+                if (retryArtifactSucceeded)
+                {
+                    automaticCheckpointFailureBlocked = false;
+                    automaticCheckpointFailureRevision = 0;
+                    SetCheckpointWarning(false);
+                }
+                else
+                {
+                    lastCheckpointHadRetryArtifactFailure = true;
+                    SetCheckpointWarning(true);
+                }
             }
-            return LastStoreResult.Success;
+            return checkpointSucceeded;
         }
 
         private bool HasCoordinatorSafetyBarrier()
@@ -420,6 +503,7 @@ namespace WasteCity.Graybox3D.Building
                 : storeRootOverrideForTesting;
             store ??= new FormalSaveStore(
                 root);
+            waveRetryStore ??= new FormalSaveWaveRetryStore(root);
         }
 
         private static void ConfigureStoreRootForTesting(string root)
