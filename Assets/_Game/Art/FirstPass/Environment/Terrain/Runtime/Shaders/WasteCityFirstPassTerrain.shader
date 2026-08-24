@@ -22,7 +22,7 @@ Shader "WasteCity/Terrain/FirstPassBlend"
         _WetlandTint("Wetland Tint", Color) = (0.31,0.40,0.20,0.30)
         _CrystalTint("Crystal Tint", Color) = (0.38,0.66,0.70,0.24)
         _RuinsTint("Ruins Tint", Color) = (0.43,0.40,0.37,0.22)
-        _DeepWaterTint("Deep Water Tint", Color) = (0.04,0.12,0.22,0.62)
+        _DeepWaterTint("Deep Water Tint", Color) = (0.025,0.07,0.25,0.82)
         _CliffTint("Cliff Tint", Color) = (0.24,0.19,0.15,0.30)
         _DeepWaterNormalStrength("Deep Water Normal Strength", Float) = 1.45
     }

@@ -89,7 +89,7 @@ namespace WasteCity.Tests
             AssertColorProperty(shader, "_WetlandTint", new Color(.31f, .40f, .20f, .30f));
             AssertColorProperty(shader, "_CrystalTint", new Color(.38f, .66f, .70f, .24f));
             AssertColorProperty(shader, "_RuinsTint", new Color(.43f, .40f, .37f, .22f));
-            AssertColorProperty(shader, "_DeepWaterTint", new Color(.04f, .12f, .22f, .62f));
+            AssertColorProperty(shader, "_DeepWaterTint", new Color(.025f, .07f, .25f, .82f));
             AssertColorProperty(shader, "_CliffTint", new Color(.24f, .19f, .15f, .30f));
             AssertFloatProperty(shader, "_DeepWaterNormalStrength", 1.45f);
         }

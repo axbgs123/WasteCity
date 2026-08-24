@@ -24,7 +24,7 @@ namespace WasteCity.ArtIntegration3D
                 case FirstArtTerrainLayer3D.Ruins:
                     return new Color(.43f, .40f, .37f, 1f);
                 case FirstArtTerrainLayer3D.DeepWater:
-                    return new Color(.04f, .12f, .22f, 1f);
+                    return new Color(.025f, .07f, .25f, 1f);
                 case FirstArtTerrainLayer3D.Cliff:
                     return new Color(.24f, .19f, .15f, 1f);
                 default:
@@ -50,7 +50,7 @@ namespace WasteCity.ArtIntegration3D
                 case FirstArtTerrainLayer3D.Ruins:
                     return .22f;
                 case FirstArtTerrainLayer3D.DeepWater:
-                    return .62f;
+                    return .82f;
                 case FirstArtTerrainLayer3D.Cliff:
                     return .30f;
                 default:
