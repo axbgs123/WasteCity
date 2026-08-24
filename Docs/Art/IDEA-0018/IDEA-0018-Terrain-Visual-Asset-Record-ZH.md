@@ -66,4 +66,6 @@
 - GREEN：`IDEA0018_ConceptGeneration_IsByteIdenticalAcrossConsecutiveRuns`、`IDEA0018_SourceChannelsMatchTheRebuiltCartographicBaseColors` 与 `BuildTextureArrays_UsesFrozenLayerOrderAndFormats` 共 `3/3` 通过；前者同时逐字节核对两次生成、仓库 28 张正式 PNG 和七份未改写 concept。记录为 `/tmp/wastecity-idea18/terrain-idempotence/final-focused-with-delivery.xml`。
 - 合同覆盖七层 BaseColor↔Height 相关性、Height↔Normal 梯度相关性、低振幅高频范围、四通道 Repeat 接缝、BaseColor 96 像素边缘带梯度、Mask RGBA 语义、Texture2DArray 冻结层顺序和格式。
 
-完成前仍必须通过：完整 `TerrainAssetDeep`、固定运行时截图与资源标记三档证据、日常完整 EditMode、完整 PlayMode、项目质量门和三项现役 3D 构建。以上聚焦自动化和开发机运行不能替代用户对比例、色差、接缝、地貌辨认和遮挡的人工结论。
+最终自动化与构建已经完成：完整 `TerrainAssetDeep` `20/20`、日常 EditMode `2515/2515`、完整 PlayMode `88/88`、项目质量分析与无界面编译通过；Windows Release 3D、Windows Development 3D、macOS universal 3D 三项构建成功。真实 Unity GUI 在 `/tmp/wastecity-first-terrain/visual-review` 生成 15 张固定截图、10 帧缩放轨迹、Near/Mid/Far 三档、300 连续水面帧、MP4 和 manifest；技术视觉门、DeepWater 蓝黑颜色门和动态门通过。准确实现提交为 `2d340d8844dae00ff7760ed44709e441ad877d72`。
+
+上述自动化、开发机截图和跨平台构建不能替代用户对比例、色差、接缝、地貌辨认和遮挡的人工结论，也不能替代真实 Windows 10/11 的视觉、GPU、显存和内存复验；状态继续是“已生成并接入，待用户视觉验收”。

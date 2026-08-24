@@ -20,6 +20,14 @@
 
 先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景。单功能检查优先看失败报告中的“只重跑这个失败”：报告实际会在“建议复跑”下给出一个可直接复制的单类筛选。若还没有失败报告，或要补跑相关类，就在[测试自动清单](Generated/Test-Inventory-ZH.md)的“精确测试文件与测试类”表找到对应类名，手动把一到数个类名用 `|` 连起来。该附录的“可复制的测试筛选命令”目前只有全部测试类的聚合筛选，不能当作单功能命令。建造、城市、UI、地形、美术、存档和 legacy schema 兼容的最低检查并不相同；先跑单功能，再跑相关检查，最后才完整回归。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
 
+## IDEA-0018 地图视觉、镜头层级与 UI 比例检查边界
+
+`IDEA-0018` 当前为“已实现待验证”。地图玩法仍固定为 `64×48`、seed `8128`、3072 格和 schema `32`；任何资源节点、通行、放置、建筑坐标或 world signature 变化都不是本轮视觉重制。地形源、四通道生成器或数组变化必须运行 `FirstArtTerrainVisualStyleTests`、`FirstArtTerrainAssetBuilderTests` 和完整 `TerrainAssetDeep`；Shader/材质与七层综合色运行 `FirstArtTerrainShaderTests`。镜头滚轮、模态阻断、Near/Mid/Far 与定向采矿覆盖运行 `GrayboxCameraAndInputTests`、`GrayboxVisualAndWorldTests`、`GrayboxBuildingProjectionAndViewTests` 和 `GrayboxRuntimeSceneTests`。
+
+UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests` 与 `GrayboxSceneContractTests`；目录、生产、修改器和防御的点击/滚动必须继续通过真实 Input System 的 `GrayboxBuildingRuntimeSceneTests`、`GrayboxProductionObservabilityRuntimeInputTests`、`GrayboxDeveloperModifierRuntimeInputTests` 与 `GrayboxDefenseRuntimeInputTests`。建造栏保持 `620×54` 和既有位置；大型面板使用安全区/滚动，不能用整体缩小绕过字号问题。
+
+发布级证据还要在真实 Unity GUI 运行 `FirstArtTerrainEvidenceCapture.StartAutomatedCapture`，并显式提供仓库外的 `WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT`。工具使用隔离临时存档进入游戏，不得读写用户真实存档；manifest 必须包含 15 张截图、10 帧缩放、Near/Mid/Far、300 连续水面帧、颜色/动态门和逐文件 SHA-256。自动截图只能证明技术合同，最终仍需用户检查地貌区分、接缝、遮挡、字体与比例，并在真实 Windows 10/11 检查 GPU、显存和内存。
+
 ## IDEA-0011 生产与界面的检查边界
 
 `IDEA-0011` 的生产、背包、应急合成、六节点兼容研究和资源状态栏已经实现待验证；`IDEA-0016` 当前正在把它扩展为 31 种资源、30 条配方、正式研究运行时和 43 节点科技树。排查正式研究规则、初始根、倍率、暂停、退款或 schema `31` 恢复时，优先运行 `FormalResearchRuntimeTests` 与 `GrayboxFormalResearchSaveAdapterTests`；排查节点数、依赖边、确定布局、缩放或视图层级时，运行 `ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`；排查真实 T、搜索字符、双 Esc、拖动、滚轮、Home、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`。历史 `DemoResearchRuntimeTests` 继续作为六节点和退役内容兼容回归，不得替代正式目录测试。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。
