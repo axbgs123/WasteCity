@@ -1107,6 +1107,7 @@ MonoBehaviour:
   leader: {fileID: 883727725}
   directControl: {fileID: 1650269103}
   groundProjector: {fileID: 1717524127}
+  mapNavigationProfile: {fileID: 0}
 --- !u!1 &658050418
 GameObject:
   m_ObjectHideFlags: 0
@@ -1719,6 +1720,7 @@ MonoBehaviour:
   obstacleRoot: {fileID: 842902525}
   sharedMaterial: {fileID: 2100000, guid: 752d4ddbbb84842099ba69793267c952, type: 2}
   resourceIconCatalog: {fileID: 11400000, guid: 14424676478b94d528670f05d60a8bc5, type: 2}
+  mapNavigationProfile: {fileID: 0}
 --- !u!4 &962754567
 Transform:
   m_ObjectHideFlags: 0
