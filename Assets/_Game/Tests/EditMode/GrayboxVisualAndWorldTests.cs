@@ -481,19 +481,19 @@ namespace WasteCity.Tests
             Assert.That(marker.DisplayText, Is.EqualTo("100"));
             Assert.That(
                 ProjectedPixelHeight(frame, orthographicSize, pixelHeight),
-                Is.InRange(36f, 40f),
-                "The frame should read as a quiet 38 px boundary.");
+                Is.InRange(54f, 58f),
+                "The frame should keep enough room around the opaque icon.");
             Assert.That(
                 ProjectedPixelHeight(icon, orthographicSize, pixelHeight),
-                Is.InRange(27f, 29f),
-                "The item icon should remain readable without covering a cell.");
+                Is.InRange(41f, 43f),
+                "The opaque item art should remain readable in a compact window.");
             Assert.That(
                 ProjectedPixelHeight(
                     labelRenderer,
                     orthographicSize,
                     pixelHeight),
-                Is.InRange(16f, 18f),
-                "The amount needs a 16-18 px visual cap height.");
+                Is.InRange(19f, 21f),
+                "The amount needs a compact but legible visual cap height.");
 
             FormalWorldMarkerMetrics3D metrics = profile.ResolveMarker(
                 FormalWorldPresentationScalePolicy3D.WorldUnitScreenHeight(
@@ -517,6 +517,68 @@ namespace WasteCity.Tests
                 Is.GreaterThan(.0001f),
                 "TextMesh characterSize is a font scale, not a requested " +
                 "world-space cap height; it requires calibrated conversion.");
+        }
+
+        [Test]
+        public void IDEA0019_MarkerTextUsesResourceTintAndOnePixelShadow()
+        {
+            const int pixelWidth = 1280;
+            const int pixelHeight = 800;
+            const float orthographicSize = 13f;
+            GrayboxWorldView3D view = CreateView();
+            view.ConfigureWorldPresentation(Track(
+                ScriptableObject.CreateInstance<
+                    FormalWorldPresentationScaleProfile3D>()));
+            view.Generate(CreateCatalogMap());
+            Assert.That(
+                view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            view.RefreshResourceNodeMarkerPresentation(
+                orthographicSize,
+                pixelWidth,
+                pixelHeight);
+
+            TextMesh foreground = marker.transform.Find("NameAndAmount")
+                .GetComponent<TextMesh>();
+            Transform shadowTransform = marker.transform.Find(
+                "NameAndAmountShadow");
+            Assert.That(shadowTransform, Is.Not.Null);
+            TextMesh shadow = shadowTransform.GetComponent<TextMesh>();
+            Assert.That(shadow, Is.Not.Null);
+            Assert.That(shadow.text, Is.EqualTo(foreground.text));
+            Assert.That(
+                shadow.characterSize,
+                Is.EqualTo(foreground.characterSize).Within(.0001f));
+            Assert.That(shadow.fontStyle, Is.EqualTo(FontStyle.Bold));
+            Assert.That(foreground.fontStyle, Is.EqualTo(FontStyle.Bold));
+            Assert.That(
+                Vector4.Distance(
+                    foreground.color,
+                    Color.Lerp(
+                        ResourceIconCatalog3D.FallbackColor(ResourceIds.Stone),
+                        Color.white,
+                        .7f)),
+                Is.LessThan(.01f));
+            Assert.That(
+                Vector4.Distance(
+                    shadow.color,
+                    new Color(
+                        16f / 255f,
+                        24f / 255f,
+                        32f / 255f,
+                        .88f)),
+                Is.LessThan(.01f));
+            Assert.That(shadow.GetComponent<MeshRenderer>().enabled, Is.True);
+            Vector3 shadowOffset = shadow.transform.localPosition -
+                foreground.transform.localPosition;
+            float projectedOffset = new Vector2(
+                shadowOffset.x,
+                shadowOffset.y).magnitude * pixelHeight /
+                (2f * orthographicSize);
+            Assert.That(projectedOffset, Is.InRange(1f, 2f));
         }
 
         [Test]
