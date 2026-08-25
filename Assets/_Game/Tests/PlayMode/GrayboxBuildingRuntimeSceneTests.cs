@@ -2017,18 +2017,22 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
-            for (var radius = 2; radius <= sessionRadius(placement); radius++)
-            for (var x = cityX - radius; x <= cityX + radius; x++)
-            for (var y = cityY - radius; y <= cityY + radius; y++)
+            foreach (Vector2Int candidate in GroundPreviewCandidates(
+                         cityX,
+                         cityY,
+                         2,
+                         sessionRadius(placement)))
             {
                 if (!world.Coordinates.TryCellToWorld(
-                        x,
-                        y,
+                        candidate.x,
+                        candidate.y,
                         0f,
                         out Vector3 corner))
                     continue;
-                Vector2 screen = Camera.main.WorldToScreenPoint(
+                Vector3 screen = Camera.main.WorldToScreenPoint(
                     corner + new Vector3(.5f, 0f, .5f));
+                if (!IsVisibleScreenPoint(screen))
+                    continue;
                 yield return MoveMouse(screen);
                 if (placement.CurrentHit.Site == BuildingSite.Ground &&
                     placement.CurrentEvaluation.IsValid)
@@ -2048,18 +2052,23 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
-            for (var radius = 2; radius <= 8; radius++)
-            for (var x = cityX - radius; x <= cityX + radius; x++)
-            for (var y = cityY - radius; y <= cityY + radius; y++)
+            foreach (Vector2Int candidate in GroundPreviewCandidates(
+                         cityX,
+                         cityY,
+                         2,
+                         8))
             {
                 if (!world.Coordinates.TryCellToWorld(
-                        x,
-                        y,
+                        candidate.x,
+                        candidate.y,
                         0f,
                         out Vector3 corner))
                     continue;
-                yield return MoveMouse(Camera.main.WorldToScreenPoint(
-                    corner + new Vector3(.5f, 0f, .5f)));
+                Vector3 screen = Camera.main.WorldToScreenPoint(
+                    corner + new Vector3(.5f, 0f, .5f));
+                if (!IsVisibleScreenPoint(screen))
+                    continue;
+                yield return MoveMouse(screen);
                 GrayboxBuildingPlacementController3D placement =
                     Object.FindObjectOfType<
                         GrayboxBuildingPlacementController3D>();
@@ -2199,18 +2208,23 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
-            for (var radius = 2; radius <= 8; radius++)
-            for (var x = cityX - radius; x <= cityX + radius; x++)
-            for (var y = cityY - radius; y <= cityY + radius; y++)
+            foreach (Vector2Int candidate in GroundPreviewCandidates(
+                         cityX,
+                         cityY,
+                         2,
+                         8))
             {
                 if (!world.Coordinates.TryCellToWorld(
-                        x,
-                        y,
+                        candidate.x,
+                        candidate.y,
                         0f,
                         out Vector3 corner))
                     continue;
-                yield return MoveMouse(Camera.main.WorldToScreenPoint(
-                    corner + new Vector3(.5f, 0f, .5f)));
+                Vector3 screen = Camera.main.WorldToScreenPoint(
+                    corner + new Vector3(.5f, 0f, .5f));
+                if (!IsVisibleScreenPoint(screen))
+                    continue;
+                yield return MoveMouse(screen);
                 if (placement.CurrentHit.Site == BuildingSite.Ground &&
                     placement.CurrentEvaluation.Failures != null &&
                     placement.CurrentEvaluation.Failures.Contains(failure) &&
@@ -2219,6 +2233,38 @@ namespace WasteCity.Tests
                     yield break;
             }
             Assert.Fail("No real ground preview exposed " + failure + ".");
+        }
+
+        private static IEnumerable<Vector2Int> GroundPreviewCandidates(
+            int centerX,
+            int centerY,
+            int minimumRadius,
+            int maximumRadius)
+        {
+            for (int radius = minimumRadius; radius <= maximumRadius; radius++)
+            {
+                for (int x = centerX - radius;
+                     x <= centerX + radius;
+                     x++)
+                {
+                    yield return new Vector2Int(x, centerY - radius);
+                    yield return new Vector2Int(x, centerY + radius);
+                }
+                for (int y = centerY - radius + 1;
+                     y < centerY + radius;
+                     y++)
+                {
+                    yield return new Vector2Int(centerX - radius, y);
+                    yield return new Vector2Int(centerX + radius, y);
+                }
+            }
+        }
+
+        private static bool IsVisibleScreenPoint(Vector3 screen)
+        {
+            return screen.z > 0f &&
+                   screen.x >= 0f && screen.x < Screen.width &&
+                   screen.y >= 0f && screen.y < Screen.height;
         }
 
         private static int sessionRadius(

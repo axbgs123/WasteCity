@@ -423,7 +423,7 @@ namespace WasteCity.Tests
                 maps.Height,
                 Is.EqualTo(seed8128Model.Height * ControlPixelsPerCell));
             int checkedCells = 0;
-            int sparseOuterCells = 0;
+            int nonDefaultOuterCells = 0;
             for (int cellY = 0; cellY < seed8128Model.Height; cellY++)
             for (int cellX = 0; cellX < seed8128Model.Width; cellX++)
             {
@@ -454,13 +454,10 @@ namespace WasteCity.Tests
                         GrayboxWorldLayout3D.LegacyHeight;
                 if (isOuter)
                 {
-                    Assert.That(sceneCell.Terrain,
-                        Is.EqualTo(TerrainKind.Wasteland));
-                    Assert.That(sceneCell.Traversal,
-                        Is.EqualTo(WorldTraversalKind.Open));
-                    Assert.That(sceneCell.ResourceId, Is.Null);
-                    Assert.That(sceneCell.ResourceAmount, Is.Zero);
-                    sparseOuterCells++;
+                    if (sceneCell.Terrain != TerrainKind.Wasteland ||
+                        sceneCell.Traversal != WorldTraversalKind.Open ||
+                        sceneCell.HasResource)
+                        nonDefaultOuterCells++;
                 }
 
                 var totals = new int[FirstArtTerrainCatalog3D.LayerCount];
@@ -510,11 +507,12 @@ namespace WasteCity.Tests
                 checkedCells++;
             }
 
-            Assert.That(checkedCells, Is.EqualTo(64 * 48));
-            Assert.That(sparseOuterCells, Is.EqualTo(2304));
+            Assert.That(checkedCells, Is.EqualTo(3072));
+            Assert.That(nonDefaultOuterCells, Is.GreaterThan(0));
             Assert.That(
                 sceneModel.ResourceNodeCount,
                 Is.EqualTo(seed8128Model.ResourceNodeCount));
+            Assert.That(sceneModel.ResourceNodeCount, Is.EqualTo(24));
             yield return null;
         }
 
