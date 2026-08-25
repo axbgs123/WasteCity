@@ -107,11 +107,11 @@ namespace WasteCity.Graybox3D
         public int PersistentGeneratedObjectCount => generatedObjects.Count;
         public int ResourceNodeMarkerCount => resourceNodeMarkers.Count;
         public int ResourceNodeMarkerRendererCount =>
-            resourceNodeMarkers.Count * 3;
+            resourceNodeMarkers.Count * 4;
         public int TotalGeneratedRendererCount =>
             WorldRendererCount + ResourceNodeMarkerRendererCount;
         public int TotalPersistentGeneratedObjectCount =>
-            PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 4;
+            PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 5;
         public bool HasActiveTerrainPresentation =>
             IsPresentationAlive(activeTerrainPresentation);
 

@@ -99,13 +99,13 @@ namespace WasteCity.Tests
             Assert.That(view.ResourceNodeMarkerCount,
                 Is.EqualTo(model.ResourceNodeCount));
             Assert.That(view.ResourceNodeMarkerRendererCount,
-                Is.EqualTo(model.ResourceNodeCount * 3));
+                Is.EqualTo(model.ResourceNodeCount * 4));
             Assert.That(view.TotalGeneratedRendererCount,
                 Is.EqualTo(view.WorldRendererCount +
-                    model.ResourceNodeCount * 3));
+                    model.ResourceNodeCount * 4));
             Assert.That(view.TotalPersistentGeneratedObjectCount,
                 Is.EqualTo(view.PersistentGeneratedObjectCount +
-                    model.ResourceNodeCount * 4));
+                    model.ResourceNodeCount * 5));
             Assert.That(
                 view.GetComponentsInChildren<Renderer>(true).Length,
                 Is.EqualTo(view.TotalGeneratedRendererCount));
@@ -406,9 +406,9 @@ namespace WasteCity.Tests
                 true,
                 true,
                 true,
+                68f * 16f / 1080f,
                 50f * 16f / 1080f,
-                36f * 16f / 1080f,
-                18f * 16f / 1080f,
+                22f * 16f / 1080f,
                 "石料\n100");
 
             Assert.That(
@@ -420,9 +420,9 @@ namespace WasteCity.Tests
                 true,
                 true,
                 true,
-                38f * 26f / 1080f,
-                28f * 26f / 1080f,
-                17f * 26f / 1080f,
+                56f * 26f / 1080f,
+                42f * 26f / 1080f,
+                20f * 26f / 1080f,
                 "100");
 
             Assert.That(
@@ -435,7 +435,7 @@ namespace WasteCity.Tests
                 true,
                 false,
                 0f,
-                20f * 52f / 1080f,
+                28f * 52f / 1080f,
                 0f,
                 string.Empty);
             Assert.That(

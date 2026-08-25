@@ -141,11 +141,11 @@ namespace WasteCity.Graybox3D
             {
                 return new FormalWorldMarkerMetrics3D(
                     ResourceNodeMarkerLod3D.Near,
+                    68f,
                     50f,
-                    36f,
-                    18f,
-                    50f,
-                    64f,
+                    22f,
+                    68f,
+                    84f,
                     true,
                     true,
                     true);
@@ -154,11 +154,11 @@ namespace WasteCity.Graybox3D
             {
                 return new FormalWorldMarkerMetrics3D(
                     ResourceNodeMarkerLod3D.Mid,
-                    38f,
-                    28f,
-                    17f,
-                    38f,
-                    52f,
+                    56f,
+                    42f,
+                    20f,
+                    56f,
+                    72f,
                     true,
                     false,
                     true);
@@ -166,10 +166,10 @@ namespace WasteCity.Graybox3D
             return new FormalWorldMarkerMetrics3D(
                 ResourceNodeMarkerLod3D.Far,
                 0f,
-                20f,
+                28f,
                 0f,
-                20f,
-                32f,
+                28f,
+                40f,
                 false,
                 false,
                 false);

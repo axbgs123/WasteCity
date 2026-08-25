@@ -248,9 +248,9 @@ namespace WasteCity.Tests
             Assert.That(ReadProperty(metrics, "ShowFrame"), Is.EqualTo(true));
             Assert.That(ReadProperty(metrics, "ShowName"), Is.EqualTo(false));
             Assert.That(ReadProperty(metrics, "ShowAmount"), Is.EqualTo(true));
-            Assert.That(ReadFloat(metrics, "FrameReferencePixels"), Is.EqualTo(38f));
-            Assert.That(ReadFloat(metrics, "IconReferencePixels"), Is.EqualTo(28f));
-            Assert.That(ReadFloat(metrics, "TextReferencePixels"), Is.EqualTo(17f));
+            Assert.That(ReadFloat(metrics, "FrameReferencePixels"), Is.EqualTo(56f));
+            Assert.That(ReadFloat(metrics, "IconReferencePixels"), Is.EqualTo(42f));
+            Assert.That(ReadFloat(metrics, "TextReferencePixels"), Is.EqualTo(20f));
         }
 
         [Test]

@@ -24,6 +24,7 @@ namespace WasteCity.Graybox3D
         private Sprite icon;
         private Sprite frame;
         private TextMesh amountLabel;
+        private TextMesh shadowLabel;
         private string resourceDisplayName;
 
         public string StableId { get; private set; }
@@ -130,6 +131,9 @@ namespace WasteCity.Graybox3D
                 amountLabel.GetComponent<MeshRenderer>();
             textRenderer.enabled = layoutVisible &&
                 (metrics.ShowName || metrics.ShowAmount);
+            MeshRenderer shadowRenderer =
+                shadowLabel.GetComponent<MeshRenderer>();
+            shadowRenderer.enabled = textRenderer.enabled;
 
             frameRenderer.transform.localScale = Vector3.one *
                 FiniteNonNegative(frameWorldHeight);
@@ -137,15 +141,24 @@ namespace WasteCity.Graybox3D
                 FiniteNonNegative(iconWorldHeight);
             amountLabel.characterSize = TextCharacterSizeForVisualHeight(
                 textWorldHeight);
+            shadowLabel.characterSize = amountLabel.characterSize;
             float markerWorldHeight = metrics.ShowFrame
                 ? FiniteNonNegative(frameWorldHeight)
                 : FiniteNonNegative(iconWorldHeight);
             float markerCenterY = metrics.ShowFrame ? .08f : .12f;
-            amountLabel.transform.localPosition = new Vector3(
+            Vector3 labelPosition = new Vector3(
                 0f,
                 markerCenterY - markerWorldHeight * .5f -
                 FiniteNonNegative(textWorldHeight) * LabelGapRatio,
                 -.01f);
+            amountLabel.transform.localPosition = labelPosition;
+            float shadowPixelWorldSize = metrics.TextReferencePixels > 0f
+                ? FiniteNonNegative(textWorldHeight) /
+                  metrics.TextReferencePixels
+                : 0f;
+            float shadowOffset = shadowPixelWorldSize * 1.25f;
+            shadowLabel.transform.localPosition = labelPosition +
+                new Vector3(shadowOffset, -shadowOffset, .001f);
             UpdateDisplayText();
         }
 
@@ -203,6 +216,17 @@ namespace WasteCity.Graybox3D
                 iconProperties = new MaterialPropertyBlock();
                 iconRenderer.sortingOrder = 30;
             }
+            if (shadowLabel == null)
+            {
+                var shadowObject = new GameObject("NameAndAmountShadow");
+                shadowObject.transform.SetParent(transform, false);
+                shadowLabel = shadowObject.AddComponent<TextMesh>();
+                ConfigureLabel(shadowLabel);
+                shadowLabel.color = ShadowColor();
+                MeshRenderer renderer =
+                    shadowObject.GetComponent<MeshRenderer>();
+                renderer.sortingOrder = 31;
+            }
             if (amountLabel == null)
             {
                 var labelObject = new GameObject("NameAndAmount");
@@ -210,36 +234,45 @@ namespace WasteCity.Graybox3D
                 labelObject.transform.localPosition =
                     new Vector3(0f, -.42f, -.01f);
                 amountLabel = labelObject.AddComponent<TextMesh>();
-                amountLabel.anchor = TextAnchor.UpperCenter;
-                amountLabel.alignment = TextAlignment.Center;
-                amountLabel.characterSize = .075f;
-                amountLabel.fontSize = 48;
-                amountLabel.fontStyle = FontStyle.Bold;
-                amountLabel.lineSpacing = .88f;
+                ConfigureLabel(amountLabel);
                 amountLabel.color = Color.white;
                 MeshRenderer renderer =
                     labelObject.GetComponent<MeshRenderer>();
-                renderer.sortingOrder = 31;
+                renderer.sortingOrder = 32;
             }
+        }
+
+        private static void ConfigureLabel(TextMesh label)
+        {
+            label.anchor = TextAnchor.UpperCenter;
+            label.alignment = TextAlignment.Center;
+            label.characterSize = .075f;
+            label.fontSize = 48;
+            label.fontStyle = FontStyle.Bold;
+            label.lineSpacing = .88f;
         }
 
         private void UpdateDisplayText()
         {
             if (amountLabel == null || DisplayedAmount < 0)
                 return;
+            string text;
             switch (DisplayLod)
             {
                 case ResourceNodeMarkerLod3D.Near:
-                    amountLabel.text = resourceDisplayName + "\n" +
+                    text = resourceDisplayName + "\n" +
                         DisplayedAmount;
                     break;
                 case ResourceNodeMarkerLod3D.Mid:
-                    amountLabel.text = DisplayedAmount.ToString();
+                    text = DisplayedAmount.ToString();
                     break;
                 default:
-                    amountLabel.text = string.Empty;
+                    text = string.Empty;
                     break;
             }
+            amountLabel.text = text;
+            if (shadowLabel != null)
+                shadowLabel.text = text;
         }
 
         private static Mesh ResolveIconMesh(Sprite sprite)
@@ -333,7 +366,18 @@ namespace WasteCity.Graybox3D
             }
             Color resourceColor =
                 ResourceIconCatalog3D.FallbackColor(ResourceId);
-            amountLabel.color = Color.Lerp(resourceColor, Color.white, .55f);
+            amountLabel.color = Color.Lerp(resourceColor, Color.white, .7f);
+            if (shadowLabel != null)
+                shadowLabel.color = ShadowColor();
+        }
+
+        private static Color ShadowColor()
+        {
+            return new Color(
+                16f / 255f,
+                24f / 255f,
+                32f / 255f,
+                .88f);
         }
     }
 }
