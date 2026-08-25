@@ -8,6 +8,9 @@ namespace WasteCity.Graybox3D
 {
     public sealed class GrayboxResourceNodeMarker3D : MonoBehaviour
     {
+        private const float TextMeshVisualHeightFactor = 5.4f;
+        private const float LabelGapRatio = .12f;
+
         private static readonly Dictionary<Sprite, Mesh> IconMeshes =
             new Dictionary<Sprite, Mesh>();
         private static readonly Dictionary<Texture, Material> IconMaterials =
@@ -79,9 +82,7 @@ namespace WasteCity.Graybox3D
             if (amount == DisplayedAmount) return false;
             DisplayedAmount = amount;
             UpdateDisplayText();
-            amountLabel.color = amount > 0
-                ? Color.white
-                : new Color(.58f, .58f, .58f, 1f);
+            ApplyLabelColor(amount);
             iconRenderer.GetPropertyBlock(iconProperties);
             Color iconColor = amount > 0
                 ? Color.white
@@ -134,7 +135,17 @@ namespace WasteCity.Graybox3D
                 FiniteNonNegative(frameWorldHeight);
             iconRenderer.transform.localScale = Vector3.one *
                 FiniteNonNegative(iconWorldHeight);
-            amountLabel.characterSize = FiniteNonNegative(textWorldHeight);
+            amountLabel.characterSize = TextCharacterSizeForVisualHeight(
+                textWorldHeight);
+            float markerWorldHeight = metrics.ShowFrame
+                ? FiniteNonNegative(frameWorldHeight)
+                : FiniteNonNegative(iconWorldHeight);
+            float markerCenterY = metrics.ShowFrame ? .08f : .12f;
+            amountLabel.transform.localPosition = new Vector3(
+                0f,
+                markerCenterY - markerWorldHeight * .5f -
+                FiniteNonNegative(textWorldHeight) * LabelGapRatio,
+                -.01f);
             UpdateDisplayText();
         }
 
@@ -203,6 +214,8 @@ namespace WasteCity.Graybox3D
                 amountLabel.alignment = TextAlignment.Center;
                 amountLabel.characterSize = .075f;
                 amountLabel.fontSize = 48;
+                amountLabel.fontStyle = FontStyle.Bold;
+                amountLabel.lineSpacing = .88f;
                 amountLabel.color = Color.white;
                 MeshRenderer renderer =
                     labelObject.GetComponent<MeshRenderer>();
@@ -300,6 +313,27 @@ namespace WasteCity.Graybox3D
             return float.IsNaN(value) || float.IsInfinity(value)
                 ? 0f
                 : Mathf.Max(0f, value);
+        }
+
+        private static float TextCharacterSizeForVisualHeight(
+            float textWorldHeight)
+        {
+            return FiniteNonNegative(textWorldHeight) /
+                TextMeshVisualHeightFactor;
+        }
+
+        private void ApplyLabelColor(int amount)
+        {
+            if (amountLabel == null)
+                return;
+            if (amount <= 0)
+            {
+                amountLabel.color = new Color(.58f, .58f, .58f, 1f);
+                return;
+            }
+            Color resourceColor =
+                ResourceIconCatalog3D.FallbackColor(ResourceId);
+            amountLabel.color = Color.Lerp(resourceColor, Color.white, .55f);
         }
     }
 }

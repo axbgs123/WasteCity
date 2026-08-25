@@ -406,9 +406,9 @@ namespace WasteCity.Tests
                 true,
                 true,
                 true,
+                50f * 16f / 1080f,
                 36f * 16f / 1080f,
-                26f * 16f / 1080f,
-                16f * 16f / 1080f,
+                18f * 16f / 1080f,
                 "石料\n100");
 
             Assert.That(
@@ -420,9 +420,9 @@ namespace WasteCity.Tests
                 true,
                 true,
                 true,
+                38f * 26f / 1080f,
                 28f * 26f / 1080f,
-                20f * 26f / 1080f,
-                13f * 26f / 1080f,
+                17f * 26f / 1080f,
                 "100");
 
             Assert.That(
@@ -435,7 +435,7 @@ namespace WasteCity.Tests
                 true,
                 false,
                 0f,
-                18f * 52f / 1080f,
+                20f * 52f / 1080f,
                 0f,
                 string.Empty);
             Assert.That(
@@ -973,9 +973,21 @@ namespace WasteCity.Tests
             Assert.That(
                 icon.localScale.y,
                 Is.EqualTo(iconWorldHeight).Within(.0001f));
-            Assert.That(
-                label.GetComponent<TextMesh>().characterSize,
-                Is.EqualTo(textWorldHeight).Within(.0001f));
+            float characterSize =
+                label.GetComponent<TextMesh>().characterSize;
+            if (textVisible)
+            {
+                Assert.That(
+                    Mathf.Abs(characterSize - textWorldHeight),
+                    Is.GreaterThan(.0001f));
+                Assert.That(
+                    characterSize,
+                    Is.EqualTo(textWorldHeight / 5.4f).Within(.0001f));
+            }
+            else
+            {
+                Assert.That(characterSize, Is.Zero.Within(.0001f));
+            }
         }
 
         private static float ProjectedPixelHeight(
