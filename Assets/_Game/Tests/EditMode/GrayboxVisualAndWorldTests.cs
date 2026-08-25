@@ -445,6 +445,146 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0019_MidMarkerUsesReadablePixelHierarchyAt1280By800()
+        {
+            const int pixelWidth = 1280;
+            const int pixelHeight = 800;
+            const float orthographicSize = 13f;
+            GrayboxWorldView3D view = CreateView();
+            FormalWorldPresentationScaleProfile3D profile = Track(
+                ScriptableObject.CreateInstance<
+                    FormalWorldPresentationScaleProfile3D>());
+            view.ConfigureWorldPresentation(profile);
+            view.Generate(CreateCatalogMap());
+            Assert.That(
+                view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+
+            Assert.That(
+                view.RefreshResourceNodeMarkerPresentation(
+                    orthographicSize,
+                    pixelWidth,
+                    pixelHeight),
+                Is.True);
+
+            MeshRenderer frame = marker.transform.Find("Frame")
+                .GetComponent<MeshRenderer>();
+            MeshRenderer icon = marker.transform.Find("Icon")
+                .GetComponent<MeshRenderer>();
+            TextMesh label = marker.transform.Find("NameAndAmount")
+                .GetComponent<TextMesh>();
+            MeshRenderer labelRenderer = label.GetComponent<MeshRenderer>();
+            Assert.That(marker.DisplayLod, Is.EqualTo(ResourceNodeMarkerLod3D.Mid));
+            Assert.That(marker.DisplayText, Is.EqualTo("100"));
+            Assert.That(
+                ProjectedPixelHeight(frame, orthographicSize, pixelHeight),
+                Is.InRange(36f, 40f),
+                "The frame should read as a quiet 38 px boundary.");
+            Assert.That(
+                ProjectedPixelHeight(icon, orthographicSize, pixelHeight),
+                Is.InRange(27f, 29f),
+                "The item icon should remain readable without covering a cell.");
+            Assert.That(
+                ProjectedPixelHeight(
+                    labelRenderer,
+                    orthographicSize,
+                    pixelHeight),
+                Is.InRange(16f, 18f),
+                "The amount needs a 16-18 px visual cap height.");
+
+            FormalWorldMarkerMetrics3D metrics = profile.ResolveMarker(
+                FormalWorldPresentationScalePolicy3D.WorldUnitScreenHeight(
+                    orthographicSize));
+            float directPhysicalPixels =
+                FormalWorldPresentationScalePolicy3D.ResolvePhysicalPixels(
+                    metrics.TextReferencePixels,
+                    Mathf.Min(
+                        metrics.TextReferencePixels,
+                        metrics.MinimumPhysicalPixels),
+                    metrics.MaximumPhysicalPixels,
+                    pixelWidth,
+                    pixelHeight);
+            float directWorldHeight =
+                FormalWorldPresentationScalePolicy3D.WorldUnitsForPixels(
+                    directPhysicalPixels,
+                    orthographicSize,
+                    pixelHeight);
+            Assert.That(
+                Mathf.Abs(label.characterSize - directWorldHeight),
+                Is.GreaterThan(.0001f),
+                "TextMesh characterSize is a font scale, not a requested " +
+                "world-space cap height; it requires calibrated conversion.");
+        }
+
+        [Test]
+        public void IDEA0019_MarkerInformationAndIconScaleDecreaseNearToFar()
+        {
+            const int pixelWidth = 1280;
+            const int pixelHeight = 800;
+            GrayboxWorldView3D view = CreateView();
+            FormalWorldPresentationScaleProfile3D profile = Track(
+                ScriptableObject.CreateInstance<
+                    FormalWorldPresentationScaleProfile3D>());
+            view.ConfigureWorldPresentation(profile);
+            view.Generate(CreateCatalogMap());
+            Assert.That(
+                view.TryGetResourceNodeMarker(
+                    9,
+                    0,
+                    out GrayboxResourceNodeMarker3D marker),
+                Is.True);
+            MeshRenderer frame = marker.transform.Find("Frame")
+                .GetComponent<MeshRenderer>();
+            MeshRenderer icon = marker.transform.Find("Icon")
+                .GetComponent<MeshRenderer>();
+            MeshRenderer label = marker.transform.Find("NameAndAmount")
+                .GetComponent<MeshRenderer>();
+
+            view.RefreshResourceNodeMarkerPresentation(
+                8f,
+                pixelWidth,
+                pixelHeight);
+            float nearIconPixels = ProjectedPixelHeight(icon, 8f, pixelHeight);
+            float nearFramePixels = ProjectedPixelHeight(frame, 8f, pixelHeight);
+            float nearTextPixels = ProjectedPixelHeight(label, 8f, pixelHeight);
+            Assert.That(marker.DisplayText, Is.EqualTo("石料\n100"));
+            Assert.That(frame.enabled, Is.True);
+            Assert.That(icon.enabled, Is.True);
+            Assert.That(label.enabled, Is.True);
+
+            view.RefreshResourceNodeMarkerPresentation(
+                13f,
+                pixelWidth,
+                pixelHeight);
+            float midIconPixels = ProjectedPixelHeight(icon, 13f, pixelHeight);
+            float midFramePixels = ProjectedPixelHeight(frame, 13f, pixelHeight);
+            float midTextPixels = ProjectedPixelHeight(label, 13f, pixelHeight);
+            Assert.That(marker.DisplayText, Is.EqualTo("100"));
+            Assert.That(frame.enabled, Is.True);
+            Assert.That(icon.enabled, Is.True);
+            Assert.That(label.enabled, Is.True);
+
+            view.RefreshResourceNodeMarkerPresentation(
+                26f,
+                pixelWidth,
+                pixelHeight);
+            float farIconPixels = ProjectedPixelHeight(icon, 26f, pixelHeight);
+            Assert.That(marker.DisplayText, Is.Empty);
+            Assert.That(frame.enabled, Is.False);
+            Assert.That(icon.enabled, Is.True);
+            Assert.That(label.enabled, Is.False);
+
+            Assert.That(nearIconPixels, Is.GreaterThan(midIconPixels));
+            Assert.That(midIconPixels, Is.GreaterThan(farIconPixels));
+            Assert.That(nearFramePixels, Is.GreaterThan(midFramePixels));
+            Assert.That(nearTextPixels, Is.GreaterThan(midTextPixels));
+            Assert.That(midTextPixels, Is.GreaterThan(0f));
+        }
+
+        [Test]
         public void IDEA0012_StableMarkerRefreshAndCameraDoNotAllocateOrRewrite()
         {
             WorldMapModel model = CreateCatalogMap();
@@ -836,6 +976,18 @@ namespace WasteCity.Tests
             Assert.That(
                 label.GetComponent<TextMesh>().characterSize,
                 Is.EqualTo(textWorldHeight).Within(.0001f));
+        }
+
+        private static float ProjectedPixelHeight(
+            Renderer renderer,
+            float orthographicSize,
+            int pixelHeight)
+        {
+            Assert.That(renderer, Is.Not.Null);
+            Assert.That(orthographicSize, Is.GreaterThan(0f));
+            Assert.That(pixelHeight, Is.GreaterThan(0));
+            return renderer.bounds.size.y * pixelHeight /
+                (2f * orthographicSize);
         }
 
         private static WorldCell[,] Capture(WorldMapModel model)
