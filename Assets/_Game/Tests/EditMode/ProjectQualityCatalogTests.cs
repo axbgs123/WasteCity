@@ -230,7 +230,7 @@ namespace WasteCity.Tests
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
                 "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
-                "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
+                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
@@ -1316,6 +1316,76 @@ namespace WasteCity.Tests
             }, demoRuntime.RequiredTestFiles);
             CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0015" },
                 demoRuntime.RequirementIds);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0020AttentionOwnershipAndReuse()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup progression =
+                FindFeature(catalog, "research-population");
+
+            Assert.That(
+                progression.ChineseName,
+                Is.EqualTo("研究、人口与文明进程"));
+            CollectionAssert.Contains(
+                progression.PrimarySourceGlobs,
+                "Assets/_Game/Scripts/Progression/**");
+            CollectionAssert.Contains(
+                progression.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs");
+            CollectionAssert.Contains(
+                progression.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs");
+            CollectionAssert.Contains(
+                progression.RequirementIds,
+                "IDEA-0020");
+
+            ProjectReuseEntry sourceCatalog =
+                FindReuse(catalog, "formal-attention-catalog");
+            Assert.That(
+                sourceCatalog.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(
+                sourceCatalog.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "FormalAttentionReasonDefinition",
+                    "FormalAttentionCatalog",
+                },
+                sourceCatalog.TypeNames);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
+                },
+                sourceCatalog.RequiredTestFiles);
+
+            ProjectReuseEntry runtime =
+                FindReuse(catalog, "formal-attention-runtime");
+            Assert.That(
+                runtime.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(
+                runtime.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "FormalAttentionHistoryEntry",
+                    "FormalAttentionSnapshot",
+                    "FormalAttentionRuntime",
+                },
+                runtime.TypeNames);
+            CollectionAssert.Contains(
+                runtime.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs");
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0020" },
+                runtime.RequirementIds);
         }
 
         [Test]

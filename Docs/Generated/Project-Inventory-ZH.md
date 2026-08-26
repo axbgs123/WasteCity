@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`0757f9e9452cba2992d4982130d807f29f1ef904e8b5998e107a17560a68b10e`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`050fae573d95a9e7fcd9ad048f6b7a1f6be26eb21b62a0cd5905c4ebd79afc71`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -234,11 +234,13 @@
 - `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
-- 研究与人口（`research-population`）：
+- 研究、人口与文明进程（`research-population`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Narrative/GuidanceFlowModel.cs`
 - `Assets/_Game/Scripts/Population/PopulationModel.cs`
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`
+- `Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs`
+- `Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`

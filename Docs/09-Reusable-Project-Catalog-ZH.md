@@ -276,6 +276,14 @@
 
 能解决什么：把默认三维场景的真实建筑、城市、世界与暂停状态送进固定生产时钟。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`。怎么复用：把当前三维场景的建筑会话、城市模式、世界坐标、CityResourceStorageModel 和 Unity 暂停状态接到固定步生产时钟。不能负责什么：只负责 GrayboxPrototype3D 场景引用与时间输入；不复制生产配方、物流范围、资源节点兼容性、仓库库存事务或界面规则。改后跑哪组测试：`GrayboxProductionControllerTests`、`GrayboxSceneContractTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxProductionController3D`。
 
+### 正式关注度来源目录（复用前审查）
+
+能解决什么：集中定义 IDEA-0020 的关注度初始值、范围、历史容量、三个阈值和 GDD A16.6 全部稳定来源。在哪里：`Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs`。怎么复用：从 IDEA-0020 的唯一正式目录读取初始值、范围、历史容量、30、60、90 阈值和 GDD A16.6 的 22 项稳定关注度来源。不能负责什么：只定义关注度静态身份、固定增量、重复策略和显示键；不保存会话数值、不读取场景或 UI，也不启动压力战斗。改后跑哪组测试：`FormalAttentionCatalogTests`。代码名：`FormalAttentionReasonDefinition`、`FormalAttentionCatalog`。
+
+### 正式关注度运行时（推荐复用）
+
+能解决什么：保存正式关注度、结构化历史、稳定事件幂等事实、三个阈值锁存和不可变快照。在哪里：`Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`。怎么复用：以稳定原因和事件键原子提交 0–100 关注度，维护 128 条有界历史、最近三条投影、30、60、90 一次性阈值和可缓存不可变快照。不能负责什么：只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。改后跑哪组测试：`FormalAttentionRuntimeTests`、`FormalProgressionTests`。代码名：`FormalAttentionHistoryEntry`、`FormalAttentionSnapshot`、`FormalAttentionRuntime`。
+
 ### 研究模型（推荐复用）
 
 能解决什么：管理研究状态，并在 schema 31 恢复时区分正式科技、退役兼容内容与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`FormalResearchCatalogTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。

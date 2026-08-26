@@ -110,28 +110,28 @@
 | 稳定来源 ID | 条件 | 变化 |
 |---|---|---:|
 | `core.attention.initial` | 新正式 3D 会话 | 初始为 10 |
-| `core.attention.fate-selected` | 首次确认命轨 | +5 |
-| `core.attention.scan.safe-mine` | 扫描安全矿点 | +2 |
-| `core.attention.scan.rift` | 扫描结晶裂谷 | +5 |
-| `core.attention.first-deployment` | 首次部署 | +5 |
-| `core.attention.build.mining-station` | 首座采矿站完成 | +2 |
-| `core.attention.build.smelter` | 首座冶炼厂完成 | +3 |
-| `core.attention.build.assembler` | 首座装配厂完成 | +4 |
-| `core.attention.build.machine-gun-turret` | 每座机枪塔完成 | +5 |
-| `core.attention.research.basic-metallurgy` | 完成基础冶金 | +3 |
-| `core.attention.research.ammunition-assembly` | 完成弹药装配 | +4 |
-| `core.attention.research.automatic-defense` | 完成自动防御 | +5 |
-| `core.attention.research.reinforced-structure` | 完成加固结构 | +5 |
+| `core.attention.fate.first-activation` | 首次确认命轨 | +5 |
+| `core.attention.scan.safe-mining-zone` | 扫描安全矿点 | +2 |
+| `core.attention.scan.crystal-rift` | 扫描结晶裂谷 | +5 |
+| `core.attention.city.first-deployment` | 首次部署 | +5 |
+| `core.attention.building.first-mining-station` | 首座采矿站完成 | +2 |
+| `core.attention.building.first-smelter` | 首座冶炼厂完成 | +3 |
+| `core.attention.building.first-assembler` | 首座装配厂完成 | +4 |
+| `core.attention.building.machine-gun-turret` | 每座机枪塔完成 | +5 |
+| `core.attention.research.automated-machinery` | 完成基础冶金 | +3 |
+| `core.attention.research.precision-assembly` | 完成弹药装配 | +4 |
+| `core.attention.research.automated-defense` | 完成自动防御 | +5 |
+| `core.attention.research.reinforced-structures` | 完成加固结构 | +5 |
 | `core.attention.research.legacy-analysis` | 完成遗产解析 | +12 |
-| `core.attention.rescue.ruin-survivor` | 遗迹救援 | +2 |
+| `core.attention.rescue.ruins` | 遗迹救援 | +2 |
 | `core.attention.rescue.cen-jin` | 救援岑烬 | +5 |
-| `core.attention.encounter.directional-repelled` | 首次击退定向攻击 | +8 |
-| `core.attention.fate.rewind-used` | 每次成功读取回溯锚点 | +12 |
-| `core.attention.fate.void-debt-cycle` | 债务周期结算 | 每完整 10 欠款 +1 |
-| `core.attention.fate.pocket-first-run` | 每类旗舰首次实际生产 | +4 |
-| `core.attention.leave-lock-zone` | 首次离开锁定观测区 | -8 |
-| `core.attention.interference-ruin` | 可选干扰遗迹成功 | -5 |
-| `core.attention.ascension` | 首次文明升阶 | +25 |
+| `core.attention.combat.first-directed-attack-defeated` | 首次击退定向攻击 | +8 |
+| `core.attention.fate.rewind-anchor-used` | 每次成功读取回溯锚点 | +12 |
+| `core.attention.fate.void-debt-periodic` | 债务周期结算 | 每完整 10 欠款 +1 |
+| `core.attention.fate.pocket-universe-activated` | 全局首次旗舰实际生产 | +4 |
+| `core.attention.escape.locked-region` | 首次离开锁定观测区 | -8 |
+| `core.attention.ruins.optional-interference` | 可选干扰遗迹成功 | -5 |
+| `core.attention.civilization.advanced` | 首次文明升阶 | +25 |
 
 当前没有权威扫描、救援、锁定区离开或干扰遗迹运行时的来源只登记配置，不用 UI 或临时碰撞器伪造触发；待相应领域系统存在后接线。
 

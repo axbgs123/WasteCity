@@ -374,7 +374,7 @@
     },
     {
       "Id": "research-population",
-      "ChineseName": "研究与人口",
+      "ChineseName": "研究、人口与文明进程",
       "SourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
         "Assets/_Game/Scripts/Population/**",
@@ -384,9 +384,10 @@
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
-        "Assets/_Game/Scripts/Population/**"
+        "Assets/_Game/Scripts/Population/**",
+        "Assets/_Game/Scripts/Progression/**"
       ],
-      "FailureLocationSummary": "先检查研究状态、人口门槛、进度与叙事接线",
+      "FailureLocationSummary": "先检查研究、人口、关注度、命轨、文明等级与升阶真值",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/DemoResearchRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
@@ -396,7 +397,9 @@
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
         "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -407,10 +410,12 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0015",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -2035,6 +2040,50 @@
       "RequirementIds": [
         "IDEA-0011",
         "IDEA-0012"
+      ]
+    },
+    {
+      "Id": "formal-attention-catalog",
+      "ChineseName": "正式关注度来源目录",
+      "TypeNames": [
+        "FormalAttentionReasonDefinition",
+        "FormalAttentionCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从 IDEA-0020 的唯一正式目录读取初始值、范围、历史容量、30、60、90 阈值和 GDD A16.6 的 22 项稳定关注度来源。",
+      "BoundarySummary": "只定义关注度静态身份、固定增量、重复策略和显示键；不保存会话数值、不读取场景或 UI，也不启动压力战斗。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-attention-runtime",
+      "ChineseName": "正式关注度运行时",
+      "TypeNames": [
+        "FormalAttentionHistoryEntry",
+        "FormalAttentionSnapshot",
+        "FormalAttentionRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "以稳定原因和事件键原子提交 0–100 关注度，维护 128 条有界历史、最近三条投影、30、60、90 一次性阈值和可缓存不可变快照。",
+      "BoundarySummary": "只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
       ]
     },
     {

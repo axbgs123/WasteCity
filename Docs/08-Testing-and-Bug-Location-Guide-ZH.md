@@ -30,7 +30,7 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 
 ## IDEA-0019 地图 v2、资源布局与世界尺度检查边界
 
-`IDEA-0019` 当前为“已批准，开发中”。它明确承接 `IDEA-0018` 当时排除的地图真值变化：地图仍为 `64×48`、3072 格、seed `8128` 和 schema `32`，但 world generation/signature 升为 v2，地形、Traversal、出生/路线与资源节点改为覆盖全图的确定性连片布局。旧 v1 world identity 必须在任何运行时应用前以“存档世界配置与当前正式世界不兼容”明确拒绝，不能把旧坐标、节点余量或建筑绑定猜测迁移到新图。
+`IDEA-0019` 当前为“已实现待验证”。它明确承接 `IDEA-0018` 当时排除的地图真值变化：地图仍为 `64×48`、3072 格、seed `8128` 和 schema `32`，但 world generation/signature 升为 v2，地形、Traversal、出生/路线与资源节点改为覆盖全图的确定性连片布局。旧 v1 world identity 必须在任何运行时应用前以“存档世界配置与当前正式世界不兼容”明确拒绝，不能把旧坐标、节点余量或建筑绑定猜测迁移到新图。
 
 地图和资源先运行 `WorldMapTests` 与 `GrayboxWorldLayout3DTests`：固定 v2 identity、重复生成、固定 `8×6` 宏格模板、每宏格两个整数扰动通道、一轮清理、出生保护区、关键区双通路和正式目录明确登记的 `24` 个坐标（铁矿 `8`、石料 `4`、能晶 `4`、水 `4`、生物质 `4`）。本版资源不是评分/搜索/地形亲和算法生成，测试应逐项比对目录坐标、类型和储量。A16.3 的两个安全铁矿、至少一个安全石料点和三个裂谷铁矿必须包含在该总数内；铁矿、石料和能晶节点还要通过既有 `BuildingResourceNodeCompatibilityRulesTests` 与 `GrayboxBuildingProjectionAndViewTests` 证明存在完整 `2×2` 采矿锚点。水和生物质保持世界来源，但不因本次地图重排被改成采矿站兼容资源。路径、部署和正式场景继续补跑 `CityPathfinderTests`、`CityTerrainRulesTests`、`CityDeploymentRulesTests`、`GrayboxMobileCityController3DTests` 与 `GrayboxRuntimeSceneTests`。
 
@@ -39,6 +39,14 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 世界比例先运行 `FormalWorldPresentationScaleProfile3DTests`，再运行 `GrayboxBuildingProjectionAndViewTests`、`GrayboxVisualAndWorldTests`、`FormalUiResponsiveLayout3DTests` 与受影响的真实输入 PlayMode。30 座 `BuildingCatalog` 的逻辑 footprint 和四向旋转必须不变；地面/内城建筑的施工、完成、废墟、预览和选择框只消费正式表现 Profile，三座正式塔的 BuildingWorldView 基础座统一为 74% footprint、精确 `.14` 格高。矿点默认正交尺寸 `13` 为 Mid，只显示图标与储量；当前三档目标分别为 Near Frame `68`、Icon `50`、Text `22`，Mid Frame `56`、Icon `42`、Text `20`，Far Icon `28`，其 Frame、Icon、Text/Shadow Renderer 显隐和物理像素换算必须在 `1280×720`、`1920×1080`、`2560×1440` 与紧凑窗口下读取实际结果。标签避让还必须验证相同输入重复得到相同可见集合、冲突时稳定 ID 决胜、引导/选中优先且至少保留 `6px` 间距。建造栏继续保持 `620×54`，目录 Hero 图标使用正式 `64` 语义尺寸，不允许用散落常量重新放大。
 
 日常实现阶段若没有修改地形源、导入规则、Texture2DArray Builder 或数组本身，仍按普通 EditMode 路由，不因 WorldMap 内容变化反复重建四个 2K 数组；正式收口按本需求批准的发布级验收补跑一次 `TerrainAssetDeep`，随后完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役构建、GUI 固定证据、文档生成/校验和 `RecordVerification`。自动化不能替代用户对地貌布局、矿区密度、建筑/图标比例、遮挡和真实 Windows GPU/显存/内存的判断。
+
+## IDEA-0020 关注度、命轨与文明升阶检查边界
+
+`IDEA-0020` 当前为“开发中”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。
+
+数值、历史和恢复运行 `FormalAttentionRuntimeTests` 与旧 `FormalProgressionTests`：一次性来源按原因锁存，可重复来源按稳定事件键防重；正负变化都夹在 `0–100`，即使封顶后的实际变化为零也要消费并记录事件；完整历史只保留最近 `128` 条，HUD 所需投影只取最后三条；阈值降低后不撤销、再跨越不重复。恢复必须保留语法有效但当前未知的历史原因为只读孤儿证据，非法快照失败时保持原对象、revision 和缓存快照身份不变。静止状态连续 `300` 次 `Capture` 必须返回同一不可变快照且托管分配为 `0 B`。
+
+这两类测试通过只证明 Task 1 的纯关注度真值，不证明 schema `33`、正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展，当前 schema 在迁移片完成前仍为 `32`。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界
 
