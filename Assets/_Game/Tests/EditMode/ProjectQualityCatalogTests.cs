@@ -228,7 +228,7 @@ namespace WasteCity.Tests
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
-                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs|Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
                 "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
@@ -1741,8 +1741,11 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs");
             StringAssert.Contains("不是第二个玩家存档槽",
                 rewind.BoundarySummary);
-            StringAssert.Contains("Host 组合", rewind.BoundarySummary);
-            StringAssert.Contains("玩家创建/读取按钮", rewind.BoundarySummary);
+            StringAssert.Contains("Host、schema 33", rewind.BoundarySummary);
+            StringAssert.Contains("Create/Read/Clear UI 命令已接",
+                rewind.BoundarySummary);
+            StringAssert.Contains("Lv.2 双锚点仍未接",
+                rewind.BoundarySummary);
 
             ProjectReuseEntry adapter = FindReuse(
                 catalog,
@@ -1768,6 +1771,58 @@ namespace WasteCity.Tests
             foreach (ProjectReuseEntry entry in new[] { pocket, debt, rewind })
                 CollectionAssert.AreEqual(new[] { "IDEA-0020" },
                     entry.RequirementIds);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0020FateOperationsReadOnlyCommands()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup ui = FindFeature(catalog, "ui-input");
+            const string glob =
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxFateOperations*.cs";
+            const string edit =
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxFateOperationsPresentationTests.cs";
+            const string play =
+                "Assets/_Game/Tests/PlayMode/" +
+                "GrayboxFateOperationsRuntimeInputTests.cs";
+            CollectionAssert.Contains(ui.SourceGlobs, glob);
+            CollectionAssert.Contains(ui.PrimarySourceGlobs, glob);
+            CollectionAssert.Contains(ui.TestFileGlobs, edit);
+            CollectionAssert.Contains(ui.TestFileGlobs, play);
+
+            ProjectReuseEntry operations = FindReuse(
+                catalog,
+                "graybox-fate-operations-ui-3d");
+            Assert.That(operations.FeatureGroupId, Is.EqualTo("ui-input"));
+            Assert.That(operations.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxFateOperationsView3D",
+                "GrayboxFateOperationsController3D",
+            }, operations.TypeNames);
+            CollectionAssert.AreEqual(new[] { edit, play },
+                operations.RequiredTestFiles);
+            StringAssert.Contains("四份不可变快照", operations.UseSummary);
+            StringAssert.Contains("不直接写 runtime、schema 或文件",
+                operations.BoundarySummary);
+            StringAssert.Contains("Host 绑定到唯一 Rewind Service",
+                operations.BoundarySummary);
+            StringAssert.Contains("读取必须二次确认",
+                operations.BoundarySummary);
+
+            ProjectReuseEntry rewind = FindReuse(
+                catalog,
+                "formal-rewind-anchor-store");
+            CollectionAssert.Contains(rewind.RequiredTestFiles, edit);
+            CollectionAssert.Contains(rewind.RequiredTestFiles, play);
+            StringAssert.Contains("Create/Read/Clear UI 命令已接",
+                rewind.BoundarySummary);
+            StringAssert.Contains("只能调用 Host 暴露的 Rewind Service",
+                rewind.BoundarySummary);
         }
 
         [Test]

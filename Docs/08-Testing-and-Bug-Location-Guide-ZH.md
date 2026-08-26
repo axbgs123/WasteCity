@@ -64,7 +64,9 @@ schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSc
 
 三项 Lv.1 规则、Host、schema 33 effect DTO、虚空债规则时钟/关注度结算、坍缩伤害和事务回溯服务全部接线后，才允许 `EffectsReady=true`。随后运行 `GrayboxFateSelectionPresentationTests` 与 `GrayboxFateSelectionRuntimeInputTests`：正式新游戏与 schema 32 迁移后的待选状态必须显示三卡强制模态，卡片完整显示中文简介、Lv.1、Lv.2 与代价；第一次点击只进入二次确认，确认才经统一 Router 原子提交命轨 Lv.1 和关注度 `+5`。系统菜单优先于该模态，建造、背包、研究、移动和世界指针都不得穿透。
 
-这仍不是 Task 6 的最终玩家闭环：在回溯锚点创建/读取/清除按钮、三条命轨专属详情和失败原因完成真实输入接线前，只能写“强制选择与领域效果已实现待继续接线”，不能写“三命轨 UI 已全部完成”；Lv.2 双锚点与升级命令归文明升阶片继续完成。
+命轨专属详情运行 `GrayboxFateOperationsPresentationTests` 与 `GrayboxFateOperationsRuntimeInputTests`：关注度详情中的“命轨详情”必须按已选命轨显示旗舰/坍缩、分资源债务/结算或锚点槽；回溯锚点的创建、读取二次确认和清除按钮只能调用 Host 持有的正式 Service。真实读取必须恢复锚点世界、保留创建后的当前关注度并额外增加 `12`；面板与确认层逐层消费 `Escape`，且建造、背包、研究和世界输入不穿透。
+
+至此只可写“三条命轨 Lv.1 与玩家操作闭环自动化通过”。Lv.2 的袖珍宇宙×4/4×4、虚空债60秒、回溯双锚点和统一升级命令仍归文明升阶片继续完成；在升阶片通过前不能写“三命轨 Lv.2 已完成”。
 
 上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化、Task 4 的正式领域事件映射和 Task 5 的关注度可观察化，不证明三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
 

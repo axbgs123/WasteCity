@@ -622,7 +622,7 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(124));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(125));
             StringAssert.Contains("### 正式四路线科技运行时（推荐复用）", content);
             StringAssert.Contains("### 正式科技树确定性投影（复用前审查）", content);
             StringAssert.Contains(
@@ -633,6 +633,9 @@ namespace WasteCity.Tests
                 content);
             StringAssert.Contains(
                 "### 三维固定命轨强制选择 UI（复用前审查）",
+                content);
+            StringAssert.Contains(
+                "### 三维命轨专属详情与操作面板（复用前审查）",
                 content);
             StringAssert.Contains(
                 "### 袖珍宇宙命轨纯规则与生产适配边界（复用前审查）",

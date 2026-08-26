@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`e07c1ff3d7bdfa5ee6d87a2849870a9b3516d4d361da2093b48f7056198ce8db`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`16b87ed4788a1c64728784a653fe7d23b686af1a98efb2e1eedf5b9285f1fa2a`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -62,6 +62,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalDefenseCampaignPersistence3D.cs`
@@ -316,6 +318,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
@@ -367,6 +371,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxDefenseWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxFateOperationsView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFateSelectionView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFormalMixedProfilerHeartbeat3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFormalSaveRuntimeHost3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`

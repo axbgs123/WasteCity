@@ -195,6 +195,45 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void IDEA0020_ClearCommitsMetadataOnlyAfterStoreSuccess()
+        {
+            using (Harness harness = Harness.Create())
+            {
+                SelectRewind(harness.Fate);
+                var metadata = new FormalRewindAnchorMetadataRuntime();
+                object service = CreateService(harness, metadata);
+                AssertResult(CreateAnchor(service, 15L), true, "Created");
+                long nextOrdinal =
+                    metadata.Capture().NextCreationOrdinal;
+                ulong revision = metadata.Capture().Revision;
+
+                AssertResult(Invoke(service, "Clear"), true, "Cleared");
+
+                Assert.That(harness.Store.Load().Code,
+                    Is.EqualTo(FormalRewindAnchorStoreCode.NoAnchor));
+                Assert.That(metadata.Capture().Entries, Is.Empty);
+                Assert.That(metadata.Capture().NextCreationOrdinal,
+                    Is.EqualTo(nextOrdinal));
+                Assert.That(metadata.Capture().Revision,
+                    Is.EqualTo(revision + 1UL));
+            }
+
+            var files = new FailingWriteFileSystem { FailNextDelete = true };
+            using (Harness harness = Harness.Create(files))
+            {
+                SelectRewind(harness.Fate);
+                var metadata = new FormalRewindAnchorMetadataRuntime();
+                object service = CreateService(harness, metadata);
+                AssertResult(CreateAnchor(service, 16L), true, "Created");
+                FormalRewindAnchorMetadataSnapshot before = metadata.Capture();
+
+                AssertResult(Invoke(service, "Clear"),
+                    false, "StoreFailed");
+                Assert.That(metadata.Capture(), Is.SameAs(before));
+            }
+        }
+
         private object CreateService(
             Harness harness,
             FormalRewindAnchorMetadataRuntime metadata = null)
@@ -580,6 +619,7 @@ namespace WasteCity.Tests
                 new Dictionary<string, byte[]>(StringComparer.Ordinal);
             private int ordinal;
             public bool FailNextWrite { get; set; }
+            public bool FailNextDelete { get; set; }
             public bool FileExists(string path) => files.ContainsKey(path);
             public byte[] ReadAllBytes(string path) =>
                 files.TryGetValue(path, out byte[] value)
@@ -606,7 +646,15 @@ namespace WasteCity.Tests
                 files[destination] = value;
                 files.Remove(source);
             }
-            public void DeleteIfExists(string path) => files.Remove(path);
+            public void DeleteIfExists(string path)
+            {
+                if (FailNextDelete)
+                {
+                    FailNextDelete = false;
+                    throw new IOException("injected delete failure");
+                }
+                files.Remove(path);
+            }
         }
     }
 }

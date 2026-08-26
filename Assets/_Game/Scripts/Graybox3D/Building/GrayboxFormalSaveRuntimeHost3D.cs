@@ -55,6 +55,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxProgressionHudView3D progressionView;
         [SerializeField]
         private GrayboxFateSelectionView3D fateSelectionView;
+        [SerializeField]
+        private GrayboxFateOperationsView3D fateOperationsView;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
             new GrayboxFormalSaveWriteIntentLatch3D();
@@ -78,6 +80,7 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxRewindAnchorService3D rewindAnchorService;
         private GrayboxProgressionHudController3D progressionHudController;
         private GrayboxFateSelectionController3D fateSelectionController;
+        private GrayboxFateOperationsController3D fateOperationsController;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -122,6 +125,8 @@ namespace WasteCity.Graybox3D.Building
             progressionHudController;
         public GrayboxFateSelectionController3D FateSelectionController =>
             fateSelectionController;
+        public GrayboxFateOperationsController3D FateOperationsController =>
+            fateOperationsController;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -301,6 +306,26 @@ namespace WasteCity.Graybox3D.Building
                     HandleFateSelectionCommitted;
                 fateSelectionController.RefreshIfChanged();
             }
+            if (fateOperationsController == null &&
+                fateOperationsView != null && progressionView != null)
+            {
+                fateOperationsController =
+                    new GrayboxFateOperationsController3D(
+                        FateRuntime,
+                        PocketUniverseEffect,
+                        VoidDebtRuntime,
+                        RewindAnchorMetadata,
+                        fateOperationsView);
+                progressionView.FateDetailsRequested +=
+                    HandleFateDetailsRequested;
+                fateOperationsView.CreateRewindAnchorRequested +=
+                    HandleCreateRewindAnchorRequested;
+                fateOperationsView.ReadRewindAnchorRequested +=
+                    HandleReadRewindAnchorRequested;
+                fateOperationsView.ClearRewindAnchorRequested +=
+                    HandleClearRewindAnchorRequested;
+                fateOperationsController.RefreshIfChanged();
+            }
             IsInitialized = true;
             return true;
         }
@@ -320,6 +345,7 @@ namespace WasteCity.Graybox3D.Building
             }
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
+            fateOperationsController?.RefreshIfChanged();
 
             ResetCheckpointBaseline();
             currentSessionId = Guid.NewGuid().ToString("N");
@@ -361,6 +387,7 @@ namespace WasteCity.Graybox3D.Building
                 LastStoreResult.Envelope.formal3D.sessionId;
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
+            fateOperationsController?.RefreshIfChanged();
             writeIntent.AdoptContinuedProgress();
             automaticCheckpointFailureBlocked = false;
             automaticCheckpointFailureRevision = 0;
@@ -490,6 +517,7 @@ namespace WasteCity.Graybox3D.Building
         {
             TickVoidDebt();
             fateSelectionController?.RefreshIfChanged();
+            fateOperationsController?.RefreshIfChanged();
             progressionHudController?.RefreshIfChanged();
             if (!IsInitialized || checkpointPolicy == null ||
                 !checkpointPolicy.HasPending)
@@ -532,6 +560,18 @@ namespace WasteCity.Graybox3D.Building
                 fateSelectionController.Dispose();
                 fateSelectionController = null;
             }
+            if (fateOperationsView != null)
+            {
+                progressionView.FateDetailsRequested -=
+                    HandleFateDetailsRequested;
+                fateOperationsView.CreateRewindAnchorRequested -=
+                    HandleCreateRewindAnchorRequested;
+                fateOperationsView.ReadRewindAnchorRequested -=
+                    HandleReadRewindAnchorRequested;
+                fateOperationsView.ClearRewindAnchorRequested -=
+                    HandleClearRewindAnchorRequested;
+            }
+            fateOperationsController = null;
             progressionAdapter = null;
             voidDebtRuntime = null;
             pocketUniverseEffect = null;
@@ -715,6 +755,62 @@ namespace WasteCity.Graybox3D.Building
             checkpointPolicy.QueueCheckpoint(
                 FormalSaveCheckpointReasonIds.FateSelectionComplete,
                 "fate-selection:" + fateId);
+        }
+
+        private void HandleFateDetailsRequested()
+        {
+            if (fateOperationsController?.TryOpen() == true)
+                progressionHudController?.RefreshIfChanged();
+        }
+
+        private void HandleCreateRewindAnchorRequested()
+        {
+            if (rewindAnchorService == null || checkpointPolicy == null) return;
+            var checkpoint = new FormalSaveCheckpointMetadata
+            {
+                sequence = checkpointPolicy.Sequence + 1L,
+                reasonId = FormalSaveCheckpointReasonIds.RewindAnchorCreated,
+                ruleTimeSeconds = session.CheckpointRuleTimeSeconds,
+                completedMilestoneIds = CopyAndSort(
+                    checkpointPolicy.CompletedMilestoneIds),
+            };
+            GrayboxRewindAnchorServiceResult3D result =
+                rewindAnchorService.Create(
+                    ResolveGameVersion(),
+                    new[] { "builtin:wastecity@" + ResolveGameVersion() },
+                    checkpoint,
+                    DateTime.UtcNow);
+            if (result.Success)
+            {
+                checkpointPolicy.QueueCheckpoint(
+                    FormalSaveCheckpointReasonIds.RewindAnchorCreated,
+                    "rewind-anchor-created:" +
+                    RewindAnchorMetadata.Revision);
+                fateOperationsController?.RefreshIfChanged();
+            }
+        }
+
+        private void HandleReadRewindAnchorRequested()
+        {
+            GrayboxRewindAnchorServiceResult3D result =
+                rewindAnchorService?.Read();
+            if (result?.Success != true || checkpointPolicy == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.RewindAnchorUsed,
+                "rewind-anchor-used:" + AttentionRuntime.Revision);
+            pocketUniverseController?.SynchronizeSelection();
+            fateOperationsController?.RefreshIfChanged();
+        }
+
+        private void HandleClearRewindAnchorRequested()
+        {
+            GrayboxRewindAnchorServiceResult3D result =
+                rewindAnchorService?.Clear();
+            if (result?.Success != true || checkpointPolicy == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.RewindAnchorCleared,
+                "rewind-anchor-cleared:" + RewindAnchorMetadata.Revision);
+            fateOperationsController?.RefreshIfChanged();
         }
 
         private static void ConfigureStoreRootForTesting(string root)

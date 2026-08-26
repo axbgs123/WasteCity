@@ -252,6 +252,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlement*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
@@ -264,6 +265,7 @@
         "Assets/_Game/Scripts/UI/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**"
       ],
@@ -282,6 +284,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
@@ -291,6 +294,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
@@ -2253,6 +2257,29 @@
       ]
     },
     {
+      "Id": "graybox-fate-operations-ui-3d",
+      "ChineseName": "三维命轨专属详情与操作面板",
+      "TypeNames": [
+        "GrayboxFateOperationsView3D",
+        "GrayboxFateOperationsController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsController3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以四份不可变快照和引用缓存显示已选命轨、袖珍旗舰与坍缩、虚空债务与结算、回溯锚点槽，并提供真实 UGUI Create、Read、Clear 与读取二次确认。",
+      "BoundarySummary": "只读取 Fate/Pocket/Void/Rewind 不可变快照并发布命令事件，不直接写 runtime、schema 或文件；回溯 Create/Read/Clear 必须由 Host 绑定到唯一 Rewind Service。未选命轨不开放，读取必须二次确认。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
       "Id": "pocket-universe-fate-effect",
       "ChineseName": "袖珍宇宙命轨纯规则与生产适配边界",
       "TypeNames": [
@@ -2328,11 +2355,13 @@
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "通过内部 Store、元数据 runtime 与 Coordinator 服务捕获和恢复非递归 schema 33 锚点，同时保留当前关注度并原子追加回溯代价。",
-      "BoundarySummary": "Lv.1 Store、Host 组合、schema 33 元数据与服务已接，但仍不是第二个玩家存档槽；玩家创建/读取按钮、命轨专属详情和 Lv.2 双锚点仍未接。失败不得改写主档、波前重试档、关注度或既有锚点。",
+      "BoundarySummary": "Lv.1 Store、Host、schema 33 元数据与 Create/Read/Clear UI 命令已接，但仍不是第二个玩家存档槽；所有按钮只能调用 Host 暴露的 Rewind Service，不能直接写 runtime 或文件。Lv.2 双锚点仍未接。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalRewindAnchorStoreTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalRewindAnchorMetadataRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorMetadataRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"

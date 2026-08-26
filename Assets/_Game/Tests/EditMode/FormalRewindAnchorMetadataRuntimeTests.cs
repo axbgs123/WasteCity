@@ -112,6 +112,41 @@ namespace WasteCity.Tests
             Assert.That(Capture(target), Is.SameAs(before));
         }
 
+        [Test]
+        public void IDEA0020_ClearPlanIsBoundIdempotentAndKeepsOrdinalHighWater()
+        {
+            object runtime = New("FormalRewindAnchorMetadataRuntime");
+            Assert.That(TryPrepare(runtime, "hash-clear", 10L,
+                out object upsert, out _), Is.True);
+            Assert.That(TryCommit(runtime, upsert, out _), Is.True);
+            object before = Capture(runtime);
+            ulong revision = Read<ulong>(before, "Revision");
+            long nextOrdinal = Read<long>(before, "NextCreationOrdinal");
+
+            Assert.That(TryPrepareClear(runtime, out object clear, out _),
+                Is.True);
+            Assert.That(Capture(runtime), Is.SameAs(before));
+            Assert.That(TryCommitClear(runtime, clear, out string error),
+                Is.True, error);
+            object cleared = Capture(runtime);
+            Assert.That(Entries(cleared), Is.Empty);
+            Assert.That(Read<long>(cleared, "NextCreationOrdinal"),
+                Is.EqualTo(nextOrdinal));
+            Assert.That(Read<ulong>(cleared, "Revision"),
+                Is.EqualTo(revision + 1UL));
+            Assert.That(TryCommitClear(runtime, clear, out _), Is.False);
+
+            object other = New("FormalRewindAnchorMetadataRuntime");
+            Assert.That(TryPrepareClear(runtime, out object foreign, out _),
+                Is.True);
+            Assert.That(TryCommitClear(other, foreign, out _), Is.False);
+            ulong emptyRevision = Read<ulong>(Capture(runtime), "Revision");
+            Assert.That(TryCommitClear(runtime, foreign, out _), Is.True);
+            Assert.That(Read<ulong>(Capture(runtime), "Revision"),
+                Is.EqualTo(emptyRevision),
+                "Clearing an already empty slot is idempotent.");
+        }
+
         private static bool TryPrepare(
             object runtime,
             string hash,
@@ -170,6 +205,37 @@ namespace WasteCity.Tests
                 BindingFlags.Instance | BindingFlags.Public);
             Assert.That(method, Is.Not.Null);
             object[] arguments = { snapshot, null };
+            bool result = (bool)method.Invoke(runtime, arguments);
+            error = arguments[1] as string;
+            return result;
+        }
+
+        private static bool TryPrepareClear(
+            object runtime,
+            out object plan,
+            out string error)
+        {
+            MethodInfo method = runtime.GetType().GetMethod(
+                "TryPrepareClear",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(method, Is.Not.Null);
+            object[] arguments = { null, null };
+            bool result = (bool)method.Invoke(runtime, arguments);
+            plan = arguments[0];
+            error = arguments[1] as string;
+            return result;
+        }
+
+        private static bool TryCommitClear(
+            object runtime,
+            object plan,
+            out string error)
+        {
+            MethodInfo method = runtime.GetType().GetMethod(
+                "TryCommitClear",
+                BindingFlags.Instance | BindingFlags.Public);
+            Assert.That(method, Is.Not.Null);
+            object[] arguments = { plan, null };
             bool result = (bool)method.Invoke(runtime, arguments);
             error = arguments[1] as string;
             return result;

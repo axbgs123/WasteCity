@@ -22,6 +22,7 @@ namespace WasteCity.Graybox3D.Building
         private GameObject detailsBlocker;
         private Button statusButton;
         private Button closeButton;
+        private Button fateDetailsButton;
         private GameObject detailsRoot;
         private Text valueLabel;
         private Text stageLabel;
@@ -40,6 +41,8 @@ namespace WasteCity.Graybox3D.Building
         public bool IsFateSelectionOpen { get; private set; }
         public int RenderCount { get; private set; }
         public bool IsDetailsOpen { get; private set; }
+
+        public event Action FateDetailsRequested;
 
         public void Configure(Canvas configuredCanvas)
         {
@@ -162,10 +165,33 @@ namespace WasteCity.Graybox3D.Building
             recentReasonsLabel = CreateText(
                 details,
                 "Progression.AttentionDetails.RecentReasons",
-                new Vector2(18f, 18f),
+                new Vector2(18f, 54f),
                 new Vector2(-18f, -42f),
                 16,
                 TextAnchor.UpperLeft);
+            RectTransform fateDetails = CreateRect(
+                details,
+                "Progression.AttentionDetails.Fate");
+            fateDetails.anchorMin = new Vector2(0f, 0f);
+            fateDetails.anchorMax = new Vector2(0f, 0f);
+            fateDetails.pivot = Vector2.zero;
+            fateDetails.anchoredPosition = new Vector2(18f, 12f);
+            fateDetails.sizeDelta = new Vector2(150f, 34f);
+            Image fateImage = fateDetails.gameObject.AddComponent<Image>();
+            fateImage.color = StatusColor;
+            fateImage.raycastTarget = true;
+            fateDetailsButton = fateDetails.gameObject.AddComponent<Button>();
+            fateDetailsButton.targetGraphic = fateImage;
+            fateDetailsButton.onClick.AddListener(
+                HandleFateDetailsRequested);
+            Text fateText = CreateText(
+                fateDetails,
+                "Progression.AttentionDetails.Fate.Label",
+                Vector2.zero,
+                Vector2.zero,
+                14,
+                TextAnchor.MiddleCenter);
+            fateText.text = "命轨详情";
             RectTransform close = CreateRect(
                 details,
                 "Progression.AttentionDetails.Close");
@@ -274,8 +300,12 @@ namespace WasteCity.Graybox3D.Building
                 statusButton.onClick.RemoveListener(OpenDetails);
             if (closeButton != null)
                 closeButton.onClick.RemoveListener(CloseDetails);
+            if (fateDetailsButton != null)
+                fateDetailsButton.onClick.RemoveListener(
+                    HandleFateDetailsRequested);
             statusButton = null;
             closeButton = null;
+            fateDetailsButton = null;
             valueLabel = null;
             stageLabel = null;
             thresholdLabel = null;
@@ -296,6 +326,11 @@ namespace WasteCity.Graybox3D.Building
             {
                 DestroyObject(previousUiRoot);
             }
+        }
+
+        private void HandleFateDetailsRequested()
+        {
+            FateDetailsRequested?.Invoke();
         }
 
         private void OnDestroy()

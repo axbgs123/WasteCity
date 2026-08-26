@@ -10,6 +10,7 @@ namespace WasteCity.Graybox3D.Building
     {
         Created,
         Replaced,
+        Cleared,
         ReadSucceeded,
         WrongFate,
         SafetyBlocked,
@@ -210,6 +211,11 @@ namespace WasteCity.Graybox3D.Building
 
             FormalSaveEnvelope target = loaded.Envelope;
             target.formal3D.progression.attention = candidate.attention;
+            if (metadata != null)
+            {
+                target.formal3D.progression.fateEffects.rewindAnchors =
+                    candidate.fateEffects.rewindAnchors;
+            }
             target.payloadHashSha256 =
                 FormalSaveCodec.ComputePayloadHashSha256(target.formal3D);
             FormalSaveValidationResult validation =
@@ -235,6 +241,40 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxRewindAnchorServiceCode3D.ReadSucceeded,
                 true,
                 "已读取回溯锚点，关注度增加 12");
+        }
+
+        public GrayboxRewindAnchorServiceResult3D Clear()
+        {
+            GrayboxRewindAnchorServiceResult3D unavailable =
+                CheckAvailability();
+            if (unavailable != null) return unavailable;
+
+            FormalRewindAnchorMetadataClearPlan metadataPlan = null;
+            if (metadata != null && !metadata.TryPrepareClear(
+                    out metadataPlan,
+                    out string metadataError))
+            {
+                return Failure(
+                    GrayboxRewindAnchorServiceCode3D.StoreFailed,
+                    "无法准备清理回溯锚点元数据",
+                    metadataError);
+            }
+
+            FormalRewindAnchorStoreResult cleared = store.Clear();
+            if (!cleared.Success) return StoreFailure(cleared);
+            if (metadata != null && !metadata.TryCommitClear(
+                    metadataPlan,
+                    out string commitError))
+            {
+                return Failure(
+                    GrayboxRewindAnchorServiceCode3D.StoreFailed,
+                    "锚点文件已清理但元数据提交失败",
+                    commitError);
+            }
+            return new GrayboxRewindAnchorServiceResult3D(
+                GrayboxRewindAnchorServiceCode3D.Cleared,
+                true,
+                "已清理回溯锚点");
         }
 
         private GrayboxRewindAnchorServiceResult3D CheckAvailability()
@@ -282,12 +322,19 @@ namespace WasteCity.Graybox3D.Building
             var candidateFate = new FormalFateRuntime();
             if (!candidateFate.TryRestore(fate.Capture(), out error))
                 return false;
+            var candidateMetadata = new FormalRewindAnchorMetadataRuntime();
+            if (metadata != null && !candidateMetadata.TryRestore(
+                    metadata.Capture(),
+                    out error))
+            {
+                return false;
+            }
             candidate = new GrayboxFormalProgressionSaveAdapter3D(
                     candidateAttention,
                     candidateFate,
                     new PocketUniverseFateEffect(),
                     new FormalVoidDebtRuntime(),
-                    new FormalRewindAnchorMetadataRuntime())
+                    candidateMetadata)
                 .Capture();
             error = string.Empty;
             return true;

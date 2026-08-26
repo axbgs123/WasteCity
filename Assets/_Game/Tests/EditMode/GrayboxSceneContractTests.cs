@@ -930,6 +930,9 @@ namespace WasteCity.Tests
             GrayboxFateSelectionView3D fateSelectionView =
                 operationsTransform.GetComponent<
                     GrayboxFateSelectionView3D>();
+            GrayboxFateOperationsView3D fateOperationsView =
+                operationsTransform.GetComponent<
+                    GrayboxFateOperationsView3D>();
             Transform systems = RequiredChild(root, "GrayboxSystems");
             GrayboxOperationsController3D controller =
                 RequiredComponent<GrayboxOperationsController3D>(
@@ -961,6 +964,7 @@ namespace WasteCity.Tests
             Assert.That(view, Is.Not.Null);
             Assert.That(progressionView, Is.Not.Null);
             Assert.That(fateSelectionView, Is.Not.Null);
+            Assert.That(fateOperationsView, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
                 Has.Length.EqualTo(1));
@@ -975,10 +979,14 @@ namespace WasteCity.Tests
             Assert.That(
                 Object.FindObjectsOfType<GrayboxFateSelectionView3D>(true),
                 Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxFateOperationsView3D>(true),
+                Has.Length.EqualTo(1));
 
             AssertReference(view, "canvas", operationsCanvas);
             AssertReference(progressionView, "canvas", operationsCanvas);
             AssertReference(fateSelectionView, "canvas", operationsCanvas);
+            AssertReference(fateOperationsView, "canvas", operationsCanvas);
             AssertReference(
                 formalSaveHost,
                 "progressionView",
@@ -988,6 +996,10 @@ namespace WasteCity.Tests
                 "fateSelectionView",
                 fateSelectionView);
             AssertReference(
+                formalSaveHost,
+                "fateOperationsView",
+                fateOperationsView);
+            AssertReference(
                 coordinator,
                 "progressionView",
                 progressionView);
@@ -995,6 +1007,10 @@ namespace WasteCity.Tests
                 coordinator,
                 "fateSelectionView",
                 fateSelectionView);
+            AssertReference(
+                coordinator,
+                "fateOperationsView",
+                fateOperationsView);
             AssertReference(
                 controller,
                 "session",

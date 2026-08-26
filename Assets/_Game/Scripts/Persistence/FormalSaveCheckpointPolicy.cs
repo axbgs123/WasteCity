@@ -22,6 +22,9 @@ namespace WasteCity.Persistence
 
         public const string FateSelectionComplete =
             "fate-selection-complete";
+        public const string RewindAnchorCreated = "rewind-anchor-created";
+        public const string RewindAnchorUsed = "rewind-anchor-used";
+        public const string RewindAnchorCleared = "rewind-anchor-cleared";
         public const string BossEventStarted = "boss-event-started";
     }
 

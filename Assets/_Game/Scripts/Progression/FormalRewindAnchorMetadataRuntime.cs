@@ -189,6 +189,24 @@ namespace WasteCity.Progression
         internal bool Consumed { get; set; }
     }
 
+    public sealed class FormalRewindAnchorMetadataClearPlan
+    {
+        internal FormalRewindAnchorMetadataClearPlan(
+            FormalRewindAnchorMetadataRuntime owner,
+            FormalRewindAnchorMetadataSnapshot expected,
+            bool hadEntry)
+        {
+            Owner = owner;
+            Expected = expected;
+            HadEntry = hadEntry;
+        }
+
+        internal FormalRewindAnchorMetadataRuntime Owner { get; }
+        internal FormalRewindAnchorMetadataSnapshot Expected { get; }
+        internal bool HadEntry { get; }
+        internal bool Consumed { get; set; }
+    }
+
     public sealed class FormalRewindAnchorMetadataRuntime
     {
         public const int MaximumAnchorsAtLevelOne = 1;
@@ -264,6 +282,51 @@ namespace WasteCity.Progression
             nextCreationOrdinal = entry.CreationOrdinal + 1;
             unchecked { revision++; }
             plan.Consumed = true;
+            RebuildSnapshot();
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryPrepareClear(
+            out FormalRewindAnchorMetadataClearPlan plan,
+            out string error)
+        {
+            plan = new FormalRewindAnchorMetadataClearPlan(
+                this,
+                cachedSnapshot,
+                entry != null);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TryCommitClear(
+            FormalRewindAnchorMetadataClearPlan plan,
+            out string error)
+        {
+            if (plan == null || !ReferenceEquals(plan.Owner, this))
+            {
+                error = "回溯锚点清理计划不属于当前运行时";
+                return false;
+            }
+            if (plan.Consumed)
+            {
+                error = "回溯锚点清理计划已提交";
+                return false;
+            }
+            if (!ReferenceEquals(plan.Expected, cachedSnapshot))
+            {
+                error = "回溯锚点清理计划已过期";
+                return false;
+            }
+
+            plan.Consumed = true;
+            if (!plan.HadEntry)
+            {
+                error = string.Empty;
+                return true;
+            }
+            entry = null;
+            unchecked { revision++; }
             RebuildSnapshot();
             error = string.Empty;
             return true;
