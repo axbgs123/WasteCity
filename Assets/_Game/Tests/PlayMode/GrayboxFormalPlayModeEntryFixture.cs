@@ -12,6 +12,7 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
+using WasteCity.Progression;
 using Object = UnityEngine.Object;
 
 namespace WasteCity.Tests
@@ -46,7 +47,9 @@ namespace WasteCity.Tests
                 new object[] { isolatedStoreRoot });
         }
 
-        public static IEnumerator StartNewProgressThroughRealUi(Mouse mouse)
+        public static IEnumerator StartNewProgressThroughRealUi(
+            Mouse mouse,
+            bool completeFateSelection = true)
         {
             Assert.That(mouse, Is.Not.Null);
             GrayboxFormalSaveEntryController3D entry =
@@ -69,6 +72,21 @@ namespace WasteCity.Tests
                 Is.True,
                 "Starting a fresh formal progress must checkpoint only into " +
                 "the isolated PlayMode slot.");
+            if (completeFateSelection)
+            {
+                yield return ClickButton(
+                    "FateSelection.Card." +
+                    FormalFateCatalog.RewindAnchorId,
+                    mouse);
+                yield return ClickButton("FateSelection.Confirm", mouse);
+                GrayboxFormalSaveRuntimeHost3D host =
+                    Object.FindObjectOfType<
+                        GrayboxFormalSaveRuntimeHost3D>();
+                Assert.That(host, Is.Not.Null);
+                Assert.That(host.FateRuntime.Capture().SelectedId,
+                    Is.EqualTo(
+                        FormalFateCatalog.RewindAnchorId));
+            }
         }
 
         public static void CleanupIsolatedStore()

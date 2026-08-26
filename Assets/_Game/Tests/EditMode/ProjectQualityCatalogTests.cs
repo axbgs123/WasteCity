@@ -228,11 +228,11 @@ namespace WasteCity.Tests
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
-                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
-                "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
-                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
+                "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs|Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
+                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
-                "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
+                "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
                 "legacy-rules-compatibility|先检查历史规则、schema 1–30 兼容与固定回归样本|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Persistence/Legacy2D/**",
@@ -480,6 +480,13 @@ namespace WasteCity.Tests
                 "FormalThreeDAttentionSaveData",
                 "FormalThreeDAttentionHistorySaveData",
                 "FormalThreeDFateSaveData",
+                "FormalThreeDFateEffectsSaveData",
+                "FormalThreeDPocketUniverseSaveData",
+                "FormalThreeDPocketUniverseFlagshipSaveData",
+                "FormalThreeDVoidDebtSaveData",
+                "FormalThreeDVoidDebtEntrySaveData",
+                "FormalThreeDRewindAnchorMetadataSaveData",
+                "FormalThreeDRewindAnchorEntrySaveData",
                 "FormalThreeDCivilizationSaveData",
                 "FormalThreeDWorldSaveData",
                 "FormalThreeDResourceNodeSaveData",
@@ -1618,6 +1625,149 @@ namespace WasteCity.Tests
             StringAssert.Contains("不进入 schema", hud.BoundarySummary);
             StringAssert.Contains("EffectsReady=false", hud.BoundarySummary);
             StringAssert.Contains("零重复刷新", hud.BoundarySummary);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0020FateDomainControlBoundaries()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            const string spec =
+                "Docs/superpowers/specs/" +
+                "2026-08-26-idea-0020-progression-attention-fate-" +
+                "ascension-design.md";
+
+            ProjectFeatureGroup progression =
+                FindFeature(catalog, "research-population");
+            foreach (string test in new[]
+            {
+                "Assets/_Game/Tests/EditMode/PocketUniverseFateEffectTests.cs",
+                "Assets/_Game/Tests/EditMode/" +
+                    "PocketUniverseProductionIntegrationTests.cs",
+                "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
+                "Assets/_Game/Tests/EditMode/" +
+                    "GrayboxPocketUniverseFateControllerTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
+                "Assets/_Game/Tests/EditMode/" +
+                    "GrayboxPocketUniverseCollapseResolverTests.cs",
+                "Assets/_Game/Tests/EditMode/" +
+                    "GrayboxVoidDebtAttentionControllerTests.cs",
+                "Assets/_Game/Tests/EditMode/" +
+                    "FormalRewindAnchorMetadataRuntimeTests.cs",
+            })
+            {
+                CollectionAssert.Contains(progression.TestFileGlobs, test);
+            }
+
+            ProjectFeatureGroup economy = FindFeature(
+                catalog,
+                "economy-production-logistics");
+            CollectionAssert.Contains(
+                economy.SourceGlobs,
+                "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs");
+            CollectionAssert.Contains(
+                economy.PrimarySourceGlobs,
+                "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs");
+            CollectionAssert.Contains(economy.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/" +
+                "PocketUniverseProductionIntegrationTests.cs");
+            CollectionAssert.Contains(economy.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs");
+            CollectionAssert.Contains(economy.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxPocketUniverseFateControllerTests.cs");
+            CollectionAssert.Contains(economy.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs");
+            CollectionAssert.Contains(economy.RequirementIds, "IDEA-0020");
+            CollectionAssert.Contains(economy.HumanDocumentPaths, spec);
+
+            ProjectFeatureGroup persistence = FindFeature(
+                catalog,
+                "persistence-migration");
+            CollectionAssert.Contains(persistence.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalRewindAnchorStoreTests.cs");
+            CollectionAssert.Contains(persistence.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs");
+
+            ProjectReuseEntry pocket = FindReuse(
+                catalog,
+                "pocket-universe-fate-effect");
+            Assert.That(pocket.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.Contains(pocket.TypeNames,
+                "PocketUniverseFateEffect");
+            CollectionAssert.Contains(pocket.TypeNames,
+                "GrayboxPocketUniverseFateController3D");
+            CollectionAssert.Contains(pocket.TypeNames,
+                "GrayboxPocketUniverseCollapseResolver3D");
+            CollectionAssert.Contains(pocket.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxPocketUniverseFateControllerTests.cs");
+            StringAssert.Contains("Lv.1 已由 Host", pocket.BoundarySummary);
+            StringAssert.Contains("不修改输入、周期或容量",
+                pocket.BoundarySummary);
+            StringAssert.Contains("Lv.2 4×4", pocket.BoundarySummary);
+
+            ProjectReuseEntry debt = FindReuse(
+                catalog,
+                "formal-void-debt-runtime");
+            Assert.That(debt.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            CollectionAssert.Contains(debt.TypeNames,
+                "GrayboxVoidDebtController3D");
+            CollectionAssert.Contains(debt.TypeNames,
+                "GrayboxVoidDebtAttentionController3D");
+            CollectionAssert.Contains(debt.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs");
+            StringAssert.Contains("Lv.1 已由 Host", debt.BoundarySummary);
+            StringAssert.Contains("普通消费仍不得透支",
+                debt.BoundarySummary);
+            StringAssert.Contains("命轨专属详情", debt.BoundarySummary);
+
+            ProjectReuseEntry rewind = FindReuse(
+                catalog,
+                "formal-rewind-anchor-store");
+            Assert.That(rewind.FeatureGroupId,
+                Is.EqualTo("persistence-migration"));
+            CollectionAssert.AreEqual(new[]
+            {
+                "FormalRewindAnchorStoreResult",
+                "FormalRewindAnchorStore",
+                "GrayboxRewindAnchorService3D",
+                "FormalRewindAnchorMetadataRuntime",
+            }, rewind.TypeNames);
+            CollectionAssert.Contains(rewind.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs");
+            StringAssert.Contains("不是第二个玩家存档槽",
+                rewind.BoundarySummary);
+            StringAssert.Contains("Host 组合", rewind.BoundarySummary);
+            StringAssert.Contains("玩家创建/读取按钮", rewind.BoundarySummary);
+
+            ProjectReuseEntry adapter = FindReuse(
+                catalog,
+                "graybox-progression-save-adapter-3d");
+            CollectionAssert.Contains(adapter.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxFormalFateEffectsSaveAdapterTests.cs");
+            StringAssert.Contains("五个 owner", adapter.BoundarySummary);
+
+            ProjectReuseEntry fateUi = FindReuse(
+                catalog,
+                "graybox-fate-selection-ui-3d");
+            Assert.That(fateUi.FeatureGroupId, Is.EqualTo("ui-input"));
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxFateSelectionCard3D",
+                "GrayboxFateSelectionView3D",
+                "GrayboxFateSelectionController3D",
+            }, fateUi.TypeNames);
+            StringAssert.Contains("真实输入已接", fateUi.BoundarySummary);
+            StringAssert.Contains("回溯锚点创建/读取按钮",
+                fateUi.BoundarySummary);
+            foreach (ProjectReuseEntry entry in new[] { pocket, debt, rewind })
+                CollectionAssert.AreEqual(new[] { "IDEA-0020" },
+                    entry.RequirementIds);
         }
 
         [Test]

@@ -34,6 +34,8 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDAttentionSaveData attention =
             new FormalThreeDAttentionSaveData();
         public FormalThreeDFateSaveData fate = new FormalThreeDFateSaveData();
+        public FormalThreeDFateEffectsSaveData fateEffects =
+            new FormalThreeDFateEffectsSaveData();
         public FormalThreeDCivilizationSaveData civilization =
             new FormalThreeDCivilizationSaveData();
     }
@@ -75,6 +77,76 @@ namespace WasteCity.Persistence.ThreeD
         public string selectedId = string.Empty;
         public int level;
         public ulong revision;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDFateEffectsSaveData
+    {
+        public FormalThreeDPocketUniverseSaveData pocketUniverse =
+            new FormalThreeDPocketUniverseSaveData();
+        public FormalThreeDVoidDebtSaveData voidDebt =
+            new FormalThreeDVoidDebtSaveData();
+        public FormalThreeDRewindAnchorMetadataSaveData rewindAnchors =
+            new FormalThreeDRewindAnchorMetadataSaveData();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDPocketUniverseSaveData
+    {
+        public int level = 1;
+        public ulong revision;
+        public FormalThreeDPocketUniverseFlagshipSaveData[] flagships =
+            Array.Empty<FormalThreeDPocketUniverseFlagshipSaveData>();
+        public string[] collapsedFlagshipIds = Array.Empty<string>();
+        public string firstProductionFlagshipId = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDPocketUniverseFlagshipSaveData
+    {
+        public string buildingDefinitionId;
+        public string stableInstanceId;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDVoidDebtSaveData
+    {
+        public int level = 1;
+        public double settlementRemainingSeconds;
+        public ulong nextSettlementOrdinal = 1ul;
+        public ulong revision;
+        public FormalThreeDVoidDebtEntrySaveData[] debts =
+            Array.Empty<FormalThreeDVoidDebtEntrySaveData>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDVoidDebtEntrySaveData
+    {
+        public string resourceId;
+        public int amount;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDRewindAnchorMetadataSaveData
+    {
+        public ulong revision;
+        public long nextCreationOrdinal = 1L;
+        public FormalThreeDRewindAnchorEntrySaveData[] anchors =
+            Array.Empty<FormalThreeDRewindAnchorEntrySaveData>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDRewindAnchorEntrySaveData
+    {
+        public string stableAnchorId;
+        public string internalKey;
+        public long creationOrdinal;
+        public string sessionId;
+        public string payloadHashSha256;
+        public long checkpointSequence;
+        public string checkpointReasonId;
+        public float checkpointRuleTimeSeconds;
+        public string[] completedMilestoneIds = Array.Empty<string>();
     }
 
     [Serializable]

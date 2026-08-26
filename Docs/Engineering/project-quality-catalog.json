@@ -202,6 +202,9 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
@@ -248,6 +251,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlement*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
@@ -259,6 +263,7 @@
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/UI/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**"
       ],
@@ -276,6 +281,7 @@
         "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
@@ -284,6 +290,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
@@ -328,11 +335,19 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs",
+        "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
-        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs"
+        "Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
+        "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs"
       ],
       "FailureLocationSummary": "先检查库存、生产循环、物流网络和建筑接线",
       "TestFileGlobs": [
@@ -341,6 +356,7 @@
         "Assets/_Game/Tests/EditMode/CityResourceStorageCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProductionSimulationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionClockTests.cs",
@@ -349,6 +365,10 @@
         "Assets/_Game/Tests/EditMode/GrayboxProductionObservabilityFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionCombatLossTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtAttentionControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/PocketUniverseProductionIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
@@ -374,10 +394,12 @@
         "IDEA-0014",
         "IDEA-0015",
         "IDEA-0016",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -390,13 +412,25 @@
         "Assets/_Game/Scripts/Progression/**",
         "Assets/_Game/Scripts/Narrative/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
         "Assets/_Game/Scripts/Population/**",
         "Assets/_Game/Scripts/Progression/**",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs"
       ],
       "FailureLocationSummary": "先检查研究、人口、关注度、命轨、文明等级与升阶真值",
       "TestFileGlobs": [
@@ -411,7 +445,18 @@
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseCollapseResolverTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtAttentionControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorMetadataRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/PocketUniverseFateEffectTests.cs",
+        "Assets/_Game/Tests/EditMode/PocketUniverseProductionIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs"
       ],
@@ -523,18 +568,26 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
+        "Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
+        "Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs"
       ],
       "FailureLocationSummary": "先检查存档格式、迁移步骤和读写边界",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorStoreTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorMetadataRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalFateEffectsSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
@@ -1279,10 +1332,11 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在正式 Attention/Fate 运行时与 schema 33 progression DTO 之间确定性捕获、预检和原子恢复关注度、幂等历史、固定候选、已选命轨和等级。",
-      "BoundarySummary": "只映射已经验证的 Progression 快照并准备绑定 owner 和快照身份的零写入恢复计划；不计算关注度、不选择命轨、不执行命轨效果、不判断升阶资格、不读写文件或操作 UI。未知历史原因只作为孤儿证据保留，不能获得正式效果。",
+      "UseSummary": "在正式 Attention、Fate 与三条 Lv.1 命轨效果 owner 和 schema 33 progression/effect DTO 之间确定性捕获、预检和原子恢复全部当前真值。",
+      "BoundarySummary": "只映射已经验证的 Progression 与命轨效果快照并准备绑定五个 owner 身份的零写入恢复计划；不计算关注度、不选择命轨、不推进效果、不读写文件或操作 UI。Lv.2 字段与玩法仍属后续。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalFateEffectsSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs"
       ],
@@ -2169,6 +2223,116 @@
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-fate-selection-ui-3d",
+      "ChineseName": "三维固定命轨强制选择 UI",
+      "TypeNames": [
+        "GrayboxFateSelectionCard3D",
+        "GrayboxFateSelectionView3D",
+        "GrayboxFateSelectionController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以真实 UGUI 全屏阻断世界输入，完整显示固定三命轨目录文案，并通过二次确认和 ProgressionEventRouter 原子提交唯一 Lv.1 选择与 +5 关注度。",
+      "BoundarySummary": "强制选择与 Host/真实输入已接，但只开放当前 Lv.1；不直接写 Fate 或 Attention runtime，不提供回溯锚点创建/读取按钮，不显示三命轨专属运行详情，Lv.2 升级 UI 属后续。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "pocket-universe-fate-effect",
+      "ChineseName": "袖珍宇宙命轨纯规则与生产适配边界",
+      "TypeNames": [
+        "PocketUniverseBuildingCandidate",
+        "PocketUniverseFlagshipState",
+        "PocketUniverseCollapseCommand",
+        "PocketUniverseFateSnapshot",
+        "PocketUniverseFateEffect",
+        "GrayboxPocketUniverseFateController3D",
+        "GrayboxPocketUniverseCollapseResolver3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/PocketUniverseFateEffect.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从正式机器配方目录确定永久旗舰，由领域控制器接入生产批次和 +4 关注度，并由坍缩解析器把 Lv.1 3×3 命令接到正式建筑生命与战损提交。",
+      "BoundarySummary": "Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；不修改输入、周期或容量。正式建模与 Lv.2 4×4 升级仍属后续，不能把 Lv.2 写成已验证。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/PocketUniverseFateEffectTests.cs",
+        "Assets/_Game/Tests/EditMode/PocketUniverseProductionIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseCollapseResolverTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-void-debt-runtime",
+      "ChineseName": "虚空债纯规则运行时",
+      "TypeNames": [
+        "FormalVoidDebtEntry",
+        "FormalVoidDebtSnapshot",
+        "FormalVoidDebtRuntime",
+        "GrayboxVoidDebtController3D",
+        "GrayboxVoidDebtAttentionController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按正式资源维护债务与结算时钟，由领域控制器接入施工透支和收入还款，并把稳定周期键逐项原子提交到 Attention。",
+      "BoundarySummary": "Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；普通消费仍不得透支。命轨专属详情和 Lv.2 60 秒升级仍属后续，调用方不得直接制造负库存。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidDebtAttentionControllerTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-rewind-anchor-store",
+      "ChineseName": "正式回溯锚点内部 Store",
+      "TypeNames": [
+        "FormalRewindAnchorStoreResult",
+        "FormalRewindAnchorStore",
+        "GrayboxRewindAnchorService3D",
+        "FormalRewindAnchorMetadataRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/FormalRewindAnchorStore.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
+        "Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "通过内部 Store、元数据 runtime 与 Coordinator 服务捕获和恢复非递归 schema 33 锚点，同时保留当前关注度并原子追加回溯代价。",
+      "BoundarySummary": "Lv.1 Store、Host 组合、schema 33 元数据与服务已接，但仍不是第二个玩家存档槽；玩家创建/读取按钮、命轨专属详情和 Lv.2 双锚点仍未接。失败不得改写主档、波前重试档、关注度或既有锚点。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorStoreTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalRewindAnchorMetadataRuntimeTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"

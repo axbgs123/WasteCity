@@ -413,6 +413,7 @@ namespace WasteCity.Persistence
                 configurationSignature = source.configurationSignature,
                 attention = CopyAttention(source.attention),
                 fate = CopyFate(source.fate),
+                fateEffects = CopyFateEffects(source.fateEffects),
                 civilization = CopyCivilization(source.civilization),
             };
         }
@@ -486,6 +487,132 @@ namespace WasteCity.Persistence
                 level = source.level,
                 committedAscensionIds = SortedCopy(
                     source.committedAscensionIds),
+            };
+        }
+
+        private static FormalThreeDFateEffectsSaveData CopyFateEffects(
+            FormalThreeDFateEffectsSaveData source)
+        {
+            if (source == null) return null;
+            return new FormalThreeDFateEffectsSaveData
+            {
+                pocketUniverse = CopyPocketUniverse(source.pocketUniverse),
+                voidDebt = CopyVoidDebt(source.voidDebt),
+                rewindAnchors = CopyRewindAnchors(source.rewindAnchors),
+            };
+        }
+
+        private static FormalThreeDPocketUniverseSaveData CopyPocketUniverse(
+            FormalThreeDPocketUniverseSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDPocketUniverseFlagshipSaveData[] flagships =
+                source.flagships == null
+                    ? null
+                    : new FormalThreeDPocketUniverseFlagshipSaveData[
+                        source.flagships.Length];
+            if (flagships != null)
+            {
+                for (var index = 0; index < flagships.Length; index++)
+                {
+                    FormalThreeDPocketUniverseFlagshipSaveData item =
+                        source.flagships[index];
+                    flagships[index] = item == null
+                        ? null
+                        : new FormalThreeDPocketUniverseFlagshipSaveData
+                        {
+                            buildingDefinitionId = item.buildingDefinitionId,
+                            stableInstanceId = item.stableInstanceId,
+                        };
+                }
+            }
+            return new FormalThreeDPocketUniverseSaveData
+            {
+                level = source.level,
+                revision = source.revision,
+                flagships = flagships,
+                collapsedFlagshipIds = source.collapsedFlagshipIds == null
+                    ? null
+                    : (string[])source.collapsedFlagshipIds.Clone(),
+                firstProductionFlagshipId =
+                    source.firstProductionFlagshipId,
+            };
+        }
+
+        private static FormalThreeDVoidDebtSaveData CopyVoidDebt(
+            FormalThreeDVoidDebtSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDVoidDebtEntrySaveData[] debts = source.debts == null
+                ? null
+                : new FormalThreeDVoidDebtEntrySaveData[source.debts.Length];
+            if (debts != null)
+            {
+                for (var index = 0; index < debts.Length; index++)
+                {
+                    FormalThreeDVoidDebtEntrySaveData item =
+                        source.debts[index];
+                    debts[index] = item == null
+                        ? null
+                        : new FormalThreeDVoidDebtEntrySaveData
+                        {
+                            resourceId = item.resourceId,
+                            amount = item.amount,
+                        };
+                }
+            }
+            return new FormalThreeDVoidDebtSaveData
+            {
+                level = source.level,
+                settlementRemainingSeconds =
+                    source.settlementRemainingSeconds,
+                nextSettlementOrdinal = source.nextSettlementOrdinal,
+                revision = source.revision,
+                debts = debts,
+            };
+        }
+
+        private static FormalThreeDRewindAnchorMetadataSaveData
+            CopyRewindAnchors(FormalThreeDRewindAnchorMetadataSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDRewindAnchorEntrySaveData[] anchors =
+                source.anchors == null
+                    ? null
+                    : new FormalThreeDRewindAnchorEntrySaveData[
+                        source.anchors.Length];
+            if (anchors != null)
+            {
+                for (var index = 0; index < anchors.Length; index++)
+                {
+                    FormalThreeDRewindAnchorEntrySaveData item =
+                        source.anchors[index];
+                    anchors[index] = item == null
+                        ? null
+                        : new FormalThreeDRewindAnchorEntrySaveData
+                        {
+                            stableAnchorId = item.stableAnchorId,
+                            internalKey = item.internalKey,
+                            creationOrdinal = item.creationOrdinal,
+                            sessionId = item.sessionId,
+                            payloadHashSha256 = item.payloadHashSha256,
+                            checkpointSequence = item.checkpointSequence,
+                            checkpointReasonId = item.checkpointReasonId,
+                            checkpointRuleTimeSeconds =
+                                item.checkpointRuleTimeSeconds,
+                            completedMilestoneIds =
+                                item.completedMilestoneIds == null
+                                    ? null
+                                    : (string[])item.completedMilestoneIds
+                                        .Clone(),
+                        };
+                }
+            }
+            return new FormalThreeDRewindAnchorMetadataSaveData
+            {
+                revision = source.revision,
+                nextCreationOrdinal = source.nextCreationOrdinal,
+                anchors = anchors,
             };
         }
 
@@ -763,6 +890,7 @@ namespace WasteCity.Persistence
                     level = 0,
                     revision = 0,
                 },
+                fateEffects = new FormalThreeDFateEffectsSaveData(),
                 civilization = new FormalThreeDCivilizationSaveData
                 {
                     level = 1,

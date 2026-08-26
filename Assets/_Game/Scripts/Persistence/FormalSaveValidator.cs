@@ -433,6 +433,8 @@ namespace WasteCity.Persistence
                 return Missing(path + ".attention");
             if (progression.fate == null)
                 return Missing(path + ".fate");
+            if (progression.fateEffects == null)
+                return Missing(path + ".fateEffects");
             if (progression.civilization == null)
                 return Missing(path + ".civilization");
 
@@ -441,6 +443,11 @@ namespace WasteCity.Persistence
                 path + ".attention");
             if (result != null) return result;
             result = ValidateFate(progression.fate, path + ".fate");
+            if (result != null) return result;
+            result = ValidateFateEffects(
+                progression.fate,
+                progression.fateEffects,
+                path + ".fateEffects");
             if (result != null) return result;
             return ValidateCivilization(
                 progression.civilization,
@@ -672,6 +679,152 @@ namespace WasteCity.Persistence
                 : Invalid(
                     FormalSaveValidationError.InvalidEnumValue,
                     path + ".committedAscensionIds");
+        }
+
+        private static FormalSaveValidationResult ValidateFateEffects(
+            FormalThreeDFateSaveData fate,
+            FormalThreeDFateEffectsSaveData effects,
+            string path)
+        {
+            if (effects.pocketUniverse == null)
+                return Missing(path + ".pocketUniverse");
+            if (effects.voidDebt == null)
+                return Missing(path + ".voidDebt");
+            if (effects.rewindAnchors == null)
+                return Missing(path + ".rewindAnchors");
+            FormalThreeDPocketUniverseSaveData pocket =
+                effects.pocketUniverse;
+            FormalThreeDVoidDebtSaveData debt = effects.voidDebt;
+            FormalThreeDRewindAnchorMetadataSaveData rewind =
+                effects.rewindAnchors;
+            if (pocket.flagships == null ||
+                pocket.collapsedFlagshipIds == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".pocketUniverse");
+            if (debt.debts == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".voidDebt.debts");
+            if (rewind.anchors == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".rewindAnchors.anchors");
+
+            var flagships = new PocketUniverseFlagshipState[
+                pocket.flagships.Length];
+            for (var index = 0; index < flagships.Length; index++)
+            {
+                FormalThreeDPocketUniverseFlagshipSaveData item =
+                    pocket.flagships[index];
+                if (item == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".pocketUniverse.flagships[" + index + "]");
+                flagships[index] = new PocketUniverseFlagshipState(
+                    item.buildingDefinitionId,
+                    item.stableInstanceId);
+            }
+            var pocketRuntime = new PocketUniverseFateEffect();
+            if (!pocketRuntime.TryRestore(
+                    new PocketUniverseFateSnapshot(
+                        pocket.level,
+                        pocket.revision,
+                        flagships,
+                        pocket.collapsedFlagshipIds,
+                        pocket.firstProductionFlagshipId),
+                    out _))
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".pocketUniverse");
+
+            var debts = new FormalVoidDebtEntry[debt.debts.Length];
+            for (var index = 0; index < debts.Length; index++)
+            {
+                FormalThreeDVoidDebtEntrySaveData item = debt.debts[index];
+                if (item == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".voidDebt.debts[" + index + "]");
+                debts[index] = new FormalVoidDebtEntry(
+                    item.resourceId,
+                    item.amount);
+            }
+            FormalVoidDebtRuntime debtRuntime;
+            try
+            {
+                debtRuntime = new FormalVoidDebtRuntime(debt.level);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".voidDebt.level");
+            }
+            if (!debtRuntime.TryRestore(
+                    new FormalVoidDebtSnapshot(
+                        debt.level,
+                        debt.settlementRemainingSeconds,
+                        debt.nextSettlementOrdinal,
+                        debt.revision,
+                        debts),
+                    out _))
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".voidDebt");
+
+            bool pocketSelected = string.Equals(
+                fate.selectedId,
+                FormalFateCatalog.PocketUniverseId,
+                StringComparison.Ordinal);
+            bool debtSelected = string.Equals(
+                fate.selectedId,
+                FormalFateCatalog.VoidDebtId,
+                StringComparison.Ordinal);
+            bool rewindSelected = string.Equals(
+                fate.selectedId,
+                FormalFateCatalog.RewindAnchorId,
+                StringComparison.Ordinal);
+            if ((!pocketSelected &&
+                 (pocket.flagships.Length != 0 ||
+                  pocket.collapsedFlagshipIds.Length != 0 ||
+                  !string.IsNullOrEmpty(pocket.firstProductionFlagshipId))) ||
+                (!debtSelected &&
+                 (debt.debts.Length != 0 ||
+                  debt.settlementRemainingSeconds != 0d)) ||
+                (!rewindSelected && rewind.anchors.Length != 0) ||
+                (pocketSelected && pocket.level != fate.level) ||
+                (debtSelected && debt.level != fate.level) ||
+                rewind.nextCreationOrdinal <= 0L)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path);
+
+            var anchorIds = new HashSet<string>(StringComparer.Ordinal);
+            long previousCreation = 0L;
+            for (var index = 0; index < rewind.anchors.Length; index++)
+            {
+                FormalThreeDRewindAnchorEntrySaveData item =
+                    rewind.anchors[index];
+                if (item == null ||
+                    !IsStableId(item.stableAnchorId) ||
+                    string.IsNullOrWhiteSpace(item.internalKey) ||
+                    string.IsNullOrWhiteSpace(item.sessionId) ||
+                    string.IsNullOrWhiteSpace(item.payloadHashSha256) ||
+                    string.IsNullOrWhiteSpace(item.checkpointReasonId) ||
+                    item.checkpointSequence < 0 ||
+                    float.IsNaN(item.checkpointRuleTimeSeconds) ||
+                    float.IsInfinity(item.checkpointRuleTimeSeconds) ||
+                    item.checkpointRuleTimeSeconds < 0f ||
+                    item.completedMilestoneIds == null ||
+                    item.creationOrdinal <= previousCreation ||
+                    !anchorIds.Add(item.stableAnchorId))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".rewindAnchors.anchors[" + index + "]");
+                previousCreation = item.creationOrdinal;
+            }
+            return null;
         }
 
         private static bool IsAppliedDeltaValid(

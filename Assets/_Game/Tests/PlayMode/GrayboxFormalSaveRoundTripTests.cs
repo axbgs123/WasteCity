@@ -23,6 +23,7 @@ using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 using WasteCity.Research;
 using Object = UnityEngine.Object;
 
@@ -482,6 +483,10 @@ namespace WasteCity.Tests
                 yield return ClickButton("Start.NewGameConfirm");
             Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
             Assert.That(entry.IsStartPageOpen, Is.False);
+            yield return ClickButton(
+                "FateSelection.Card." +
+                FormalFateCatalog.RewindAnchorId);
+            yield return ClickButton("FateSelection.Confirm");
             SetDevelopmentRuleTime(1f);
         }
 

@@ -53,6 +53,7 @@ namespace WasteCity.Graybox3D.Building
         private bool hasPublishedContentHash;
         private readonly List<ProductionStateMeasurement> stepMeasurements =
             new List<ProductionStateMeasurement>();
+        private IFormalProductionOutputModifier outputModifier;
 
         public GrayboxProductionRuntime3D Runtime { get; } =
             new GrayboxProductionRuntime3D();
@@ -64,6 +65,7 @@ namespace WasteCity.Graybox3D.Building
         public ulong StatisticsRevision { get; private set; }
         public ProductionStatisticsDelta LastStatisticsDelta { get; private set; } =
             ProductionStatisticsDelta.Empty;
+        public Exception LastBatchNotificationFailure { get; private set; }
         internal WorldMapModel LatestWorld => latestWorld;
         internal CityResourceStorageModel LatestCityStorage =>
             latestCityStorage;
@@ -71,6 +73,15 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxProductionClock3D()
         {
             Commands = new GrayboxProductionCommandFacade3D(this);
+        }
+
+        public event Action<BuildingProductionState, ulong>
+            ProductionBatchesCompleted;
+
+        public void ConfigureOutputModifier(
+            IFormalProductionOutputModifier modifier)
+        {
+            outputModifier = modifier;
         }
 
         public void Tick(
@@ -112,7 +123,8 @@ namespace WasteCity.Graybox3D.Building
                     cityInventory,
                     cityCapacity,
                     Runtime.ActiveWarehouseCount,
-                    globallyPaused: false);
+                    globallyPaused: false,
+                    outputModifier: outputModifier);
                 CompleteStepMeasurements(
                     ref completedProductionBatchCount,
                     ref productionActiveProgressSeconds);
@@ -166,7 +178,8 @@ namespace WasteCity.Graybox3D.Building
                     StepSeconds,
                     world,
                     cityStorage,
-                    globallyPaused: false);
+                    globallyPaused: false,
+                    outputModifier: outputModifier);
                 CompleteStepMeasurements(
                     ref completedProductionBatchCount,
                     ref productionActiveProgressSeconds);
@@ -219,6 +232,10 @@ namespace WasteCity.Graybox3D.Building
                     measurement.State.CompletionRevision -
                     measurement.CompletionRevision;
                 completedProductionBatchCount += (int)completedCycles;
+                if (completedCycles > 0)
+                    PublishBatchesCompleted(
+                        measurement.State,
+                        completedCycles);
                 float activeSeconds =
                     (completedCycles * measurement.State.Definition.DurationSeconds) +
                     measurement.State.ProgressSeconds -
@@ -226,6 +243,28 @@ namespace WasteCity.Graybox3D.Building
                 productionActiveProgressSeconds += Math.Max(
                     0f,
                     Math.Min(StepSeconds, activeSeconds));
+            }
+        }
+
+        private void PublishBatchesCompleted(
+            BuildingProductionState state,
+            ulong completedCycles)
+        {
+            Action<BuildingProductionState, ulong> handlers =
+                ProductionBatchesCompleted;
+            if (handlers == null) return;
+            Delegate[] subscribers = handlers.GetInvocationList();
+            for (var index = 0; index < subscribers.Length; index++)
+            {
+                try
+                {
+                    ((Action<BuildingProductionState, ulong>)
+                        subscribers[index])(state, completedCycles);
+                }
+                catch (Exception exception)
+                {
+                    LastBatchNotificationFailure = exception;
+                }
             }
         }
 

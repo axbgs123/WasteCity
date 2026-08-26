@@ -77,7 +77,7 @@ namespace WasteCity.Tests
         public void IDEA0020_CatalogKeepsEffectsClosedUntilAllAdaptersExist()
         {
             Type catalog = RequireType(CatalogTypeName);
-            Assert.That(ReadStatic<bool>(catalog, "EffectsReady"), Is.False);
+            Assert.That(ReadStatic<bool>(catalog, "EffectsReady"), Is.True);
             Assert.That(ReadConstant(catalog, "MaximumLevel"), Is.EqualTo(9));
         }
 

@@ -62,6 +62,8 @@ namespace WasteCity.Graybox3D.Building
         public SingleCityDefenseCampaignSnapshot CampaignSnapshot =>
             runtime?.CampaignSnapshot;
         public GrayboxBuildingHealthRuntime3D BuildingHealth => buildingHealth;
+        public GrayboxCombatDestructionCoordinator3D DestructionCoordinator =>
+            destructionCoordinator;
         public GrayboxCombatDestructionResult3D LastDestructionResult =>
             runtime?.LastDestructionResult;
         public GrayboxDefenseWorldView3D WorldView => worldView;

@@ -1084,6 +1084,9 @@ namespace WasteCity.Editor
             GrayboxProgressionHudView3D progressionView =
                 EnsureComponent<GrayboxProgressionHudView3D>(
                     operationsTransform);
+            GrayboxFateSelectionView3D fateSelectionView =
+                EnsureComponent<GrayboxFateSelectionView3D>(
+                    operationsTransform);
             RemoveMissingMonoBehavioursFromExactObject(
                 operationsTransform.gameObject);
             GrayboxDefenseHud3D defenseHud =
@@ -1158,7 +1161,8 @@ namespace WasteCity.Editor
                 ("production", buildingReferences.Production),
                 ("defense", buildingReferences.DefenseController),
                 ("evacuation", buildingReferences.Evacuation),
-                ("progressionView", progressionView));
+                ("progressionView", progressionView),
+                ("fateSelectionView", fateSelectionView));
             SetReferences(
                 formalSaveEntry,
                 ("runtimeHost", formalSaveHost),
@@ -1170,6 +1174,7 @@ namespace WasteCity.Editor
                 ("canvas", operationsCanvas),
                 ("resourceIconCatalog", resourceIconCatalog));
             SetReferences(progressionView, ("canvas", operationsCanvas));
+            SetReferences(fateSelectionView, ("canvas", operationsCanvas));
             SetReferences(
                 defenseHud,
                 ("canvas", operationsCanvas),
@@ -1207,7 +1212,8 @@ namespace WasteCity.Editor
                 ("operations", operationsController),
                 ("defense", buildingReferences.DefenseController),
                 ("formalSaveEntry", formalSaveEntry),
-                ("progressionView", progressionView));
+                ("progressionView", progressionView),
+                ("fateSelectionView", fateSelectionView));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
@@ -1222,6 +1228,12 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The graybox scene progression HUD is not unique.");
+            }
+            if (RequireSingle<GrayboxFateSelectionView3D>(scene) !=
+                    fateSelectionView)
+            {
+                throw new InvalidOperationException(
+                    "The graybox scene fate selection view is not unique.");
             }
             if (RequireSingle<GrayboxFormalSaveRuntimeHost3D>(scene) !=
                     formalSaveHost ||

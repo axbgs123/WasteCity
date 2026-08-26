@@ -33,6 +33,7 @@ namespace WasteCity.Tests
             Type root = progression.FieldType;
             Type attention = RequireField(root, "attention").FieldType;
             Type fate = RequireField(root, "fate").FieldType;
+            Type effects = RequireField(root, "fateEffects").FieldType;
             Type civilization = RequireField(root, "civilization").FieldType;
 
             RequireField(attention, "value", typeof(int));
@@ -47,6 +48,18 @@ namespace WasteCity.Tests
             RequireField(fate, "level", typeof(int));
             RequireField(fate, "revision", typeof(ulong));
 
+            Type pocket = RequireField(effects, "pocketUniverse").FieldType;
+            Type debt = RequireField(effects, "voidDebt").FieldType;
+            Type rewind = RequireField(effects, "rewindAnchors").FieldType;
+            RequireArray(pocket, "flagships");
+            RequireArray(pocket, "collapsedFlagshipIds", typeof(string));
+            RequireField(pocket, "firstProductionFlagshipId", typeof(string));
+            RequireArray(debt, "debts");
+            RequireField(debt, "settlementRemainingSeconds", typeof(double));
+            RequireField(debt, "nextSettlementOrdinal", typeof(ulong));
+            RequireArray(rewind, "anchors");
+            RequireField(rewind, "nextCreationOrdinal", typeof(long));
+
             RequireField(civilization, "level", typeof(int));
             RequireArray(civilization, "committedAscensionIds", typeof(string));
         }
@@ -58,6 +71,7 @@ namespace WasteCity.Tests
             object progression = ReadField(envelope.formal3D, "progression");
             object attention = ReadField(progression, "attention");
             object fate = ReadField(progression, "fate");
+            object effects = ReadField(progression, "fateEffects");
             object civilization = ReadField(progression, "civilization");
 
             WriteField(attention, "value", 42);
@@ -84,6 +98,16 @@ namespace WasteCity.Tests
             WriteField(fate, "selectedId", FateIds[1]);
             WriteField(fate, "level", 1);
             WriteField(fate, "revision", 1ul);
+            object voidDebt = ReadField(effects, "voidDebt");
+            WriteField(voidDebt, "settlementRemainingSeconds", 23d);
+            WriteField(voidDebt, "debts", new[]
+            {
+                new FormalThreeDVoidDebtEntrySaveData
+                {
+                    resourceId = "core.resource.stone",
+                    amount = 7,
+                },
+            });
             WriteField(civilization, "level", 1);
             WriteField(civilization, "committedAscensionIds",
                 Array.Empty<string>());
@@ -105,6 +129,12 @@ namespace WasteCity.Tests
             Assert.That(Read<string>(actualFate, "selectedId"),
                 Is.EqualTo(FateIds[1]));
             Assert.That(Read<int>(actualFate, "level"), Is.EqualTo(1));
+            object actualEffects = ReadField(actual, "fateEffects");
+            object actualDebt = ReadField(actualEffects, "voidDebt");
+            Assert.That(Read<double>(actualDebt,
+                "settlementRemainingSeconds"), Is.EqualTo(23d));
+            Assert.That(((Array)ReadField(actualDebt, "debts")).Length,
+                Is.EqualTo(1));
             Assert.That(Read<int>(ReadField(actual, "civilization"), "level"),
                 Is.EqualTo(1));
         }
@@ -115,12 +145,15 @@ namespace WasteCity.Tests
         [TestCase("unknown-fate")]
         [TestCase("unselected-with-level")]
         [TestCase("selected-with-zero-level")]
+        [TestCase("void-debt-while-pocket")]
+        [TestCase("negative-void-debt")]
         public void IDEA0020_ValidatorRejectsInvalidProgressionTruth(string fault)
         {
             FormalSaveEnvelope envelope = MigratedFixture();
             object progression = ReadField(envelope.formal3D, "progression");
             object attention = ReadField(progression, "attention");
             object fate = ReadField(progression, "fate");
+            object effects = ReadField(progression, "fateEffects");
 
             switch (fault)
             {
@@ -144,6 +177,28 @@ namespace WasteCity.Tests
                     break;
                 case "selected-with-zero-level":
                     Select(fate, FateIds[0], 0);
+                    break;
+                case "void-debt-while-pocket":
+                    Select(fate, FateIds[0], 1);
+                    WriteField(ReadField(effects, "voidDebt"), "debts", new[]
+                    {
+                        new FormalThreeDVoidDebtEntrySaveData
+                        {
+                            resourceId = "core.resource.stone",
+                            amount = 2,
+                        },
+                    });
+                    break;
+                case "negative-void-debt":
+                    Select(fate, FateIds[1], 1);
+                    WriteField(ReadField(effects, "voidDebt"), "debts", new[]
+                    {
+                        new FormalThreeDVoidDebtEntrySaveData
+                        {
+                            resourceId = "core.resource.stone",
+                            amount = -1,
+                        },
+                    });
                     break;
             }
 

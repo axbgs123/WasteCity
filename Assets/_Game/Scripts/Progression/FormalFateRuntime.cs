@@ -48,7 +48,7 @@ namespace WasteCity.Progression
             RebuildSnapshot();
         }
 
-        public bool EffectsReady => false;
+        public bool EffectsReady => FormalFateCatalog.EffectsReady;
 
         public bool TrySelect(
             string fateId,

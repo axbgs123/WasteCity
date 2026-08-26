@@ -60,6 +60,12 @@ schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSc
 
 真实输入运行 `GrayboxProgressionRuntimeInputTests`、`GrayboxUsabilityRuntimeSceneTests` 与 `GrayboxSceneContractTests`：必须从正式新游戏入口进入，用真实 UGUI 指针点击关注度状态打开最近三条详情；详情打开时建造、背包、研究、修改器和世界输入不得穿透，`Escape` 只关闭详情并清理 UI 焦点，下一输入帧恢复正常。`EffectsReady=false` 时可以准备固定三命轨展示资料，但不得强制打开选择界面，也不得向玩家声称命轨效果已经启用。
 
+三命轨效果的基础片分别运行 `PocketUniverseFateEffectTests`、`PocketUniverseProductionIntegrationTests`、`GrayboxPocketUniverseFateControllerTests`、`FormalVoidDebtRuntimeTests`、`GrayboxVoidDebtIntegrationTests`、`FormalRewindAnchorStoreTests` 与 `GrayboxRewindAnchorServiceTests`。袖珍宇宙必须从正式机器生产目录推导类别，旗舰资格稳定且不转移，完整批次按 Lv.1×2/Lv.2×4 在写入前检查容量，输入和周期不变；首次真实旗舰批次只提交一次 `+4`，Attention 失败时回滚首次生产事实；纯坍缩命令只能按旗舰稳定 ID 生成一次。虚空债只有正式建造付款策略可以现金加债务，格子或表现失败必须同时回滚现金和债务；同资源收入在城市库存提交前优先偿债，生产、研究、合成和转移仍不能借。回溯锚点 Store 必须使用独立隐藏内部槽和正式 codec/validator/原子文件事务，服务层读取前保留当前完整 Attention 并增加 `12`，再经 Coordinator 单次事务恢复；绝不复用玩家存档或波前重试槽，也不能递归保存锚点载荷。
+
+三项 Lv.1 规则、Host、schema 33 effect DTO、虚空债规则时钟/关注度结算、坍缩伤害和事务回溯服务全部接线后，才允许 `EffectsReady=true`。随后运行 `GrayboxFateSelectionPresentationTests` 与 `GrayboxFateSelectionRuntimeInputTests`：正式新游戏与 schema 32 迁移后的待选状态必须显示三卡强制模态，卡片完整显示中文简介、Lv.1、Lv.2 与代价；第一次点击只进入二次确认，确认才经统一 Router 原子提交命轨 Lv.1 和关注度 `+5`。系统菜单优先于该模态，建造、背包、研究、移动和世界指针都不得穿透。
+
+这仍不是 Task 6 的最终玩家闭环：在回溯锚点创建/读取/清除按钮、三条命轨专属详情和失败原因完成真实输入接线前，只能写“强制选择与领域效果已实现待继续接线”，不能写“三命轨 UI 已全部完成”；Lv.2 双锚点与升级命令归文明升阶片继续完成。
+
 上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化、Task 4 的正式领域事件映射和 Task 5 的关注度可观察化，不证明三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界

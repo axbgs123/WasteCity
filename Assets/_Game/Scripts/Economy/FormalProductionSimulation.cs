@@ -5,6 +5,11 @@ using WasteCity.World;
 
 namespace WasteCity.Economy
 {
+    public interface IFormalProductionOutputModifier
+    {
+        int OutputMultiplier(string stableInstanceId);
+    }
+
     public sealed class FormalProductionSimulation
     {
         private readonly List<BuildingProductionState> orderedStates =
@@ -17,7 +22,8 @@ namespace WasteCity.Economy
             ResourceInventory cityInventory,
             ResourceCapacityPolicy cityCapacity,
             int activeWarehouseCount,
-            bool globallyPaused)
+            bool globallyPaused,
+            IFormalProductionOutputModifier outputModifier = null)
         {
             if (states == null || cityInventory == null || cityCapacity == null)
                 return;
@@ -47,7 +53,12 @@ namespace WasteCity.Economy
                     cityInventory,
                     cityCapacity,
                     activeWarehouseCount);
-                AdvanceProduction(state, safeDelta, world, cityInventory);
+                AdvanceProduction(
+                    state,
+                    safeDelta,
+                    world,
+                    cityInventory,
+                    outputModifier: outputModifier);
             }
         }
 
@@ -56,7 +67,8 @@ namespace WasteCity.Economy
             float deltaSeconds,
             WorldMapModel world,
             CityResourceStorageModel cityStorage,
-            bool globallyPaused)
+            bool globallyPaused,
+            IFormalProductionOutputModifier outputModifier = null)
         {
             if (states == null || cityStorage == null) return;
 
@@ -79,7 +91,8 @@ namespace WasteCity.Economy
                     safeDelta,
                     world,
                     cityInventory: null,
-                    cityStorage: cityStorage);
+                    cityStorage: cityStorage,
+                    outputModifier: outputModifier);
             }
         }
 
@@ -252,7 +265,8 @@ namespace WasteCity.Economy
             float deltaSeconds,
             WorldMapModel world,
             ResourceInventory cityInventory,
-            CityResourceStorageModel cityStorage = null)
+            CityResourceStorageModel cityStorage = null,
+            IFormalProductionOutputModifier outputModifier = null)
         {
             if (state.IsPlayerPaused)
             {
@@ -268,7 +282,8 @@ namespace WasteCity.Economy
                         state,
                         world,
                         cityInventory,
-                        cityStorage))
+                        cityStorage,
+                        outputModifier))
                 {
                     return;
                 }
@@ -285,7 +300,7 @@ namespace WasteCity.Economy
 
                 state.Advance(needed);
                 remaining -= needed;
-                if (!TryCompleteCycle(state, world))
+                if (!TryCompleteCycle(state, world, outputModifier))
                     return;
 
                 if (remaining <= 0f)
@@ -294,7 +309,8 @@ namespace WasteCity.Economy
                         state,
                         world,
                         cityInventory,
-                        cityStorage);
+                        cityStorage,
+                        outputModifier);
                     return;
                 }
             }
@@ -304,9 +320,13 @@ namespace WasteCity.Economy
             BuildingProductionState state,
             WorldMapModel world,
             ResourceInventory cityInventory,
-            CityResourceStorageModel cityStorage = null)
+            CityResourceStorageModel cityStorage = null,
+            IFormalProductionOutputModifier outputModifier = null)
         {
             FormalProductionDefinition definition = state.Definition;
+            int outputMultiplier = ResolveOutputMultiplier(
+                state,
+                outputModifier);
             string outputResourceId = ResolveOutputResourceId(state, world);
             if (string.IsNullOrEmpty(outputResourceId))
             {
@@ -315,13 +335,16 @@ namespace WasteCity.Economy
             }
 
             if (definition.UsesBoundResourceNode &&
-                !HasHarvestableCompatibleNode(state, world))
+                !HasHarvestableCompatibleNode(
+                    state,
+                    world,
+                    outputMultiplier))
             {
                 state.SetStopReason(ProductionStopReason.Depleted);
                 return false;
             }
 
-            if (!CanStoreCycleOutputs(state, world))
+            if (!CanStoreCycleOutputs(state, world, outputMultiplier))
             {
                 state.SetStopReason(ProductionStopReason.OutputFull);
                 return false;
@@ -373,9 +396,13 @@ namespace WasteCity.Economy
 
         private static bool TryCompleteCycle(
             BuildingProductionState state,
-            WorldMapModel world)
+            WorldMapModel world,
+            IFormalProductionOutputModifier outputModifier)
         {
             FormalProductionDefinition definition = state.Definition;
+            int outputMultiplier = ResolveOutputMultiplier(
+                state,
+                outputModifier);
             if (definition.UsesBoundResourceNode)
             {
                 string pendingResourceId = ResolveOutputResourceId(state, world);
@@ -386,8 +413,10 @@ namespace WasteCity.Economy
                     return false;
                 }
 
+                int multipliedOutput =
+                    definition.OutputAmount * outputMultiplier;
                 if (state.Output.Get(pendingResourceId) +
-                    definition.OutputAmount > definition.OutputCapacity)
+                    multipliedOutput > definition.OutputCapacity)
                 {
                     state.SetStopReason(ProductionStopReason.OutputFull);
                     return false;
@@ -399,9 +428,9 @@ namespace WasteCity.Economy
                     : world.Harvest(
                         state.BoundNodeX,
                         state.BoundNodeY,
-                        definition.OutputAmount,
+                        multipliedOutput,
                         out resourceId);
-                if (harvested != definition.OutputAmount ||
+                if (harvested != multipliedOutput ||
                     !BuildingResourceNodeCompatibilityRules.IsCompatible(
                         BuildingCatalog.MiningStation,
                         resourceId) ||
@@ -412,7 +441,10 @@ namespace WasteCity.Economy
                     return false;
                 }
             }
-            else if (!TryStoreAllOutputs(state.Output, definition.Outputs))
+            else if (!TryStoreAllOutputs(
+                         state.Output,
+                         definition.Outputs,
+                         outputMultiplier))
             {
                 state.SetStopReason(ProductionStopReason.OutputFull);
                 return false;
@@ -424,23 +456,29 @@ namespace WasteCity.Economy
 
         private static bool CanStoreCycleOutputs(
             BuildingProductionState state,
-            WorldMapModel world)
+            WorldMapModel world,
+            int outputMultiplier)
         {
             FormalProductionDefinition definition = state.Definition;
             if (definition.UsesBoundResourceNode)
             {
                 string resourceId = ResolveOutputResourceId(state, world);
                 return !string.IsNullOrEmpty(resourceId) &&
-                    state.Output.Get(resourceId) + definition.OutputAmount <=
+                    state.Output.Get(resourceId) +
+                    definition.OutputAmount * outputMultiplier <=
                     definition.OutputCapacity;
             }
 
-            return CanStoreAllOutputs(state.Output, definition.Outputs);
+            return CanStoreAllOutputs(
+                state.Output,
+                definition.Outputs,
+                outputMultiplier);
         }
 
         private static bool CanStoreAllOutputs(
             ResourceInventory inventory,
-            IReadOnlyList<ResourceAmount> outputs)
+            IReadOnlyList<ResourceAmount> outputs,
+            int outputMultiplier = 1)
         {
             if (inventory == null || outputs == null || outputs.Count == 0)
                 return false;
@@ -454,6 +492,7 @@ namespace WasteCity.Economy
                 }
 
                 int total = AggregateAmount(outputs, output.ResourceId);
+                if (total > 0) total *= outputMultiplier;
                 if (total <= 0) return false;
                 if (inventory.Get(output.ResourceId) + total >
                     inventory.CapacityPerResource)
@@ -466,9 +505,13 @@ namespace WasteCity.Economy
 
         private static bool TryStoreAllOutputs(
             ResourceInventory inventory,
-            IReadOnlyList<ResourceAmount> outputs)
+            IReadOnlyList<ResourceAmount> outputs,
+            int outputMultiplier = 1)
         {
-            if (!CanStoreAllOutputs(inventory, outputs)) return false;
+            if (!CanStoreAllOutputs(
+                    inventory,
+                    outputs,
+                    outputMultiplier)) return false;
 
             string previousResourceId = null;
             for (var committed = 0; committed < outputs.Count; committed++)
@@ -478,14 +521,16 @@ namespace WasteCity.Economy
                     previousResourceId);
                 if (resourceId == null) return true;
 
-                int total = AggregateAmount(outputs, resourceId);
+                int total =
+                    AggregateAmount(outputs, resourceId) * outputMultiplier;
                 int before = inventory.Get(resourceId);
                 if (inventory.Add(resourceId, total) != total)
                 {
                     RollBackStoredOutputs(
                         inventory,
                         outputs,
-                        previousResourceId);
+                        previousResourceId,
+                        outputMultiplier);
                     inventory.Restore(resourceId, before);
                     return false;
                 }
@@ -564,7 +609,8 @@ namespace WasteCity.Economy
         private static void RollBackStoredOutputs(
             ResourceInventory inventory,
             IReadOnlyList<ResourceAmount> outputs,
-            string lastCommittedResourceId)
+            string lastCommittedResourceId,
+            int outputMultiplier = 1)
         {
             string previousResourceId = null;
             while (true)
@@ -585,7 +631,7 @@ namespace WasteCity.Economy
                 inventory.Restore(
                     resourceId,
                     inventory.Get(resourceId) -
-                    AggregateAmount(outputs, resourceId));
+                    AggregateAmount(outputs, resourceId) * outputMultiplier);
                 previousResourceId = resourceId;
             }
         }
@@ -659,7 +705,8 @@ namespace WasteCity.Economy
 
         private static bool HasHarvestableCompatibleNode(
             BuildingProductionState state,
-            WorldMapModel world)
+            WorldMapModel world,
+            int outputMultiplier = 1)
         {
             if (world == null ||
                 state.BoundNodeX < 0 || state.BoundNodeY < 0 ||
@@ -670,10 +717,21 @@ namespace WasteCity.Economy
             }
 
             WorldCell cell = world.Get(state.BoundNodeX, state.BoundNodeY);
-            return cell.ResourceAmount >= state.Definition.OutputAmount &&
+            return cell.ResourceAmount >=
+                state.Definition.OutputAmount * outputMultiplier &&
                 BuildingResourceNodeCompatibilityRules.IsCompatible(
                     BuildingCatalog.MiningStation,
                     cell.ResourceId);
+        }
+
+        private static int ResolveOutputMultiplier(
+            BuildingProductionState state,
+            IFormalProductionOutputModifier outputModifier)
+        {
+            if (state == null || outputModifier == null) return 1;
+            return Math.Max(
+                1,
+                outputModifier.OutputMultiplier(state.StableInstanceId));
         }
 
         private static string ResolveOutputResourceId(

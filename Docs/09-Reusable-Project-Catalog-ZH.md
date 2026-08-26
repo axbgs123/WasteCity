@@ -118,7 +118,7 @@
 
 ### 正式三维文明进程存档适配器（复用前审查）
 
-能解决什么：在正式 Attention/Fate 运行时和 schema 33 Progression DTO 之间确定性捕获与恢复关注度、阈值、幂等事件、结构化历史、固定候选、已选命轨和等级。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs`。怎么复用：在正式 Attention/Fate 运行时与 schema 33 progression DTO 之间确定性捕获、预检和原子恢复关注度、幂等历史、固定候选、已选命轨和等级。不能负责什么：只映射已经验证的 Progression 快照并准备绑定 owner 和快照身份的零写入恢复计划；不计算关注度、不选择命轨、不执行命轨效果、不判断升阶资格、不读写文件或操作 UI。未知历史原因只作为孤儿证据保留，不能获得正式效果。改后跑哪组测试：`GrayboxFormalProgressionSaveAdapterTests`、`FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`。代码名：`GrayboxFormalProgressionRestorePlan3D`、`GrayboxFormalProgressionSaveAdapter3D`。
+能解决什么：在五个正式进程 owner 与 schema 33 Progression/effect DTO 之间原子捕获和恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs`。怎么复用：在正式 Attention、Fate 与三条 Lv.1 命轨效果 owner 和 schema 33 progression/effect DTO 之间确定性捕获、预检和原子恢复全部当前真值。不能负责什么：只映射已经验证的 Progression 与命轨效果快照并准备绑定五个 owner 身份的零写入恢复计划；不计算关注度、不选择命轨、不推进效果、不读写文件或操作 UI。Lv.2 字段与玩法仍属后续。改后跑哪组测试：`GrayboxFormalProgressionSaveAdapterTests`、`GrayboxFormalFateEffectsSaveAdapterTests`、`FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`。代码名：`GrayboxFormalProgressionRestorePlan3D`、`GrayboxFormalProgressionSaveAdapter3D`。
 
 ### 三维首版防御存档适配器（复用前审查）
 
@@ -295,6 +295,22 @@
 ### 三维文明进程关注度 HUD（复用前审查）
 
 能解决什么：把正式关注度与固定命轨快照转换成常驻状态和可点击详情。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`。怎么复用：从正式 Attention/Fate 不可变快照投影关注度数值、四阶段、下一阈值、最近三条中文原因和固定命轨候选，并用真实 UGUI 状态按钮打开或关闭详情。不能负责什么：只读取不可变快照并更新真实 UGUI；不写 Attention/Fate runtime、不进入 schema、不复制关注度增量或命轨规则，也不得在 EffectsReady=false 时开放或强制弹出命轨选择。相同快照引用必须保持零重复刷新。改后跑哪组测试：`GrayboxProgressionPresentationTests`、`GrayboxProgressionRuntimeInputTests`。代码名：`GrayboxProgressionHudView3D`、`GrayboxProgressionHudController3D`。
+
+### 三维固定命轨强制选择 UI（复用前审查）
+
+能解决什么：在首次正式进度中阻断世界输入并让玩家二次确认唯一命轨。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`。怎么复用：以真实 UGUI 全屏阻断世界输入，完整显示固定三命轨目录文案，并通过二次确认和 ProgressionEventRouter 原子提交唯一 Lv.1 选择与 +5 关注度。不能负责什么：强制选择与 Host/真实输入已接，但只开放当前 Lv.1；不直接写 Fate 或 Attention runtime，不提供回溯锚点创建/读取按钮，不显示三命轨专属运行详情，Lv.2 升级 UI 属后续。改后跑哪组测试：`GrayboxFateSelectionPresentationTests`、`GrayboxFateSelectionRuntimeInputTests`。代码名：`GrayboxFateSelectionCard3D`、`GrayboxFateSelectionView3D`、`GrayboxFateSelectionController3D`。
+
+### 袖珍宇宙命轨纯规则与生产适配边界（复用前审查）
+
+能解决什么：确定每类正式生产建筑的唯一旗舰，并把倍率、首次生产关注度和 Lv.1 坍缩接到真实领域。在哪里：`Assets/_Game/Scripts/Progression/PocketUniverseFateEffect.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs`。怎么复用：从正式机器配方目录确定永久旗舰，由领域控制器接入生产批次和 +4 关注度，并由坍缩解析器把 Lv.1 3×3 命令接到正式建筑生命与战损提交。不能负责什么：Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；不修改输入、周期或容量。正式建模与 Lv.2 4×4 升级仍属后续，不能把 Lv.2 写成已验证。改后跑哪组测试：`PocketUniverseFateEffectTests`、`PocketUniverseProductionIntegrationTests`、`GrayboxPocketUniverseFateControllerTests`、`GrayboxPocketUniverseCollapseResolverTests`。代码名：`PocketUniverseBuildingCandidate`、`PocketUniverseFlagshipState`、`PocketUniverseCollapseCommand`、`PocketUniverseFateSnapshot`、`PocketUniverseFateEffect`、`GrayboxPocketUniverseFateController3D`、`GrayboxPocketUniverseCollapseResolver3D`。
+
+### 虚空债纯规则运行时（复用前审查）
+
+能解决什么：维护施工透支债务，并把借款、还款和周期关注度接到统一经济与进程事务。在哪里：`Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`。怎么复用：按正式资源维护债务与结算时钟，由领域控制器接入施工透支和收入还款，并把稳定周期键逐项原子提交到 Attention。不能负责什么：Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；普通消费仍不得透支。命轨专属详情和 Lv.2 60 秒升级仍属后续，调用方不得直接制造负库存。改后跑哪组测试：`FormalVoidDebtRuntimeTests`、`GrayboxVoidDebtIntegrationTests`、`GrayboxVoidDebtAttentionControllerTests`。代码名：`FormalVoidDebtEntry`、`FormalVoidDebtSnapshot`、`FormalVoidDebtRuntime`、`GrayboxVoidDebtController3D`、`GrayboxVoidDebtAttentionController3D`。
+
+### 正式回溯锚点内部 Store（复用前审查）
+
+能解决什么：在独立隐藏路径保存正式锚点，并通过 Coordinator、元数据与关注度事务安全恢复世界。在哪里：`Assets/_Game/Scripts/Persistence/FormalRewindAnchorStore.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`、`Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`。怎么复用：通过内部 Store、元数据 runtime 与 Coordinator 服务捕获和恢复非递归 schema 33 锚点，同时保留当前关注度并原子追加回溯代价。不能负责什么：Lv.1 Store、Host 组合、schema 33 元数据与服务已接，但仍不是第二个玩家存档槽；玩家创建/读取按钮、命轨专属详情和 Lv.2 双锚点仍未接。失败不得改写主档、波前重试档、关注度或既有锚点。改后跑哪组测试：`FormalRewindAnchorStoreTests`、`GrayboxRewindAnchorServiceTests`、`FormalRewindAnchorMetadataRuntimeTests`。代码名：`FormalRewindAnchorStoreResult`、`FormalRewindAnchorStore`、`GrayboxRewindAnchorService3D`、`FormalRewindAnchorMetadataRuntime`。
 
 ### 正式固定三命轨目录（复用前审查）
 

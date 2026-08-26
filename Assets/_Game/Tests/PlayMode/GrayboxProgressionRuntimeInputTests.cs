@@ -123,7 +123,7 @@ namespace WasteCity.Tests
                 "The persistent attention status must be a real UGUI button.");
             Assert.That(RequireSceneObject(AttentionValueName)
                     .GetComponent<Text>().text,
-                Does.Contain("10").And.Contain("100"));
+                Does.Contain("15").And.Contain("100"));
             GameObject details = RequireSceneObject(
                 AttentionDetailsName,
                 includeInactive: true);
@@ -144,7 +144,7 @@ namespace WasteCity.Tests
                 .GetComponent<Text>();
             Assert.That(recentReasons, Is.Not.Null);
             Assert.That(recentReasons.text,
-                Does.Contain("最近").And.Contain("暂无"));
+                Does.Contain("最近").And.Contain("选择命轨").And.Contain("+5"));
 
             yield return ClickUiElement(pointerProbe);
             Assert.That(pointerProbeClicks, Is.Zero,

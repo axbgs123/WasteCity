@@ -4,6 +4,21 @@ using System.Collections.ObjectModel;
 
 namespace WasteCity.Economy
 {
+    public interface ICityResourceCreditHook
+    {
+        bool IsCreditSuppressed { get; }
+
+        int GetRepaymentAmount(string resourceId, int requestedAmount);
+
+        bool TryCommitRepayment(
+            string resourceId,
+            int amount,
+            out object rollbackState,
+            out string error);
+
+        bool TryRollbackRepayment(object rollbackState, out string error);
+    }
+
     public enum WarehouseRemovalStatus
     {
         Completed,
@@ -204,6 +219,7 @@ namespace WasteCity.Economy
         private readonly int[] networkBefore = new int[ResourceIds.All.Length];
         private CityStorageOrphanResource[] orphanResources =
             Array.Empty<CityStorageOrphanResource>();
+        private ICityResourceCreditHook creditHook;
 
         public CityResourceStorageModel(
             ResourceInventory coreInventory,
@@ -224,6 +240,20 @@ namespace WasteCity.Economy
         public int CoreCapacityPerResource => coreCapacityPerResource;
         public int WarehouseCount => warehouses.Count;
         public Exception LastNotificationFailure => lastNotificationFailure;
+
+        public bool TrySetCreditHook(ICityResourceCreditHook hook)
+        {
+            if (disposed || hook == null) return false;
+            if (ReferenceEquals(creditHook, hook)) return true;
+            if (creditHook != null) return false;
+            creditHook = hook;
+            return true;
+        }
+
+        public void ClearCreditHook(ICityResourceCreditHook hook)
+        {
+            if (ReferenceEquals(creditHook, hook)) creditHook = null;
+        }
 
         public bool ContainsWarehouse(string stableInstanceId)
         {
@@ -483,8 +513,6 @@ namespace WasteCity.Economy
             if (!ResourceCapacityPolicy.IsRegisteredResource(resourceId))
                 return 0;
             long space = CoreAcceptableSpace(resourceId);
-            if (warehouses.Count == 0)
-                return space >= int.MaxValue ? int.MaxValue : (int)space;
             foreach (KeyValuePair<string, WarehouseStorageState> item in
                      warehouses)
             {
@@ -492,6 +520,12 @@ namespace WasteCity.Economy
                 if (warehouse.IsConnected && warehouse.CanAccept(resourceId))
                     space += warehouse.FreeSpace;
             }
+            if (creditHook != null && !creditHook.IsCreditSuppressed)
+                space += Math.Max(
+                    0,
+                    creditHook.GetRepaymentAmount(
+                        resourceId,
+                        int.MaxValue));
             return space >= int.MaxValue ? int.MaxValue : (int)space;
         }
 
@@ -565,10 +599,43 @@ namespace WasteCity.Economy
             {
                 return 0;
             }
+            ICityResourceCreditHook hook = creditHook;
+            int repayment = hook == null || hook.IsCreditSuppressed
+                ? 0
+                : Math.Min(
+                    requestedAmount,
+                    Math.Max(
+                        0,
+                        hook.GetRepaymentAmount(
+                            resourceId,
+                            requestedAmount)));
             StoragePlan plan = CreatePlan();
-            int accepted = plan.Add(resourceId, requestedAmount);
-            if (accepted > 0) Commit(plan);
-            return accepted;
+            int stored = plan.Add(
+                resourceId,
+                requestedAmount - repayment);
+            int accepted = repayment + stored;
+            if (accepted <= 0) return 0;
+
+            object rollbackState = null;
+            if (repayment > 0 && !hook.TryCommitRepayment(
+                    resourceId,
+                    repayment,
+                    out rollbackState,
+                    out _))
+            {
+                return 0;
+            }
+            try
+            {
+                if (stored > 0) Commit(plan);
+                return accepted;
+            }
+            catch
+            {
+                if (rollbackState != null)
+                    hook.TryRollbackRepayment(rollbackState, out _);
+                throw;
+            }
         }
 
         public bool TrySpendFromNetwork(string resourceId, int amount)
@@ -1064,6 +1131,7 @@ namespace WasteCity.Economy
             if (disposed) return;
             disposed = true;
             coreInventory.AttributedChanged -= HandleCoreChanged;
+            creditHook = null;
         }
 
         internal void RestoreChangeAttribution(

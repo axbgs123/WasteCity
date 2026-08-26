@@ -200,6 +200,7 @@ namespace WasteCity.Graybox3D.Building
         private PopulationModel population;
         private float checkpointRuleTimeSeconds;
         private GrayboxFormalRuleClock3D formalRuleClock;
+        private IGrayboxConstructionPaymentPolicy3D constructionPaymentPolicy;
 
         public bool DevelopmentFixtureEnabled => developmentFixtureEnabled;
         public ResourceInventory Inventory { get; private set; }
@@ -227,6 +228,12 @@ namespace WasteCity.Graybox3D.Building
             readOnlyInstances;
 
         public event Action<GrayboxBuildingInstance3D> BuildingCompleted;
+
+        public void ConfigureConstructionPaymentPolicy(
+            IGrayboxConstructionPaymentPolicy3D policy)
+        {
+            constructionPaymentPolicy = policy;
+        }
 
         public void ConfigureRuleClock(GrayboxFormalRuleClock3D ruleClock)
         {
@@ -375,9 +382,10 @@ namespace WasteCity.Graybox3D.Building
                 !evaluation.CompatibleResourceNode.IsValid)
                 return false;
 
-            if (!CityStorage.TrySpendFromNetwork(
+            if (!TryCommitConstructionPayment(
                     refreshed.Definition.CostId,
-                    refreshed.Definition.Cost))
+                    refreshed.Definition.Cost,
+                    out GrayboxConstructionPaymentReceipt3D paymentReceipt))
                 return false;
 
             if (!refreshed.Grid.TryRestore(
@@ -388,9 +396,12 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Site,
                     refreshed.Orientation))
             {
-                CityStorage.AddToNetwork(
-                    refreshed.Definition.CostId,
-                    refreshed.Definition.Cost);
+                if (!TryRollbackConstructionPayment(
+                        refreshed.Definition.CostId,
+                        refreshed.Definition.Cost,
+                        paymentReceipt))
+                    throw new InvalidOperationException(
+                        "Failed to rollback construction payment.");
                 return false;
             }
 
@@ -412,7 +423,8 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Grid,
                     placement,
                     refreshed.Definition.CostId,
-                    refreshed.Definition.Cost);
+                    refreshed.Definition.Cost,
+                    paymentReceipt);
                 if (cleanupFailure != null)
                     createFailure.Data[PresentationCleanupFailureDataKey] =
                         cleanupFailure;
@@ -426,7 +438,8 @@ namespace WasteCity.Graybox3D.Building
                     refreshed.Grid,
                     placement,
                     refreshed.Definition.CostId,
-                    refreshed.Definition.Cost);
+                    refreshed.Definition.Cost,
+                    paymentReceipt);
                 if (cleanupFailure != null) throw cleanupFailure;
                 return false;
             }
@@ -1744,9 +1757,14 @@ namespace WasteCity.Graybox3D.Building
                 IsResearchCompleted,
                 CompletedBuildingCount);
             bool canAfford = definition != null &&
-                CityStorage.CanSpendFromNetwork(
-                    definition.CostId,
-                    definition.Cost);
+                (constructionPaymentPolicy != null
+                    ? constructionPaymentPolicy.CanFundConstruction(
+                        CityStorage,
+                        definition.CostId,
+                        definition.Cost)
+                    : CityStorage.CanSpendFromNetwork(
+                        definition.CostId,
+                        definition.Cost));
             return new BuildingPlacementRequest(
                 definition,
                 evaluationGrid,
@@ -2009,10 +2027,44 @@ namespace WasteCity.Graybox3D.Building
             BuildingGrid grid,
             PlacedBuilding placement,
             string costId,
-            int spentCost)
+            int spentCost,
+            GrayboxConstructionPaymentReceipt3D paymentReceipt)
         {
             grid.Remove(placement);
-            CityStorage.AddToNetwork(costId, spentCost);
+            if (!TryRollbackConstructionPayment(
+                    costId,
+                    spentCost,
+                    paymentReceipt))
+                throw new InvalidOperationException(
+                    "Failed to rollback construction payment.");
+        }
+
+        private bool TryCommitConstructionPayment(
+            string resourceId,
+            int amount,
+            out GrayboxConstructionPaymentReceipt3D receipt)
+        {
+            receipt = null;
+            return constructionPaymentPolicy != null
+                ? constructionPaymentPolicy.TryCommitConstructionCost(
+                    CityStorage,
+                    resourceId,
+                    amount,
+                    out receipt,
+                    out _)
+                : CityStorage.TrySpendFromNetwork(resourceId, amount);
+        }
+
+        private bool TryRollbackConstructionPayment(
+            string resourceId,
+            int amount,
+            GrayboxConstructionPaymentReceipt3D receipt)
+        {
+            return constructionPaymentPolicy != null
+                ? constructionPaymentPolicy.TryRollbackConstructionCost(
+                    receipt,
+                    out _)
+                : CityStorage.AddToNetwork(resourceId, amount) == amount;
         }
     }
 }

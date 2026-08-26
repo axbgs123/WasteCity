@@ -109,7 +109,7 @@ namespace WasteCity.Tests
             using (PresentationFixture fixture = Create(attention, fate))
             {
                 Assert.That(Read<bool>(fixture.Controller, "EffectsReady"),
-                    Is.False);
+                    Is.True);
                 Assert.That(Refresh(fixture.Controller), Is.True);
                 int rendered = Read<int>(fixture.View, "RenderCount");
                 Assert.That(Refresh(fixture.Controller), Is.False);
@@ -125,8 +125,8 @@ namespace WasteCity.Tests
                     }));
                 Assert.That(Read<bool>(fixture.View, "IsFateSelectionOpen"),
                     Is.False,
-                    "EffectsReady=false may prepare cards but cannot force " +
-                    "the formal selection modal open.");
+                    "The attention HUD prepares cards but the dedicated " +
+                    "fate-selection view owns the formal modal.");
             }
         }
 

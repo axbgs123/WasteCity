@@ -927,6 +927,9 @@ namespace WasteCity.Tests
             GrayboxProgressionHudView3D progressionView =
                 operationsTransform.GetComponent<
                     GrayboxProgressionHudView3D>();
+            GrayboxFateSelectionView3D fateSelectionView =
+                operationsTransform.GetComponent<
+                    GrayboxFateSelectionView3D>();
             Transform systems = RequiredChild(root, "GrayboxSystems");
             GrayboxOperationsController3D controller =
                 RequiredComponent<GrayboxOperationsController3D>(
@@ -957,6 +960,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize));
             Assert.That(view, Is.Not.Null);
             Assert.That(progressionView, Is.Not.Null);
+            Assert.That(fateSelectionView, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
                 Has.Length.EqualTo(1));
@@ -968,17 +972,29 @@ namespace WasteCity.Tests
                 Object.FindObjectsOfType<
                     GrayboxProgressionHudView3D>(true),
                 Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<GrayboxFateSelectionView3D>(true),
+                Has.Length.EqualTo(1));
 
             AssertReference(view, "canvas", operationsCanvas);
             AssertReference(progressionView, "canvas", operationsCanvas);
+            AssertReference(fateSelectionView, "canvas", operationsCanvas);
             AssertReference(
                 formalSaveHost,
                 "progressionView",
                 progressionView);
             AssertReference(
+                formalSaveHost,
+                "fateSelectionView",
+                fateSelectionView);
+            AssertReference(
                 coordinator,
                 "progressionView",
                 progressionView);
+            AssertReference(
+                coordinator,
+                "fateSelectionView",
+                fateSelectionView);
             AssertReference(
                 controller,
                 "session",

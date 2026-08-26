@@ -77,6 +77,7 @@ namespace WasteCity.Tests
             Assert.That(progression, Is.Not.Null);
             object attention = ReadField(progression, "attention");
             object fate = ReadField(progression, "fate");
+            object effects = ReadField(progression, "fateEffects");
             object civilization = ReadField(progression, "civilization");
 
             Assert.That(Read<int>(attention, "value"), Is.EqualTo(10),
@@ -93,6 +94,21 @@ namespace WasteCity.Tests
             Assert.That(Read<string>(fate, "selectedId"), Is.Empty);
             Assert.That(Read<int>(fate, "level"), Is.Zero);
             Assert.That(Read<ulong>(fate, "revision"), Is.Zero);
+            object pocket = ReadField(effects, "pocketUniverse");
+            object debt = ReadField(effects, "voidDebt");
+            object rewind = ReadField(effects, "rewindAnchors");
+            Assert.That(Sequence(pocket, "flagships"), Is.Empty);
+            Assert.That(Sequence(pocket, "collapsedFlagshipIds"), Is.Empty);
+            Assert.That(Read<string>(pocket, "firstProductionFlagshipId"),
+                Is.Empty);
+            Assert.That(Sequence(debt, "debts"), Is.Empty);
+            Assert.That(Read<double>(debt, "settlementRemainingSeconds"),
+                Is.Zero);
+            Assert.That(Read<ulong>(debt, "nextSettlementOrdinal"),
+                Is.EqualTo(1ul));
+            Assert.That(Sequence(rewind, "anchors"), Is.Empty);
+            Assert.That(Read<long>(rewind, "nextCreationOrdinal"),
+                Is.EqualTo(1L));
             Assert.That(Read<int>(civilization, "level"), Is.EqualTo(1));
             Assert.That(Sequence(civilization, "committedAscensionIds"),
                 Is.Empty);

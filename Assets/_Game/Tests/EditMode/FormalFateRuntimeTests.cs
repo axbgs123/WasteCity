@@ -36,7 +36,7 @@ namespace WasteCity.Tests
             Assert.That(Read<string>(first, "SelectedId"), Is.Null.Or.Empty);
             Assert.That(Read<int>(first, "Level"), Is.Zero);
             Assert.That(Read<bool>(first, "HasSelection"), Is.False);
-            Assert.That(Read<bool>(runtime, "EffectsReady"), Is.False);
+            Assert.That(Read<bool>(runtime, "EffectsReady"), Is.True);
             Assert.That(StringSequence(first, "OfferedIds"),
                 Is.EqualTo(FixedOffers));
         }

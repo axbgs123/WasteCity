@@ -58,6 +58,7 @@ namespace WasteCity.Progression
 
         public const int MaximumLevel = 9;
         public const int MaximumImplementedLevel = 2;
+        public const int PocketUniverseCollapseDamage = 150;
 
         private static readonly ReadOnlyCollection<FormalFateDefinition> all =
             Array.AsReadOnly(new[]
@@ -93,7 +94,7 @@ namespace WasteCity.Progression
 
         public static IReadOnlyList<FormalFateDefinition> All => all;
         public static IReadOnlyList<FormalFateDefinition> FixedOffers => all;
-        public static bool EffectsReady => false;
+        public static bool EffectsReady => true;
 
         public static FormalFateDefinition Find(string id)
         {

@@ -27,13 +27,16 @@ namespace WasteCity.Tests
         };
 
         [Test]
-        public void IDEA0020_AdapterRequiresExplicitAttentionAndFateOwners()
+        public void IDEA0020_AdapterRequiresAllExplicitProgressionOwners()
         {
             Type adapter = RequireType(AdapterTypeName);
             ConstructorInfo constructor = adapter.GetConstructor(new[]
             {
                 typeof(FormalAttentionRuntime),
                 typeof(FormalFateRuntime),
+                typeof(PocketUniverseFateEffect),
+                typeof(FormalVoidDebtRuntime),
+                typeof(FormalRewindAnchorMetadataRuntime),
             });
             Assert.That(constructor, Is.Not.Null);
             Assert.That(adapter.GetConstructors(), Has.Length.EqualTo(1));
@@ -42,11 +45,44 @@ namespace WasteCity.Tests
                 {
                     null,
                     new FormalFateRuntime(),
+                    new PocketUniverseFateEffect(),
+                    new FormalVoidDebtRuntime(),
+                    new FormalRewindAnchorMetadataRuntime(),
                 }));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
                 {
                     new FormalAttentionRuntime(),
+                    null,
+                    new PocketUniverseFateEffect(),
+                    new FormalVoidDebtRuntime(),
+                    new FormalRewindAnchorMetadataRuntime(),
+                }));
+            Assert.Throws<TargetInvocationException>(() =>
+                constructor.Invoke(new object[]
+                {
+                    new FormalAttentionRuntime(),
+                    new FormalFateRuntime(),
+                    null,
+                    new FormalVoidDebtRuntime(),
+                    new FormalRewindAnchorMetadataRuntime(),
+                }));
+            Assert.Throws<TargetInvocationException>(() =>
+                constructor.Invoke(new object[]
+                {
+                    new FormalAttentionRuntime(),
+                    new FormalFateRuntime(),
+                    new PocketUniverseFateEffect(),
+                    null,
+                    new FormalRewindAnchorMetadataRuntime(),
+                }));
+            Assert.Throws<TargetInvocationException>(() =>
+                constructor.Invoke(new object[]
+                {
+                    new FormalAttentionRuntime(),
+                    new FormalFateRuntime(),
+                    new PocketUniverseFateEffect(),
+                    new FormalVoidDebtRuntime(),
                     null,
                 }));
         }
@@ -307,7 +343,10 @@ namespace WasteCity.Tests
             return Activator.CreateInstance(
                 RequireType(AdapterTypeName),
                 attention,
-                fate);
+                fate,
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime());
         }
 
         private static FormalThreeDProgressionSaveData Capture(object adapter)

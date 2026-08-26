@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`d32e26738b3a54eeb7bf76d17163a1ad44b523168904426d64cd7ecc36d1192d`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`e07c1ff3d7bdfa5ee6d87a2849870a9b3516d4d361da2093b48f7056198ce8db`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -62,12 +62,16 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalDefenseCampaignPersistence3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
@@ -80,7 +84,10 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`
@@ -157,13 +164,17 @@
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
+- `Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`
 - 基础时钟与会话（`foundation-clock`）：
 - `Assets/_Game/Scripts/Content/StableId.cs`
 - `Assets/_Game/Scripts/Core/GameClockModel.cs`
@@ -196,8 +207,10 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
+- `Assets/_Game/Scripts/Persistence/FormalRewindAnchorStore.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveCheckpointPolicy.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs`
 - `Assets/_Game/Scripts/Persistence/FormalSaveData.cs`
@@ -210,6 +223,7 @@
 - `Assets/_Game/Scripts/Persistence/Legacy2D/EnemySnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/FriendlyUnitSnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs`
+- `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
 - 展示与美术整合（`presentation-art-integration`）：
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffCatalog3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`
@@ -241,7 +255,14 @@
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 - 研究、人口与文明进程（`research-population`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Narrative/GuidanceFlowModel.cs`
 - `Assets/_Game/Scripts/Population/PopulationModel.cs`
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`
@@ -250,6 +271,9 @@
 - `Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
+- `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
+- `Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`
+- `Assets/_Game/Scripts/Progression/PocketUniverseFateEffect.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`
 - `Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`
@@ -292,6 +316,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`
@@ -341,6 +367,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxDefenseWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDeveloperModifierBootstrap3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxEvacuationController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxFateSelectionView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFormalMixedProfilerHeartbeat3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxFormalSaveRuntimeHost3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
