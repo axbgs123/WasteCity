@@ -32,6 +32,8 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxDefenseController3D defense;
         [SerializeField]
         private GrayboxFormalSaveEntryController3D formalSaveEntry;
+        [SerializeField]
+        private GrayboxProgressionHudView3D progressionView;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
         private readonly Dictionary<Keyboard, Action<char>>
@@ -126,6 +128,13 @@ namespace WasteCity.Graybox3D.Usability
             {
                 if (escapePressed && systemMenu != null)
                     systemMenu.Open();
+                return SuppressAll();
+            }
+
+            if (progressionView != null && progressionView.IsDetailsOpen)
+            {
+                if (escapePressed)
+                    progressionView.CloseDetails();
                 return SuppressAll();
             }
 
@@ -351,6 +360,7 @@ namespace WasteCity.Graybox3D.Usability
             operations = null;
             defense = null;
             formalSaveEntry = null;
+            progressionView = null;
             developmentPanel = null;
         }
 

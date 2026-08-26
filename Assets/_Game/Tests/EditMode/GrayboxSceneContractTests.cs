@@ -924,6 +924,9 @@ namespace WasteCity.Tests
                 operationsTransform.GetComponent<CanvasScaler>();
             GrayboxOperationsView3D view =
                 operationsTransform.GetComponent<GrayboxOperationsView3D>();
+            GrayboxProgressionHudView3D progressionView =
+                operationsTransform.GetComponent<
+                    GrayboxProgressionHudView3D>();
             Transform systems = RequiredChild(root, "GrayboxSystems");
             GrayboxOperationsController3D controller =
                 RequiredComponent<GrayboxOperationsController3D>(
@@ -933,6 +936,10 @@ namespace WasteCity.Tests
                 RequiredComponent<GrayboxUsabilityInputCoordinator3D>(
                     systems,
                     "GrayboxUsabilityInputCoordinator");
+            GrayboxFormalSaveRuntimeHost3D formalSaveHost =
+                RequiredComponent<GrayboxFormalSaveRuntimeHost3D>(
+                    systems,
+                    "GrayboxFormalSaveRuntimeHost");
             GrayboxBuildingInputRouter3D buildingInput =
                 Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
 
@@ -949,6 +956,7 @@ namespace WasteCity.Tests
             Assert.That(scaler.uiScaleMode,
                 Is.EqualTo(CanvasScaler.ScaleMode.ScaleWithScreenSize));
             Assert.That(view, Is.Not.Null);
+            Assert.That(progressionView, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
                 Has.Length.EqualTo(1));
@@ -956,8 +964,21 @@ namespace WasteCity.Tests
                 Object.FindObjectsOfType<
                     GrayboxOperationsController3D>(true),
                 Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxProgressionHudView3D>(true),
+                Has.Length.EqualTo(1));
 
             AssertReference(view, "canvas", operationsCanvas);
+            AssertReference(progressionView, "canvas", operationsCanvas);
+            AssertReference(
+                formalSaveHost,
+                "progressionView",
+                progressionView);
+            AssertReference(
+                coordinator,
+                "progressionView",
+                progressionView);
             AssertReference(
                 controller,
                 "session",

@@ -17,6 +17,9 @@ namespace WasteCity.Tests
         private const string PolicyTypeName =
             "WasteCity.Progression.FormalAttentionRepeatPolicy, " +
             "WasteCity.Game";
+        private const string StageTypeName =
+            "WasteCity.Progression.FormalAttentionStageDefinition, " +
+            "WasteCity.Game";
 
         private static readonly IReadOnlyDictionary<string, ExpectedReason>
             Expected = new Dictionary<string, ExpectedReason>(
@@ -46,6 +49,34 @@ namespace WasteCity.Tests
                 { "core.attention.civilization.advanced", Event(25) },
             };
 
+        private static readonly IReadOnlyDictionary<string, string>
+            ExpectedDisplayNames = new Dictionary<string, string>(
+                StringComparer.Ordinal)
+            {
+                { "core.attention.fate.first-activation", "选择命轨" },
+                { "core.attention.scan.safe-mining-zone", "扫描安全矿区" },
+                { "core.attention.scan.crystal-rift", "扫描结晶裂谷" },
+                { "core.attention.city.first-deployment", "城市首次展开" },
+                { "core.attention.building.first-mining-station", "首座采矿站完工" },
+                { "core.attention.building.first-smelter", "首座冶炼厂完工" },
+                { "core.attention.building.first-assembler", "首座装配厂完工" },
+                { "core.attention.building.machine-gun-turret", "机枪塔完工" },
+                { "core.attention.research.automated-machinery", "完成基础冶金" },
+                { "core.attention.research.precision-assembly", "完成精密装配" },
+                { "core.attention.research.automated-defense", "完成自动防御架构" },
+                { "core.attention.research.reinforced-structures", "完成加固结构" },
+                { "core.attention.research.legacy-analysis", "完成遗产解析" },
+                { "core.attention.rescue.ruins", "废墟救援" },
+                { "core.attention.rescue.cen-jin", "营救岑烬" },
+                { "core.attention.combat.first-directed-attack-defeated", "首次击退定向攻击" },
+                { "core.attention.fate.rewind-anchor-used", "使用回溯锚点" },
+                { "core.attention.fate.void-debt-periodic", "虚空债结算" },
+                { "core.attention.fate.pocket-universe-activated", "袖珍宇宙旗舰启动" },
+                { "core.attention.escape.locked-region", "离开锁定观测区域" },
+                { "core.attention.ruins.optional-interference", "完成可选干扰遗迹" },
+                { "core.attention.civilization.advanced", "文明升阶" },
+            };
+
         [Test]
         public void IDEA0020_CatalogExposesBoundedAttentionContract()
         {
@@ -71,6 +102,7 @@ namespace WasteCity.Tests
             RequireProperty(definition, "Delta", typeof(int));
             RequireProperty(definition, "RepeatPolicy", policy);
             RequireProperty(definition, "LocalizationKey", typeof(string));
+            RequireProperty(definition, "DisplayName", typeof(string));
 
             object[] all = ReadSequence(catalog, "All").Cast<object>().ToArray();
             Assert.That(all, Has.Length.EqualTo(22));
@@ -96,7 +128,93 @@ namespace WasteCity.Tests
                         pair.Key.Substring("core.attention.".Length)
                             .Replace('.', '-')),
                     pair.Key);
+                Assert.That(Read<string>(item, "DisplayName"),
+                    Is.EqualTo(ExpectedDisplayNames[pair.Key]),
+                    pair.Key);
             }
+        }
+
+        [Test]
+        public void IDEA0020_DisplayNameResolverUsesChineseFallbackForUnknown()
+        {
+            Type catalog = RequireType(CatalogTypeName);
+            MethodInfo displayName = catalog.GetMethod(
+                "DisplayNameForReason",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(string) },
+                null);
+            Assert.That(displayName, Is.Not.Null);
+            foreach (KeyValuePair<string, string> pair in ExpectedDisplayNames)
+            {
+                Assert.That(displayName.Invoke(null, new object[] { pair.Key }),
+                    Is.EqualTo(pair.Value), pair.Key);
+            }
+            foreach (string unknown in new[]
+                {
+                    null,
+                    string.Empty,
+                    "removed.attention.reason",
+                })
+            {
+                string actual = (string)displayName.Invoke(
+                    null,
+                    new object[] { unknown });
+                Assert.That(actual, Is.EqualTo("未知历史原因"));
+                if (!string.IsNullOrEmpty(unknown))
+                    Assert.That(actual, Does.Not.Contain(unknown).IgnoreCase);
+            }
+        }
+
+        [Test]
+        public void IDEA0020_CatalogDefinesExactFourSemanticStages()
+        {
+            Type catalog = RequireType(CatalogTypeName);
+            Type stageType = RequireType(StageTypeName);
+            RequireProperty(stageType, "MinimumInclusive", typeof(int));
+            RequireProperty(stageType, "MaximumInclusive", typeof(int));
+            RequireProperty(stageType, "DisplayName", typeof(string));
+            RequireProperty(stageType, "LocalizationKey", typeof(string));
+
+            object[] stages = ReadSequence(catalog, "Stages")
+                .Cast<object>()
+                .ToArray();
+            Assert.That(stages, Has.Length.EqualTo(4));
+            AssertStage(stages[0], 0, 29, "未锁定", "attention.stage.unlocked");
+            AssertStage(stages[1], 30, 59, "异常回波", "attention.stage.echo");
+            AssertStage(stages[2], 60, 89, "定向观测", "attention.stage.directed");
+            AssertStage(stages[3], 90, 100, "坐标锁定", "attention.stage.locked");
+
+            MethodInfo stageFor = catalog.GetMethod(
+                "StageFor",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(int) },
+                null);
+            Assert.That(stageFor, Is.Not.Null);
+            Assert.That(stageFor.ReturnType, Is.EqualTo(stageType));
+            foreach (var sample in new[]
+                {
+                    (0, 0), (29, 0), (30, 1), (59, 1),
+                    (60, 2), (89, 2), (90, 3), (100, 3),
+                })
+            {
+                Assert.That(stageFor.Invoke(null, new object[] { sample.Item1 }),
+                    Is.SameAs(stages[sample.Item2]), sample.Item1.ToString());
+            }
+            Assert.That(stageFor.Invoke(null, new object[] { -1 }), Is.Null);
+            Assert.That(stageFor.Invoke(null, new object[] { 101 }), Is.Null);
+        }
+
+        [Test]
+        public void IDEA0020_NextThresholdSkipsEveryAlreadyLatchedThreshold()
+        {
+            AssertNextThreshold(10, Array.Empty<int>(), true, 30, 20);
+            AssertNextThreshold(30, new[] { 30 }, true, 60, 30);
+            AssertNextThreshold(20, new[] { 30 }, true, 60, 40);
+            AssertNextThreshold(89, new[] { 30, 60 }, true, 90, 1);
+            AssertNextThreshold(20, new[] { 30, 60, 90 }, false, 0, 0);
+            AssertNextThreshold(90, new[] { 30, 60, 90 }, false, 0, 0);
         }
 
         [Test]
@@ -126,6 +244,51 @@ namespace WasteCity.Tests
 
         private static ExpectedReason Event(int delta) =>
             new ExpectedReason(delta, "OncePerStableEvent");
+
+        private static void AssertStage(
+            object stage,
+            int minimum,
+            int maximum,
+            string displayName,
+            string localizationKey)
+        {
+            Assert.That(Read<int>(stage, "MinimumInclusive"),
+                Is.EqualTo(minimum));
+            Assert.That(Read<int>(stage, "MaximumInclusive"),
+                Is.EqualTo(maximum));
+            Assert.That(Read<string>(stage, "DisplayName"),
+                Is.EqualTo(displayName));
+            Assert.That(Read<string>(stage, "LocalizationKey"),
+                Is.EqualTo(localizationKey));
+        }
+
+        private static void AssertNextThreshold(
+            int value,
+            IReadOnlyList<int> reached,
+            bool expectedResult,
+            int expectedThreshold,
+            int expectedDistance)
+        {
+            Type catalog = RequireType(CatalogTypeName);
+            MethodInfo method = catalog.GetMethod(
+                "TryGetNextUnreachedThreshold",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    typeof(int),
+                    typeof(IReadOnlyList<int>),
+                    typeof(int).MakeByRefType(),
+                    typeof(int).MakeByRefType(),
+                },
+                null);
+            Assert.That(method, Is.Not.Null);
+            object[] arguments = { value, reached, 0, 0 };
+            Assert.That((bool)method.Invoke(null, arguments),
+                Is.EqualTo(expectedResult));
+            Assert.That((int)arguments[2], Is.EqualTo(expectedThreshold));
+            Assert.That((int)arguments[3], Is.EqualTo(expectedDistance));
+        }
 
         private static Type RequireType(string name)
         {

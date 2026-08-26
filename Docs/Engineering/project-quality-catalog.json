@@ -247,6 +247,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlement*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
@@ -257,6 +258,7 @@
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/UI/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**"
       ],
@@ -273,6 +275,7 @@
         "Assets/_Game/Tests/EditMode/FormalUiResponsiveLayout3DTests.cs",
         "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
@@ -280,6 +283,7 @@
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
@@ -300,12 +304,14 @@
         "IDEA-0016",
         "IDEA-0017",
         "IDEA-0018",
-        "IDEA-0019"
+        "IDEA-0019",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
-        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -2140,6 +2146,29 @@
       "BoundarySummary": "只路由已经发生的领域事实；不扫描建筑或科技、不轮询 revision、不从存档恢复状态追补历史、不计算目录增量、不生成压力战斗、不读写文件或操作 UI。扫描、救援、锁定区离开和干扰遗迹在没有权威发布者时保持未接线，Dispose 必须解除全部订阅。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-progression-hud-3d",
+      "ChineseName": "三维文明进程关注度 HUD",
+      "TypeNames": [
+        "GrayboxProgressionHudView3D",
+        "GrayboxProgressionHudController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "从正式 Attention/Fate 不可变快照投影关注度数值、四阶段、下一阈值、最近三条中文原因和固定命轨候选，并用真实 UGUI 状态按钮打开或关闭详情。",
+      "BoundarySummary": "只读取不可变快照并更新真实 UGUI；不写 Attention/Fate runtime、不进入 schema、不复制关注度增量或命轨规则，也不得在 EffectsReady=false 时开放或强制弹出命轨选择。相同快照引用必须保持零重复刷新。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"

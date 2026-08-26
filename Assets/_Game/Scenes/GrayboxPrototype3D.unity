@@ -2251,6 +2251,7 @@ MonoBehaviour:
   operations: {fileID: 1322457538}
   defense: {fileID: 293867046}
   formalSaveEntry: {fileID: 1259927447}
+  progressionView: {fileID: 1804086898}
 --- !u!1 &1545501224
 GameObject:
   m_ObjectHideFlags: 0
@@ -2610,6 +2611,7 @@ GameObject:
   - component: {fileID: 1804086894}
   - component: {fileID: 1804086893}
   - component: {fileID: 1804086897}
+  - component: {fileID: 1804086898}
   m_Layer: 5
   m_Name: ProductionObservabilityCanvas
   m_TagString: Untagged
@@ -2727,6 +2729,19 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   canvas: {fileID: 1804086896}
   eventSystem: {fileID: 277173301}
+--- !u!114 &1804086898
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804086891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4d6c8e1f2794b73b5c10d9e608fa231, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  canvas: {fileID: 1804086896}
 --- !u!1 &1959787198
 GameObject:
   m_ObjectHideFlags: 0
@@ -2765,6 +2780,7 @@ MonoBehaviour:
   production: {fileID: 740990735}
   defense: {fileID: 293867046}
   evacuation: {fileID: 1361780017}
+  progressionView: {fileID: 1804086898}
 --- !u!4 &1959787200
 Transform:
   m_ObjectHideFlags: 0

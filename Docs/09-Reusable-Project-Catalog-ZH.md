@@ -292,6 +292,10 @@
 
 能解决什么：把正式三维中已经提交的展开、建筑完成、研究完成和命轨选择事实收口为关注度命令。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`。怎么复用：订阅首次展开、建筑完成和自然研究完成的已提交领域事件，以稳定原因和事件键交给唯一 FormalAttentionRuntime，并把固定命轨选择与 +5 关注度作为可回滚的窄事务提交。不能负责什么：只路由已经发生的领域事实；不扫描建筑或科技、不轮询 revision、不从存档恢复状态追补历史、不计算目录增量、不生成压力战斗、不读写文件或操作 UI。扫描、救援、锁定区离开和干扰遗迹在没有权威发布者时保持未接线，Dispose 必须解除全部订阅。改后跑哪组测试：`GrayboxProgressionEventIntegrationTests`。代码名：`GrayboxProgressionEventRouter3D`。
 
+### 三维文明进程关注度 HUD（复用前审查）
+
+能解决什么：把正式关注度与固定命轨快照转换成常驻状态和可点击详情。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`。怎么复用：从正式 Attention/Fate 不可变快照投影关注度数值、四阶段、下一阈值、最近三条中文原因和固定命轨候选，并用真实 UGUI 状态按钮打开或关闭详情。不能负责什么：只读取不可变快照并更新真实 UGUI；不写 Attention/Fate runtime、不进入 schema、不复制关注度增量或命轨规则，也不得在 EffectsReady=false 时开放或强制弹出命轨选择。相同快照引用必须保持零重复刷新。改后跑哪组测试：`GrayboxProgressionPresentationTests`、`GrayboxProgressionRuntimeInputTests`。代码名：`GrayboxProgressionHudView3D`、`GrayboxProgressionHudController3D`。
+
 ### 正式固定三命轨目录（复用前审查）
 
 能解决什么：固定定义 IDEA-0020 的袖珍宇宙、虚空债和回溯锚点三条正式命轨。在哪里：`Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`。怎么复用：定义 IDEA-0020 固定三选一的袖珍宇宙、虚空债和回溯锚点稳定身份、顺序、显示键与规则键。不能负责什么：只定义正式三条命轨静态内容；不从 LegacyPathCatalog 的九条历史池随机抽取，不保存选择或等级，不执行生产、债务、回溯、关注度、存档或 UI 效果。改后跑哪组测试：`FormalFateCatalogTests`。代码名：`FormalFateDefinition`、`FormalFateCatalog`。

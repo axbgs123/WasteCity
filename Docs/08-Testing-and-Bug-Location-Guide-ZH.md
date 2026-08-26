@@ -56,7 +56,11 @@ schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSc
 
 正式命轨首次选择必须由同一路由命令协调命轨状态与关注度：任一关注度提交失败时回滚命轨选择，不能留下“已选命轨但缺少关注度历史”的半提交状态。此片仍未接 HUD、真实玩家输入、三条命轨实际效果、压力遭遇或文明升阶，`EffectsReady` 必须继续为 `false`。
 
-上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化和 Task 4 的正式领域事件映射，不证明正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
+关注度 HUD 运行 `GrayboxProgressionPresentationTests`、`FormalAttentionCatalogTests`、`FormalUiLayoutPolicy3DTests` 和 `FormalUiResponsiveLayout3DTests`。正式目录拥有 22 项中文原因、未知历史原因回退、四个阶段与下一未锁存阈值计算；降低关注度后不得重新指向已经锁存的阈值。HUD 只读取 Attention/Fate 的不可变快照，静止快照不重复刷新；顶部关注度槽与资源栏、速度栏使用正式布局槽，不能靠覆盖或缩小资源数字接入。
+
+真实输入运行 `GrayboxProgressionRuntimeInputTests`、`GrayboxUsabilityRuntimeSceneTests` 与 `GrayboxSceneContractTests`：必须从正式新游戏入口进入，用真实 UGUI 指针点击关注度状态打开最近三条详情；详情打开时建造、背包、研究、修改器和世界输入不得穿透，`Escape` 只关闭详情并清理 UI 焦点，下一输入帧恢复正常。`EffectsReady=false` 时可以准备固定三命轨展示资料，但不得强制打开选择界面，也不得向玩家声称命轨效果已经启用。
+
+上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化、Task 4 的正式领域事件映射和 Task 5 的关注度可观察化，不证明三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界
 

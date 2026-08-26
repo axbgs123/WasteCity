@@ -66,6 +66,31 @@ namespace WasteCity.Tests
             Assert.That(hud.transform.localScale, Is.EqualTo(Vector3.one));
         }
 
+        [TestCase(1280f, 720f)]
+        [TestCase(1920f, 1080f)]
+        [TestCase(2560f, 1440f)]
+        public void IDEA0020_AttentionSlotStaysSafeAndSeparateFromTopHud(
+            float width,
+            float height)
+        {
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                new Rect(0f, 0f, width, height));
+
+            AssertInside(layout.SafeArea, layout.AttentionStatusSlot);
+            Assert.That(
+                layout.AttentionStatusSlot.Overlaps(
+                    layout.ResourceStatusSlot),
+                Is.False);
+            Assert.That(
+                layout.AttentionStatusSlot.Overlaps(
+                    layout.SpeedAndMenuSlot),
+                Is.False);
+            Assert.That(layout.AttentionStatusSlot.width,
+                Is.GreaterThan(0f));
+            Assert.That(layout.ResourceStatusSlot.width,
+                Is.GreaterThan(0f));
+        }
+
         [TestCase(1920f, 1080f)]
         [TestCase(2580f, 1080f)]
         public void IDEA0018_LargeOperationsPanelsFitSafeModalArea(

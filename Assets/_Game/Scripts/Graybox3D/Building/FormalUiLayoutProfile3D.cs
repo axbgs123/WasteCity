@@ -55,6 +55,7 @@ namespace WasteCity.Graybox3D.Building
         public float DangerSlotMaximumWidth => 420f;
         public float SpeedSlotWidthRatio => .18f;
         public float SpeedSlotMaximumWidth => 320f;
+        public float AttentionStatusWidth => 260f;
         public float BuildBarWidthRatio => .42f;
         public float BuildBarMaximumWidth => 620f;
         public float BuildBarHeight => 54f;

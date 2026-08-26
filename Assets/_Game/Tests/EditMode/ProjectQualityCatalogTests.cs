@@ -228,7 +228,7 @@ namespace WasteCity.Tests
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
-                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
                 "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
@@ -1567,6 +1567,57 @@ namespace WasteCity.Tests
             StringAssert.Contains("存档恢复", session.BoundarySummary);
             StringAssert.Contains("订阅者异常逐个隔离",
                 session.BoundarySummary);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0020ProgressionHudReadOnlyBoundary()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup ui = FindFeature(catalog, "ui-input");
+            const string hudGlob =
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxProgressionHud*.cs";
+            const string editTest =
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxProgressionPresentationTests.cs";
+            const string playTest =
+                "Assets/_Game/Tests/PlayMode/" +
+                "GrayboxProgressionRuntimeInputTests.cs";
+            const string spec =
+                "Docs/superpowers/specs/" +
+                "2026-08-26-idea-0020-progression-attention-fate-" +
+                "ascension-design.md";
+
+            CollectionAssert.Contains(ui.SourceGlobs, hudGlob);
+            CollectionAssert.Contains(ui.PrimarySourceGlobs, hudGlob);
+            CollectionAssert.Contains(ui.TestFileGlobs, editTest);
+            CollectionAssert.Contains(ui.TestFileGlobs, playTest);
+            CollectionAssert.Contains(ui.RequirementIds, "IDEA-0020");
+            CollectionAssert.Contains(ui.HumanDocumentPaths, spec);
+
+            ProjectReuseEntry hud = FindReuse(
+                catalog,
+                "graybox-progression-hud-3d");
+            Assert.That(hud.FeatureGroupId, Is.EqualTo("ui-input"));
+            Assert.That(hud.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxProgressionHudView3D",
+                "GrayboxProgressionHudController3D",
+            }, hud.TypeNames);
+            CollectionAssert.AreEqual(new[] { editTest, playTest },
+                hud.RequiredTestFiles);
+            CollectionAssert.AreEqual(new[] { "IDEA-0020" },
+                hud.RequirementIds);
+            StringAssert.Contains("不可变快照", hud.UseSummary);
+            StringAssert.Contains("真实 UGUI", hud.BoundarySummary);
+            StringAssert.Contains("不写 Attention/Fate runtime",
+                hud.BoundarySummary);
+            StringAssert.Contains("不进入 schema", hud.BoundarySummary);
+            StringAssert.Contains("EffectsReady=false", hud.BoundarySummary);
+            StringAssert.Contains("零重复刷新", hud.BoundarySummary);
         }
 
         [Test]

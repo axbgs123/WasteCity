@@ -1081,6 +1081,9 @@ namespace WasteCity.Editor
             GrayboxOperationsView3D operationsView =
                 EnsureComponent<GrayboxOperationsView3D>(
                     operationsTransform);
+            GrayboxProgressionHudView3D progressionView =
+                EnsureComponent<GrayboxProgressionHudView3D>(
+                    operationsTransform);
             RemoveMissingMonoBehavioursFromExactObject(
                 operationsTransform.gameObject);
             GrayboxDefenseHud3D defenseHud =
@@ -1154,7 +1157,8 @@ namespace WasteCity.Editor
                 ("operations", operationsController),
                 ("production", buildingReferences.Production),
                 ("defense", buildingReferences.DefenseController),
-                ("evacuation", buildingReferences.Evacuation));
+                ("evacuation", buildingReferences.Evacuation),
+                ("progressionView", progressionView));
             SetReferences(
                 formalSaveEntry,
                 ("runtimeHost", formalSaveHost),
@@ -1165,6 +1169,7 @@ namespace WasteCity.Editor
                 operationsView,
                 ("canvas", operationsCanvas),
                 ("resourceIconCatalog", resourceIconCatalog));
+            SetReferences(progressionView, ("canvas", operationsCanvas));
             SetReferences(
                 defenseHud,
                 ("canvas", operationsCanvas),
@@ -1201,7 +1206,8 @@ namespace WasteCity.Editor
                 ("developer", buildingReferences.Developer),
                 ("operations", operationsController),
                 ("defense", buildingReferences.DefenseController),
-                ("formalSaveEntry", formalSaveEntry));
+                ("formalSaveEntry", formalSaveEntry),
+                ("progressionView", progressionView));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
@@ -1210,6 +1216,12 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The graybox scene defense HUD is not unique.");
+            }
+            if (RequireSingle<GrayboxProgressionHudView3D>(scene) !=
+                    progressionView)
+            {
+                throw new InvalidOperationException(
+                    "The graybox scene progression HUD is not unique.");
             }
             if (RequireSingle<GrayboxFormalSaveRuntimeHost3D>(scene) !=
                     formalSaveHost ||

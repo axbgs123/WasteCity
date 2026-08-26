@@ -10,6 +10,7 @@ namespace WasteCity.Graybox3D.Building
             Rect safeArea,
             Rect dangerAndCoreSlot,
             Rect resourceStatusSlot,
+            Rect attentionStatusSlot,
             Rect speedAndMenuSlot,
             Rect buildFeedbackSlot,
             Rect buildBarSlot,
@@ -20,6 +21,7 @@ namespace WasteCity.Graybox3D.Building
             SafeArea = safeArea;
             DangerAndCoreSlot = dangerAndCoreSlot;
             ResourceStatusSlot = resourceStatusSlot;
+            AttentionStatusSlot = attentionStatusSlot;
             SpeedAndMenuSlot = speedAndMenuSlot;
             BuildFeedbackSlot = buildFeedbackSlot;
             BuildBarSlot = buildBarSlot;
@@ -31,6 +33,7 @@ namespace WasteCity.Graybox3D.Building
         public Rect SafeArea { get; }
         public Rect DangerAndCoreSlot { get; }
         public Rect ResourceStatusSlot { get; }
+        public Rect AttentionStatusSlot { get; }
         public Rect SpeedAndMenuSlot { get; }
         public Rect BuildFeedbackSlot { get; }
         public Rect BuildBarSlot { get; }
@@ -62,6 +65,7 @@ namespace WasteCity.Graybox3D.Building
             float speedWidth = Mathf.Min(
                 safeArea.width * profile.SpeedSlotWidthRatio,
                 profile.SpeedSlotMaximumWidth);
+            float attentionWidth = profile.AttentionStatusWidth;
             float resourceWidth =
                 safeArea.width - dangerWidth - speedWidth - gap * 2f;
             Rect danger = new Rect(
@@ -73,6 +77,11 @@ namespace WasteCity.Graybox3D.Building
                 danger.xMax + gap,
                 danger.y,
                 resourceWidth,
+                topHeight);
+            Rect attention = new Rect(
+                resources.xMax - attentionWidth,
+                resources.yMin - gap - topHeight,
+                attentionWidth,
                 topHeight);
             Rect speed = new Rect(
                 resources.xMax + gap,
@@ -126,6 +135,7 @@ namespace WasteCity.Graybox3D.Building
                 safeArea,
                 danger,
                 resources,
+                attention,
                 speed,
                 feedback,
                 buildBar,

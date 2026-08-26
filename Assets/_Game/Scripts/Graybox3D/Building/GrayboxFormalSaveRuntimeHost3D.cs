@@ -51,6 +51,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxProductionController3D production;
         [SerializeField] private GrayboxDefenseController3D defense;
         [SerializeField] private GrayboxEvacuationController3D evacuation;
+        [SerializeField] private GrayboxProgressionHudView3D progressionView;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
             new GrayboxFormalSaveWriteIntentLatch3D();
@@ -63,6 +64,7 @@ namespace WasteCity.Graybox3D.Building
         private FormalFateRuntime fateRuntime;
         private GrayboxFormalProgressionSaveAdapter3D progressionAdapter;
         private GrayboxProgressionEventRouter3D progressionEventRouter;
+        private GrayboxProgressionHudController3D progressionHudController;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -87,6 +89,8 @@ namespace WasteCity.Graybox3D.Building
                     FateRuntime);
         public GrayboxProgressionEventRouter3D ProgressionEventRouter =>
             progressionEventRouter;
+        public GrayboxProgressionHudController3D ProgressionHudController =>
+            progressionHudController;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -157,6 +161,15 @@ namespace WasteCity.Graybox3D.Building
                     FateRuntime);
                 eventRouter.Bind(city.Deployment, session);
                 progressionEventRouter = eventRouter;
+            }
+            if (progressionHudController == null && progressionView != null)
+            {
+                progressionHudController =
+                    new GrayboxProgressionHudController3D(
+                        AttentionRuntime,
+                        FateRuntime,
+                        progressionView);
+                progressionHudController.RefreshIfChanged();
             }
 
             var worldCity = new GrayboxWorldCitySaveAdapter3D(
@@ -389,6 +402,7 @@ namespace WasteCity.Graybox3D.Building
 
         private void LateUpdate()
         {
+            progressionHudController?.RefreshIfChanged();
             if (!IsInitialized || checkpointPolicy == null ||
                 !checkpointPolicy.HasPending)
             {
@@ -413,6 +427,7 @@ namespace WasteCity.Graybox3D.Building
             terminalSpeedGate = null;
             progressionEventRouter?.Dispose();
             progressionEventRouter = null;
+            progressionHudController = null;
             progressionAdapter = null;
             fateRuntime = null;
             attentionRuntime = null;

@@ -56,6 +56,7 @@ namespace WasteCity.Tests
             Assert.That(profile.PrimaryButtonMinimumHeight, Is.EqualTo(44f));
             Assert.That(profile.BuildBarMaximumWidth, Is.EqualTo(620f));
             Assert.That(profile.BuildBarHeight, Is.EqualTo(54f));
+            Assert.That(profile.AttentionStatusWidth, Is.EqualTo(260f));
         }
 
         [TestCase(1280f, 720f, 24f)]
@@ -88,6 +89,7 @@ namespace WasteCity.Tests
             {
                 layout.DangerAndCoreSlot,
                 layout.ResourceStatusSlot,
+                layout.AttentionStatusSlot,
                 layout.SpeedAndMenuSlot,
                 layout.BuildFeedbackSlot,
                 layout.BuildBarSlot,
@@ -105,6 +107,10 @@ namespace WasteCity.Tests
                 Is.False);
             Assert.That(
                 layout.ResourceStatusSlot.Overlaps(
+                    layout.AttentionStatusSlot),
+                Is.False);
+            Assert.That(
+                layout.AttentionStatusSlot.Overlaps(
                     layout.SpeedAndMenuSlot),
                 Is.False);
             Assert.That(
@@ -125,6 +131,37 @@ namespace WasteCity.Tests
                 layout.SelectionDrawerSlot.Overlaps(
                     layout.SpeedAndMenuSlot),
                 Is.False);
+        }
+
+        [TestCase(1280f, 720f)]
+        [TestCase(1920f, 1080f)]
+        [TestCase(2560f, 1440f)]
+        public void IDEA0020_AttentionOwnsAFormalTopSlotWithoutOverlap(
+            float width,
+            float height)
+        {
+            var canvas = new Rect(0f, 0f, width, height);
+            FormalUiLayout3D layout = FormalUiLayoutPolicy3D.Calculate(
+                canvas,
+                FormalUiLayoutProfile3D.Standard);
+            var property = typeof(FormalUiLayout3D).GetProperty(
+                "AttentionStatusSlot");
+            Assert.That(property, Is.Not.Null);
+            var attention = (Rect)property.GetValue(layout);
+
+            AssertRectHasPositiveSize(attention);
+            AssertRectContains(layout.SafeArea, attention);
+            Assert.That(attention.Overlaps(layout.ResourceStatusSlot),
+                Is.False);
+            Assert.That(attention.Overlaps(layout.SpeedAndMenuSlot),
+                Is.False);
+            Assert.That(attention.yMax, Is.EqualTo(
+                layout.ResourceStatusSlot.yMin -
+                FormalUiLayoutProfile3D.Standard.SpaceMedium).Within(.01f));
+            Assert.That(attention.height, Is.EqualTo(
+                layout.ResourceStatusSlot.height).Within(.01f));
+            Assert.That(layout.ResourceStatusSlot.width,
+                Is.GreaterThanOrEqualTo(680f));
         }
 
         [Test]

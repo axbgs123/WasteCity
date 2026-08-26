@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`2ba0eed0eb8f0f00c2aec617dd9feb01b86ca3d828bd778de8030fcba71cc36e`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`d32e26738b3a54eeb7bf76d17163a1ad44b523168904426d64cd7ecc36d1192d`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -75,6 +75,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
@@ -292,6 +294,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
@@ -342,6 +346,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxOperationsController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxOperationsView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxProductionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxProgressionHudView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxResearchSearchFocus3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxResearchTreeView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxResearchTreeViewportInput3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
