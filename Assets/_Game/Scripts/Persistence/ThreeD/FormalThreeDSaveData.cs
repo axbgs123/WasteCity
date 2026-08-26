@@ -1,5 +1,6 @@
 using System;
 using WasteCity.Combat;
+using WasteCity.Progression;
 
 namespace WasteCity.Persistence.ThreeD
 {
@@ -19,6 +20,68 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDDefenseCampaignSaveData defenseCampaign;
         public FormalThreeDEvacuationSaveData evacuation;
         public FormalThreeDPauseSaveData pause;
+        public FormalThreeDProgressionSaveData progression =
+            new FormalThreeDProgressionSaveData();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDProgressionSaveData
+    {
+        public const string ConfigurationSignature =
+            "builtin:progression@1";
+
+        public string configurationSignature = ConfigurationSignature;
+        public FormalThreeDAttentionSaveData attention =
+            new FormalThreeDAttentionSaveData();
+        public FormalThreeDFateSaveData fate = new FormalThreeDFateSaveData();
+        public FormalThreeDCivilizationSaveData civilization =
+            new FormalThreeDCivilizationSaveData();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDAttentionSaveData
+    {
+        public int value = FormalAttentionCatalog.InitialValue;
+        public ulong revision;
+        public FormalThreeDAttentionHistorySaveData[] history =
+            Array.Empty<FormalThreeDAttentionHistorySaveData>();
+        public int[] reachedThresholds = Array.Empty<int>();
+        public string[] committedStableEventKeys = Array.Empty<string>();
+        public string[] completedOneShotReasonIds = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDAttentionHistorySaveData
+    {
+        public string reasonId;
+        public string stableEventKey;
+        public int requestedDelta;
+        public int appliedDelta;
+        public int valueAfter;
+        public ulong revision;
+        public float ruleTimeSeconds;
+        public string sourceInstanceId;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDFateSaveData
+    {
+        public string[] offeredIds =
+        {
+            FormalFateCatalog.PocketUniverseId,
+            FormalFateCatalog.VoidDebtId,
+            FormalFateCatalog.RewindAnchorId,
+        };
+        public string selectedId = string.Empty;
+        public int level;
+        public ulong revision;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDCivilizationSaveData
+    {
+        public int level = 1;
+        public string[] committedAscensionIds = Array.Empty<string>();
     }
 
     [Serializable]

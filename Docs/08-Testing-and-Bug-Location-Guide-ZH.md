@@ -48,7 +48,9 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 
 固定三命轨状态运行 `FormalFateCatalogTests`、`FormalFateRuntimeTests` 和旧 `LegacySelectionTests`、`LegacyEffectTests`。正式目录必须始终按袖珍宇宙、虚空债、回溯锚点顺序只给三项，继续使用稳定 `core.legacy.*` 字符串但不得引用 `WasteCity.Legacy` 历史代码；新运行时初始为未选择、等级 `0`，只允许一次正式选择并变为等级 `1`。恢复只接受固定候选顺序以及“未选等级 0”或“已选等级 1”，非法状态不得改变 revision 或缓存快照。本片 `EffectsReady` 必须保持 `false`，也不得公开升级命令。
 
-这些纯规则测试通过只证明 Task 1 的关注度真值和 Task 2 的固定候选/选择状态，不证明 schema `33`、正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展，当前 schema 在迁移片完成前仍为 `32`。人工试玩和真实 Windows 复验必须保持未完成状态。
+schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`，并补跑 `FormalSaveEnvelopeTests`、`FormalSaveValidatorTests`、`FormalSaveFileTransactionTests`、历史 schema `32` 战役/废墟测试、波前重试、Coordinator 和 RuntimeHost。schema `31` 必须先按原格式验证 hash，再固定迁到 `32` 的战役结构，最后生成 `33` 的清洁 progression；schema `32` 同样先按不含 progression 的历史 payload 验证 hash，再生成关注度 `10`、固定三候选待选、文明等级 `1`。迁移不得从旧建筑、科技、战斗、旧 observation 或 legacyPath 字段反推历史。当前 schema `33` 源文档必须显式包含 progression 各数组，缺失不能依赖 JsonUtility 字段初始值伪装成有效。
+
+上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态和 Task 3A 的 schema 核心迁移，不证明正式 3D Adapter、UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界
 

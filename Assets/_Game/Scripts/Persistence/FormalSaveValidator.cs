@@ -6,6 +6,7 @@ using WasteCity.Building;
 using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 
 namespace WasteCity.Persistence
 {
@@ -108,6 +109,16 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "evacuation", "pendingRollbackStableInstanceIds" },
         };
 
+        private static readonly string[][] RequiredProgressionSourceArrays =
+        {
+            new[] { "formal3D", "progression", "attention", "history" },
+            new[] { "formal3D", "progression", "attention", "reachedThresholds" },
+            new[] { "formal3D", "progression", "attention", "committedStableEventKeys" },
+            new[] { "formal3D", "progression", "attention", "completedOneShotReasonIds" },
+            new[] { "formal3D", "progression", "fate", "offeredIds" },
+            new[] { "formal3D", "progression", "civilization", "committedAscensionIds" },
+        };
+
         public static FormalSaveValidationResult ValidateDecoded(
             FormalSaveDecodeResult decoded)
         {
@@ -144,6 +155,20 @@ namespace WasteCity.Persistence
                         return Invalid(
                             FormalSaveValidationError.MissingRequiredValue,
                             string.Join(".", path));
+                    }
+                }
+                if (ReadSourceSchemaVersion(source) ==
+                    FormalSaveEnvelope.CurrentSchemaVersion)
+                {
+                    for (int index = 0;
+                         index < RequiredProgressionSourceArrays.Length;
+                         index++)
+                    {
+                        string[] path = RequiredProgressionSourceArrays[index];
+                        if (!HasJsonPath(source, path))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", path));
                     }
                 }
                 if (TryFindJsonPath(
@@ -274,6 +299,8 @@ namespace WasteCity.Persistence
             if (result != null) return result;
             result = ValidateEvacuation(data.evacuation, buildingIds);
             if (result != null) return result;
+            result = ValidateProgression(data.progression);
+            if (result != null) return result;
 
             string computedHash =
                 FormalSaveCodec.ComputePayloadHashSha256(data);
@@ -386,7 +413,285 @@ namespace WasteCity.Persistence
                 return Missing("formal3D.defenseCampaign");
             if (data.evacuation == null) return Missing("formal3D.evacuation");
             if (data.pause == null) return Missing("formal3D.pause");
+            if (data.progression == null)
+                return Missing("formal3D.progression");
             return null;
+        }
+
+        private static FormalSaveValidationResult ValidateProgression(
+            FormalThreeDProgressionSaveData progression)
+        {
+            const string path = "formal3D.progression";
+            if (!string.Equals(
+                    progression.configurationSignature,
+                    FormalThreeDProgressionSaveData.ConfigurationSignature,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".configurationSignature");
+            if (progression.attention == null)
+                return Missing(path + ".attention");
+            if (progression.fate == null)
+                return Missing(path + ".fate");
+            if (progression.civilization == null)
+                return Missing(path + ".civilization");
+
+            FormalSaveValidationResult result = ValidateAttention(
+                progression.attention,
+                path + ".attention");
+            if (result != null) return result;
+            result = ValidateFate(progression.fate, path + ".fate");
+            if (result != null) return result;
+            return ValidateCivilization(
+                progression.civilization,
+                path + ".civilization");
+        }
+
+        private static FormalSaveValidationResult ValidateAttention(
+            FormalThreeDAttentionSaveData attention,
+            string path)
+        {
+            if (attention.value < FormalAttentionCatalog.MinimumValue ||
+                attention.value > FormalAttentionCatalog.MaximumValue)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".value");
+            if (attention.history == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".history");
+            if (attention.history.Length >
+                FormalAttentionCatalog.HistoryCapacity)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".history");
+            if (attention.reachedThresholds == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".reachedThresholds");
+            if (attention.committedStableEventKeys == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".committedStableEventKeys");
+            if (attention.completedOneShotReasonIds == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".completedOneShotReasonIds");
+
+            FormalSaveValidationResult result = ValidateThresholds(
+                attention.reachedThresholds,
+                path + ".reachedThresholds");
+            if (result != null) return result;
+            result = UniqueNonBlank(
+                attention.committedStableEventKeys,
+                path + ".committedStableEventKeys");
+            if (result != null) return result;
+            result = UniqueNonBlank(
+                attention.completedOneShotReasonIds,
+                path + ".completedOneShotReasonIds");
+            if (result != null) return result;
+
+            var committed = new HashSet<string>(
+                attention.committedStableEventKeys,
+                StringComparer.Ordinal);
+            var completedOneShotReasons = new HashSet<string>(
+                attention.completedOneShotReasonIds,
+                StringComparer.Ordinal);
+            var historyEventKeys = new HashSet<string>(
+                StringComparer.Ordinal);
+            ulong previousRevision = 0;
+            for (int index = 0; index < attention.history.Length; index++)
+            {
+                FormalThreeDAttentionHistorySaveData entry =
+                    attention.history[index];
+                string item = path + ".history[" + index + "]";
+                if (entry == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        item);
+                if (!IsStableId(entry.reasonId))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        item + ".reasonId");
+                if (string.IsNullOrWhiteSpace(entry.stableEventKey))
+                    return Missing(item + ".stableEventKey");
+                if (!historyEventKeys.Add(entry.stableEventKey))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        item + ".stableEventKey");
+                if (!committed.Contains(entry.stableEventKey))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        item + ".stableEventKey");
+                if (entry.requestedDelta == 0 ||
+                    !IsAppliedDeltaValid(
+                        entry.requestedDelta,
+                        entry.appliedDelta))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        item + ".appliedDelta");
+                if (entry.valueAfter < FormalAttentionCatalog.MinimumValue ||
+                    entry.valueAfter > FormalAttentionCatalog.MaximumValue)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        item + ".valueAfter");
+                if (entry.revision == 0 ||
+                    entry.revision <= previousRevision ||
+                    entry.revision > attention.revision)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        item + ".revision");
+                result = NonNegativeFinite(
+                    entry.ruleTimeSeconds,
+                    item + ".ruleTimeSeconds");
+                if (result != null) return result;
+                if (!string.IsNullOrEmpty(entry.sourceInstanceId) &&
+                    !IsStableId(entry.sourceInstanceId))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        item + ".sourceInstanceId");
+                FormalAttentionReasonDefinition reason =
+                    FormalAttentionCatalog.Find(entry.reasonId);
+                if (reason != null &&
+                    reason.RepeatPolicy ==
+                        FormalAttentionRepeatPolicy.OncePerSession &&
+                    !completedOneShotReasons.Contains(entry.reasonId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        item + ".reasonId");
+                previousRevision = entry.revision;
+            }
+
+            if (attention.history.Length == 0)
+            {
+                if (attention.revision != 0 ||
+                    attention.reachedThresholds.Length != 0 ||
+                    attention.committedStableEventKeys.Length != 0 ||
+                    attention.completedOneShotReasonIds.Length != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        path + ".revision");
+            }
+            else if (previousRevision != attention.revision ||
+                     attention.history[attention.history.Length - 1]
+                         .valueAfter != attention.value)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".revision");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateThresholds(
+            int[] thresholds,
+            string path)
+        {
+            int previous = 0;
+            for (int index = 0; index < thresholds.Length; index++)
+            {
+                int value = thresholds[index];
+                if (!IsAttentionThreshold(value) || value <= previous)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        path + "[" + index + "]");
+                previous = value;
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateFate(
+            FormalThreeDFateSaveData fate,
+            string path)
+        {
+            string[] expected =
+            {
+                FormalFateCatalog.PocketUniverseId,
+                FormalFateCatalog.VoidDebtId,
+                FormalFateCatalog.RewindAnchorId,
+            };
+            if (fate.offeredIds == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".offeredIds");
+            if (fate.offeredIds.Length != expected.Length)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".offeredIds");
+            for (int index = 0; index < expected.Length; index++)
+            {
+                if (!string.Equals(
+                        fate.offeredIds[index],
+                        expected[index],
+                        StringComparison.Ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        path + ".offeredIds[" + index + "]");
+            }
+
+            if (string.IsNullOrEmpty(fate.selectedId))
+            {
+                if (fate.level != 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        path + ".level");
+                return null;
+            }
+
+            bool known = false;
+            for (int index = 0; index < expected.Length; index++)
+                known |= string.Equals(
+                    fate.selectedId,
+                    expected[index],
+                    StringComparison.Ordinal);
+            if (!known)
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".selectedId");
+            if (fate.level != 1)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".level");
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateCivilization(
+            FormalThreeDCivilizationSaveData civilization,
+            string path)
+        {
+            if (civilization.level != 1)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".level");
+            if (civilization.committedAscensionIds == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".committedAscensionIds");
+            return civilization.committedAscensionIds.Length == 0
+                ? null
+                : Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".committedAscensionIds");
+        }
+
+        private static bool IsAppliedDeltaValid(
+            int requested,
+            int applied)
+        {
+            return requested > 0
+                ? applied >= 0 && applied <= requested
+                : applied <= 0 && applied >= requested;
+        }
+
+        private static bool IsAttentionThreshold(int candidate)
+        {
+            IReadOnlyList<int> thresholds = FormalAttentionCatalog.Thresholds;
+            for (int index = 0; index < thresholds.Count; index++)
+            {
+                if (thresholds[index] == candidate)
+                    return true;
+            }
+            return false;
         }
 
         private static FormalSaveValidationResult ValidateWorld(
@@ -1976,6 +2281,28 @@ namespace WasteCity.Persistence
             }
             int finalStart = SkipWhitespace(json, start, end);
             return finalStart < end && json[finalStart] == '[';
+        }
+
+        private static int ReadSourceSchemaVersion(string json)
+        {
+            if (!TryFindObjectMember(
+                    json,
+                    0,
+                    json.Length,
+                    "saveSchemaVersion",
+                    out int valueStart,
+                    out int valueEnd))
+                return 0;
+            string value = json.Substring(
+                valueStart,
+                valueEnd - valueStart).Trim();
+            return int.TryParse(
+                value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int schemaVersion)
+                ? schemaVersion
+                : 0;
         }
 
         private static FormalSaveValidationResult

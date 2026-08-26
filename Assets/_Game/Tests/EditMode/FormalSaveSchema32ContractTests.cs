@@ -20,13 +20,13 @@ namespace WasteCity.Tests
             BindingFlags.Public | BindingFlags.Instance;
 
         [Test]
-        public void CurrentFormalSchemaIsThirtyTwo()
+        public void CurrentFormalSchemaIsThirtyThree()
         {
             Assert.That(
                 FormalSaveEnvelope.CurrentSchemaVersion,
-                Is.EqualTo(32),
-                "IDEA-0017 requires schema 32 before any new campaign " +
-                "payload can be written.");
+                Is.EqualTo(33),
+                "IDEA-0020 advances the current schema to 33 while " +
+                "preserving the IDEA-0017 campaign payload.");
         }
 
         [Test]
@@ -63,9 +63,9 @@ namespace WasteCity.Tests
             Assert.That(result.PayloadKind,
                 Is.EqualTo(FormalSavePayloadKind.Formal3D));
             Assert.That(result.Envelope, Is.Not.Null);
-            Assert.That(result.Envelope.saveSchemaVersion, Is.EqualTo(32),
+            Assert.That(result.Envelope.saveSchemaVersion, Is.EqualTo(33),
                 "DecodeAny must migrate a valid schema 31 envelope to the " +
-                "current schema 32 contract.");
+                "current schema 33 contract.");
             Assert.That(result.Envelope.formal3D, Is.Not.Null);
 
             FieldInfo campaignField = RequireCampaignField();
@@ -472,7 +472,7 @@ namespace WasteCity.Tests
 
             Assert.That(decoded.Success, Is.True,
                 legacyState + ": " + decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(32));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(33));
             FormalSaveValidationResult validation =
                 FormalSaveValidator.ValidateDecoded(decoded);
             Assert.That(validation.IsValid, Is.True,
@@ -735,9 +735,10 @@ namespace WasteCity.Tests
 
             Assert.That(result.Success, Is.True, result.Message);
             Assert.That(result.Envelope, Is.Not.Null);
-            Assert.That(result.Envelope.saveSchemaVersion, Is.EqualTo(32),
+            Assert.That(result.Envelope.saveSchemaVersion, Is.EqualTo(33),
                 "The schema 31 fixture must pass through the schema 32 " +
-                "migration before speed defaults are observed.");
+                "campaign migration and schema 33 progression migration " +
+                "before speed defaults are observed.");
 
             object campaign = RequireCampaignField().GetValue(
                 result.Envelope.formal3D);
@@ -1176,7 +1177,7 @@ namespace WasteCity.Tests
                 ReadFixture("schema-31-formal-3d.json"));
             Assert.That(decoded.Success, Is.True, decoded.Message);
             Assert.That(decoded.Envelope, Is.Not.Null);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(32));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(33));
             return decoded.Envelope;
         }
 

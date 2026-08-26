@@ -8,6 +8,7 @@ using WasteCity.Building;
 using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 
 namespace WasteCity.Persistence
 {
@@ -34,6 +35,24 @@ namespace WasteCity.Persistence
             public FormalThreeDResearchSaveData research;
             public FormalThreeDProductionSaveData production;
             public FormalThreeDDefenseSaveData defense;
+            public FormalThreeDEvacuationSaveData evacuation;
+            public FormalThreeDPauseSaveData pause;
+        }
+
+        [Serializable]
+        private sealed class SchemaThirtyTwoPayload
+        {
+            public string sessionId;
+            public FormalThreeDWorldSaveData world;
+            public FormalThreeDCitySaveData city;
+            public FormalThreeDBuildingsSaveData buildings;
+            public FormalThreeDStorageSaveData storage;
+            public FormalThreeDBackpackSaveData backpack;
+            public FormalThreeDCraftingSaveData crafting;
+            public FormalThreeDResearchSaveData research;
+            public FormalThreeDProductionSaveData production;
+            public FormalThreeDDefenseSaveData defense;
+            public FormalThreeDDefenseCampaignSaveData defenseCampaign;
             public FormalThreeDEvacuationSaveData evacuation;
             public FormalThreeDPauseSaveData pause;
         }
@@ -87,9 +106,9 @@ namespace WasteCity.Persistence
                 string.IsNullOrWhiteSpace(
                     payload.defenseCampaign.campaignId))
                 return ComputeSchemaThirtyOnePayloadHash(payload);
-            return ComputeSha256(JsonUtility.ToJson(
-                CopyPayloadWithCanonicalCampaign(payload),
-                false));
+            if (payload.progression == null)
+                return ComputeSchemaThirtyTwoPayloadHash(payload);
+            return ComputeSchemaThirtyThreePayloadHash(payload);
         }
 
         private static string ComputeSha256(string value)
@@ -172,9 +191,10 @@ namespace WasteCity.Persistence
                     : FormalSaveDecodeResult.Legacy(legacy, json);
             }
             if (hasEnvelopeSchema &&
-                (probe.saveSchemaVersion ==
-                    FormalSaveEnvelope.CurrentSchemaVersion ||
-                 probe.saveSchemaVersion == 31))
+                (probe.saveSchemaVersion == 31 ||
+                 probe.saveSchemaVersion == 32 ||
+                 probe.saveSchemaVersion ==
+                    FormalSaveEnvelope.CurrentSchemaVersion))
             {
                 if (!string.Equals(
                         probe.runtimeKind,
@@ -223,7 +243,23 @@ namespace WasteCity.Persistence
                             FormalSaveDecodeError.MalformedJson,
                             "旧版存档校验失败");
                     }
-                    envelope = MigrateSchemaThirtyOne(envelope);
+                    envelope = MigrateSchemaThirtyOneToThirtyTwo(envelope);
+                    envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
+                }
+                else if (probe.saveSchemaVersion == 32)
+                {
+                    string legacyHash = ComputeSchemaThirtyTwoPayloadHash(
+                        envelope.formal3D);
+                    if (!string.Equals(
+                            legacyHash,
+                            envelope.payloadHashSha256,
+                            StringComparison.Ordinal))
+                    {
+                        return FormalSaveDecodeResult.Failed(
+                            FormalSaveDecodeError.MalformedJson,
+                            "旧版存档校验失败");
+                    }
+                    envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
                 }
                 return FormalSaveDecodeResult.ThreeD(envelope, json);
             }
@@ -259,11 +295,7 @@ namespace WasteCity.Persistence
                 return;
             }
 
-            MigrateSchemaThirtyOne(new FormalSaveEnvelope
-            {
-                formal3D = payload,
-                checkpoint = checkpoint,
-            });
+            EnsureCampaignState(payload, checkpoint);
         }
 
         public static FormalThreeDDefenseCampaignSaveData CloneCampaignState(
@@ -302,6 +334,38 @@ namespace WasteCity.Persistence
             return ComputeSha256(JsonUtility.ToJson(legacy, false));
         }
 
+        private static string ComputeSchemaThirtyTwoPayloadHash(
+            FormalThreeDSaveData source)
+        {
+            FormalThreeDSaveData canonical =
+                CopyPayloadWithCanonicalCampaign(source);
+            var legacy = new SchemaThirtyTwoPayload
+            {
+                sessionId = canonical.sessionId,
+                world = canonical.world,
+                city = canonical.city,
+                buildings = canonical.buildings,
+                storage = canonical.storage,
+                backpack = canonical.backpack,
+                crafting = canonical.crafting,
+                research = canonical.research,
+                production = canonical.production,
+                defense = canonical.defense,
+                defenseCampaign = canonical.defenseCampaign,
+                evacuation = canonical.evacuation,
+                pause = canonical.pause,
+            };
+            return ComputeSha256(JsonUtility.ToJson(legacy, false));
+        }
+
+        private static string ComputeSchemaThirtyThreePayloadHash(
+            FormalThreeDSaveData source)
+        {
+            return ComputeSha256(JsonUtility.ToJson(
+                CopyPayloadWithCanonicalCampaign(source),
+                false));
+        }
+
         private static FormalSaveCheckpointMetadata CopyCheckpoint(
             FormalSaveCheckpointMetadata source)
         {
@@ -336,7 +400,102 @@ namespace WasteCity.Persistence
                 defenseCampaign = CopyCampaign(source.defenseCampaign),
                 evacuation = source.evacuation,
                 pause = source.pause,
+                progression = CopyProgression(source.progression),
             };
+        }
+
+        private static FormalThreeDProgressionSaveData CopyProgression(
+            FormalThreeDProgressionSaveData source)
+        {
+            if (source == null) return null;
+            return new FormalThreeDProgressionSaveData
+            {
+                configurationSignature = source.configurationSignature,
+                attention = CopyAttention(source.attention),
+                fate = CopyFate(source.fate),
+                civilization = CopyCivilization(source.civilization),
+            };
+        }
+
+        private static FormalThreeDAttentionSaveData CopyAttention(
+            FormalThreeDAttentionSaveData source)
+        {
+            if (source == null) return null;
+            return new FormalThreeDAttentionSaveData
+            {
+                value = source.value,
+                revision = source.revision,
+                history = CopyAttentionHistory(source.history),
+                reachedThresholds = SortedCopy(source.reachedThresholds),
+                committedStableEventKeys = SortedCopy(
+                    source.committedStableEventKeys),
+                completedOneShotReasonIds = SortedCopy(
+                    source.completedOneShotReasonIds),
+            };
+        }
+
+        private static FormalThreeDAttentionHistorySaveData[]
+            CopyAttentionHistory(
+                FormalThreeDAttentionHistorySaveData[] source)
+        {
+            if (source == null || source.Length == 0)
+                return Array.Empty<FormalThreeDAttentionHistorySaveData>();
+            var result =
+                new FormalThreeDAttentionHistorySaveData[source.Length];
+            for (int index = 0; index < source.Length; index++)
+            {
+                FormalThreeDAttentionHistorySaveData item = source[index];
+                result[index] = item == null
+                    ? null
+                    : new FormalThreeDAttentionHistorySaveData
+                    {
+                        reasonId = item.reasonId,
+                        stableEventKey = item.stableEventKey,
+                        requestedDelta = item.requestedDelta,
+                        appliedDelta = item.appliedDelta,
+                        valueAfter = item.valueAfter,
+                        revision = item.revision,
+                        ruleTimeSeconds = item.ruleTimeSeconds,
+                        sourceInstanceId = item.sourceInstanceId,
+                    };
+            }
+            return result;
+        }
+
+        private static FormalThreeDFateSaveData CopyFate(
+            FormalThreeDFateSaveData source)
+        {
+            if (source == null) return null;
+            return new FormalThreeDFateSaveData
+            {
+                offeredIds = source.offeredIds == null
+                    ? Array.Empty<string>()
+                    : (string[])source.offeredIds.Clone(),
+                selectedId = source.selectedId,
+                level = source.level,
+                revision = source.revision,
+            };
+        }
+
+        private static FormalThreeDCivilizationSaveData CopyCivilization(
+            FormalThreeDCivilizationSaveData source)
+        {
+            if (source == null) return null;
+            return new FormalThreeDCivilizationSaveData
+            {
+                level = source.level,
+                committedAscensionIds = SortedCopy(
+                    source.committedAscensionIds),
+            };
+        }
+
+        private static int[] SortedCopy(int[] values)
+        {
+            if (values == null || values.Length == 0)
+                return Array.Empty<int>();
+            var result = (int[])values.Clone();
+            Array.Sort(result);
+            return result;
         }
 
         private static FormalThreeDDefenseCampaignSaveData CopyCampaign(
@@ -555,10 +714,76 @@ namespace WasteCity.Persistence
             return null;
         }
 
-        private static FormalSaveEnvelope MigrateSchemaThirtyOne(
+        private static FormalSaveEnvelope MigrateSchemaThirtyOneToThirtyTwo(
             FormalSaveEnvelope envelope)
         {
-            FormalThreeDDefenseSaveData legacy = envelope.formal3D.defense;
+            EnsureCampaignState(envelope.formal3D, envelope.checkpoint);
+            envelope.saveSchemaVersion = 32;
+            envelope.payloadHashSha256 = ComputeSchemaThirtyTwoPayloadHash(
+                envelope.formal3D);
+            return envelope;
+        }
+
+        private static FormalSaveEnvelope MigrateSchemaThirtyTwoToThirtyThree(
+            FormalSaveEnvelope envelope)
+        {
+            envelope.formal3D.progression = CreateCleanProgressionState();
+            envelope.saveSchemaVersion = 33;
+            envelope.payloadHashSha256 =
+                ComputeSchemaThirtyThreePayloadHash(envelope.formal3D);
+            return envelope;
+        }
+
+        private static FormalThreeDProgressionSaveData
+            CreateCleanProgressionState()
+        {
+            return new FormalThreeDProgressionSaveData
+            {
+                configurationSignature =
+                    FormalThreeDProgressionSaveData.ConfigurationSignature,
+                attention = new FormalThreeDAttentionSaveData
+                {
+                    value = FormalAttentionCatalog.InitialValue,
+                    revision = 0,
+                    history = Array.Empty<
+                        FormalThreeDAttentionHistorySaveData>(),
+                    reachedThresholds = Array.Empty<int>(),
+                    committedStableEventKeys = Array.Empty<string>(),
+                    completedOneShotReasonIds = Array.Empty<string>(),
+                },
+                fate = new FormalThreeDFateSaveData
+                {
+                    offeredIds = new[]
+                    {
+                        FormalFateCatalog.PocketUniverseId,
+                        FormalFateCatalog.VoidDebtId,
+                        FormalFateCatalog.RewindAnchorId,
+                    },
+                    selectedId = string.Empty,
+                    level = 0,
+                    revision = 0,
+                },
+                civilization = new FormalThreeDCivilizationSaveData
+                {
+                    level = 1,
+                    committedAscensionIds = Array.Empty<string>(),
+                },
+            };
+        }
+
+        private static void EnsureCampaignState(
+            FormalThreeDSaveData payload,
+            FormalSaveCheckpointMetadata checkpoint)
+        {
+            if (payload == null ||
+                (payload.defenseCampaign != null &&
+                 !string.IsNullOrWhiteSpace(
+                     payload.defenseCampaign.campaignId)))
+            {
+                return;
+            }
+
+            FormalThreeDDefenseSaveData legacy = payload.defense;
             var campaign = new FormalThreeDDefenseCampaignSaveData
             {
                 campaignId = "campaign.single-city-defense.v1",
@@ -595,7 +820,7 @@ namespace WasteCity.Persistence
                     {
                         elapsedRuleSeconds = Math.Max(
                             0f,
-                            envelope.checkpoint?.ruleTimeSeconds ?? 0f),
+                            checkpoint?.ruleTimeSeconds ?? 0f),
                         spawnedEnemyCount =
                             legacy?.spawnedEnemyCount ?? 0,
                         defeatedEnemyCount =
@@ -618,22 +843,17 @@ namespace WasteCity.Persistence
                         partialFromMigration = true,
                     },
                 towerCombatStates = MigrateTowerCombatStates(
-                    envelope.formal3D.buildings,
+                    payload.buildings,
                     legacy),
                 enemyStates = IsCompletedTutorial(legacy)
                     ? Array.Empty<
                         FormalThreeDDefenseCampaignEnemyStateSaveData>()
                     : MigrateEnemyStates(legacy),
                 buildingHealthStates = MigrateBuildingHealthStates(
-                    envelope.formal3D.buildings),
+                    payload.buildings),
             };
 
-            envelope.formal3D.defenseCampaign = campaign;
-            envelope.saveSchemaVersion =
-                FormalSaveEnvelope.CurrentSchemaVersion;
-            envelope.payloadHashSha256 = ComputePayloadHashSha256(
-                envelope.formal3D);
-            return envelope;
+            payload.defenseCampaign = campaign;
         }
 
         private static int MigratedCampaignPhase(

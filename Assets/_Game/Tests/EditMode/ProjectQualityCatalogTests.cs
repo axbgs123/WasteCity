@@ -453,6 +453,10 @@ namespace WasteCity.Tests
                 "FormalSaveCodec",
                 "FormalSaveValidationResult",
                 "FormalSaveValidator",
+                "FormalThreeDProgressionSaveData",
+                "FormalThreeDAttentionSaveData",
+                "FormalThreeDFateSaveData",
+                "FormalThreeDCivilizationSaveData",
                 "FormalThreeDWorldSaveData",
                 "FormalThreeDBuildingsSaveData",
                 "FormalThreeDStorageSaveData",
@@ -472,6 +476,11 @@ namespace WasteCity.Tests
             string[] expectedFormalThreeDDtoTypes =
             {
                 "FormalThreeDSaveData",
+                "FormalThreeDProgressionSaveData",
+                "FormalThreeDAttentionSaveData",
+                "FormalThreeDAttentionHistorySaveData",
+                "FormalThreeDFateSaveData",
+                "FormalThreeDCivilizationSaveData",
                 "FormalThreeDWorldSaveData",
                 "FormalThreeDResourceNodeSaveData",
                 "FormalThreeDResourceAmountSaveData",

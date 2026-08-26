@@ -524,6 +524,8 @@
         "Assets/_Game/Tests/EditMode/FormalSaveFileTransactionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
@@ -550,11 +552,13 @@
         "DOC-0001",
         "IDEA-0015",
         "IDEA-0017",
-        "IDEA-0019"
+        "IDEA-0019",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
-        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FullRegression"
     },
@@ -3234,6 +3238,10 @@
         "FormalSaveCodec",
         "FormalSaveValidationResult",
         "FormalSaveValidator",
+        "FormalThreeDProgressionSaveData",
+        "FormalThreeDAttentionSaveData",
+        "FormalThreeDFateSaveData",
+        "FormalThreeDCivilizationSaveData",
         "FormalThreeDWorldSaveData",
         "FormalThreeDBuildingsSaveData",
         "FormalThreeDStorageSaveData",
@@ -3258,19 +3266,22 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以统一信封区分 legacy 2D schema 1 与 30、正式 3D schema 31、当前 schema 32 和未来版本，提供确定性编码、payload hash、结构校验、高价值跨引用语义校验、schema 32 完整统计往返及 schema 31 的受控部分统计迁移。",
-      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，schema 31 迁移不得伪造完整历史统计。",
+      "UseSummary": "以统一信封区分 legacy 2D schema 1 至 30、正式 3D schema 31、32、当前 schema 33 和未来版本，提供确定性编码、逐版本历史 payload hash、结构与跨引用验证，以及 31→32→33 单向迁移。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，32→33 不从旧建筑、研究或战斗反推关注度、命轨和文明历史。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema32ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ]
     },
     {
