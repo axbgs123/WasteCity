@@ -647,6 +647,73 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0019_OverlappingLabelsHideDeterministicallyWhileGuidanceWins()
+        {
+            var cells = new WorldCell[2, 1];
+            cells[0, 0] = new WorldCell(
+                TerrainKind.Wasteland,
+                ResourceIds.Biomass,
+                100);
+            cells[1, 0] = new WorldCell(
+                TerrainKind.Wasteland,
+                ResourceIds.Water,
+                100);
+            GrayboxWorldView3D view = CreateView();
+            view.ConfigureWorldPresentation(Track(
+                ScriptableObject.CreateInstance<
+                    FormalWorldPresentationScaleProfile3D>()));
+            view.Generate(new WorldMapModel(cells));
+            GameObject cameraObject = Track(new GameObject("LabelCamera"));
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 8f;
+            camera.aspect = 1280f / 800f;
+            camera.transform.position = new Vector3(-.5f, 10f, -.5f);
+            camera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            view.FaceResourceNodeMarkers(camera.transform);
+            view.RefreshResourceNodeMarkerPresentation(8f, 1280, 800);
+            MethodInfo layout = RequireMethod(
+                typeof(GrayboxWorldView3D),
+                "RefreshResourceNodeMarkerLabelLayout",
+                typeof(bool),
+                typeof(Camera),
+                typeof(int),
+                typeof(int));
+            Assert.That(
+                layout.Invoke(view, new object[] { camera, 1280, 800 }),
+                Is.EqualTo(true));
+            Assert.That(view.TryGetResourceNodeMarker(
+                0, 0, out GrayboxResourceNodeMarker3D first), Is.True);
+            Assert.That(view.TryGetResourceNodeMarker(
+                1, 0, out GrayboxResourceNodeMarker3D second), Is.True);
+
+            AssertMarkerIconAndLabel(first, true);
+            AssertMarkerIconAndLabel(second, false);
+            Assert.That(
+                view.LastResourceNodeLabelSeparationPixels,
+                Is.EqualTo(6f).Within(.001f),
+                "The profile separation must clamp to at least six " +
+                "physical pixels in a compact window.");
+            Assert.That(
+                layout.Invoke(view, new object[] { camera, 1280, 800 }),
+                Is.EqualTo(false),
+                "The same camera, profile, and stable marker order must " +
+                "produce the same visibility without renderer rewrites.");
+            AssertMarkerIconAndLabel(first, true);
+            AssertMarkerIconAndLabel(second, false);
+
+            Assert.That(
+                view.SetResourceMarkerGuidanceOverride(1, 0, true),
+                Is.True);
+            layout.Invoke(view, new object[] { camera, 1280, 800 });
+            AssertMarkerIconAndLabel(first, false);
+            AssertMarkerIconAndLabel(second, true);
+            Assert.That(
+                layout.Invoke(view, new object[] { camera, 1280, 800 }),
+                Is.EqualTo(false));
+        }
+
+        [Test]
         public void IDEA0012_StableMarkerRefreshAndCameraDoNotAllocateOrRewrite()
         {
             WorldMapModel model = CreateCatalogMap();
@@ -1062,6 +1129,25 @@ namespace WasteCity.Tests
             Assert.That(pixelHeight, Is.GreaterThan(0));
             return renderer.bounds.size.y * pixelHeight /
                 (2f * orthographicSize);
+        }
+
+        private static void AssertMarkerIconAndLabel(
+            GrayboxResourceNodeMarker3D marker,
+            bool expectedLabelVisible)
+        {
+            Assert.That(
+                marker.transform.Find("Icon").GetComponent<MeshRenderer>()
+                    .enabled,
+                Is.True,
+                "Label avoidance must never hide the resource icon.");
+            Assert.That(
+                marker.transform.Find("NameAndAmount")
+                    .GetComponent<MeshRenderer>().enabled,
+                Is.EqualTo(expectedLabelVisible));
+            Assert.That(
+                marker.transform.Find("NameAndAmountShadow")
+                    .GetComponent<MeshRenderer>().enabled,
+                Is.EqualTo(expectedLabelVisible));
         }
 
         private static WorldCell[,] Capture(WorldMapModel model)

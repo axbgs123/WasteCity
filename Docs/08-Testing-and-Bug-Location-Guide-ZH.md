@@ -26,7 +26,19 @@
 
 UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests` 与 `GrayboxSceneContractTests`；目录、生产、修改器和防御的点击/滚动必须继续通过真实 Input System 的 `GrayboxBuildingRuntimeSceneTests`、`GrayboxProductionObservabilityRuntimeInputTests`、`GrayboxDeveloperModifierRuntimeInputTests` 与 `GrayboxDefenseRuntimeInputTests`。建造栏保持 `620×54` 和既有位置；大型面板使用安全区/滚动，不能用整体缩小绕过字号问题。
 
-发布级证据还要在真实 Unity GUI 运行 `FirstArtTerrainEvidenceCapture.StartAutomatedCapture`，并显式提供仓库外的 `WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT`。工具使用隔离临时存档进入游戏，不得读写用户真实存档；manifest 必须包含 15 张截图、10 帧缩放、Near/Mid/Far、300 连续水面帧、颜色/动态门和逐文件 SHA-256。自动截图只能证明技术合同，最终仍需用户检查地貌区分、接缝、遮挡、字体与比例，并在真实 Windows 10/11 检查 GPU、显存和内存。
+发布级证据还要在真实 Unity GUI 运行 `FirstArtTerrainEvidenceCapture.StartAutomatedCapture`，并显式提供仓库外的 `WASTECITY_FIRST_TERRAIN_RUNTIME_RESULT`。工具使用隔离临时存档进入游戏，不得读写用户真实存档；manifest 必须包含 15 张截图、10 帧缩放、Near/Mid/Far、300 连续水面帧、颜色/动态门和逐文件 SHA-256。自动截图只能证明技术合同，最终仍需用户检查地貌区分、接缝、遮挡、字体与比例，并在真实 Windows 10 和 Windows 11 检查 GPU、显存和内存。
+
+## IDEA-0019 地图 v2、资源布局与世界尺度检查边界
+
+`IDEA-0019` 当前为“已批准，开发中”。它明确承接 `IDEA-0018` 当时排除的地图真值变化：地图仍为 `64×48`、3072 格、seed `8128` 和 schema `32`，但 world generation/signature 升为 v2，地形、Traversal、出生/路线与资源节点改为覆盖全图的确定性连片布局。旧 v1 world identity 必须在任何运行时应用前以“存档世界配置与当前正式世界不兼容”明确拒绝，不能把旧坐标、节点余量或建筑绑定猜测迁移到新图。
+
+地图和资源先运行 `WorldMapTests` 与 `GrayboxWorldLayout3DTests`：固定 v2 identity、重复生成、固定 `8×6` 宏格模板、每宏格两个整数扰动通道、一轮清理、出生保护区、关键区双通路和正式目录明确登记的 `24` 个坐标（铁矿 `8`、石料 `4`、能晶 `4`、水 `4`、生物质 `4`）。本版资源不是评分/搜索/地形亲和算法生成，测试应逐项比对目录坐标、类型和储量。A16.3 的两个安全铁矿、至少一个安全石料点和三个裂谷铁矿必须包含在该总数内；铁矿、石料和能晶节点还要通过既有 `BuildingResourceNodeCompatibilityRulesTests` 与 `GrayboxBuildingProjectionAndViewTests` 证明存在完整 `2×2` 采矿锚点。水和生物质保持世界来源，但不因本次地图重排被改成采矿站兼容资源。路径、部署和正式场景继续补跑 `CityPathfinderTests`、`CityTerrainRulesTests`、`CityDeploymentRulesTests`、`GrayboxMobileCityController3DTests` 与 `GrayboxRuntimeSceneTests`。
+
+存档身份运行 `GrayboxFormalSaveWorldCityTests`、`GrayboxFormalSaveRuntimeHostTests` 和正式 3D round-trip PlayMode：generation `2`、signature `core.world.formal-3d.v2.64x48` 与 schema `32` 必须分别断言，v1 拒绝不能改变当前 WorldMap、城市、人口或导航状态。`GrayboxWorldLayout3DTests.IDEA0019_Seed8128V2WorldMatchesStableGoldenHash` 已保存当前 3072 格按 `y/x|terrain|traversal|resource|amount` canonical 编码计算的 SHA-256 `2f0ecd374ad3a1bf6fd50564d949741618c7ce1b72bc6619f67acda632b1e6fd`；地图真值变化必须同步 generation/signature 或经批准更新该 hash。地表控制图、唯一 Renderer 和 Ruins/Cliff 继续运行 `FirstArtTerrainControlMapTests`、`FirstArtTerrainRendererTests`、`FirstArtTerrainSceneContractTests`、`FirstArtTerrainRuntimeSceneTests` 及 Ruins/Cliff 的 Layout、Geometry、Presentation、SceneContract 测试；不得增加第二套地图判断、逐格常驻对象或绕过 14 Prefab、两类合批、13 材质与分类回退。
+
+世界比例先运行 `FormalWorldPresentationScaleProfile3DTests`，再运行 `GrayboxBuildingProjectionAndViewTests`、`GrayboxVisualAndWorldTests`、`FormalUiResponsiveLayout3DTests` 与受影响的真实输入 PlayMode。30 座 `BuildingCatalog` 的逻辑 footprint 和四向旋转必须不变；地面/内城建筑的施工、完成、废墟、预览和选择框只消费正式表现 Profile，三座正式塔的 BuildingWorldView 基础座统一为 74% footprint、精确 `.14` 格高。矿点默认正交尺寸 `13` 为 Mid，只显示图标与储量；当前三档目标分别为 Near Frame `68`、Icon `50`、Text `22`，Mid Frame `56`、Icon `42`、Text `20`，Far Icon `28`，其 Frame、Icon、Text/Shadow Renderer 显隐和物理像素换算必须在 `1280×720`、`1920×1080`、`2560×1440` 与紧凑窗口下读取实际结果。标签避让还必须验证相同输入重复得到相同可见集合、冲突时稳定 ID 决胜、引导/选中优先且至少保留 `6px` 间距。建造栏继续保持 `620×54`，目录 Hero 图标使用正式 `64` 语义尺寸，不允许用散落常量重新放大。
+
+日常实现阶段若没有修改地形源、导入规则、Texture2DArray Builder 或数组本身，仍按普通 EditMode 路由，不因 WorldMap 内容变化反复重建四个 2K 数组；正式收口按本需求批准的发布级验收补跑一次 `TerrainAssetDeep`，随后完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役构建、GUI 固定证据、文档生成/校验和 `RecordVerification`。自动化不能替代用户对地貌布局、矿区密度、建筑/图标比例、遮挡和真实 Windows GPU/显存/内存的判断。
 
 ## IDEA-0011 生产与界面的检查边界
 

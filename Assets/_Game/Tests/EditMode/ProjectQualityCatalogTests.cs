@@ -224,7 +224,7 @@ namespace WasteCity.Tests
             string[] expectedFailureLocations =
             {
                 "foundation-clock|先检查时钟、会话、资源与稳定标识|Assets/_Game/Scripts/Core/**|Assets/_Game/Scripts/Content/StableId.cs",
-                "world-terrain|先检查地图模型、地形规则和世界投影|Assets/_Game/Scripts/World/**|Assets/_Game/Art/FirstPass/Environment/Terrain/**|ArtSource/FirstPass/Environment/Terrain/**",
+                "world-terrain|先检查地图模型、地形规则和世界投影|Assets/_Game/Scripts/World/**|Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs|Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs|Assets/_Game/Art/FirstPass/Environment/Terrain/**|ArtSource/FirstPass/Environment/Terrain/**",
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
@@ -233,7 +233,7 @@ namespace WasteCity.Tests
                 "research-population|先检查研究状态、人口门槛、进度与叙事接线|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
-                "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**",
+                "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
                 "legacy-rules-compatibility|先检查历史规则、schema 1–30 兼容与固定回归样本|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Persistence/Legacy2D/**",
             };
@@ -1222,7 +1222,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
             }, nodeMarkers.RequiredTestFiles);
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0012", "IDEA-0018" },
+                new[] { "IDEA-0012", "IDEA-0018", "IDEA-0019" },
                 nodeMarkers.RequirementIds);
 
             ProjectReuseEntry legacyCapacity = FindReuse(

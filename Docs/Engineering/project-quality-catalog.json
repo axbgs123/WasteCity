@@ -39,11 +39,15 @@
       "ChineseName": "世界地图与地形",
       "SourceGlobs": [
         "Assets/_Game/Scripts/World/**",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs",
         "Assets/_Game/Art/FirstPass/Environment/Terrain/**",
         "ArtSource/FirstPass/Environment/Terrain/**"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/World/**",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs",
         "Assets/_Game/Art/FirstPass/Environment/Terrain/**",
         "ArtSource/FirstPass/Environment/Terrain/**"
       ],
@@ -72,6 +76,9 @@
         "Assets/_Game/Tests/EditMode/FirstArtTerrainSceneContractTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainShaderTests.cs",
         "Assets/_Game/Tests/EditMode/FirstArtTerrainVisualStyleTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/PlayMode/FirstArtTerrainRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
@@ -79,12 +86,14 @@
       ],
       "RequirementIds": [
         "DOC-0001",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
-        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "Performance"
     },
@@ -111,6 +120,7 @@
         "Assets/_Game/Tests/EditMode/DirectControlRulesTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxMobileCityController3DTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
         "Assets/_Game/Tests/EditMode/PlanarCoordinateMapper3DTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs"
       ],
@@ -120,10 +130,12 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0014",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -209,10 +221,12 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "FocusedPlayMode"
     },
@@ -282,11 +296,13 @@
         "IDEA-0014",
         "IDEA-0016",
         "IDEA-0017",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
-        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -526,10 +542,12 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "FullRegression"
     },
@@ -542,6 +560,7 @@
         "Assets/_Game/Scripts/Graybox3D/GrayboxVisualSlot.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs",
         "Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs",
@@ -560,12 +579,14 @@
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Presentation/**",
-        "Assets/_Game/Scripts/ArtIntegration3D/**"
+        "Assets/_Game/Scripts/ArtIntegration3D/**",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs"
       ],
       "FailureLocationSummary": "先检查视觉槽、材质接入、投影与相机场景引用",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalWorldPresentationScaleProfile3DTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
@@ -581,7 +602,8 @@
         "DOC-0001",
         "IDEA-0012",
         "IDEA-0016",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -589,7 +611,8 @@
         "Docs/Art/IDEA-0016/IDEA0016-2D-Visual-Content-Catalog-ZH.md",
         "Docs/superpowers/specs/2026-08-23-idea-0016-production-2d-art-pipeline-design.md",
         "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
-        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -734,13 +757,16 @@
       ],
       "FeatureGroupId": "world-terrain",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用于保存世界地图状态。",
-      "BoundarySummary": "不处理场景渲染。",
+      "UseSummary": "保存格位地形、Traversal、资源余量与揭示等世界运行时真值。",
+      "BoundarySummary": "不选择 v2 生成策略，也不处理场景渲染、存档文件或建筑放置。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/WorldMapTests.cs"
+        "Assets/_Game/Tests/EditMode/WorldMapTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0019"
       ]
     },
     {
@@ -754,13 +780,41 @@
       ],
       "FeatureGroupId": "city-navigation-deployment",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "用于灰盒世界布局。",
-      "BoundarySummary": "调整布局前需要场景复核。",
+      "UseSummary": "作为正式 64×48 世界入口消费 IDEA-0019 的 v2 确定性生成器。",
+      "BoundarySummary": "只选择正式世界生成边界；不复制地图目录、渲染、存档 IO 或放置合法性，调整布局前需要场景复核。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0019"
+      ]
+    },
+    {
+      "Id": "formal-world-generation-3d",
+      "ChineseName": "正式三维世界生成目录",
+      "TypeNames": [
+        "FormalWorldGenerationCatalog3D",
+        "FormalWorldGenerator3D",
+        "FormalResourceNodeSpec3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以固定 8×6 宏格模板、每宏格整数扰动、固定 Traversal 区域/走廊和 24 项精确坐标资源目录生成 seed 8128 的正式 64×48 v2 世界。",
+      "BoundarySummary": "只拥有确定性初始地图内容与生成配置；当前不实现评分候选、定点插值或随机 spot，也不持有运行时剩余储量、揭示、渲染、存档文件、城市路径或建筑放置真值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
+        "Assets/_Game/Tests/EditMode/WorldMapTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0019"
       ]
     },
     {
@@ -1324,16 +1378,18 @@
       ],
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在场景内显示建筑与半透明放置预览，并用稳定前向标记同步四向旋转、旋转后占地和模型朝向。",
-      "BoundarySummary": "只负责 GrayboxPrototype3D 的建筑表现，不作为纯领域模型复用；不得自行决定锚点、旋转合法性、成本或资源节点兼容性。",
+      "UseSummary": "在场景内显示建筑、半透明预览和前向标记，并消费正式尺度 Profile 统一地面/内城与各生命周期表现。",
+      "BoundarySummary": "只负责 GrayboxPrototype3D 的建筑表现；不得修改 BuildingCatalog 占地或自行决定锚点、旋转合法性、成本和节点兼容性。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalWorldPresentationScaleProfile3DTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0008",
         "IDEA-0010",
-        "BUG-0006"
+        "BUG-0006",
+        "IDEA-0019"
       ]
     },
     {
@@ -2691,7 +2747,8 @@
       ],
       "RequirementIds": [
         "IDEA-0012",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
       ]
     },
     {
@@ -2705,15 +2762,41 @@
       ],
       "FeatureGroupId": "presentation-art-integration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "统一正式三维地图的正交缩放边界、滚轮步长与资源矿点近中远显示层级。",
-      "BoundarySummary": "只拥有导航和标记表现配置；不修改地图尺寸、地形、资源节点、储量或输入焦点真值，模态抑制必须继续经过正式输入协调器。",
+      "UseSummary": "统一正式三维地图的正交缩放边界和滚轮步长，并向世界表现提供当前观察距离。",
+      "BoundarySummary": "只拥有导航配置；矿点的物理像素尺寸和实际 Near/Mid/Far 显隐由正式世界表现尺度配置负责。它不修改地图、节点、储量或输入焦点真值，模态抑制必须继续经过正式输入协调器。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxRuntimeSceneTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
+      ]
+    },
+    {
+      "Id": "formal-world-presentation-scale-3d",
+      "ChineseName": "正式三维世界表现尺度",
+      "TypeNames": [
+        "FormalWorldPresentationScaleProfile3D",
+        "FormalWorldPresentationScalePolicy3D",
+        "FormalBuildingVisualMetrics3D",
+        "FormalWorldMarkerMetrics3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs"
+      ],
+      "FeatureGroupId": "presentation-art-integration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "按 BuildingDefinition.Id 解析 30 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。",
+      "BoundarySummary": "只拥有世界表现参数与纯换算；不得定义或修改 BuildingCatalog 占地、资源节点、地图、Sprite 身份、相机输入、正式 UI 图标 token 或存档真值，UI token 继续由 FormalUiLayoutProfile3D 持有。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalWorldPresentationScaleProfile3DTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingProjectionAndViewTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0019"
       ]
     },
     {
@@ -2734,7 +2817,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-    "UseSummary": "统一 1920×1080 参考分辨率、Expand 缩放、安全区、语义槽位、间距、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。",
+    "UseSummary": "统一 1920×1080 参考分辨率、Expand 缩放、安全区、语义槽位、间距、图标语义尺寸、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。",
     "BoundarySummary": "只负责 UGUI 画布与布局表现；布局以 Canvas 本地矩形为真值，字体下限才读取物理像素缩放；不拥有玩法数据、输入命令或窗口生命周期，既有建造栏继续保持 620×54 的批准尺寸与位置。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalUiLayoutPolicy3DTests.cs",
@@ -2745,7 +2828,8 @@
       ],
       "RequirementIds": [
         "BUG-0007",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0019"
       ]
     },
     {
@@ -3177,14 +3261,15 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "从显式提供的 GrayboxSceneBootstrap、移动城市控制器与建筑会话捕获并恢复 schema 31 的确定性世界身份、城市位置、朝向、模式、展开/收起活动转换和规则时间。",
-      "BoundarySummary": "只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；恢复必须复用当前正式世界和城市公开恢复边界，不重新生成另一份世界。",
+      "UseSummary": "捕获并恢复 schema 32 的 v2 世界身份、节点余量、城市位置、模式、活动转换和规则时间，并明确拒绝 v1 world identity。",
+      "BoundarySummary": "只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；不猜测迁移旧地图坐标。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0014",
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0019"
       ]
     },
     {

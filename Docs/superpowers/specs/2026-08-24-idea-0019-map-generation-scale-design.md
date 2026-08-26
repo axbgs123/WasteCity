@@ -51,7 +51,7 @@ FormalWorldGenerationCatalog3D（v2 不可变配置）
 - start cell：`(10,9)`；
 - start protection：切比雪夫半径 `4`，形成 `9×9` Open、无资源、可部署区；
 - macro cell：`8`，逻辑模板 `8×6`；
-- 边界扰动最大 `±2` 格，使用整数定点插值；
+- 边界扰动最大 `±2` 格；每个 `8×8` 宏格分别读取两个稳定整数通道，对格位坐标施加常量有符号偏移后再选择宏格，不实现定点插值、连续噪声或逐格评分；
 - 地形清理：一轮八邻域多数清理，平票保持原值。
 
 目标地形占比：Wasteland `50%–60%`、Rocky `18%–26%`、Crystal `8%–15%`、Wetland `8%–15%`。非荒地必须形成宏观连片区；孤立单格特殊地形合计不超过验收门。
@@ -80,7 +80,7 @@ Traversal 后置生成：
 | 水 | 4 | 湿地区可接近岸边 Open 格 |
 | 生物质 | 4 | 湿地与遗迹边缘 Open 格 |
 
-节点按 `ResourceSpotSpec` 生成：稳定 ID、资源 ID、区域中心、抖动半径、搜索半径、数量、地形亲和、节点间距、储量范围和 salt 全部来自正式配置。候选使用整数距离加 `WorldSeed.Sample` 稳定评分，贪心满足配额和间距；配置不足时显式失败，不能静默少放。
+首版 v2 的 `24` 个节点全部由 `FormalResourceNodeSpec3D` 明确登记稳定 ID、资源 ID、精确坐标和储量；生成器只验证越界、非 Open、出生保护、重复格位和总数后原样投放，不实现候选评分、搜索半径、地形亲和贪心或定点插值。将来若要从配置生成随机 spot，必须先以独立需求和 golden hash 变更明确替代本轮固定坐标合同。
 
 铁矿、石料和能晶节点必须有至少一个通过完整统一评估的 `2×2` 采矿站锚点；两个安全铁矿锚点不能重叠。水和生物质保持既有不可由采矿站直接提取的玩法边界。
 
@@ -94,7 +94,7 @@ v1 旧地图节点和建筑绑定无法安全映射到 v2；尝试继续时通�
 
 ## 7. 建筑表现尺度
 
-新增 `FormalWorldPresentationScaleProfile3D`，只拥有：
+新增 `FormalWorldPresentationScaleProfile3D` 及正式资源 `Assets/_Game/Resources/Presentation/FormalWorldPresentationScaleProfile3D.asset`，只拥有：
 
 - Ground/Inner cell visual scale；
 - footprint inset；
@@ -103,7 +103,7 @@ v1 旧地图节点和建筑绑定无法安全映射到 v2；尝试继续时通�
 - 炮塔 foundation/superstructure 边界；
 - Marker 像素档、标签间距和选择框线宽。
 
-它不得拥有 `BuildingDefinition`、放置合法性、库存、研究、节点、碰撞真值或存档字段。
+它可以按 `BuildingDefinition.Id` 解析 30 项表现 archetype，但不得定义或修改 `BuildingDefinition` 的占地、放置、成本、生命和运行规则，也不得拥有库存、研究、节点、碰撞真值、相机输入、UI 图标 token 或存档字段；UI 图标 token 继续只由 `FormalUiLayoutProfile3D` 持有。
 
 全部建筑稳定 ID 映射到独立表现 archetype；不能直接复用建造菜单分类，因为路线分类不能表达建筑轮廓。正式 Profile 必须对 `BuildingCatalog.All` 30 项精确覆盖一次：
 
@@ -134,23 +134,23 @@ v1 旧地图节点和建筑绑定无法安全映射到 v2；尝试继续时通�
 
 所有轴从场地 cell size 推导；InnerCity 允许最多 `1.15` 的受控垂直强调，但单体高度不得超过 `.55` world unit。逻辑 footprint、选择和放置 collider 不从视觉 bounds 反推。
 
-炮塔的 `GrayboxBuildingWorldView3D` 只显示不高于 `.12` 格的基础座；`GrayboxDefenseWorldView3D` 拥有武器上层。两者合成的 1×1 水平边界不超过 `.82×.82`，且不再叠加完整通用建筑。
+炮塔的 `GrayboxBuildingWorldView3D` 使用精确 `.14` 格高、74% footprint 的 `DefenseFoundation` 基础座；`GrayboxDefenseWorldView3D` 拥有武器上层。两者合成的 1×1 水平边界不超过 `.82×.82`，且不再叠加完整通用建筑。
 
 ## 8. Marker 与 UI 图标
 
 Marker LOD 使用“一个地面格投影到屏幕的相对高度”而不是裸 orthographic size：
 
-- Near：单格高度 ≥ `4.5%`，框 `28–36px`、名称+储量；
-- Mid：`2.7%–4.5%`，框 `20–28px`、仅储量；
-- Far：< `2.7%`，图标 `12–18px`、无文字或受控聚合。
+- Near：单格高度 ≥ `4.5%`，Frame `68px`、Icon `50px`、Text `22px`，显示名称+储量；
+- Mid：`2.7%–4.5%`，Frame `56px`、Icon `42px`、Text `20px`，仅显示储量；
+- Far：< `2.7%`，只显示 `28px` Icon，无文字或 Frame。
 
-普通标签屏幕矩形至少间隔 `6px`；默认 `1920×1080 / ortho 13` 不显示全图名称。悬停、选中与采矿指引可强制 Near，并抑制附近低优先级标签。Marker 稳定 ID、对象身份、资源量和采矿合法性不变。
+上述数值是用户查看实际 Player 后授权反复校准形成的当前正式基线，不追溯声称早期较小尺寸已经通过人工验收。普通标签必须按稳定优先级和稳定 ID 做确定性避让，屏幕矩形至少间隔 `6px`；相同相机、分辨率和世界快照重复计算必须得到相同可见集合。默认 `1920×1080 / ortho 13` 不显示全图名称；悬停、选中与采矿指引可强制 Near，并抑制附近低优先级标签。Marker 稳定 ID、对象身份、资源量和采矿合法性不变。
 
 扩展 `FormalUiLayoutProfile3D` 的图标语义 token：Inline `16`、Compact `20`、Row `24`、Slot `32`、Node `48`、Hero `64`。View 只选择语义级，不再写散落尺寸。建造栏保持 `620×54` 及反馈位置；目录 Hero 图标不超过卡片行高 `65%`，行内图标不超过行高 `60%`。
 
 ## 9. TDD 与完成门
 
-第一批 RED：正式 v2 全图覆盖、24 节点配额/安全储量、宏区连通、出生保护、双通路、真实采矿锚点、v2 存档与 v1 原子拒绝。第二批 RED：全部建筑类别、Ground/Inner 同比、炮塔单一基础座、Marker 实际像素/避让、UI icon token 与真实输入。
+第一批 RED：正式 v2 全图覆盖、固定 24 坐标/安全储量、宏区连通、出生保护、双通路、真实采矿锚点、v2 存档与 v1 原子拒绝。第二批 RED：全部建筑类别、Ground/Inner 同比、`.14` DefenseFoundation、Marker 实际像素/避让、UI icon token 与真实输入。`GrayboxWorldLayout3DTests.IDEA0019_Seed8128V2WorldMatchesStableGoldenHash` 已将 3072 格 canonical 内容冻结为真实 SHA-256 `2f0ecd374ad3a1bf6fd50564d949741618c7ce1b72bc6619f67acda632b1e6fd`；任何地图真值变化都必须显式更新 generation/signature 或经批准更新 golden hash。标签避让必须有同输入重复计算、相邻冲突、引导优先和稳定 ID 决胜测试，不能只检查单个 Marker 尺寸。
 
 实现后依次运行：地图/放置/存档/比例聚焦 EditMode → 真实输入 PlayMode → `TerrainAssetDeep` → 日常完整 EditMode → 完整 PlayMode → 项目质量门 → Windows Release 3D → Windows Development 3D → macOS universal 3D → 固定 GUI 证据 → 官方文档生成/校验/Analyze/RecordVerification。
 

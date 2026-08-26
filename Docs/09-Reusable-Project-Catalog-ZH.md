@@ -24,11 +24,15 @@
 
 ### 世界地图模型（推荐复用）
 
-能解决什么：保存世界地图状态。在哪里：`Assets/_Game/Scripts/World/WorldMapModel.cs`。怎么复用：用于保存世界地图状态。把地图状态放进此模型而不是塞进显示层。不能负责什么：不处理场景渲染。改后跑哪组测试：`WorldMapTests`。代码名：`WorldMapModel`。
+能解决什么：保存格位地形、Traversal、资源类型与剩余储量、揭示和孤立资源等世界运行时真值。在哪里：`Assets/_Game/Scripts/World/WorldMapModel.cs`。怎么复用：保存格位地形、Traversal、资源余量与揭示等世界运行时真值。不能负责什么：不选择 v2 生成策略，也不处理场景渲染、存档文件或建筑放置。改后跑哪组测试：`WorldMapTests`、`GrayboxWorldLayout3DTests`、`GrayboxFormalSaveWorldCityTests`。代码名：`WorldMapModel`。
 
 ### 三维世界布局（复用前审查）
 
-能解决什么：安排三维灰盒世界的位置。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`。怎么复用：用于灰盒世界布局。调整布局前需要场景复核。不能负责什么：不能替你判断新玩法规则。改后跑哪组测试：`GrayboxWorldLayout3DTests`。代码名：`GrayboxWorldLayout3D`。
+能解决什么：作为正式 `64×48` 世界入口调用 IDEA-0019 的 v2 确定性生成器。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`。怎么复用：作为正式 64×48 世界入口消费 IDEA-0019 的 v2 确定性生成器。不能负责什么：只选择正式世界生成边界；不复制地图目录、渲染、存档 IO 或放置合法性，调整布局前需要场景复核。改后跑哪组测试：`GrayboxWorldLayout3DTests`、`GrayboxFormalSaveWorldCityTests`。代码名：`GrayboxWorldLayout3D`。
+
+### 正式三维世界生成目录（复用前审查）
+
+能解决什么：定义并生成 IDEA-0019 的 v2 固定宏格地貌、Traversal 区域、出生保护区、关键走廊、精确 `24` 个固定坐标资源节点和正式 world identity。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs`、`Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs`。怎么复用：以固定 8×6 宏格模板、每宏格整数扰动、固定 Traversal 区域/走廊和 24 项精确坐标资源目录生成 seed 8128 的正式 64×48 v2 世界。当前 canonical golden SHA-256 为 `2f0ecd374ad3a1bf6fd50564d949741618c7ce1b72bc6619f67acda632b1e6fd`。不能负责什么：只拥有确定性初始地图内容与生成配置；当前不实现评分候选、定点插值或随机 spot，也不持有运行时剩余储量、揭示、渲染、存档文件、城市路径或建筑放置真值。改后跑哪组测试：`GrayboxWorldLayout3DTests`、`WorldMapTests`、`GrayboxFormalSaveWorldCityTests`、`GrayboxFormalSaveRuntimeHostTests`。代码名：`FormalWorldGenerationCatalog3D`、`FormalWorldGenerator3D`、`FormalResourceNodeSpec3D`。
 
 ### 平面坐标映射（推荐复用）
 
@@ -134,7 +138,7 @@
 
 ### 三维建筑世界视图（仅限场景）
 
-能解决什么：在当前场景显示建筑、半透明放置预览和稳定前向标记。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs` 与 `Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat`。怎么复用：在场景内显示建筑与半透明放置预览，并用稳定前向标记同步四向旋转、旋转后占地和模型朝向。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现，不作为纯领域模型复用；不得自行决定锚点、旋转合法性、成本或资源节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`。代码名：`GrayboxBuildingWorldView3D`。
+能解决什么：在当前场景显示建筑、半透明放置预览和稳定前向标记，并消费正式世界尺度 Profile 统一地面/内城、施工/完成/废墟的表现包围。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs` 与 `Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat`。怎么复用：在场景内显示建筑、半透明预览和前向标记，并消费正式尺度 Profile 统一地面/内城与各生命周期表现。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现；不得修改 BuildingCatalog 占地或自行决定锚点、旋转合法性、成本和节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`、`FormalWorldPresentationScaleProfile3DTests`。代码名：`GrayboxBuildingWorldView3D`。
 
 ## UI 与输入
 
@@ -362,7 +366,7 @@
 
 ### 三维世界与移动城市存档适配器（复用前审查）
 
-能解决什么：在 schema `31` 与既有三维世界、移动城市权威状态之间做确定性捕获和恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`。怎么复用：从显式提供的 GrayboxSceneBootstrap、移动城市控制器与建筑会话捕获并恢复 schema 31 的确定性世界身份、城市位置、朝向、模式、展开/收起活动转换和规则时间。不能负责什么：只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；恢复必须复用当前正式世界和城市公开恢复边界，不重新生成另一份世界。改后跑哪组测试：`GrayboxFormalSaveWorldCityTests`。代码名：`GrayboxWorldCitySaveAdapter3D`。
+能解决什么：在 schema `32` 与既有三维世界、移动城市权威状态之间做确定性捕获和恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`。怎么复用：捕获并恢复 schema 32 的 v2 世界身份、节点余量、城市位置、模式、活动转换和规则时间，并明确拒绝 v1 world identity。不能负责什么：只映射世界与城市权威状态，不拥有文件 IO、领域总协调、建筑/库存/生产真值、路径缓存、物流连接、表现或 UI；不猜测迁移旧地图坐标。改后跑哪组测试：`GrayboxFormalSaveWorldCityTests`。代码名：`GrayboxWorldCitySaveAdapter3D`。
 
 ### 正式三维存档领域协调器（复用前审查）
 
@@ -400,15 +404,19 @@
 
 ### 三维资源矿点标识与图标标记（仅限场景）
 
-能解决什么：把 `WorldMapModel` 的真实资源节点投影为带稳定 ID 和共享资源图标的可回收场景标记。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs` 与 `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`。怎么复用：在 GrayboxPrototype3D 中以世界坐标生成稳定矿点 ID，并把 WorldMapModel 的真实资源节点投影为复用共享资源图标的可回收标记。不能负责什么：只属于当前 3D 世界表现与对象复用层；不创建资源节点、不决定节点类型、储量、采矿合法性或枯竭规则，所有真值必须继续来自 WorldMapModel。改后跑哪组测试：`GrayboxVisualAndWorldTests`。代码名：`GrayboxResourceNodeIdentity3D`、`GrayboxResourceNodeMarker3D`。
+能解决什么：把 `WorldMapModel` 的真实资源节点投影为带稳定坐标 ID、共享资源图标和 Profile 驱动 Near/Mid/Far 尺度的可回收场景标记。在哪里：`Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeIdentity3D.cs` 与 `Assets/_Game/Scripts/Graybox3D/GrayboxResourceNodeMarker3D.cs`。怎么复用：在 GrayboxPrototype3D 中以世界坐标生成稳定矿点 ID，并把 WorldMapModel 的真实资源节点投影为复用共享资源图标的可回收标记。同屏标签由世界视图按稳定优先级、稳定 ID 和 `6px` 间距确定性避让。不能负责什么：只属于当前 3D 世界表现与对象复用层；不创建资源节点、不决定节点类型、储量、采矿合法性或枯竭规则，所有真值必须继续来自 WorldMapModel。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`FormalWorldPresentationScaleProfile3DTests`。代码名：`GrayboxResourceNodeIdentity3D`、`GrayboxResourceNodeMarker3D`。
 
 ### 正式三维地图导航与矿点层级（复用前审查）
 
-能解决什么：统一正式三维地图的正交缩放边界、滚轮步长与资源矿点 Near/Mid/Far 显示层级。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`、`Assets/_Game/Resources/Presentation/FormalMapNavigationProfile3D.asset`。怎么复用：统一正式三维地图的正交缩放边界、滚轮步长与资源矿点近中远显示层级。不能负责什么：只拥有导航和标记表现配置；不修改地图尺寸、地形、资源节点、储量或输入焦点真值，模态抑制必须继续经过正式输入协调器。改后跑哪组测试：`GrayboxCameraAndInputTests`、`GrayboxVisualAndWorldTests`、`GrayboxRuntimeSceneTests`。代码名：`FormalMapNavigationProfile3D`。
+能解决什么：统一正式三维地图的正交缩放边界和滚轮步长，并向世界表现提供当前观察距离。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`、`Assets/_Game/Resources/Presentation/FormalMapNavigationProfile3D.asset`。怎么复用：统一正式三维地图的正交缩放边界和滚轮步长，并向世界表现提供当前观察距离。不能负责什么：只拥有导航配置；矿点的物理像素尺寸和实际 Near/Mid/Far 显隐由正式世界表现尺度配置负责。它不修改地图、节点、储量或输入焦点真值，模态抑制必须继续经过正式输入协调器。改后跑哪组测试：`GrayboxCameraAndInputTests`、`GrayboxVisualAndWorldTests`、`GrayboxRuntimeSceneTests`。代码名：`FormalMapNavigationProfile3D`。
+
+### 正式三维世界表现尺度（复用前审查）
+
+能解决什么：统一 30 座建筑的表现 archetype、Ground/InnerCity 格尺度、footprint 填充率与高度带，以及矿点 Near/Mid/Far 的参考像素、显隐和世界单位换算。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`、`Assets/_Game/Resources/Presentation/FormalWorldPresentationScaleProfile3D.asset`。怎么复用：按 BuildingDefinition.Id 解析 30 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。不能负责什么：只拥有世界表现参数与纯换算；不得定义或修改 BuildingCatalog 占地、资源节点、地图、Sprite 身份、相机输入、正式 UI 图标 token 或存档真值，UI token 继续由 FormalUiLayoutProfile3D 持有。改后跑哪组测试：`FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxVisualAndWorldTests`。代码名：`FormalWorldPresentationScaleProfile3D`、`FormalWorldPresentationScalePolicy3D`、`FormalBuildingVisualMetrics3D`、`FormalWorldMarkerMetrics3D`、`FormalBuildingVisualArchetype3D`。
 
 ### 正式三维响应式界面布局（复用前审查）
 
-能解决什么：统一 1920×1080 参考分辨率、`ScaleWithScreenSize + Expand`、安全区、语义槽位、间距、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`。怎么复用：统一 1920×1080 参考分辨率、Expand 缩放、安全区、语义槽位、间距、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。不能负责什么：只负责 UGUI 画布与布局表现；布局以 Canvas 本地矩形为真值，字体下限才读取物理像素缩放；不拥有玩法数据、输入命令或窗口生命周期，既有建造栏继续保持 620×54 的批准尺寸与位置。改后跑哪组测试：`FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests`、`GrayboxSceneContractTests`、`GrayboxDeveloperModifierRuntimeInputTests`、`GrayboxDefenseRuntimeInputTests`。代码名：`FormalUiLayoutProfile3D`、`FormalUiLayoutPolicy3D`、`FormalUiLayout3D`、`FormalUiCanvasConfiguration3D`、`FormalUiCanvasMetrics3D`、`FormalUiReadableText3D`。
+能解决什么：统一 1920×1080 参考分辨率、`ScaleWithScreenSize + Expand`、安全区、语义槽位、间距、图标语义尺寸、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`。怎么复用：统一 1920×1080 参考分辨率、Expand 缩放、安全区、语义槽位、间距、图标语义尺寸、大面板尺寸上限和运行时可刷新的 12 物理像素字体下限。不能负责什么：只负责 UGUI 画布与布局表现；布局以 Canvas 本地矩形为真值，字体下限才读取物理像素缩放；不拥有玩法数据、输入命令或窗口生命周期，既有建造栏继续保持 620×54 的批准尺寸与位置。改后跑哪组测试：`FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests`、`GrayboxSceneContractTests`、`GrayboxDeveloperModifierRuntimeInputTests`、`GrayboxDefenseRuntimeInputTests`。代码名：`FormalUiLayoutProfile3D`、`FormalUiLayoutPolicy3D`、`FormalUiLayout3D`、`FormalUiCanvasConfiguration3D`、`FormalUiCanvasMetrics3D`、`FormalUiReadableText3D`。
 
 ### 三维灰盒视觉槽位（仅限场景）
 
@@ -432,7 +440,7 @@
 
 ### 废墟与悬崖三维布局合批（复用前审查）
 
-能解决什么：从既有世界地图确定性投影并合批 Ruins/Cliff 几何。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`、`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`。怎么复用：用于从既有世界地图确定性投影并合批废墟与悬崖几何。不能负责什么：只消费既有地图与配置，不创建第二套地形判断或逐格常驻对象。改后跑哪组测试：`FirstArtRuinsCliffGeometryTests`、`FirstArtRuinsCliffLayoutTests`。代码名：`FirstArtRuinsCliffGeometry3D`、`FirstArtRuinsCliffLayout3D`。
+能解决什么：从 IDEA-0019 v2 世界地图确定性投影并合批 Ruins/Cliff 几何。在哪里：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffGeometry3D.cs`、`Assets/_Game/Scripts/ArtIntegration3D/FirstArtRuinsCliffLayout3D.cs`。怎么复用：用于从既有世界地图确定性投影并合批废墟与悬崖几何。不能负责什么：只消费既有地图与配置，不创建第二套地形判断或逐格常驻对象。改后跑哪组测试：`FirstArtRuinsCliffGeometryTests`、`FirstArtRuinsCliffLayoutTests`、`FormalWorldPresentationScaleProfile3DTests`。代码名：`FirstArtRuinsCliffGeometry3D`、`FirstArtRuinsCliffLayout3D`。
 
 ### 废墟与悬崖三维呈现（仅限场景）
 

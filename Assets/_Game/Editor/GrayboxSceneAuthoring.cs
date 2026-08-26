@@ -36,6 +36,9 @@ namespace WasteCity.Editor
             "Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat";
         private const string ResourceIconCatalogPath =
             "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset";
+        private const string WorldPresentationScaleProfilePath =
+            "Assets/_Game/Resources/Presentation/" +
+            "FormalWorldPresentationScaleProfile3D.asset";
         private const string DefaultRendererPath =
             "Packages/com.unity.render-pipelines.universal/" +
             "Runtime/Data/UniversalRendererData.asset";
@@ -833,6 +836,20 @@ namespace WasteCity.Editor
                 RequireSingle<GrayboxMobileCityController3D>(scene);
             GrayboxWorldView3D world =
                 RequireSingle<GrayboxWorldView3D>(scene);
+            FormalWorldPresentationScaleProfile3D presentationScaleProfile =
+                AssetDatabase.LoadAssetAtPath<
+                    FormalWorldPresentationScaleProfile3D>(
+                        WorldPresentationScaleProfilePath);
+            string presentationScaleError = null;
+            if (presentationScaleProfile == null ||
+                !presentationScaleProfile.TryValidate(
+                    out presentationScaleError))
+            {
+                throw new InvalidOperationException(
+                    string.IsNullOrEmpty(presentationScaleError)
+                        ? "The formal world presentation scale profile is missing."
+                        : presentationScaleError);
+            }
             GrayboxDirectControlCoordinator directControl =
                 RequireSingle<GrayboxDirectControlCoordinator>(scene);
             GrayboxLeaderController3D leader =
@@ -928,7 +945,8 @@ namespace WasteCity.Editor
                 ("infrastructureRoot", infrastructureRoot),
                 ("sharedMaterial", material),
                 ("previewMaterial", previewMaterial),
-                ("city", city));
+                ("city", city),
+                ("presentationScaleProfile", presentationScaleProfile));
             SetReferences(
                 city,
                 ("ruleTimeSourceBehaviour", session));
@@ -956,7 +974,8 @@ namespace WasteCity.Editor
                 ("resourceIconCatalog", resourceIconCatalog));
             SetReferences(
                 world,
-                ("resourceIconCatalog", resourceIconCatalog));
+                ("resourceIconCatalog", resourceIconCatalog),
+                ("worldPresentationScaleProfile", presentationScaleProfile));
             SetReferences(
                 construction,
                 ("session", session),

@@ -335,15 +335,17 @@ F1C/F1D 中“敌人、炮塔与战斗不在本阶段”的文字继续作为对
 
 实施顺序：
 
-1. 先以失败测试冻结 v2 地图合同：`3072` 格、宏区连通、出生保护、双通路、特殊地形簇、`24` 个精确资源节点、GDD 安全铁/石与裂谷铁、真实 `2×2` 采矿锚点、确定性内容哈希；
-2. 建立纯 C# 正式 v2 生成配置和生成器，`GrayboxWorldLayout3D` 只作默认世界 facade，`WorldMapModel` 继续拥有运行时格位、储量、揭示和采收真值；
+1. 先以失败测试冻结 v2 地图合同：`3072` 格、宏区连通、出生保护、双通路、特殊地形簇、正式目录固定的 `24` 个精确坐标/资源/储量、GDD 安全铁/石与裂谷铁、真实 `2×2` 采矿锚点和真实非零全图 golden SHA-256；
+2. 建立纯 C# 正式 v2 生成配置和生成器：地形由固定 `8×6` 宏格模板、每宏格两个稳定整数偏移通道和一轮清理产生，资源按 `FormalResourceNodeSpec3D` 原样投放，不实现评分候选、定点插值或随机 spot；`GrayboxWorldLayout3D` 只作默认世界 facade，`WorldMapModel` 继续拥有运行时格位、储量、揭示和采收真值；
 3. 将 world generation version/signature 升级为 v2，保持 schema `32` codec 不变；自动验证 v2 往返和 v1 地图存档中文拒绝且运行时原子不变；
-4. 先以失败测试覆盖 Ground/Inner、1×1/2×2/3×2、四方向、全部建筑类别、炮塔基础座与武器上层边界，再接纯表现尺度 Profile；逻辑 footprint、旋转、放置、物流和存档坐标不变；
-5. 扩展正式地图导航与 UI Profile，以屏幕像素/地面格相对高度驱动 Marker Near/Mid/Far，以语义 token 统一 UI 图标；默认镜头不显示全图名称，普通标签不重叠，建造栏 `620×54` 与反馈位置不变；
+4. 先以失败测试覆盖 Ground/Inner、1×1/2×2/3×2、四方向、全部建筑类别及 74% footprint、精确 `.14` 格高的 DefenseFoundation，再接纯表现尺度 Profile；逻辑 footprint、旋转、放置、物流和存档坐标不变；
+5. 扩展正式地图导航与 UI Profile，以屏幕像素/地面格相对高度驱动 Marker Near/Mid/Far；当前用户比例迭代基线为 Near `68/50/22`、Mid `56/42/20`、Far Icon `28`。UI 图标继续由 `FormalUiLayoutProfile3D` 的语义 token 统一；默认镜头不显示全图名称，普通标签按稳定 ID 确定性避让，建造栏 `620×54` 与反馈位置不变；
 6. 更新地表、Ruins/Cliff、场景出生与固定证据消费 v2 真值，保留唯一地形 Presenter、14 个稳定 Prefab、两类合批、13 个共享材质和分类原子回退；
 7. 运行地图/放置/存档/比例/真实输入聚焦测试、`TerrainAssetDeep`、日常完整 EditMode、完整 PlayMode、项目质量门、三项现役构建、固定 GUI 证据、官方文档生成/校验和 `RecordVerification`。
 
 不包含：`96×64` 扩图、六角格、迷雾、区块流送、随机多世界、新资源/建筑/模型/动画、复杂 NavMesh、跨城市运输、UI Toolkit 重写、v1 地图存档迁移或正式发布。用户视觉试玩与真实 Windows 10/11 GPU、显存、内存验收继续由实际结果确认。
+
+当前开发分支已经形成 v2 固定宏格/整数扰动、固定 24 节点、generation/signature、建筑尺度 Profile 和 Marker/UI 比例接线，并以 SHA-256 `2f0ecd374ad3a1bf6fd50564d949741618c7ce1b72bc6619f67acda632b1e6fd` 冻结当前 3072 格 canonical 内容；场景双 Profile 合同 `39/39` 已通过。标签避让已完成 RED `1/1`、GREEN `1/1` 和相关聚焦回归 `35/35`，覆盖同输入稳定集合、相邻冲突、引导优先、稳定 ID 决胜与至少 `6 px` 间距。阶段仍处于开发中：完整回归、构建、用户视觉试玩和真实 Windows 验收均未完成。
 
 ### 阶段 F2：跨路线桥节点
 

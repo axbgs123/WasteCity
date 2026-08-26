@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using NUnit.Framework;
 using WasteCity.City;
 using WasteCity.Economy;
@@ -16,6 +19,18 @@ namespace WasteCity.Tests
         private const int RiftY = 35;
         private const int EasternChokeX = 52;
         private const int EasternChokeY = 25;
+
+        [Test]
+        public void IDEA0019_Seed8128V2WorldMatchesStableGoldenHash()
+        {
+            WorldMapModel world = GrayboxWorldLayout3D.CreateDefault();
+
+            Assert.That(
+                StableContentHash(world),
+                Is.EqualTo(
+                    "2f0ecd374ad3a1bf6fd50564d949741618c7ce1b72bc6619f67acda632b1e6fd"));
+        }
+
         [Test]
         public void IDEA0019_ConstantsKeepApprovedDimensionsAndSeed()
         {
@@ -208,6 +223,45 @@ namespace WasteCity.Tests
                     for (int x = from.X - 1; x <= from.X + 1; x++)
                         AssertPassable(world, x, y, name);
                 }
+            }
+        }
+
+        private static string StableContentHash(WorldMapModel world)
+        {
+            var canonical = new StringBuilder(
+                world.Width * world.Height * 32);
+            for (var y = 0; y < world.Height; y++)
+            for (var x = 0; x < world.Width; x++)
+            {
+                WorldCell cell = world.Get(x, y);
+                canonical.Append(y.ToString(CultureInfo.InvariantCulture));
+                canonical.Append('/');
+                canonical.Append(x.ToString(CultureInfo.InvariantCulture));
+                canonical.Append('|');
+                canonical.Append(((int)cell.Terrain).ToString(
+                    CultureInfo.InvariantCulture));
+                canonical.Append('|');
+                canonical.Append(((int)cell.Traversal).ToString(
+                    CultureInfo.InvariantCulture));
+                canonical.Append('|');
+                canonical.Append(cell.ResourceId ?? string.Empty);
+                canonical.Append('|');
+                canonical.Append(cell.ResourceAmount.ToString(
+                    CultureInfo.InvariantCulture));
+                canonical.Append('\n');
+            }
+            using (SHA256 algorithm = SHA256.Create())
+            {
+                byte[] digest = algorithm.ComputeHash(
+                    Encoding.UTF8.GetBytes(canonical.ToString()));
+                var result = new StringBuilder(digest.Length * 2);
+                for (var index = 0; index < digest.Length; index++)
+                {
+                    result.Append(digest[index].ToString(
+                        "x2",
+                        CultureInfo.InvariantCulture));
+                }
+                return result.ToString();
             }
         }
         private static void AssertPassable(

@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`41e2a67d0059336ede73b7596c68a845373c2146c75f00c2cb2c307862923ead`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`0757f9e9452cba2992d4982130d807f29f1ef904e8b5998e107a17560a68b10e`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -219,6 +219,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`
@@ -300,6 +301,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs`
 - `Assets/_Game/Scripts/UI/TitleMenuModel.cs`
 - 世界地图与地形（`world-terrain`）：
+- `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs`
 - `Assets/_Game/Scripts/World/CameraFollowModel.cs`
 - `Assets/_Game/Scripts/World/ConsciousnessNetworkRules.cs`
 - `Assets/_Game/Scripts/World/RescueSiteModel.cs`
@@ -355,6 +358,7 @@
 - `WasteCity.ArtIntegration3D.FirstArtTerrainProfile3D`：`Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainProfile3D.cs`
 - `WasteCity.Graybox3D.BuildingIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
 - `WasteCity.Graybox3D.FormalMapNavigationProfile3D`：`Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
+- `WasteCity.Graybox3D.FormalWorldPresentationScaleProfile3D`：`Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`
 - `WasteCity.Graybox3D.Production2DVisualCatalog3D`：`Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
 - `WasteCity.Graybox3D.ResearchIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `WasteCity.Graybox3D.ResourceIconCatalog3D`：`Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
@@ -413,6 +417,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxGroundProjector.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMeshBuilder.cs`

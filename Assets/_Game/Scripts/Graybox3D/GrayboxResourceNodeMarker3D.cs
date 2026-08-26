@@ -26,6 +26,8 @@ namespace WasteCity.Graybox3D
         private TextMesh amountLabel;
         private TextMesh shadowLabel;
         private string resourceDisplayName;
+        private bool labelRequestedByLod = true;
+        private bool labelLayoutVisible = true;
 
         public string StableId { get; private set; }
         public string ResourceId { get; private set; }
@@ -40,6 +42,11 @@ namespace WasteCity.Graybox3D
         public ResourceNodeMarkerLod3D DisplayLod { get; private set; } =
             ResourceNodeMarkerLod3D.Near;
         public bool GuidanceOverride { get; private set; }
+        internal bool HasLabelContent =>
+            labelRequestedByLod && !string.IsNullOrEmpty(DisplayText);
+        internal Bounds LabelWorldBounds => amountLabel == null
+            ? default
+            : amountLabel.GetComponent<MeshRenderer>().bounds;
 
         public void Configure(
             string stableId,
@@ -107,6 +114,9 @@ namespace WasteCity.Graybox3D
             DisplayLod = effective;
             GuidanceOverride = guidanceOverride;
             UpdateDisplayText();
+            labelRequestedByLod = effective != ResourceNodeMarkerLod3D.Far;
+            labelLayoutVisible = true;
+            ApplyLabelRendererVisibility();
             return true;
         }
 
@@ -127,13 +137,9 @@ namespace WasteCity.Graybox3D
             frameRenderer.enabled = layoutVisible &&
                 metrics.ShowFrame && frame != null;
             iconRenderer.enabled = layoutVisible && icon != null;
-            MeshRenderer textRenderer =
-                amountLabel.GetComponent<MeshRenderer>();
-            textRenderer.enabled = layoutVisible &&
-                (metrics.ShowName || metrics.ShowAmount);
-            MeshRenderer shadowRenderer =
-                shadowLabel.GetComponent<MeshRenderer>();
-            shadowRenderer.enabled = textRenderer.enabled;
+            labelRequestedByLod = metrics.ShowName || metrics.ShowAmount;
+            labelLayoutVisible = layoutVisible;
+            ApplyLabelRendererVisibility();
 
             frameRenderer.transform.localScale = Vector3.one *
                 FiniteNonNegative(frameWorldHeight);
@@ -160,6 +166,15 @@ namespace WasteCity.Graybox3D
             shadowLabel.transform.localPosition = labelPosition +
                 new Vector3(shadowOffset, -shadowOffset, .001f);
             UpdateDisplayText();
+        }
+
+        internal bool SetLabelLayoutVisible(bool visible)
+        {
+            if (labelLayoutVisible == visible)
+                return false;
+            labelLayoutVisible = visible;
+            ApplyLabelRendererVisibility();
+            return true;
         }
 
         public void SetIcon(Sprite icon)
@@ -273,6 +288,15 @@ namespace WasteCity.Graybox3D
             amountLabel.text = text;
             if (shadowLabel != null)
                 shadowLabel.text = text;
+        }
+
+        private void ApplyLabelRendererVisibility()
+        {
+            if (amountLabel == null || shadowLabel == null)
+                return;
+            bool visible = labelRequestedByLod && labelLayoutVisible;
+            amountLabel.GetComponent<MeshRenderer>().enabled = visible;
+            shadowLabel.GetComponent<MeshRenderer>().enabled = visible;
         }
 
         private static Mesh ResolveIconMesh(Sprite sprite)

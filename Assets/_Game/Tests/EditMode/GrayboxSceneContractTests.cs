@@ -41,6 +41,11 @@ namespace WasteCity.Tests
             "Assets/_Game/Rendering/Graybox3D/GrayboxPreview.mat";
         private const string ResourceIconCatalogPath =
             "Assets/_Game/Rendering/Graybox3D/ResourceIconCatalog3D.asset";
+        private const string WorldPresentationScaleProfilePath =
+            "Assets/_Game/Resources/Presentation/" +
+            "FormalWorldPresentationScaleProfile3D.asset";
+        private const string WorldPresentationScaleProfileGuid =
+            "5048623d53e84ac2b0442cefa37829cc";
 
         [Test]
         public void Scene_HasIndependentBootstrapHierarchyAndReferences()
@@ -180,6 +185,35 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxOperationsView3D>(true),
                 "resourceIconCatalog",
                 catalog);
+        }
+
+        [Test]
+        public void IDEA0019_SceneWorldViewsShareFormalScaleProfileAsset()
+        {
+            EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+            FormalWorldPresentationScaleProfile3D profile =
+                AssetDatabase.LoadAssetAtPath<
+                    FormalWorldPresentationScaleProfile3D>(
+                    WorldPresentationScaleProfilePath);
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>(true);
+            GrayboxBuildingWorldView3D buildings =
+                Object.FindObjectOfType<
+                    GrayboxBuildingWorldView3D>(true);
+
+            Assert.That(profile, Is.Not.Null);
+            Assert.That(
+                AssetDatabase.AssetPathToGUID(
+                    WorldPresentationScaleProfilePath),
+                Is.EqualTo(WorldPresentationScaleProfileGuid));
+            AssertReference(
+                world,
+                "worldPresentationScaleProfile",
+                profile);
+            AssertReference(
+                buildings,
+                "presentationScaleProfile",
+                profile);
         }
 
         [Test]

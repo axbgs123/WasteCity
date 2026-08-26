@@ -70,6 +70,8 @@ namespace WasteCity.Graybox3D
         private readonly List<GrayboxResourceNodeMarker3D>
             guidedResourceNodeMarkers =
                 new List<GrayboxResourceNodeMarker3D>();
+        private readonly List<Rect> acceptedResourceLabelRects =
+            new List<Rect>(32);
         private readonly Dictionary<string, bool> surfaceFallbackVisibility =
             CreateSurfaceFallbackVisibility();
         private IGrayboxTerrainPresentation3D activeTerrainPresentation;
@@ -112,6 +114,11 @@ namespace WasteCity.Graybox3D
             WorldRendererCount + ResourceNodeMarkerRendererCount;
         public int TotalPersistentGeneratedObjectCount =>
             PersistentGeneratedObjectCount + resourceNodeMarkers.Count * 5;
+        public float LastResourceNodeLabelSeparationPixels
+        {
+            get;
+            private set;
+        }
         public bool HasActiveTerrainPresentation =>
             IsPresentationAlive(activeTerrainPresentation);
 
@@ -225,6 +232,7 @@ namespace WasteCity.Graybox3D
                     AddResourceNodeMarker(x, y, cell, origin);
                 }
             }
+            resourceNodeMarkers.Sort(CompareResourceMarkerPriority);
 
             foreach (Group group in groups.Values)
                 BuildGroup(group);
@@ -237,6 +245,7 @@ namespace WasteCity.Graybox3D
             hasResourceNodeFacingRotation = false;
             hasResourceNodeMarkerLod = false;
             hasResourceNodeMarkerPresentation = false;
+            LastResourceNodeLabelSeparationPixels = 0f;
         }
 
         public void AttachTerrainPresentation(
@@ -369,6 +378,10 @@ namespace WasteCity.Graybox3D
                         camera.orthographicSize,
                         camera.pixelWidth,
                         camera.pixelHeight);
+                RefreshResourceNodeMarkerLabelLayout(
+                    camera,
+                    camera.pixelWidth,
+                    camera.pixelHeight);
             }
         }
 
@@ -462,6 +475,7 @@ namespace WasteCity.Graybox3D
                 guidedResourceNodeMarkers.Add(marker);
             else
                 guidedResourceNodeMarkers.Remove(marker);
+            RefreshCurrentResourceLabelLayout();
             return true;
         }
 
@@ -490,7 +504,44 @@ namespace WasteCity.Graybox3D
                 }
             }
             guidedResourceNodeMarkers.Clear();
+            RefreshCurrentResourceLabelLayout();
             return true;
+        }
+
+        public bool RefreshResourceNodeMarkerLabelLayout(
+            Camera camera,
+            int pixelWidth,
+            int pixelHeight)
+        {
+            EnsureWorldPresentationProfile();
+            if (camera == null || worldPresentationScaleProfile == null)
+                return false;
+            pixelWidth = EffectivePixelSize(pixelWidth, 1920);
+            pixelHeight = EffectivePixelSize(pixelHeight, 1080);
+            float separation =
+                FormalWorldPresentationScalePolicy3D.ResolvePhysicalPixels(
+                    worldPresentationScaleProfile
+                        .MarkerSeparationReferencePixels,
+                    6f,
+                    12f,
+                    pixelWidth,
+                    pixelHeight);
+            LastResourceNodeLabelSeparationPixels = separation;
+            acceptedResourceLabelRects.Clear();
+            bool changed = false;
+            changed |= ResolveResourceLabelPass(
+                camera,
+                pixelWidth,
+                pixelHeight,
+                separation,
+                guidanceOnly: true);
+            changed |= ResolveResourceLabelPass(
+                camera,
+                pixelWidth,
+                pixelHeight,
+                separation,
+                guidanceOnly: false);
+            return changed;
         }
 
         public bool FaceResourceNodeMarkers(Transform cameraTransform)
@@ -532,6 +583,7 @@ namespace WasteCity.Graybox3D
             resourceNodeMarkers.Clear();
             resourceNodeMarkersByCell.Clear();
             guidedResourceNodeMarkers.Clear();
+            acceptedResourceLabelRects.Clear();
             nextResourceNodeRefreshAt = 0f;
             hasResourceNodeFacingRotation = false;
             hasResourceNodeMarkerLod = false;
@@ -828,6 +880,126 @@ namespace WasteCity.Graybox3D
                     FormalWorldPresentationScaleProfile3D>(
                     FormalWorldPresentationScaleProfile3D.ResourcesPath);
             }
+        }
+
+        private bool ResolveResourceLabelPass(
+            Camera camera,
+            int pixelWidth,
+            int pixelHeight,
+            float separation,
+            bool guidanceOnly)
+        {
+            bool changed = false;
+            for (var index = 0; index < resourceNodeMarkers.Count; index++)
+            {
+                GrayboxResourceNodeMarker3D marker =
+                    resourceNodeMarkers[index];
+                if (marker == null ||
+                    marker.GuidanceOverride != guidanceOnly)
+                    continue;
+                Rect labelRect = default;
+                bool visible = marker.HasLabelContent &&
+                    TryProjectLabelRect(
+                        camera,
+                        marker.LabelWorldBounds,
+                        pixelWidth,
+                        pixelHeight,
+                        out labelRect) &&
+                    !OverlapsAcceptedLabel(labelRect, separation);
+                changed |= marker.SetLabelLayoutVisible(visible);
+                if (visible)
+                    acceptedResourceLabelRects.Add(labelRect);
+            }
+            return changed;
+        }
+
+        private bool OverlapsAcceptedLabel(Rect candidate, float separation)
+        {
+            var expanded = new Rect(
+                candidate.xMin - separation,
+                candidate.yMin - separation,
+                candidate.width + separation * 2f,
+                candidate.height + separation * 2f);
+            for (var index = 0;
+                 index < acceptedResourceLabelRects.Count;
+                 index++)
+            {
+                if (expanded.Overlaps(
+                        acceptedResourceLabelRects[index]))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool TryProjectLabelRect(
+            Camera camera,
+            Bounds bounds,
+            int pixelWidth,
+            int pixelHeight,
+            out Rect result)
+        {
+            result = default;
+            if (bounds.size.sqrMagnitude <= 0f)
+                return false;
+            Vector3 minimum = bounds.min;
+            Vector3 maximum = bounds.max;
+            float minimumX = float.PositiveInfinity;
+            float minimumY = float.PositiveInfinity;
+            float maximumX = float.NegativeInfinity;
+            float maximumY = float.NegativeInfinity;
+            for (var corner = 0; corner < 8; corner++)
+            {
+                Vector3 world = new Vector3(
+                    (corner & 1) == 0 ? minimum.x : maximum.x,
+                    (corner & 2) == 0 ? minimum.y : maximum.y,
+                    (corner & 4) == 0 ? minimum.z : maximum.z);
+                Vector3 viewport = camera.WorldToViewportPoint(world);
+                if (viewport.z <= 0f)
+                    return false;
+                float x = viewport.x * pixelWidth;
+                float y = viewport.y * pixelHeight;
+                minimumX = Mathf.Min(minimumX, x);
+                minimumY = Mathf.Min(minimumY, y);
+                maximumX = Mathf.Max(maximumX, x);
+                maximumY = Mathf.Max(maximumY, y);
+            }
+            result = Rect.MinMaxRect(
+                minimumX,
+                minimumY,
+                maximumX,
+                maximumY);
+            return result.xMax > 0f && result.yMax > 0f &&
+                result.xMin < pixelWidth && result.yMin < pixelHeight;
+        }
+
+        private void RefreshCurrentResourceLabelLayout()
+        {
+            Camera camera = Camera.main;
+            if (camera == null || !hasResourceNodeMarkerPresentation)
+                return;
+            RefreshResourceNodeMarkerLabelLayout(
+                camera,
+                lastMarkerPixelWidth,
+                lastMarkerPixelHeight);
+        }
+
+        private static int CompareResourceMarkerPriority(
+            GrayboxResourceNodeMarker3D left,
+            GrayboxResourceNodeMarker3D right)
+        {
+            if (ReferenceEquals(left, right))
+                return 0;
+            if (left == null)
+                return 1;
+            if (right == null)
+                return -1;
+            int comparison = left.WorldX.CompareTo(right.WorldX);
+            if (comparison != 0)
+                return comparison;
+            comparison = left.WorldY.CompareTo(right.WorldY);
+            return comparison != 0
+                ? comparison
+                : string.CompareOrdinal(left.StableId, right.StableId);
         }
 
         private void ApplyResourceNodeMarkerPresentation(

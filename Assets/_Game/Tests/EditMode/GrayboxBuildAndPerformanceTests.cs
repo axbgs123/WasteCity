@@ -1170,13 +1170,14 @@ namespace WasteCity.Tests
             int rendererCountBefore =
                 UnityEngine.Object.FindObjectsOfType<MeshRenderer>().Length;
             GrayboxWorldView3D view = CreateWorldView();
+            WorldMapModel formalWorld = GrayboxWorldLayout3D.CreateDefault();
+            int expectedResourceNodeCount =
+                FormalWorldGenerationCatalog3D.ExpectedResourceNodeCount;
 
-            view.Generate(
-                new WorldMapModel(
-                    GrayboxSceneBootstrap.WorldWidth,
-                    GrayboxSceneBootstrap.WorldHeight,
-                    new WorldSeed(
-                        GrayboxSceneBootstrap.WorldSeedValue)));
+            Assert.That(
+                formalWorld.ResourceNodeCount,
+                Is.EqualTo(expectedResourceNodeCount));
+            view.Generate(formalWorld);
 
             int generatedRendererCount =
                 UnityEngine.Object.FindObjectsOfType<MeshRenderer>().Length -
@@ -1194,10 +1195,31 @@ namespace WasteCity.Tests
                 view.PersistentGeneratedObjectCount,
                 Is.LessThanOrEqualTo(16));
             Assert.That(
+                view.ResourceNodeMarkerCount,
+                Is.EqualTo(expectedResourceNodeCount));
+            Assert.That(
+                view.ResourceNodeMarkerRendererCount,
+                Is.EqualTo(expectedResourceNodeCount * 4),
+                "Each formal node owns frame, icon, shadow, and text.");
+            Assert.That(
+                view.TotalPersistentGeneratedObjectCount,
+                Is.EqualTo(
+                    view.PersistentGeneratedObjectCount +
+                    expectedResourceNodeCount * 5),
+                "Each formal node owns one root and four visual children.");
+            Assert.That(
                 generatedRendererCount,
                 Is.EqualTo(view.TotalGeneratedRendererCount));
-            Assert.That(generatedRendererCount, Is.LessThan(64 * 32),
-                "Formal resource marker frames add one bounded renderer per node.");
+            Assert.That(
+                generatedRendererCount,
+                Is.LessThanOrEqualTo(128),
+                "The 24-node formal map must remain inside its batched " +
+                "world plus marker renderer budget.");
+            Assert.That(
+                view.TotalPersistentGeneratedObjectCount,
+                Is.LessThanOrEqualTo(144),
+                "The formal map may use at most 16 batched world objects " +
+                "plus five persistent objects for each of 24 nodes.");
         }
 
         [Test]
