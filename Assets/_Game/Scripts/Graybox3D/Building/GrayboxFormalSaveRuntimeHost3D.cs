@@ -4,6 +4,8 @@ using UnityEngine;
 using WasteCity.Core;
 using WasteCity.Defense;
 using WasteCity.Persistence;
+using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -57,6 +59,9 @@ namespace WasteCity.Graybox3D.Building
         private GameSpeedModel speed;
         private GrayboxFormalRuleClock3D ruleClock;
         private GrayboxCampaignTerminalSpeedGate3D terminalSpeedGate;
+        private FormalAttentionRuntime attentionRuntime;
+        private FormalFateRuntime fateRuntime;
+        private GrayboxFormalProgressionSaveAdapter3D progressionAdapter;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -70,6 +75,15 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxCampaignTerminalSpeedGate3D TerminalSpeedGate =>
             terminalSpeedGate ??=
                 new GrayboxCampaignTerminalSpeedGate3D(Speed);
+        public FormalAttentionRuntime AttentionRuntime =>
+            attentionRuntime ??= new FormalAttentionRuntime();
+        public FormalFateRuntime FateRuntime =>
+            fateRuntime ??= new FormalFateRuntime();
+        public GrayboxFormalProgressionSaveAdapter3D ProgressionAdapter =>
+            progressionAdapter ??=
+                new GrayboxFormalProgressionSaveAdapter3D(
+                    AttentionRuntime,
+                    FateRuntime);
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -98,6 +112,7 @@ namespace WasteCity.Graybox3D.Building
             if (IsInitialized) return true;
             EnsureStore();
             _ = Speed;
+            _ = ProgressionAdapter;
             if (!HasAuthoredRuntimeReferences() ||
                 !bootstrap.IsInitialized ||
                 bootstrap.World == null ||
@@ -160,6 +175,7 @@ namespace WasteCity.Graybox3D.Building
                 buildingStorage,
                 economy,
                 productionAdapter,
+                ProgressionAdapter,
                 defenseAdapter,
                 evacuationAdapter,
                 new GrayboxFormalPauseSaveDomain3D(Speed),
@@ -190,6 +206,12 @@ namespace WasteCity.Graybox3D.Building
             FormalSaveStoreResult existing = Probe();
             if (existing.Code == FormalSaveStoreCode.UnsupportedFutureSchema)
                 return false;
+            if (!ProgressionAdapter.TryRestore(
+                    new FormalThreeDProgressionSaveData(),
+                    out _))
+            {
+                return false;
+            }
 
             ResetCheckpointBaseline();
             currentSessionId = Guid.NewGuid().ToString("N");
@@ -377,6 +399,9 @@ namespace WasteCity.Graybox3D.Building
             ruleClock = null;
             terminalSpeedGate?.Synchronize(null);
             terminalSpeedGate = null;
+            progressionAdapter = null;
+            fateRuntime = null;
+            attentionRuntime = null;
             speed = null;
             IsInitialized = false;
             CheckpointWarningChanged = null;

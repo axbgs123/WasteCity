@@ -61,7 +61,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void CoordinatorPublishesTheFixedSevenDomainOrder()
+        public void CoordinatorPublishesTheFixedEightDomainOrder()
         {
             Type coordinator = RequireRuntimeType(
                 "GrayboxFormalSaveCoordinator3D");
@@ -85,6 +85,7 @@ namespace WasteCity.Tests
                     "BuildingStorage",
                     "Economy",
                     "Production",
+                    "Progression",
                     "Defense",
                     "Evacuation",
                     "Pause",
@@ -305,6 +306,7 @@ namespace WasteCity.Tests
         [TestCase(GrayboxFormalSaveDomainId3D.BuildingStorage)]
         [TestCase(GrayboxFormalSaveDomainId3D.Economy)]
         [TestCase(GrayboxFormalSaveDomainId3D.Production)]
+        [TestCase(GrayboxFormalSaveDomainId3D.Progression)]
         [TestCase(GrayboxFormalSaveDomainId3D.Defense)]
         [TestCase(GrayboxFormalSaveDomainId3D.Evacuation)]
         public void ApplyFailureReplaysRollbackAndRestoresCanonicalAuthority(
@@ -332,7 +334,7 @@ namespace WasteCity.Tests
             Assert.That(CanonicalPayload(harness.Authority.State),
                 Is.EqualTo(preloadCanonical),
                 "Rollback must restore the complete pre-load authority.");
-            Assert.That(harness.TotalCaptureCount, Is.EqualTo(7));
+            Assert.That(harness.TotalCaptureCount, Is.EqualTo(8));
             Assert.That(harness.Rebuilder.InvocationCount, Is.EqualTo(1),
                 "Successful rollback must rebuild derived state once.");
             Assert.That(harness.CompletionCount, Is.Zero);
@@ -578,7 +580,7 @@ namespace WasteCity.Tests
                 "CreateProduction",
                 BindingFlags.Public | BindingFlags.Static);
             Assert.That(factory, Is.Not.Null,
-                "Production needs one public assembly boundary for the six " +
+                "Production needs one public assembly boundary for the seven " +
                 "real adapters, Pause domain, live providers, and barrier " +
                 "consumers.");
             Assert.That(factory.ReturnType, Is.EqualTo(coordinator));
@@ -590,6 +592,7 @@ namespace WasteCity.Tests
                 typeof(GrayboxBuildingStorageSaveAdapter3D),
                 typeof(GrayboxEconomySaveAdapter3D),
                 typeof(GrayboxProductionSaveAdapter3D),
+                typeof(GrayboxFormalProgressionSaveAdapter3D),
                 typeof(GrayboxDefenseSaveAdapter3D),
                 typeof(GrayboxEvacuationSaveAdapter3D),
                 typeof(IFormalThreeDSaveDomain),
@@ -1169,6 +1172,9 @@ namespace WasteCity.Tests
                         return;
                     case GrayboxFormalSaveDomainId3D.Production:
                         destination.production = copy.production;
+                        return;
+                    case GrayboxFormalSaveDomainId3D.Progression:
+                        destination.progression = copy.progression;
                         return;
                     case GrayboxFormalSaveDomainId3D.Defense:
                         destination.defense = copy.defense;

@@ -506,6 +506,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
@@ -538,6 +539,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalGameSpeedPersistenceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveProductionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveUiAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
@@ -1249,6 +1251,29 @@
       ],
       "RequirementIds": [
         "IDEA-0015"
+      ]
+    },
+    {
+      "Id": "graybox-progression-save-adapter-3d",
+      "ChineseName": "正式三维文明进程存档适配器",
+      "TypeNames": [
+        "GrayboxFormalProgressionRestorePlan3D",
+        "GrayboxFormalProgressionSaveAdapter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在正式 Attention/Fate 运行时与 schema 33 progression DTO 之间确定性捕获、预检和原子恢复关注度、幂等历史、固定候选、已选命轨和等级。",
+      "BoundarySummary": "只映射已经验证的 Progression 快照并准备绑定 owner 和快照身份的零写入恢复计划；不计算关注度、不选择命轨、不执行命轨效果、不判断升阶资格、不读写文件或操作 UI。未知历史原因只作为孤儿证据保留，不能获得正式效果。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
       ]
     },
     {
@@ -3391,15 +3416,17 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按 world/city、building/storage、economy、production、defense、evacuation、pause 固定顺序协调 schema 31 capture 与恢复，先完整验证，再事务式应用，失败时回滚权威领域并在成功提交后统一重建派生状态。",
+      "UseSummary": "按 world/city、building/storage、economy、production、progression、defense、evacuation、pause 固定顺序协调 schema 33 capture 与恢复，先完整验证，再事务式应用，失败时回滚八个权威领域并在成功提交后统一重建派生状态。",
       "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0020"
       ]
     },
     {
@@ -3413,17 +3440,19 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 组合统一玩家 store、七领域 coordinator、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。",
+      "UseSummary": "在 GrayboxPrototype3D 组合统一玩家 store、schema 33 八领域 coordinator、唯一 Attention/Fate 运行时、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。",
       "BoundarySummary": "只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案或领域 DTO 规则；内部波前重试档不是第二玩家槽，失败不能伪装成已保存或已恢复。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ]
     },
     {

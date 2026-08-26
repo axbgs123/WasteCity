@@ -116,6 +116,10 @@
 
 能解决什么：在正式三维生产运行时的持久化快照与 schema 31 逐建筑生产 DTO 之间执行确定性映射。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`。怎么复用：在 GrayboxProductionRuntime3D 的持久化快照边界与 schema 31 FormalThreeDProduction DTO 之间执行确定性映射，并把恢复委托给运行时的预检与单次提交。不能负责什么：只负责生产领域快照与 DTO 映射；不拥有文件 IO、场景搜索、生产 tick、物流、建筑放置或矿点兼容规则，也不复制这些系统的判断。改后跑哪组测试：`GrayboxFormalSaveProductionTests`。代码名：`GrayboxProductionSaveAdapter3D`。
 
+### 正式三维文明进程存档适配器（复用前审查）
+
+能解决什么：在正式 Attention/Fate 运行时和 schema 33 Progression DTO 之间确定性捕获与恢复关注度、阈值、幂等事件、结构化历史、固定候选、已选命轨和等级。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs`。怎么复用：在正式 Attention/Fate 运行时与 schema 33 progression DTO 之间确定性捕获、预检和原子恢复关注度、幂等历史、固定候选、已选命轨和等级。不能负责什么：只映射已经验证的 Progression 快照并准备绑定 owner 和快照身份的零写入恢复计划；不计算关注度、不选择命轨、不执行命轨效果、不判断升阶资格、不读写文件或操作 UI。未知历史原因只作为孤儿证据保留，不能获得正式效果。改后跑哪组测试：`GrayboxFormalProgressionSaveAdapterTests`、`FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`。代码名：`GrayboxFormalProgressionRestorePlan3D`、`GrayboxFormalProgressionSaveAdapter3D`。
+
 ### 三维首版防御存档适配器（复用前审查）
 
 能解决什么：在正式三维防御运行时的当前十波战役快照与 schema 32 防御 DTO 之间执行确定性映射，并保留 schema 31 教学波旧档迁移入口。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs`。怎么复用：在正式三维防御运行时、十波战役持久状态与当前 FormalThreeD 防御 DTO 之间执行确定性映射，保留配置签名、出生锚点、波次阶段、完整会话统计、塔攻击余量、活动敌人、建筑生命和核心状态，并通过零写入计划把 schema 31 的可确认统计迁移为显式部分统计后统一提交。不能负责什么：只负责防御领域快照、迁移兼容与 FormalThreeD DTO 映射；不拥有文件 IO、场景搜索、规则 tick、城市库存、UI 或表现对象。FormalSaveValidator 只验证结构与高价值跨引用；目标缓存、状态文案、攻击事件和表现池不入档，迁移不得伪造完整历史统计。改后跑哪组测试：`GrayboxFormalSaveDefenseTests`、`GrayboxFormalDefenseCampaignSaveAdapterTests`、`FormalSaveSchema32ContractTests`、`SessionStatisticsTests`。代码名：`GrayboxDefenseSaveAdapter3D`。
@@ -386,11 +390,11 @@
 
 ### 正式三维存档领域协调器（复用前审查）
 
-能解决什么：按七领域固定顺序协调完整快照和带回滚的事务式恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`。怎么复用：按 world/city、building/storage、economy、production、defense、evacuation、pause 固定顺序协调 schema 31 capture 与恢复，先完整验证，再事务式应用，失败时回滚权威领域并在成功提交后统一重建派生状态。不能负责什么：只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。改后跑哪组测试：`GrayboxFormalSaveCoordinatorTests`、`GrayboxFormalSaveCheckpointTests`、`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxFormalControllerRebuilder3D`、`GrayboxFormalPauseSaveDomain3D`、`GrayboxFormalSaveCoordinatorResult3D`、`GrayboxFormalSaveCoordinator3D`。
+能解决什么：按八领域固定顺序协调完整快照和带回滚的事务式恢复。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`。怎么复用：按 world/city、building/storage、economy、production、progression、defense、evacuation、pause 固定顺序协调 schema 33 capture 与恢复，先完整验证，再事务式应用，失败时回滚八个权威领域并在成功提交后统一重建派生状态。不能负责什么：只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。改后跑哪组测试：`GrayboxFormalSaveCoordinatorTests`、`GrayboxFormalSaveCheckpointTests`、`GrayboxFormalProgressionSaveAdapterTests`、`GrayboxBuildAndPerformanceTests`。代码名：`GrayboxFormalControllerRebuilder3D`、`GrayboxFormalPauseSaveDomain3D`、`GrayboxFormalSaveCoordinatorResult3D`、`GrayboxFormalSaveCoordinator3D`。
 
 ### 正式三维存档运行时主机（仅限场景）
 
-能解决什么：在正式三维场景组合唯一存档运行时、事件驱动检查点与最近波前内部重试档。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`。怎么复用：在 GrayboxPrototype3D 组合统一玩家 store、七领域 coordinator、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。不能负责什么：只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案或领域 DTO 规则；内部波前重试档不是第二玩家槽，失败不能伪装成已保存或已恢复。改后跑哪组测试：`GrayboxFormalSaveRuntimeHostTests`、`FormalSaveWaveRetryStoreTests`、`GrayboxFormalSaveRuntimeInputTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxFormalSaveRuntimeHost3D`。
+能解决什么：在正式三维场景组合唯一存档运行时、八个事务领域、唯一 Attention/Fate 状态、事件驱动检查点与最近波前内部重试档。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`。怎么复用：在 GrayboxPrototype3D 组合统一玩家 store、schema 33 八领域 coordinator、唯一 Attention/Fate 运行时、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。不能负责什么：只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案或领域 DTO 规则；内部波前重试档不是第二玩家槽，失败不能伪装成已保存或已恢复。改后跑哪组测试：`GrayboxFormalSaveRuntimeHostTests`、`GrayboxFormalProgressionSaveAdapterTests`、`FormalSaveWaveRetryStoreTests`、`GrayboxFormalSaveRuntimeInputTests`、`GrayboxFormalSaveRoundTripTests`。代码名：`GrayboxFormalSaveRuntimeHost3D`。
 
 ### 正式三维存档启动与退出入口（仅限场景）
 

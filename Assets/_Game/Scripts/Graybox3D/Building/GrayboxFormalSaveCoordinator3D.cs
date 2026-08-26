@@ -16,6 +16,7 @@ namespace WasteCity.Graybox3D.Building
         BuildingStorage,
         Economy,
         Production,
+        Progression,
         Defense,
         Evacuation,
         Pause,
@@ -260,6 +261,7 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxFormalSaveDomainId3D.BuildingStorage,
                 GrayboxFormalSaveDomainId3D.Economy,
                 GrayboxFormalSaveDomainId3D.Production,
+                GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Defense,
                 GrayboxFormalSaveDomainId3D.Evacuation,
                 GrayboxFormalSaveDomainId3D.Pause,
@@ -288,6 +290,7 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingStorageSaveAdapter3D buildingStorage,
             GrayboxEconomySaveAdapter3D economy,
             GrayboxProductionSaveAdapter3D production,
+            GrayboxFormalProgressionSaveAdapter3D progression,
             GrayboxDefenseSaveAdapter3D defense,
             GrayboxEvacuationSaveAdapter3D evacuation,
             IFormalThreeDSaveDomain pauseDomain,
@@ -308,6 +311,8 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(economy));
             if (production == null)
                 throw new ArgumentNullException(nameof(production));
+            if (progression == null)
+                throw new ArgumentNullException(nameof(progression));
             if (defense == null)
                 throw new ArgumentNullException(nameof(defense));
             if (evacuation == null)
@@ -391,11 +396,19 @@ namespace WasteCity.Graybox3D.Building
                             out error);
                     }),
                 new DelegateDomain(
+                    GrayboxFormalSaveDomainId3D.Progression,
+                    destination =>
+                        destination.progression = progression.Capture(),
+                    (FormalThreeDSaveData source, out string error) =>
+                        progression.TryRestore(
+                            source.progression,
+                            out error)),
+                new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Defense,
                     destination =>
                     {
                         // Keep schema-31 output available for compatibility,
-                        // while schema 32 truth comes only from the live
+                        // while current campaign truth comes only from the live
                         // formal campaign runtime.
                         destination.defense = defense.Capture();
                         destination.defenseCampaign =

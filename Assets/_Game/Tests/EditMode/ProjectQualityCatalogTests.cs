@@ -607,6 +607,42 @@ namespace WasteCity.Tests
                 worldCity.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs");
 
+            CollectionAssert.Contains(
+                persistence.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxFormalProgressionSaveAdapter3D.cs");
+            CollectionAssert.Contains(
+                persistence.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxFormalProgressionSaveAdapterTests.cs");
+            CollectionAssert.Contains(
+                persistence.RequirementIds,
+                "IDEA-0020");
+            ProjectReuseEntry progression = FindReuse(
+                catalog,
+                "graybox-progression-save-adapter-3d");
+            Assert.That(
+                progression.FeatureGroupId,
+                Is.EqualTo("persistence-migration"));
+            Assert.That(
+                progression.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(new[]
+            {
+                "GrayboxFormalProgressionRestorePlan3D",
+                "GrayboxFormalProgressionSaveAdapter3D",
+            }, progression.TypeNames);
+            CollectionAssert.Contains(
+                progression.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxFormalProgressionSaveAdapterTests.cs");
+            StringAssert.Contains(
+                "零写入恢复计划",
+                progression.BoundarySummary);
+            StringAssert.Contains(
+                "不读写文件",
+                progression.BoundarySummary);
+
             ProjectReuseEntry coordinator = FindReuse(
                 catalog,
                 "graybox-formal-save-coordinator-3d");
@@ -620,6 +656,11 @@ namespace WasteCity.Tests
             CollectionAssert.Contains(
                 coordinator.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs");
+            CollectionAssert.Contains(
+                coordinator.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxFormalProgressionSaveAdapterTests.cs");
+            StringAssert.Contains("progression", coordinator.UseSummary);
             StringAssert.Contains("回滚", coordinator.BoundarySummary);
 
             ProjectReuseEntry runtimeHost = FindReuse(
@@ -630,9 +671,11 @@ namespace WasteCity.Tests
             CollectionAssert.IsSubsetOf(new[]
             {
                 "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+                "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
             }, runtimeHost.RequiredTestFiles);
+            StringAssert.Contains("八领域", runtimeHost.UseSummary);
 
             ProjectReuseEntry entry = FindReuse(
                 catalog,
