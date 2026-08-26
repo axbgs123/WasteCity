@@ -201,6 +201,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalEvacuationPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProductionLifecycleTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
@@ -222,11 +223,13 @@
         "IDEA-0014",
         "IDEA-0015",
         "IDEA-0017",
-        "IDEA-0019"
+        "IDEA-0019",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
-        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FocusedPlayMode"
     },
@@ -380,12 +383,14 @@
         "Assets/_Game/Scripts/Population/**",
         "Assets/_Game/Scripts/Progression/**",
         "Assets/_Game/Scripts/Narrative/**",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
         "Assets/_Game/Scripts/Population/**",
-        "Assets/_Game/Scripts/Progression/**"
+        "Assets/_Game/Scripts/Progression/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs"
       ],
       "FailureLocationSummary": "先检查研究、人口、关注度、命轨、文明等级与升阶真值",
       "TestFileGlobs": [
@@ -400,6 +405,7 @@
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs"
       ],
@@ -1171,13 +1177,14 @@
       ],
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；schema 31 恢复时先在临时双网格验证稳定实例、方向、占格、资源点绑定与 nextStableInstanceOrdinal 高水位，再统一替换实例和表现。正式撤离仍只在原子仓储提交成功后移除建筑。",
-      "BoundarySummary": "不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；不从场景搜索建筑、不重新支付建造成本，也不从当前实例推导并复用历史高水位。仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有；schema 31 只保存权威建筑状态，连接和表现仍为派生状态。",
+      "UseSummary": "协调三维建筑会话并持有当前会话唯一的 CityResourceStorageModel；只有建筑从施工中真实提交为已完成，且表现更新、仓库注册、catalog 与 placement revision 全部成功后，才按稳定实例发布一次 BuildingCompleted。",
+      "BoundarySummary": "BuildingCompleted 只陈述已经提交的建筑事实，不计算关注度或命轨效果；Configure、存档恢复和重复同步绝不补发，订阅者异常逐个隔离且不能回滚建筑。会话仍不替代放置、物流、撤离或仓库规则，也不从场景搜索建筑。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
       ],
       "RequirementIds": [
@@ -1185,7 +1192,8 @@
         "IDEA-0012",
         "IDEA-0014",
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ]
     },
     {
@@ -2112,6 +2120,26 @@
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-progression-event-router-3d",
+      "ChineseName": "三维文明进程领域事件路由器",
+      "TypeNames": [
+        "GrayboxProgressionEventRouter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "订阅首次展开、建筑完成和自然研究完成的已提交领域事件，以稳定原因和事件键交给唯一 FormalAttentionRuntime，并把固定命轨选择与 +5 关注度作为可回滚的窄事务提交。",
+      "BoundarySummary": "只路由已经发生的领域事实；不扫描建筑或科技、不轮询 revision、不从存档恢复状态追补历史、不计算目录增量、不生成压力战斗、不读写文件或操作 UI。扫描、救援、锁定区离开和干扰遗迹在没有权威发布者时保持未接线，Dispose 必须解除全部订阅。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"

@@ -230,7 +230,7 @@ namespace WasteCity.Tests
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
                 "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs",
-                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**",
+                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs",
                 "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
@@ -1500,6 +1500,73 @@ namespace WasteCity.Tests
                 StringAssert.DoesNotContain("LegacyPathCatalog", source);
                 StringAssert.DoesNotContain("LegacySelectionModel", source);
             }
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0020ProgressionEventsWithoutPolling()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            const string integrationTest =
+                "Assets/_Game/Tests/EditMode/" +
+                "GrayboxProgressionEventIntegrationTests.cs";
+
+            ProjectFeatureGroup progression =
+                FindFeature(catalog, "research-population");
+            CollectionAssert.Contains(
+                progression.SourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxProgressionEventRouter3D.cs");
+            CollectionAssert.Contains(
+                progression.PrimarySourceGlobs,
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxProgressionEventRouter3D.cs");
+            CollectionAssert.Contains(
+                progression.TestFileGlobs,
+                integrationTest);
+
+            ProjectReuseEntry router = FindReuse(
+                catalog,
+                "graybox-progression-event-router-3d");
+            Assert.That(router.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(router.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(
+                new[] { "GrayboxProgressionEventRouter3D" },
+                router.TypeNames);
+            CollectionAssert.AreEqual(
+                new[] { integrationTest },
+                router.RequiredTestFiles);
+            StringAssert.Contains("不扫描建筑或科技", router.BoundarySummary);
+            StringAssert.Contains("不轮询 revision", router.BoundarySummary);
+            StringAssert.Contains("不从存档恢复状态追补历史",
+                router.BoundarySummary);
+            StringAssert.Contains("保持未接线", router.BoundarySummary);
+
+            ProjectFeatureGroup building = FindFeature(
+                catalog,
+                "building-construction-evacuation");
+            CollectionAssert.Contains(building.TestFileGlobs,
+                integrationTest);
+            CollectionAssert.Contains(building.RequirementIds, "IDEA-0020");
+            CollectionAssert.Contains(
+                building.HumanDocumentPaths,
+                "Docs/superpowers/specs/" +
+                "2026-08-26-idea-0020-progression-attention-fate-" +
+                "ascension-design.md");
+
+            ProjectReuseEntry session = FindReuse(
+                catalog,
+                "building-session-3d");
+            CollectionAssert.Contains(session.RequiredTestFiles,
+                integrationTest);
+            CollectionAssert.Contains(session.RequirementIds, "IDEA-0020");
+            StringAssert.Contains("BuildingCompleted", session.UseSummary);
+            StringAssert.Contains("Configure", session.BoundarySummary);
+            StringAssert.Contains("存档恢复", session.BoundarySummary);
+            StringAssert.Contains("订阅者异常逐个隔离",
+                session.BoundarySummary);
         }
 
         [Test]

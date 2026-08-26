@@ -102,7 +102,7 @@
 
 ### 三维建筑会话（复用前审查）
 
-能解决什么：协调当前三维建造、schema 31 批量恢复和正式撤离提交边界。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话，并持有当前会话唯一的 CityResourceStorageModel；schema 31 恢复时先在临时双网格验证稳定实例、方向、占格、资源点绑定与 nextStableInstanceOrdinal 高水位，再统一替换实例和表现。正式撤离仍只在原子仓储提交成功后移除建筑。。不能负责什么：不替代领域建造、物流距离、撤离纯规则或仓库过滤规则；不从场景搜索建筑、不重新支付建造成本，也不从当前实例推导并复用历史高水位。仓库内容由 CityResourceStorageModel 和 WarehouseStorageState 拥有；schema 31 只保存权威建筑状态，连接和表现仍为派生状态。。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxBuildingCombatLifecycleTests`、`GrayboxEvacuationTests`、`GrayboxFormalSaveBuildingStorageTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingRestoreEntry3D`、`GrayboxBuildingSession3D`。
+能解决什么：协调三维建筑会话，并在真实施工提交后发布稳定完成事实。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`。怎么复用：协调三维建筑会话并持有当前会话唯一的 CityResourceStorageModel；只有建筑从施工中真实提交为已完成，且表现更新、仓库注册、catalog 与 placement revision 全部成功后，才按稳定实例发布一次 BuildingCompleted。不能负责什么：BuildingCompleted 只陈述已经提交的建筑事实，不计算关注度或命轨效果；Configure、存档恢复和重复同步绝不补发，订阅者异常逐个隔离且不能回滚建筑。会话仍不替代放置、物流、撤离或仓库规则，也不从场景搜索建筑。改后跑哪组测试：`GrayboxBuildingSessionTests`、`GrayboxBuildingCombatLifecycleTests`、`GrayboxEvacuationTests`、`GrayboxFormalSaveBuildingStorageTests`、`GrayboxProgressionEventIntegrationTests`、`GrayboxWarehouseStorageIntegrationTests`。代码名：`GrayboxBuildingRestoreEntry3D`、`GrayboxBuildingSession3D`。
 
 ### 三维建筑与仓储存档适配器（复用前审查）
 
@@ -287,6 +287,10 @@
 ### 正式关注度运行时（推荐复用）
 
 能解决什么：保存正式关注度、结构化历史、稳定事件幂等事实、三个阈值锁存和不可变快照。在哪里：`Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`。怎么复用：以稳定原因和事件键原子提交 0–100 关注度，维护 128 条有界历史、最近三条投影、30、60、90 一次性阈值和可缓存不可变快照。不能负责什么：只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。改后跑哪组测试：`FormalAttentionRuntimeTests`、`FormalProgressionTests`。代码名：`FormalAttentionHistoryEntry`、`FormalAttentionSnapshot`、`FormalAttentionRuntime`。
+
+### 三维文明进程领域事件路由器（复用前审查）
+
+能解决什么：把正式三维中已经提交的展开、建筑完成、研究完成和命轨选择事实收口为关注度命令。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`。怎么复用：订阅首次展开、建筑完成和自然研究完成的已提交领域事件，以稳定原因和事件键交给唯一 FormalAttentionRuntime，并把固定命轨选择与 +5 关注度作为可回滚的窄事务提交。不能负责什么：只路由已经发生的领域事实；不扫描建筑或科技、不轮询 revision、不从存档恢复状态追补历史、不计算目录增量、不生成压力战斗、不读写文件或操作 UI。扫描、救援、锁定区离开和干扰遗迹在没有权威发布者时保持未接线，Dispose 必须解除全部订阅。改后跑哪组测试：`GrayboxProgressionEventIntegrationTests`。代码名：`GrayboxProgressionEventRouter3D`。
 
 ### 正式固定三命轨目录（复用前审查）
 

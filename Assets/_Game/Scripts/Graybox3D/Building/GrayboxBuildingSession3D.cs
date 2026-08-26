@@ -226,6 +226,8 @@ namespace WasteCity.Graybox3D.Building
         public IReadOnlyList<GrayboxBuildingInstance3D> Instances =>
             readOnlyInstances;
 
+        public event Action<GrayboxBuildingInstance3D> BuildingCompleted;
+
         public void ConfigureRuleClock(GrayboxFormalRuleClock3D ruleClock)
         {
             formalRuleClock = ruleClock ??
@@ -588,6 +590,7 @@ namespace WasteCity.Graybox3D.Building
                     RegisterCompletedWarehouse(instance);
                     AdvanceCatalogRevision();
                     AdvancePlacementRevision();
+                    PublishBuildingCompleted(instance);
                 }
             }
         }
@@ -1453,6 +1456,27 @@ namespace WasteCity.Graybox3D.Building
                 RegisterCompletedWarehouse(instance);
                 AdvanceCatalogRevision();
                 AdvancePlacementRevision();
+                PublishBuildingCompleted(instance);
+            }
+        }
+
+        private void PublishBuildingCompleted(
+            GrayboxBuildingInstance3D instance)
+        {
+            Action<GrayboxBuildingInstance3D> handlers = BuildingCompleted;
+            if (handlers == null) return;
+            Delegate[] subscribers = handlers.GetInvocationList();
+            for (var index = 0; index < subscribers.Length; index++)
+            {
+                try
+                {
+                    ((Action<GrayboxBuildingInstance3D>)subscribers[index])(
+                        instance);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception, this);
+                }
             }
         }
 

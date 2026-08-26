@@ -52,7 +52,11 @@ schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSc
 
 正式三维进程适配器运行 `GrayboxFormalProgressionSaveAdapterTests`、`GrayboxFormalSaveCoordinatorTests` 与 `GrayboxFormalSaveRuntimeHostTests`。Capture 必须从唯一 Attention/Fate 运行时深拷贝 DTO；Prepare 用临时运行时规范化验证而不写真实状态；恢复计划绑定 adapter owner、Prepare 时两个缓存快照身份并只能提交一次。Coordinator 固定八域顺序为 World/City、Building/Storage、Economy、Production、Progression、Defense、Evacuation、Pause，capture、apply 和 rollback 必须共用同一有序数组。RuntimeHost 只创建唯一纯 C# 运行时与适配器，不接 HUD 或命轨效果；开始新进度必须恢复清洁 progression，避免同一 Host 串档。
 
-上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态和 Task 3 的 schema/Adapter/八领域持久化，不证明正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
+关注度领域事件接线运行 `GrayboxProgressionEventIntegrationTests`，并补跑 `GrayboxBuildingSessionTests`、`CityDeploymentRulesTests`、`FormalResearchRuntimeTests` 和 RuntimeHost 回归。事件路由器只能订阅城市首次展开的正式 checkpoint、建筑会话已提交的 `BuildingCompleted` 事实与研究运行时的自然 `Completed` 事实；不得扫描场景、在 `Update` 轮询或从 UI/表现对象反推完成。建筑恢复、配置和重复绑定不发布完成事件；首次采矿站、冶炼厂、装配厂靠一次性 reason 去重，每一座机枪塔靠稳定实例键独立记账。
+
+正式命轨首次选择必须由同一路由命令协调命轨状态与关注度：任一关注度提交失败时回滚命轨选择，不能留下“已选命轨但缺少关注度历史”的半提交状态。此片仍未接 HUD、真实玩家输入、三条命轨实际效果、压力遭遇或文明升阶，`EffectsReady` 必须继续为 `false`。
+
+上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化和 Task 4 的正式领域事件映射，不证明正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界
 

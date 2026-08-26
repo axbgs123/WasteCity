@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`e631a1b6501aabb278cb8c951d384f5ca878269a63449f90068140b6332a67ed`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`2ba0eed0eb8f0f00c2aec617dd9feb01b86ca3d828bd778de8030fcba71cc36e`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -74,6 +74,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
@@ -238,6 +239,7 @@
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 - 研究、人口与文明进程（`research-population`）：
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
 - `Assets/_Game/Scripts/Narrative/GuidanceFlowModel.cs`
 - `Assets/_Game/Scripts/Population/PopulationModel.cs`
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`

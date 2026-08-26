@@ -62,6 +62,7 @@ namespace WasteCity.Graybox3D.Building
         private FormalAttentionRuntime attentionRuntime;
         private FormalFateRuntime fateRuntime;
         private GrayboxFormalProgressionSaveAdapter3D progressionAdapter;
+        private GrayboxProgressionEventRouter3D progressionEventRouter;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -84,6 +85,8 @@ namespace WasteCity.Graybox3D.Building
                 new GrayboxFormalProgressionSaveAdapter3D(
                     AttentionRuntime,
                     FateRuntime);
+        public GrayboxProgressionEventRouter3D ProgressionEventRouter =>
+            progressionEventRouter;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -146,6 +149,15 @@ namespace WasteCity.Graybox3D.Building
             }
             if (!evacuation.TryRebuildAfterPersistenceRestore(out _))
                 return false;
+
+            if (progressionEventRouter == null)
+            {
+                var eventRouter = new GrayboxProgressionEventRouter3D(
+                    AttentionRuntime,
+                    FateRuntime);
+                eventRouter.Bind(city.Deployment, session);
+                progressionEventRouter = eventRouter;
+            }
 
             var worldCity = new GrayboxWorldCitySaveAdapter3D(
                 bootstrap,
@@ -399,6 +411,8 @@ namespace WasteCity.Graybox3D.Building
             ruleClock = null;
             terminalSpeedGate?.Synchronize(null);
             terminalSpeedGate = null;
+            progressionEventRouter?.Dispose();
+            progressionEventRouter = null;
             progressionAdapter = null;
             fateRuntime = null;
             attentionRuntime = null;
