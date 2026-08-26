@@ -284,6 +284,14 @@
 
 能解决什么：保存正式关注度、结构化历史、稳定事件幂等事实、三个阈值锁存和不可变快照。在哪里：`Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`。怎么复用：以稳定原因和事件键原子提交 0–100 关注度，维护 128 条有界历史、最近三条投影、30、60、90 一次性阈值和可缓存不可变快照。不能负责什么：只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。改后跑哪组测试：`FormalAttentionRuntimeTests`、`FormalProgressionTests`。代码名：`FormalAttentionHistoryEntry`、`FormalAttentionSnapshot`、`FormalAttentionRuntime`。
 
+### 正式固定三命轨目录（复用前审查）
+
+能解决什么：固定定义 IDEA-0020 的袖珍宇宙、虚空债和回溯锚点三条正式命轨。在哪里：`Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`。怎么复用：定义 IDEA-0020 固定三选一的袖珍宇宙、虚空债和回溯锚点稳定身份、顺序、显示键与规则键。不能负责什么：只定义正式三条命轨静态内容；不从 LegacyPathCatalog 的九条历史池随机抽取，不保存选择或等级，不执行生产、债务、回溯、关注度、存档或 UI 效果。改后跑哪组测试：`FormalFateCatalogTests`。代码名：`FormalFateDefinition`、`FormalFateCatalog`。
+
+### 正式命轨选择运行时（推荐复用）
+
+能解决什么：维护固定候选、待选择与已选择、命轨等级、单次选择幂等、revision、缓存快照和原子恢复。在哪里：`Assets/_Game/Scripts/Progression/FormalFateRuntime.cs`。怎么复用：维护固定三候选、待选择与已选择状态、命轨等级、单次选择幂等、revision、缓存快照和原子恢复。不能负责什么：只拥有命轨选择与等级真值；不执行袖珍宇宙、虚空债或回溯锚点效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。改后跑哪组测试：`FormalFateRuntimeTests`、`FormalProgressionTests`。代码名：`FormalFateSnapshot`、`FormalFateRuntime`。
+
 ### 研究模型（推荐复用）
 
 能解决什么：管理研究状态，并在 schema 31 恢复时区分正式科技、退役兼容内容与可保留的缺失内容。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`。怎么复用：管理已完成科技、活动科技和剩余规则时间，并为 schema 31 提供确定性 snapshot、零写入 prepare 和绑定 revision/owner 的单次 commit；语法有效的未知已完成科技与未知活动科技会原样保留。不能负责什么：未知已完成科技不授予效果，未知活动科技保持暂停；恢复不重新扣除研究资源，也不保存或伪造研究站资格、城市倍率、UI 或表现。模型不拥有文件 IO，正式 3D 目录解析由调用方显式提供。改后跑哪组测试：`ResearchTests`、`FormalResearchCatalogTests`、`DemoResearchRuntimeTests`、`GrayboxFormalSaveEconomyTests`。代码名：`ResearchPersistenceSnapshot`、`ResearchRestorePlan`、`ResearchModel`。

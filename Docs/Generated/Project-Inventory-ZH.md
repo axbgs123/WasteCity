@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`050fae573d95a9e7fcd9ad048f6b7a1f6be26eb21b62a0cd5905c4ebd79afc71`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`8d84ae92f8f0916a063d9001ec185202b93e46b972567b3a5a0b707b6e442a07`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -241,6 +241,8 @@
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`
+- `Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`
+- `Assets/_Game/Scripts/Progression/FormalFateRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`

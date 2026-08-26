@@ -46,7 +46,9 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 
 数值、历史和恢复运行 `FormalAttentionRuntimeTests` 与旧 `FormalProgressionTests`：一次性来源按原因锁存，可重复来源按稳定事件键防重；正负变化都夹在 `0–100`，即使封顶后的实际变化为零也要消费并记录事件；完整历史只保留最近 `128` 条，HUD 所需投影只取最后三条；阈值降低后不撤销、再跨越不重复。恢复必须保留语法有效但当前未知的历史原因为只读孤儿证据，非法快照失败时保持原对象、revision 和缓存快照身份不变。静止状态连续 `300` 次 `Capture` 必须返回同一不可变快照且托管分配为 `0 B`。
 
-这两类测试通过只证明 Task 1 的纯关注度真值，不证明 schema `33`、正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展，当前 schema 在迁移片完成前仍为 `32`。人工试玩和真实 Windows 复验必须保持未完成状态。
+固定三命轨状态运行 `FormalFateCatalogTests`、`FormalFateRuntimeTests` 和旧 `LegacySelectionTests`、`LegacyEffectTests`。正式目录必须始终按袖珍宇宙、虚空债、回溯锚点顺序只给三项，继续使用稳定 `core.legacy.*` 字符串但不得引用 `WasteCity.Legacy` 历史代码；新运行时初始为未选择、等级 `0`，只允许一次正式选择并变为等级 `1`。恢复只接受固定候选顺序以及“未选等级 0”或“已选等级 1”，非法状态不得改变 revision 或缓存快照。本片 `EffectsReady` 必须保持 `false`，也不得公开升级命令。
+
+这些纯规则测试通过只证明 Task 1 的关注度真值和 Task 2 的固定候选/选择状态，不证明 schema `33`、正式 3D UI、真实输入、三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展，当前 schema 在迁移片完成前仍为 `32`。人工试玩和真实 Windows 复验必须保持未完成状态。
 
 ## IDEA-0011 生产与界面的检查边界
 

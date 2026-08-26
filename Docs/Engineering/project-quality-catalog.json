@@ -399,7 +399,9 @@
         "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -2080,6 +2082,49 @@
       "BoundarySummary": "只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-fate-catalog",
+      "ChineseName": "正式固定三命轨目录",
+      "TypeNames": [
+        "FormalFateDefinition",
+        "FormalFateCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalFateCatalog.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "定义 IDEA-0020 固定三选一的袖珍宇宙、虚空债和回溯锚点稳定身份、顺序、显示键与规则键。",
+      "BoundarySummary": "只定义正式三条命轨静态内容；不从 LegacyPathCatalog 的九条历史池随机抽取，不保存选择或等级，不执行生产、债务、回溯、关注度、存档或 UI 效果。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-fate-runtime",
+      "ChineseName": "正式命轨选择运行时",
+      "TypeNames": [
+        "FormalFateSnapshot",
+        "FormalFateRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalFateRuntime.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "维护固定三候选、待选择与已选择状态、命轨等级、单次选择幂等、revision、缓存快照和原子恢复。",
+      "BoundarySummary": "只拥有命轨选择与等级真值；不执行袖珍宇宙、虚空债或回溯锚点效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
       ],
       "RequirementIds": [

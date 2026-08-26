@@ -1389,6 +1389,68 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CommittedCatalog_MapsIdea0020FateOwnershipWithoutLegacyCode()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup progression =
+                FindFeature(catalog, "research-population");
+            CollectionAssert.Contains(
+                progression.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs");
+            CollectionAssert.Contains(
+                progression.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs");
+
+            ProjectReuseEntry fateCatalog =
+                FindReuse(catalog, "formal-fate-catalog");
+            Assert.That(
+                fateCatalog.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(
+                fateCatalog.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(
+                new[] { "FormalFateDefinition", "FormalFateCatalog" },
+                fateCatalog.TypeNames);
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs",
+                },
+                fateCatalog.RequiredTestFiles);
+
+            ProjectReuseEntry fateRuntime =
+                FindReuse(catalog, "formal-fate-runtime");
+            Assert.That(
+                fateRuntime.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(
+                fateRuntime.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.Recommended));
+            CollectionAssert.AreEqual(
+                new[] { "FormalFateSnapshot", "FormalFateRuntime" },
+                fateRuntime.TypeNames);
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0020" },
+                fateRuntime.RequirementIds);
+
+            foreach (string relativePath in new[]
+            {
+                "Assets/_Game/Scripts/Progression/FormalFateCatalog.cs",
+                "Assets/_Game/Scripts/Progression/FormalFateRuntime.cs",
+            })
+            {
+                string source = File.ReadAllText(Path.Combine(
+                    ProjectRoot(),
+                    relativePath));
+                StringAssert.DoesNotContain("WasteCity.Legacy", source);
+                StringAssert.DoesNotContain("LegacyPathCatalog", source);
+                StringAssert.DoesNotContain("LegacySelectionModel", source);
+            }
+        }
+
+        [Test]
         public void CommittedCatalog_MapsIdea0013DefenseOwnershipReuseAndHud()
         {
             ProjectQualityCatalog catalog =
