@@ -28,6 +28,9 @@ namespace WasteCity.Graybox3D.Building
         private Text stageLabel;
         private Text thresholdLabel;
         private Text recentReasonsLabel;
+        private Button pressureStatusButton;
+        private GameObject pressureDetailsRoot;
+        private Text pressureDetailsLabel;
         private IReadOnlyList<string> recentReasonTexts =
             Array.Empty<string>();
         private IReadOnlyList<string> preparedFateIds =
@@ -41,6 +44,11 @@ namespace WasteCity.Graybox3D.Building
         public bool IsFateSelectionOpen { get; private set; }
         public int RenderCount { get; private set; }
         public bool IsDetailsOpen { get; private set; }
+        public string PressureStatusText { get; private set; } = string.Empty;
+        public string BossStatusText { get; private set; } = string.Empty;
+        public string BossPhaseText { get; private set; } = string.Empty;
+        public int PressureRenderCount { get; private set; }
+        public bool IsPressureDetailsOpen { get; private set; }
 
         public event Action FateDetailsRequested;
 
@@ -84,6 +92,7 @@ namespace WasteCity.Graybox3D.Building
         public void CloseDetails()
         {
             IsDetailsOpen = false;
+            ClosePressureDetails();
             if (detailsRoot != null) detailsRoot.SetActive(false);
             if (detailsBlocker != null) detailsBlocker.SetActive(false);
             EventSystem current = EventSystem.current;
@@ -93,6 +102,37 @@ namespace WasteCity.Graybox3D.Building
             {
                 current.SetSelectedGameObject(null);
             }
+        }
+
+        public void ApplyPressure(
+            string pressureStatus,
+            string bossStatus,
+            string bossPhase)
+        {
+            PressureStatusText = pressureStatus ?? string.Empty;
+            BossStatusText = bossStatus ?? string.Empty;
+            BossPhaseText = bossPhase ?? string.Empty;
+            unchecked { PressureRenderCount++; }
+            EnsureUi();
+            Text label = pressureStatusButton.GetComponentInChildren<Text>();
+            label.text = PressureStatusText;
+            pressureDetailsLabel.text = PressureStatusText + "\n" +
+                BossStatusText + "\n" + BossPhaseText;
+        }
+
+        public void ClosePressureDetails()
+        {
+            IsPressureDetailsOpen = false;
+            IsDetailsOpen = false;
+            if (pressureDetailsRoot != null)
+                pressureDetailsRoot.SetActive(false);
+        }
+
+        private void OpenPressureDetails()
+        {
+            IsPressureDetailsOpen = true;
+            IsDetailsOpen = true;
+            pressureDetailsRoot.SetActive(true);
         }
 
         private void OpenDetails()
@@ -143,6 +183,34 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(-12f, -38f),
                 14,
                 TextAnchor.MiddleRight);
+
+            RectTransform pressureStatus = CreateRect(
+                uiRoot, "Progression.AttentionPressure.Status");
+            pressureStatus.anchorMin = new Vector2(0f, 1f);
+            pressureStatus.anchorMax = new Vector2(0f, 1f);
+            pressureStatus.pivot = new Vector2(0f, 1f);
+            pressureStatus.anchoredPosition = new Vector2(18f, -98f);
+            pressureStatus.sizeDelta = new Vector2(300f, 52f);
+            Image pressureImage = pressureStatus.gameObject.AddComponent<Image>();
+            pressureImage.color = StatusColor;
+            pressureImage.raycastTarget = true;
+            pressureStatusButton = pressureStatus.gameObject.AddComponent<Button>();
+            pressureStatusButton.targetGraphic = pressureImage;
+            pressureStatusButton.onClick.AddListener(OpenPressureDetails);
+            CreateText(pressureStatus, "Label", Vector2.zero, Vector2.zero,
+                15, TextAnchor.MiddleCenter);
+
+            RectTransform pressureDetails = CreateRect(
+                uiRoot, "Progression.AttentionPressure.Details");
+            Stretch(pressureDetails);
+            Image pressureBlocker = pressureDetails.gameObject.AddComponent<Image>();
+            pressureBlocker.color = new Color(0f, 0f, 0f, .72f);
+            pressureBlocker.raycastTarget = true;
+            pressureDetailsRoot = pressureDetails.gameObject;
+            pressureDetailsLabel = CreateText(pressureDetails, "Content",
+                new Vector2(220f, 180f), new Vector2(-220f, -180f), 20,
+                TextAnchor.MiddleCenter);
+            pressureDetailsRoot.SetActive(false);
 
             RectTransform blocker = CreateRect(
                 uiRoot,
@@ -303,9 +371,14 @@ namespace WasteCity.Graybox3D.Building
             if (fateDetailsButton != null)
                 fateDetailsButton.onClick.RemoveListener(
                     HandleFateDetailsRequested);
+            if (pressureStatusButton != null)
+                pressureStatusButton.onClick.RemoveListener(OpenPressureDetails);
             statusButton = null;
             closeButton = null;
             fateDetailsButton = null;
+            pressureStatusButton = null;
+            pressureDetailsRoot = null;
+            pressureDetailsLabel = null;
             valueLabel = null;
             stageLabel = null;
             thresholdLabel = null;

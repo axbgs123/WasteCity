@@ -68,11 +68,11 @@ namespace WasteCity.Graybox3D.Building
         private void AcquireVictoryPause()
         {
             if (ownsVictoryPause ||
-                speed.IsPaused(GamePauseReason.Advancement))
+                speed.IsPaused(GamePauseReason.CampaignVictory))
             {
                 return;
             }
-            speed.SetPaused(GamePauseReason.Advancement, true);
+            speed.SetPaused(GamePauseReason.CampaignVictory, true);
             ownsVictoryPause = true;
         }
 
@@ -87,7 +87,7 @@ namespace WasteCity.Graybox3D.Building
         private void ReleaseVictoryPause()
         {
             if (!ownsVictoryPause) return;
-            speed.SetPaused(GamePauseReason.Advancement, false);
+            speed.SetPaused(GamePauseReason.CampaignVictory, false);
             ownsVictoryPause = false;
         }
 

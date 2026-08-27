@@ -44,10 +44,15 @@ namespace WasteCity.Editor
 
         private const string Prefix = "tech-";
         private const string MasterSuffix = "-master-v1.png";
+        private const string LegacyAnalysisId =
+            "core.research.legacy-analysis";
+        private const string LegacyAnalysisPlaceholderSourceId =
+            "core.research.artifact-crafting";
 
         [MenuItem("WasteCity/Art/Production 2D/Build Technology Icon Catalog")]
         public static void BuildTechnologyIconCatalog()
         {
+            EnsureLegacyAnalysisPlaceholderAssets();
             Production2DTechnologyIconValidationReport report =
                 ValidateSourceAssets();
             if (!report.IsValid)
@@ -96,6 +101,37 @@ namespace WasteCity.Editor
         public static void BuildTechnologyIconCatalogForBatch()
         {
             BuildTechnologyIconCatalog();
+        }
+
+        public static void EnsureLegacyAnalysisPlaceholderAssetsForBatch()
+        {
+            EnsureLegacyAnalysisPlaceholderAssets();
+        }
+
+        private static void EnsureLegacyAnalysisPlaceholderAssets()
+        {
+            string delivery = ExpectedAssetPath(LegacyAnalysisId);
+            string master = ExpectedMasterPath(LegacyAnalysisId);
+            string sourceDelivery = ExpectedAssetPath(
+                LegacyAnalysisPlaceholderSourceId);
+            string sourceMaster = ExpectedMasterPath(
+                LegacyAnalysisPlaceholderSourceId);
+            if (string.IsNullOrEmpty(delivery) || string.IsNullOrEmpty(master) ||
+                !File.Exists(sourceDelivery) || !File.Exists(sourceMaster))
+            {
+                throw new FileNotFoundException(
+                    "Legacy analysis placeholder source is unavailable.");
+            }
+            Directory.CreateDirectory(TechnologyMastersRoot);
+            if (!File.Exists(master)) File.Copy(sourceMaster, master, false);
+            if (!File.Exists(delivery))
+            {
+                File.Copy(sourceDelivery, delivery, false);
+                AssetDatabase.ImportAsset(
+                    delivery,
+                    ImportAssetOptions.ForceUpdate |
+                    ImportAssetOptions.ForceSynchronousImport);
+            }
         }
 
         public static string ExpectedAssetPath(string researchId)

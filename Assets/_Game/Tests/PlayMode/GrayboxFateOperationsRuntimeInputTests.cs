@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -171,6 +173,139 @@ namespace WasteCity.Tests
             yield return OpenFateOperations();
             yield return Click(RequireSceneObject("FateOperations.ClearAnchors"));
             Assert.That(host.RewindAnchorMetadata.Capture().Entries, Is.Empty);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0020_LevelTwoSelectsSlotTwoAndReadsThroughConfirmation()
+        {
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxBuildingInteractionModel3D building =
+                Object.FindObjectOfType<GrayboxBuildingInteractionModel3D>();
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(building, Is.Not.Null);
+            Assert.That(operations, Is.Not.Null);
+            Assert.That(city, Is.Not.Null);
+
+            yield return SelectRewindFate();
+            ConfigureLevelTwoRewindOwners(host);
+
+            yield return OpenFateOperations();
+            yield return Click(RequireSceneObject(
+                "FateOperations.CreateAnchor"));
+            Assert.That(host.RewindAnchorMetadata.Capture().Entries,
+                Has.Count.EqualTo(1));
+            yield return CloseFateOperationsAndDetails();
+
+            yield return TapKey(Key.F);
+            city.Deployment.Tick(10f);
+            yield return null;
+            CityMode slotTwoMode = city.Mode;
+
+            yield return OpenFateOperations();
+            yield return Click(RequireSceneObject(
+                "FateOperations.CreateAnchor"));
+            Assert.That(host.RewindAnchorMetadata.Capture().Entries,
+                Has.Count.EqualTo(2));
+            string[] ids = host.RewindAnchorMetadata.Capture().Entries
+                .Select(value => value.AnchorId).ToArray();
+            Assert.That(ids, Does.Contain(
+                GrayboxRewindAnchorService3D.StableAnchorId));
+            Assert.That(ids, Does.Contain(
+                GrayboxRewindAnchorService3D.SecondStableAnchorId));
+            Assert.That(RequireSceneObject(
+                "FateOperations.RewindSlot.2").activeInHierarchy, Is.True);
+            yield return CloseFateOperationsAndDetails();
+
+            yield return TapKey(Key.F);
+            city.Deployment.Tick(10f);
+            yield return null;
+            Assert.That(city.Mode, Is.Not.EqualTo(slotTwoMode));
+            int attentionBeforeRead = host.AttentionRuntime.Value;
+
+            yield return OpenFateOperations();
+            yield return Click(RequireSceneObject(
+                "FateOperations.RewindSlot.2"));
+            yield return Click(RequireSceneObject(
+                "FateOperations.ReadAnchor"));
+            GameObject confirmation = RequireSceneObject(
+                "FateOperations.Confirmation");
+            Assert.That(confirmation.activeInHierarchy, Is.True);
+            yield return AssertModalBlocksGameplay(
+                confirmation,
+                building,
+                operations,
+                city);
+            yield return Click(RequireSceneObject("FateOperations.Confirm"));
+
+            Assert.That(city.Mode, Is.EqualTo(slotTwoMode));
+            Assert.That(host.AttentionRuntime.Value,
+                Is.EqualTo(attentionBeforeRead + 12));
+            Assert.That(host.RewindAnchorMetadata.Capture().Entries,
+                Has.Count.EqualTo(2));
+            Assert.That(host.RewindAnchorMetadata.Capture().Entries
+                    .Select(value => value.AnchorId),
+                Does.Contain(
+                    GrayboxRewindAnchorService3D.SecondStableAnchorId));
+        }
+
+        private static void ConfigureLevelTwoRewindOwners(
+            GrayboxFormalSaveRuntimeHost3D host)
+        {
+            Assert.That(host.FateRuntime.TryPromoteToLevelTwo(
+                out string error), Is.True, error);
+            Assert.That(host.RewindAnchorMetadata.TrySetFateLevel(
+                2, out error), Is.True, error);
+            FormalCivilizationAscensionRuntime civilization =
+                FindOwnedRuntime<FormalCivilizationAscensionRuntime>(host);
+            AdvancementSequenceModel sequence =
+                FindOwnedRuntime<AdvancementSequenceModel>(host);
+            Assert.That(civilization, Is.Not.Null,
+                "Host must own the selected fate's civilization runtime.");
+            Assert.That(sequence, Is.Not.Null,
+                "Host must own the restorable advancement sequence.");
+            Assert.That(civilization.TryRestore(
+                new FormalCivilizationAscensionSnapshot(
+                    2,
+                    FormalFateCatalog.RewindAnchorId,
+                    2,
+                    true,
+                    1ul),
+                out error), Is.True, error);
+            sequence.Restore(
+                (int)AdvancementSequenceStage.Continued,
+                0f);
+        }
+
+        private static T FindOwnedRuntime<T>(object owner)
+            where T : class
+        {
+            const BindingFlags flags = BindingFlags.Instance |
+                BindingFlags.Public | BindingFlags.NonPublic;
+            PropertyInfo property = owner.GetType().GetProperties(flags)
+                .FirstOrDefault(value => typeof(T).IsAssignableFrom(
+                    value.PropertyType) && value.GetIndexParameters().Length == 0);
+            if (property?.GetValue(owner) is T fromProperty)
+                return fromProperty;
+            FieldInfo field = owner.GetType().GetFields(flags)
+                .FirstOrDefault(value => typeof(T).IsAssignableFrom(
+                    value.FieldType));
+            return field?.GetValue(owner) as T;
+        }
+
+        private IEnumerator CloseFateOperationsAndDetails()
+        {
+            yield return TapKey(Key.Escape);
+            GameObject details = RequireSceneObject(
+                "Progression.AttentionDetails",
+                includeInactive: true);
+            Assert.That(details.activeInHierarchy, Is.True);
+            yield return TapKey(Key.Escape);
+            Assert.That(details.activeSelf, Is.False);
         }
 
         private IEnumerator SelectRewindFate()

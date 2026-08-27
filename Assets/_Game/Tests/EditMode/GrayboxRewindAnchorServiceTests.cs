@@ -234,6 +234,85 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void IDEA0020_LevelOneSlotReadAfterLevelTwoPreservesBothSlots()
+        {
+            var metadata = new FormalRewindAnchorMetadataRuntime();
+            using (Harness harness = Harness.Create(
+                       null,
+                       metadata,
+                       selectedRewind: true))
+            {
+                object service = CreateService(harness, metadata);
+                int initial = harness.Authority.WorldSeed;
+                AssertResult(CreateAnchor(service, 30L), true, "Created");
+                harness.Authority.MutateWorldSeed(1);
+
+                Assert.That(harness.Fate.TryPromoteToLevelTwo(
+                    out string error), Is.True, error);
+                Assert.That(metadata.TrySetFateLevel(2, out error), Is.True,
+                    error);
+                Assert.That(harness.Civilization.TryRestore(
+                    new FormalCivilizationAscensionSnapshot(
+                        2,
+                        FormalFateCatalog.RewindAnchorId,
+                        2,
+                        true,
+                        1ul),
+                    out error), Is.True, error);
+                harness.Sequence.Restore(
+                    (int)AdvancementSequenceStage.Continued,
+                    0f);
+                AssertResult(CreateAnchor(service, 31L), true, "Created");
+                FormalRewindAnchorMetadataSnapshot beforeRead =
+                    metadata.Capture();
+                Assert.That(beforeRead.Entries.Select(value => value.AnchorId),
+                    Is.EqualTo(new[]
+                    {
+                        GrayboxRewindAnchorService3D.StableAnchorId,
+                        GrayboxRewindAnchorService3D.SecondStableAnchorId,
+                    }));
+                Assert.That(harness.Store.Load(1).Envelope.formal3D
+                    .progression.fate.level, Is.EqualTo(1));
+                Assert.That(harness.Store.Load(2).Envelope.formal3D.world.worldSeed,
+                    Is.EqualTo(initial + 1));
+
+                harness.Authority.MutateWorldSeed(10);
+                object read = Invoke(
+                    service,
+                    "Read",
+                    GrayboxRewindAnchorService3D.StableAnchorId);
+                AssertResult(read, true, "ReadSucceeded");
+                Assert.That(harness.Authority.WorldSeed, Is.EqualTo(initial));
+                Assert.That(harness.Attention.Value, Is.EqualTo(22));
+                Assert.That(harness.Fate.Capture().Level, Is.EqualTo(2));
+                Assert.That(harness.Civilization.Capture().CivilizationLevel,
+                    Is.EqualTo(2));
+                Assert.That(metadata.Capture().Entries.Select(
+                        value => value.AnchorId),
+                    Is.EqualTo(beforeRead.Entries.Select(
+                        value => value.AnchorId)));
+
+                GrayboxFormalSaveCoordinatorResult3D captured =
+                    harness.Coordinator.CaptureEnvelope(
+                        harness.SessionId,
+                        "test.idea-0020",
+                        new[] { "builtin:wastecity@test.idea-0020" },
+                        new FormalSaveCheckpointMetadata
+                        {
+                            sequence = 32L,
+                            reasonId = FormalSaveCheckpointReasonIds.NewGameReady,
+                            ruleTimeSeconds = 18f,
+                            completedMilestoneIds = Array.Empty<string>(),
+                        },
+                        new DateTime(
+                            2026, 8, 27, 2, 0, 0, DateTimeKind.Utc));
+                Assert.That(captured.Success, Is.True, captured.Message);
+                Assert.That(FormalSaveValidator.ValidateEnvelope(
+                    captured.Envelope).IsValid, Is.True);
+            }
+        }
+
         private object CreateService(
             Harness harness,
             FormalRewindAnchorMetadataRuntime metadata = null)
@@ -300,9 +379,14 @@ namespace WasteCity.Tests
             string name,
             params object[] arguments)
         {
-            MethodInfo method = owner.GetType().GetMethod(
-                name,
-                BindingFlags.Instance | BindingFlags.Public);
+            MethodInfo method = owner.GetType().GetMethods(
+                    BindingFlags.Instance | BindingFlags.Public)
+                .SingleOrDefault(candidate => candidate.Name == name &&
+                    candidate.GetParameters().Length == arguments.Length &&
+                    candidate.GetParameters().Select((parameter, index) =>
+                        arguments[index] == null ||
+                        parameter.ParameterType.IsInstanceOfType(
+                            arguments[index])).All(value => value));
             Assert.That(method, Is.Not.Null, name);
             try
             {
@@ -320,7 +404,9 @@ namespace WasteCity.Tests
             string code)
         {
             Assert.That(result, Is.Not.Null);
-            Assert.That(Read<bool>(result, "Success"), Is.EqualTo(success));
+            Assert.That(Read<bool>(result, "Success"), Is.EqualTo(success),
+                Read<string>(result, "Message") + " | " +
+                Read<string>(result, "Diagnostic"));
             Assert.That(Read<object>(result, "Code").ToString(),
                 Is.EqualTo(code));
             Assert.That(Read<string>(result, "Message"), Is.Not.Empty);
@@ -383,6 +469,8 @@ namespace WasteCity.Tests
                 MutableAuthority authority,
                 FormalAttentionRuntime attention,
                 FormalFateRuntime fate,
+                FormalCivilizationAscensionRuntime civilization,
+                AdvancementSequenceModel sequence,
                 FormalRewindAnchorStore store,
                 GrayboxFormalSaveCoordinator3D coordinator,
                 int initialWorldSeed,
@@ -392,6 +480,8 @@ namespace WasteCity.Tests
                 Authority = authority;
                 Attention = attention;
                 Fate = fate;
+                Civilization = civilization;
+                Sequence = sequence;
                 Store = store;
                 Coordinator = coordinator;
                 InitialWorldSeed = initialWorldSeed;
@@ -401,13 +491,17 @@ namespace WasteCity.Tests
             public MutableAuthority Authority { get; }
             public FormalAttentionRuntime Attention { get; }
             public FormalFateRuntime Fate { get; }
+            public FormalCivilizationAscensionRuntime Civilization { get; }
+            public AdvancementSequenceModel Sequence { get; }
             public FormalRewindAnchorStore Store { get; }
             public GrayboxFormalSaveCoordinator3D Coordinator { get; }
             public int InitialWorldSeed { get; }
             public string SessionId { get; }
 
             public static Harness Create(
-                IFormalSaveFileSystem fileSystem = null)
+                IFormalSaveFileSystem fileSystem = null,
+                FormalRewindAnchorMetadataRuntime rewindMetadata = null,
+                bool selectedRewind = false)
             {
                 FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
                     File.ReadAllText(Path.Combine(
@@ -419,12 +513,26 @@ namespace WasteCity.Tests
                 var authority = new MutableAuthority(payload);
                 var attention = new FormalAttentionRuntime();
                 var fate = new FormalFateRuntime();
+                if (selectedRewind) SelectRewind(fate);
+                FormalCivilizationAscensionRuntime civilization =
+                    selectedRewind
+                        ? new FormalCivilizationAscensionRuntime(
+                            FormalFateCatalog.RewindAnchorId)
+                        : null;
+                AdvancementSequenceModel sequence = selectedRewind
+                    ? new AdvancementSequenceModel()
+                    : null;
                 var adapter = new GrayboxFormalProgressionSaveAdapter3D(
                     attention,
                     fate,
                     new PocketUniverseFateEffect(),
                     new FormalVoidDebtRuntime(),
-                    new FormalRewindAnchorMetadataRuntime());
+                    rewindMetadata ?? new FormalRewindAnchorMetadataRuntime(),
+                    new GrayboxAttentionPressureSaveAdapter3D(
+                        new AttentionPressureRuntime(),
+                        new GrayboxDefenseRuntime3D(0f, 0f, 9f, 0f)),
+                    civilization,
+                    sequence);
                 IFormalThreeDSaveDomain[] domains = new IFormalThreeDSaveDomain[
                     GrayboxFormalSaveCoordinator3D.DomainOrder.Count];
                 for (var index = 0; index < domains.Length; index++)
@@ -444,6 +552,8 @@ namespace WasteCity.Tests
                     authority,
                     attention,
                     fate,
+                    civilization,
+                    sequence,
                     new FormalRewindAnchorStore(root.Path, fileSystem),
                     coordinator,
                     payload.world.worldSeed,

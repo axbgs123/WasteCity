@@ -55,6 +55,77 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0020_PressureTransitionsAreRepeatableCheckpointReasons()
+        {
+            var sink = new FakeSink(true, true, true);
+            object policy = CreatePolicy(sink, new FakeClock());
+            string warning = Reason("PressureWarningStarted");
+            string started = Reason("PressureEncounterStarted");
+            string completed = Reason("PressureEncounterCompleted");
+
+            Queue(policy, warning, "pressure.30.warning");
+            Assert.That(Flush(policy), Is.True);
+            Queue(policy, started, "pressure.30.started");
+            Assert.That(Flush(policy), Is.True);
+            Queue(policy, completed, "pressure.30.completed");
+            Assert.That(Flush(policy), Is.True);
+
+            Assert.That(sink.Attempts.Select(value => value.reasonId),
+                Is.EqualTo(new[] { warning, started, completed }));
+            CollectionAssert.IsEmpty(CompletedMilestones(policy));
+        }
+
+        [TestCase("FateSelectionComplete", "fate-selection-a")]
+        [TestCase("RewindAnchorCreated", "rewind-created-a")]
+        [TestCase("RewindAnchorUsed", "rewind-used-a")]
+        [TestCase("RewindAnchorCleared", "rewind-cleared-a")]
+        public void IDEA0020_FateAndRewindTransitionsAreRepeatableCheckpoints(
+            string reasonProperty,
+            string firstStableEvent)
+        {
+            var sink = new FakeSink(true, true);
+            var policy = (FormalSaveCheckpointPolicy)CreatePolicy(
+                sink, new FakeClock());
+            string reason = Reason(reasonProperty);
+
+            Assert.That(policy.QueueCheckpoint(reason, firstStableEvent),
+                Is.True, reason);
+            Assert.That(policy.QueueCheckpoint(reason, firstStableEvent),
+                Is.False, "The same pending stable event is deduplicated.");
+            Assert.That(Flush(policy), Is.True);
+            Assert.That(policy.QueueCheckpoint(reason, firstStableEvent),
+                Is.False, "A committed stable event cannot be replayed.");
+            Assert.That(policy.QueueCheckpoint(
+                reason, firstStableEvent + "-next"), Is.True,
+                "The reason remains repeatable for a distinct stable event.");
+            Assert.That(Flush(policy), Is.True);
+
+            Assert.That(sink.Attempts.Select(value => value.reasonId),
+                Is.EqualTo(new[] { reason, reason }));
+            CollectionAssert.IsEmpty(CompletedMilestones(policy),
+                "Fate and rewind transition checkpoints are events, not " +
+                "one-shot milestone completion truth.");
+            Assert.That(sink.Attempts.All(value =>
+                value.completedMilestoneIds.Length == 0), Is.True);
+        }
+
+        [Test]
+        public void IDEA0020_FirstCivilizationAscensionIsOneShotCheckpoint()
+        {
+            var sink = new FakeSink(true, true);
+            object policy = CreatePolicy(sink, new FakeClock());
+            string reason = Reason("FirstCivilizationAscension");
+
+            Queue(policy, reason, "first-civilization-ascension");
+            Assert.That(Flush(policy), Is.True);
+            Queue(policy, reason, "first-civilization-ascension-duplicate");
+            Flush(policy);
+
+            Assert.That(sink.Attempts, Has.Count.EqualTo(1));
+            CollectionAssert.Contains(CompletedMilestones(policy), reason);
+        }
+
+        [Test]
         public void OneShotMilestoneSavesOnlyOnceAndCommitsAfterSuccess()
         {
             var sink = new FakeSink(true);
@@ -258,7 +329,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void FutureFateAndBossReasonsRemainConstantsOnly()
+        public void FateAndBossReasonsKeepTheGenericQueueBoundary()
         {
             Type reasons = RequireType(ReasonTypeName);
             Assert.That(ReadReason(reasons, "FateSelectionComplete"),

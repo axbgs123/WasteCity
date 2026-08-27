@@ -5,6 +5,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Economy;
+using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.Progression;
 
@@ -136,6 +137,92 @@ namespace WasteCity.Tests
                 Assert.That(Read<bool>(fixture.View,
                     "IsReadConfirmationOpen"), Is.False);
             }
+        }
+
+        [Test]
+        public void IDEA0020_LevelTwoShowsTwoStableSelectableRewindSlots()
+        {
+            FormalFateRuntime fate = Selected(FormalFateCatalog.RewindAnchorId);
+            Assert.That(fate.TryPromoteToLevelTwo(out string error), Is.True,
+                error);
+            var rewind = new FormalRewindAnchorMetadataRuntime(2);
+            Assert.That(rewind.TryRestore(
+                new FormalRewindAnchorMetadataSnapshot(
+                    2,
+                    5,
+                    new[]
+                    {
+                        Metadata(
+                            GrayboxRewindAnchorService3D.StableAnchorId,
+                            3),
+                        Metadata(
+                            GrayboxRewindAnchorService3D.SecondStableAnchorId,
+                            4),
+                    }),
+                out error), Is.True, error);
+
+            using (Fixture fixture = Create(fate, rewind: rewind))
+            {
+                Assert.That(Refresh(fixture.Controller), Is.True);
+                string[] slots = Strings(
+                    fixture.View,
+                    "RewindAnchorSlotTexts");
+                Assert.That(slots, Has.Length.EqualTo(2));
+                Assert.That(slots[0],
+                    Does.Contain("槽位 1").And.Contain("创建序号 3")
+                        .And.Contain("已创建"));
+                Assert.That(slots[1],
+                    Does.Contain("槽位 2").And.Contain("创建序号 4")
+                        .And.Contain("已创建"));
+                Assert.That(Read<bool>(fixture.View,
+                    "RewindLevelTwoSlotsVisible"), Is.True);
+
+                string requested = null;
+                EventInfo selectedRead = fixture.View.GetType().GetEvent(
+                    "ReadRewindAnchorByIdRequested");
+                Assert.That(selectedRead, Is.Not.Null);
+                selectedRead.AddEventHandler(
+                    fixture.View,
+                    new Action<string>(anchorId => requested = anchorId));
+                MethodInfo select = fixture.Controller.GetType().GetMethod(
+                    "TrySelectRewindAnchor",
+                    new[] { typeof(string) });
+                Assert.That(select, Is.Not.Null);
+                Assert.That((bool)select.Invoke(fixture.Controller, new object[]
+                {
+                    GrayboxRewindAnchorService3D.SecondStableAnchorId,
+                }), Is.True);
+                Assert.That(Read<string>(fixture.View,
+                    "SelectedRewindAnchorId"),
+                    Is.EqualTo(
+                        GrayboxRewindAnchorService3D.SecondStableAnchorId));
+                Assert.That(InvokeBool(fixture.Controller,
+                    "TryRequestReadAnchor"), Is.True);
+                Assert.That(InvokeBool(fixture.Controller,
+                    "TryConfirmReadAnchor"), Is.True);
+                Assert.That(requested,
+                    Is.EqualTo(
+                        GrayboxRewindAnchorService3D.SecondStableAnchorId));
+            }
+        }
+
+        private static FormalRewindAnchorMetadata Metadata(
+            string anchorId,
+            long creationOrdinal)
+        {
+            return new FormalRewindAnchorMetadata(
+                anchorId,
+                ".internal-rewind-anchor/slot-" + creationOrdinal + ".json",
+                "session.operations",
+                "hash.operations." + creationOrdinal,
+                new FormalSaveCheckpointMetadata
+                {
+                    sequence = creationOrdinal,
+                    reasonId = "save-and-exit",
+                    ruleTimeSeconds = creationOrdinal,
+                    completedMilestoneIds = Array.Empty<string>(),
+                },
+                creationOrdinal);
         }
 
         private static Fixture Create(

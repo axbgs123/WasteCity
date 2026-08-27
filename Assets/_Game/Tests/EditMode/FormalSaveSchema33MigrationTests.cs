@@ -78,6 +78,7 @@ namespace WasteCity.Tests
             object attention = ReadField(progression, "attention");
             object fate = ReadField(progression, "fate");
             object effects = ReadField(progression, "fateEffects");
+            object pressure = ReadField(progression, "pressure");
             object civilization = ReadField(progression, "civilization");
 
             Assert.That(Read<int>(attention, "value"), Is.EqualTo(10),
@@ -109,7 +110,19 @@ namespace WasteCity.Tests
             Assert.That(Sequence(rewind, "anchors"), Is.Empty);
             Assert.That(Read<long>(rewind, "nextCreationOrdinal"),
                 Is.EqualTo(1L));
+            Assert.That(Read<ulong>(pressure, "revision"), Is.Zero);
+            Assert.That(Sequence(pressure, "entries"), Is.Empty);
+            Assert.That(Read<string>(pressure, "activeEncounterId"), Is.Empty);
+            Assert.That(ReadField(pressure, "activeCampaign"), Is.Null);
             Assert.That(Read<int>(civilization, "level"), Is.EqualTo(1));
+            Assert.That(Read<ulong>(civilization, "revision"), Is.Zero);
+            Assert.That(Read<string>(civilization, "ascensionId"), Is.Empty);
+            Assert.That(Read<bool>(civilization, "ascensionCompleted"),
+                Is.False);
+            Assert.That(Read<int>(civilization, "sequenceStage"),
+                Is.EqualTo(0));
+            Assert.That(Read<float>(civilization, "remainingRuleSeconds"),
+                Is.Zero);
             Assert.That(Sequence(civilization, "committedAscensionIds"),
                 Is.Empty);
         }

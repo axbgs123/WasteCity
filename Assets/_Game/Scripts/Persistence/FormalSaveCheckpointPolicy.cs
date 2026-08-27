@@ -25,7 +25,15 @@ namespace WasteCity.Persistence
         public const string RewindAnchorCreated = "rewind-anchor-created";
         public const string RewindAnchorUsed = "rewind-anchor-used";
         public const string RewindAnchorCleared = "rewind-anchor-cleared";
+        public const string PressureWarningStarted =
+            "pressure-warning-started";
+        public const string PressureEncounterStarted =
+            "pressure-encounter-started";
+        public const string PressureEncounterCompleted =
+            "pressure-encounter-completed";
         public const string BossEventStarted = "boss-event-started";
+        public const string FirstCivilizationAscension =
+            "first-civilization-ascension";
     }
 
     public sealed class FormalSaveCheckpointPolicy
@@ -357,9 +365,41 @@ namespace WasteCity.Persistence
                     priority = 40;
                     oneShot = true;
                     return true;
+                case FormalSaveCheckpointReasonIds.FateSelectionComplete:
+                    priority = 41;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.RewindAnchorCreated:
+                    priority = 42;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.RewindAnchorUsed:
+                    priority = 43;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.RewindAnchorCleared:
+                    priority = 44;
+                    oneShot = false;
+                    return true;
                 case FormalSaveCheckpointReasonIds.CampaignWaveWarningStarted:
                     priority = 45;
                     oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.PressureWarningStarted:
+                    priority = 46;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.PressureEncounterStarted:
+                    priority = 47;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.PressureEncounterCompleted:
+                    priority = 48;
+                    oneShot = false;
+                    return true;
+                case FormalSaveCheckpointReasonIds.FirstCivilizationAscension:
+                    priority = 49;
+                    oneShot = true;
                     return true;
                 case FormalSaveCheckpointReasonIds.EvacuationBatchConfirmed:
                     priority = 50;

@@ -18,7 +18,16 @@ namespace WasteCity.Graybox3D.Building
             FormalFateSnapshot targetFate,
             PocketUniverseFateSnapshot targetPocketUniverse,
             FormalVoidDebtSnapshot targetVoidDebt,
-            FormalRewindAnchorMetadataSnapshot targetRewindAnchors)
+            FormalRewindAnchorMetadataSnapshot targetRewindAnchors,
+            GrayboxAttentionPressureRestorePlan3D pressurePlan,
+            FormalCivilizationAscensionSnapshot expectedCivilization,
+            FormalCivilizationAscensionSnapshot targetCivilization,
+            AdvancementSequenceStage expectedSequenceStage,
+            float expectedSequenceRemaining,
+            AdvancementSequenceStage targetSequenceStage,
+            float targetSequenceRemaining,
+            int expectedRewindFateLevel,
+            int targetRewindFateLevel)
         {
             Owner = owner;
             ExpectedAttention = expectedAttention;
@@ -31,6 +40,15 @@ namespace WasteCity.Graybox3D.Building
             TargetPocketUniverse = targetPocketUniverse;
             TargetVoidDebt = targetVoidDebt;
             TargetRewindAnchors = targetRewindAnchors;
+            PressurePlan = pressurePlan;
+            ExpectedCivilization = expectedCivilization;
+            TargetCivilization = targetCivilization;
+            ExpectedSequenceStage = expectedSequenceStage;
+            ExpectedSequenceRemaining = expectedSequenceRemaining;
+            TargetSequenceStage = targetSequenceStage;
+            TargetSequenceRemaining = targetSequenceRemaining;
+            ExpectedRewindFateLevel = expectedRewindFateLevel;
+            TargetRewindFateLevel = targetRewindFateLevel;
         }
 
         internal GrayboxFormalProgressionSaveAdapter3D Owner { get; }
@@ -46,6 +64,17 @@ namespace WasteCity.Graybox3D.Building
         internal FormalVoidDebtSnapshot TargetVoidDebt { get; }
         internal FormalRewindAnchorMetadataSnapshot TargetRewindAnchors
             { get; }
+        internal GrayboxAttentionPressureRestorePlan3D PressurePlan { get; }
+        internal FormalCivilizationAscensionSnapshot ExpectedCivilization
+            { get; }
+        internal FormalCivilizationAscensionSnapshot TargetCivilization
+            { get; }
+        internal AdvancementSequenceStage ExpectedSequenceStage { get; }
+        internal float ExpectedSequenceRemaining { get; }
+        internal AdvancementSequenceStage TargetSequenceStage { get; }
+        internal float TargetSequenceRemaining { get; }
+        internal int ExpectedRewindFateLevel { get; }
+        internal int TargetRewindFateLevel { get; }
         internal bool Consumed { get; set; }
     }
 
@@ -56,13 +85,19 @@ namespace WasteCity.Graybox3D.Building
         private readonly PocketUniverseFateEffect pocketUniverse;
         private readonly FormalVoidDebtRuntime voidDebt;
         private readonly FormalRewindAnchorMetadataRuntime rewindAnchors;
+        private readonly GrayboxAttentionPressureSaveAdapter3D pressureAdapter;
+        private readonly FormalCivilizationAscensionRuntime civilization;
+        private readonly AdvancementSequenceModel advancementSequence;
 
         public GrayboxFormalProgressionSaveAdapter3D(
             FormalAttentionRuntime attention,
             FormalFateRuntime fate,
             PocketUniverseFateEffect pocketUniverse,
             FormalVoidDebtRuntime voidDebt,
-            FormalRewindAnchorMetadataRuntime rewindAnchors)
+            FormalRewindAnchorMetadataRuntime rewindAnchors,
+            GrayboxAttentionPressureSaveAdapter3D pressureAdapter = null,
+            FormalCivilizationAscensionRuntime civilization = null,
+            AdvancementSequenceModel advancementSequence = null)
         {
             this.attention = attention ??
                 throw new ArgumentNullException(nameof(attention));
@@ -73,6 +108,9 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(voidDebt));
             this.rewindAnchors = rewindAnchors ??
                 throw new ArgumentNullException(nameof(rewindAnchors));
+            this.pressureAdapter = pressureAdapter;
+            this.civilization = civilization;
+            this.advancementSequence = advancementSequence;
         }
 
         public FormalThreeDProgressionSaveData Capture()
@@ -129,11 +167,54 @@ namespace WasteCity.Graybox3D.Building
                     rewindAnchors = CaptureRewindAnchors(
                         rewindAnchors.Capture()),
                 },
-                civilization = new FormalThreeDCivilizationSaveData
-                {
-                    level = 1,
-                    committedAscensionIds = Array.Empty<string>(),
-                },
+                pressure = pressureAdapter?.Capture() ??
+                    new FormalThreeDAttentionPressureSaveData(),
+                civilization = CaptureCivilization(fateState),
+            };
+        }
+
+        private FormalThreeDCivilizationSaveData CaptureCivilization(
+            FormalFateSnapshot fateState)
+        {
+            if (civilization == null)
+                return new FormalThreeDCivilizationSaveData();
+            FormalCivilizationAscensionSnapshot snapshot =
+                civilization.Capture();
+            bool pending = fateState != null && !fateState.HasSelection &&
+                string.IsNullOrEmpty(snapshot.FateId) &&
+                snapshot.FateLevel == 0 && !snapshot.Ascended;
+            if (!pending && (fateState == null || !fateState.HasSelection ||
+                !string.Equals(
+                    snapshot.FateId,
+                    fateState.SelectedId,
+                    StringComparison.Ordinal) ||
+                snapshot.FateLevel != fateState.Level))
+            {
+                throw new InvalidOperationException(
+                    "文明升阶 owner 与正式命轨真值不一致");
+            }
+            AdvancementSequenceStage stage = advancementSequence?.Stage ??
+                AdvancementSequenceStage.None;
+            float remaining = advancementSequence?.Remaining ?? 0f;
+            if (snapshot.Ascended && advancementSequence == null)
+                throw new InvalidOperationException(
+                    "已升阶文明缺少演出序列 owner");
+            return new FormalThreeDCivilizationSaveData
+            {
+                level = snapshot.CivilizationLevel,
+                revision = snapshot.Revision,
+                ascensionId = snapshot.Ascended
+                    ? FormalThreeDCivilizationSaveData.FirstAscensionId
+                    : string.Empty,
+                ascensionCompleted = snapshot.Ascended,
+                sequenceStage = (int)stage,
+                remainingRuleSeconds = remaining,
+                committedAscensionIds = snapshot.Ascended
+                    ? new[]
+                    {
+                        FormalThreeDCivilizationSaveData.FirstAscensionId,
+                    }
+                    : Array.Empty<string>(),
             };
         }
 
@@ -162,13 +243,6 @@ namespace WasteCity.Graybox3D.Building
                 error = "正式进度存档数据或必需数组不完整";
                 return false;
             }
-            if (data.civilization.level != 1 ||
-                data.civilization.committedAscensionIds.Length != 0)
-            {
-                error = "当前正式进度存档仅支持文明等级一的未升阶状态";
-                return false;
-            }
-
             if (!TryPrepareAttention(
                     data.attention,
                     out FormalAttentionSnapshot attentionTarget,
@@ -187,6 +261,7 @@ namespace WasteCity.Graybox3D.Building
                     out error) ||
                 !TryPrepareRewindAnchors(
                     data.fateEffects.rewindAnchors,
+                    fateTarget,
                     out FormalRewindAnchorMetadataSnapshot rewindTarget,
                     out error) ||
                 !ValidateEffectOwnership(
@@ -196,6 +271,37 @@ namespace WasteCity.Graybox3D.Building
                     data.fateEffects.rewindAnchors,
                     out error))
             {
+                return false;
+            }
+            int targetRewindFateLevel = fateTarget.Level == 2 &&
+                string.Equals(
+                    fateTarget.SelectedId,
+                    FormalFateCatalog.RewindAnchorId,
+                    StringComparison.Ordinal)
+                        ? 2
+                        : 1;
+
+            if (!TryPrepareCivilization(
+                    data.civilization,
+                    fateTarget,
+                    out FormalCivilizationAscensionSnapshot civilizationTarget,
+                    out AdvancementSequenceStage sequenceStageTarget,
+                    out float sequenceRemainingTarget,
+                    out error))
+            {
+                return false;
+            }
+
+            GrayboxAttentionPressureRestorePlan3D pressurePlan = null;
+            if (pressureAdapter != null)
+            {
+                if (!pressureAdapter.TryPrepareRestore(
+                        data.pressure, out pressurePlan, out error))
+                    return false;
+            }
+            else if (!IsCleanPressure(data.pressure))
+            {
+                error = "当前进度适配器未配置压力持久化 owner";
                 return false;
             }
 
@@ -210,7 +316,20 @@ namespace WasteCity.Graybox3D.Building
                 fateTarget,
                 pocketTarget,
                 debtTarget,
-                rewindTarget);
+                rewindTarget,
+                pressurePlan,
+                civilization?.Capture(),
+                civilizationTarget,
+                advancementSequence?.Stage ??
+                    AdvancementSequenceStage.None,
+                advancementSequence?.Remaining ?? 0f,
+                sequenceStageTarget,
+                sequenceRemainingTarget,
+                rewindAnchors.MaximumAnchors ==
+                    FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelTwo
+                        ? 2
+                        : 1,
+                targetRewindFateLevel);
             error = string.Empty;
             return true;
         }
@@ -237,7 +356,20 @@ namespace WasteCity.Graybox3D.Building
                 !ReferenceEquals(voidDebt.Capture(), plan.ExpectedVoidDebt) ||
                 !ReferenceEquals(
                     rewindAnchors.Capture(),
-                    plan.ExpectedRewindAnchors))
+                    plan.ExpectedRewindAnchors) ||
+                civilization != null && !ReferenceEquals(
+                    civilization.Capture(),
+                    plan.ExpectedCivilization) ||
+                advancementSequence != null &&
+                (advancementSequence.Stage != plan.ExpectedSequenceStage ||
+                 advancementSequence.Remaining !=
+                    plan.ExpectedSequenceRemaining) ||
+                rewindAnchors.MaximumAnchors !=
+                    (plan.ExpectedRewindFateLevel == 2
+                        ? FormalRewindAnchorMetadataRuntime
+                            .MaximumAnchorsAtLevelTwo
+                        : FormalRewindAnchorMetadataRuntime
+                            .MaximumAnchorsAtLevelOne))
             {
                 error = "正式进度恢复计划已过期";
                 return false;
@@ -250,14 +382,25 @@ namespace WasteCity.Graybox3D.Building
             FormalVoidDebtSnapshot previousDebt = voidDebt.Capture();
             FormalRewindAnchorMetadataSnapshot previousRewind =
                 rewindAnchors.Capture();
+            FormalCivilizationAscensionSnapshot previousCivilization =
+                civilization?.Capture();
+            AdvancementSequenceStage previousSequenceStage =
+                advancementSequence?.Stage ?? AdvancementSequenceStage.None;
+            float previousSequenceRemaining =
+                advancementSequence?.Remaining ?? 0f;
             if (!attention.TryRestore(plan.TargetAttention, out error) ||
                 !fate.TryRestore(plan.TargetFate, out error) ||
                 !pocketUniverse.TryRestore(
                     plan.TargetPocketUniverse,
                     out error) ||
                 !voidDebt.TryRestore(plan.TargetVoidDebt, out error) ||
-                !rewindAnchors.TryRestore(
+                !TryRestoreRewindAnchors(
                     plan.TargetRewindAnchors,
+                    plan.TargetRewindFateLevel,
+                    out error) ||
+                plan.TargetCivilization != null &&
+                !civilization.TryRestore(
+                    plan.TargetCivilization,
                     out error))
             {
                 Rollback(
@@ -265,7 +408,31 @@ namespace WasteCity.Graybox3D.Building
                     previousFate,
                     previousPocket,
                     previousDebt,
-                    previousRewind);
+                    previousRewind,
+                    previousCivilization,
+                    previousSequenceStage,
+                    previousSequenceRemaining,
+                    plan.ExpectedRewindFateLevel);
+                return false;
+            }
+            if (advancementSequence != null)
+                advancementSequence.Restore(
+                    (int)plan.TargetSequenceStage,
+                    plan.TargetSequenceRemaining);
+            if (plan.PressurePlan != null &&
+                !pressureAdapter.TryCommitRestore(
+                    plan.PressurePlan, out error))
+            {
+                Rollback(
+                    previousAttention,
+                    previousFate,
+                    previousPocket,
+                    previousDebt,
+                    previousRewind,
+                    previousCivilization,
+                    previousSequenceStage,
+                    previousSequenceRemaining,
+                    plan.ExpectedRewindFateLevel);
                 return false;
             }
 
@@ -287,6 +454,7 @@ namespace WasteCity.Graybox3D.Building
                 data.fateEffects.pocketUniverse != null &&
                 data.fateEffects.voidDebt != null &&
                 data.fateEffects.rewindAnchors != null &&
+                data.pressure != null && data.pressure.entries != null &&
                 data.civilization != null &&
                 data.attention.history != null &&
                 data.attention.reachedThresholds != null &&
@@ -298,6 +466,15 @@ namespace WasteCity.Graybox3D.Building
                 data.fateEffects.voidDebt.debts != null &&
                 data.fateEffects.rewindAnchors.anchors != null &&
                 data.civilization.committedAscensionIds != null;
+        }
+
+        private static bool IsCleanPressure(
+            FormalThreeDAttentionPressureSaveData data)
+        {
+            return data != null && data.revision == 0ul &&
+                data.entries != null && data.entries.Length == 0 &&
+                string.IsNullOrEmpty(data.activeEncounterId) &&
+                data.activeCampaign == null;
         }
 
         private static bool TryPrepareAttention(
@@ -528,8 +705,121 @@ namespace WasteCity.Graybox3D.Building
             };
         }
 
+        private bool TryPrepareCivilization(
+            FormalThreeDCivilizationSaveData data,
+            FormalFateSnapshot fateTarget,
+            out FormalCivilizationAscensionSnapshot snapshot,
+            out AdvancementSequenceStage sequenceStage,
+            out float sequenceRemaining,
+            out string error)
+        {
+            snapshot = null;
+            sequenceStage = AdvancementSequenceStage.None;
+            sequenceRemaining = 0f;
+            if (data == null || data.committedAscensionIds == null ||
+                !Enum.IsDefined(
+                    typeof(AdvancementSequenceStage),
+                    data.sequenceStage) ||
+                float.IsNaN(data.remainingRuleSeconds) ||
+                float.IsInfinity(data.remainingRuleSeconds) ||
+                data.remainingRuleSeconds < 0f)
+            {
+                error = "文明升阶或演出序列存档无效";
+                return false;
+            }
+            sequenceStage = (AdvancementSequenceStage)data.sequenceStage;
+            sequenceRemaining = data.remainingRuleSeconds;
+            bool clean = data.level == 1 && data.revision == 0ul &&
+                string.IsNullOrEmpty(data.ascensionId) &&
+                !data.ascensionCompleted &&
+                data.committedAscensionIds.Length == 0 &&
+                sequenceStage == AdvancementSequenceStage.None &&
+                sequenceRemaining == 0f && fateTarget.Level <= 1;
+            if (clean)
+            {
+                if (civilization == null) return Success(out error);
+                snapshot = new FormalCivilizationAscensionSnapshot(
+                    1,
+                    fateTarget.HasSelection
+                        ? fateTarget.SelectedId
+                        : string.Empty,
+                    fateTarget.HasSelection ? 1 : 0,
+                    false,
+                    0ul);
+                var validator = fateTarget.HasSelection
+                    ? new FormalCivilizationAscensionRuntime(
+                        fateTarget.SelectedId)
+                    : new FormalCivilizationAscensionRuntime();
+                if (!validator.TryRestore(snapshot, out error)) return false;
+                snapshot = validator.Capture();
+                return true;
+            }
+
+            bool committed = data.level == 2 && data.revision > 0ul &&
+                data.ascensionCompleted &&
+                data.committedAscensionIds.Length == 1 &&
+                string.Equals(
+                    data.ascensionId,
+                    FormalThreeDCivilizationSaveData.FirstAscensionId,
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    data.committedAscensionIds[0],
+                    FormalThreeDCivilizationSaveData.FirstAscensionId,
+                    StringComparison.Ordinal) &&
+                fateTarget.HasSelection && fateTarget.Level == 2 &&
+                IsValidSequence(sequenceStage, sequenceRemaining);
+            if (!committed)
+            {
+                error = "文明等级、升阶锁、命轨或演出序列组合无效";
+                return false;
+            }
+            if (civilization == null || advancementSequence == null)
+            {
+                error = "二级文明恢复缺少升阶规则或演出序列 owner";
+                return false;
+            }
+            var runtime = new FormalCivilizationAscensionRuntime(
+                fateTarget.SelectedId);
+            var candidate = new FormalCivilizationAscensionSnapshot(
+                data.level,
+                fateTarget.SelectedId,
+                fateTarget.Level,
+                data.ascensionCompleted,
+                data.revision);
+            if (!runtime.TryRestore(candidate, out error)) return false;
+            snapshot = runtime.Capture();
+            return true;
+        }
+
+        private static bool Success(out string error)
+        {
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool IsValidSequence(
+            AdvancementSequenceStage stage,
+            float remaining)
+        {
+            switch (stage)
+            {
+                case AdvancementSequenceStage.Scanning:
+                    return remaining > 0f && remaining <= 2.5f;
+                case AdvancementSequenceStage.Confirmed:
+                    return remaining > 0f && remaining <= 3f;
+                case AdvancementSequenceStage.Warning:
+                    return remaining > 0f && remaining <= 4f;
+                case AdvancementSequenceStage.Results:
+                case AdvancementSequenceStage.Continued:
+                    return remaining == 0f;
+                default:
+                    return false;
+            }
+        }
+
         private static bool TryPrepareRewindAnchors(
             FormalThreeDRewindAnchorMetadataSaveData data,
+            FormalFateSnapshot fateState,
             out FormalRewindAnchorMetadataSnapshot snapshot,
             out string error)
         {
@@ -572,7 +862,13 @@ namespace WasteCity.Graybox3D.Building
                 data.revision,
                 data.nextCreationOrdinal,
                 entries);
-            var validator = new FormalRewindAnchorMetadataRuntime();
+            bool rewindLevelTwo = fateState != null &&
+                fateState.Level == 2 && string.Equals(
+                    fateState.SelectedId,
+                    FormalFateCatalog.RewindAnchorId,
+                    StringComparison.Ordinal);
+            var validator = new FormalRewindAnchorMetadataRuntime(
+                rewindLevelTwo ? 2 : 1);
             if (!validator.TryRestore(candidate, out error))
             {
                 snapshot = null;
@@ -601,6 +897,14 @@ namespace WasteCity.Graybox3D.Building
                 fateState.SelectedId,
                 FormalFateCatalog.RewindAnchorId,
                 StringComparison.Ordinal);
+            int expectedPocketLevel = pocketSelected ? fateState.Level : 1;
+            int expectedDebtLevel = debtSelected ? fateState.Level : 1;
+            int expectedRewindCapacity = rewindSelected &&
+                fateState.Level == 2
+                    ? FormalRewindAnchorMetadataRuntime
+                        .MaximumAnchorsAtLevelTwo
+                    : FormalRewindAnchorMetadataRuntime
+                        .MaximumAnchorsAtLevelOne;
             if ((!pocketSelected &&
                  (pocket.Flagships.Count != 0 ||
                   pocket.CollapsedFlagshipIds.Count != 0 ||
@@ -608,15 +912,12 @@ namespace WasteCity.Graybox3D.Building
                 (!debtSelected &&
                  (debt.Debts.Count != 0 ||
                   debt.SettlementRemainingSeconds != 0d)) ||
-                (!rewindSelected && rewind.anchors.Length != 0))
+                (!rewindSelected && rewind.anchors.Length != 0) ||
+                pocket.Level != expectedPocketLevel ||
+                debt.Level != expectedDebtLevel ||
+                rewind.anchors.Length > expectedRewindCapacity)
             {
                 error = "未选择的命轨不能携带已激活效果状态";
-                return false;
-            }
-            if ((pocketSelected && pocket.Level != fateState.Level) ||
-                (debtSelected && debt.Level != fateState.Level))
-            {
-                error = "命轨效果等级与正式命轨等级不一致";
                 return false;
             }
             if (rewind.nextCreationOrdinal <= 0L)
@@ -646,13 +947,42 @@ namespace WasteCity.Graybox3D.Building
             FormalFateSnapshot fateState,
             PocketUniverseFateSnapshot pocketState,
             FormalVoidDebtSnapshot debtState,
-            FormalRewindAnchorMetadataSnapshot rewindState)
+            FormalRewindAnchorMetadataSnapshot rewindState,
+            FormalCivilizationAscensionSnapshot civilizationState,
+            AdvancementSequenceStage sequenceStage,
+            float sequenceRemaining,
+            int rewindFateLevel)
         {
             attention.TryRestore(attentionState, out _);
             fate.TryRestore(fateState, out _);
             pocketUniverse.TryRestore(pocketState, out _);
             voidDebt.TryRestore(debtState, out _);
-            rewindAnchors.TryRestore(rewindState, out _);
+            TryRestoreRewindAnchors(
+                rewindState,
+                rewindFateLevel,
+                out _);
+            if (civilization != null && civilizationState != null)
+                civilization.TryRestore(civilizationState, out _);
+            advancementSequence?.Restore(
+                (int)sequenceStage,
+                sequenceRemaining);
+        }
+
+        private bool TryRestoreRewindAnchors(
+            FormalRewindAnchorMetadataSnapshot snapshot,
+            int fateLevel,
+            out string error)
+        {
+            int targetCapacity = fateLevel == 2
+                ? FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelTwo
+                : FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelOne;
+            if (rewindAnchors.MaximumAnchors < targetCapacity)
+            {
+                return rewindAnchors.TrySetFateLevel(fateLevel, out error) &&
+                    rewindAnchors.TryRestore(snapshot, out error);
+            }
+            if (!rewindAnchors.TryRestore(snapshot, out error)) return false;
+            return rewindAnchors.TrySetFateLevel(fateLevel, out error);
         }
 
         private static string[] Copy(IReadOnlyList<string> source)

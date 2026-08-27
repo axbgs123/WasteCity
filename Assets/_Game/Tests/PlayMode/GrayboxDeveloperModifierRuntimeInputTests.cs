@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -11,6 +12,7 @@ using UnityEngine.UI;
 using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
+using WasteCity.Progression;
 
 namespace WasteCity.Tests
 {
@@ -55,8 +57,12 @@ namespace WasteCity.Tests
                 LoadSceneMode.Single);
             yield return null;
             yield return null;
+            bool progressionModifierTest = TestContext.CurrentContext.Test.Name
+                .Contains("IDEA0020");
             yield return GrayboxFormalPlayModeEntryFixture
-                .StartNewProgressThroughRealUi(mouse);
+                .StartNewProgressThroughRealUi(
+                    mouse,
+                    completeFateSelection: !progressionModifierTest);
         }
 
         [UnityTearDown]
@@ -222,6 +228,173 @@ namespace WasteCity.Tests
                 GrayboxBuildingInteractionState.CatalogOpen));
         }
 
+        [UnityTest]
+        public IEnumerator
+            IDEA0020_ProgressionActionsUseRealZeroSearchParametersAndFormalOwners()
+        {
+            GrayboxDeveloperModifierBootstrap3D developer =
+                Object.FindObjectOfType<
+                    GrayboxDeveloperModifierBootstrap3D>();
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(developer, Is.Not.Null);
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.FateRuntime.Capture().HasSelection, Is.False);
+
+            yield return TapKey(Key.Digit0);
+            Assert.That(developer.IsPanelOpen, Is.True,
+                "The Development/Editor modifier must open through real 0.");
+            InputField actionSearch = FindInput("Progression Action Search");
+            yield return FocusInput(actionSearch);
+            yield return TapKey(Key.U);
+            yield return TapKey(Key.Digit0);
+            Assert.That(developer.IsPanelOpen, Is.True,
+                "U and 0 cannot leak through a focused text parameter.");
+            Assert.That(host.Sequence.Stage,
+                Is.EqualTo(AdvancementSequenceStage.None));
+
+            yield return SelectProgressionAction(
+                "查询进度配置签名",
+                "developer.query.configuration-signature");
+            yield return ClickUi(FindButton(
+                "Execute Progression Action").GetComponent<RectTransform>());
+            Assert.That(developer.HasModifiedGameState, Is.False,
+                "Read-only query actions never mark the run modified.");
+            Assert.That(FindText("Developer Feedback").text,
+                Does.Contain("配置签名"));
+
+            yield return SetProgressionAmount(29);
+            yield return SelectProgressionAction(
+                "设置关注度", "developer.attention.set");
+            yield return ExecuteProgressionAction();
+            yield return SetProgressionAmount(1);
+            yield return SelectProgressionAction(
+                "增加关注度", "developer.attention.increase");
+            yield return ExecuteProgressionAction();
+            yield return AssertAttentionThreshold(host, 30);
+            yield return SetAttentionThenCross(host, 59, 60);
+            yield return SetAttentionThenCross(host, 89, 90);
+            Assert.That(developer.HasModifiedGameState, Is.True);
+            Assert.That(FindSceneText(
+                    "Progression.AttentionStatus.Value").text,
+                Does.Contain("90").And.Contain("100"));
+
+            yield return FocusInput(actionSearch);
+            yield return TapKey(Key.Escape);
+            Assert.That(developer.IsPanelOpen, Is.True,
+                "First Escape clears text focus only.");
+            yield return TapKey(Key.Escape);
+            Assert.That(developer.IsPanelOpen, Is.False,
+                "Second Escape closes the modifier without opening menu.");
+            yield return TapKey(Key.Digit0);
+            Assert.That(developer.IsPanelOpen, Is.True);
+
+            yield return SelectProgressionAction(
+                "选择袖珍宇宙命轨",
+                "developer.fate.select-pocket-universe");
+            yield return ExecuteProgressionAction();
+            Assert.That(host.FateRuntime.Capture().SelectedId,
+                Is.EqualTo(FormalFateCatalog.PocketUniverseId));
+            yield return SelectProgressionAction(
+                "满足升阶测试条件",
+                "developer.ascension.requirements-satisfy");
+            yield return ExecuteProgressionAction();
+            Assert.That(host.CaptureRequirements().CanAscend, Is.True);
+            yield return SelectProgressionAction(
+                "执行首次文明升阶",
+                "developer.civilization.first-ascension");
+            yield return ExecuteProgressionAction();
+            Assert.That(host.Civilization.Capture().CivilizationLevel,
+                Is.EqualTo(2));
+            Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(2));
+
+            GrayboxFormalSaveEntryController3D entry =
+                Object.FindObjectOfType<
+                    GrayboxFormalSaveEntryController3D>(true);
+            Assert.That(entry, Is.Not.Null);
+            GrayboxFormalSaveUiResult3D saved = entry.SaveAndExit();
+            Assert.That(saved.Success, Is.True, saved.Message);
+            yield return SceneManager.LoadSceneAsync(
+                SceneName, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+            yield return ClickUi(
+                FindButton("Start.Continue").GetComponent<RectTransform>());
+            host = Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.AttentionRuntime.Value, Is.EqualTo(100),
+                "The saved value includes the one-time ascension +25 cap.");
+            Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(2));
+            Assert.That(host.Civilization.Capture().CivilizationLevel,
+                Is.EqualTo(2));
+        }
+
+        private IEnumerator SetAttentionThenCross(
+            GrayboxFormalSaveRuntimeHost3D host,
+            int before,
+            int threshold)
+        {
+            yield return SetProgressionAmount(before);
+            yield return SelectProgressionAction(
+                "设置关注度", "developer.attention.set");
+            yield return ExecuteProgressionAction();
+            yield return SetProgressionAmount(1);
+            yield return SelectProgressionAction(
+                "增加关注度", "developer.attention.increase");
+            yield return ExecuteProgressionAction();
+            yield return AssertAttentionThreshold(host, threshold);
+        }
+
+        private IEnumerator AssertAttentionThreshold(
+            GrayboxFormalSaveRuntimeHost3D host,
+            int threshold)
+        {
+            yield return null;
+            Assert.That(host.AttentionRuntime.Capture().ReachedThresholds,
+                Does.Contain(threshold));
+            Assert.That(host.AttentionPressureRuntime.Capture().Entries
+                    .Select(value => value.Threshold),
+                Does.Contain(threshold));
+        }
+
+        private IEnumerator SelectProgressionAction(
+            string chineseName,
+            string stableId)
+        {
+            InputField search = FindInput("Progression Action Search");
+            yield return ReplaceInputText(search, chineseName);
+            Button action = FindButton("Developer.Progression." + stableId);
+            Assert.That(action.gameObject.activeInHierarchy, Is.True,
+                chineseName);
+            Assert.That(action.GetComponentInChildren<Text>().text,
+                Is.EqualTo(chineseName));
+            yield return ClickUi(action.GetComponent<RectTransform>());
+        }
+
+        private IEnumerator SetProgressionAmount(int value)
+        {
+            yield return ReplaceInputText(
+                FindInput("Progression Amount"), value.ToString());
+        }
+
+        private IEnumerator ExecuteProgressionAction()
+        {
+            yield return ClickUi(FindButton(
+                "Execute Progression Action").GetComponent<RectTransform>());
+        }
+
+        private IEnumerator ReplaceInputText(
+            InputField input,
+            string value)
+        {
+            yield return FocusInput(input);
+            int characters = input.text?.Length ?? 0;
+            for (var index = 0; index < characters; index++)
+                yield return TapKey(Key.Backspace);
+            yield return TypeText(value);
+            Assert.That(input.text, Is.EqualTo(value));
+        }
+
         private IEnumerator TapKey(Key key)
         {
             QueueKeyboard(key);
@@ -342,6 +515,25 @@ namespace WasteCity.Tests
                 if (values[index].name == name)
                     return values[index];
             Assert.Fail("Missing button " + name + ".");
+            return null;
+        }
+
+        private static Text FindText(string rootName)
+        {
+            GameObject root = GameObject.Find(rootName);
+            Assert.That(root, Is.Not.Null, rootName);
+            Text text = root.GetComponentInChildren<Text>(true);
+            Assert.That(text, Is.Not.Null, rootName);
+            return text;
+        }
+
+        private static Text FindSceneText(string name)
+        {
+            Text[] values = Object.FindObjectsOfType<Text>(true);
+            for (var index = 0; index < values.Length; index++)
+                if (values[index].name == name)
+                    return values[index];
+            Assert.Fail("Missing text " + name + ".");
             return null;
         }
     }

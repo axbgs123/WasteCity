@@ -148,6 +148,9 @@ namespace WasteCity.Progression
 
         public int Value => value;
         public ulong Revision => revision;
+        public Exception LastThresholdNotificationFailure { get; private set; }
+
+        public event Action<int> ThresholdReached;
 
         public bool TryApply(
             string reasonId,
@@ -216,8 +219,9 @@ namespace WasteCity.Progression
             if (history.Count == FormalAttentionCatalog.HistoryCapacity)
                 history.Dequeue();
             history.Enqueue(entry);
-            LockReachedThresholds(previous, value);
+            int newlyReachedMask = LockReachedThresholds(previous, value);
             RebuildSnapshot();
+            PublishReachedThresholds(newlyReachedMask);
             error = string.Empty;
             return true;
         }
@@ -403,16 +407,44 @@ namespace WasteCity.Progression
             return true;
         }
 
-        private void LockReachedThresholds(int previous, int current)
+        private int LockReachedThresholds(int previous, int current)
         {
             if (current <= previous)
-                return;
+                return 0;
+            int mask = 0;
             IReadOnlyList<int> thresholds = FormalAttentionCatalog.Thresholds;
             for (var index = 0; index < thresholds.Count; index++)
             {
                 int threshold = thresholds[index];
-                if (previous < threshold && current >= threshold)
-                    reachedThresholds.Add(threshold);
+                if (previous < threshold && current >= threshold &&
+                    reachedThresholds.Add(threshold))
+                    mask |= 1 << index;
+            }
+            return mask;
+        }
+
+        private void PublishReachedThresholds(int mask)
+        {
+            if (mask == 0 || ThresholdReached == null) return;
+            IReadOnlyList<int> thresholds = FormalAttentionCatalog.Thresholds;
+            for (var thresholdIndex = 0;
+                 thresholdIndex < thresholds.Count;
+                 thresholdIndex++)
+            {
+                if ((mask & (1 << thresholdIndex)) == 0) continue;
+                Delegate[] handlers = ThresholdReached.GetInvocationList();
+                for (var index = 0; index < handlers.Length; index++)
+                {
+                    try
+                    {
+                        ((Action<int>)handlers[index])(
+                            thresholds[thresholdIndex]);
+                    }
+                    catch (Exception exception)
+                    {
+                        LastThresholdNotificationFailure = exception;
+                    }
+                }
             }
         }
 

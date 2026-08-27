@@ -28,6 +28,8 @@ namespace WasteCity.Tests
             "core.research.precision-assembly";
         private const string AutomatedDefenseId =
             "core.research.automated-defense";
+        private const string LegacyAnalysisId =
+            "core.research.legacy-analysis";
 
         private static readonly float[] RowY =
         {
@@ -72,11 +74,11 @@ namespace WasteCity.Tests
             int expectedEdgeCount = ResearchCatalog.All.Sum(
                 definition => definition.RequiredResearchIds.Count);
 
-            Assert.That(projection.Nodes, Has.Count.EqualTo(43));
+            Assert.That(projection.Nodes, Has.Count.EqualTo(44));
             Assert.That(projection.Edges,
                 Has.Count.EqualTo(expectedEdgeCount));
-            Assert.That(expectedEdgeCount, Is.EqualTo(48),
-                "The approved formal catalog has exactly 48 prerequisite edges.");
+            Assert.That(expectedEdgeCount, Is.EqualTo(49),
+                "IDEA-0020 adds the automatic-defense to legacy-analysis edge.");
 
             var actualEdges = new HashSet<string>(StringComparer.Ordinal);
             foreach (ResearchTreeEdgeProjection3D edge in projection.Edges)
@@ -250,6 +252,20 @@ namespace WasteCity.Tests
                 Is.EqualTo(PrecisionAssemblyId),
                 "Both T2 candidates are current; the lower CatalogOrder " +
                 "must be the deterministic main focus.");
+
+            ResearchTreeNodeProjection3D legacy =
+                projection.SelectLatestResearchable(new[]
+                {
+                    AutomatedDefenseId,
+                    PrecisionAssemblyId,
+                    LegacyAnalysisId,
+                });
+            Assert.That(legacy.ResearchId, Is.EqualTo(LegacyAnalysisId));
+            var viewport = new Vector2(1476f, 644f);
+            ResearchTreeViewportState3D focused = projection.Focus(
+                new[] { legacy.ResearchId }, viewport, 28f);
+            AssertNodesInsideViewport(
+                new[] { legacy }, focused, viewport, 28f);
             Assert.That(projection.SelectLatestResearchable(
                 Array.Empty<string>()), Is.Null);
         }
@@ -266,7 +282,7 @@ namespace WasteCity.Tests
                     PrecisionAssemblyId,
                 });
 
-            Assert.That(filtered.Nodes, Has.Count.EqualTo(43));
+            Assert.That(filtered.Nodes, Has.Count.EqualTo(44));
             Assert.That(filtered.Bounds, Is.EqualTo(original.Bounds));
             foreach (ResearchTreeNodeProjection3D originalNode in
                      original.Nodes)

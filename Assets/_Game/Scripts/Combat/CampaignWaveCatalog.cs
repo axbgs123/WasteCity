@@ -27,6 +27,24 @@ namespace WasteCity.Combat
         }
     }
 
+    public sealed class SingleCityDefenseCampaignDefinition
+    {
+        public SingleCityDefenseCampaignDefinition(
+            string id,
+            params CampaignWaveDefinition[] waves)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                throw new ArgumentException(nameof(id));
+            Id = id;
+            Waves = Array.AsReadOnly(waves == null
+                ? Array.Empty<CampaignWaveDefinition>()
+                : (CampaignWaveDefinition[])waves.Clone());
+        }
+
+        public string Id { get; }
+        public IReadOnlyList<CampaignWaveDefinition> Waves { get; }
+    }
+
     public static class CampaignWaveCatalog
     {
         public const string Id="campaign.single-city-defense.v1";
@@ -47,6 +65,9 @@ namespace WasteCity.Combat
 
         private static readonly IReadOnlyList<CampaignWaveDefinition>
             ReadOnlyWaves=Array.AsReadOnly(Waves);
+
+        public static readonly SingleCityDefenseCampaignDefinition Default =
+            new SingleCityDefenseCampaignDefinition(Id, Waves);
 
         public static IReadOnlyList<CampaignWaveDefinition> All => ReadOnlyWaves;
     }

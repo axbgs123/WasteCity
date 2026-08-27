@@ -46,6 +46,7 @@ namespace WasteCity.Graybox3D.Building
     public sealed class GrayboxRewindAnchorService3D
     {
         public const string StableAnchorId = "rewind-anchor.slot.0001";
+        public const string SecondStableAnchorId = "rewind-anchor.slot.0002";
         public const string SaveTransactionSafetyCode = "save-transaction";
         public const string DeploymentSafetyCode = "deployment-transition";
         public const string EvacuationSafetyCode = "evacuation";
@@ -119,7 +120,9 @@ namespace WasteCity.Graybox3D.Building
             if (sessionId == null)
                 return SessionMismatch("当前正式会话身份无效");
 
-            FormalRewindAnchorStoreResult existing = store.Load();
+            int slot = SelectCreationSlot();
+            string anchorId = AnchorIdForSlot(slot);
+            FormalRewindAnchorStoreResult existing = store.Load(slot);
             bool replacing = existing.Success;
             if (existing.Code ==
                     FormalRewindAnchorStoreCode.UnsupportedFutureSchema ||
@@ -145,9 +148,11 @@ namespace WasteCity.Graybox3D.Building
 
             FormalRewindAnchorMetadataUpsertPlan metadataPlan = null;
             if (metadata != null && !metadata.TryPrepareUpsert(
-                    StableAnchorId,
+                    anchorId,
                     FormalRewindAnchorStore.InternalDirectoryName + "/" +
-                        FormalRewindAnchorStore.FileName,
+                        (slot == 1
+                            ? FormalRewindAnchorStore.FileName
+                            : FormalRewindAnchorStore.SecondFileName),
                     sessionId,
                     captured.Envelope.payloadHashSha256,
                     captured.Envelope.checkpoint,
@@ -161,7 +166,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             FormalRewindAnchorStoreResult saved =
-                store.Save(captured.Envelope);
+                store.Save(captured.Envelope, slot);
             if (!saved.Success) return StoreFailure(saved);
             if (metadata != null &&
                 !metadata.TryCommitUpsert(metadataPlan, out string commitError))
@@ -181,11 +186,21 @@ namespace WasteCity.Graybox3D.Building
 
         public GrayboxRewindAnchorServiceResult3D Read()
         {
+            return Read(StableAnchorId);
+        }
+
+        public GrayboxRewindAnchorServiceResult3D Read(string anchorId)
+        {
             GrayboxRewindAnchorServiceResult3D unavailable =
                 CheckAvailability();
             if (unavailable != null) return unavailable;
 
-            FormalRewindAnchorStoreResult loaded = store.Load();
+            int slot = SlotForAnchorId(anchorId);
+            if (slot == 0)
+                return Failure(
+                    GrayboxRewindAnchorServiceCode3D.InvalidAnchor,
+                    "回溯锚点稳定身份无效");
+            FormalRewindAnchorStoreResult loaded = store.Load(slot);
             if (!loaded.Success || loaded.Envelope?.formal3D == null)
                 return LoadFailure(loaded);
 
@@ -200,6 +215,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             if (!TryCreateAttentionCandidate(
+                    anchorId,
                     out FormalThreeDProgressionSaveData candidate,
                     out string attentionError))
             {
@@ -209,13 +225,31 @@ namespace WasteCity.Graybox3D.Building
                     attentionError);
             }
 
+            GrayboxFormalSaveCoordinatorResult3D currentCapture =
+                coordinator.CaptureEnvelope(
+                    currentSessionId,
+                    loaded.Envelope.gameVersion,
+                    loaded.Envelope.contentSources ?? Array.Empty<string>(),
+                    loaded.Envelope.checkpoint,
+                    DateTime.UtcNow);
+            FormalThreeDProgressionSaveData currentProgression =
+                currentCapture.Envelope?.formal3D?.progression;
+            if (!currentCapture.Success || currentProgression == null)
+            {
+                return Failure(
+                    GrayboxRewindAnchorServiceCode3D.CaptureFailed,
+                    "无法捕获当前命轨与文明状态",
+                    currentCapture.Message);
+            }
+
             FormalSaveEnvelope target = loaded.Envelope;
             target.formal3D.progression.attention = candidate.attention;
-            if (metadata != null)
-            {
-                target.formal3D.progression.fateEffects.rewindAnchors =
-                    candidate.fateEffects.rewindAnchors;
-            }
+            target.formal3D.progression.fate = Clone(
+                currentProgression.fate);
+            target.formal3D.progression.civilization = Clone(
+                currentProgression.civilization);
+            target.formal3D.progression.fateEffects.rewindAnchors = Clone(
+                currentProgression.fateEffects.rewindAnchors);
             target.payloadHashSha256 =
                 FormalSaveCodec.ComputePayloadHashSha256(target.formal3D);
             FormalSaveValidationResult validation =
@@ -243,6 +277,14 @@ namespace WasteCity.Graybox3D.Building
                 "已读取回溯锚点，关注度增加 12");
         }
 
+        private static T Clone<T>(T value) where T : class
+        {
+            return value == null
+                ? default
+                : UnityEngine.JsonUtility.FromJson<T>(
+                    UnityEngine.JsonUtility.ToJson(value, false));
+        }
+
         public GrayboxRewindAnchorServiceResult3D Clear()
         {
             GrayboxRewindAnchorServiceResult3D unavailable =
@@ -260,8 +302,13 @@ namespace WasteCity.Graybox3D.Building
                     metadataError);
             }
 
-            FormalRewindAnchorStoreResult cleared = store.Clear();
+            FormalRewindAnchorStoreResult cleared = store.Clear(1);
             if (!cleared.Success) return StoreFailure(cleared);
+            if (metadata?.MaximumAnchors == 2)
+            {
+                cleared = store.Clear(2);
+                if (!cleared.Success) return StoreFailure(cleared);
+            }
             if (metadata != null && !metadata.TryCommitClear(
                     metadataPlan,
                     out string commitError))
@@ -300,6 +347,7 @@ namespace WasteCity.Graybox3D.Building
         }
 
         private bool TryCreateAttentionCandidate(
+            string anchorId,
             out FormalThreeDProgressionSaveData candidate,
             out string error)
         {
@@ -308,7 +356,7 @@ namespace WasteCity.Graybox3D.Building
             if (!candidateAttention.TryRestore(attention.Capture(), out error))
                 return false;
 
-            string eventKey = "rewind-anchor-read:" + StableAnchorId + ":" +
+            string eventKey = "rewind-anchor-read:" + anchorId + ":" +
                 (candidateAttention.Revision + 1UL).ToString(
                     CultureInfo.InvariantCulture);
             if (!candidateAttention.TryApply(
@@ -322,7 +370,8 @@ namespace WasteCity.Graybox3D.Building
             var candidateFate = new FormalFateRuntime();
             if (!candidateFate.TryRestore(fate.Capture(), out error))
                 return false;
-            var candidateMetadata = new FormalRewindAnchorMetadataRuntime();
+            var candidateMetadata = new FormalRewindAnchorMetadataRuntime(
+                metadata?.MaximumAnchors == 2 ? 2 : 1);
             if (metadata != null && !candidateMetadata.TryRestore(
                     metadata.Capture(),
                     out error))
@@ -345,6 +394,34 @@ namespace WasteCity.Graybox3D.Building
             string value = currentSessionIdProvider();
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
+
+        private int SelectCreationSlot()
+        {
+            if (metadata == null || metadata.MaximumAnchors == 1) return 1;
+            var snapshot = metadata.Capture();
+            bool hasOne = false;
+            bool hasTwo = false;
+            for (var index = 0; index < snapshot.Entries.Count; index++)
+            {
+                hasOne |= snapshot.Entries[index].AnchorId == StableAnchorId;
+                hasTwo |= snapshot.Entries[index].AnchorId ==
+                    SecondStableAnchorId;
+            }
+            if (!hasOne) return 1;
+            if (!hasTwo) return 2;
+            return SlotForAnchorId(snapshot.Entries[0].AnchorId);
+        }
+
+        private static int SlotForAnchorId(string anchorId)
+        {
+            if (string.Equals(anchorId, StableAnchorId,
+                    StringComparison.Ordinal)) return 1;
+            return string.Equals(anchorId, SecondStableAnchorId,
+                    StringComparison.Ordinal) ? 2 : 0;
+        }
+
+        private static string AnchorIdForSlot(int slot) =>
+            slot == 2 ? SecondStableAnchorId : StableAnchorId;
 
         private static string SafetyMessage(string code)
         {

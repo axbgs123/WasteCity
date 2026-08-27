@@ -210,18 +210,52 @@ namespace WasteCity.Progression
     public sealed class FormalRewindAnchorMetadataRuntime
     {
         public const int MaximumAnchorsAtLevelOne = 1;
+        public const int MaximumAnchorsAtLevelTwo = 2;
 
-        private FormalRewindAnchorMetadata entry;
+        private readonly List<FormalRewindAnchorMetadata> entries =
+            new List<FormalRewindAnchorMetadata>(MaximumAnchorsAtLevelTwo);
+        private int maximumAnchors;
         private ulong revision;
         private long nextCreationOrdinal = 1;
         private FormalRewindAnchorMetadataSnapshot cachedSnapshot;
 
         public FormalRewindAnchorMetadataRuntime()
+            : this(1)
         {
+        }
+
+        public FormalRewindAnchorMetadataRuntime(int fateLevel)
+        {
+            if (fateLevel != 1 && fateLevel != 2)
+                throw new ArgumentOutOfRangeException(nameof(fateLevel));
+            maximumAnchors = fateLevel == 2
+                ? MaximumAnchorsAtLevelTwo
+                : MaximumAnchorsAtLevelOne;
             RebuildSnapshot();
         }
 
         public ulong Revision => revision;
+        public int MaximumAnchors => maximumAnchors;
+
+        public bool TrySetFateLevel(int fateLevel, out string error)
+        {
+            if (fateLevel != 1 && fateLevel != 2)
+            {
+                error = "回溯锚点仅支持命轨等级一或二";
+                return false;
+            }
+            int next = fateLevel == 2
+                ? MaximumAnchorsAtLevelTwo
+                : MaximumAnchorsAtLevelOne;
+            if (entries.Count > next)
+            {
+                error = "当前锚点数量超过目标命轨等级容量";
+                return false;
+            }
+            maximumAnchors = next;
+            error = string.Empty;
+            return true;
+        }
 
         public FormalRewindAnchorMetadataSnapshot Capture() => cachedSnapshot;
 
@@ -278,8 +312,18 @@ namespace WasteCity.Progression
                 return false;
             }
 
-            entry = plan.Candidate.Copy();
-            nextCreationOrdinal = entry.CreationOrdinal + 1;
+            int replaceIndex = -1;
+            for (var index = 0; index < entries.Count; index++)
+                if (string.Equals(entries[index].AnchorId,
+                        plan.Candidate.AnchorId, StringComparison.Ordinal))
+                    replaceIndex = index;
+            if (replaceIndex >= 0) entries.RemoveAt(replaceIndex);
+            else if (entries.Count >= maximumAnchors) entries.RemoveAt(0);
+            FormalRewindAnchorMetadata committed = plan.Candidate.Copy();
+            entries.Add(committed);
+            entries.Sort((left, right) =>
+                left.CreationOrdinal.CompareTo(right.CreationOrdinal));
+            nextCreationOrdinal = committed.CreationOrdinal + 1;
             unchecked { revision++; }
             plan.Consumed = true;
             RebuildSnapshot();
@@ -294,7 +338,7 @@ namespace WasteCity.Progression
             plan = new FormalRewindAnchorMetadataClearPlan(
                 this,
                 cachedSnapshot,
-                entry != null);
+                entries.Count != 0);
             error = string.Empty;
             return true;
         }
@@ -325,7 +369,7 @@ namespace WasteCity.Progression
                 error = string.Empty;
                 return true;
             }
-            entry = null;
+            entries.Clear();
             unchecked { revision++; }
             RebuildSnapshot();
             error = string.Empty;
@@ -337,32 +381,34 @@ namespace WasteCity.Progression
             out string error)
         {
             if (snapshot == null || snapshot.Entries == null ||
-                snapshot.Entries.Count > MaximumAnchorsAtLevelOne ||
+                snapshot.Entries.Count > maximumAnchors ||
                 snapshot.NextCreationOrdinal <= 0)
             {
                 error = "回溯锚点元数据快照无效或超过一槽上限";
                 return false;
             }
 
-            FormalRewindAnchorMetadata candidate = null;
-            if (snapshot.Entries.Count == 1)
+            var candidates = new List<FormalRewindAnchorMetadata>(
+                snapshot.Entries.Count);
+            long previousOrdinal = 0;
+            var anchorIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < snapshot.Entries.Count; index++)
             {
-                FormalRewindAnchorMetadata source = snapshot.Entries[0];
+                FormalRewindAnchorMetadata source = snapshot.Entries[index];
                 if (!FormalRewindAnchorMetadata.IsValid(source) ||
-                    source.CreationOrdinal >= snapshot.NextCreationOrdinal)
+                    source.CreationOrdinal <= previousOrdinal ||
+                    source.CreationOrdinal >= snapshot.NextCreationOrdinal ||
+                    !anchorIds.Add(source.AnchorId))
                 {
                     error = "回溯锚点元数据记录无效";
                     return false;
                 }
-                candidate = source.Copy();
-            }
-            else if (snapshot.NextCreationOrdinal != 1)
-            {
-                error = "空锚点快照不能包含创建序号高水位";
-                return false;
+                candidates.Add(source.Copy());
+                previousOrdinal = source.CreationOrdinal;
             }
 
-            entry = candidate;
+            entries.Clear();
+            entries.AddRange(candidates);
             revision = snapshot.Revision;
             nextCreationOrdinal = snapshot.NextCreationOrdinal;
             RebuildSnapshot();
@@ -375,9 +421,15 @@ namespace WasteCity.Progression
             cachedSnapshot = new FormalRewindAnchorMetadataSnapshot(
                 revision,
                 nextCreationOrdinal,
-                entry == null
-                    ? Array.Empty<FormalRewindAnchorMetadata>()
-                    : new[] { entry.Copy() });
+                CopyEntries());
+        }
+
+        private FormalRewindAnchorMetadata[] CopyEntries()
+        {
+            var result = new FormalRewindAnchorMetadata[entries.Count];
+            for (var index = 0; index < result.Length; index++)
+                result[index] = entries[index].Copy();
+            return result;
         }
     }
 }

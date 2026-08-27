@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.Combat;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -409,6 +410,42 @@ namespace WasteCity.Graybox3D.Building
                 root.transform.localScale = new Vector3(.55f, .7f, .55f);
                 Renderer renderer = root.GetComponent<Renderer>();
                 renderer.sharedMaterial = sharedMaterial;
+                GameObject outline = GameObject.CreatePrimitive(
+                    PrimitiveType.Sphere);
+                outline.name = "Defense.Enemy.Outline";
+                outline.transform.SetParent(root.transform, false);
+                outline.transform.localPosition = Vector3.zero;
+                outline.transform.localScale = Vector3.one * 1.18f;
+                Collider outlineCollider = outline.GetComponent<Collider>();
+                if (outlineCollider != null) DestroyOwned(outlineCollider);
+                Renderer outlineRenderer = outline.GetComponent<Renderer>();
+                outlineRenderer.sharedMaterial = sharedMaterial;
+                outline.SetActive(false);
+                var labelObject = new GameObject(
+                    "Defense.Enemy.StatusLabel",
+                    typeof(TextMesh));
+                labelObject.transform.SetParent(root.transform, false);
+                labelObject.transform.localPosition = new Vector3(0f, 1.25f, 0f);
+                TextMesh label = labelObject.GetComponent<TextMesh>();
+                label.anchor = TextAnchor.LowerCenter;
+                label.alignment = TextAlignment.Center;
+                label.characterSize = .12f;
+                label.fontSize = 32;
+                label.color = Color.white;
+                Renderer labelRenderer = labelObject.GetComponent<Renderer>();
+                labelRenderer.sharedMaterial = sharedMaterial;
+                labelObject.SetActive(false);
+                GameObject healthBar = GameObject.CreatePrimitive(
+                    PrimitiveType.Cube);
+                healthBar.name = "Defense.Enemy.WorldHealthBar";
+                healthBar.transform.SetParent(root.transform, false);
+                healthBar.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+                healthBar.transform.localScale = new Vector3(1f, .08f, .08f);
+                Collider healthCollider = healthBar.GetComponent<Collider>();
+                if (healthCollider != null) DestroyOwned(healthCollider);
+                Renderer healthRenderer = healthBar.GetComponent<Renderer>();
+                healthRenderer.sharedMaterial = sharedMaterial;
+                healthBar.SetActive(false);
                 GrayboxDefensePickTarget3D target =
                     root.AddComponent<GrayboxDefensePickTarget3D>();
                 target.Configure(
@@ -416,7 +453,9 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxDefenseSelectionKind3D.None,
                     null);
                 root.SetActive(false);
-                enemyPool.Add(new EnemyVisual(root, renderer, target));
+                enemyPool.Add(new EnemyVisual(
+                    root, renderer, outlineRenderer, label, labelRenderer,
+                    healthBar, healthRenderer, target));
             }
         }
 
@@ -568,7 +607,12 @@ namespace WasteCity.Graybox3D.Building
         private void ApplySharedMaterial()
         {
             for (int index = 0; index < enemyPool.Count; index++)
+            {
                 enemyPool[index].Renderer.sharedMaterial = sharedMaterial;
+                enemyPool[index].Outline.sharedMaterial = sharedMaterial;
+                enemyPool[index].LabelRenderer.sharedMaterial = sharedMaterial;
+                enemyPool[index].HealthRenderer.sharedMaterial = sharedMaterial;
+            }
             for (int towerIndex = 0;
                  towerIndex < towerPool.Count;
                  towerIndex++)
@@ -701,14 +745,74 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseEnemySnapshot3D enemy)
         {
             float healthRatio = Mathf.Clamp01(
-                enemy.CurrentHealth / 60f);
+                enemy.CurrentHealth / (float)enemy.MaximumHealth);
+            bool isBoss = string.Equals(
+                enemy.EnemyDefinitionId,
+                EnemyCatalog.CrystalBroodmother.Id.Value,
+                StringComparison.Ordinal);
+            bool isBurrower = string.Equals(
+                enemy.EnemyDefinitionId,
+                EnemyCatalog.Burrower.Id.Value,
+                StringComparison.Ordinal);
+            visual.Root.name = isBoss
+                ? "CrystalBroodmother.Placeholder"
+                : "Defense.Enemy." + enemy.StableId;
+            visual.Root.transform.localScale = isBoss
+                ? new Vector3(2f, 2.4f, 2f)
+                : isBurrower
+                    ? new Vector3(.9f, .55f, .9f)
+                    : new Vector3(.55f, .7f, .55f);
+            Color healthy = isBoss
+                ? new Color(.82f, .18f, .72f, 1f)
+                : isBurrower
+                    ? new Color(.58f, .3f, .72f, 1f)
+                    : new Color(.9f, .28f, .14f, 1f);
             visual.Properties.SetColor(
                 "_Color",
                 Color.Lerp(
                     new Color(.25f, .08f, .06f, 1f),
-                    new Color(.9f, .28f, .14f, 1f),
+                    healthy,
                     healthRatio));
             visual.Renderer.SetPropertyBlock(visual.Properties);
+            visual.Outline.gameObject.SetActive(isBoss);
+            visual.Outline.gameObject.name = isBoss
+                ? "CrystalBroodmother.Outline"
+                : "Defense.Enemy.Outline";
+            if (isBoss)
+            {
+                visual.OutlineProperties.SetColor(
+                    "_Color",
+                    new Color(.15f, .95f, 1f, 1f));
+                visual.Outline.SetPropertyBlock(visual.OutlineProperties);
+            }
+            visual.Label.gameObject.SetActive(isBoss || isBurrower);
+            visual.Label.gameObject.name = isBoss
+                ? "CrystalBroodmother.Phase"
+                : "Defense.Enemy.StatusLabel";
+            visual.Label.text = isBoss
+                ? "晶壳母体  " + BossPhase(healthRatio) + "\n" +
+                  enemy.CurrentHealth + "/" + enemy.MaximumHealth
+                : isBurrower ? "结晶掘地者" : string.Empty;
+            visual.HealthBar.SetActive(isBoss);
+            visual.HealthBar.name = isBoss
+                ? "CrystalBroodmother.WorldHealthBar"
+                : "Defense.Enemy.WorldHealthBar";
+            if (isBoss)
+            {
+                visual.HealthBar.transform.localScale = new Vector3(
+                    Mathf.Max(.02f, healthRatio), .08f, .08f);
+                visual.HealthProperties.SetColor(
+                    "_Color",
+                    Color.Lerp(Color.red, Color.green, healthRatio));
+                visual.HealthRenderer.SetPropertyBlock(
+                    visual.HealthProperties);
+            }
+        }
+
+        private static string BossPhase(float healthRatio)
+        {
+            if (healthRatio > .7f) return "阶段一";
+            return healthRatio > .35f ? "阶段二" : "阶段三";
         }
 
         private static void ApplyTowerState(
@@ -791,18 +895,37 @@ namespace WasteCity.Graybox3D.Building
             public EnemyVisual(
                 GameObject root,
                 Renderer renderer,
+                Renderer outline,
+                TextMesh label,
+                Renderer labelRenderer,
+                GameObject healthBar,
+                Renderer healthRenderer,
                 GrayboxDefensePickTarget3D target)
             {
                 Root = root;
                 Renderer = renderer;
+                Outline = outline;
+                Label = label;
+                LabelRenderer = labelRenderer;
+                HealthBar = healthBar;
+                HealthRenderer = healthRenderer;
                 Target = target;
                 Properties = new MaterialPropertyBlock();
+                OutlineProperties = new MaterialPropertyBlock();
+                HealthProperties = new MaterialPropertyBlock();
             }
 
             public GameObject Root { get; }
             public Renderer Renderer { get; }
+            public Renderer Outline { get; }
+            public TextMesh Label { get; }
+            public Renderer LabelRenderer { get; }
+            public GameObject HealthBar { get; }
+            public Renderer HealthRenderer { get; }
             public GrayboxDefensePickTarget3D Target { get; }
             public MaterialPropertyBlock Properties { get; }
+            public MaterialPropertyBlock OutlineProperties { get; }
+            public MaterialPropertyBlock HealthProperties { get; }
         }
 
         private sealed class TowerVisual

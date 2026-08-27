@@ -44,7 +44,7 @@ namespace WasteCity.Editor
             new Production2DAtlasDefinition(
                 "Technology",
                 Production2DTechnologyImportPolicy.Root,
-                43),
+                44),
             new Production2DAtlasDefinition(
                 "Buildings",
                 Production2DBuildingImportPolicy.Root,

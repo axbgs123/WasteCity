@@ -28,6 +28,9 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform uiRoot;
         private Button towerPauseButton;
         private Text towerPauseButtonText;
+        private Button buildingUpgradeButton;
+        private Text buildingUpgradeButtonText;
+        private Text buildingUpgradeFeedbackText;
         private CanvasGroup selectionGroup;
         private GameObject fallbackCanvasObject;
         private GameObject fallbackEventSystemObject;
@@ -56,6 +59,33 @@ namespace WasteCity.Graybox3D.Building
         public int RefreshCount { get; private set; }
 
         public event Action<string> TowerPauseRequested;
+        public event Action<string> BuildingUpgradeRequested;
+
+        public bool IsBuildingUpgradeVisible { get; private set; }
+        public bool CanUpgradeSelectedBuilding { get; private set; }
+        public string BuildingUpgradeFeedback { get; private set; } =
+            string.Empty;
+
+        public void ApplyBuildingUpgradeCommand(
+            bool visible,
+            bool canUpgrade,
+            string buttonLabel,
+            string feedback)
+        {
+            EnsureFallbackConfiguration();
+            IsBuildingUpgradeVisible = visible;
+            CanUpgradeSelectedBuilding = visible && canUpgrade;
+            BuildingUpgradeFeedback = feedback ?? string.Empty;
+            buildingUpgradeButton.gameObject.SetActive(visible);
+            buildingUpgradeButton.interactable = CanUpgradeSelectedBuilding;
+            if (buildingUpgradeButton.targetGraphic != null)
+                buildingUpgradeButton.targetGraphic.raycastTarget = visible;
+            buildingUpgradeButtonText.text = string.IsNullOrWhiteSpace(
+                buttonLabel) ? "升级选中建筑" : buttonLabel;
+            buildingUpgradeFeedbackText.text = BuildingUpgradeFeedback;
+            buildingUpgradeFeedbackText.gameObject.SetActive(
+                !string.IsNullOrWhiteSpace(BuildingUpgradeFeedback));
+        }
 
         public void ApplySpeed(
             float requestedSpeed,
@@ -211,6 +241,10 @@ namespace WasteCity.Graybox3D.Building
         {
             if (towerPauseButton != null)
                 towerPauseButton.onClick.RemoveListener(HandlePauseClicked);
+            if (buildingUpgradeButton != null)
+                buildingUpgradeButton.onClick.RemoveListener(
+                    HandleBuildingUpgradeClicked);
+            BuildingUpgradeRequested = null;
         }
 
         private void OnRectTransformDimensionsChange()
@@ -338,6 +372,37 @@ namespace WasteCity.Graybox3D.Building
             towerPauseButtonText.rectTransform.offsetMin = Vector2.zero;
             towerPauseButtonText.rectTransform.offsetMax = Vector2.zero;
             towerPauseButton.onClick.AddListener(HandlePauseClicked);
+            buildingUpgradeButton = CreateButton(
+                SelectionRect,
+                "DefenseDetails.BuildingUpgradeButton",
+                new Vector2(.5f, 0f),
+                new Vector2(.5f, 0f),
+                new Vector2(.5f, 0f),
+                new Vector2(0f, 56f),
+                new Vector2(220f, 38f));
+            buildingUpgradeButtonText = CreateText(
+                buildingUpgradeButton.GetComponent<RectTransform>(),
+                "Defense.Selection.Upgrade.Text",
+                Vector2.zero,
+                Vector2.zero,
+                15,
+                TextAnchor.MiddleCenter);
+            buildingUpgradeButtonText.rectTransform.anchorMin = Vector2.zero;
+            buildingUpgradeButtonText.rectTransform.anchorMax = Vector2.one;
+            buildingUpgradeButtonText.rectTransform.offsetMin = Vector2.zero;
+            buildingUpgradeButtonText.rectTransform.offsetMax = Vector2.zero;
+            buildingUpgradeButton.onClick.AddListener(
+                HandleBuildingUpgradeClicked);
+            buildingUpgradeFeedbackText = CreateText(
+                SelectionRect,
+                "Defense.Selection.Upgrade.Feedback",
+                new Vector2(14f, 96f),
+                new Vector2(-14f, -150f),
+                14,
+                TextAnchor.LowerCenter);
+            buildingUpgradeButton.gameObject.SetActive(false);
+            buildingUpgradeButton.targetGraphic.raycastTarget = false;
+            buildingUpgradeFeedbackText.gameObject.SetActive(false);
 
             SummaryText.text = FormatSummary(LastSnapshot);
             SpeedText.text = FormatSpeed(requestedSpeed, effectiveSpeed);
@@ -409,6 +474,13 @@ namespace WasteCity.Graybox3D.Building
             {
                 TowerPauseRequested?.Invoke(selectedStableId);
             }
+        }
+
+        private void HandleBuildingUpgradeClicked()
+        {
+            if (IsBuildingUpgradeVisible && CanUpgradeSelectedBuilding &&
+                !string.IsNullOrWhiteSpace(selectedStableId))
+                BuildingUpgradeRequested?.Invoke(selectedStableId);
         }
 
         private static string FormatSummary(

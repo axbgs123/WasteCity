@@ -414,6 +414,7 @@ namespace WasteCity.Persistence
                 attention = CopyAttention(source.attention),
                 fate = CopyFate(source.fate),
                 fateEffects = CopyFateEffects(source.fateEffects),
+                pressure = CopyPressure(source.pressure),
                 civilization = CopyCivilization(source.civilization),
             };
         }
@@ -478,6 +479,89 @@ namespace WasteCity.Persistence
             };
         }
 
+        private static FormalThreeDAttentionPressureSaveData CopyPressure(
+            FormalThreeDAttentionPressureSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDAttentionPressureEntrySaveData[] entries =
+                source.entries == null ? null :
+                new FormalThreeDAttentionPressureEntrySaveData[
+                    source.entries.Length];
+            if (entries != null)
+            {
+                for (var index = 0; index < entries.Length; index++)
+                {
+                    FormalThreeDAttentionPressureEntrySaveData item =
+                        source.entries[index];
+                    entries[index] = item == null ? null :
+                        new FormalThreeDAttentionPressureEntrySaveData
+                        {
+                            threshold = item.threshold,
+                            state = item.state,
+                            warningRemainingSeconds =
+                                item.warningRemainingSeconds,
+                        };
+                }
+            }
+            return new FormalThreeDAttentionPressureSaveData
+            {
+                revision = source.revision,
+                entries = entries,
+                activeEncounterId = source.activeEncounterId,
+                activeCampaign = CopyPressureCampaign(source.activeCampaign),
+            };
+        }
+
+        private static FormalThreeDPressureCampaignSaveData
+            CopyPressureCampaign(FormalThreeDPressureCampaignSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDPressureInjectedReinforcementSaveData[] injected =
+                source.injectedReinforcements == null ? null :
+                new FormalThreeDPressureInjectedReinforcementSaveData[
+                    source.injectedReinforcements.Length];
+            if (injected != null)
+            {
+                for (var index = 0; index < injected.Length; index++)
+                {
+                    FormalThreeDPressureInjectedReinforcementSaveData item =
+                        source.injectedReinforcements[index];
+                    injected[index] = item == null ? null :
+                        new FormalThreeDPressureInjectedReinforcementSaveData
+                        {
+                            stableEventId = item.stableEventId,
+                            entries = SortedEnemyCounts(item.entries),
+                        };
+                }
+                Array.Sort(injected, (left, right) => string.CompareOrdinal(
+                    left?.stableEventId, right?.stableEventId));
+            }
+            return new FormalThreeDPressureCampaignSaveData
+            {
+                campaignId = source.campaignId,
+                phase = source.phase,
+                currentWaveNumber = source.currentWaveNumber,
+                plannedEnemyCountsByEnemyId = SortedEnemyCounts(
+                    source.plannedEnemyCountsByEnemyId),
+                spawnedEnemyCountsByEnemyId = SortedEnemyCounts(
+                    source.spawnedEnemyCountsByEnemyId),
+                defeatedEnemyCountsByEnemyId = SortedEnemyCounts(
+                    source.defeatedEnemyCountsByEnemyId),
+                frozenSpawnAnchors = SortedSpawnAnchors(
+                    source.frozenSpawnAnchors),
+                warningRemainingSeconds = source.warningRemainingSeconds,
+                spawnClockSeconds = source.spawnClockSeconds,
+                fixedStepAccumulatorSeconds =
+                    source.fixedStepAccumulatorSeconds,
+                nextEnemyOrdinal = source.nextEnemyOrdinal,
+                coreCurrentHealth = source.coreCurrentHealth,
+                result = source.result,
+                statistics = CopyStatistics(source.statistics),
+                enemyStates = SortedEnemyStates(source.enemyStates),
+                injectedReinforcements = injected,
+            };
+        }
+
         private static FormalThreeDCivilizationSaveData CopyCivilization(
             FormalThreeDCivilizationSaveData source)
         {
@@ -485,6 +569,11 @@ namespace WasteCity.Persistence
             return new FormalThreeDCivilizationSaveData
             {
                 level = source.level,
+                revision = source.revision,
+                ascensionId = source.ascensionId,
+                ascensionCompleted = source.ascensionCompleted,
+                sequenceStage = source.sequenceStage,
+                remainingRuleSeconds = source.remainingRuleSeconds,
                 committedAscensionIds = SortedCopy(
                     source.committedAscensionIds),
             };
@@ -894,6 +983,11 @@ namespace WasteCity.Persistence
                 civilization = new FormalThreeDCivilizationSaveData
                 {
                     level = 1,
+                    revision = 0ul,
+                    ascensionId = string.Empty,
+                    ascensionCompleted = false,
+                    sequenceStage = (int)AdvancementSequenceStage.None,
+                    remainingRuleSeconds = 0f,
                     committedAscensionIds = Array.Empty<string>(),
                 },
             };

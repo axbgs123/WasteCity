@@ -20,6 +20,7 @@ using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Research;
+using WasteCity.Progression;
 
 namespace WasteCity.Tests
 {
@@ -106,6 +107,7 @@ namespace WasteCity.Tests
                 {
                     "System.Boolean ResolveRuntimeAvailability(System.Boolean,System.Boolean)",
                     "System.Void Configure(WasteCity.Graybox3D.Building.GrayboxBuildingSession3D,WasteCity.Graybox3D.GrayboxMobileCityController3D,WasteCity.Graybox3D.Building.GrayboxBuildingWorldView3D,UnityEngine.Canvas)",
+                    "System.Void ConfigureProgressionFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionFacade3D)",
                     "System.Boolean TryTogglePanel()"
                 }));
 
@@ -168,6 +170,9 @@ namespace WasteCity.Tests
                 PublicMethodSignatures(modifierType),
                 Is.EquivalentTo(new[]
                 {
+                    "System.Void ConfigureProgressionFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionFacade3D)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionQuery3D QueryProgression()",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ExecuteProgressionAction(System.String,System.String,System.Int32)",
                     "System.Boolean AddResource(System.String,System.Int32)",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D AddResourceWithFeedback(System.String,System.Int32)",
                     "System.Boolean SetResource(System.String,System.Int32)",
@@ -477,7 +482,7 @@ namespace WasteCity.Tests
                         panel.transform,
                         "Developer Feedback")
                     .GetComponentInChildren<Text>(true).text,
-                    Is.EqualTo("请选择物品或科技"));
+                    Is.EqualTo("请选择物品、科技或文明进程动作"));
                 Button[] catalogButtons =
                     panel.GetComponentsInChildren<Button>(true);
                 Assert.That(catalogButtons.Count(button =>
@@ -487,7 +492,7 @@ namespace WasteCity.Tests
                 Assert.That(catalogButtons.Count(button =>
                     button.name.StartsWith(
                         "Developer.Research.",
-                        StringComparison.Ordinal)), Is.EqualTo(43));
+                        StringComparison.Ordinal)), Is.EqualTo(44));
                 Assert.That(ButtonNamed(
                         panel,
                         "Developer.Resource." + ResourceIds.HybridCore)
@@ -932,6 +937,118 @@ namespace WasteCity.Tests
                     fixture.Presentation,
                     fixture.Canvas);
                 Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.False);
+            }
+            finally
+            {
+                DestroyRuntimeObjects(owned);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator
+            Bootstrap_ProgressionActionsBrowseSearchQueryAndMutateThroughFacade()
+        {
+            yield return new EnterPlayMode();
+            var owned = new List<UnityEngine.Object>();
+            try
+            {
+                RuntimeBootstrapFixture fixture =
+                    CreateRuntimeBootstrapFixture(owned);
+                var attention = new FormalAttentionRuntime();
+                var fate = new FormalFateRuntime();
+                var civilization = new FormalCivilizationAscensionRuntime();
+                var pocket = new PocketUniverseFateEffect();
+                var debt = new FormalVoidDebtRuntime();
+                var rewind = new FormalRewindAnchorMetadataRuntime();
+                var pressure = new AttentionPressureRuntime();
+                var sequence = new AdvancementSequenceModel();
+                var facade = new GrayboxDeveloperProgressionFacade3D(
+                    attention,
+                    fate,
+                    civilization,
+                    pocket,
+                    debt,
+                    rewind,
+                    pressure,
+                    sequence);
+                fixture.Bootstrap.Configure(
+                    fixture.Session,
+                    fixture.City,
+                    fixture.Presentation,
+                    fixture.Canvas);
+                fixture.Bootstrap.ConfigureProgressionFacade(facade);
+                Assert.That(fixture.Bootstrap.TryTogglePanel(), Is.True);
+                GameObject panel = FindPanel(fixture.Canvas);
+
+                Button[] actionButtons = panel.GetComponentsInChildren<
+                    Button>(true).Where(button => button.name.StartsWith(
+                        "Developer.Progression.",
+                        StringComparison.Ordinal)).ToArray();
+                Assert.That(actionButtons, Has.Length.EqualTo(
+                    GrayboxDeveloperCatalogQuery3D
+                        .ProgressionActionEntries.Count));
+                Assert.That(actionButtons.Select(button =>
+                        button.GetComponentInChildren<Text>(true).text),
+                    Has.All.Not.Contains("developer."));
+                InputField search = InputNamed(
+                    panel, "Progression Action Search");
+                Assert.That(search, Is.Not.Null);
+                search.text = "关注度";
+                search.onValueChanged.Invoke(search.text);
+                Assert.That(actionButtons.Count(button =>
+                    button.gameObject.activeSelf), Is.GreaterThan(0));
+                Assert.That(ButtonNamed(
+                        panel,
+                        "Developer.Progression." +
+                        "developer.attention.increase").gameObject.activeSelf,
+                    Is.True);
+                Assert.That(ButtonNamed(
+                        panel,
+                        "Developer.Progression." +
+                        "developer.fate.select-rewind-anchor").gameObject.activeSelf,
+                    Is.False);
+                search.text = string.Empty;
+
+                ButtonNamed(
+                    panel,
+                    "Developer.Progression." +
+                    "developer.query.configuration-signature")
+                    .onClick.Invoke();
+                ButtonNamed(panel, "Execute Progression Action")
+                    .onClick.Invoke();
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.False,
+                    "Progression queries must not mark the session modified.");
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Developer Feedback")
+                    .GetComponentInChildren<Text>(true).text,
+                    Does.Contain("配置签名"));
+
+                ButtonNamed(
+                    panel,
+                    "Developer.Progression." +
+                    "developer.attention.increase")
+                    .onClick.Invoke();
+                InputNamed(panel, "Progression Amount").text = "2";
+                ButtonNamed(panel, "Execute Progression Action")
+                    .onClick.Invoke();
+                Assert.That(attention.Value, Is.EqualTo(12));
+                Assert.That(fixture.Bootstrap.HasModifiedGameState, Is.True);
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Developer Feedback")
+                    .GetComponentInChildren<Text>(true).text,
+                    Does.Contain("增加关注度").And.Contain("已执行"));
+
+                Assert.That(InputNamed(
+                    panel, "Progression Pressure Threshold"), Is.Not.Null);
+                Assert.That(InputNamed(
+                    panel, "Progression Anchor Id"), Is.Not.Null);
+                Assert.That(DescendantNamed(
+                        panel.transform,
+                        "Selected Progression Action")
+                    .GetComponentInChildren<Text>(true).text,
+                    Does.Contain("增加关注度"));
             }
             finally
             {

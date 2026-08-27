@@ -33,7 +33,7 @@ namespace WasteCity.Editor
         public const string PresentationManifestPath =
             "Docs/Art/IDEA-0016/Manifests/" +
             "idea-0016-ui-character-marker-visual-assets.json";
-        public const int ExpectedVisualCount = 114;
+        public const int ExpectedVisualCount = 115;
         public const int ExpectedRecipeCount = 30;
 
         [MenuItem("WasteCity/Art/Production 2D/Build Unified Visual Catalog")]
@@ -129,7 +129,7 @@ namespace WasteCity.Editor
                 .ToArray();
             ValidateUniqueVisualKeys(ordered);
             ValidateClassCount(ordered, Production2DVisualClass.Item, 31);
-            ValidateClassCount(ordered, Production2DVisualClass.Technology, 43);
+            ValidateClassCount(ordered, Production2DVisualClass.Technology, 44);
             ValidateClassCount(ordered, Production2DVisualClass.Building, 30);
             ValidateClassCount(ordered, Production2DVisualClass.Ui, 7);
             ValidateClassCount(ordered, Production2DVisualClass.Character, 1);

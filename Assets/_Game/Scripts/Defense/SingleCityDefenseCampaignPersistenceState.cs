@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using WasteCity.Combat;
 
 namespace WasteCity.Defense
@@ -216,6 +217,9 @@ namespace WasteCity.Defense
             frozenSpawnAnchors;
         private readonly ReadOnlyCollection<
             SingleCityDefenseCampaignEnemyPersistenceState> enemies;
+        private readonly ReadOnlyCollection<
+            SingleCityDefenseInjectedReinforcementPersistenceState>
+            injectedReinforcements;
 
         public SingleCityDefenseCampaignPersistenceState(
             string campaignId,
@@ -237,7 +241,9 @@ namespace WasteCity.Defense
                 frozenSpawnAnchors,
             IEnumerable<SingleCityDefenseCampaignEnemyPersistenceState>
                 enemies,
-            SingleCityDefenseCampaignStatisticsPersistenceState statistics)
+            SingleCityDefenseCampaignStatisticsPersistenceState statistics,
+            IEnumerable<SingleCityDefenseInjectedReinforcementPersistenceState>
+                injectedReinforcements = null)
         {
             CampaignId = campaignId;
             Phase = phase;
@@ -256,6 +262,11 @@ namespace WasteCity.Defense
                 defeatedEnemyCountsByEnemyId);
             this.frozenSpawnAnchors = CopyAnchors(frozenSpawnAnchors);
             this.enemies = CopyEnemies(enemies);
+            this.injectedReinforcements = Array.AsReadOnly(
+                (injectedReinforcements ?? Array.Empty<
+                    SingleCityDefenseInjectedReinforcementPersistenceState>())
+                .OrderBy(value => value?.StableEventId,
+                    StringComparer.Ordinal).ToArray());
             Statistics = statistics == null
                 ? null
                 : new SingleCityDefenseCampaignStatisticsPersistenceState(
@@ -298,6 +309,8 @@ namespace WasteCity.Defense
             FrozenSpawnAnchors => frozenSpawnAnchors;
         public IReadOnlyList<SingleCityDefenseCampaignEnemyPersistenceState>
             Enemies => enemies;
+        public IReadOnlyList<SingleCityDefenseInjectedReinforcementPersistenceState>
+            InjectedReinforcements => injectedReinforcements;
         public SingleCityDefenseCampaignStatisticsPersistenceState Statistics
         {
             get;
@@ -388,6 +401,21 @@ namespace WasteCity.Defense
                 right?.StableId));
             return result.AsReadOnly();
         }
+    }
+
+    public sealed class SingleCityDefenseInjectedReinforcementPersistenceState
+    {
+        private readonly ReadOnlyCollection<WaveEntry> entries;
+        public SingleCityDefenseInjectedReinforcementPersistenceState(
+            string stableEventId,
+            IEnumerable<WaveEntry> entries)
+        {
+            StableEventId = stableEventId;
+            this.entries = Array.AsReadOnly((entries ?? Array.Empty<WaveEntry>())
+                .ToArray());
+        }
+        public string StableEventId { get; }
+        public IReadOnlyList<WaveEntry> Entries => entries;
     }
 
     public sealed class SingleCityDefenseCampaignRestorePlan

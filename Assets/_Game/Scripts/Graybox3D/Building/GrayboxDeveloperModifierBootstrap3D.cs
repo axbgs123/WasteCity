@@ -5,6 +5,7 @@ using WasteCity.Economy;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System;
 using UnityEngine.UI;
+using WasteCity.Progression;
 #endif
 
 namespace WasteCity.Graybox3D.Building
@@ -25,15 +26,24 @@ namespace WasteCity.Graybox3D.Building
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private GrayboxDeveloperModifier3D modifier;
+        private GrayboxDeveloperProgressionFacade3D progressionFacade;
         private bool retainedModifiedGameState;
         private GameObject panelRoot;
         private CatalogRow[] resourceRows;
         private CatalogRow[] researchRows;
+        private CatalogRow[] progressionRows;
         private Text selectedResourceLabel;
         private Text selectedResearchLabel;
+        private Text selectedProgressionActionLabel;
         private Text feedbackLabel;
         private string selectedResourceId;
         private string selectedResearchId;
+        private string selectedProgressionActionId;
+        private InputField progressionAmount;
+        private InputField progressionPressureThreshold;
+        private InputField progressionAnchorId;
+        private int canvasSortingOrderBeforePanel;
+        private bool ownsCanvasSortingOverride;
 #endif
 
         public bool IsRuntimeAvailable
@@ -101,7 +111,9 @@ namespace WasteCity.Graybox3D.Building
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             DisposeDevelopmentSurface();
             if (sessionChanged)
+            {
                 retainedModifiedGameState = false;
+            }
 #endif
             this.session = session;
             this.city = city;
@@ -112,12 +124,32 @@ namespace WasteCity.Graybox3D.Building
 #endif
         }
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public void ConfigureProgressionFacade(
+            GrayboxDeveloperProgressionFacade3D facade)
+        {
+            if (ReferenceEquals(progressionFacade, facade)) return;
+            progressionFacade = facade;
+            modifier?.ConfigureProgressionFacade(facade);
+        }
+#endif
+
         public bool TryTogglePanel()
         {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (!IsRuntimeAvailable)
                 return false;
-            panelRoot.SetActive(!panelRoot.activeSelf);
+            bool opening = !panelRoot.activeSelf;
+            if (opening)
+            {
+                AcquireCanvasSortingOverride();
+                panelRoot.transform.SetAsLastSibling();
+            }
+            else
+            {
+                ReleaseCanvasSortingOverride();
+            }
+            panelRoot.SetActive(opening);
             return true;
 #else
             return false;
@@ -173,11 +205,13 @@ namespace WasteCity.Graybox3D.Building
                 session,
                 city,
                 presentation);
+            modifier.ConfigureProgressionFacade(progressionFacade);
             CreatePanel();
         }
 
         private void DisposeDevelopmentSurface()
         {
+            ReleaseCanvasSortingOverride();
             if (modifier != null && modifier.HasModifiedGameState)
                 retainedModifiedGameState = true;
             modifier = null;
@@ -195,16 +229,40 @@ namespace WasteCity.Graybox3D.Building
             panelRoot = null;
             resourceRows = null;
             researchRows = null;
+            progressionRows = null;
             selectedResourceLabel = null;
             selectedResearchLabel = null;
+            selectedProgressionActionLabel = null;
             feedbackLabel = null;
             selectedResourceId = null;
             selectedResearchId = null;
+            selectedProgressionActionId = null;
+            progressionAmount = null;
+            progressionPressureThreshold = null;
+            progressionAnchorId = null;
             ownedPanel.SetActive(false);
             if (Application.isPlaying)
                 Destroy(ownedPanel);
             else
                 DestroyImmediate(ownedPanel);
+        }
+
+        private void AcquireCanvasSortingOverride()
+        {
+            if (canvas == null || ownsCanvasSortingOverride) return;
+            canvasSortingOrderBeforePanel = canvas.sortingOrder;
+            canvas.sortingOrder = Mathf.Max(
+                canvas.sortingOrder,
+                FormalUiLayoutProfile3D.Standard.OperationsSortingOrder + 1);
+            ownsCanvasSortingOverride = true;
+        }
+
+        private void ReleaseCanvasSortingOverride()
+        {
+            if (!ownsCanvasSortingOverride) return;
+            if (canvas != null)
+                canvas.sortingOrder = canvasSortingOrderBeforePanel;
+            ownsCanvasSortingOverride = false;
         }
 
         private void CreatePanel()
@@ -315,10 +373,46 @@ namespace WasteCity.Graybox3D.Building
             CreateButton(content, "Unlock All", "解锁全部研究", () =>
                 SetFeedback(modifier.UnlockAllResearchWithFeedback().Message));
 
+            CreateLabel(content, "Progression Catalog Label",
+                "文明进程（列表浏览 + 输入搜索）");
+            InputField progressionSearch = CreateInput(
+                content,
+                "Progression Action Search",
+                string.Empty);
+            progressionRows = CreateCatalogResults(
+                content,
+                "Progression Action Results",
+                GrayboxDeveloperCatalogQuery3D.ProgressionActionEntries,
+                entry => SelectProgressionAction(entry));
+            GrayboxDeveloperCatalogEntry3D initialProgression =
+                GrayboxDeveloperCatalogQuery3D.ProgressionActionEntries[0];
+            selectedProgressionActionId = initialProgression.StableId;
+            selectedProgressionActionLabel = CreateLabel(
+                content,
+                "Selected Progression Action",
+                "当前文明进程动作：" + initialProgression.DisplayName);
+            progressionSearch.onValueChanged.AddListener(value =>
+                ApplyCatalogFilter(progressionRows, value));
+            progressionAmount = CreateInput(
+                content, "Progression Amount", "10");
+            progressionPressureThreshold = CreateInput(
+                content, "Progression Pressure Threshold", "30");
+            progressionAnchorId = CreateInput(
+                content,
+                "Progression Anchor Id",
+                GrayboxRewindAnchorService3D.StableAnchorId);
+            CreateLabel(content, "Progression Resource Parameter",
+                "资源参数使用上方当前物品");
+            CreateButton(
+                content,
+                "Execute Progression Action",
+                "执行当前文明进程动作",
+                ExecuteSelectedProgressionAction);
+
             feedbackLabel = CreateLabel(
                 content,
                 "Developer Feedback",
-                "请选择物品或科技");
+                "请选择物品、科技或文明进程动作");
 
             CreateLabel(content, "Session Tools Label", "城市与施工");
             InputField populationAmount = CreateInput(
@@ -506,10 +600,19 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < rows.Length; index++)
             {
                 GrayboxDeveloperCatalogEntry3D entry = entries[index];
-                string prefix = entry.Kind ==
-                    GrayboxDeveloperCatalogKind3D.Resource
-                    ? "Developer.Resource."
-                    : "Developer.Research.";
+                string prefix;
+                switch (entry.Kind)
+                {
+                    case GrayboxDeveloperCatalogKind3D.Resource:
+                        prefix = "Developer.Resource.";
+                        break;
+                    case GrayboxDeveloperCatalogKind3D.Research:
+                        prefix = "Developer.Research.";
+                        break;
+                    default:
+                        prefix = "Developer.Progression.";
+                        break;
+                }
                 Button button = CreateButton(
                     content,
                     prefix + entry.StableId,
@@ -532,6 +635,112 @@ namespace WasteCity.Graybox3D.Building
             selectedResearchId = entry.StableId;
             selectedResearchLabel.text = "当前科技：" + entry.DisplayName;
             SetFeedback("已选择科技：" + entry.DisplayName);
+        }
+
+        private void SelectProgressionAction(
+            GrayboxDeveloperCatalogEntry3D entry)
+        {
+            selectedProgressionActionId = entry.StableId;
+            selectedProgressionActionLabel.text =
+                "当前文明进程动作：" + entry.DisplayName;
+            SetFeedback("已选择文明进程动作：" + entry.DisplayName);
+        }
+
+        private void ExecuteSelectedProgressionAction()
+        {
+            if (progressionFacade == null)
+            {
+                SetFeedback("文明进程服务尚未连接");
+                return;
+            }
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveProgressionAction(
+                    selectedProgressionActionId,
+                    out GrayboxDeveloperCatalogEntry3D action))
+            {
+                SetFeedback("请选择有效的文明进程动作");
+                return;
+            }
+
+            int amount = ReadInt(progressionAmount, 0);
+            int threshold = ReadInt(progressionPressureThreshold, 0);
+            string anchorId = progressionAnchorId?.text?.Trim() ??
+                string.Empty;
+            bool isQuery = action.StableId.StartsWith(
+                "developer.query.", StringComparison.Ordinal);
+            if (isQuery)
+            {
+                SetFeedback(QueryFeedback(action.StableId));
+                return;
+            }
+
+            string argument = action.StableId.StartsWith(
+                    "developer.void-debt.", StringComparison.Ordinal)
+                ? selectedResourceId
+                : action.StableId == "developer.rewind.read"
+                    ? anchorId
+                    : null;
+            int commandAmount = action.StableId.StartsWith(
+                    "developer.pressure.", StringComparison.Ordinal)
+                ? threshold
+                : amount;
+            GrayboxDeveloperCommandResult3D result =
+                modifier.ExecuteProgressionAction(
+                    action.StableId,
+                    argument,
+                    commandAmount);
+            SetFeedback(result.Message + ProgressionStatus());
+        }
+
+        private string QueryFeedback(string actionId)
+        {
+            GrayboxDeveloperProgressionQuery3D query =
+                modifier.QueryProgression();
+            if (query == null) return "文明进程服务尚未连接";
+            switch (actionId)
+            {
+                case "developer.query.committed-ids":
+                    return "已提交稳定记录：" + Join(query.CommittedIds);
+                case "developer.query.thresholds":
+                    return "已到达关注度阈值：" + Join(query.ReachedThresholds);
+                case "developer.query.pressure-queue":
+                    return "压力队列：" + Join(query.PressureQueue);
+                case "developer.query.configuration-signature":
+                    return "进度配置签名：" + query.ConfigurationSignature;
+                default:
+                    return "文明进程查询未执行";
+            }
+        }
+
+        private string ProgressionStatus()
+        {
+            GrayboxDeveloperProgressionQuery3D query =
+                modifier.QueryProgression();
+            if (query == null) return string.Empty;
+            FormalFateDefinition fate = FormalFateCatalog.Find(query.FateId);
+            string fateName = fate == null ? "未选择命轨" :
+                fate.DisplayName + " Lv." + query.FateLevel;
+            return " 当前：关注度 " + query.Attention +
+                "，文明 Lv." + query.CivilizationLevel +
+                "，" + fateName;
+        }
+
+        private static int ReadInt(InputField input, int fallback)
+        {
+            return input != null && int.TryParse(input.text, out int value)
+                ? value
+                : fallback;
+        }
+
+        private static string Join<T>(System.Collections.Generic.IReadOnlyList<T> values)
+        {
+            if (values == null || values.Count == 0) return "无";
+            var result = new string[values.Count];
+            for (var index = 0; index < values.Count; index++)
+            {
+                object value = values[index];
+                result[index] = value?.ToString() ?? string.Empty;
+            }
+            return string.Join("、", result);
         }
 
         private static void ApplyCatalogFilter(

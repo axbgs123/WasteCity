@@ -29,6 +29,9 @@ namespace WasteCity.Graybox3D.Building
         public bool LastEscapeRequestsSystemMenu { get; private set; }
         public bool HasKeyboardFocus =>
             menu != null && menu.HasKeyboardFocus();
+        public bool IsBuildInteractionActive =>
+            interaction != null &&
+            interaction.State != GrayboxBuildingInteractionState.Inactive;
         public bool AllowsInventoryDuringEvacuation =>
             evacuation != null &&
             evacuation.IsProcessing &&

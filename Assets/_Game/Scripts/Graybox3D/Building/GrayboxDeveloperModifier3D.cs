@@ -5,6 +5,7 @@ using WasteCity.City;
 using WasteCity.Content;
 using WasteCity.Economy;
 using WasteCity.Research;
+using WasteCity.Progression;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -13,9 +14,83 @@ namespace WasteCity.Graybox3D.Building
         private readonly GrayboxBuildingSession3D session;
         private readonly GrayboxMobileCityController3D city;
         private readonly GrayboxBuildingWorldView3D presentation;
+        private GrayboxDeveloperProgressionFacade3D progression;
         private bool hasModifiedGameState;
 
         public bool HasModifiedGameState => hasModifiedGameState;
+
+        public void ConfigureProgressionFacade(
+            GrayboxDeveloperProgressionFacade3D facade)
+        {
+            progression = facade;
+        }
+
+        public GrayboxDeveloperProgressionQuery3D QueryProgression()
+        {
+            return progression?.Query();
+        }
+
+        public GrayboxDeveloperCommandResult3D ExecuteProgressionAction(
+            string actionIdOrChineseName,
+            string argument = null,
+            int amount = 0)
+        {
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveProgressionAction(
+                    actionIdOrChineseName,
+                    out GrayboxDeveloperCatalogEntry3D entry))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.UnknownAction,
+                    false,
+                    message: "未找到领域动作：" +
+                        (actionIdOrChineseName ?? string.Empty));
+            }
+            if (progression == null)
+                return Result(
+                    GrayboxDeveloperCommandCode3D.ProgressionUnavailable,
+                    false,
+                    entry,
+                    amount,
+                    message: "正式进度命令尚未接入");
+            if (!ValidateProgressionArguments(
+                    entry.StableId,
+                    argument,
+                    amount,
+                    out string validationError))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.InvalidAmount,
+                    false,
+                    entry,
+                    amount,
+                    message: validationError);
+            }
+
+            bool changed = ExecuteProgressionCore(
+                entry.StableId,
+                argument,
+                amount);
+            RecordChange(changed);
+            if (changed)
+                return Result(
+                    GrayboxDeveloperCommandCode3D.Success,
+                    true,
+                    entry,
+                    amount,
+                    affectedCount: 1,
+                    message: entry.DisplayName + "：已执行");
+            bool failed = IsFailureOnlyAction(entry.StableId);
+            return Result(
+                failed
+                    ? GrayboxDeveloperCommandCode3D.CommandFailed
+                    : GrayboxDeveloperCommandCode3D.NoChange,
+                !failed,
+                entry,
+                amount,
+                message: failed
+                    ? entry.DisplayName + "：执行失败"
+                    : entry.DisplayName + "：状态未改变");
+        }
 
         public GrayboxDeveloperModifier3D(
             GrayboxBuildingSession3D session,
@@ -27,6 +102,135 @@ namespace WasteCity.Graybox3D.Building
             this.city = city ?? throw new ArgumentNullException(nameof(city));
             this.presentation = presentation ?? throw new ArgumentNullException(
                 nameof(presentation));
+        }
+
+        private bool ExecuteProgressionCore(
+            string actionId,
+            string argument,
+            int amount)
+        {
+            switch (actionId)
+            {
+                case "developer.attention.increase":
+                    return progression.IncreaseAttention(amount);
+                case "developer.attention.decrease":
+                    return progression.DecreaseAttention(amount);
+                case "developer.attention.set":
+                    return progression.SetAttentionFixture(amount);
+                case "developer.fate.select-pocket-universe":
+                    return progression.SelectFate(
+                        FormalFateCatalog.PocketUniverseId);
+                case "developer.fate.select-void-debt":
+                    return progression.SelectFate(
+                        FormalFateCatalog.VoidDebtId);
+                case "developer.fate.select-rewind-anchor":
+                    return progression.SelectFate(
+                        FormalFateCatalog.RewindAnchorId);
+                case "developer.fate.upgrade-level-two":
+                    return progression.UpgradeSelectedFateToLevelTwo();
+                case "developer.rewind.create":
+                    return progression.CreateRewindAnchor();
+                case "developer.rewind.read":
+                    return progression.ReadRewindAnchor(argument);
+                case "developer.rewind.clear":
+                    return progression.ClearRewindAnchors();
+                case "developer.void-debt.add":
+                    return progression.AddVoidDebt(
+                        ResolveResourceArgument(argument), amount);
+                case "developer.void-debt.repay":
+                    return progression.RepayVoidDebt(
+                        ResolveResourceArgument(argument), amount);
+                case "developer.pressure.trigger":
+                    return progression.TriggerPressure(amount);
+                case "developer.pressure.complete":
+                    return progression.CompletePressureFixture(amount);
+                case "developer.pressure.reset":
+                    return progression.ResetPressureFixture();
+                case "developer.boss.set-defeated":
+                    return progression.SetBossDefeatedFixture(true);
+                case "developer.boss.clear-defeated":
+                    return progression.SetBossDefeatedFixture(false);
+                case "developer.ascension.requirements-satisfy":
+                    return progression.SatisfyAscensionRequirementsFixture();
+                case "developer.ascension.requirements-clear":
+                    return progression.ClearAscensionRequirementsFixture();
+                case "developer.civilization.first-ascension":
+                    return progression.ExecuteFirstCivilizationAscension();
+                case "developer.query.committed-ids":
+                case "developer.query.thresholds":
+                case "developer.query.pressure-queue":
+                case "developer.query.configuration-signature":
+                    progression.Query();
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ValidateProgressionArguments(
+            string actionId,
+            string argument,
+            int amount,
+            out string error)
+        {
+            bool positiveAmount = actionId == "developer.attention.increase" ||
+                actionId == "developer.attention.decrease" ||
+                actionId == "developer.void-debt.add" ||
+                actionId == "developer.void-debt.repay";
+            if (positiveAmount && amount <= 0)
+            {
+                error = "动作数量必须大于 0";
+                return false;
+            }
+            if (actionId == "developer.attention.set" &&
+                (amount < FormalAttentionCatalog.MinimumValue ||
+                 amount > FormalAttentionCatalog.MaximumValue))
+            {
+                error = "关注度设置值必须位于 0–100";
+                return false;
+            }
+            if ((actionId == "developer.void-debt.add" ||
+                 actionId == "developer.void-debt.repay") &&
+                !GrayboxDeveloperCatalogQuery3D.TryResolveResource(
+                    argument,
+                    out _))
+            {
+                error = "虚空债动作需要正式资源 ID";
+                return false;
+            }
+            if ((actionId == "developer.pressure.trigger" ||
+                 actionId == "developer.pressure.complete") &&
+                AttentionPressureCatalog.FindByThreshold(amount) == null)
+            {
+                error = "压力阈值必须是 30、60 或 90";
+                return false;
+            }
+            if (actionId == "developer.rewind.read" &&
+                string.IsNullOrWhiteSpace(argument))
+            {
+                error = "读取锚点需要稳定 anchor ID";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool IsFailureOnlyAction(string actionId)
+        {
+            return actionId == "developer.rewind.create" ||
+                actionId == "developer.rewind.read" ||
+                actionId == "developer.rewind.clear" ||
+                actionId == "developer.fate.upgrade-level-two" ||
+                actionId == "developer.civilization.first-ascension";
+        }
+
+        private static string ResolveResourceArgument(string argument)
+        {
+            return GrayboxDeveloperCatalogQuery3D.TryResolveResource(
+                argument,
+                out GrayboxDeveloperCatalogEntry3D entry)
+                    ? entry.StableId
+                    : argument;
         }
 
         public bool AddResource(string resourceId, int amount)

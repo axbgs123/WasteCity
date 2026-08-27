@@ -114,7 +114,10 @@ namespace WasteCity.Tests
 
             Assert.That(campaign.Snapshot.Phase,
                 Is.EqualTo(SingleCityDefenseCampaignPhase.Victory));
-            Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.CampaignVictory), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.False,
+                "Campaign victory must not occupy the civilization " +
+                "advancement modal pause reason.");
             Assert.That(speed.IsPaused(GamePauseReason.Defeat), Is.False);
             Assert.That(speed.Speed, Is.Zero);
             Assert.That(speed.RequestedSpeed, Is.EqualTo(2f));
@@ -124,6 +127,7 @@ namespace WasteCity.Tests
 
             speed.SetPaused(GamePauseReason.User, true);
             Assert.That(InvokeBool(gate, "TryContinueSandbox"), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.CampaignVictory), Is.False);
             Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.False);
             Assert.That(speed.IsPaused(GamePauseReason.User), Is.False,
                 "Continue sandbox resumes the restored last non-zero speed.");
@@ -146,6 +150,26 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void VictoryContinuationReleasesOnlyCampaignVictoryPause()
+        {
+            SingleCityDefenseCampaignModel campaign = ReachVictory();
+            var speed = new GameSpeedModel();
+            speed.SetPaused(GamePauseReason.Advancement, true);
+            object gate = CreateTerminalGate(speed);
+
+            SynchronizeTerminalGate(gate, campaign.Snapshot);
+
+            Assert.That(speed.IsPaused(GamePauseReason.CampaignVictory), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.True);
+            Assert.That(InvokeBool(gate, "TryContinueSandbox"), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.CampaignVictory), Is.False);
+            Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.True,
+                "Continuing the sandbox must not close an independently " +
+                "owned civilization advancement modal.");
+            Assert.That(speed.Speed, Is.Zero);
+        }
+
+        [Test]
         public void DefeatFreezesEffectiveSpeedAndCannotContinueInPlace()
         {
             var campaign = new SingleCityDefenseCampaignModel(8f, 8f);
@@ -160,6 +184,7 @@ namespace WasteCity.Tests
             Assert.That(campaign.Snapshot.Phase,
                 Is.EqualTo(SingleCityDefenseCampaignPhase.Defeat));
             Assert.That(speed.IsPaused(GamePauseReason.Defeat), Is.True);
+            Assert.That(speed.IsPaused(GamePauseReason.CampaignVictory), Is.False);
             Assert.That(speed.IsPaused(GamePauseReason.Advancement), Is.False);
             Assert.That(speed.Speed, Is.Zero);
             Assert.That(speed.LastNonZeroSpeed, Is.EqualTo(2f));

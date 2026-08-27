@@ -344,14 +344,14 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0019_FormalEnvelopeSchemaRemainsThirtyTwo()
+        public void IDEA0019_FormalEnvelopeSchemaUsesApprovedSuccessor()
         {
             Assert.That(
                 WasteCity.Persistence.FormalSaveEnvelope
                     .CurrentSchemaVersion,
-                Is.EqualTo(32),
-                "IDEA-0019 changes world content identity, not the " +
-                "Formal3D envelope schema.");
+                Is.EqualTo(33),
+                "IDEA-0019 world generation remains v2 while IDEA-0020 " +
+                "approved the later Formal3D schema 33 envelope.");
         }
 
         [Test]

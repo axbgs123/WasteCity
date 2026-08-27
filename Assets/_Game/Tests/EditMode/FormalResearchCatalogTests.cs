@@ -204,31 +204,55 @@ namespace WasteCity.Tests
                     "core.research.artifact-crafting"),
                 "recipe:fusion.production.flesh-elixir",
                 "rule:bridge.effect.elixir-triple-with-mutation-risk"),
+            Node(43, LegacyAnalysisId, "Technology", 3, 4,
+                "Researchable", Req("core.research.automated-defense"),
+                "progression:core.progression.legacy-analysis"),
         };
 
         [Test]
-        public void FormalCatalogIsTheExactApprovedFortyThreeNodeSet()
+        public void IDEA0020_FormalCatalogContainsFortyFourNodesIncludingLegacyAnalysis()
         {
             ResearchDefinition[] definitions = ResearchCatalog.All;
             string[] ids = definitions.Select(value => value.Id.Value).ToArray();
 
-            Assert.That(ids, Has.Length.EqualTo(43));
-            Assert.That(ids.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(43));
+            Assert.That(ids, Has.Length.EqualTo(44));
+            Assert.That(ids.Distinct(StringComparer.Ordinal).Count(), Is.EqualTo(44));
             CollectionAssert.AreEqual(
                 Expected.Select(value => value.Id).ToArray(),
                 ids,
-                "Formal order must be the approved CatalogOrder 0..42 order.");
-            CollectionAssert.DoesNotContain(ids, LegacyAnalysisId);
+                "Formal order must be the approved CatalogOrder 0..43 order.");
+            CollectionAssert.Contains(ids, LegacyAnalysisId);
             CollectionAssert.DoesNotContain(ids, ReinforcedStructuresId);
         }
 
         [Test]
-        public void FormalCatalogHasOneCommonRootFourNineNodeRoutesAndSixBridges()
+        public void IDEA0020_LegacyAnalysisHasApprovedFormalCostAndDuration()
+        {
+            ResearchDefinition legacy = ResearchCatalog.Find(LegacyAnalysisId);
+            Assert.That(legacy, Is.Not.Null);
+            Assert.That(legacy.Name, Is.EqualTo("遗产解析"));
+            Assert.That(legacy.Duration, Is.EqualTo(60f));
+            Assert.That(legacy.ReleaseState,
+                Is.EqualTo(ResearchReleaseState.Researchable));
+            CollectionAssert.AreEqual(
+                new[] { "core.research.automated-defense" },
+                legacy.RequiredResearchIds);
+            Assert.That(legacy.Costs.Select(value =>
+                    value.ResourceId + ":" + value.Amount),
+                Is.EqualTo(new[]
+                {
+                    ResourceIds.Alloy + ":30",
+                    ResourceIds.Biomass + ":20",
+                }));
+        }
+
+        [Test]
+        public void FormalCatalogHasOneCommonRootExpandedTechnologyAndSixBridges()
         {
             ResearchDefinition[] definitions = ResearchCatalog.All;
 
             Assert.That(CountRoute(definitions, "Common"), Is.EqualTo(1));
-            Assert.That(CountRoute(definitions, "Technology"), Is.EqualTo(9));
+            Assert.That(CountRoute(definitions, "Technology"), Is.EqualTo(10));
             Assert.That(CountRoute(definitions, "Cultivation"), Is.EqualTo(9));
             Assert.That(CountRoute(definitions, "Biological"), Is.EqualTo(9));
             Assert.That(CountRoute(definitions, "Psionics"), Is.EqualTo(9));

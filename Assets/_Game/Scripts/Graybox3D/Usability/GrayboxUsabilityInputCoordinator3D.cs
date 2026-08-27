@@ -18,7 +18,8 @@ namespace WasteCity.Graybox3D.Usability
     public sealed class GrayboxUsabilityInputCoordinator3D :
         MonoBehaviour,
         IGrayboxInputInterceptor,
-        IGrayboxDefenseSettlementCommands3D
+        IGrayboxDefenseSettlementCommands3D,
+        IGrayboxCivilizationAdvancementInputBinding3D
     {
         [SerializeField]
         private GrayboxBuildingInputRouter3D buildingInput;
@@ -38,14 +39,31 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxFateSelectionView3D fateSelectionView;
         [SerializeField]
         private GrayboxFateOperationsView3D fateOperationsView;
+        [SerializeField]
+        private GrayboxCivilizationAdvancementView3D advancementView;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
+        private Func<bool> tryAdvanceOrOpen;
+        private Func<bool> tryContinueAdvancement;
         private readonly Dictionary<Keyboard, Action<char>>
             developmentTextInputBindings =
                 new Dictionary<Keyboard, Action<char>>();
         private bool observesDevelopmentInputDevices;
 
         public uint BuildingInputInvocationCount { get; private set; }
+
+        public void ConfigureAdvancement(
+            GrayboxCivilizationAdvancementView3D view,
+            Func<bool> tryAdvanceOrOpen,
+            Func<bool> tryContinue)
+        {
+            advancementView = view ??
+                throw new ArgumentNullException(nameof(view));
+            this.tryAdvanceOrOpen = tryAdvanceOrOpen ??
+                throw new ArgumentNullException(nameof(tryAdvanceOrOpen));
+            tryContinueAdvancement = tryContinue ??
+                throw new ArgumentNullException(nameof(tryContinue));
+        }
 
         public void ConfigureFormalSaveEntry(
             GrayboxFormalSaveEntryController3D formalSaveEntry)
@@ -130,6 +148,19 @@ namespace WasteCity.Graybox3D.Usability
 
             if (fateSelectionView != null && fateSelectionView.IsOpen)
             {
+                EnsureDevelopmentPanelAdapter();
+                if (developmentPanel != null && developmentPanel.IsOpen)
+                    return ProcessOpenDevelopmentPanelInput(
+                        keyboard,
+                        escapePressed);
+                bool openDevelopmentPressed = keyboard != null &&
+                    keyboard.digit0Key.wasPressedThisFrame;
+                if (openDevelopmentPressed &&
+                    developer != null &&
+                    developer.TryTogglePanel())
+                {
+                    return SuppressAll();
+                }
                 if (escapePressed && systemMenu != null)
                     systemMenu.Open();
                 return SuppressAll();
@@ -161,23 +192,30 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
-            EnsureDevelopmentPanelAdapter();
-            if (developmentPanel != null && developmentPanel.IsOpen)
+            if (advancementView != null && advancementView.IsOpen)
             {
-                if (HasActiveTextInputFocus())
+                bool advancementPressed = keyboard != null &&
+                    keyboard.uKey.wasPressedThisFrame;
+                if (advancementPressed)
                 {
-                    if (escapePressed)
-                        ClearActiveTextInputFocus();
-                    return SuppressAll();
+                    bool resultsVisible =
+                        advancementView.ContinueButton != null &&
+                        advancementView.ContinueButton.gameObject.activeSelf;
+                    if (resultsVisible)
+                        tryContinueAdvancement?.Invoke();
+                    else
+                        tryAdvanceOrOpen?.Invoke();
                 }
-
-                bool closeDevelopmentPressed = escapePressed ||
-                    (keyboard != null &&
-                     keyboard.digit0Key.wasPressedThisFrame);
-                if (closeDevelopmentPressed)
-                    developmentPanel.Close();
+                if (escapePressed && systemMenu != null)
+                    systemMenu.Open();
                 return SuppressAll();
             }
+
+            EnsureDevelopmentPanelAdapter();
+            if (developmentPanel != null && developmentPanel.IsOpen)
+                return ProcessOpenDevelopmentPanelInput(
+                    keyboard,
+                    escapePressed);
 
             bool tacticalPausePressed = keyboard != null &&
                 keyboard.spaceKey.wasPressedThisFrame;
@@ -283,6 +321,17 @@ namespace WasteCity.Graybox3D.Usability
                     return SuppressAll();
             }
 
+            bool advancementRequested = keyboard != null &&
+                keyboard.uKey.wasPressedThisFrame;
+            if (advancementRequested)
+            {
+                bool blocked = HasActiveTextInputFocus() ||
+                    buildingInput != null &&
+                    buildingInput.IsBuildInteractionActive;
+                if (!blocked) tryAdvanceOrOpen?.Invoke();
+                return SuppressAll();
+            }
+
             GrayboxInputSuppression buildingSuppression = default;
             if (buildingInput != null)
             {
@@ -386,6 +435,9 @@ namespace WasteCity.Graybox3D.Usability
             progressionView = null;
             fateSelectionView = null;
             fateOperationsView = null;
+            advancementView = null;
+            tryAdvanceOrOpen = null;
+            tryContinueAdvancement = null;
             developmentPanel = null;
         }
 
@@ -406,6 +458,23 @@ namespace WasteCity.Graybox3D.Usability
                     systemMenu.Continue();
                     break;
             }
+        }
+
+        private GrayboxInputSuppression ProcessOpenDevelopmentPanelInput(
+            Keyboard keyboard,
+            bool escapePressed)
+        {
+            if (HasActiveTextInputFocus())
+            {
+                if (escapePressed) ClearActiveTextInputFocus();
+                return SuppressAll();
+            }
+
+            bool closePressed = escapePressed ||
+                keyboard != null &&
+                keyboard.digit0Key.wasPressedThisFrame;
+            if (closePressed) developmentPanel?.Close();
+            return SuppressAll();
         }
 
         private void CloseOwnedMenu()
@@ -471,6 +540,9 @@ namespace WasteCity.Graybox3D.Usability
                 if (eventSystem != null && IsActiveTextInput(
                         eventSystem.currentSelectedGameObject))
                 {
+                    InputField input = eventSystem.currentSelectedGameObject
+                        .GetComponentInParent<InputField>();
+                    input?.DeactivateInputField();
                     eventSystem.SetSelectedGameObject(null);
                 }
             }

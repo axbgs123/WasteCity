@@ -1090,6 +1090,9 @@ namespace WasteCity.Editor
             GrayboxFateOperationsView3D fateOperationsView =
                 EnsureComponent<GrayboxFateOperationsView3D>(
                     operationsTransform);
+            GrayboxCivilizationAdvancementView3D advancementView =
+                EnsureComponent<GrayboxCivilizationAdvancementView3D>(
+                    operationsTransform);
             RemoveMissingMonoBehavioursFromExactObject(
                 operationsTransform.gameObject);
             GrayboxDefenseHud3D defenseHud =
@@ -1166,7 +1169,10 @@ namespace WasteCity.Editor
                 ("evacuation", buildingReferences.Evacuation),
                 ("progressionView", progressionView),
                 ("fateSelectionView", fateSelectionView),
-                ("fateOperationsView", fateOperationsView));
+                ("fateOperationsView", fateOperationsView),
+                ("advancementView", advancementView),
+                ("developerModifier", buildingReferences.Developer),
+                ("inputCoordinator", coordinator));
             SetReferences(
                 formalSaveEntry,
                 ("runtimeHost", formalSaveHost),
@@ -1180,6 +1186,7 @@ namespace WasteCity.Editor
             SetReferences(progressionView, ("canvas", operationsCanvas));
             SetReferences(fateSelectionView, ("canvas", operationsCanvas));
             SetReferences(fateOperationsView, ("canvas", operationsCanvas));
+            SetReferences(advancementView, ("canvas", operationsCanvas));
             SetReferences(
                 defenseHud,
                 ("canvas", operationsCanvas),
@@ -1219,7 +1226,8 @@ namespace WasteCity.Editor
                 ("formalSaveEntry", formalSaveEntry),
                 ("progressionView", progressionView),
                 ("fateSelectionView", fateSelectionView),
-                ("fateOperationsView", fateOperationsView));
+                ("fateOperationsView", fateOperationsView),
+                ("advancementView", advancementView));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
@@ -1246,6 +1254,12 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The graybox scene fate operations view is not unique.");
+            }
+            if (RequireSingle<GrayboxCivilizationAdvancementView3D>(scene) !=
+                    advancementView)
+            {
+                throw new InvalidOperationException(
+                    "The civilization advancement view is not unique.");
             }
             if (RequireSingle<GrayboxFormalSaveRuntimeHost3D>(scene) !=
                     formalSaveHost ||

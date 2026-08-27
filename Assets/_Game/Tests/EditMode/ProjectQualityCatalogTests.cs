@@ -228,10 +228,10 @@ namespace WasteCity.Tests
                 "city-navigation-deployment|先检查城市规则、寻路、部署状态和场景接线|Assets/_Game/Scripts/City/**|Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs",
                 "leader-direct-control|先检查领袖状态、控制切换和场景输入接线|Assets/_Game/Scripts/Leader/**|Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs",
                 "building-construction-evacuation|先检查建筑定义、建造限制、放置会话和场景接线|Assets/_Game/Scripts/Building/**|Assets/_Game/Scripts/Graybox3D/Building/*.cs",
-                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
+                "ui-input|先检查焦点、输入优先级、界面组件和真实场景引用|Assets/_Game/Scripts/UI/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs|Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs|Assets/_Game/Scripts/Graybox3D/Usability/**",
                 "economy-production-logistics|先检查库存、生产循环、物流网络和建筑接线|Assets/_Game/Scripts/Economy/**|Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs|Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
-                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
-                "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
+                "research-population|先检查研究、人口、关注度、命轨、文明等级与升阶真值|Assets/_Game/Scripts/Research/**|Assets/_Game/Scripts/Population/**|Assets/_Game/Scripts/Progression/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs",
+                "combat-routes|先检查战斗规则、路线内容、单位状态和事件接线|Assets/_Game/Scripts/Combat/**|Assets/_Game/Scripts/Defense/**|Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs|Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs|Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs",
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
@@ -479,6 +479,10 @@ namespace WasteCity.Tests
                 "FormalThreeDProgressionSaveData",
                 "FormalThreeDAttentionSaveData",
                 "FormalThreeDAttentionHistorySaveData",
+                "FormalThreeDAttentionPressureSaveData",
+                "FormalThreeDAttentionPressureEntrySaveData",
+                "FormalThreeDPressureCampaignSaveData",
+                "FormalThreeDPressureInjectedReinforcementSaveData",
                 "FormalThreeDFateSaveData",
                 "FormalThreeDFateEffectsSaveData",
                 "FormalThreeDPocketUniverseSaveData",
@@ -1448,6 +1452,89 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CommittedCatalog_MapsIdea0020PressureAndBroodmotherRules()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectFeatureGroup progression =
+                FindFeature(catalog, "research-population");
+            ProjectFeatureGroup combat = FindFeature(catalog, "combat-routes");
+
+            foreach (string test in new[]
+            {
+                "Assets/_Game/Tests/EditMode/AttentionPressureCatalogTests.cs",
+                "Assets/_Game/Tests/EditMode/AttentionPressureRuntimeTests.cs",
+            })
+            {
+                CollectionAssert.Contains(progression.TestFileGlobs, test);
+                CollectionAssert.Contains(combat.TestFileGlobs, test);
+            }
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/CrystalBroodmotherCatalogTests.cs");
+            CollectionAssert.Contains(combat.TestFileGlobs,
+                "Assets/_Game/Tests/EditMode/CrystalBroodmotherEncounterTests.cs");
+            CollectionAssert.Contains(combat.RequirementIds, "IDEA-0020");
+
+            ProjectReuseEntry pressure = FindReuse(
+                catalog,
+                "attention-pressure-runtime");
+            Assert.That(pressure.FeatureGroupId,
+                Is.EqualTo("research-population"));
+            Assert.That(pressure.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.AreEqual(new[]
+            {
+                "AttentionPressureDefinition",
+                "AttentionPressureCatalog",
+                "AttentionPressureCommand",
+                "AttentionPressureEntrySnapshot",
+                "AttentionPressureSnapshot",
+                "AttentionPressureRuntime",
+                "GrayboxAttentionPressureDefenseController3D",
+                "GrayboxAttentionPressureRuntimeController3D",
+                "GrayboxAttentionPressureRestorePlan3D",
+                "GrayboxAttentionPressureSaveAdapter3D",
+                "GrayboxAttentionPressurePresentationController3D",
+            }, pressure.TypeNames);
+            string pressureGuidance = pressure.UseSummary + "\n" +
+                pressure.BoundarySummary;
+            StringAssert.Contains("控制器", pressureGuidance);
+            StringAssert.Contains("Defense", pressureGuidance);
+            StringAssert.Contains("schema 33", pressureGuidance);
+            StringAssert.Contains("HUD", pressureGuidance);
+
+            ProjectReuseEntry broodmother = FindReuse(
+                catalog,
+                "crystal-broodmother-encounter");
+            Assert.That(broodmother.FeatureGroupId,
+                Is.EqualTo("combat-routes"));
+            Assert.That(broodmother.ReuseLevel,
+                Is.EqualTo(ProjectReuseLevel.ReviewBeforeReuse));
+            CollectionAssert.Contains(broodmother.TypeNames,
+                "CrystalBroodmotherCatalog");
+            CollectionAssert.Contains(broodmother.TypeNames,
+                "CrystalBroodmotherEncounter");
+            CollectionAssert.Contains(broodmother.TypeNames,
+                "AttentionPressureCampaignCatalog");
+            StringAssert.Contains("正式 Defense",
+                broodmother.BoundarySummary);
+            CollectionAssert.AreEqual(new[] { "IDEA-0020" },
+                broodmother.RequirementIds);
+
+            ProjectReuseEntry research = FindReuse(
+                catalog,
+                "formal-research-runtime");
+            CollectionAssert.Contains(research.TypeNames, "ResearchCatalog");
+            CollectionAssert.Contains(research.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs");
+            CollectionAssert.Contains(research.RequirementIds, "IDEA-0020");
+            StringAssert.Contains("44", research.UseSummary);
+            StringAssert.Contains("legacy-analysis", research.UseSummary);
+        }
+
+        [Test]
         public void CommittedCatalog_MapsIdea0020FateOwnershipWithoutLegacyCode()
         {
             ProjectQualityCatalog catalog =
@@ -1569,7 +1656,8 @@ namespace WasteCity.Tests
             CollectionAssert.Contains(session.RequiredTestFiles,
                 integrationTest);
             CollectionAssert.Contains(session.RequirementIds, "IDEA-0020");
-            StringAssert.Contains("BuildingCompleted", session.UseSummary);
+            StringAssert.Contains("BuildingCompleted",
+                session.UseSummary + "\n" + session.BoundarySummary);
             StringAssert.Contains("Configure", session.BoundarySummary);
             StringAssert.Contains("存档恢复", session.BoundarySummary);
             StringAssert.Contains("订阅者异常逐个隔离",
@@ -1704,10 +1792,11 @@ namespace WasteCity.Tests
             CollectionAssert.Contains(pocket.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/" +
                 "GrayboxPocketUniverseFateControllerTests.cs");
-            StringAssert.Contains("Lv.1 已由 Host", pocket.BoundarySummary);
+            StringAssert.Contains("Lv.1/Lv.2 已由 Host",
+                pocket.BoundarySummary);
             StringAssert.Contains("不修改输入、周期或容量",
                 pocket.BoundarySummary);
-            StringAssert.Contains("Lv.2 4×4", pocket.BoundarySummary);
+            StringAssert.Contains("Lv.2", pocket.BoundarySummary);
 
             ProjectReuseEntry debt = FindReuse(
                 catalog,
@@ -1720,7 +1809,8 @@ namespace WasteCity.Tests
                 "GrayboxVoidDebtAttentionController3D");
             CollectionAssert.Contains(debt.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs");
-            StringAssert.Contains("Lv.1 已由 Host", debt.BoundarySummary);
+            StringAssert.Contains("Lv.1/Lv.2 已由 Host",
+                debt.BoundarySummary);
             StringAssert.Contains("普通消费仍不得透支",
                 debt.BoundarySummary);
             StringAssert.Contains("命轨专属详情", debt.BoundarySummary);
@@ -1734,7 +1824,12 @@ namespace WasteCity.Tests
             {
                 "FormalRewindAnchorStoreResult",
                 "FormalRewindAnchorStore",
+                "GrayboxRewindAnchorServiceResult3D",
                 "GrayboxRewindAnchorService3D",
+                "FormalRewindAnchorMetadata",
+                "FormalRewindAnchorMetadataSnapshot",
+                "FormalRewindAnchorMetadataUpsertPlan",
+                "FormalRewindAnchorMetadataClearPlan",
                 "FormalRewindAnchorMetadataRuntime",
             }, rewind.TypeNames);
             CollectionAssert.Contains(rewind.RequiredTestFiles,
@@ -1742,9 +1837,9 @@ namespace WasteCity.Tests
             StringAssert.Contains("不是第二个玩家存档槽",
                 rewind.BoundarySummary);
             StringAssert.Contains("Host、schema 33", rewind.BoundarySummary);
-            StringAssert.Contains("Create/Read/Clear UI 命令已接",
+            StringAssert.Contains("指定槽 Create/Read/Clear 已接",
                 rewind.BoundarySummary);
-            StringAssert.Contains("Lv.2 双锚点仍未接",
+            StringAssert.Contains("跨等级读取",
                 rewind.BoundarySummary);
 
             ProjectReuseEntry adapter = FindReuse(
@@ -1753,7 +1848,8 @@ namespace WasteCity.Tests
             CollectionAssert.Contains(adapter.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/" +
                 "GrayboxFormalFateEffectsSaveAdapterTests.cs");
-            StringAssert.Contains("五个 owner", adapter.BoundarySummary);
+            StringAssert.Contains("绑定 owner 身份",
+                adapter.BoundarySummary);
 
             ProjectReuseEntry fateUi = FindReuse(
                 catalog,
@@ -1819,9 +1915,9 @@ namespace WasteCity.Tests
                 "formal-rewind-anchor-store");
             CollectionAssert.Contains(rewind.RequiredTestFiles, edit);
             CollectionAssert.Contains(rewind.RequiredTestFiles, play);
-            StringAssert.Contains("Create/Read/Clear UI 命令已接",
+            StringAssert.Contains("指定槽 Create/Read/Clear 已接",
                 rewind.BoundarySummary);
-            StringAssert.Contains("只能调用 Host 暴露的 Rewind Service",
+            StringAssert.Contains("按钮只能调用 Host Service",
                 rewind.BoundarySummary);
         }
 
@@ -2296,7 +2392,9 @@ namespace WasteCity.Tests
             CollectionAssert.AreEqual(
                 entry.Id == "graybox-defense-selection-hud-3d"
                     ? new[] { "IDEA-0017", "IDEA-0018" }
-                    : new[] { "IDEA-0017" },
+                    : entry.Id == "graybox-formal-rule-clock-3d"
+                        ? new[] { "IDEA-0017", "IDEA-0020" }
+                        : new[] { "IDEA-0017" },
                 entry.RequirementIds,
                 entry.Id);
             string guidance = entry.UseSummary + "\n" +

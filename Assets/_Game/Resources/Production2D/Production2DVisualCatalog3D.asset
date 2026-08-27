@@ -226,6 +226,10 @@ MonoBehaviour:
     variant: default
     sprite: {fileID: 21300000, guid: 170bcac84cb734f40ab2e0fc80099eff, type: 3}
   - visualClass: 1
+    contentId: core.research.legacy-analysis
+    variant: default
+    sprite: {fileID: 21300000, guid: 6bb76ab04a7074333850a4890c5c012a, type: 3}
+  - visualClass: 1
     contentId: core.research.metabolic-acceleration
     variant: default
     sprite: {fileID: 21300000, guid: 7578def23dc984baf9893e71c5eccfae, type: 3}

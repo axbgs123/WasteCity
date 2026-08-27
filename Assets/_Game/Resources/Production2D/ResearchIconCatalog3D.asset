@@ -57,6 +57,8 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: 06d0e37f60b15447ba4f9c7c7b3cd47a, type: 3}
   - researchId: core.research.gene-splicing
     sprite: {fileID: 21300000, guid: 170bcac84cb734f40ab2e0fc80099eff, type: 3}
+  - researchId: core.research.legacy-analysis
+    sprite: {fileID: 21300000, guid: 6bb76ab04a7074333850a4890c5c012a, type: 3}
   - researchId: core.research.metabolic-acceleration
     sprite: {fileID: 21300000, guid: 7578def23dc984baf9893e71c5eccfae, type: 3}
   - researchId: core.research.mind-control

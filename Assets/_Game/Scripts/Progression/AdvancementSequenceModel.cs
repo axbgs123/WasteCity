@@ -4,12 +4,38 @@ namespace WasteCity.Progression
 {
     public enum AdvancementSequenceStage { None, Scanning, Confirmed, Warning, Results, Continued }
 
+    public sealed class AdvancementSequenceSnapshot
+    {
+        public AdvancementSequenceSnapshot(
+            AdvancementSequenceStage stage,
+            float remaining)
+        {
+            Stage = stage;
+            Remaining = remaining;
+        }
+
+        public AdvancementSequenceStage Stage { get; }
+        public float Remaining { get; }
+        public bool IsPresenting =>
+            Stage >= AdvancementSequenceStage.Scanning &&
+            Stage <= AdvancementSequenceStage.Results;
+    }
+
     public sealed class AdvancementSequenceModel
     {
+        private AdvancementSequenceSnapshot cachedSnapshot;
+
+        public AdvancementSequenceModel()
+        {
+            RebuildSnapshot();
+        }
+
         public AdvancementSequenceStage Stage { get; private set; }
         public float Remaining { get; private set; }
         public bool IsPresenting => Stage >= AdvancementSequenceStage.Scanning && Stage <= AdvancementSequenceStage.Results;
         public event Action<AdvancementSequenceStage> Changed;
+
+        public AdvancementSequenceSnapshot Capture() => cachedSnapshot;
 
         public bool Start()
         {
@@ -23,7 +49,12 @@ namespace WasteCity.Progression
             float carry = delta;
             while (carry > 0f && Stage < AdvancementSequenceStage.Results)
             {
-                if (carry < Remaining) { Remaining -= carry; return; }
+                if (carry < Remaining)
+                {
+                    Remaining -= carry;
+                    RebuildSnapshot();
+                    return;
+                }
                 carry -= Remaining;
                 if (Stage == AdvancementSequenceStage.Scanning) Set(AdvancementSequenceStage.Confirmed, 3f);
                 else if (Stage == AdvancementSequenceStage.Confirmed) Set(AdvancementSequenceStage.Warning, 4f);
@@ -40,10 +71,22 @@ namespace WasteCity.Progression
         public void Restore(int stage, float remaining)
         {
             Stage = Enum.IsDefined(typeof(AdvancementSequenceStage), stage) ? (AdvancementSequenceStage)stage : AdvancementSequenceStage.None;
-            Remaining = Math.Max(0f, remaining); Changed?.Invoke(Stage);
+            Remaining = Math.Max(0f, remaining);
+            RebuildSnapshot();
+            Changed?.Invoke(Stage);
         }
 
         private void Set(AdvancementSequenceStage stage, float remaining)
-        { Stage = stage; Remaining = remaining; Changed?.Invoke(stage); }
+        {
+            Stage = stage;
+            Remaining = remaining;
+            RebuildSnapshot();
+            Changed?.Invoke(stage);
+        }
+
+        private void RebuildSnapshot()
+        {
+            cachedSnapshot = new AdvancementSequenceSnapshot(Stage, Remaining);
+        }
     }
 }

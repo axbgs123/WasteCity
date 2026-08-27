@@ -2254,6 +2254,7 @@ MonoBehaviour:
   progressionView: {fileID: 1804086898}
   fateSelectionView: {fileID: 1804086899}
   fateOperationsView: {fileID: 1804086900}
+  advancementView: {fileID: 1804086901}
 --- !u!1 &1545501224
 GameObject:
   m_ObjectHideFlags: 0
@@ -2616,6 +2617,7 @@ GameObject:
   - component: {fileID: 1804086898}
   - component: {fileID: 1804086899}
   - component: {fileID: 1804086900}
+  - component: {fileID: 1804086901}
   m_Layer: 5
   m_Name: ProductionObservabilityCanvas
   m_TagString: Untagged
@@ -2772,6 +2774,19 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   canvas: {fileID: 1804086896}
+--- !u!114 &1804086901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804086891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a3501f6051fc40348bc2ab724f70e07, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  canvas: {fileID: 1804086896}
 --- !u!1 &1959787198
 GameObject:
   m_ObjectHideFlags: 0
@@ -2813,6 +2828,9 @@ MonoBehaviour:
   progressionView: {fileID: 1804086898}
   fateSelectionView: {fileID: 1804086899}
   fateOperationsView: {fileID: 1804086900}
+  developerModifier: {fileID: 1573738604}
+  advancementView: {fileID: 1804086901}
+  inputCoordinator: {fileID: 1513971949}
 --- !u!4 &1959787200
 Transform:
   m_ObjectHideFlags: 0

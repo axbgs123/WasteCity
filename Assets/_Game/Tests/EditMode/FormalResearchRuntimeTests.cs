@@ -23,12 +23,12 @@ namespace WasteCity.Tests
         private const string Ballistics = "core.research.ballistics";
 
         [Test]
-        public void NewRuntimeUsesFortyThreeNodeCatalogAndCompletesFormalRoot()
+        public void NewRuntimeUsesFortyFourNodeCatalogAndCompletesFormalRoot()
         {
             var model = new ResearchModel();
             var runtime = new FormalResearchRuntime(model);
 
-            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(43));
+            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(44));
             Assert.That(runtime.Model, Is.SameAs(model));
             Assert.That(runtime.IsCompleted(Root), Is.True);
             Assert.That(model.CompletedCount, Is.EqualTo(1));

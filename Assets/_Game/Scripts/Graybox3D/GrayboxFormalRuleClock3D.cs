@@ -37,13 +37,16 @@ namespace WasteCity.Graybox3D
 
         public float ResolveRuleDelta(float unscaledDeltaSeconds)
         {
-            if (!IsFinitePositive(unscaledDeltaSeconds)) return 0f;
-            double resolved =
-                (double)unscaledDeltaSeconds * EffectiveSpeed *
-                developmentAcceleration;
-            return resolved >= float.MaxValue
-                ? float.MaxValue
-                : (float)resolved;
+            return ResolveDelta(unscaledDeltaSeconds, EffectiveSpeed);
+        }
+
+        public float ResolvePresentationDelta(float unscaledDeltaSeconds)
+        {
+            float presentationSpeed = terminal
+                ? 0f
+                : NormalizeSpeed(speed.SpeedIgnoring(
+                    GamePauseReason.Advancement));
+            return ResolveDelta(unscaledDeltaSeconds, presentationSpeed);
         }
 
         public static float ResolveCompatibilityRuleDelta(
@@ -61,6 +64,19 @@ namespace WasteCity.Graybox3D
         {
             if (!IsFinitePositive(value)) return 0f;
             return value < 1.5f ? 1f : 2f;
+        }
+
+        private float ResolveDelta(
+            float unscaledDeltaSeconds,
+            float effectiveSpeed)
+        {
+            if (!IsFinitePositive(unscaledDeltaSeconds)) return 0f;
+            double resolved =
+                (double)unscaledDeltaSeconds * effectiveSpeed *
+                developmentAcceleration;
+            return resolved >= float.MaxValue
+                ? float.MaxValue
+                : (float)resolved;
         }
 
         private static bool IsFinitePositive(float value)

@@ -933,6 +933,9 @@ namespace WasteCity.Tests
             GrayboxFateOperationsView3D fateOperationsView =
                 operationsTransform.GetComponent<
                     GrayboxFateOperationsView3D>();
+            GrayboxCivilizationAdvancementView3D advancementView =
+                operationsTransform.GetComponent<
+                    GrayboxCivilizationAdvancementView3D>();
             Transform systems = RequiredChild(root, "GrayboxSystems");
             GrayboxOperationsController3D controller =
                 RequiredComponent<GrayboxOperationsController3D>(
@@ -948,6 +951,9 @@ namespace WasteCity.Tests
                     "GrayboxFormalSaveRuntimeHost");
             GrayboxBuildingInputRouter3D buildingInput =
                 Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
+            GrayboxDeveloperModifierBootstrap3D developer =
+                Object.FindObjectOfType<
+                    GrayboxDeveloperModifierBootstrap3D>(true);
 
             Assert.That(operationsCanvas, Is.Not.Null);
             Assert.That(operationsCanvas.renderMode,
@@ -965,6 +971,8 @@ namespace WasteCity.Tests
             Assert.That(progressionView, Is.Not.Null);
             Assert.That(fateSelectionView, Is.Not.Null);
             Assert.That(fateOperationsView, Is.Not.Null);
+            Assert.That(advancementView, Is.Not.Null);
+            Assert.That(developer, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
                 Has.Length.EqualTo(1));
@@ -982,11 +990,16 @@ namespace WasteCity.Tests
             Assert.That(
                 Object.FindObjectsOfType<GrayboxFateOperationsView3D>(true),
                 Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxCivilizationAdvancementView3D>(true),
+                Has.Length.EqualTo(1));
 
             AssertReference(view, "canvas", operationsCanvas);
             AssertReference(progressionView, "canvas", operationsCanvas);
             AssertReference(fateSelectionView, "canvas", operationsCanvas);
             AssertReference(fateOperationsView, "canvas", operationsCanvas);
+            AssertReference(advancementView, "canvas", operationsCanvas);
             AssertReference(
                 formalSaveHost,
                 "progressionView",
@@ -1000,6 +1013,18 @@ namespace WasteCity.Tests
                 "fateOperationsView",
                 fateOperationsView);
             AssertReference(
+                formalSaveHost,
+                "advancementView",
+                advancementView);
+            AssertReference(
+                formalSaveHost,
+                "inputCoordinator",
+                coordinator);
+            AssertReference(
+                formalSaveHost,
+                "developerModifier",
+                developer);
+            AssertReference(
                 coordinator,
                 "progressionView",
                 progressionView);
@@ -1011,6 +1036,10 @@ namespace WasteCity.Tests
                 coordinator,
                 "fateOperationsView",
                 fateOperationsView);
+            AssertReference(
+                coordinator,
+                "advancementView",
+                advancementView);
             AssertReference(
                 controller,
                 "session",
@@ -1344,6 +1373,14 @@ namespace WasteCity.Tests
             StringAssert.Contains("SystemMenuCanvas", method);
             StringAssert.Contains("GrayboxUsabilityInputCoordinator", method);
             StringAssert.Contains("GrayboxFormalSaveEntryController", method);
+            StringAssert.Contains(
+                "GrayboxCivilizationAdvancementView3D",
+                method);
+            StringAssert.Contains("(\"advancementView\", advancementView)", method);
+            StringAssert.Contains("(\"inputCoordinator\", coordinator)", method);
+            StringAssert.Contains(
+                "SetReferences(advancementView, (\"canvas\", operationsCanvas))",
+                method);
             StringAssert.Contains("formalSaveEntry", method);
             StringAssert.Contains("inputInterceptor", method);
             StringAssert.DoesNotContain("FindObjectOfType", method);

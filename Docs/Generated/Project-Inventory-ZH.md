@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`16b87ed4788a1c64728784a653fe7d23b686af1a98efb2e1eedf5b9285f1fa2a`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`47d2a57a61d75ef765d3d08b943b79cdb471a4c2f8468d673018a03383873bd5`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -33,6 +33,10 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureDefenseController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressurePresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureRuntimeController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingCatalogPresenter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingHealthRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
@@ -43,8 +47,12 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingStorageSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingUpgradeController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCampaignTerminalSpeedGate3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementPresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
@@ -59,6 +67,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperProgressionFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
@@ -104,9 +113,12 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs`
 - 战斗与路线（`combat-routes`）：
+- `Assets/_Game/Scripts/Combat/AttentionPressureCampaignCatalog.cs`
 - `Assets/_Game/Scripts/Combat/BehemothBreedingModel.cs`
 - `Assets/_Game/Scripts/Combat/BossEncounterModel.cs`
 - `Assets/_Game/Scripts/Combat/CampaignWaveCatalog.cs`
+- `Assets/_Game/Scripts/Combat/CrystalBroodmotherCatalog.cs`
+- `Assets/_Game/Scripts/Combat/CrystalBroodmotherEncounter.cs`
 - `Assets/_Game/Scripts/Combat/DamageMatrix.cs`
 - `Assets/_Game/Scripts/Combat/DefenseTowerCatalog.cs`
 - `Assets/_Game/Scripts/Combat/EnemyDefinition.cs`
@@ -134,6 +146,10 @@
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseSettlement.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerCombatModel.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerPersistenceState.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureDefenseController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressurePresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureRuntimeController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs`
@@ -143,6 +159,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
+- `Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs`
+- `Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs`
 - 经济生产与物流（`economy-production-logistics`）：
 - `Assets/_Game/Scripts/Building/LogisticsNetworkModel.cs`
 - `Assets/_Game/Scripts/Economy/AlchemyModel.cs`
@@ -256,6 +274,13 @@
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
 - `Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 - 研究、人口与文明进程（`research-population`）：
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureDefenseController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressurePresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureRuntimeController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementPresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
@@ -268,9 +293,13 @@
 - `Assets/_Game/Scripts/Narrative/GuidanceFlowModel.cs`
 - `Assets/_Game/Scripts/Population/PopulationModel.cs`
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`
+- `Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs`
+- `Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`
+- `Assets/_Game/Scripts/Progression/FormalCivilizationAscension.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`
+- `Assets/_Game/Scripts/Progression/FormalFateLevelTwoCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
 - `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
@@ -314,6 +343,9 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingMenuView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementPresentationController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs`
@@ -361,6 +393,7 @@
 - `WasteCity.Graybox3D.Building.GrayboxBuildingSession3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingSurfaceProjector3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxCivilizationAdvancementView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxConstructionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseHud3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`

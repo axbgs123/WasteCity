@@ -233,25 +233,10 @@ namespace WasteCity.Research
             "core.research.precision-assembly";
         public const string AutomatedDefenseId =
             "core.research.automated-defense";
+        public const string LegacyAnalysisId =
+            "core.research.legacy-analysis";
         public const string ThoughtAccelerationId =
             "core.research.thought-acceleration";
-
-        private static readonly ResearchDefinition retiredLegacyAnalysis =
-            new ResearchDefinition(
-                "core.research.legacy-analysis",
-                "遗产解析",
-                DevelopmentRoute.Technology,
-                Costs(
-                    Cost(ResourceIds.Alloy, 30),
-                    Cost(ResourceIds.Biomass, 20)),
-                60f,
-                Req("core.research.automated-defense"),
-                2,
-                "满足首循环文明升阶条件",
-                -1,
-                2,
-                ResearchReleaseState.RetiredCompatibility,
-                Effects("progression:core.progression.legacy-analysis"));
 
         public static readonly ResearchDefinition[] All =
         {
@@ -569,7 +554,17 @@ namespace WasteCity.Research
                 90f, "跨路线配方与突变规则仅预览",
                 Req("core.research.bio-cultivation", "core.research.artifact-crafting"),
                 "recipe:fusion.production.flesh-elixir",
-                "rule:bridge.effect.elixir-triple-with-mutation-risk")
+                "rule:bridge.effect.elixir-triple-with-mutation-risk"),
+
+            Node(43, LegacyAnalysisId, "遗产解析",
+                DevelopmentRoute.Technology, 3, 4,
+                ResearchReleaseState.Researchable,
+                Costs(
+                    Cost(ResourceIds.Alloy, 30),
+                    Cost(ResourceIds.Biomass, 20)),
+                60f, "满足首循环文明升阶条件",
+                Req(AutomatedDefenseId),
+                "progression:core.progression.legacy-analysis")
         };
 
         public static ResearchDefinition[] Starting => All;
@@ -580,12 +575,7 @@ namespace WasteCity.Research
             ResearchDefinition formal = All.FirstOrDefault(value =>
                 string.Equals(value.Id.Value, id, StringComparison.Ordinal));
             if (formal != null) return formal;
-            return string.Equals(
-                retiredLegacyAnalysis.Id.Value,
-                id,
-                StringComparison.Ordinal)
-                ? retiredLegacyAnalysis
-                : null;
+            return null;
         }
 
         private static ResearchDefinition Node(

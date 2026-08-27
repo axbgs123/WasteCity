@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Core;
 using WasteCity.Defense;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
+using WasteCity.Graybox3D.Usability;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -57,6 +59,12 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxFateSelectionView3D fateSelectionView;
         [SerializeField]
         private GrayboxFateOperationsView3D fateOperationsView;
+        [SerializeField]
+        private GrayboxDeveloperModifierBootstrap3D developerModifier;
+        [SerializeField]
+        private GrayboxCivilizationAdvancementView3D advancementView;
+        [SerializeField]
+        private MonoBehaviour inputCoordinator;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
             new GrayboxFormalSaveWriteIntentLatch3D();
@@ -70,7 +78,31 @@ namespace WasteCity.Graybox3D.Building
         private PocketUniverseFateEffect pocketUniverseEffect;
         private FormalVoidDebtRuntime voidDebtRuntime;
         private FormalRewindAnchorMetadataRuntime rewindAnchorMetadata;
+        private AttentionPressureRuntime attentionPressureRuntime;
+        private FormalCivilizationAscensionRuntime civilization;
+        private AdvancementSequenceModel advancementSequence;
+        private GrayboxCivilizationAdvancementController3D
+            civilizationAdvancementController;
+        private GrayboxBuildingUpgradeController3D buildingUpgradeController;
+        private string buildingUpgradeFeedbackStableId = string.Empty;
+        private string buildingUpgradeFeedback = string.Empty;
+        private bool buildingUpgradeProjectionInitialized;
+        private string presentedBuildingUpgradeStableId = string.Empty;
+        private uint presentedBuildingUpgradeCatalogRevision;
+        private ulong presentedBuildingUpgradeStorageRevision;
+        private ulong presentedBuildingUpgradeCivilizationRevision;
+        private FormalCivilizationAscensionRequirements cachedRequirements;
+        private uint cachedRequirementsCatalogRevision;
+        private bool cachedRequirementsProductionRunning;
+        private bool cachedRequirementsBossDefeated;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private FormalCivilizationAscensionRequirements
+            developmentRequirementsOverride;
+        private GrayboxDeveloperProgressionFacade3D
+            developerProgressionFacade;
+#endif
         private GrayboxFormalProgressionSaveAdapter3D progressionAdapter;
+        private GrayboxAttentionPressureSaveAdapter3D pressureSaveAdapter;
         private GrayboxProgressionEventRouter3D progressionEventRouter;
         private GrayboxPocketUniverseFateController3D pocketUniverseController;
         private GrayboxVoidDebtController3D voidDebtController;
@@ -78,9 +110,17 @@ namespace WasteCity.Graybox3D.Building
             voidDebtAttentionController;
         private FormalRewindAnchorStore rewindAnchorStore;
         private GrayboxRewindAnchorService3D rewindAnchorService;
+        private GrayboxAttentionPressureDefenseController3D
+            pressureDefenseController;
+        private GrayboxAttentionPressureRuntimeController3D
+            pressureRuntimeController;
+        private GrayboxAttentionPressurePresentationController3D
+            pressurePresentation;
         private GrayboxProgressionHudController3D progressionHudController;
         private GrayboxFateSelectionController3D fateSelectionController;
         private GrayboxFateOperationsController3D fateOperationsController;
+        private GrayboxCivilizationAdvancementPresentationController3D
+            advancementPresentationController;
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
@@ -105,14 +145,14 @@ namespace WasteCity.Graybox3D.Building
         public FormalRewindAnchorMetadataRuntime RewindAnchorMetadata =>
             rewindAnchorMetadata ??=
                 new FormalRewindAnchorMetadataRuntime();
+        public AttentionPressureRuntime AttentionPressureRuntime =>
+            attentionPressureRuntime ??= new AttentionPressureRuntime();
+        public FormalCivilizationAscensionRuntime Civilization =>
+            civilization ??= new FormalCivilizationAscensionRuntime();
+        public AdvancementSequenceModel Sequence =>
+            advancementSequence ??= new AdvancementSequenceModel();
         public GrayboxFormalProgressionSaveAdapter3D ProgressionAdapter =>
-            progressionAdapter ??=
-                new GrayboxFormalProgressionSaveAdapter3D(
-                    AttentionRuntime,
-                    FateRuntime,
-                    PocketUniverseEffect,
-                    VoidDebtRuntime,
-                    RewindAnchorMetadata);
+            progressionAdapter;
         public GrayboxProgressionEventRouter3D ProgressionEventRouter =>
             progressionEventRouter;
         public GrayboxPocketUniverseFateController3D PocketUniverseController =>
@@ -121,6 +161,13 @@ namespace WasteCity.Graybox3D.Building
             voidDebtController;
         public GrayboxRewindAnchorService3D RewindAnchorService =>
             rewindAnchorService;
+        public bool BossDefeated
+        {
+            get
+            {
+                return IsBossDefeated(AttentionPressureRuntime.Capture());
+            }
+        }
         public GrayboxProgressionHudController3D ProgressionHudController =>
             progressionHudController;
         public GrayboxFateSelectionController3D FateSelectionController =>
@@ -140,6 +187,12 @@ namespace WasteCity.Graybox3D.Building
             private set;
         }
         public bool HasCheckpointWarning { get; private set; }
+        public string LastInitializationError { get; private set; } =
+            string.Empty;
+        public string LastProgressionRestoreError { get; private set; } =
+            string.Empty;
+        public string LastStartNewProgressError { get; private set; } =
+            string.Empty;
 
         public event Action<bool> CheckpointWarningChanged;
 
@@ -152,10 +205,10 @@ namespace WasteCity.Graybox3D.Building
 
         public bool TryInitialize()
         {
+            LastInitializationError = string.Empty;
             if (IsInitialized) return true;
             EnsureStore();
             _ = Speed;
-            _ = ProgressionAdapter;
             if (!HasAuthoredRuntimeReferences() ||
                 !bootstrap.IsInitialized ||
                 bootstrap.World == null ||
@@ -166,14 +219,25 @@ namespace WasteCity.Graybox3D.Building
                 operations.Crafting == null ||
                 operations.Research == null)
             {
+                LastInitializationError =
+                    "场景运行时引用或正式经济模型尚未就绪";
                 return false;
             }
 
             BindRuleClock();
 
-            if (!production.TryRebuildAfterPersistenceRestore(out _) ||
-                !defense.TryRebuildAfterPersistenceRestore(out _))
+            if (!production.TryRebuildAfterPersistenceRestore(
+                    out string productionError))
             {
+                LastInitializationError =
+                    "生产运行时重建失败：" + productionError;
+                return false;
+            }
+            if (!defense.TryRebuildAfterPersistenceRestore(
+                    out string defenseError))
+            {
+                LastInitializationError =
+                    "防御运行时重建失败：" + defenseError;
                 return false;
             }
 
@@ -183,12 +247,19 @@ namespace WasteCity.Graybox3D.Building
                     production.Clock.Runtime,
                     defense.Runtime);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException exception)
             {
+                LastInitializationError =
+                    "撤离运行时接线失败：" + exception.Message;
                 return false;
             }
-            if (!evacuation.TryRebuildAfterPersistenceRestore(out _))
+            if (!evacuation.TryRebuildAfterPersistenceRestore(
+                    out string evacuationError))
+            {
+                LastInitializationError =
+                    "撤离运行时重建失败：" + evacuationError;
                 return false;
+            }
 
             if (progressionEventRouter == null)
             {
@@ -226,6 +297,24 @@ namespace WasteCity.Graybox3D.Building
                         FateRuntime,
                         VoidDebtRuntime);
             }
+            RebuildPressureComposition();
+            if (buildingUpgradeController == null)
+            {
+                buildingUpgradeController =
+                    new GrayboxBuildingUpgradeController3D(
+                        session,
+                        () => Civilization.Capture().CivilizationLevel,
+                        buildingPresentation);
+                if (defense.Hud != null)
+                    defense.Hud.BuildingUpgradeRequested +=
+                        HandleBuildingUpgradeRequested;
+            }
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            developerProgressionFacade ??=
+                new GrayboxDeveloperProgressionFacade3D(this);
+            developerModifier?.ConfigureProgressionFacade(
+                developerProgressionFacade);
+#endif
             if (progressionHudController == null && progressionView != null)
             {
                 progressionHudController =
@@ -234,6 +323,14 @@ namespace WasteCity.Graybox3D.Building
                         FateRuntime,
                         progressionView);
                 progressionHudController.RefreshIfChanged();
+            }
+            if (pressurePresentation == null && progressionView != null)
+            {
+                pressurePresentation =
+                    new GrayboxAttentionPressurePresentationController3D(
+                        AttentionPressureRuntime,
+                        progressionView);
+                pressurePresentation.RefreshIfChanged();
             }
 
             var worldCity = new GrayboxWorldCitySaveAdapter3D(
@@ -320,11 +417,32 @@ namespace WasteCity.Graybox3D.Building
                     HandleFateDetailsRequested;
                 fateOperationsView.CreateRewindAnchorRequested +=
                     HandleCreateRewindAnchorRequested;
-                fateOperationsView.ReadRewindAnchorRequested +=
-                    HandleReadRewindAnchorRequested;
+                fateOperationsView.ReadRewindAnchorByIdRequested +=
+                    HandleReadRewindAnchorByIdRequested;
                 fateOperationsView.ClearRewindAnchorRequested +=
                     HandleClearRewindAnchorRequested;
                 fateOperationsController.RefreshIfChanged();
+            }
+            if (advancementPresentationController == null &&
+                advancementView != null && inputCoordinator is
+                    IGrayboxCivilizationAdvancementInputBinding3D inputBinding)
+            {
+                advancementPresentationController =
+                    new GrayboxCivilizationAdvancementPresentationController3D(
+                        Civilization,
+                        FateRuntime,
+                        Sequence,
+                        advancementView,
+                        CaptureRequirements);
+                advancementPresentationController.AdvanceRequested +=
+                    HandleAdvancementRequested;
+                advancementPresentationController.ContinueRequested +=
+                    HandleAdvancementContinueRequested;
+                inputBinding.ConfigureAdvancement(
+                    advancementView,
+                    TryAdvanceCivilizationFromInput,
+                    TryContinueCivilizationAdvancement);
+                advancementPresentationController.RefreshIfChanged();
             }
             IsInitialized = true;
             return true;
@@ -332,20 +450,43 @@ namespace WasteCity.Graybox3D.Building
 
         public bool TryStartNewProgress()
         {
-            if (!TryInitialize() || HasCoordinatorSafetyBarrier())
+            LastStartNewProgressError = string.Empty;
+            LastProgressionRestoreError = string.Empty;
+            if (!TryInitialize())
+            {
+                LastStartNewProgressError =
+                    string.IsNullOrWhiteSpace(LastInitializationError)
+                        ? "正式 3D 运行时初始化失败"
+                        : LastInitializationError;
                 return false;
+            }
+            if (HasCoordinatorSafetyBarrier())
+            {
+                LastStartNewProgressError =
+                    "存档事务处于安全阻断状态";
+                return false;
+            }
             FormalSaveStoreResult existing = Probe();
             if (existing.Code == FormalSaveStoreCode.UnsupportedFutureSchema)
+            {
+                LastStartNewProgressError = existing.Message;
                 return false;
+            }
             if (!ProgressionAdapter.TryRestore(
                     new FormalThreeDProgressionSaveData(),
-                    out _))
+                    out string progressionError))
             {
+                LastProgressionRestoreError = progressionError;
+                LastStartNewProgressError = progressionError;
                 return false;
             }
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
+            SynchronizeAdvancementPause();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            developmentRequirementsOverride = null;
+#endif
 
             ResetCheckpointBaseline();
             currentSessionId = Guid.NewGuid().ToString("N");
@@ -358,7 +499,12 @@ namespace WasteCity.Graybox3D.Building
             bool queued = checkpointPolicy.QueueCheckpoint(
                 FormalSaveCheckpointReasonIds.NewGameReady,
                 currentSessionId + "|ready");
-            if (!queued) return false;
+            if (!queued)
+            {
+                LastStartNewProgressError =
+                    "新进度就绪检查点无法加入保存队列";
+                return false;
+            }
 
             // A new game may continue when its first automatic save fails;
             // the pending request and new-progress intent remain retryable.
@@ -388,10 +534,195 @@ namespace WasteCity.Graybox3D.Building
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
+            SynchronizeAdvancementPause();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            developmentRequirementsOverride = null;
+#endif
             writeIntent.AdoptContinuedProgress();
             automaticCheckpointFailureBlocked = false;
             automaticCheckpointFailureRevision = 0;
             SetCheckpointWarning(false);
+            return true;
+        }
+
+        public FormalCivilizationAscensionRequirements CaptureRequirements()
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (developmentRequirementsOverride != null)
+                return developmentRequirementsOverride;
+#endif
+            uint catalogRevision = session?.CatalogRevision ?? 0u;
+            ProductionObservabilitySnapshot productionSnapshot =
+                production?.Snapshot ?? ProductionObservabilitySnapshot.Empty;
+            AttentionPressureSnapshot pressureSnapshot =
+                AttentionPressureRuntime.Capture();
+            bool bossDefeated = pressureSnapshot.CrystalBroodmotherDefeated;
+            if (cachedRequirements != null &&
+                cachedRequirementsCatalogRevision == catalogRevision &&
+                cachedRequirementsProductionRunning ==
+                    productionSnapshot.HasCurrentlyRunnableBuilding &&
+                cachedRequirementsBossDefeated == bossDefeated)
+            {
+                return cachedRequirements;
+            }
+            bool legacyAnalysisCompleted = session != null &&
+                session.IsResearchCompleted(
+                    FormalCivilizationAscensionRuntime
+                        .LegacyAnalysisResearchId);
+            var machineGunTurrets = 0;
+            IReadOnlyList<GrayboxBuildingInstance3D> instances =
+                session?.Instances;
+            if (instances != null)
+            {
+                for (var index = 0; index < instances.Count; index++)
+                {
+                    GrayboxBuildingInstance3D instance = instances[index];
+                    if (instance != null && instance.IsPlayerOwned &&
+                        instance.State ==
+                            GrayboxBuildingInstanceState.Completed &&
+                        string.Equals(
+                            instance.Placement?.Definition?.Id.Value,
+                            BuildingCatalog.MachineGunTurret.Id.Value,
+                            StringComparison.Ordinal))
+                    {
+                        machineGunTurrets++;
+                    }
+                }
+            }
+            bool productionRunning =
+                productionSnapshot.HasCurrentlyRunnableBuilding;
+            cachedRequirements =
+                new FormalCivilizationAscensionRequirements(
+                legacyAnalysisCompleted,
+                machineGunTurrets,
+                bossDefeated,
+                productionRunning);
+            cachedRequirementsCatalogRevision = catalogRevision;
+            cachedRequirementsProductionRunning = productionRunning;
+            cachedRequirementsBossDefeated = bossDefeated;
+            return cachedRequirements;
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool SatisfyAscensionRequirementsForDevelopment()
+        {
+            if (developmentRequirementsOverride?.CanAscend == true)
+                return false;
+            developmentRequirementsOverride =
+                new FormalCivilizationAscensionRequirements(
+                    true,
+                    FormalCivilizationAscensionRuntime
+                        .RequiredMachineGunTurretCount,
+                    true,
+                    true);
+            return true;
+        }
+
+        public bool ClearAscensionRequirementsForDevelopment()
+        {
+            if (developmentRequirementsOverride == null) return false;
+            developmentRequirementsOverride = null;
+            cachedRequirements = null;
+            return true;
+        }
+
+        public bool CompletePressureFixtureForDevelopment(int threshold)
+        {
+            return TryRestorePressureFixtureForDevelopment(threshold);
+        }
+
+        public bool ResetPressureFixtureForDevelopment()
+        {
+            return TryRestorePressureFixtureForDevelopment(0);
+        }
+
+        public bool SetBossDefeatedForDevelopment(bool defeated)
+        {
+            if (AttentionPressureRuntime.Capture()
+                    .CrystalBroodmotherDefeated == defeated)
+                return false;
+            return TryRestorePressureFixtureForDevelopment(
+                defeated ? 90 : 60);
+        }
+
+        private bool TryRestorePressureFixtureForDevelopment(int threshold)
+        {
+            if (threshold != 0 &&
+                AttentionPressureCatalog.FindByThreshold(threshold) == null)
+                return false;
+            AttentionPressureSnapshot before =
+                AttentionPressureRuntime.Capture();
+            var entries = new List<AttentionPressureEntrySnapshot>();
+            for (var index = 0;
+                 index < AttentionPressureCatalog.All.Count;
+                 index++)
+            {
+                AttentionPressureDefinition definition =
+                    AttentionPressureCatalog.All[index];
+                if (definition.Threshold > threshold) break;
+                entries.Add(new AttentionPressureEntrySnapshot(
+                    definition.Threshold,
+                    AttentionPressureState.Completed,
+                    0f));
+            }
+            var candidate = new AttentionPressureSnapshot(
+                before.Revision + 1UL,
+                entries.ToArray());
+            var validator = new AttentionPressureRuntime();
+            if (!validator.TryRestore(candidate, out _)) return false;
+            bool pressureChanged = before.Entries.Count != entries.Count;
+            if (!pressureChanged)
+            {
+                for (var index = 0; index < entries.Count; index++)
+                {
+                    if (before.Entries[index].Threshold !=
+                            entries[index].Threshold ||
+                        before.Entries[index].State != entries[index].State)
+                    {
+                        pressureChanged = true;
+                        break;
+                    }
+                }
+            }
+            bool defenseChanged = defense?.Runtime?
+                .HasActivePressureCampaign == true;
+            if (!pressureChanged && !defenseChanged) return false;
+            if (defenseChanged) defense.Runtime.ClearActivePressure();
+            return AttentionPressureRuntime.TryRestore(candidate, out _);
+        }
+#endif
+
+        public GrayboxCivilizationAdvancementResult3D
+            TryAdvanceCivilization()
+        {
+            if (!TryInitialize() ||
+                civilizationAdvancementController == null)
+            {
+                return AdvancementFailure(
+                    "advancement.runtime-unavailable",
+                    LastInitializationError);
+            }
+            if (!Sequence.Start())
+                return AdvancementFailure("advancement.sequence-unavailable");
+            GrayboxCivilizationAdvancementResult3D result =
+                civilizationAdvancementController.Execute(
+                    CaptureRequirements());
+            if (!result.Success)
+            {
+                Sequence.Restore((int)AdvancementSequenceStage.None, 0f);
+                return result;
+            }
+            Speed.SetPaused(GamePauseReason.Advancement, true);
+            checkpointPolicy?.QueueCheckpoint(
+                result.CheckpointReasonId,
+                result.StableEventKey);
+            return result;
+        }
+
+        public bool TryContinueCivilizationAdvancement()
+        {
+            if (!TryInitialize() || !Sequence.Continue()) return false;
+            Speed.SetPaused(GamePauseReason.Advancement, false);
             return true;
         }
 
@@ -515,10 +846,15 @@ namespace WasteCity.Graybox3D.Building
 
         private void LateUpdate()
         {
+            TickCivilizationAdvancement();
             TickVoidDebt();
+            TickAttentionPressure();
+            RefreshBuildingUpgradeCommand();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
             progressionHudController?.RefreshIfChanged();
+            pressurePresentation?.RefreshIfChanged();
+            advancementPresentationController?.RefreshIfChanged();
             if (!IsInitialized || checkpointPolicy == null ||
                 !checkpointPolicy.HasPending)
             {
@@ -552,6 +888,49 @@ namespace WasteCity.Graybox3D.Building
             rewindAnchorService = null;
             rewindAnchorStore = null;
             rewindAnchorMetadata = null;
+            if (pressureRuntimeController != null)
+            {
+                pressureRuntimeController.WarningStarted -=
+                    HandlePressureWarningStarted;
+                pressureRuntimeController.Dispose();
+                pressureRuntimeController = null;
+            }
+            if (pressureDefenseController != null)
+            {
+                pressureDefenseController.EncounterStarted -=
+                    HandlePressureEncounterStarted;
+                pressureDefenseController.EncounterCompleted -=
+                    HandlePressureEncounterCompleted;
+                pressureDefenseController.Dispose();
+                pressureDefenseController = null;
+            }
+            pressurePresentation = null;
+            attentionPressureRuntime = null;
+            if (advancementPresentationController != null)
+            {
+                advancementPresentationController.AdvanceRequested -=
+                    HandleAdvancementRequested;
+                advancementPresentationController.ContinueRequested -=
+                    HandleAdvancementContinueRequested;
+                advancementPresentationController.Dispose();
+                advancementPresentationController = null;
+            }
+            Speed.SetPaused(GamePauseReason.Advancement, false);
+            civilizationAdvancementController = null;
+            if (defense?.Hud != null)
+                defense.Hud.BuildingUpgradeRequested -=
+                    HandleBuildingUpgradeRequested;
+            buildingUpgradeController = null;
+            buildingUpgradeFeedbackStableId = string.Empty;
+            buildingUpgradeFeedback = string.Empty;
+            advancementSequence = null;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            developerModifier?.ConfigureProgressionFacade(null);
+            developerProgressionFacade = null;
+            developmentRequirementsOverride = null;
+#endif
+            civilization = null;
+            cachedRequirements = null;
             progressionHudController = null;
             if (fateSelectionController != null)
             {
@@ -566,13 +945,14 @@ namespace WasteCity.Graybox3D.Building
                     HandleFateDetailsRequested;
                 fateOperationsView.CreateRewindAnchorRequested -=
                     HandleCreateRewindAnchorRequested;
-                fateOperationsView.ReadRewindAnchorRequested -=
-                    HandleReadRewindAnchorRequested;
+                fateOperationsView.ReadRewindAnchorByIdRequested -=
+                    HandleReadRewindAnchorByIdRequested;
                 fateOperationsView.ClearRewindAnchorRequested -=
                     HandleClearRewindAnchorRequested;
             }
             fateOperationsController = null;
             progressionAdapter = null;
+            pressureSaveAdapter = null;
             voidDebtRuntime = null;
             pocketUniverseEffect = null;
             fateRuntime = null;
@@ -747,6 +1127,11 @@ namespace WasteCity.Graybox3D.Building
         private void HandleFateSelectionCommitted(string fateId)
         {
             pocketUniverseController?.SynchronizeSelection();
+            if (!Civilization.TryBindFate(fateId, out string bindError))
+            {
+                Debug.LogError(bindError, this);
+                return;
+            }
             if (checkpointPolicy == null ||
                 string.IsNullOrWhiteSpace(fateId))
             {
@@ -755,6 +1140,23 @@ namespace WasteCity.Graybox3D.Building
             checkpointPolicy.QueueCheckpoint(
                 FormalSaveCheckpointReasonIds.FateSelectionComplete,
                 "fate-selection:" + fateId);
+        }
+
+        private void HandleAdvancementRequested()
+        {
+            TryAdvanceCivilization();
+            advancementPresentationController?.RefreshIfChanged();
+        }
+
+        private void HandleAdvancementContinueRequested()
+        {
+            TryContinueCivilizationAdvancement();
+            advancementPresentationController?.RefreshIfChanged();
+        }
+
+        private bool TryAdvanceCivilizationFromInput()
+        {
+            return TryAdvanceCivilization().Success;
         }
 
         private void HandleFateDetailsRequested()
@@ -802,6 +1204,19 @@ namespace WasteCity.Graybox3D.Building
             fateOperationsController?.RefreshIfChanged();
         }
 
+        private void HandleReadRewindAnchorByIdRequested(string anchorId)
+        {
+            GrayboxRewindAnchorServiceResult3D result =
+                rewindAnchorService?.Read(anchorId);
+            if (result?.Success != true || checkpointPolicy == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.RewindAnchorUsed,
+                "rewind-anchor-used:" + AttentionRuntime.Revision);
+            pocketUniverseController?.SynchronizeSelection();
+            fateOperationsController?.RefreshIfChanged();
+            SynchronizeAdvancementPause();
+        }
+
         private void HandleClearRewindAnchorRequested()
         {
             GrayboxRewindAnchorServiceResult3D result =
@@ -811,6 +1226,218 @@ namespace WasteCity.Graybox3D.Building
                 FormalSaveCheckpointReasonIds.RewindAnchorCleared,
                 "rewind-anchor-cleared:" + RewindAnchorMetadata.Revision);
             fateOperationsController?.RefreshIfChanged();
+        }
+
+        private void TickAttentionPressure()
+        {
+            if (!IsInitialized || pressureRuntimeController == null ||
+                coordinator?.IsTransactionPaused == true)
+                return;
+            GrayboxDefenseRuntimeSnapshot3D defenseState = defense?.Snapshot;
+            SingleCityDefenseCampaignSnapshot campaignState =
+                defense?.CampaignSnapshot;
+            bool mainCampaignActive = campaignState == null ||
+                campaignState.Result != SingleCityDefenseCampaignResult.Victory;
+            bool tutorialCompleted = defenseState != null &&
+                defenseState.TutorialWaveTriggerCount > 0 &&
+                defenseState.SpawnedEnemyCount > 0 &&
+                defenseState.AliveEnemyCount == 0;
+            bool firstTowerCompleted = defenseState != null &&
+                defenseState.Towers.Count > 0;
+            pressureRuntimeController.Tick(
+                RuleClock.ResolveRuleDelta(Time.unscaledDeltaTime),
+                mainCampaignActive,
+                tutorialCompleted,
+                firstTowerCompleted,
+                out _);
+        }
+
+        private void HandleBuildingUpgradeRequested(string stableInstanceId)
+        {
+            if (buildingUpgradeController == null ||
+                string.IsNullOrWhiteSpace(stableInstanceId)) return;
+            GrayboxBuildingUpgradeResult3D result =
+                buildingUpgradeController.TryUpgrade(stableInstanceId);
+            buildingUpgradeFeedbackStableId = stableInstanceId;
+            buildingUpgradeFeedback = result.Message;
+            buildingUpgradeProjectionInitialized = false;
+            if (result.Success)
+            {
+                production?.TryRebuildAfterPersistenceRestore(out _);
+                defense?.TryRebuildAfterPersistenceRestore(out _);
+            }
+            RefreshBuildingUpgradeCommand();
+        }
+
+        private bool RefreshBuildingUpgradeCommand()
+        {
+            if (!IsInitialized || buildingUpgradeController == null ||
+                defense?.Hud == null) return false;
+            string stableId = defense.SelectedStableId ?? string.Empty;
+            uint catalogRevision = session?.CatalogRevision ?? 0u;
+            ulong storageRevision = session?.CityStorage?.Revision ?? 0UL;
+            ulong civilizationRevision = Civilization.Capture().Revision;
+            if (buildingUpgradeProjectionInitialized && string.Equals(
+                    stableId,
+                    presentedBuildingUpgradeStableId,
+                    StringComparison.Ordinal) &&
+                catalogRevision == presentedBuildingUpgradeCatalogRevision &&
+                storageRevision == presentedBuildingUpgradeStorageRevision &&
+                civilizationRevision ==
+                    presentedBuildingUpgradeCivilizationRevision)
+                return false;
+            GrayboxBuildingUpgradeAvailability3D availability =
+                buildingUpgradeController.CaptureAvailability(stableId);
+            if (!string.Equals(
+                    stableId,
+                    buildingUpgradeFeedbackStableId,
+                    StringComparison.Ordinal))
+            {
+                buildingUpgradeFeedbackStableId = string.Empty;
+                buildingUpgradeFeedback = string.Empty;
+            }
+            defense.Hud.ApplyBuildingUpgradeCommand(
+                availability.IsVisible,
+                availability.CanUpgrade,
+                availability.ButtonLabel,
+                string.IsNullOrEmpty(buildingUpgradeFeedback)
+                    ? availability.Feedback
+                    : buildingUpgradeFeedback);
+            buildingUpgradeProjectionInitialized = true;
+            presentedBuildingUpgradeStableId = stableId ?? string.Empty;
+            presentedBuildingUpgradeCatalogRevision = catalogRevision;
+            presentedBuildingUpgradeStorageRevision = storageRevision;
+            presentedBuildingUpgradeCivilizationRevision =
+                civilizationRevision;
+            return true;
+        }
+
+        private void RebuildPressureComposition()
+        {
+            if (pressureRuntimeController != null)
+            {
+                pressureRuntimeController.WarningStarted -=
+                    HandlePressureWarningStarted;
+                pressureRuntimeController.Dispose();
+            }
+            if (pressureDefenseController != null)
+            {
+                pressureDefenseController.EncounterStarted -=
+                    HandlePressureEncounterStarted;
+                pressureDefenseController.EncounterCompleted -=
+                    HandlePressureEncounterCompleted;
+                pressureDefenseController.Dispose();
+            }
+
+            pressureDefenseController =
+                new GrayboxAttentionPressureDefenseController3D(
+                    AttentionPressureRuntime,
+                    defense.Runtime);
+            pressureDefenseController.EncounterStarted +=
+                HandlePressureEncounterStarted;
+            pressureDefenseController.EncounterCompleted +=
+                HandlePressureEncounterCompleted;
+            pressureRuntimeController =
+                new GrayboxAttentionPressureRuntimeController3D(
+                    AttentionRuntime,
+                    AttentionPressureRuntime,
+                    pressureDefenseController);
+            pressureRuntimeController.WarningStarted +=
+                HandlePressureWarningStarted;
+            pressureRuntimeController.Bind();
+            pressureSaveAdapter =
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    AttentionPressureRuntime,
+                    defense.Runtime);
+            RebuildProgressionComposition();
+        }
+
+        private void RebuildProgressionComposition()
+        {
+            civilizationAdvancementController ??=
+                new GrayboxCivilizationAdvancementController3D(
+                    Civilization,
+                    FateRuntime,
+                    AttentionRuntime,
+                    PocketUniverseEffect,
+                    VoidDebtRuntime,
+                    RewindAnchorMetadata);
+            progressionAdapter =
+                new GrayboxFormalProgressionSaveAdapter3D(
+                    AttentionRuntime,
+                    FateRuntime,
+                    PocketUniverseEffect,
+                    VoidDebtRuntime,
+                    RewindAnchorMetadata,
+                    pressureSaveAdapter,
+                    Civilization,
+                    Sequence);
+        }
+
+        private void TickCivilizationAdvancement()
+        {
+            if (!IsInitialized) return;
+            AdvancementSequenceStage stage = Sequence.Stage;
+            bool presenting = stage >= AdvancementSequenceStage.Scanning &&
+                stage <= AdvancementSequenceStage.Results;
+            Speed.SetPaused(GamePauseReason.Advancement, presenting);
+            if (stage < AdvancementSequenceStage.Scanning ||
+                stage >= AdvancementSequenceStage.Results)
+                return;
+            Sequence.Tick(RuleClock.ResolvePresentationDelta(
+                Time.unscaledDeltaTime));
+        }
+
+        private void SynchronizeAdvancementPause()
+        {
+            AdvancementSequenceStage stage = Sequence.Stage;
+            Speed.SetPaused(
+                GamePauseReason.Advancement,
+                stage >= AdvancementSequenceStage.Scanning &&
+                stage <= AdvancementSequenceStage.Results);
+        }
+
+        private static GrayboxCivilizationAdvancementResult3D
+            AdvancementFailure(string message, string diagnostic = null)
+        {
+            return new GrayboxCivilizationAdvancementResult3D(
+                GrayboxCivilizationAdvancementCode3D.PrepareFailed,
+                false,
+                message,
+                diagnostic: diagnostic);
+        }
+
+        private static bool IsBossDefeated(
+            AttentionPressureSnapshot snapshot)
+        {
+            return snapshot?.CrystalBroodmotherDefeated == true;
+        }
+
+        private void HandlePressureWarningStarted(
+            AttentionPressureCommand command)
+        {
+            if (checkpointPolicy == null || command == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.PressureWarningStarted,
+                "pressure-warning:" + command.EncounterId);
+        }
+
+        private void HandlePressureEncounterStarted(
+            AttentionPressureCommand command)
+        {
+            if (checkpointPolicy == null || command == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.PressureEncounterStarted,
+                "pressure-started:" + command.EncounterId);
+        }
+
+        private void HandlePressureEncounterCompleted(
+            AttentionPressureCommand command)
+        {
+            if (checkpointPolicy == null || command == null) return;
+            checkpointPolicy.QueueCheckpoint(
+                FormalSaveCheckpointReasonIds.PressureEncounterCompleted,
+                "pressure-completed:" + command.EncounterId);
         }
 
         private static void ConfigureStoreRootForTesting(string root)

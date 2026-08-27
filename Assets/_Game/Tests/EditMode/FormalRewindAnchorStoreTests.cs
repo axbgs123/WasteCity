@@ -203,6 +203,33 @@ namespace WasteCity.Tests
             AssertResult(Invoke(store, "Load"), false, "DiskReadFailed");
         }
 
+        [Test]
+        public void IDEA0020_LevelTwoSlotsUseIndependentNonRecursiveFiles()
+        {
+            using (var root = new TemporaryDirectory())
+            {
+                var store = new FormalRewindAnchorStore(root.Path);
+                Assert.That(store.Save(ValidEnvelope(20L), 1).Success, Is.True);
+                Assert.That(store.Save(ValidEnvelope(21L), 2).Success, Is.True);
+                Assert.That(store.Load(1).Envelope.checkpoint.sequence,
+                    Is.EqualTo(20L));
+                Assert.That(store.Load(2).Envelope.checkpoint.sequence,
+                    Is.EqualTo(21L));
+                string directory = Path.Combine(root.Path,
+                    FormalRewindAnchorStore.InternalDirectoryName);
+                string first = File.ReadAllText(Path.Combine(directory,
+                    FormalRewindAnchorStore.FileName));
+                string second = File.ReadAllText(Path.Combine(directory,
+                    FormalRewindAnchorStore.SecondFileName));
+                StringAssert.DoesNotContain("anchorPayload", first + second);
+                StringAssert.DoesNotContain("encodedEnvelope", first + second);
+                Assert.That(store.Clear(1).Success, Is.True);
+                Assert.That(store.Load(1).Code,
+                    Is.EqualTo(FormalRewindAnchorStoreCode.NoAnchor));
+                Assert.That(store.Load(2).Success, Is.True);
+            }
+        }
+
         private static object CreateStore(
             string root,
             IFormalSaveFileSystem fileSystem = null)

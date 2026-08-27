@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
 
@@ -154,6 +155,9 @@ namespace WasteCity.Tests
                 typeof(PocketUniverseFateEffect),
                 typeof(FormalVoidDebtRuntime),
                 typeof(FormalRewindAnchorMetadataRuntime),
+                typeof(GrayboxAttentionPressureSaveAdapter3D),
+                typeof(FormalCivilizationAscensionRuntime),
+                typeof(AdvancementSequenceModel),
             });
             Assert.That(constructor, Is.Not.Null);
             return constructor.Invoke(new object[]
@@ -163,6 +167,9 @@ namespace WasteCity.Tests
                 pocket,
                 debt,
                 new FormalRewindAnchorMetadataRuntime(),
+                null,
+                null,
+                null,
             });
         }
 

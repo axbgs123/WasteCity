@@ -174,6 +174,45 @@ namespace WasteCity.Tests
             Assert.That(allocated, Is.Zero);
         }
 
+        [Test]
+        public void IDEA0020_ThresholdEventsPublishCommittedFactsOnceWithoutRestoreReplay()
+        {
+            object runtime = CreateRuntime();
+            EventInfo thresholdReached = runtime.GetType().GetEvent(
+                "ThresholdReached",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(thresholdReached, Is.Not.Null);
+            Assert.That(thresholdReached.EventHandlerType,
+                Is.EqualTo(typeof(Action<int>)));
+            var observed = new System.Collections.Generic.List<int>();
+            Action<int> throwing = _ => throw new InvalidOperationException(
+                "injected threshold observer failure");
+            Action<int> healthy = value => observed.Add(value);
+            thresholdReached.AddEventHandler(runtime, throwing);
+            thresholdReached.AddEventHandler(runtime, healthy);
+
+            for (var index = 0; index < 90; index++)
+            {
+                Assert.That(Apply(
+                    runtime,
+                    "core.attention.fate.void-debt-periodic",
+                    "threshold.event." + index), Is.True);
+            }
+            Assert.That(observed, Is.EqualTo(new[] { 30, 60, 90 }));
+
+            object snapshot = Capture(runtime);
+            object restored = CreateRuntime();
+            var replayed = new System.Collections.Generic.List<int>();
+            thresholdReached = restored.GetType().GetEvent(
+                "ThresholdReached");
+            thresholdReached.AddEventHandler(
+                restored,
+                new Action<int>(value => replayed.Add(value)));
+            Assert.That(Restore(restored, snapshot), Is.True);
+            Assert.That(replayed, Is.Empty,
+                "Persistence restore cannot replay threshold facts.");
+        }
+
         private static object CreateRuntime() =>
             Activator.CreateInstance(RequireType(RuntimeTypeName));
 

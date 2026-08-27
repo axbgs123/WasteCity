@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Graybox3D.Building;
+using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
 
@@ -37,6 +39,11 @@ namespace WasteCity.Tests
                 typeof(PocketUniverseFateEffect),
                 typeof(FormalVoidDebtRuntime),
                 typeof(FormalRewindAnchorMetadataRuntime),
+                RequireType(
+                    "WasteCity.Graybox3D.Building." +
+                    "GrayboxAttentionPressureSaveAdapter3D, WasteCity.Game"),
+                typeof(FormalCivilizationAscensionRuntime),
+                typeof(AdvancementSequenceModel),
             });
             Assert.That(constructor, Is.Not.Null);
             Assert.That(adapter.GetConstructors(), Has.Length.EqualTo(1));
@@ -48,6 +55,9 @@ namespace WasteCity.Tests
                     new PocketUniverseFateEffect(),
                     new FormalVoidDebtRuntime(),
                     new FormalRewindAnchorMetadataRuntime(),
+                    null,
+                    null,
+                    null,
                 }));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
@@ -57,6 +67,9 @@ namespace WasteCity.Tests
                     new PocketUniverseFateEffect(),
                     new FormalVoidDebtRuntime(),
                     new FormalRewindAnchorMetadataRuntime(),
+                    null,
+                    null,
+                    null,
                 }));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
@@ -66,6 +79,9 @@ namespace WasteCity.Tests
                     null,
                     new FormalVoidDebtRuntime(),
                     new FormalRewindAnchorMetadataRuntime(),
+                    null,
+                    null,
+                    null,
                 }));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
@@ -75,6 +91,9 @@ namespace WasteCity.Tests
                     new PocketUniverseFateEffect(),
                     null,
                     new FormalRewindAnchorMetadataRuntime(),
+                    null,
+                    null,
+                    null,
                 }));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
@@ -83,6 +102,9 @@ namespace WasteCity.Tests
                     new FormalFateRuntime(),
                     new PocketUniverseFateEffect(),
                     new FormalVoidDebtRuntime(),
+                    null,
+                    null,
+                    null,
                     null,
                 }));
         }
@@ -135,6 +157,335 @@ namespace WasteCity.Tests
             Assert.That(second.attention.committedStableEventKeys[0],
                 Is.EqualTo("fate-selection-complete"));
             Assert.That(second.fate.offeredIds, Is.EqualTo(FateIds));
+        }
+
+        [Test]
+        public void IDEA0020_PendingCivilizationOwnerSurvivesFreshRestore()
+        {
+            var fate = new FormalFateRuntime();
+            var civilization = new FormalCivilizationAscensionRuntime();
+            var sequence = new AdvancementSequenceModel();
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                new FormalAttentionRuntime(),
+                fate,
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                null,
+                civilization,
+                sequence);
+
+            Assert.That(adapter.TryRestore(
+                new FormalThreeDProgressionSaveData(),
+                out string error), Is.True, error);
+            Assert.That(civilization.Capture().FateId, Is.Empty);
+            Assert.That(civilization.Capture().FateLevel, Is.Zero);
+            Assert.That(sequence.Stage,
+                Is.EqualTo(AdvancementSequenceStage.None));
+            FormalThreeDProgressionSaveData captured = adapter.Capture();
+            Assert.That(captured.civilization.level, Is.EqualTo(1));
+            Assert.That(captured.civilization.ascensionCompleted, Is.False);
+        }
+
+        [Test]
+        public void IDEA0020_SameProcessSelectedOwnersResetToFreshProgress()
+        {
+            var fate = new FormalFateRuntime();
+            Assert.That(fate.TrySelect(
+                FormalFateCatalog.PocketUniverseId,
+                out _, out _, out string error), Is.True, error);
+            var civilization = new FormalCivilizationAscensionRuntime(
+                FormalFateCatalog.PocketUniverseId);
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                new FormalAttentionRuntime(),
+                fate,
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                null,
+                civilization,
+                new AdvancementSequenceModel());
+
+            Assert.That(adapter.TryRestore(
+                new FormalThreeDProgressionSaveData(),
+                out error), Is.True, error);
+            Assert.That(fate.Capture().HasSelection, Is.False);
+            Assert.That(civilization.Capture().FateId, Is.Empty);
+            Assert.That(civilization.Capture().FateLevel, Is.Zero);
+        }
+
+        [Test]
+        public void IDEA0020_SameProcessAscendedOwnersResetToFreshProgress()
+        {
+            CreateLevelTwoOwners(
+                FormalFateCatalog.RewindAnchorId,
+                out FormalAttentionRuntime attention,
+                out FormalFateRuntime fate,
+                out PocketUniverseFateEffect pocket,
+                out FormalVoidDebtRuntime debt,
+                out FormalRewindAnchorMetadataRuntime rewind,
+                out FormalCivilizationAscensionRuntime civilization,
+                out AdvancementSequenceModel sequence);
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                attention, fate, pocket, debt, rewind, null,
+                civilization, sequence);
+
+            Assert.That(adapter.TryRestore(
+                new FormalThreeDProgressionSaveData(),
+                out string error), Is.True, error);
+            Assert.That(fate.Capture().HasSelection, Is.False);
+            Assert.That(civilization.Capture().FateId, Is.Empty);
+            Assert.That(civilization.Capture().Ascended, Is.False);
+            Assert.That(sequence.Stage,
+                Is.EqualTo(AdvancementSequenceStage.None));
+            Assert.That(rewind.MaximumAnchors,
+                Is.EqualTo(
+                    FormalRewindAnchorMetadataRuntime
+                        .MaximumAnchorsAtLevelOne));
+            Assert.That(rewind.Capture().Entries, Is.Empty);
+        }
+
+        [Test]
+        public void IDEA0020_PressureAdapterIsSixthAtomicProgressionOwner()
+        {
+            var pressure = new AttentionPressureRuntime();
+            var pressureAdapter = new GrayboxAttentionPressureSaveAdapter3D(
+                pressure,
+                new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f));
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                new FormalAttentionRuntime(),
+                new FormalFateRuntime(),
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                pressureAdapter);
+            FormalThreeDProgressionSaveData data = adapter.Capture();
+            data.pressure.entries = new[]
+            {
+                new FormalThreeDAttentionPressureEntrySaveData
+                {
+                    threshold = 30,
+                    state = (int)AttentionPressureState.Queued,
+                },
+            };
+            data.pressure.revision = 1ul;
+            AttentionPressureSnapshot before = pressure.Capture();
+            Assert.That(adapter.TryPrepareRestore(
+                data,
+                out GrayboxFormalProgressionRestorePlan3D plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(pressure.Capture(), Is.SameAs(before));
+            Assert.That(adapter.TryCommitRestore(plan, out string error),
+                Is.True, error);
+            Assert.That(pressure.Capture().Entries.Single().Threshold,
+                Is.EqualTo(30));
+        }
+
+        [TestCase("core.legacy.pocket-universe")]
+        [TestCase("core.legacy.void-debt")]
+        [TestCase("core.legacy.rewind-anchor")]
+        public void IDEA0020_LevelTwoOwnersAndAscensionSequenceRoundTrip(
+            string fateId)
+        {
+            CreateLevelTwoOwners(
+                fateId,
+                out FormalAttentionRuntime attention,
+                out FormalFateRuntime fate,
+                out PocketUniverseFateEffect pocket,
+                out FormalVoidDebtRuntime debt,
+                out FormalRewindAnchorMetadataRuntime rewind,
+                out FormalCivilizationAscensionRuntime civilization,
+                out AdvancementSequenceModel sequence);
+            var pressure = new AttentionPressureRuntime();
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                attention,
+                fate,
+                pocket,
+                debt,
+                rewind,
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    pressure,
+                    new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f)),
+                civilization,
+                sequence);
+
+            FormalThreeDProgressionSaveData data = adapter.Capture();
+            Assert.That(data.fate.level, Is.EqualTo(2));
+            Assert.That(data.civilization.level, Is.EqualTo(2));
+            Assert.That(data.civilization.revision, Is.EqualTo(1ul));
+            Assert.That(data.civilization.ascensionCompleted, Is.True);
+            Assert.That(data.civilization.ascensionId,
+                Is.EqualTo("first-civilization-ascension"));
+            Assert.That(data.civilization.sequenceStage,
+                Is.EqualTo((int)AdvancementSequenceStage.Scanning));
+            Assert.That(data.civilization.remainingRuleSeconds,
+                Is.EqualTo(1.25f));
+            Assert.That(data.civilization.committedAscensionIds,
+                Is.EqualTo(new[] { "first-civilization-ascension" }));
+            if (fateId == FormalFateCatalog.PocketUniverseId)
+                Assert.That(data.fateEffects.pocketUniverse.level,
+                    Is.EqualTo(2));
+            else if (fateId == FormalFateCatalog.VoidDebtId)
+                Assert.That(data.fateEffects.voidDebt.level, Is.EqualTo(2));
+            else
+                Assert.That(data.fateEffects.rewindAnchors.anchors,
+                    Has.Length.EqualTo(2));
+
+            CreateLevelTwoTargets(
+                fateId,
+                out FormalAttentionRuntime targetAttention,
+                out FormalFateRuntime targetFate,
+                out PocketUniverseFateEffect targetPocket,
+                out FormalVoidDebtRuntime targetDebt,
+                out FormalRewindAnchorMetadataRuntime targetRewind,
+                out FormalCivilizationAscensionRuntime targetCivilization,
+                out AdvancementSequenceModel targetSequence);
+            var targetPressure = new AttentionPressureRuntime();
+            var target = new GrayboxFormalProgressionSaveAdapter3D(
+                targetAttention,
+                targetFate,
+                targetPocket,
+                targetDebt,
+                targetRewind,
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    targetPressure,
+                    new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f)),
+                targetCivilization,
+                targetSequence);
+            Assert.That(target.TryRestore(data, out string error), Is.True,
+                error);
+            Assert.That(targetFate.Capture().Level, Is.EqualTo(2));
+            Assert.That(targetCivilization.Capture().Ascended, Is.True);
+            Assert.That(targetSequence.Stage,
+                Is.EqualTo(AdvancementSequenceStage.Scanning));
+            Assert.That(targetSequence.Remaining, Is.EqualTo(1.25f));
+            Assert.That(targetRewind.Capture().Entries.Count,
+                Is.EqualTo(fateId == FormalFateCatalog.RewindAnchorId ? 2 : 0));
+        }
+
+        [Test]
+        public void IDEA0020_DefaultLevelOneOwnerRestoresLevelTwoDoubleSlots()
+        {
+            CreateLevelTwoOwners(
+                FormalFateCatalog.RewindAnchorId,
+                out FormalAttentionRuntime attention,
+                out FormalFateRuntime fate,
+                out PocketUniverseFateEffect pocket,
+                out FormalVoidDebtRuntime debt,
+                out FormalRewindAnchorMetadataRuntime rewind,
+                out FormalCivilizationAscensionRuntime civilization,
+                out AdvancementSequenceModel sequence);
+            var source = new GrayboxFormalProgressionSaveAdapter3D(
+                attention,
+                fate,
+                pocket,
+                debt,
+                rewind,
+                null,
+                civilization,
+                sequence);
+            FormalThreeDProgressionSaveData data = source.Capture();
+
+            var targetFate = new FormalFateRuntime();
+            var targetRewind = new FormalRewindAnchorMetadataRuntime();
+            var target = new GrayboxFormalProgressionSaveAdapter3D(
+                new FormalAttentionRuntime(),
+                targetFate,
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                targetRewind,
+                null,
+                new FormalCivilizationAscensionRuntime(
+                    FormalFateCatalog.RewindAnchorId),
+                new AdvancementSequenceModel());
+            Assert.That(target.TryRestore(data, out string error), Is.True,
+                error);
+            Assert.That(targetFate.Capture().Level, Is.EqualTo(2));
+            Assert.That(targetRewind.MaximumAnchors,
+                Is.EqualTo(
+                    FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelTwo));
+            Assert.That(targetRewind.Capture().Entries, Has.Count.EqualTo(2));
+        }
+
+        private static void CreateLevelTwoOwners(
+            string fateId,
+            out FormalAttentionRuntime attention,
+            out FormalFateRuntime fate,
+            out PocketUniverseFateEffect pocket,
+            out FormalVoidDebtRuntime debt,
+            out FormalRewindAnchorMetadataRuntime rewind,
+            out FormalCivilizationAscensionRuntime civilization,
+            out AdvancementSequenceModel sequence)
+        {
+            attention = new FormalAttentionRuntime();
+            fate = new FormalFateRuntime();
+            Assert.That(fate.TrySelect(fateId, out _, out _, out string error),
+                Is.True, error);
+            Assert.That(fate.TryPromoteToLevelTwo(out error), Is.True, error);
+            pocket = new PocketUniverseFateEffect();
+            debt = fateId == FormalFateCatalog.VoidDebtId
+                ? new FormalVoidDebtRuntime(2)
+                : new FormalVoidDebtRuntime();
+            rewind = fateId == FormalFateCatalog.RewindAnchorId
+                ? new FormalRewindAnchorMetadataRuntime(2)
+                : new FormalRewindAnchorMetadataRuntime();
+            if (fateId == FormalFateCatalog.PocketUniverseId)
+                Assert.That(pocket.TrySetLevel(2, out error), Is.True, error);
+            if (fateId == FormalFateCatalog.RewindAnchorId)
+            {
+                AddAnchor(rewind, "anchor.one", 1f);
+                AddAnchor(rewind, "anchor.two", 2f);
+            }
+            civilization = new FormalCivilizationAscensionRuntime(fateId);
+            Assert.That(civilization.TryRestore(
+                new FormalCivilizationAscensionSnapshot(
+                    2, fateId, 2, true, 1ul), out error), Is.True, error);
+            sequence = new AdvancementSequenceModel();
+            sequence.Restore((int)AdvancementSequenceStage.Scanning, 1.25f);
+        }
+
+        private static void CreateLevelTwoTargets(
+            string fateId,
+            out FormalAttentionRuntime attention,
+            out FormalFateRuntime fate,
+            out PocketUniverseFateEffect pocket,
+            out FormalVoidDebtRuntime debt,
+            out FormalRewindAnchorMetadataRuntime rewind,
+            out FormalCivilizationAscensionRuntime civilization,
+            out AdvancementSequenceModel sequence)
+        {
+            attention = new FormalAttentionRuntime();
+            fate = new FormalFateRuntime();
+            pocket = new PocketUniverseFateEffect();
+            debt = new FormalVoidDebtRuntime();
+            rewind = fateId == FormalFateCatalog.RewindAnchorId
+                ? new FormalRewindAnchorMetadataRuntime(2)
+                : new FormalRewindAnchorMetadataRuntime();
+            civilization = new FormalCivilizationAscensionRuntime(fateId);
+            sequence = new AdvancementSequenceModel();
+        }
+
+        private static void AddAnchor(
+            FormalRewindAnchorMetadataRuntime rewind,
+            string id,
+            float ruleTime)
+        {
+            Assert.That(rewind.TryPrepareUpsert(
+                id,
+                "internal." + id,
+                "session.000001",
+                new string('a', 64),
+                new FormalSaveCheckpointMetadata
+                {
+                    sequence = (long)ruleTime,
+                    reasonId = FormalSaveCheckpointReasonIds.NewGameReady,
+                    ruleTimeSeconds = ruleTime,
+                    completedMilestoneIds = Array.Empty<string>(),
+                },
+                out FormalRewindAnchorMetadataUpsertPlan plan,
+                out string error), Is.True, error);
+            Assert.That(rewind.TryCommitUpsert(plan, out error), Is.True,
+                error);
         }
 
         [Test]
@@ -273,8 +624,8 @@ namespace WasteCity.Tests
                 "BuildingStorage",
                 "Economy",
                 "Production",
-                "Progression",
                 "Defense",
+                "Progression",
                 "Evacuation",
                 "Pause",
             }));
@@ -346,7 +697,10 @@ namespace WasteCity.Tests
                 fate,
                 new PocketUniverseFateEffect(),
                 new FormalVoidDebtRuntime(),
-                new FormalRewindAnchorMetadataRuntime());
+                new FormalRewindAnchorMetadataRuntime(),
+                null,
+                null,
+                null);
         }
 
         private static FormalThreeDProgressionSaveData Capture(object adapter)

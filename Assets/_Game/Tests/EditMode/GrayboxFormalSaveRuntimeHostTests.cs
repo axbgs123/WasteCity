@@ -10,6 +10,7 @@ using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 
 namespace WasteCity.Tests
 {
@@ -40,6 +41,7 @@ namespace WasteCity.Tests
                 typeof(GrayboxProductionController3D),
                 typeof(GrayboxDefenseController3D),
                 typeof(GrayboxEvacuationController3D),
+                typeof(GrayboxCivilizationAdvancementView3D),
             };
 
             FieldInfo[] fields = host.GetFields(
@@ -56,6 +58,56 @@ namespace WasteCity.Tests
                     Is.Not.Null,
                     expected[index].Name + " must be authored explicitly.");
             }
+
+            FieldInfo inputBinding = fields.SingleOrDefault(value =>
+                value.Name == "inputCoordinator");
+            Assert.That(inputBinding, Is.Not.Null);
+            Assert.That(inputBinding.FieldType, Is.EqualTo(typeof(MonoBehaviour)));
+            Assert.That(
+                inputBinding.GetCustomAttribute<SerializeField>(),
+                Is.Not.Null,
+                "Input binding must be authored without a reverse assembly " +
+                "dependency on the Usability implementation.");
+        }
+
+        [Test]
+        public void IDEA0020_HostComposesAdvancementPresentationAndInputOnce()
+        {
+            string source = File.ReadAllText(SourcePath);
+            string initialize = ExtractMethod(source, "public bool TryInitialize(");
+            string lateUpdate = ExtractMethod(source, "private void LateUpdate(");
+            string destroy = ExtractMethod(source, "private void OnDestroy(");
+
+            StringAssert.Contains(
+                "new GrayboxCivilizationAdvancementPresentationController3D(",
+                initialize);
+            StringAssert.Contains("CaptureRequirements", initialize);
+            StringAssert.Contains("AdvanceRequested +=", initialize);
+            StringAssert.Contains("ContinueRequested +=", initialize);
+            StringAssert.Contains("ConfigureAdvancement(", initialize);
+            StringAssert.Contains("TryAdvanceCivilizationFromInput", initialize);
+            StringAssert.Contains(
+                "TryContinueCivilizationAdvancement",
+                initialize);
+            StringAssert.Contains(
+                "advancementPresentationController?.RefreshIfChanged()",
+                lateUpdate);
+            StringAssert.Contains("AdvanceRequested -=", destroy);
+            StringAssert.Contains("ContinueRequested -=", destroy);
+            StringAssert.Contains(
+                "advancementPresentationController.Dispose()",
+                destroy);
+
+            string advanceHandler = ExtractMethod(
+                source,
+                "private void HandleAdvancementRequested(");
+            string continueHandler = ExtractMethod(
+                source,
+                "private void HandleAdvancementContinueRequested(");
+            StringAssert.Contains("TryAdvanceCivilization()", advanceHandler);
+            StringAssert.Contains(
+                "TryContinueCivilizationAdvancement()",
+                continueHandler);
         }
 
         [Test]
@@ -74,16 +126,196 @@ namespace WasteCity.Tests
                 host,
                 "LastCoordinatorResult",
                 typeof(GrayboxFormalSaveCoordinatorResult3D));
+            AssertProperty(host, "LastInitializationError", typeof(string));
+            AssertProperty(
+                host,
+                "LastProgressionRestoreError",
+                typeof(string));
+            AssertProperty(host, "LastStartNewProgressError", typeof(string));
             AssertProperty(
                 host,
                 "LastWaveRetryStoreResult",
                 typeof(FormalSaveWaveRetryStoreResult));
+            AssertProperty(
+                host,
+                "Civilization",
+                typeof(FormalCivilizationAscensionRuntime));
+            AssertProperty(
+                host,
+                "Sequence",
+                typeof(AdvancementSequenceModel));
             AssertMethod(host, "Probe", typeof(FormalSaveStoreResult));
             AssertMethod(host, "TryStartNewProgress", typeof(bool));
             AssertMethod(host, "TryContinue", typeof(bool));
             AssertMethod(host, "TryRetryWaveCheckpoint", typeof(bool));
             AssertMethod(host, "TrySaveAndExit", typeof(bool));
             AssertMethod(host, "FlushPendingCheckpoint", typeof(bool));
+            AssertMethod(
+                host,
+                "CaptureRequirements",
+                typeof(FormalCivilizationAscensionRequirements));
+            AssertMethod(
+                host,
+                "TryAdvanceCivilization",
+                typeof(GrayboxCivilizationAdvancementResult3D));
+            AssertMethod(
+                host,
+                "TryContinueCivilizationAdvancement",
+                typeof(bool));
+        }
+
+        [Test]
+        public void IDEA0020_RequirementsProviderIsStableAndAllocationFree()
+        {
+            var root = new GameObject("Advancement.Requirements.Host");
+            root.SetActive(false);
+            try
+            {
+                GrayboxFormalSaveRuntimeHost3D host =
+                    root.AddComponent<GrayboxFormalSaveRuntimeHost3D>();
+                FormalCivilizationAscensionRequirements stable =
+                    host.CaptureRequirements();
+                host.CaptureRequirements();
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                bool same = true;
+                for (var index = 0; index < 300; index++)
+                    same &= ReferenceEquals(
+                        stable, host.CaptureRequirements());
+                long allocated =
+                    GC.GetAllocatedBytesForCurrentThread() - before;
+
+                Assert.That(same, Is.True);
+                Assert.That(allocated, Is.Zero);
+                string source = File.ReadAllText(SourcePath);
+                string capture = ExtractMethod(
+                    source,
+                    "public FormalCivilizationAscensionRequirements " +
+                    "CaptureRequirements(");
+                StringAssert.DoesNotContain("productionSnapshot.Entries", capture);
+                StringAssert.DoesNotContain("FindObjects", capture);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void IDEA0020_HostOwnsAdvancementAndRestoresPresentationPause()
+        {
+            string source = File.ReadAllText(SourcePath);
+            string rebuild = ExtractMethod(
+                source,
+                "private void RebuildProgressionComposition(");
+            string advance = ExtractMethod(
+                source,
+                "public GrayboxCivilizationAdvancementResult3D");
+            string lateUpdate = ExtractMethod(source, "private void LateUpdate(");
+            string continueProgress = ExtractMethod(
+                source,
+                "public bool TryContinue(");
+
+            StringAssert.Contains("Civilization", rebuild);
+            StringAssert.Contains("Sequence", rebuild);
+            StringAssert.Contains("Sequence.Start()", advance);
+            StringAssert.Contains("GamePauseReason.Advancement", advance);
+            StringAssert.Contains("QueueCheckpoint", advance);
+            StringAssert.Contains("TickCivilizationAdvancement()", lateUpdate);
+            StringAssert.Contains("SynchronizeAdvancementPause()", continueProgress);
+            StringAssert.Contains("ResolvePresentationDelta", source);
+        }
+
+        [Test]
+        public void IDEA0020_HostOwnsOneLivePressureGraphAndAllCheckpoints()
+        {
+            Type host = RequireType(HostTypeName);
+            AssertProperty(
+                host,
+                "AttentionPressureRuntime",
+                typeof(WasteCity.Progression.AttentionPressureRuntime));
+            string source = File.ReadAllText(SourcePath);
+            string initialize = ExtractMethod(source, "public bool TryInitialize(");
+            string lateUpdate = ExtractMethod(source, "private void LateUpdate(");
+            string destroy = ExtractMethod(source, "private void OnDestroy(");
+            string rebuildPressure = ExtractMethod(
+                source,
+                "private void RebuildPressureComposition(");
+            string rebuildProgression = ExtractMethod(
+                source,
+                "private void RebuildProgressionComposition(");
+
+            int rebuild = initialize.IndexOf(
+                "defense.TryRebuildAfterPersistenceRestore",
+                StringComparison.Ordinal);
+            int composition = initialize.IndexOf(
+                "RebuildPressureComposition();",
+                StringComparison.Ordinal);
+            int saveOwner = rebuildPressure.IndexOf(
+                "new GrayboxAttentionPressureSaveAdapter3D(",
+                StringComparison.Ordinal);
+            int progressionOwner = rebuildProgression.IndexOf(
+                "new GrayboxFormalProgressionSaveAdapter3D(",
+                StringComparison.Ordinal);
+            Assert.That(composition, Is.GreaterThan(rebuild));
+            Assert.That(saveOwner, Is.GreaterThanOrEqualTo(0));
+            Assert.That(progressionOwner, Is.GreaterThanOrEqualTo(0));
+            StringAssert.Contains("pressureSaveAdapter", rebuildPressure);
+            StringAssert.Contains(
+                "RebuildProgressionComposition();",
+                rebuildPressure);
+            StringAssert.Contains(
+                "GrayboxAttentionPressurePresentationController3D",
+                initialize);
+            StringAssert.Contains("TickAttentionPressure()", lateUpdate);
+            StringAssert.Contains("RefreshIfChanged()", lateUpdate);
+            StringAssert.Contains("pressureRuntimeController.Dispose()", destroy);
+            StringAssert.Contains("pressureDefenseController.Dispose()", destroy);
+            StringAssert.Contains("progressionAdapter = null", destroy);
+
+            StringAssert.Contains("PressureWarningStarted", source);
+            StringAssert.Contains("PressureEncounterStarted", source);
+            StringAssert.Contains("PressureEncounterCompleted", source);
+        }
+
+        [Test]
+        public void IDEA0020_FreshSchema33ProgressionRestoresWithPressureOwner()
+        {
+            var pressure = new AttentionPressureRuntime();
+            var defense = new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f);
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                new FormalAttentionRuntime(),
+                new FormalFateRuntime(),
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    pressure,
+                    defense));
+
+            Assert.That(adapter.TryRestore(
+                new FormalThreeDProgressionSaveData(),
+                out string error), Is.True, error);
+            Assert.That(pressure.Capture().Entries, Is.Empty);
+            Assert.That(defense.HasActivePressureCampaign, Is.False);
+        }
+
+        [Test]
+        public void IDEA0020_NewProgressPreservesTheExactFailedStageDiagnostic()
+        {
+            string source = File.ReadAllText(SourcePath);
+            string initialize = ExtractMethod(source, "public bool TryInitialize(");
+            string start = ExtractMethod(
+                source,
+                "public bool TryStartNewProgress(");
+
+            StringAssert.Contains("LastInitializationError", initialize);
+            StringAssert.Contains("out string progressionError", start);
+            StringAssert.Contains(
+                "LastProgressionRestoreError = progressionError",
+                start);
+            StringAssert.Contains("LastStartNewProgressError", start);
+            StringAssert.DoesNotContain("out _", start,
+                "A fresh-progress restore failure must remain diagnosable.");
         }
 
         [Test]

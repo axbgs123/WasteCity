@@ -147,6 +147,52 @@ namespace WasteCity.Tests
                 "Clearing an already empty slot is idempotent.");
         }
 
+        [Test]
+        public void IDEA0020_LevelTwoKeepsTwoSlotsAndReplacesStableOldest()
+        {
+            var runtime = new FormalRewindAnchorMetadataRuntime(2);
+            Upsert(runtime, "anchor-a", "hash-a", 1L);
+            Upsert(runtime, "anchor-b", "hash-b", 2L);
+            Assert.That(runtime.Capture().Entries.Select(value => value.AnchorId),
+                Is.EqualTo(new[] { "anchor-a", "anchor-b" }));
+            Upsert(runtime, "anchor-c", "hash-c", 3L);
+            Assert.That(runtime.Capture().Entries.Select(value => value.AnchorId),
+                Is.EqualTo(new[] { "anchor-b", "anchor-c" }));
+            Assert.That(runtime.Capture().Entries.Select(
+                    value => value.CreationOrdinal),
+                Is.EqualTo(new[] { 2L, 3L }));
+
+            var restored = new FormalRewindAnchorMetadataRuntime(2);
+            Assert.That(restored.TryRestore(runtime.Capture(), out string error),
+                Is.True, error);
+            Assert.That(restored.Capture().Entries, Has.Count.EqualTo(2));
+            var levelOne = new FormalRewindAnchorMetadataRuntime();
+            Assert.That(levelOne.TryRestore(runtime.Capture(), out _), Is.False);
+        }
+
+        private static void Upsert(
+            FormalRewindAnchorMetadataRuntime runtime,
+            string anchorId,
+            string hash,
+            long sequence)
+        {
+            Assert.That(runtime.TryPrepareUpsert(
+                anchorId,
+                ".internal-rewind-anchor/" + anchorId,
+                "session-a",
+                hash,
+                new FormalSaveCheckpointMetadata
+                {
+                    sequence = sequence,
+                    reasonId = "rewind-anchor-created",
+                    ruleTimeSeconds = 1f,
+                    completedMilestoneIds = Array.Empty<string>(),
+                },
+                out FormalRewindAnchorMetadataUpsertPlan plan,
+                out string error), Is.True, error);
+            Assert.That(runtime.TryCommitUpsert(plan, out error), Is.True, error);
+        }
+
         private static bool TryPrepare(
             object runtime,
             string hash,

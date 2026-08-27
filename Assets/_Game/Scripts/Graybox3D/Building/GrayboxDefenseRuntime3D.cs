@@ -706,6 +706,9 @@ namespace WasteCity.Graybox3D.Building
                     StringComparer.Ordinal);
         private TutorialDefenseRuntimeModel tutorial;
         private SingleCityDefenseCampaignModel campaign;
+        private SingleCityDefenseCampaignModel activePressureCampaign;
+        private string activePressureEncounterId;
+        private CrystalBroodmotherEncounter activeBroodmotherEncounter;
         private GrayboxBuildingHealthRuntime3D campaignBuildingHealth;
         private GrayboxCombatDestructionCoordinator3D
             campaignDestructionCoordinator;
@@ -771,6 +774,129 @@ namespace WasteCity.Graybox3D.Building
                 }
                 return cachedCampaignSnapshot;
             }
+        }
+
+        public SingleCityDefenseCampaignSnapshot ActiveCampaignSnapshot =>
+            ActiveCampaign?.Snapshot;
+        public string ActivePressureEncounterId =>
+            activePressureEncounterId ?? string.Empty;
+        public bool HasActivePressureCampaign =>
+            activePressureCampaign != null && !activePressureCampaign.IsTerminal;
+
+        public event Action<string, SingleCityDefenseCampaignResult>
+            PressureCampaignTerminalCommitted;
+        public event Action<string> CrystalBroodmotherDefeated;
+
+        private SingleCityDefenseCampaignModel ActiveCampaign =>
+            activePressureCampaign != null && !activePressureCampaign.IsTerminal
+                ? activePressureCampaign
+                : campaign;
+
+        public bool TryStartPressure(
+            SingleCityDefenseCampaignDefinition definition,
+            out string error)
+        {
+            if (definition == null || campaign == null ||
+                campaign.Snapshot.Result !=
+                    SingleCityDefenseCampaignResult.Victory ||
+                activePressureCampaign != null)
+            {
+                error = "十波战役尚未胜利或已有压力遭遇";
+                return false;
+            }
+            var pressure = new SingleCityDefenseCampaignModel(
+                requestedCoreX, requestedCoreZ, definition);
+            if (!pressure.TryStartAfterExternalWarning())
+            {
+                error = "压力遭遇定义无法启动";
+                return false;
+            }
+            activePressureCampaign = pressure;
+            activePressureEncounterId = definition.Id;
+            pressure.TerminalCommitted += HandlePressureTerminal;
+            pressure.EnemyDefeated += HandlePressureEnemyDefeated;
+            activeBroodmotherEncounter = null;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            error = string.Empty;
+            return true;
+        }
+
+        public SingleCityDefenseCampaignPersistenceState
+            CaptureActivePressurePersistence()
+        {
+            return activePressureCampaign?.CaptureForPersistence();
+        }
+
+        public bool TryRestoreActivePressure(
+            SingleCityDefenseCampaignDefinition definition,
+            SingleCityDefenseCampaignPersistenceState state,
+            out string error)
+        {
+            if (definition == null || state == null || campaign == null ||
+                campaign.Snapshot.Result !=
+                    SingleCityDefenseCampaignResult.Victory ||
+                activePressureCampaign != null ||
+                !string.Equals(
+                    definition.Id,
+                    state.CampaignId,
+                    StringComparison.Ordinal))
+            {
+                error = "压力遭遇恢复前置或定义身份无效";
+                return false;
+            }
+
+            var candidate = new SingleCityDefenseCampaignModel(
+                requestedCoreX,
+                requestedCoreZ,
+                definition);
+            if (!candidate.TryPrepareRestore(
+                    state,
+                    out SingleCityDefenseCampaignRestorePlan plan,
+                    out error) ||
+                !candidate.TryCommitRestore(plan, out error))
+            {
+                return false;
+            }
+
+            activePressureCampaign = candidate;
+            activePressureEncounterId = definition.Id;
+            candidate.TerminalCommitted += HandlePressureTerminal;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            error = string.Empty;
+            return true;
+        }
+
+        public bool ClearActivePressure()
+        {
+            if (activePressureCampaign == null) return false;
+            activePressureCampaign.TerminalCommitted -=
+                HandlePressureTerminal;
+            activePressureCampaign = null;
+            activePressureEncounterId = null;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            return true;
+        }
+
+        private void HandlePressureTerminal(
+            SingleCityDefenseCampaignResult result)
+        {
+            string encounterId = activePressureEncounterId;
+            PressureCampaignTerminalCommitted?.Invoke(encounterId, result);
+            if (activePressureCampaign != null)
+            {
+                activePressureCampaign.TerminalCommitted -=
+                    HandlePressureTerminal;
+                activePressureCampaign.EnemyDefeated -=
+                    HandlePressureEnemyDefeated;
+            }
+            activePressureCampaign = null;
+            activePressureEncounterId = null;
+            activeBroodmotherEncounter = null;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
         }
 
         public void ConfigureFormalCampaign(
@@ -1282,11 +1408,11 @@ namespace WasteCity.Graybox3D.Building
             if (requestedCoreX == x && requestedCoreZ == z) return;
             requestedCoreX = x;
             requestedCoreZ = z;
-            if (campaign == null)
+            if (ActiveCampaign == null)
                 tutorial.SetCorePosition(x, z);
             else
-                campaign.SetCorePosition(x, z);
-            campaignSnapshotDirty = campaign != null;
+                ActiveCampaign.SetCorePosition(x, z);
+            campaignSnapshotDirty = ActiveCampaign != null;
             snapshotDirty = true;
             persistenceGeneration++;
         }
@@ -1761,13 +1887,16 @@ namespace WasteCity.Graybox3D.Building
             bool advancedFixedStep = false;
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
-                campaign.Advance(
+                SingleCityDefenseCampaignModel owner = ActiveCampaign;
+                owner.Advance(
                     StepSecondsFloat,
                     requestedSpeed: 1,
                     campaignBuildingTargetProvider,
                     campaignBuildingDamageApplier);
                 for (var index = 0; index < campaignTowers.Count; index++)
-                    TickCampaignTower(campaignTowers[index], cityStorage);
+                    TickCampaignTower(
+                        campaignTowers[index], cityStorage, owner);
+                ObserveCrystalBroodmotherAuthority(owner);
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < 0d &&
                     accumulatorSeconds > -StepEpsilon)
@@ -1783,7 +1912,8 @@ namespace WasteCity.Graybox3D.Building
 
         private void TickCampaignTower(
             SingleCityDefenseTowerCombatModel tower,
-            CityResourceStorageModel cityStorage)
+            CityResourceStorageModel cityStorage,
+            SingleCityDefenseCampaignModel owner)
         {
             if (!campaignRunnableIds.Contains(tower.StableInstanceId))
                 return;
@@ -1797,7 +1927,7 @@ namespace WasteCity.Graybox3D.Building
             tower.RefillFrom(cityStorage);
             int damage = tower.Tick(
                 StepSecondsFloat,
-                campaign,
+                owner,
                 globallyPaused: false);
             if (damage > 0)
             {
@@ -1820,6 +1950,72 @@ namespace WasteCity.Graybox3D.Building
                 cityStorage.GetNetworkAmount(tower.ConsumableId) > 0
                     ? GrayboxDefenseTowerStatus3D.OutOfLogistics
                     : GrayboxDefenseTowerStatus3D.MissingAmmunition;
+        }
+
+        private void ObserveCrystalBroodmotherAuthority(
+            SingleCityDefenseCampaignModel owner)
+        {
+            if (!ReferenceEquals(owner, activePressureCampaign)) return;
+            SingleCityDefenseCampaignSnapshot snapshot = owner.Snapshot;
+            SingleCityDefenseEnemySnapshot boss = null;
+            for (var index = 0; index < snapshot.Enemies.Count; index++)
+            {
+                if (string.Equals(
+                        snapshot.Enemies[index].EnemyDefinitionId,
+                        CrystalBroodmotherCatalog.StableArchetypeId,
+                        StringComparison.Ordinal))
+                {
+                    boss = snapshot.Enemies[index];
+                    break;
+                }
+            }
+            if (boss == null) return;
+            if (activeBroodmotherEncounter == null)
+                activeBroodmotherEncounter =
+                    new CrystalBroodmotherEncounter(boss.StableId);
+            ApplyBroodmotherCommands(owner,
+                activeBroodmotherEncounter.ObserveAuthorityHealth(
+                    boss.StableId,
+                    boss.CurrentHealth,
+                    CrystalBroodmotherCatalog.MaximumHealth));
+        }
+
+        private void HandlePressureEnemyDefeated(
+            string stableEnemyId,
+            string enemyDefinitionId)
+        {
+            if (activePressureCampaign == null ||
+                activeBroodmotherEncounter == null ||
+                !string.Equals(enemyDefinitionId,
+                    CrystalBroodmotherCatalog.StableArchetypeId,
+                    StringComparison.Ordinal)) return;
+            IReadOnlyList<CrystalBroodmotherCommand> commands =
+                activeBroodmotherEncounter.ObserveAuthorityHealth(
+                    stableEnemyId, 0,
+                    CrystalBroodmotherCatalog.MaximumHealth);
+            ApplyBroodmotherCommands(activePressureCampaign, commands);
+            for (var index = 0; index < commands.Count; index++)
+                if (commands[index].Kind == CrystalBroodmotherCommandKind.Defeated)
+                    CrystalBroodmotherDefeated?.Invoke(stableEnemyId);
+        }
+
+        private static void ApplyBroodmotherCommands(
+            SingleCityDefenseCampaignModel owner,
+            IReadOnlyList<CrystalBroodmotherCommand> commands)
+        {
+            for (var commandIndex = 0; commandIndex < commands.Count;
+                 commandIndex++)
+            {
+                CrystalBroodmotherCommand command = commands[commandIndex];
+                if (command.Kind !=
+                    CrystalBroodmotherCommandKind.SpawnReinforcements) continue;
+                var entries = new WaveEntry[command.Reinforcements.Count];
+                for (var index = 0; index < entries.Length; index++)
+                    entries[index] = new WaveEntry(
+                        command.Reinforcements[index].Archetype,
+                        command.Reinforcements[index].Count);
+                owner.TryInjectReinforcements(command.StableCommandId, entries);
+            }
         }
 
         private DefenseBuildingCombatTarget[] GetCampaignBuildingTargets()
@@ -2115,7 +2311,7 @@ namespace WasteCity.Graybox3D.Building
 
         private GrayboxDefenseRuntimeSnapshot3D CaptureCampaignSnapshot()
         {
-            SingleCityDefenseCampaignSnapshot source = CampaignSnapshot;
+            SingleCityDefenseCampaignSnapshot source = ActiveCampaignSnapshot;
             var towerSnapshots =
                 new GrayboxDefenseTowerSnapshot3D[campaignTowers.Count];
             for (var index = 0; index < campaignTowers.Count; index++)

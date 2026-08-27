@@ -31,11 +31,11 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void ResearchCatalogUsesAllFortyThreeFormalChineseDefinitions()
+        public void ResearchCatalogUsesAllFortyFourFormalChineseDefinitions()
         {
             var entries = GrayboxDeveloperCatalogQuery3D.ResearchEntries;
 
-            Assert.That(entries, Has.Count.EqualTo(43));
+            Assert.That(entries, Has.Count.EqualTo(44));
             Assert.That(
                 entries.Select(value => value.StableId),
                 Is.EqualTo(ResearchCatalog.All.Select(
@@ -90,7 +90,7 @@ namespace WasteCity.Tests
                 Is.EqualTo("core.research.spirit-sensing"));
             Assert.That(
                 GrayboxDeveloperCatalogQuery3D.SearchResearch(null),
-                Has.Count.EqualTo(43));
+                Has.Count.EqualTo(44));
         }
 
         [Test]
@@ -110,6 +110,54 @@ namespace WasteCity.Tests
             Assert.That(GrayboxDeveloperCatalogQuery3D.TryResolveResearch(
                 resource.DisplayName,
                 out _), Is.False);
+        }
+
+        [Test]
+        public void ProgressionActionCatalogUsesStableIdsAndPlayerFacingChinese()
+        {
+            var entries = GrayboxDeveloperCatalogQuery3D
+                .ProgressionActionEntries;
+
+            Assert.That(entries, Is.Not.Empty);
+            Assert.That(entries.Select(value => value.StableId), Is.Unique);
+            Assert.That(entries, Has.All.Matches<
+                GrayboxDeveloperCatalogEntry3D>(value =>
+                    value.Kind ==
+                        GrayboxDeveloperCatalogKind3D.ProgressionAction &&
+                    value.StableId.StartsWith("developer.") &&
+                    !string.IsNullOrWhiteSpace(value.DisplayName) &&
+                    value.DisplayName != value.StableId &&
+                    !value.DisplayName.Contains("Try") &&
+                    !value.DisplayName.Contains("Execute") &&
+                    !value.DisplayName.Contains("Fixture")));
+            Assert.That(entries.Select(value => value.DisplayName),
+                Does.Contain("增加关注度")
+                    .And.Contain("选择回溯锚点命轨")
+                    .And.Contain("执行首次文明升阶")
+                    .And.Contain("查询进度配置签名"));
+        }
+
+        [Test]
+        public void ProgressionActionSearchSupportsListChineseAndStableId()
+        {
+            var chinese = GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("关注度");
+            var stable = GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("REWIND.READ");
+
+            Assert.That(chinese, Is.Not.Empty);
+            Assert.That(chinese, Has.All.Matches<
+                GrayboxDeveloperCatalogEntry3D>(value =>
+                    value.DisplayName.Contains("关注度")));
+            Assert.That(stable, Has.Count.EqualTo(1));
+            Assert.That(stable[0].DisplayName, Is.EqualTo("读取指定回溯锚点"));
+            Assert.That(GrayboxDeveloperCatalogQuery3D
+                    .TryResolveProgressionAction(
+                        "查询压力队列",
+                        out GrayboxDeveloperCatalogEntry3D resolved),
+                Is.True);
+            Assert.That(resolved.StableId,
+                Is.EqualTo("developer.query.pressure-queue"));
         }
     }
 }

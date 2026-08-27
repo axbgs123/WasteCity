@@ -86,12 +86,12 @@ namespace WasteCity.Tests
                     ReinforcedStructures,
                     LegacyAnalysis,
                 }));
-            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(43));
+            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(44));
             Assert.That(
                 ResearchCatalog.All.Select(value => value.Id.Value)
                     .Distinct()
                     .ToArray(),
-                Has.Length.EqualTo(43));
+                Has.Length.EqualTo(44));
             ResearchDefinition longAssembly =
                 ResearchCatalog.Find(AmmunitionAssembly);
             Assert.That(longAssembly.Name, Is.EqualTo("精密装配"));

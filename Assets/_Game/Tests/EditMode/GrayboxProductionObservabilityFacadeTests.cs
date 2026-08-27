@@ -34,6 +34,11 @@ namespace WasteCity.Tests
             Assert.That(snapshot.Revision, Is.EqualTo(1));
             Assert.That(clock.Revision, Is.EqualTo(snapshot.Revision));
             Assert.That(snapshot.ActiveWarehouseCount, Is.Zero);
+            Assert.That(snapshot.HasCurrentlyRunnableBuilding, Is.True);
+            Assert.That(
+                ProductionObservabilitySnapshot.Empty
+                    .HasCurrentlyRunnableBuilding,
+                Is.False);
             Assert.That(snapshot.Entries, Has.Count.EqualTo(2));
             Assert.That(snapshot.Entries[0].StableInstanceId,
                 Is.EqualTo(mine.StableInstanceId));

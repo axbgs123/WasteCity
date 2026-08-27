@@ -81,6 +81,20 @@ namespace WasteCity.Progression
             return true;
         }
 
+        public bool TryPromoteToLevelTwo(out string error)
+        {
+            if (string.IsNullOrEmpty(selectedId) || level != 1)
+            {
+                error = "只有已选择且处于一级的正式命轨可以升至二级";
+                return false;
+            }
+            level = 2;
+            unchecked { revision++; }
+            RebuildSnapshot();
+            error = string.Empty;
+            return true;
+        }
+
         public FormalFateSnapshot Capture()
         {
             return cachedSnapshot;
@@ -102,7 +116,8 @@ namespace WasteCity.Progression
             }
 
             bool pending = !snapshot.HasSelection && snapshot.Level == 0;
-            bool selected = snapshot.HasSelection && snapshot.Level == 1 &&
+            bool selected = snapshot.HasSelection &&
+                (snapshot.Level == 1 || snapshot.Level == 2) &&
                 FormalFateCatalog.Find(snapshot.SelectedId) != null &&
                 ContainsOffer(snapshot.SelectedId);
             if (!pending && !selected)

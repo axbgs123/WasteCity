@@ -261,8 +261,8 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxFormalSaveDomainId3D.BuildingStorage,
                 GrayboxFormalSaveDomainId3D.Economy,
                 GrayboxFormalSaveDomainId3D.Production,
-                GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Defense,
+                GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Evacuation,
                 GrayboxFormalSaveDomainId3D.Pause,
             });
@@ -396,14 +396,6 @@ namespace WasteCity.Graybox3D.Building
                             out error);
                     }),
                 new DelegateDomain(
-                    GrayboxFormalSaveDomainId3D.Progression,
-                    destination =>
-                        destination.progression = progression.Capture(),
-                    (FormalThreeDSaveData source, out string error) =>
-                        progression.TryRestore(
-                            source.progression,
-                            out error)),
-                new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Defense,
                     destination =>
                     {
@@ -432,6 +424,14 @@ namespace WasteCity.Graybox3D.Building
                                 instancesProvider(),
                                 out error);
                     }),
+                new DelegateDomain(
+                    GrayboxFormalSaveDomainId3D.Progression,
+                    destination =>
+                        destination.progression = progression.Capture(),
+                    (FormalThreeDSaveData source, out string error) =>
+                        progression.TryRestore(
+                            source.progression,
+                            out error)),
                 new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Evacuation,
                     destination =>

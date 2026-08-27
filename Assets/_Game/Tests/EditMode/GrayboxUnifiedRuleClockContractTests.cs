@@ -98,6 +98,38 @@ namespace WasteCity.Tests
                 "Development acceleration never bypasses terminal pause.");
         }
 
+        [TestCase(GamePauseReason.User)]
+        [TestCase(GamePauseReason.Title)]
+        [TestCase(GamePauseReason.Session)]
+        [TestCase(GamePauseReason.Defeat)]
+        [TestCase(GamePauseReason.SystemMenu)]
+        [TestCase(GamePauseReason.CampaignVictory)]
+        public void PresentationDeltaIgnoresOnlyAdvancementPause(
+            GamePauseReason foreignReason)
+        {
+            var speed = new GameSpeedModel();
+            speed.Set(2f);
+            object clock = CreateClock(speed);
+            speed.SetPaused(GamePauseReason.Advancement, true);
+
+            Assert.That(
+                (float)Invoke(clock, "ResolvePresentationDelta", .25f),
+                Is.EqualTo(.5f).Within(Tolerance));
+
+            speed.SetPaused(foreignReason, true);
+            Assert.That(
+                (float)Invoke(clock, "ResolvePresentationDelta", .25f),
+                Is.Zero,
+                "A user pause must still freeze advancement presentation.");
+            speed.SetPaused(foreignReason, false);
+
+            Invoke(clock, "SetTerminal", true);
+            Assert.That(
+                (float)Invoke(clock, "ResolvePresentationDelta", .25f),
+                Is.Zero,
+                "Terminal state must still freeze advancement presentation.");
+        }
+
         [Test]
         public void UnboundCompatibilityFallbackMirrorsUnityScaleOnce()
         {

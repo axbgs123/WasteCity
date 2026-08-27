@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
@@ -62,7 +63,24 @@ namespace WasteCity.Tests
             Assert.That(entry.IsNewGameConfirmationOpen, Is.False,
                 "An empty isolated formal slot must never request overwrite " +
                 "confirmation.");
-            Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
+            GrayboxFormalSaveRuntimeHost3D diagnosticHost =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(
+                entry.IsRuntimeReady,
+                Is.True,
+                entry.FeedbackMessage + " | hostInitialized=" +
+                (diagnosticHost?.IsInitialized.ToString() ?? "missing") +
+                " | store=" +
+                (diagnosticHost?.LastStoreResult?.Code.ToString() ?? "null") +
+                " | coordinator=" +
+                (diagnosticHost?.LastCoordinatorResult?.Code.ToString() ??
+                 "null") +
+                " | startError=" +
+                (diagnosticHost?.LastStartNewProgressError ?? "null") +
+                " | initializationError=" +
+                (diagnosticHost?.LastInitializationError ?? "null") +
+                " | progressionError=" +
+                (diagnosticHost?.LastProgressionRestoreError ?? "null"));
             Assert.That(entry.IsStartPageOpen, Is.False);
             Assert.That(Time.timeScale, Is.GreaterThan(0f));
             Assert.That(
@@ -138,6 +156,23 @@ namespace WasteCity.Tests
             Vector2 position = RectTransformUtility.WorldToScreenPoint(
                 null,
                 rect.TransformPoint(rect.rect.center));
+
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                position = position,
+            };
+            var raycasts = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, raycasts);
+            string raycastNames = string.Join(", ", raycasts.Select(
+                value => value.gameObject == null
+                    ? "null"
+                    : value.gameObject.name));
+            Assert.That(raycasts, Is.Not.Empty, name + " raycast");
+            Assert.That(
+                raycasts[0].gameObject == button.gameObject ||
+                raycasts[0].gameObject.transform.IsChildOf(button.transform),
+                Is.True,
+                name + " is covered by: " + raycastNames);
 
             QueueMouse(mouse, position);
             yield return null;

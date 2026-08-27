@@ -46,14 +46,14 @@ namespace WasteCity.Persistence
         public const string InternalDirectoryName =
             ".internal-rewind-anchor";
         public const string FileName = "slot-01.json";
+        public const string SecondFileName = "slot-02.json";
 
         private static readonly UTF8Encoding Utf8 =
             new UTF8Encoding(false, true);
 
         private readonly IFormalSaveFileSystem fileSystem;
         private readonly FormalSaveFileTransaction transaction;
-        private readonly string anchorPath;
-        private readonly string backupPath;
+        private readonly string internalRoot;
 
         [Serializable]
         private sealed class IdentityProbe
@@ -76,16 +76,22 @@ namespace WasteCity.Persistence
             this.fileSystem = fileSystem ??
                 new SystemFormalSaveFileSystem();
             transaction = new FormalSaveFileTransaction(this.fileSystem);
-            anchorPath = Path.Combine(
+            internalRoot = Path.Combine(
                 Path.GetFullPath(directory),
-                InternalDirectoryName,
-                FileName);
-            backupPath = anchorPath + ".bak";
+                InternalDirectoryName);
         }
 
         public FormalRewindAnchorStoreResult Save(
             FormalSaveEnvelope envelope)
         {
+            return Save(envelope, 1);
+        }
+
+        public FormalRewindAnchorStoreResult Save(
+            FormalSaveEnvelope envelope,
+            int slot)
+        {
+            string anchorPath = SlotPath(slot);
             if (!IsCurrentFormalEnvelope(envelope))
                 return Invalid("只接受当前正式 3D 存档");
 
@@ -126,6 +132,13 @@ namespace WasteCity.Persistence
 
         public FormalRewindAnchorStoreResult Load()
         {
+            return Load(1);
+        }
+
+        public FormalRewindAnchorStoreResult Load(int slot)
+        {
+            string anchorPath = SlotPath(slot);
+            string backupPath = anchorPath + ".bak";
             bool hasPrimary = fileSystem.FileExists(anchorPath);
             bool hasBackup = fileSystem.FileExists(backupPath);
             if (!hasPrimary && !hasBackup)
@@ -176,6 +189,13 @@ namespace WasteCity.Persistence
 
         public FormalRewindAnchorStoreResult Clear()
         {
+            return Clear(1);
+        }
+
+        public FormalRewindAnchorStoreResult Clear(int slot)
+        {
+            string anchorPath = SlotPath(slot);
+            string backupPath = anchorPath + ".bak";
             try
             {
                 fileSystem.DeleteIfExists(anchorPath);
@@ -193,6 +213,15 @@ namespace WasteCity.Persistence
                     "无法清除回溯锚点",
                     diagnostic: ExceptionDiagnostic(exception));
             }
+        }
+
+        private string SlotPath(int slot)
+        {
+            if (slot != 1 && slot != 2)
+                throw new ArgumentOutOfRangeException(nameof(slot));
+            return Path.Combine(
+                internalRoot,
+                slot == 1 ? FileName : SecondFileName);
         }
 
         private FormalRewindAnchorStoreResult ReadCandidate(

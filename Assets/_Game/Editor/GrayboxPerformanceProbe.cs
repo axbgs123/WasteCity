@@ -2297,8 +2297,12 @@ namespace WasteCity.Editor
                 case GrayboxFormalSaveDomainId3D.Production:
                     destination.production = source.production;
                     return;
+                case GrayboxFormalSaveDomainId3D.Progression:
+                    destination.progression = source.progression;
+                    return;
                 case GrayboxFormalSaveDomainId3D.Defense:
                     destination.defense = source.defense;
+                    destination.defenseCampaign = source.defenseCampaign;
                     return;
                 case GrayboxFormalSaveDomainId3D.Evacuation:
                     destination.evacuation = source.evacuation;

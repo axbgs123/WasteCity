@@ -7,6 +7,7 @@ using NUnit.Framework;
 using UnityEngine;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Progression;
 
 namespace WasteCity.Tests
 {
@@ -34,6 +35,7 @@ namespace WasteCity.Tests
             Type attention = RequireField(root, "attention").FieldType;
             Type fate = RequireField(root, "fate").FieldType;
             Type effects = RequireField(root, "fateEffects").FieldType;
+            Type pressure = RequireField(root, "pressure").FieldType;
             Type civilization = RequireField(root, "civilization").FieldType;
 
             RequireField(attention, "value", typeof(int));
@@ -60,8 +62,67 @@ namespace WasteCity.Tests
             RequireArray(rewind, "anchors");
             RequireField(rewind, "nextCreationOrdinal", typeof(long));
 
+            RequireField(pressure, "revision", typeof(ulong));
+            Type pressureEntry = RequireArray(pressure, "entries")
+                .FieldType.GetElementType();
+            RequireField(pressureEntry, "threshold", typeof(int));
+            RequireField(pressureEntry, "state", typeof(int));
+            RequireField(pressureEntry, "warningRemainingSeconds",
+                typeof(float));
+            RequireField(pressure, "activeEncounterId", typeof(string));
+            RequireField(pressure, "activeCampaign");
+
             RequireField(civilization, "level", typeof(int));
+            RequireField(civilization, "revision", typeof(ulong));
+            RequireField(civilization, "ascensionId", typeof(string));
+            RequireField(civilization, "ascensionCompleted", typeof(bool));
+            RequireField(civilization, "sequenceStage", typeof(int));
+            RequireField(civilization, "remainingRuleSeconds", typeof(float));
             RequireArray(civilization, "committedAscensionIds", typeof(string));
+        }
+
+        [Test]
+        public void IDEA0020_LevelTwoCivilizationAndVoidEffectRoundTrip()
+        {
+            FormalSaveEnvelope envelope = MigratedFixture();
+            object progression = ReadField(envelope.formal3D, "progression");
+            object fate = ReadField(progression, "fate");
+            object effects = ReadField(progression, "fateEffects");
+            object debt = ReadField(effects, "voidDebt");
+            object civilization = ReadField(progression, "civilization");
+            Select(fate, FormalFateCatalog.VoidDebtId, 2);
+            WriteField(fate, "revision", 2ul);
+            WriteField(debt, "level", 2);
+            WriteField(civilization, "level", 2);
+            WriteField(civilization, "revision", 1ul);
+            WriteField(civilization, "ascensionId",
+                "first-civilization-ascension");
+            WriteField(civilization, "ascensionCompleted", true);
+            WriteField(civilization, "sequenceStage",
+                (int)AdvancementSequenceStage.Scanning);
+            WriteField(civilization, "remainingRuleSeconds", 1.5f);
+            WriteField(civilization, "committedAscensionIds", new[]
+            {
+                "first-civilization-ascension",
+            });
+            Rehash(envelope);
+
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
+                FormalSaveCodec.EncodeEnvelope(envelope));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateDecoded(decoded);
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+            FormalThreeDCivilizationSaveData actual =
+                decoded.Envelope.formal3D.progression.civilization;
+            Assert.That(actual.level, Is.EqualTo(2));
+            Assert.That(actual.revision, Is.EqualTo(1ul));
+            Assert.That(actual.ascensionCompleted, Is.True);
+            Assert.That(actual.sequenceStage,
+                Is.EqualTo((int)AdvancementSequenceStage.Scanning));
+            Assert.That(actual.remainingRuleSeconds, Is.EqualTo(1.5f));
+            Assert.That(actual.committedAscensionIds,
+                Is.EqualTo(new[] { "first-civilization-ascension" }));
         }
 
         [Test]
@@ -147,6 +208,14 @@ namespace WasteCity.Tests
         [TestCase("selected-with-zero-level")]
         [TestCase("void-debt-while-pocket")]
         [TestCase("negative-void-debt")]
+        [TestCase("pressure-active-without-campaign")]
+        [TestCase("pressure-active-id-mismatch")]
+        [TestCase("fate-two-civilization-one")]
+        [TestCase("civilization-two-fate-one")]
+        [TestCase("civilization-two-missing-lock")]
+        [TestCase("civilization-two-wrong-id")]
+        [TestCase("civilization-two-no-sequence")]
+        [TestCase("civilization-two-invalid-time")]
         public void IDEA0020_ValidatorRejectsInvalidProgressionTruth(string fault)
         {
             FormalSaveEnvelope envelope = MigratedFixture();
@@ -154,6 +223,8 @@ namespace WasteCity.Tests
             object attention = ReadField(progression, "attention");
             object fate = ReadField(progression, "fate");
             object effects = ReadField(progression, "fateEffects");
+            object pressure = ReadField(progression, "pressure");
+            object civilization = ReadField(progression, "civilization");
 
             switch (fault)
             {
@@ -200,6 +271,75 @@ namespace WasteCity.Tests
                         },
                     });
                     break;
+                case "pressure-active-without-campaign":
+                    WriteField(pressure, "entries", new[]
+                    {
+                        new FormalThreeDAttentionPressureEntrySaveData
+                        {
+                            threshold = 30,
+                            state = (int)AttentionPressureState.Active,
+                        },
+                    });
+                    break;
+                case "pressure-active-id-mismatch":
+                    WriteField(pressure, "entries", new[]
+                    {
+                        new FormalThreeDAttentionPressureEntrySaveData
+                        {
+                            threshold = 30,
+                            state = (int)AttentionPressureState.Active,
+                        },
+                    });
+                    WriteField(pressure, "activeEncounterId",
+                        "core.attention-encounter.high-risk-attack");
+                    WriteField(pressure, "activeCampaign",
+                        new FormalThreeDPressureCampaignSaveData
+                        {
+                            campaignId =
+                                "core.attention-encounter.high-risk-attack",
+                        });
+                    break;
+                case "fate-two-civilization-one":
+                    Select(fate, FateIds[0], 2);
+                    WriteField(ReadField(effects, "pocketUniverse"),
+                        "level", 2);
+                    break;
+                case "civilization-two-fate-one":
+                    Select(fate, FateIds[0], 1);
+                    ConfigureCompletedCivilization(civilization);
+                    break;
+                case "civilization-two-missing-lock":
+                    Select(fate, FateIds[0], 2);
+                    WriteField(ReadField(effects, "pocketUniverse"),
+                        "level", 2);
+                    ConfigureCompletedCivilization(civilization);
+                    WriteField(civilization, "committedAscensionIds",
+                        Array.Empty<string>());
+                    break;
+                case "civilization-two-wrong-id":
+                    Select(fate, FateIds[0], 2);
+                    WriteField(ReadField(effects, "pocketUniverse"),
+                        "level", 2);
+                    ConfigureCompletedCivilization(civilization);
+                    WriteField(civilization, "ascensionId", "wrong.id");
+                    break;
+                case "civilization-two-no-sequence":
+                    Select(fate, FateIds[0], 2);
+                    WriteField(ReadField(effects, "pocketUniverse"),
+                        "level", 2);
+                    ConfigureCompletedCivilization(civilization);
+                    WriteField(civilization, "sequenceStage",
+                        (int)AdvancementSequenceStage.None);
+                    break;
+                case "civilization-two-invalid-time":
+                    Select(fate, FateIds[0], 2);
+                    WriteField(ReadField(effects, "pocketUniverse"),
+                        "level", 2);
+                    ConfigureCompletedCivilization(civilization);
+                    WriteField(civilization, "sequenceStage",
+                        (int)AdvancementSequenceStage.Results);
+                    WriteField(civilization, "remainingRuleSeconds", 1f);
+                    break;
             }
 
             Rehash(envelope);
@@ -207,6 +347,22 @@ namespace WasteCity.Tests
                 FormalSaveValidator.ValidateEnvelope(envelope);
             Assert.That(result.IsValid, Is.False, fault);
             Assert.That(result.FieldPath, Does.StartWith("formal3D.progression"));
+        }
+
+        private static void ConfigureCompletedCivilization(object civilization)
+        {
+            WriteField(civilization, "level", 2);
+            WriteField(civilization, "revision", 1ul);
+            WriteField(civilization, "ascensionId",
+                "first-civilization-ascension");
+            WriteField(civilization, "ascensionCompleted", true);
+            WriteField(civilization, "sequenceStage",
+                (int)AdvancementSequenceStage.Scanning);
+            WriteField(civilization, "remainingRuleSeconds", 2f);
+            WriteField(civilization, "committedAscensionIds", new[]
+            {
+                "first-civilization-ascension",
+            });
         }
 
         private static void Select(object fate, string id, int level)

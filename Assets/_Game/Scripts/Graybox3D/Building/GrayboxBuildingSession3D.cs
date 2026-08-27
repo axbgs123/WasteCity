@@ -115,7 +115,7 @@ namespace WasteCity.Graybox3D.Building
         }
 
         public string StableInstanceId { get; }
-        public PlacedBuilding Placement { get; }
+        public PlacedBuilding Placement { get; private set; }
         public ConstructionProgress Progress { get; }
         public ResourceNodeBinding BoundResourceNode { get; }
         public GrayboxBuildingInstanceState State { get; private set; }
@@ -125,6 +125,12 @@ namespace WasteCity.Graybox3D.Building
         internal void Complete()
         {
             State = GrayboxBuildingInstanceState.Completed;
+        }
+
+        internal void ReplacePlacement(PlacedBuilding placement)
+        {
+            Placement = placement ??
+                throw new ArgumentNullException(nameof(placement));
         }
 
         internal void RestoreConstruction(float remaining)
@@ -1152,6 +1158,131 @@ namespace WasteCity.Graybox3D.Building
             EnsureConfigured();
             ResearchDefinition definition = ResearchCatalog.Find(id);
             return definition != null && Research.IsCompleted(definition.Id);
+        }
+
+        internal bool TryUpgradeCompletedBuilding(
+            GrayboxBuildingInstance3D instance,
+            BuildingUpgradeDefinition upgrade,
+            IGrayboxBuildingPresentation3D presentation,
+            out string error)
+        {
+            EnsureConfigured();
+            if (instance == null || upgrade == null || presentation == null ||
+                !instances.Contains(instance) ||
+                instance.State != GrayboxBuildingInstanceState.Completed ||
+                !instance.IsPlayerOwned || instance.IsEvacuationLocked ||
+                !ReferenceEquals(
+                    instance.Placement.Definition,
+                    upgrade.Source) ||
+                upgrade.Target == null || upgrade.Cost <= 0 ||
+                string.IsNullOrWhiteSpace(upgrade.CostId))
+            {
+                error = "升级目标必须是已完成、归玩家且未锁定的正式建筑";
+                return false;
+            }
+            if (!CityStorage.CanSpendFromNetwork(
+                    upgrade.CostId,
+                    upgrade.Cost))
+            {
+                error = "城市库存缺少建筑升级材料";
+                return false;
+            }
+
+            BuildingGrid grid = instance.Placement.Site ==
+                    BuildingSite.InnerCity
+                ? InnerGrid
+                : GroundGrid;
+            PlacedBuilding sourcePlacement = instance.Placement;
+            var freeUpgradePayment = new ResourceInventory(0);
+            if (!grid.TryUpgrade(
+                    sourcePlacement,
+                    upgrade.Target,
+                    freeUpgradePayment,
+                    upgrade.CostId,
+                    0,
+                    out PlacedBuilding targetPlacement))
+            {
+                error = "建筑升级目标无法保持原占格和站点";
+                return false;
+            }
+            instance.ReplacePlacement(targetPlacement);
+
+            bool presentationRemoved = false;
+            bool targetPresentationCreated = false;
+            try
+            {
+                presentation.Remove(instance);
+                presentationRemoved = true;
+                targetPresentationCreated = presentation.TryCreate(instance);
+            }
+            catch
+            {
+                targetPresentationCreated = false;
+            }
+            if (!targetPresentationCreated)
+            {
+                if (presentationRemoved)
+                {
+                    try { presentation.Remove(instance); }
+                    catch { }
+                }
+                RollbackBuildingUpgrade(
+                    instance,
+                    sourcePlacement,
+                    grid,
+                    freeUpgradePayment,
+                    presentation,
+                    presentationRemoved);
+                error = "建筑升级表现替换失败，规则状态已回滚";
+                return false;
+            }
+
+            if (!CityStorage.TrySpendFromNetwork(
+                    upgrade.CostId,
+                    upgrade.Cost))
+            {
+                try { presentation.Remove(instance); }
+                catch { }
+                RollbackBuildingUpgrade(
+                    instance,
+                    sourcePlacement,
+                    grid,
+                    freeUpgradePayment,
+                    presentation,
+                    true);
+                error = "建筑升级材料提交失败，规则状态已回滚";
+                return false;
+            }
+
+            AdvanceCatalogRevision();
+            AdvancePlacementRevision();
+            error = string.Empty;
+            return true;
+        }
+
+        private static void RollbackBuildingUpgrade(
+            GrayboxBuildingInstance3D instance,
+            PlacedBuilding sourcePlacement,
+            BuildingGrid grid,
+            ResourceInventory payment,
+            IGrayboxBuildingPresentation3D presentation,
+            bool restorePresentation)
+        {
+            if (instance == null || sourcePlacement == null || grid == null)
+                return;
+            if (grid.TryUpgrade(
+                    instance.Placement,
+                    sourcePlacement.Definition,
+                    payment,
+                    sourcePlacement.Definition.CostId,
+                    0,
+                    out PlacedBuilding restoredPlacement))
+            {
+                instance.ReplacePlacement(restoredPlacement);
+            }
+            if (!restorePresentation) return;
+            try { presentation.TryCreate(instance); }
+            catch { }
         }
 
         public bool HasContactedRoute(ContentRoute route)

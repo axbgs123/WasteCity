@@ -78,7 +78,7 @@ namespace WasteCity.Tests
                 .OrderBy(value => value, StringComparer.Ordinal)
                 .ToArray();
 
-            Assert.That(nodeButtons, Has.Length.EqualTo(43));
+            Assert.That(nodeButtons, Has.Length.EqualTo(44));
             Assert.That(actualNames, Is.EqualTo(expectedNames));
             Assert.That(view.IsResearchOpen, Is.True);
         }

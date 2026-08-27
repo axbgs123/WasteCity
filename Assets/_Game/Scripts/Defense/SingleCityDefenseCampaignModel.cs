@@ -254,13 +254,16 @@ namespace WasteCity.Defense
         public const string CityCoreTargetId = "city.core";
 
         private const double FixedStepSeconds = .1d;
-        private const double StepEpsilon = .0000001d;
+        private const double StepEpsilon = .000001d;
 
         private float coreX;
         private float coreZ;
         private readonly List<EnemyState> enemies = new List<EnemyState>();
         private readonly List<SpawnDefinition> spawnSequence =
             new List<SpawnDefinition>();
+        private readonly SortedDictionary<string, WaveEntry[]>
+            injectedReinforcements = new SortedDictionary<string, WaveEntry[]>(
+                StringComparer.Ordinal);
         private readonly SessionStatisticsModel statistics =
             new SessionStatisticsModel();
         private readonly Dictionary<CampaignSpawnDirection,
@@ -281,11 +284,22 @@ namespace WasteCity.Defense
         private int coreCurrentHealth = CityCoreCombatModel.FormalMaximumHealth;
         private ulong persistenceGeneration;
         private ulong terminalRevision;
+        private readonly SingleCityDefenseCampaignDefinition definition;
 
         public SingleCityDefenseCampaignModel(float coreX, float coreZ)
+            : this(coreX, coreZ, CampaignWaveCatalog.Default)
+        {
+        }
+
+        public SingleCityDefenseCampaignModel(
+            float coreX,
+            float coreZ,
+            SingleCityDefenseCampaignDefinition definition)
         {
             this.coreX = coreX;
             this.coreZ = coreZ;
+            this.definition = definition ??
+                throw new ArgumentNullException(nameof(definition));
         }
 
         public SingleCityDefenseCampaignSnapshot Snapshot => CreateSnapshot();
@@ -298,6 +312,32 @@ namespace WasteCity.Defense
         public event Action<int> WaveWarningStarted;
         public event Action<SingleCityDefenseCampaignResult>
             TerminalCommitted;
+        public event Action<string, string> EnemyDefeated;
+
+        public bool TryInjectReinforcements(
+            string stableEventId,
+            IReadOnlyList<WaveEntry> entries)
+        {
+            if (IsTerminal || currentWave == null ||
+                string.IsNullOrWhiteSpace(stableEventId) || entries == null ||
+                entries.Count == 0 || injectedReinforcements.ContainsKey(
+                    stableEventId))
+                return false;
+            var copy = new WaveEntry[entries.Count];
+            for (var index = 0; index < copy.Length; index++)
+            {
+                WaveEntry entry = entries[index];
+                if (entry.Count <= 0 ||
+                    FindEnemyDefinition(entry.Archetype) == null)
+                    return false;
+                copy[index] = entry;
+            }
+            injectedReinforcements.Add(stableEventId, copy);
+            AppendSpawnEntries(currentWave, copy, spawnSequence);
+            phase = SingleCityDefenseCampaignPhase.SpawningAndCombat;
+            persistenceGeneration++;
+            return true;
+        }
 
         public SingleCityDefenseCampaignPersistenceState CaptureForPersistence()
         {
@@ -306,18 +346,8 @@ namespace WasteCity.Defense
             var planned = new Dictionary<string, int>(StringComparer.Ordinal);
             if (currentWave != null)
             {
-                for (var index = 0; index < currentWave.Entries.Count; index++)
-                {
-                    EnemyDefinition definition = FindEnemyDefinition(
-                        currentWave.Entries[index].Archetype);
-                    if (definition != null)
-                    {
-                        Add(
-                            planned,
-                            definition.Id.Value,
-                            currentWave.Entries[index].Count);
-                    }
-                }
+                for (var index = 0; index < spawnSequence.Count; index++)
+                    Add(planned, spawnSequence[index].Definition.Id.Value, 1);
             }
 
             var spawned = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -366,7 +396,7 @@ namespace WasteCity.Defense
             }
 
             return new SingleCityDefenseCampaignPersistenceState(
-                CampaignWaveCatalog.Id,
+                definition.Id,
                 phase,
                 currentWave == null ? 0 : currentWave.Number,
                 (float)warningRemainingSeconds,
@@ -402,7 +432,8 @@ namespace WasteCity.Defense
                     capturedStatistics.ProductionActiveProgressSeconds,
                     capturedStatistics.ProductionEligibleSeconds,
                     capturedStatistics.CityWasPackedAfterCampaignStart,
-                    capturedStatistics.DevelopmentModifierUsed));
+                    capturedStatistics.DevelopmentModifierUsed),
+                InjectedPersistenceStates());
         }
 
         public bool TryPrepareRestore(
@@ -462,6 +493,10 @@ namespace WasteCity.Defense
             enemies.AddRange(candidate.Enemies);
             spawnSequence.Clear();
             spawnSequence.AddRange(candidate.SpawnSequence);
+            injectedReinforcements.Clear();
+            foreach (KeyValuePair<string, WaveEntry[]> pair in
+                     candidate.InjectedReinforcements)
+                injectedReinforcements.Add(pair.Key, pair.Value);
             frozenSpawnAnchors.Clear();
             foreach (KeyValuePair<CampaignSpawnDirection,
                      SingleCityDefenseCampaignSpawnAnchorPersistenceState> pair
@@ -542,13 +577,31 @@ namespace WasteCity.Defense
                 !IsFormalDefenseTower(buildingId) ||
                 tower == null ||
                 tower.LocalCapacity <= 0 ||
-                CampaignWaveCatalog.All.Count == 0)
+                definition.Waves.Count == 0)
             {
                 return false;
             }
 
             campaignTriggered = true;
             BeginWave(0);
+            persistenceGeneration++;
+            return true;
+        }
+
+        public bool TryStartAfterExternalWarning()
+        {
+            if (ReferenceEquals(definition, CampaignWaveCatalog.Default) ||
+                campaignTriggered || definition.Waves.Count == 0)
+                return false;
+            campaignTriggered = true;
+            currentWave = definition.Waves[0];
+            warningRemainingSeconds = 0d;
+            spawnClockSeconds = 0d;
+            nextSpawnIndex = 0;
+            enemies.Clear();
+            BuildSpawnSequence(currentWave);
+            FreezeSpawnAnchors(currentWave);
+            phase = SingleCityDefenseCampaignPhase.SpawningAndCombat;
             persistenceGeneration++;
             return true;
         }
@@ -633,6 +686,7 @@ namespace WasteCity.Defense
             enemy.CurrentHealth = 0;
             RegisterDamage(sourceTowerBuildingId, appliedDamage);
             RegisterKill(enemy.Definition.Id.Value, sourceTowerBuildingId);
+            EnemyDefeated?.Invoke(enemy.StableId, enemy.Definition.Id.Value);
             persistenceGeneration++;
             return true;
         }
@@ -658,6 +712,9 @@ namespace WasteCity.Defense
             if (enemy.CurrentHealth == 0)
             {
                 RegisterKill(enemy.Definition.Id.Value, towerBuildingId);
+                EnemyDefeated?.Invoke(
+                    enemy.StableId,
+                    enemy.Definition.Id.Value);
             }
             persistenceGeneration++;
             return applied;
@@ -742,6 +799,9 @@ namespace WasteCity.Defense
                 RegisterKill(
                     enemy.Definition.Id.Value,
                     towerBuildingId);
+                EnemyDefeated?.Invoke(
+                    enemy.StableId,
+                    enemy.Definition.Id.Value);
             }
             persistenceGeneration++;
             return applied;
@@ -861,6 +921,22 @@ namespace WasteCity.Defense
                 return SingleCityDefenseCampaignResult.Victory;
             }
             return SingleCityDefenseCampaignResult.None;
+        }
+
+        private SingleCityDefenseCampaignResult ResolveCurrentTerminalResult(
+            int currentWaveNumber,
+            bool allPlannedEnemiesSpawned,
+            int aliveEnemyCount,
+            int currentCoreHealth)
+        {
+            if (currentCoreHealth <= 0)
+                return SingleCityDefenseCampaignResult.Defeat;
+            return definition.Waves.Count > 0 &&
+                currentWaveNumber ==
+                    definition.Waves[definition.Waves.Count - 1].Number &&
+                allPlannedEnemiesSpawned && aliveEnemyCount <= 0
+                    ? SingleCityDefenseCampaignResult.Victory
+                    : SingleCityDefenseCampaignResult.None;
         }
 
         private void Step(
@@ -1194,7 +1270,8 @@ namespace WasteCity.Defense
                 return;
             }
 
-            SingleCityDefenseCampaignResult terminal = ResolveTerminalResult(
+            SingleCityDefenseCampaignResult terminal =
+                ResolveCurrentTerminalResult(
                 currentWave.Number,
                 allPlannedEnemiesSpawned: true,
                 aliveEnemyCount: 0,
@@ -1213,12 +1290,12 @@ namespace WasteCity.Defense
         private void BeginWave(int catalogIndex)
         {
             if (catalogIndex < 0 ||
-                catalogIndex >= CampaignWaveCatalog.All.Count)
+                catalogIndex >= definition.Waves.Count)
             {
                 return;
             }
 
-            currentWave = CampaignWaveCatalog.All[catalogIndex];
+            currentWave = definition.Waves[catalogIndex];
             warningRemainingSeconds = currentWave.WarningSeconds;
             spawnClockSeconds = 0d;
             nextSpawnIndex = 0;
@@ -1319,6 +1396,41 @@ namespace WasteCity.Defense
             while (added);
         }
 
+        private static void AppendSpawnEntries(
+            CampaignWaveDefinition wave,
+            IReadOnlyList<WaveEntry> entries,
+            IList<SpawnDefinition> destination)
+        {
+            for (var entryIndex = 0; entryIndex < entries.Count; entryIndex++)
+            for (var count = 0; count < entries[entryIndex].Count; count++)
+            {
+                EnemyDefinition enemy = FindEnemyDefinition(
+                    entries[entryIndex].Archetype);
+                CampaignSpawnDirection direction = wave.Directions.Count == 0
+                    ? CampaignSpawnDirection.East
+                    : wave.Directions[destination.Count % wave.Directions.Count];
+                destination.Add(new SpawnDefinition(enemy, direction));
+            }
+        }
+
+        private SingleCityDefenseInjectedReinforcementPersistenceState[]
+            InjectedPersistenceStates()
+        {
+            var result = new
+                SingleCityDefenseInjectedReinforcementPersistenceState[
+                    injectedReinforcements.Count];
+            var index = 0;
+            foreach (KeyValuePair<string, WaveEntry[]> pair in
+                     injectedReinforcements)
+            {
+                result[index++] =
+                    new SingleCityDefenseInjectedReinforcementPersistenceState(
+                        pair.Key,
+                        pair.Value);
+            }
+            return result;
+        }
+
         private int AliveEnemyCount
         {
             get
@@ -1373,7 +1485,7 @@ namespace WasteCity.Defense
                 currentWave == null ? 0 : currentWave.Number,
                 phase,
                 (float)warningRemainingSeconds,
-                currentWave == null ? 0 : currentWave.TotalCount,
+                currentWave == null ? 0 : spawnSequence.Count,
                 nextSpawnIndex,
                 AliveEnemyCount,
                 coreCurrentHealth,
@@ -1408,7 +1520,7 @@ namespace WasteCity.Defense
                 return Fail("Campaign persistence state is required.", out error);
             if (!string.Equals(
                     state.CampaignId,
-                    CampaignWaveCatalog.Id,
+                    definition.Id,
                     StringComparison.Ordinal))
             {
                 return Fail("Campaign id is not supported.", out error);
@@ -1444,7 +1556,7 @@ namespace WasteCity.Defense
                 }
             }
             else if (state.CurrentWaveNumber < 1 ||
-                     state.CurrentWaveNumber > CampaignWaveCatalog.All.Count)
+                     state.CurrentWaveNumber > definition.Waves.Count)
             {
                 return Fail("Campaign wave number is invalid.", out error);
             }
@@ -1473,9 +1585,40 @@ namespace WasteCity.Defense
 
             CampaignWaveDefinition wave = isIdle
                 ? null
-                : CampaignWaveCatalog.All[state.CurrentWaveNumber - 1];
+                : definition.Waves[state.CurrentWaveNumber - 1];
             var sequence = new List<SpawnDefinition>();
             if (wave != null) BuildSpawnSequenceFor(wave, sequence);
+            var restoredInjections = new SortedDictionary<string, WaveEntry[]>(
+                StringComparer.Ordinal);
+            if (state.InjectedReinforcements == null)
+                return Fail("Injected reinforcements are required.", out error);
+            string previousInjectionId = null;
+            for (var injectionIndex = 0;
+                 injectionIndex < state.InjectedReinforcements.Count;
+                 injectionIndex++)
+            {
+                SingleCityDefenseInjectedReinforcementPersistenceState injected =
+                    state.InjectedReinforcements[injectionIndex];
+                if (injected == null ||
+                    string.IsNullOrWhiteSpace(injected.StableEventId) ||
+                    previousInjectionId != null && string.CompareOrdinal(
+                        previousInjectionId, injected.StableEventId) >= 0 ||
+                    injected.Entries == null || injected.Entries.Count == 0)
+                    return Fail("Injected reinforcement record is invalid.",
+                        out error);
+                var entries = new WaveEntry[injected.Entries.Count];
+                for (var entryIndex = 0; entryIndex < entries.Length; entryIndex++)
+                {
+                    entries[entryIndex] = injected.Entries[entryIndex];
+                    if (entries[entryIndex].Count <= 0 || FindEnemyDefinition(
+                            entries[entryIndex].Archetype) == null)
+                        return Fail("Injected reinforcement entry is invalid.",
+                            out error);
+                }
+                restoredInjections.Add(injected.StableEventId, entries);
+                AppendSpawnEntries(wave, entries, sequence);
+                previousInjectionId = injected.StableEventId;
+            }
             if (state.NextEnemyOrdinal > sequence.Count)
             {
                 return Fail("Next enemy ordinal exceeds the wave plan.", out error);
@@ -1524,19 +1667,8 @@ namespace WasteCity.Defense
 
             var expectedPlanned = new Dictionary<string, int>(
                 StringComparer.Ordinal);
-            if (wave != null)
-            {
-                for (var index = 0; index < wave.Entries.Count; index++)
-                {
-                    EnemyDefinition definition = FindEnemyDefinition(
-                        wave.Entries[index].Archetype);
-                    if (definition != null)
-                    {
-                        Add(expectedPlanned, definition.Id.Value,
-                            wave.Entries[index].Count);
-                    }
-                }
-            }
+            for (var index = 0; index < sequence.Count; index++)
+                Add(expectedPlanned, sequence[index].Definition.Id.Value, 1);
             var expectedSpawned = new Dictionary<string, int>(
                 StringComparer.Ordinal);
             for (var index = 0; index < state.NextEnemyOrdinal; index++)
@@ -1677,7 +1809,8 @@ namespace WasteCity.Defense
                 restoredDamage,
                 restoredTowerKills,
                 restoredConsumables,
-                restoredBuildingLosses);
+                restoredBuildingLosses,
+                restoredInjections);
             error = null;
             return true;
         }
@@ -1719,7 +1852,7 @@ namespace WasteCity.Defense
             }
             int expectedCompleted = state.Phase ==
                 SingleCityDefenseCampaignPhase.Victory
-                ? CampaignWaveCatalog.All.Count
+                ? definition.Waves.Count
                 : Math.Max(0, state.CurrentWaveNumber - 1);
             int expectedSpawned = SpawnedBeforeWave(state.CurrentWaveNumber) +
                 state.NextEnemyOrdinal;
@@ -1974,15 +2107,15 @@ namespace WasteCity.Defense
             SpawnedBeforeWave(currentWave == null ? 0 : currentWave.Number) +
             nextSpawnIndex;
 
-        private static int SpawnedBeforeWave(int currentWaveNumber)
+        private int SpawnedBeforeWave(int currentWaveNumber)
         {
             int total = 0;
             int count = Math.Max(0, currentWaveNumber - 1);
             for (var index = 0;
-                 index < count && index < CampaignWaveCatalog.All.Count;
+                 index < count && index < definition.Waves.Count;
                  index++)
             {
-                total += CampaignWaveCatalog.All[index].TotalCount;
+                total += definition.Waves[index].TotalCount;
             }
             return total;
         }
@@ -2434,7 +2567,8 @@ namespace WasteCity.Defense
                 Dictionary<string, int> damageByTowerBuildingId,
                 Dictionary<string, int> killsByTowerBuildingId,
                 Dictionary<string, int> consumablesSpentByResourceId,
-                Dictionary<string, int> buildingLossesByBuildingId)
+                Dictionary<string, int> buildingLossesByBuildingId,
+                SortedDictionary<string, WaveEntry[]> injectedReinforcements)
             {
                 CurrentWave = currentWave;
                 Phase = phase;
@@ -2465,6 +2599,7 @@ namespace WasteCity.Defense
                 KillsByTowerBuildingId = killsByTowerBuildingId;
                 ConsumablesSpentByResourceId = consumablesSpentByResourceId;
                 BuildingLossesByBuildingId = buildingLossesByBuildingId;
+                InjectedReinforcements = injectedReinforcements;
             }
 
             public CampaignWaveDefinition CurrentWave { get; }
@@ -2498,6 +2633,10 @@ namespace WasteCity.Defense
                 get;
             }
             public Dictionary<string, int> BuildingLossesByBuildingId
+            {
+                get;
+            }
+            public SortedDictionary<string, WaveEntry[]> InjectedReinforcements
             {
                 get;
             }

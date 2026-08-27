@@ -38,7 +38,32 @@ namespace WasteCity.Tests
         [TestCase(GamePauseReason.Title)]
         [TestCase(GamePauseReason.Session)]
         [TestCase(GamePauseReason.Defeat)]
+        [TestCase(GamePauseReason.SystemMenu)]
+        [TestCase(GamePauseReason.CampaignVictory)]
+        public void SpeedIgnoringAdvancementPreservesRequestedSpeedOnlyWhenAlone(
+            GamePauseReason foreignReason)
+        {
+            var model = new GameSpeedModel();
+            model.Set(2f);
+            model.SetPaused(GamePauseReason.Advancement, true);
+
+            Assert.That(
+                model.SpeedIgnoring(GamePauseReason.Advancement),
+                Is.EqualTo(2f));
+
+            model.SetPaused(foreignReason, true);
+            Assert.That(
+                model.SpeedIgnoring(GamePauseReason.Advancement),
+                Is.Zero,
+                "Ignoring Advancement must never bypass another pause.");
+        }
+
+        [TestCase(GamePauseReason.User)]
+        [TestCase(GamePauseReason.Title)]
+        [TestCase(GamePauseReason.Session)]
+        [TestCase(GamePauseReason.Defeat)]
         [TestCase(GamePauseReason.Advancement)]
+        [TestCase(GamePauseReason.CampaignVictory)]
         public void IDEA0007_SystemMenuPauseReasonIsIndependent(
             GamePauseReason foreignReason)
         {

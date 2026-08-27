@@ -10,7 +10,8 @@ namespace WasteCity.Core
         Session,
         Defeat,
         Advancement,
-        SystemMenu
+        SystemMenu,
+        CampaignVictory
     }
 
     public sealed class GameSpeedModel
@@ -25,6 +26,15 @@ namespace WasteCity.Core
         public float LastNonZeroSpeed => lastNonZeroSpeed;
         public float Speed => pauseReasons.Count == 0 ? requestedSpeed : 0f;
         public ulong Revision => revision;
+
+        public float SpeedIgnoring(GamePauseReason ignoredReason)
+        {
+            foreach (GamePauseReason reason in pauseReasons)
+            {
+                if (reason != ignoredReason) return 0f;
+            }
+            return requestedSpeed;
+        }
 
         public void Set(float speed)
         {

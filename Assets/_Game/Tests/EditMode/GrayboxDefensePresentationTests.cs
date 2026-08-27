@@ -341,6 +341,58 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0020_BossAndBurrowerUseDistinctPooledReadablePlaceholders()
+        {
+            WorldFixture fixture = CreateWorldFixture();
+            var boss = new GrayboxDefenseEnemySnapshot3D(
+                "enemy.boss.000001",
+                EnemyCatalog.CrystalBroodmother.Id.Value,
+                0, 8f, 8f, 2000,
+                EnemyCatalog.CrystalBroodmother.MaximumHealth,
+                "城市核心", 10f, false);
+            var burrower = new GrayboxDefenseEnemySnapshot3D(
+                "enemy.burrower.000001",
+                EnemyCatalog.Burrower.Id.Value,
+                1, 10f, 8f,
+                EnemyCatalog.Burrower.MaximumHealth,
+                EnemyCatalog.Burrower.MaximumHealth,
+                "生产建筑", 8f, false);
+
+            fixture.View.Apply(Snapshot(enemies: new[] { boss, burrower }),
+                Array.Empty<GrayboxBuildingInstance3D>());
+            Assert.That(fixture.View.TryGetEnemyObject(
+                boss.StableId, out GameObject bossObject), Is.True);
+            Assert.That(fixture.View.TryGetEnemyObject(
+                burrower.StableId, out GameObject burrowerObject), Is.True);
+            Assert.That(bossObject.transform.localScale.x,
+                Is.GreaterThan(burrowerObject.transform.localScale.x));
+            Assert.That(burrowerObject.transform.localScale,
+                Is.Not.EqualTo(new Vector3(.55f, .7f, .55f)));
+            TextMesh bossLabel = bossObject.GetComponentInChildren<TextMesh>(true);
+            TextMesh burrowerLabel =
+                burrowerObject.GetComponentInChildren<TextMesh>(true);
+            Assert.That(bossLabel.text,
+                Does.Contain("晶壳母体").And.Contain("阶段二")
+                    .And.Contain("2000/4000"));
+            Assert.That(burrowerLabel.text, Does.Contain("结晶掘地者"));
+            Assert.That(bossObject.transform.Find("CrystalBroodmother.Outline")
+                .gameObject.activeSelf, Is.True);
+            Assert.That(bossObject.name,
+                Is.EqualTo("CrystalBroodmother.Placeholder"));
+            Assert.That(bossObject.transform.Find(
+                "CrystalBroodmother.WorldHealthBar"), Is.Not.Null);
+            Assert.That(bossObject.transform.Find(
+                "CrystalBroodmother.Phase"), Is.Not.Null);
+
+            int pooled = fixture.View.PooledEnemyCapacity;
+            fixture.View.Apply(Snapshot(enemies: new[] { boss, burrower }),
+                Array.Empty<GrayboxBuildingInstance3D>());
+            Assert.That(fixture.View.PooledEnemyCapacity, Is.EqualTo(pooled));
+            Assert.That(pooled, Is.GreaterThanOrEqualTo(46),
+                "The existing pool must cover the ten-wave and pressure peaks.");
+        }
+
+        [Test]
         public void PoolExhaustionClipsPresentationWithoutMutatingSettledSnapshot()
         {
             WorldFixture fixture = CreateWorldFixture();
@@ -766,7 +818,8 @@ namespace WasteCity.Tests
 
             Button pauseButton = fixture.View
                 .GetComponentsInChildren<Button>(true)
-                .Single();
+                .Single(button => button.name ==
+                    "DefenseDetails.TowerPauseButton");
             Assert.That(pauseButton.gameObject.activeInHierarchy, Is.True);
             Assert.That(pauseButton.interactable, Is.True);
             pauseButton.onClick.Invoke();

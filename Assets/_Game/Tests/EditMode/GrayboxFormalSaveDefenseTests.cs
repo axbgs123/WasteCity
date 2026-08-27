@@ -1313,6 +1313,9 @@ namespace WasteCity.Tests
                     case GrayboxFormalSaveDomainId3D.Production:
                         destination.production = copy.production;
                         break;
+                    case GrayboxFormalSaveDomainId3D.Progression:
+                        destination.progression = copy.progression;
+                        break;
                     case GrayboxFormalSaveDomainId3D.Defense:
                         destination.defense = copy.defense;
                         destination.defenseCampaign = copy.defenseCampaign;

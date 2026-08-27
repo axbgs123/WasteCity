@@ -36,6 +36,8 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDFateSaveData fate = new FormalThreeDFateSaveData();
         public FormalThreeDFateEffectsSaveData fateEffects =
             new FormalThreeDFateEffectsSaveData();
+        public FormalThreeDAttentionPressureSaveData pressure =
+            new FormalThreeDAttentionPressureSaveData();
         public FormalThreeDCivilizationSaveData civilization =
             new FormalThreeDCivilizationSaveData();
     }
@@ -63,6 +65,64 @@ namespace WasteCity.Persistence.ThreeD
         public ulong revision;
         public float ruleTimeSeconds;
         public string sourceInstanceId;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDAttentionPressureSaveData
+    {
+        public ulong revision;
+        public FormalThreeDAttentionPressureEntrySaveData[] entries =
+            Array.Empty<FormalThreeDAttentionPressureEntrySaveData>();
+        public string activeEncounterId = string.Empty;
+        public FormalThreeDPressureCampaignSaveData activeCampaign;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDAttentionPressureEntrySaveData
+    {
+        public int threshold;
+        public int state;
+        public float warningRemainingSeconds;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDPressureCampaignSaveData
+    {
+        public string campaignId;
+        public int phase;
+        public int currentWaveNumber;
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            plannedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            spawnedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+            defeatedEnemyCountsByEnemyId =
+                Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
+        public FormalThreeDDefenseCampaignSpawnAnchorSaveData[]
+            frozenSpawnAnchors =
+                Array.Empty<FormalThreeDDefenseCampaignSpawnAnchorSaveData>();
+        public float warningRemainingSeconds;
+        public float spawnClockSeconds;
+        public float fixedStepAccumulatorSeconds;
+        public int nextEnemyOrdinal;
+        public int coreCurrentHealth;
+        public int result;
+        public FormalThreeDDefenseCampaignStatisticsSaveData statistics;
+        public FormalThreeDDefenseCampaignEnemyStateSaveData[] enemyStates =
+            Array.Empty<FormalThreeDDefenseCampaignEnemyStateSaveData>();
+        public FormalThreeDPressureInjectedReinforcementSaveData[]
+            injectedReinforcements =
+                Array.Empty<FormalThreeDPressureInjectedReinforcementSaveData>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDPressureInjectedReinforcementSaveData
+    {
+        public string stableEventId;
+        public FormalThreeDDefenseCampaignEnemyCountSaveData[] entries =
+            Array.Empty<FormalThreeDDefenseCampaignEnemyCountSaveData>();
     }
 
     [Serializable]
@@ -152,7 +212,15 @@ namespace WasteCity.Persistence.ThreeD
     [Serializable]
     public sealed class FormalThreeDCivilizationSaveData
     {
+        public const string FirstAscensionId =
+            "first-civilization-ascension";
+
         public int level = 1;
+        public ulong revision;
+        public string ascensionId = string.Empty;
+        public bool ascensionCompleted;
+        public int sequenceStage;
+        public float remainingRuleSeconds;
         public string[] committedAscensionIds = Array.Empty<string>();
     }
 

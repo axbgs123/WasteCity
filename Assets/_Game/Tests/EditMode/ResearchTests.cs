@@ -27,14 +27,14 @@ namespace WasteCity.Tests
         }
         [Test] public void ResearchProgressCanBeRestored()
         {var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Iron,10);var model=FormalModel();model.Start(ResearchCatalog.Find("core.research.automated-machinery"),inventory);model.Tick(5);var restored=new ResearchModel();restored.Restore(model.CaptureCompleted(),model.Active.Id.Value,model.Remaining);Assert.That(restored.Active.Id.Value,Is.EqualTo("core.research.automated-machinery"));Assert.That(restored.Remaining,Is.EqualTo(15));}
-        [Test] public void RetiredLegacyAnalysisCannotStartOrSpend(){var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Alloy,30);inventory.Add(ResourceIds.Biomass,20);var model=new ResearchModel();model.Restore(new[]{"core.research.scrap-processing","core.research.automated-defense"},null,0);var legacy=ResearchCatalog.Find("core.research.legacy-analysis");Assert.That(legacy.ReleaseState,Is.EqualTo(ResearchReleaseState.RetiredCompatibility));Assert.That(model.Start(legacy,inventory),Is.False);Assert.That(inventory.Get(ResourceIds.Alloy),Is.EqualTo(30));Assert.That(inventory.Get(ResourceIds.Biomass),Is.EqualTo(20));}
-        [Test] public void FormalCatalogContainsExactFortyThreeNodesWithoutRetiredEntries(){Assert.That(ResearchCatalog.All.Length,Is.EqualTo(43));Assert.That(ResearchCatalog.All.Select(value=>value.Id.Value).Distinct().Count(),Is.EqualTo(43));Assert.That(ResearchCatalog.All.Any(value=>value.ReleaseState==ResearchReleaseState.RetiredCompatibility),Is.False);}
+        [Test] public void LegacyAnalysisStartsWithApprovedCost(){var inventory=new ResourceInventory(100);inventory.Add(ResourceIds.Alloy,30);inventory.Add(ResourceIds.Biomass,20);var model=new ResearchModel();model.Restore(new[]{"core.research.scrap-processing","core.research.automated-defense"},null,0);var legacy=ResearchCatalog.Find("core.research.legacy-analysis");Assert.That(legacy.ReleaseState,Is.EqualTo(ResearchReleaseState.Researchable));Assert.That(model.Start(legacy,inventory),Is.True);Assert.That(inventory.Get(ResourceIds.Alloy),Is.Zero);Assert.That(inventory.Get(ResourceIds.Biomass),Is.Zero);}
+        [Test] public void FormalCatalogContainsExactFortyFourNodesWithoutRetiredEntries(){Assert.That(ResearchCatalog.All.Length,Is.EqualTo(44));Assert.That(ResearchCatalog.All.Select(value=>value.Id.Value).Distinct().Count(),Is.EqualTo(44));Assert.That(ResearchCatalog.All.Any(value=>value.ReleaseState==ResearchReleaseState.RetiredCompatibility),Is.False);}
         [Test] public void ResearchWithTwoRequirementsRequiresBothRoutes(){var bridge=new ResearchDefinition("test.research.bridge","双路线研究",DevelopmentRoute.Bridge,ResourceIds.Alloy,50,90f,"core.research.precision-assembly",3,"测试双路线前置","core.research.psionic-workshop");var inventory=new ResourceInventory(200);inventory.Add(ResourceIds.Alloy,100);var model=new ResearchModel();model.Restore(new[]{"core.research.precision-assembly"},null,0);Assert.That(model.Start(bridge,inventory),Is.False);model.Restore(new[]{"core.research.precision-assembly","core.research.psionic-workshop"},null,0);Assert.That(model.Start(bridge,inventory),Is.True);}
         [Test] public void PreviewResearchCannotStartOrSpend(){var preview=ResearchCatalog.Find("core.research.bridge.psionic-mech");var inventory=new ResourceInventory(200);inventory.Add(ResourceIds.Alloy,30);inventory.Add(ResourceIds.PsionicAmplifier,20);var model=new ResearchModel();model.Restore(new[]{"core.research.precision-assembly","core.research.psionic-workshop"},null,0);Assert.That(preview.ReleaseState,Is.EqualTo(ResearchReleaseState.PreviewOnly));Assert.That(model.Start(preview,inventory),Is.False);Assert.That(inventory.Get(ResourceIds.Alloy),Is.EqualTo(30));Assert.That(inventory.Get(ResourceIds.PsionicAmplifier),Is.EqualTo(20));}
         [Test] public void ExtendedResearchNodesRoundTripWithPreviewActiveFrozen(){var model=new ResearchModel();model.Restore(new[]{"core.research.alloy-armor","core.research.collective-consciousness"},"core.research.bridge.bio-hangar",17);Assert.That(model.IsCompleted(ResearchCatalog.Find("core.research.alloy-armor").Id),Is.True);Assert.That(model.Active,Is.Null);Assert.That(model.MissingActiveResearchId,Is.EqualTo("core.research.bridge.bio-hangar"));Assert.That(model.Remaining,Is.EqualTo(17));Assert.That(model.CaptureForPersistence().ActiveResearchId,Is.EqualTo("core.research.bridge.bio-hangar"));}
 
         [Test]
-        public void RetiredCompletedResearchPersistsAsInertCompatibilityData()
+        public void LegacyAnalysisCompletedResearchRestoresAsFormalCompletion()
         {
             const string legacy = "core.research.legacy-analysis";
             var model = new ResearchModel();
@@ -49,16 +49,16 @@ namespace WasteCity.Tests
             Assert.That(model.TryCommitRestoreForPersistence(plan, out error),
                 Is.True, error);
 
-            Assert.That(model.CompletedCount, Is.Zero);
+            Assert.That(model.CompletedCount, Is.EqualTo(1));
             Assert.That(model.IsCompleted(ResearchCatalog.Find(legacy).Id),
-                Is.False);
+                Is.True);
             CollectionAssert.Contains(
                 model.CaptureForPersistence().CompletedResearchIds,
                 legacy);
         }
 
         [Test]
-        public void RetiredActiveResearchPersistsFrozenWithoutBecomingActive()
+        public void LegacyAnalysisActiveResearchRestoresAsFormalActiveWork()
         {
             const string legacy = "core.research.legacy-analysis";
             var model = new ResearchModel();
@@ -73,13 +73,12 @@ namespace WasteCity.Tests
             Assert.That(model.TryCommitRestoreForPersistence(plan, out error),
                 Is.True, error);
 
-            Assert.That(model.Active, Is.Null);
-            Assert.That(model.HasMissingActiveResearch, Is.True);
-            Assert.That(model.MissingActiveResearchId, Is.EqualTo(legacy));
+            Assert.That(model.Active.Id.Value, Is.EqualTo(legacy));
+            Assert.That(model.HasMissingActiveResearch, Is.False);
             Assert.That(model.Remaining, Is.EqualTo(17f));
-            Assert.That(model.Tick(100f), Is.False);
+            Assert.That(model.Tick(17f), Is.True);
             Assert.That(model.CaptureForPersistence().ActiveResearchId,
-                Is.EqualTo(legacy));
+                Is.Null.Or.Empty);
         }
 
         [Test]

@@ -191,7 +191,12 @@ namespace WasteCity.Graybox3D.Building
                 copy.Count,
                 StringComparer.Ordinal);
             for (var index = 0; index < copy.Count; index++)
+            {
                 lookup.Add(copy[index].StableInstanceId, copy[index]);
+                if (!copy[index].IsPlayerPaused &&
+                    copy[index].StopReason == ProductionStopReason.None)
+                    HasCurrentlyRunnableBuilding = true;
+            }
             entryById = new ReadOnlyDictionary<string,
                 ProductionBuildingObservability>(lookup);
         }
@@ -200,6 +205,7 @@ namespace WasteCity.Graybox3D.Building
         public ulong Revision { get; }
         public int ActiveWarehouseCount { get; }
         public IReadOnlyList<ProductionBuildingObservability> Entries { get; }
+        public bool HasCurrentlyRunnableBuilding { get; }
 
         public bool TryGet(
             string stableInstanceId,

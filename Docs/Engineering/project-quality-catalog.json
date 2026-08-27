@@ -189,6 +189,7 @@
         "Assets/_Game/Tests/EditMode/BuildingResourceNodeCompatibilityRulesTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingUnlockTests.cs",
         "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUpgradeControllerTests.cs",
         "Assets/_Game/Tests/EditMode/ConstructionProgressTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingCatalogTests.cs",
@@ -208,7 +209,8 @@
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -253,6 +255,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
@@ -266,6 +269,7 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHud*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**"
       ],
@@ -277,6 +281,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxCameraAndInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperProgressionCommandTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
         "Assets/_Game/Tests/EditMode/FormalUiLayoutPolicy3DTests.cs",
         "Assets/_Game/Tests/EditMode/FormalUiResponsiveLayout3DTests.cs",
@@ -285,6 +290,10 @@
         "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUpgradeControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GuidanceFlowTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
@@ -295,6 +304,8 @@
         "Assets/_Game/Tests/PlayMode/GrayboxProgressionRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
       ],
@@ -422,7 +433,9 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
@@ -434,7 +447,9 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs"
       ],
       "FailureLocationSummary": "先检查研究、人口、关注度、命轨、文明等级与升阶真值",
       "TestFileGlobs": [
@@ -449,6 +464,13 @@
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureRuntimeControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressurePresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxAttentionPressureRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
@@ -462,7 +484,14 @@
         "Assets/_Game/Tests/EditMode/PocketUniverseFateEffectTests.cs",
         "Assets/_Game/Tests/EditMode/PocketUniverseProductionIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFatePerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFateLevelTwoCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalCivilizationAscensionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -488,12 +517,18 @@
       "SourceGlobs": [
         "Assets/_Game/Scripts/Combat/**",
         "Assets/_Game/Scripts/Defense/**",
+        "Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs",
+        "Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Combat/**",
         "Assets/_Game/Scripts/Defense/**",
+        "Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs",
+        "Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
@@ -508,6 +543,16 @@
         "Assets/_Game/Tests/EditMode/FriendlyUnitCommandTests.cs",
         "Assets/_Game/Tests/EditMode/FriendlyUnitTacticalRulesTests.cs",
         "Assets/_Game/Tests/EditMode/FormalCombatTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherEncounterTests.cs",
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressurePresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxAttentionPressureRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettledAttackPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementUi3DTests.cs",
         "Assets/_Game/Tests/EditMode/SingleCityDefenseSettlementTests.cs",
@@ -551,10 +596,12 @@
         "IDEA-0013",
         "IDEA-0014",
         "IDEA-0015",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md"
       ],
       "MinimumVerification": "FocusedPlayMode"
     },
@@ -614,7 +661,8 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalPlayModeEntryFixture.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -757,7 +805,8 @@
         "IDEA-0014",
         "IDEA-0016",
         "IDEA-0017",
-        "IDEA-0018"
+        "IDEA-0018",
+        "IDEA-0020"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -1065,6 +1114,43 @@
       ]
     },
     {
+      "Id": "graybox-building-upgrade-controller-3d",
+      "ChineseName": "三维正式建筑原位升级命令",
+      "TypeNames": [
+        "BuildingUpgradeDefinition",
+        "BuildingUpgradeCatalog",
+        "GrayboxBuildingUpgradeAvailability3D",
+        "GrayboxBuildingUpgradeResult3D",
+        "GrayboxBuildingUpgradeController3D",
+        "GrayboxDefenseHudView3D",
+        "GrayboxDefenseController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Building/BuildingUpgradeModel.cs",
+        "Assets/_Game/Scripts/Building/BuildingGrid.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSession3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingUpgradeController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHudView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs"
+      ],
+      "FeatureGroupId": "building-construction-evacuation",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在文明 Lv.2、对应研究完成且城市网络材料充足时，把机枪塔原位升级为重机枪塔，或把剑阵塔原位升级为御剑台；Host 把缓存的可用性投影接到 Defense 选中建筑 HUD，真实按钮只发布稳定实例升级命令并显示反馈。",
+      "BoundarySummary": "Controller/Session 保持稳定实例、占格、站点、朝向、完成状态和建筑数量，并在失败时零写或完整回滚；HUD 已接且不重算规则。`core.research.alloy-armor` 与 `core.research.sword-riding` 仍是 PreviewOnly，所以开发夹具可验证按钮，但自然玩家研究入口尚未开放。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUpgradeControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
       "Id": "building-mobility-rules",
       "ChineseName": "建筑移动规则",
       "TypeNames": [
@@ -1240,15 +1326,16 @@
       ],
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "协调三维建筑会话并持有当前会话唯一的 CityResourceStorageModel；只有建筑从施工中真实提交为已完成，且表现更新、仓库注册、catalog 与 placement revision 全部成功后，才按稳定实例发布一次 BuildingCompleted。",
-      "BoundarySummary": "BuildingCompleted 只陈述已经提交的建筑事实，不计算关注度或命轨效果；Configure、存档恢复和重复同步绝不补发，订阅者异常逐个隔离且不能回滚建筑。会话仍不替代放置、物流、撤离或仓库规则，也不从场景搜索建筑。",
+      "UseSummary": "协调三维建筑会话并持有当前会话唯一的 CityResourceStorageModel；除正式施工完成事件外，还提供保持稳定实例 ID、位置、方向、站点、完成状态和建筑数量不变的原位升级提交，并在表现或付款失败时回滚规则、表现与材料。",
+      "BoundarySummary": "BuildingCompleted 只陈述真实施工完成，原位升级不得重发完成事件；Configure、存档恢复和重复同步也绝不补发，订阅者异常逐个隔离且不能回滚建筑。会话不判断文明/科技升级资格，不替代目录、输入、放置、物流、撤离或仓库规则，也不从场景搜索建筑。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxBuildingSessionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingCombatLifecycleTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxEvacuationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveBuildingStorageTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxProgressionEventIntegrationTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxBuildingUpgradeControllerTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -1336,13 +1423,15 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在正式 Attention、Fate 与三条 Lv.1 命轨效果 owner 和 schema 33 progression/effect DTO 之间确定性捕获、预检和原子恢复全部当前真值。",
-      "BoundarySummary": "只映射已经验证的 Progression 与命轨效果快照并准备绑定五个 owner 身份的零写入恢复计划；不计算关注度、不选择命轨、不推进效果、不读写文件或操作 UI。Lv.2 字段与玩法仍属后续。",
+      "UseSummary": "在正式 Attention、Fate、三条命轨效果、Civilization 与 AdvancementSequence owner 和 schema 33 progression/effect DTO 之间确定性捕获、预检并原子恢复 Lv.1/Lv.2 当前真值。",
+      "BoundarySummary": "只映射已经验证的 Progression、文明升阶、演出阶段与命轨效果快照，并准备绑定 owner 身份的零写入恢复计划；不计算升阶资格、不提交关注度或奖励、不推进演出、不读写文件或操作 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalFateEffectsSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"
@@ -1569,15 +1658,45 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "从正式资源与研究目录建立稳定顺序的中文查询快照，支持中文名和 stable ID 的规范化子串搜索，供 Editor/Development 修改器的列表与输入查找共用。",
-      "BoundarySummary": "只负责只读目录投影和查询，不增加资源、不解锁科技、不持有搜索框或选择状态；命令仍须经过正式库存和研究入口，Release 不得引用修改器 UI 或行为。",
+      "UseSummary": "从正式资源、研究与文明进程动作目录建立稳定顺序的中文查询快照，支持列表浏览、中文名和 stable ID 的规范化子串搜索，供 Editor/Development 修改器的列表与输入查找共用。",
+      "BoundarySummary": "只负责只读目录投影和查询，不增加资源、不解锁科技、不执行 Attention/Fate/Pressure/Boss/Ascension，也不持有搜索框或选择状态；命令必须经过 Modifier/Facade 公共入口，Release 不得引用修改器 UI 或行为。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-developer-progression-facade-3d",
+      "ChineseName": "三维开发修改器文明进程命令边界",
+      "TypeNames": [
+        "GrayboxDeveloperProgressionQuery3D",
+        "GrayboxDeveloperProgressionFacade3D",
+        "GrayboxDeveloperModifier3D",
+        "GrayboxDeveloperModifierBootstrap3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperProgressionFacade3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifier3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperCatalogQuery3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在 Editor/Development 许可内，以 24 个稳定中文动作查询 Attention、Fate、Pressure、Boss、锚点和首次文明升阶，并把玩家同源命令与明确测试夹具委托给唯一 Host/领域 owner；Bootstrap 同时提供列表、中文搜索与数值/资源/阈值/锚点参数。",
+      "BoundarySummary": "只作为开发诊断入口；查询、失败和无变化不得标记修改器使用，真实改变才单向标记。强制命轨选择前仅 dev-only 真实 0 可置顶打开，系统菜单仍最高；Release 不包含 Facade、命令或面板行为。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperProgressionCommandTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
       ]
     },
     {
@@ -1657,16 +1776,19 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "结算打开时先阻断全部世界输入并只分发继续沙盒、最近波前重试、返回标题和允许的关闭命令；无结算时再按既有取消链、开发面板和系统菜单优先级分发输入。",
-      "BoundarySummary": "只协调当前场景输入消费者，不判断结算动作是否合法、不复制建筑或存档规则，也不作为全项目通用输入总线。",
+      "UseSummary": "按正式优先级协调启动页、系统菜单、命轨、文明升阶、关注度详情、结算、文本焦点、建造、背包、研究和世界输入；世界空闲时真实 U 走 Host 升阶命令，Results 阶段 U 走继续命令。",
+      "BoundarySummary": "只协调当前场景输入消费者并通过显式回调发布命令，不判断四项升阶条件、不修改 Civilization/Sequence/Attention、不复制建筑或存档规则，也不作为全项目通用输入总线。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxUsabilityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxUsabilityRuntimeSceneTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0007",
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ]
     },
     {
@@ -2183,7 +2305,104 @@
       "BoundarySummary": "只拥有关注度数值、历史、幂等事实、阈值锁存和恢复边界；不扫描建筑或科技、不访问 Unity，也不直接生成敌人、写存档文件或操作 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionPerformanceTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "attention-pressure-runtime",
+      "ChineseName": "正式关注度压力纯运行时",
+      "TypeNames": [
+        "AttentionPressureDefinition",
+        "AttentionPressureCatalog",
+        "AttentionPressureCommand",
+        "AttentionPressureEntrySnapshot",
+        "AttentionPressureSnapshot",
+        "AttentionPressureRuntime",
+        "GrayboxAttentionPressureDefenseController3D",
+        "GrayboxAttentionPressureRuntimeController3D",
+        "GrayboxAttentionPressureRestorePlan3D",
+        "GrayboxAttentionPressureSaveAdapter3D",
+        "GrayboxAttentionPressurePresentationController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs",
+        "Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureDefenseController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureRuntimeController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressurePresentationController3D.cs",
+        "Assets/_Game/Scripts/Combat/CampaignWaveCatalog.cs",
+        "Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseRuntime3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs",
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs",
+        "Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "以固定 30、60、90 阈值目录维护升序有界压力队列、精确规则计时和串行遭遇，并通过窄控制器接入正式 Defense、schema 33 与 HUD；Warning 规则仍逐 tick 推进，但可见快照最多每 0.1 秒发布一次。",
+      "BoundarySummary": "纯运行时拥有压力队列/计时真值，0.1 秒只限制可见 snapshot/HUD 发布频率，不能量化或拖慢 60、75、90 秒规则；控制器不复制十波战斗算法、不从表现反推敌人或阈值，也不直接改 Attention。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/AttentionPressureCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureRuntimeControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressurePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalAttentionPerformanceTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxAttentionPressureRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityDefenseCampaignPersistenceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "crystal-broodmother-encounter",
+      "ChineseName": "晶壳母体纯遭遇规则",
+      "TypeNames": [
+        "CrystalBroodmotherReinforcementDefinition",
+        "CrystalBroodmotherPhaseDefinition",
+        "CrystalBroodmotherCatalog",
+        "CrystalBroodmotherCommand",
+        "CrystalBroodmotherSnapshot",
+        "CrystalBroodmotherEncounter",
+        "AttentionPressureCampaignCatalog"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Combat/CrystalBroodmotherCatalog.cs",
+        "Assets/_Game/Scripts/Combat/CrystalBroodmotherEncounter.cs",
+        "Assets/_Game/Scripts/Combat/AttentionPressureCampaignCatalog.cs",
+        "Assets/_Game/Scripts/Combat/EnemyDefinition.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs"
+      ],
+      "FeatureGroupId": "combat-routes",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "由唯一 CrystalBroodmotherCatalog 定义 Boss 生命、速度、固定步和 70%/35% 阶段增援；AttentionPressureCampaignCatalog 只引用稳定 Boss 原型和正式战役波，不复制数值目录。",
+      "BoundarySummary": "目录和遭遇模型不拥有刷怪、建筑伤害、存档或 UI；正式 Defense 仍是敌人生命与击败事实唯一 owner。其他 Campaign/Runtime/表现只能消费唯一 Boss 目录，不能再声明第二套生命、速度或阶段阈值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherEncounterTests.cs",
+        "Assets/_Game/Tests/EditMode/CrystalBroodmotherPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/AttentionPressureCampaignCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxAttentionPressureDefenseControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefensePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseObservabilityTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxDefenseSnapshotStabilityTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxAttentionPressureRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"
@@ -2247,7 +2466,7 @@
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "以真实 UGUI 全屏阻断世界输入，完整显示固定三命轨目录文案，并通过二次确认和 ProgressionEventRouter 原子提交唯一 Lv.1 选择与 +5 关注度。",
-      "BoundarySummary": "强制选择与 Host/真实输入已接，但只开放当前 Lv.1；不直接写 Fate 或 Attention runtime，不提供回溯锚点创建/读取按钮，不显示三命轨专属运行详情，Lv.2 升级 UI 属后续。",
+      "BoundarySummary": "强制选择与 Host/真实输入已接且只负责首次 Lv.1 选择；不直接写 Fate 或 Attention runtime，不提供回溯锚点创建/读取按钮，也不承担文明升阶。Lv.2 由独立文明升阶 UI 与 Host 事务处理。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs"
@@ -2269,8 +2488,8 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以四份不可变快照和引用缓存显示已选命轨、袖珍旗舰与坍缩、虚空债务与结算、回溯锚点槽，并提供真实 UGUI Create、Read、Clear 与读取二次确认。",
-      "BoundarySummary": "只读取 Fate/Pocket/Void/Rewind 不可变快照并发布命令事件，不直接写 runtime、schema 或文件；回溯 Create/Read/Clear 必须由 Host 绑定到唯一 Rewind Service。未选命轨不开放，读取必须二次确认。",
+      "UseSummary": "以四份不可变快照和引用缓存显示已选命轨、袖珍旗舰与坍缩、虚空债务与结算，以及 Lv.1 单锚点/Lv.2 双锚点稳定槽选择，并提供真实 UGUI Create、Read、Clear 与指定槽读取二次确认。",
+      "BoundarySummary": "只读取 Fate/Pocket/Void/Rewind 不可变快照并发布带稳定锚点 ID 的命令事件，不直接写 runtime、schema 或文件；Create/Read/Clear 必须由 Host 绑定到唯一 Rewind Service。未选命轨不开放，读取必须二次确认。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs"
@@ -2299,7 +2518,7 @@
       "FeatureGroupId": "research-population",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "从正式机器配方目录确定永久旗舰，由领域控制器接入生产批次和 +4 关注度，并由坍缩解析器把 Lv.1 3×3 命令接到正式建筑生命与战损提交。",
-      "BoundarySummary": "Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；不修改输入、周期或容量。正式建模与 Lv.2 4×4 升级仍属后续，不能把 Lv.2 写成已验证。",
+      "BoundarySummary": "Lv.1/Lv.2 已由 Host 文明升阶事务组合并进入 schema 33 效果 DTO；升级只改变正式产出倍率和坍缩范围，不修改输入、周期或容量。正式三维建模仍未制作，聚焦自动化不能替代人工视觉验收。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/PocketUniverseFateEffectTests.cs",
         "Assets/_Game/Tests/EditMode/PocketUniverseProductionIntegrationTests.cs",
@@ -2328,7 +2547,7 @@
       "FeatureGroupId": "research-population",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "按正式资源维护债务与结算时钟，由领域控制器接入施工透支和收入还款，并把稳定周期键逐项原子提交到 Attention。",
-      "BoundarySummary": "Lv.1 已由 Host 组合并进入 schema 33 效果 DTO；普通消费仍不得透支。命轨专属详情和 Lv.2 60 秒升级仍属后续，调用方不得直接制造负库存。",
+      "BoundarySummary": "Lv.1/Lv.2 已由 Host 文明升阶事务组合并进入 schema 33 效果 DTO；普通消费仍不得透支，升级只把正式结算间隔切换为 60 秒，命轨专属详情继续显示债务与计时。调用方不得直接制造负库存。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalVoidDebtRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
@@ -2344,7 +2563,12 @@
       "TypeNames": [
         "FormalRewindAnchorStoreResult",
         "FormalRewindAnchorStore",
+        "GrayboxRewindAnchorServiceResult3D",
         "GrayboxRewindAnchorService3D",
+        "FormalRewindAnchorMetadata",
+        "FormalRewindAnchorMetadataSnapshot",
+        "FormalRewindAnchorMetadataUpsertPlan",
+        "FormalRewindAnchorMetadataClearPlan",
         "FormalRewindAnchorMetadataRuntime"
       ],
       "AssetPaths": [
@@ -2354,8 +2578,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "通过内部 Store、元数据 runtime 与 Coordinator 服务捕获和恢复非递归 schema 33 锚点，同时保留当前关注度并原子追加回溯代价。",
-      "BoundarySummary": "Lv.1 Store、Host、schema 33 元数据与 Create/Read/Clear UI 命令已接，但仍不是第二个玩家存档槽；所有按钮只能调用 Host 暴露的 Rewind Service，不能直接写 runtime 或文件。Lv.2 双锚点仍未接。",
+      "UseSummary": "通过两个独立隐藏内部槽、元数据 runtime 与 Coordinator 服务捕获和恢复非递归 schema 33 锚点；Lv.1 容量为 1，Lv.2 容量为 2，满槽时按稳定创建序号替换最旧锚点，读取保留当前关注度并原子追加回溯代价。读取升阶前创建的 Lv.1 槽后必须保留当前文明/命轨 Lv.2 与两个现役锚点。",
+      "BoundarySummary": "Host、schema 33、文明升阶容量切换、跨等级读取、双槽选择 UI 与指定槽 Create/Read/Clear 已接并通过对应聚焦自动化；锚点载荷中的旧 progression 不得把当前 Lv.2 owner 或双槽元数据降级。它仍不是第二个玩家存档槽，按钮只能调用 Host Service。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalRewindAnchorStoreTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
@@ -2396,15 +2620,100 @@
         "FormalFateRuntime"
       ],
       "AssetPaths": [
-        "Assets/_Game/Scripts/Progression/FormalFateRuntime.cs"
+        "Assets/_Game/Scripts/Progression/FormalFateRuntime.cs",
+        "Assets/_Game/Scripts/Progression/FormalFateLevelTwoCatalog.cs"
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "维护固定三候选、待选择与已选择状态、命轨等级、单次选择幂等、revision、缓存快照和原子恢复。",
-      "BoundarySummary": "只拥有命轨选择与等级真值；不执行袖珍宇宙、虚空债或回溯锚点效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。",
+      "UseSummary": "维护固定三候选、待选择与已选择状态、命轨等级、Lv.1→Lv.2 单次晋级、revision、缓存快照和原子恢复；Lv.2 静态目录集中提供袖珍宇宙×4 与 4×4、虚空债 60 秒和回溯容量 2。",
+      "BoundarySummary": "只拥有命轨选择与等级真值及 Lv.2 参数；不判断文明升阶条件，不执行袖珍宇宙、虚空债或回溯锚点效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFateLevelTwoCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFatePerformanceTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-civilization-ascension-runtime",
+      "ChineseName": "首次文明升阶纯规则运行时",
+      "TypeNames": [
+        "FormalCivilizationAscensionRequirements",
+        "FormalCivilizationAscensionRequirementStatus",
+        "FormalCivilizationAscensionPlan",
+        "FormalCivilizationAscensionCommand",
+        "FormalCivilizationAscensionSnapshot",
+        "FormalCivilizationAscensionRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalCivilizationAscension.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "校验遗产解析完成、至少两座已完成玩家机枪塔、晶壳母体已击败和当前生产运行四项条件，并以绑定 owner、预期快照和单次消费计划提交首次文明 1→2、命轨 1→2 命令；升阶本身无额外资源费。",
+      "BoundarySummary": "只拥有升阶条件投影、等级快照和事务命令；不自行查询研究、塔、Boss 或生产真值，不直接晋级 FormalFateRuntime 或三条效果运行时，也不提交关注度 +25、检查点、Host、UI、动画或存档。调用方必须将这些跨 owner 操作做成可回滚的统一事务。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalCivilizationAscensionRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-civilization-advancement-runtime-3d",
+      "ChineseName": "三维文明升阶原子协调与演出序列",
+      "TypeNames": [
+        "GrayboxCivilizationAdvancementResult3D",
+        "GrayboxCivilizationAdvancementController3D",
+        "AdvancementSequenceSnapshot",
+        "AdvancementSequenceModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementController3D.cs",
+        "Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在四项资格通过后，把 Civilization、Fate、Attention 与所选 Lv.2 效果作为可回滚的单次事务提交，并用缓存不可变快照推进 Scanning 2.5 秒、Confirmed 3 秒、Warning 4 秒、Results 与 Continued。",
+      "BoundarySummary": "协调器不自行查询研究、塔、Boss 或生产，Sequence 不提交奖励或保存文件；权威资格采集、检查点、规则时间、暂停、UI 和 schema 往返由 Host/Adapter 组合。建筑原位升级由独立 UpgradeController/Session 命令负责；对应科技仍为 PreviewOnly，不能从本运行时推断自然玩家升级入口已开放。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "graybox-civilization-advancement-ui-3d",
+      "ChineseName": "三维文明升阶清单、演出与真实输入界面",
+      "TypeNames": [
+        "GrayboxCivilizationAdvancementPresentation3D",
+        "GrayboxCivilizationAdvancementPresentationController3D",
+        "GrayboxCivilizationAdvancementView3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementPresentationController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Usability/GrayboxUsabilityInputCoordinator3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingInputRouter3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "读取 Requirements/Civilization/Fate/Sequence 不可变状态，并直接消费 Civilization 的 CanPrepareAscension、目标文明/命轨等级、Attention reason/reward 投影，显示四项清单与四阶段结果；真实 U 仍路由到 Host。",
+      "BoundarySummary": "View/Presenter 不复制文明 1→2、命轨 1→2 或 +25 等领域常量，只发布 AdvanceRequested/ContinueRequested；输入协调器服从正式模态优先级。场景接线仅适用于 GrayboxPrototype3D。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalFatePerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"
@@ -2442,23 +2751,27 @@
       "Id": "formal-research-runtime",
       "ChineseName": "正式四路线科技运行时",
       "TypeNames": [
+        "ResearchCatalog",
         "FormalResearchRuntime"
       ],
       "AssetPaths": [
+        "Assets/_Game/Scripts/Research/ResearchModel.cs",
         "Assets/_Game/Scripts/Research/FormalResearchRuntime.cs"
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "组合统一 ResearchModel 与正式 43 节点 ResearchCatalog，提交稳定 ID 研究启动、城市形态/思维加速倍率推进、研究站与全局暂停、80% 原子退款，以及 schema 31 正式目录恢复。",
-      "BoundarySummary": "不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO 或效果表现；未知活动科技冻结并继续通过持久化往返，初始根科技在新会话和恢复后由正式运行时修复。",
+      "UseSummary": "组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含重新开放的 core.research.legacy-analysis，并提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。",
+      "BoundarySummary": "不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO、关注度或效果表现；legacy-analysis 的完成事件由外部进程路由，未知活动科技继续冻结并可持久化往返。",
       "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalResearchRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalResearchSaveAdapterTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
-        "IDEA-0016"
+        "IDEA-0016",
+        "IDEA-0020"
       ]
     },
     {
@@ -2765,23 +3078,29 @@
       "Id": "graybox-formal-rule-clock-3d",
       "ChineseName": "三维统一正式规则时钟",
       "TypeNames": [
-        "GrayboxFormalRuleClock3D"
+        "GameSpeedModel",
+        "GrayboxFormalRuleClock3D",
+        "GrayboxCampaignTerminalSpeedGate3D"
       ],
       "AssetPaths": [
-        "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs"
+        "Assets/_Game/Scripts/Core/GameSpeedModel.cs",
+        "Assets/_Game/Scripts/Graybox3D/GrayboxFormalRuleClock3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCampaignTerminalSpeedGate3D.cs"
       ],
       "FeatureGroupId": "foundation-clock",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在正式三维场景把玩家请求速度、系统菜单暂停、终局强制暂停和固定步余量合并为唯一有效规则时间，再按固定顺序推进城市、施工、生产、防御和撤离。",
-      "BoundarySummary": "只作为 GrayboxPrototype3D 的规则时钟组合根；不拥有各领域玩法状态，不使用 Unity 表现时间替代规则时间，不允许领域控制器另起 Update 时钟。暂停和速度输入仍由正式命令门发布。",
+      "UseSummary": "在正式三维场景把玩家请求速度、系统菜单、战役胜利、失败与文明升阶等独立暂停原因合并为唯一有效规则时间；升阶表现时钟只忽略 Advancement，自身仍受 CampaignVictory/Defeat 等终局原因约束。",
+      "BoundarySummary": "只作为 GrayboxPrototype3D 的规则时钟与暂停组合根；CampaignVictory 与 Advancement 必须由各自 owner 获取和释放，不允许互相解除。它不拥有领域玩法状态，也不允许领域控制器另起 Update 时钟。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxUnifiedRuleClockContractTests.cs",
+        "Assets/_Game/Tests/EditMode/GameSpeedTests.cs",
         "Assets/_Game/Tests/EditMode/FormalGameSpeedCommandFacadeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSpeedHudAndTerminalTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignRuntimeIntegrationTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0017"
+        "IDEA-0017",
+        "IDEA-0020"
       ]
     },
     {
@@ -3450,13 +3769,14 @@
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "用于编辑器生成灰盒场景。",
-      "BoundarySummary": "不在运行时调用。",
+      "UseSummary": "用于编辑器生成正式灰盒场景，并保证文明升阶 View、Host、输入协调器及既有命轨/存档组件为稳定单实例引用。",
+      "BoundarySummary": "只在编辑器场景生成与修复时调用，不执行升阶领域命令、不保存运行时状态，也不替代 GrayboxSceneContractTests 的单实例和引用验证。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxSceneContractTests.cs"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0020"
       ]
     },
     {
@@ -3620,14 +3940,15 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按稳定原因与事件键合并自动检查点，维护 sequence、已完成一次性里程碑、失败保留和明确 Flush 边界，并允许恢复检查点基线。",
+      "UseSummary": "按稳定原因与事件键合并自动检查点，区分一次性里程碑与命轨选择、锚点创建/读取/清理等可重复转换事件，维护 sequence、失败保留和明确 Flush 边界，并允许恢复检查点基线。",
       "BoundarySummary": "只拥有检查点意图与历史高水位，不自行 capture、写盘、重试每帧或决定玩家文案；保存回调、规则时间和事件订阅必须由正式运行时显式注入。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0015"
+        "IDEA-0015",
+        "IDEA-0020"
       ]
     },
     {
@@ -3666,7 +3987,7 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按 world/city、building/storage、economy、production、progression、defense、evacuation、pause 固定顺序协调 schema 33 capture 与恢复，先完整验证，再事务式应用，失败时回滚八个权威领域并在成功提交后统一重建派生状态。",
+      "UseSummary": "按 world/city、building/storage、economy、production、defense、progression、evacuation、pause 固定依赖顺序协调 schema 33 capture 与恢复，使活动压力进程在主战役真值恢复后再绑定；先完整验证，再事务式应用，失败时回滚八个权威领域并在成功提交后统一重建派生状态。",
       "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
@@ -3690,14 +4011,18 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 组合统一玩家 store、schema 33 八领域 coordinator、唯一 Attention/Fate 运行时、自动检查点、继续游戏、新游戏、保存退出和波前起点内部快照，并在无待处理检查点时保持 LateUpdate 零写盘。",
-      "BoundarySummary": "只作为正式 3D 场景组合根，不用于冻结 2D，也不拥有玩家文案或领域 DTO 规则；内部波前重试档不是第二玩家槽，失败不能伪装成已保存或已恢复。",
+      "UseSummary": "在 GrayboxPrototype3D 组合 schema 33 八领域 coordinator、Attention/Fate/Civilization/三项效果唯一 owner、四项升阶资格采集、原子 1→2 命令、AdvancementSequence、独立暂停、UGUI/真实 U、检查点与保存恢复。",
+      "BoundarySummary": "只作为正式 3D 场景组合根；资格从 Research/Building/Pressure/Production 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO 规则或建筑升级规则；内部重试档和回溯锚点都不是第二玩家存档槽。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",

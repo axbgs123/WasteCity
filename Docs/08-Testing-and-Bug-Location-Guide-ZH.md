@@ -42,7 +42,7 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 
-`IDEA-0020` 当前为“开发中”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。
+`IDEA-0020` 当前为“已实现待验证”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。
 
 数值、历史和恢复运行 `FormalAttentionRuntimeTests` 与旧 `FormalProgressionTests`：一次性来源按原因锁存，可重复来源按稳定事件键防重；正负变化都夹在 `0–100`，即使封顶后的实际变化为零也要消费并记录事件；完整历史只保留最近 `128` 条，HUD 所需投影只取最后三条；阈值降低后不撤销、再跨越不重复。恢复必须保留语法有效但当前未知的历史原因为只读孤儿证据，非法快照失败时保持原对象、revision 和缓存快照身份不变。静止状态连续 `300` 次 `Capture` 必须返回同一不可变快照且托管分配为 `0 B`。
 
@@ -66,9 +66,35 @@ schema `33` 核心合同运行 `FormalSaveSchema33ContractTests`、`FormalSaveSc
 
 命轨专属详情运行 `GrayboxFateOperationsPresentationTests` 与 `GrayboxFateOperationsRuntimeInputTests`：关注度详情中的“命轨详情”必须按已选命轨显示旗舰/坍缩、分资源债务/结算或锚点槽；回溯锚点的创建、读取二次确认和清除按钮只能调用 Host 持有的正式 Service。真实读取必须恢复锚点世界、保留创建后的当前关注度并额外增加 `12`；面板与确认层逐层消费 `Escape`，且建造、背包、研究和世界输入不穿透。
 
-至此只可写“三条命轨 Lv.1 与玩家操作闭环自动化通过”。Lv.2 的袖珍宇宙×4/4×4、虚空债60秒、回溯双锚点和统一升级命令仍归文明升阶片继续完成；在升阶片通过前不能写“三命轨 Lv.2 已完成”。
+文明升阶与命轨 Lv.2 先运行 `FormalFateLevelTwoCatalogTests`、`FormalFateRuntimeTests`、`FormalCivilizationAscensionRuntimeTests`、`GrayboxCivilizationAdvancementControllerTests`、`FormalRewindAnchorMetadataRuntimeTests`、`FormalRewindAnchorStoreTests` 与 `GrayboxRewindAnchorServiceTests`。静态目录固定袖珍宇宙产出×4/坍缩 4×4、虚空债 60 秒结算和回溯容量 2；纯升阶运行时仍只拥有四项条件投影与绑定 owner 的单次计划，跨 Civilization/Fate/Attention/所选效果的提交和失败回滚只能由 `GrayboxCivilizationAdvancementController3D` 负责。任一 owner 失败必须恢复六份提交前快照，不能留下文明 2、命轨 1、关注度缺失或效果等级不一致的半提交状态。
 
-上述测试通过只证明 Task 1 的关注度真值、Task 2 的固定候选/选择状态、Task 3 的 schema/Adapter/八领域持久化、Task 4 的正式领域事件映射和 Task 5 的关注度可观察化，不证明三命轨效果、压力攻击、晶壳母体或文明升阶已经实现。后续每片继续按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)和[实施计划](superpowers/plans/2026-08-26-idea-0020-progression-attention-fate-ascension.md)扩展。人工试玩和真实 Windows 复验必须保持未完成状态。
+正式 Host 与保存边界运行 `GrayboxFormalSaveRuntimeHostTests`、`GrayboxFormalProgressionSaveAdapterTests`、`FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`、`FormalSaveValidatorTests`、Coordinator 和 checkpoint 回归。Host 只能从已完成研究、玩家已完成机枪塔、Pressure 的晶壳母体完成事实和 Production 不可变观测快照收集四项资格；真实 U 与按钮必须调用同一 `TryAdvanceCivilization`，一次性提交文明 `1→2`、命轨 `1→2`、所选效果 Lv.2、关注度 `+25` 和首次升阶检查点。`AdvancementSequenceModel` 单独拥有 `Scanning 2.5s → Confirmed 3s → Warning 4s → Results → Continued`，Host 使用 `GamePauseReason.Advancement` 获取/释放暂停；十波胜利必须使用独立 `CampaignVictory`，两者不得互相解除。schema `33` 保存 Civilization 完成锁、revision、已提交升阶 ID、Sequence 阶段/剩余规则秒数和三项 Lv.2 效果，Warning 与 Results 恢复后不得重放奖励。
+
+升阶可观察化运行 `GrayboxCivilizationAdvancementPresentationTests`、`GrayboxCivilizationAdvancementInputCoordinatorTests`、`GrayboxSceneContractTests` 与 `GrayboxCivilizationAdvancementRuntimeInputTests`。View/Presenter 只读取 Requirements/Civilization/Fate/Sequence 不可变状态，显示四项清单、文明 Lv.1→Lv.2、所选命轨 Lv.2、关注度 `+25`、U 提示和四阶段文案，并只发布 Advance/Continue 请求。系统菜单、命轨选择/操作、关注度详情、文本输入、建造、背包、研究和结算优先于 U；演出模态打开后 B/E/T/W 与世界输入不得穿透。真实 PlayMode 必须从隔离正式新游戏 UGUI 进入，以公开 owner/开发测试夹具建立四项条件，再用真实 U 完成一次升阶；Warning 和 Results 各自保存、场景重载并真实点击 `Start.Continue`，确认文明、命轨、关注度和阶段不重复。
+
+回溯锚点 Lv.2 还要补跑 `GrayboxFateOperationsPresentationTests`、`GrayboxFateOperationsRuntimeInputTests`、`GrayboxRewindAnchorServiceTests` 与 `GrayboxFormalSaveCheckpointTests`：元数据保持两个稳定槽，两个隐藏 Store 文件相互独立，第三次创建按稳定创建序号替换最旧槽；UI 必须显示并选择两个槽，以稳定锚点 ID 经过读取二次确认和 Host Service 恢复指定槽。跨等级读取必须覆盖“先在 Lv.1 创建槽一、升至 Lv.2 再创建槽二、读取旧槽一”：世界回到旧锚点，但当前文明/命轨继续为 Lv.2，两个现役锚点均保留，随后 Coordinator 捕获仍通过 schema 校验。命轨选择、锚点创建、读取和清理必须在 `FormalSaveCheckpointPolicy` 登记为可重复转换事件；相同稳定事件键在 pending 和 committed 后均拒绝重放，不同稳定键可再次入队，且这些事件不得写入 `CompletedMilestoneIds`。该检查点专项当前为 `23 项全部通过`。
+
+文明 Lv.2 建筑升级运行 `BuildingUpgradeTests`、`GrayboxBuildingUpgradeControllerTests`、`GrayboxDefensePresentationTests` 与 `GrayboxDefenseRuntimeInputTests`。`BuildingUpgradeCatalog` 只定义机枪塔→重机枪塔（20 合金）和剑阵塔→御剑台（20 灵铁）两条正式升级；Controller 必须同时读取文明等级、Session 已完成研究和城市网络材料，再委托 Session 原位提交。成功后稳定实例 ID、占格、站点、朝向、完成状态和建筑总数不变，也不重发 `BuildingCompleted`；不满足条件时零写失败，表现替换或付款失败时必须把网格、实例定义、表现和材料全部回滚。Host 已把缓存的升级可用性投影接入 Defense 选中建筑 HUD，按钮只发布稳定实例命令、失败显示中文原因且点击不得泄漏为世界选择；当前专项证据为升级 EditMode `23 项全部通过`、真实升级 PlayMode `1 项通过`、Defense 回归 `7 项全部通过`。`core.research.alloy-armor` 和 `core.research.sword-riding` 仍是 `PreviewOnly`，所以“命令/HUD 已接”不等于自然玩家已能研究并使用升级；开发研究授予只用于到达命令和 UI 边界。
+
+以上聚焦自动化证明 Task 8 的 Host、UI、真实输入、schema 33 往返、双槽操作以及建筑升级命令/HUD 已经实现；仍不能写成 IDEA-0020 全部完成。Task 9 修改器与 Task 10 性能稳定性已经具备下述聚焦检查边界，但升级科技的自然研究发布、完整 EditMode、完整 PlayMode、项目质量门、正式构建、用户试玩和真实 Windows 10 与 11 验收仍未完成。
+
+Task 9 开发修改器运行 `GrayboxDeveloperProgressionCommandTests`、`GrayboxDeveloperModifierCatalogTests`、`GrayboxDeveloperModifierTests` 与 `GrayboxDeveloperModifierRuntimeInputTests`。Facade 只在 `UNITY_EDITOR || DEVELOPMENT_BUILD` 中存在，并通过中文名称或 stable ID 查询 24 个 Attention、Fate、Pressure、Boss、双锚点和首次文明升阶动作；Bootstrap 同时保留列表浏览、中文输入搜索和数值/当前资源/压力阈值/锚点参数，但只调用 Modifier/Facade 公共命令。查询、失败和无变化不得标记 `DeveloperModifierUsed`，真实改变才单向标记；强制命轨选择前仅 dev-only 真实 `0` 可置顶打开修改器，系统菜单仍最高，文本焦点 U 和 0、双 `Escape` 和世界输入抑制必须走真实 Input System。当前真实输入专项为 `2 项全部通过`，包含 `29→30`、`59→60`、`89→90`、命轨、升阶、正式 HUD 和保存重载；Release Bootstrap 仍只能返回不可用，修改器状态不能冒充自然流程证据。
+
+Task 10 性能与稳定性运行 `FormalAttentionPerformanceTests`、`FormalFatePerformanceTests` 与 `CrystalBroodmotherPerformanceTests`，并保留既有 Defense 稳定、构建性能和场景合同。静止 Attention、Pressure Controller/HUD 与升阶 Presenter 预热后连续 300 次必须保持 `0 B`；60、75、90 秒 Warning 规则时间仍逐 tick 精确推进，但可见 snapshot/HUD 最多按 `0.1` 秒（10 Hz）发布，300 个 60 FPS 样本最多刷新 50 次且受 `64 KiB` 预算约束。三条命轨各 20 次 capture/restore 不得增长监听器、债务、锚点、旗舰或稳定 ID；Boss 继续复用 46 槽敌池和正式 `0.1` 秒固定步，所有生命、速度和 70% 和 35% 阶段数值只能来自唯一 `CrystalBroodmotherCatalog`，Campaign/Runtime/表现不得再声明第二目录。升阶 Presenter 必须消费 Civilization 的 `CanPrepareAscension`、目标等级和 Attention reason/reward 投影，不能在 UI 复制 `1→2` 或 `+25`。上述是本机聚焦门，不替代完整回归、Profiler 原始证据、正式构建或 Windows 实机验收。
+
+压力遭遇当前已经接入正式 Defense、Host、schema `33`、HUD 与真实输入，但仍须按所有权分层验证。`AttentionPressureCatalogTests`、`AttentionPressureRuntimeTests` 和 `GrayboxAttentionPressureRuntimeControllerTests` 固定 30、60、90、60、75、90 秒警告、容量 3、十波活动时只排队、30 的教学波/首塔门槛、60 与 90 前序完成门槛及唯一 warning/active owner。`AttentionPressureCampaignCatalogTests` 证明三场压力使用可注入的 `SingleCityDefenseCampaignDefinition`，复用既有 `SingleCityDefenseCampaignModel` 固定步、生成、索敌、塔伤、敌人攻击、建筑伤害和统计算法；旧构造仍委托十波 Default，不能复制 `WaveDirectorModel` 另建战斗真值。
+
+正式 Defense 串行接线运行 `GrayboxAttentionPressureDefenseControllerTests`、`GrayboxFormalDefenseCampaignRuntimeIntegrationTests` 和既有 Campaign persistence/checkpoint 回归：十波未胜利时拒绝压力，同一时刻最多一个 `activePressureCampaign`，现役塔、建筑生命和战损协调器继续是唯一 owner；压力清场后回写 `AttentionPressureRuntime.TryCompleteActive` 并恢复十波胜利沙盒。active pressure 的 capture/restore 必须复用 CampaignModel prepare/commit，定义 ID 不匹配、主战役未胜利或坏状态都零写失败。当前聚焦证据中 Campaign Definition 与旧 Campaign 回归为 `61 项全部通过`，压力 Defense/旧真实塔伤和建筑伤害回归为 `22 项全部通过2`，active pressure persistence 相关回归为 `25 项全部通过`；这些是本机聚焦自动化，不是完整发布回归。
+
+压力存档运行 `GrayboxAttentionPressureSaveAdapterTests`、`FormalSaveSchema33ContractTests`、`FormalSaveSchema33MigrationTests`、`FormalSaveValidatorTests`、Coordinator、RuntimeHost、checkpoint 和波前重试相关测试。schema `33` progression 保存队列 entry、警告余量、active encounter、单波 Campaign 状态和已注入阶段事件；没有 active entry 时 active campaign 必须为空，ID、组成、敌人、阶段与队列交叉引用不一致必须拒绝。schema `32→33` 仍生成空压力默认值，不得从旧十波、关注度或敌人反推压力历史。Host 只用统一规则时钟推进压力，并在真实新游戏保存成功后才开放输入。
+
+晶壳母体规则运行 `CrystalBroodmotherCatalogTests` 与 `CrystalBroodmotherEncounterTests`：4000 生命、0.6 格/秒、0.1 秒固定步，70% 的 4 晶壳兽、35% 的 6 啃噬者+2 啸叫者和唯一击败命令按稳定 ID 幂等。Boss 生命仍由 Defense Campaign EnemyState 唯一拥有，阶段逻辑只能观察权威生命并注入同一 Campaign，不能维护第二份可反写生命。`GrayboxDefensePresentationTests` 进一步验证 46 槽预建敌池、Burrower 可辨识占位和晶壳母体的明显比例、独立轮廓色、按正式最大生命计算的颜色/血条、中文阶段标记；普通敌比例和共享材质合同不变，刷新不得逐帧创建对象。该专项当前为 `29 项全部通过`，相关 Presentation/Observability/Snapshot 回归曾为 `40 项全部通过`。
+
+压力 HUD 运行 `GrayboxAttentionPressurePresentationTests` 与 `GrayboxAttentionPressureRuntimeInputTests`。EditMode 必须用合法串行快照分三次覆盖 Queued、Completed+Warning、Completed+Completed+Active，不能为了同时展示所有文案构造两个 owner。HUD 显示排队、预警倒计时、进行中、已完成、晶壳母体状态和阶段，同一 snapshot 引用不重复刷新；详情使用真实全屏 UGUI 并复用统一模态输入门。PlayMode 必须从正式新游戏入口进入，经 Pressure command、正式 Pressure Defense Controller 和 DefenseRuntime 实际生成 Boss，再断言 `CrystalBroodmother.Placeholder`、`Outline`、`WorldHealthBar`、`Phase` 与详情点击/世界输入阻断，不能只把纯 PressureRuntime 恢复成 Active 来伪造 Boss。当前聚焦证据为 Pressure EditMode `1 项通过`、Pressure PlayMode `1 项通过`、HUD/WorldView 相关回归 `20 项全部通过`；新游戏入口阻断修复属于同一真实输入证据链。
+
+遗产解析节点运行 `FormalResearchCatalogTests`、`ResearchTests`、`ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`：正式科技总数为 44、依赖边 49；`core.research.legacy-analysis` 为 Technology tier 3 / row 4，前置自动防御，成本 30 合金+20 生物质，耗时 60 秒并保持自下向上布局与最新可研究聚焦。完成后的 `+12` 继续由自然 Research Completed 事件路由，恢复已完成节点不得重放。
+
+上述聚焦证据与最终日常完整 EditMode 2803 项、完整 PlayMode 96 项、项目质量门和三项现役构建共同证明 Task 7 至 Task 10 的自动化与构建门已经完成；这仍不得写成用户试玩或真实 Windows 验收已经完成。晶壳母体和升阶界面的比例、轮廓、文案节奏与操作理解仍需用户人工试玩确认；真实 Windows 10 与 11 的 GPU、显存、内存、字体、输入和视觉结果必须保持未完成。后续仍按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)继续升级科技自然发布、完整回归和发布门。
 
 ## IDEA-0011 生产与界面的检查边界
 

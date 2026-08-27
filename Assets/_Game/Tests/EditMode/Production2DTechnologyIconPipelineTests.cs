@@ -50,7 +50,7 @@ namespace WasteCity.Tests
         [Test]
         public void IDEA0016_AllStableResearchIdsMapToDeterministicTechnologyPaths()
         {
-            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(43));
+            Assert.That(ResearchCatalog.All, Has.Length.EqualTo(44));
             string[] paths = ResearchCatalog.All
                 .Select(definition =>
                     Production2DTechnologyIconCatalogBuilder
@@ -128,8 +128,8 @@ namespace WasteCity.Tests
                 Production2DTechnologyIconCatalogBuilder.ValidateSourceAssets();
             Assert.That(report.IsValid, Is.True, report.FormatErrors());
             Assert.That(report.Warnings, Is.Empty);
-            Assert.That(TechnologyPngs(), Has.Length.EqualTo(43));
-            Assert.That(TechnologyMasterPngs(), Has.Length.EqualTo(43));
+            Assert.That(TechnologyPngs(), Has.Length.EqualTo(44));
+            Assert.That(TechnologyMasterPngs(), Has.Length.EqualTo(44));
 
             Production2DTechnologyIconCatalogBuilder
                 .BuildTechnologyIconCatalog();
@@ -158,7 +158,38 @@ namespace WasteCity.Tests
                     .ValidateMasterSourceAssets();
             Assert.That(report.IsValid, Is.True, report.FormatErrors());
             Assert.That(report.Warnings, Is.Empty);
-            Assert.That(TechnologyMasterPngs(), Has.Length.EqualTo(43));
+            Assert.That(TechnologyMasterPngs(), Has.Length.EqualTo(44));
+        }
+
+        [Test]
+        public void IDEA0020_LegacyAnalysisIconIsIndependentAndByteStable()
+        {
+            const string researchId = "core.research.legacy-analysis";
+            Production2DTechnologyIconCatalogBuilder
+                .BuildTechnologyIconCatalogForBatch();
+            string delivery = Production2DTechnologyIconCatalogBuilder
+                .ExpectedAssetPath(researchId);
+            string master = Production2DTechnologyIconCatalogBuilder
+                .ExpectedMasterPath(researchId);
+            Assert.That(delivery, Does.EndWith("tech-legacy-analysis.png"));
+            Assert.That(master,
+                Does.EndWith("tech-legacy-analysis-master-v1.png"));
+            Assert.That(File.Exists(delivery), Is.True);
+            Assert.That(File.Exists(delivery + ".meta"), Is.True);
+            Assert.That(File.Exists(master), Is.True);
+            Assert.That(AssetDatabase.LoadAssetAtPath<Sprite>(delivery),
+                Is.Not.Null);
+            byte[] deliveryBytes = File.ReadAllBytes(delivery);
+            byte[] metaBytes = File.ReadAllBytes(delivery + ".meta");
+            byte[] masterBytes = File.ReadAllBytes(master);
+
+            Production2DTechnologyIconCatalogBuilder
+                .BuildTechnologyIconCatalogForBatch();
+
+            Assert.That(File.ReadAllBytes(delivery), Is.EqualTo(deliveryBytes));
+            Assert.That(File.ReadAllBytes(delivery + ".meta"),
+                Is.EqualTo(metaBytes));
+            Assert.That(File.ReadAllBytes(master), Is.EqualTo(masterBytes));
         }
 
         [Test]

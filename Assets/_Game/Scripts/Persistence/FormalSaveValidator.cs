@@ -116,6 +116,7 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "progression", "attention", "committedStableEventKeys" },
             new[] { "formal3D", "progression", "attention", "completedOneShotReasonIds" },
             new[] { "formal3D", "progression", "fate", "offeredIds" },
+            new[] { "formal3D", "progression", "pressure", "entries" },
             new[] { "formal3D", "progression", "civilization", "committedAscensionIds" },
         };
 
@@ -200,6 +201,40 @@ namespace WasteCity.Persistence
                                 FormalSaveValidationError.MissingRequiredValue,
                                 string.Join(".", campaignArrays[index]));
                     }
+                }
+                if (TryFindJsonPath(
+                        source,
+                        new[]
+                        {
+                            "formal3D", "progression", "pressure",
+                            "activeCampaign",
+                        },
+                        out int pressureStart,
+                        out int pressureEnd) &&
+                    SkipWhitespace(source, pressureStart, pressureEnd) <
+                        pressureEnd &&
+                    source[SkipWhitespace(
+                        source, pressureStart, pressureEnd)] == '{')
+                {
+                    string[][] pressureArrays =
+                    {
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "plannedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "spawnedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "defeatedEnemyCountsByEnemyId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "frozenSpawnAnchors" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "enemyStates" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "injectedReinforcements" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "statistics", "killsByEnemyId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "statistics", "buildingLossesByBuildingId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "statistics", "damageByTowerBuildingId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "statistics", "killsByTowerBuildingId" },
+                        new[] { "formal3D", "progression", "pressure", "activeCampaign", "statistics", "consumablesSpentByResourceId" },
+                    };
+                    for (var index = 0; index < pressureArrays.Length; index++)
+                        if (!HasJsonPath(source, pressureArrays[index]))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", pressureArrays[index]));
                 }
                 FormalThreeDSaveData payload = decoded.Envelope.formal3D;
                 FormalSaveValidationResult nestedArrays =
@@ -435,6 +470,8 @@ namespace WasteCity.Persistence
                 return Missing(path + ".fate");
             if (progression.fateEffects == null)
                 return Missing(path + ".fateEffects");
+            if (progression.pressure == null)
+                return Missing(path + ".pressure");
             if (progression.civilization == null)
                 return Missing(path + ".civilization");
 
@@ -444,14 +481,101 @@ namespace WasteCity.Persistence
             if (result != null) return result;
             result = ValidateFate(progression.fate, path + ".fate");
             if (result != null) return result;
+            result = ValidateCivilization(
+                progression.civilization,
+                progression.fate,
+                path + ".civilization");
+            if (result != null) return result;
             result = ValidateFateEffects(
                 progression.fate,
                 progression.fateEffects,
                 path + ".fateEffects");
             if (result != null) return result;
-            return ValidateCivilization(
-                progression.civilization,
-                path + ".civilization");
+            result = ValidatePressure(
+                progression.pressure,
+                path + ".pressure");
+            if (result != null) return result;
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidatePressure(
+            FormalThreeDAttentionPressureSaveData data,
+            string path)
+        {
+            if (data.entries == null)
+                return Invalid(FormalSaveValidationError.InvalidArray,
+                    path + ".entries");
+            var entries = new AttentionPressureEntrySnapshot[
+                data.entries.Length];
+            AttentionPressureEntrySnapshot active = null;
+            for (var index = 0; index < entries.Length; index++)
+            {
+                FormalThreeDAttentionPressureEntrySaveData item =
+                    data.entries[index];
+                string itemPath = path + ".entries[" + index + "]";
+                if (item == null || !Enum.IsDefined(
+                        typeof(AttentionPressureState), item.state))
+                    return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                        itemPath + ".state");
+                entries[index] = new AttentionPressureEntrySnapshot(
+                    item.threshold,
+                    (AttentionPressureState)item.state,
+                    item.warningRemainingSeconds);
+                if (entries[index].State == AttentionPressureState.Active)
+                    active = entries[index];
+            }
+            var validator = new AttentionPressureRuntime();
+            if (!validator.TryRestore(new AttentionPressureSnapshot(
+                    data.revision, entries), out _))
+                return Invalid(FormalSaveValidationError.InvalidDefense, path);
+
+            bool hasCampaign = data.activeCampaign != null &&
+                !string.IsNullOrEmpty(data.activeCampaign.campaignId);
+            if ((active != null) != hasCampaign)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".activeCampaign");
+            if (!hasCampaign)
+                return string.IsNullOrEmpty(data.activeEncounterId)
+                    ? null
+                    : Invalid(FormalSaveValidationError.InvalidDefense,
+                        path + ".activeEncounterId");
+            FormalThreeDPressureCampaignSaveData campaign =
+                data.activeCampaign;
+            if (string.IsNullOrWhiteSpace(data.activeEncounterId) ||
+                !string.Equals(active.EncounterId,
+                    data.activeEncounterId, StringComparison.Ordinal) ||
+                !string.Equals(campaign.campaignId,
+                    data.activeEncounterId, StringComparison.Ordinal) ||
+                AttentionPressureCampaignCatalog.Find(
+                    data.activeEncounterId) == null)
+                return Invalid(FormalSaveValidationError.InvalidDefense,
+                    path + ".activeEncounterId");
+            if (campaign.plannedEnemyCountsByEnemyId == null ||
+                campaign.spawnedEnemyCountsByEnemyId == null ||
+                campaign.defeatedEnemyCountsByEnemyId == null ||
+                campaign.frozenSpawnAnchors == null ||
+                campaign.enemyStates == null || campaign.statistics == null ||
+                campaign.injectedReinforcements == null ||
+                campaign.statistics.killsByEnemyId == null ||
+                campaign.statistics.buildingLossesByBuildingId == null ||
+                campaign.statistics.damageByTowerBuildingId == null ||
+                campaign.statistics.killsByTowerBuildingId == null ||
+                campaign.statistics.consumablesSpentByResourceId == null)
+                return Invalid(FormalSaveValidationError.InvalidArray,
+                    path + ".activeCampaign");
+            for (var index = 0;
+                 index < campaign.injectedReinforcements.Length;
+                 index++)
+            {
+                FormalThreeDPressureInjectedReinforcementSaveData item =
+                    campaign.injectedReinforcements[index];
+                if (item == null || string.IsNullOrWhiteSpace(
+                        item.stableEventId) || item.entries == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        path + ".activeCampaign.injectedReinforcements[" +
+                        index + "]");
+            }
+            return null;
         }
 
         private static FormalSaveValidationResult ValidateAttention(
@@ -655,7 +779,7 @@ namespace WasteCity.Persistence
                 return Invalid(
                     FormalSaveValidationError.InvalidStableId,
                     path + ".selectedId");
-            if (fate.level != 1)
+            if (fate.level != 1 && fate.level != 2)
                 return Invalid(
                     FormalSaveValidationError.InvalidEnumValue,
                     path + ".level");
@@ -664,21 +788,106 @@ namespace WasteCity.Persistence
 
         private static FormalSaveValidationResult ValidateCivilization(
             FormalThreeDCivilizationSaveData civilization,
+            FormalThreeDFateSaveData fate,
             string path)
         {
-            if (civilization.level != 1)
-                return Invalid(
-                    FormalSaveValidationError.InvalidEnumValue,
-                    path + ".level");
             if (civilization.committedAscensionIds == null)
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
                     path + ".committedAscensionIds");
-            return civilization.committedAscensionIds.Length == 0
-                ? null
-                : Invalid(
+            FormalSaveValidationResult unique = UniqueNonBlank(
+                civilization.committedAscensionIds,
+                path + ".committedAscensionIds");
+            if (unique != null) return unique;
+            if (!Enum.IsDefined(
+                    typeof(AdvancementSequenceStage),
+                    civilization.sequenceStage) ||
+                float.IsNaN(civilization.remainingRuleSeconds) ||
+                float.IsInfinity(civilization.remainingRuleSeconds) ||
+                civilization.remainingRuleSeconds < 0f)
+                return Invalid(
                     FormalSaveValidationError.InvalidEnumValue,
-                    path + ".committedAscensionIds");
+                    path + ".sequenceStage");
+
+            AdvancementSequenceStage stage =
+                (AdvancementSequenceStage)civilization.sequenceStage;
+            bool clean = civilization.level == 1 &&
+                civilization.revision == 0ul &&
+                string.IsNullOrEmpty(civilization.ascensionId) &&
+                !civilization.ascensionCompleted &&
+                civilization.committedAscensionIds.Length == 0 &&
+                stage == AdvancementSequenceStage.None &&
+                civilization.remainingRuleSeconds == 0f &&
+                fate.level <= 1;
+            if (clean) return null;
+
+            bool committed = civilization.level == 2 &&
+                civilization.revision > 0ul &&
+                civilization.ascensionCompleted &&
+                civilization.committedAscensionIds.Length == 1 &&
+                string.Equals(
+                    civilization.ascensionId,
+                    FormalThreeDCivilizationSaveData.FirstAscensionId,
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    civilization.committedAscensionIds[0],
+                    FormalThreeDCivilizationSaveData.FirstAscensionId,
+                    StringComparison.Ordinal) &&
+                !string.IsNullOrEmpty(fate.selectedId) &&
+                fate.level == 2 &&
+                IsValidAscensionSequenceTime(
+                    stage,
+                    civilization.remainingRuleSeconds);
+            if (!committed)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path);
+
+            try
+            {
+                var runtime = new FormalCivilizationAscensionRuntime(
+                    fate.selectedId);
+                if (!runtime.TryRestore(
+                        new FormalCivilizationAscensionSnapshot(
+                            civilization.level,
+                            fate.selectedId,
+                            fate.level,
+                            civilization.ascensionCompleted,
+                            civilization.revision),
+                        out _))
+                {
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        path);
+                }
+            }
+            catch (ArgumentException)
+            {
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".ascensionId");
+            }
+            return null;
+        }
+
+        private static bool IsValidAscensionSequenceTime(
+            AdvancementSequenceStage stage,
+            float remaining)
+        {
+            switch (stage)
+            {
+                case AdvancementSequenceStage.Scanning:
+                    return remaining > 0f && remaining <= 2.5f;
+                case AdvancementSequenceStage.Confirmed:
+                    return remaining > 0f && remaining <= 3f;
+                case AdvancementSequenceStage.Warning:
+                    return remaining > 0f && remaining <= 4f;
+                case AdvancementSequenceStage.Results:
+                case AdvancementSequenceStage.Continued:
+                    return remaining == 0f;
+                default:
+                    return false;
+            }
         }
 
         private static FormalSaveValidationResult ValidateFateEffects(
@@ -785,6 +994,11 @@ namespace WasteCity.Persistence
                 fate.selectedId,
                 FormalFateCatalog.RewindAnchorId,
                 StringComparison.Ordinal);
+            int expectedPocketLevel = pocketSelected ? fate.level : 1;
+            int expectedDebtLevel = debtSelected ? fate.level : 1;
+            int expectedRewindCapacity = rewindSelected && fate.level == 2
+                ? FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelTwo
+                : FormalRewindAnchorMetadataRuntime.MaximumAnchorsAtLevelOne;
             if ((!pocketSelected &&
                  (pocket.flagships.Length != 0 ||
                   pocket.collapsedFlagshipIds.Length != 0 ||
@@ -793,8 +1007,9 @@ namespace WasteCity.Persistence
                  (debt.debts.Length != 0 ||
                   debt.settlementRemainingSeconds != 0d)) ||
                 (!rewindSelected && rewind.anchors.Length != 0) ||
-                (pocketSelected && pocket.level != fate.level) ||
-                (debtSelected && debt.level != fate.level) ||
+                pocket.level != expectedPocketLevel ||
+                debt.level != expectedDebtLevel ||
+                rewind.anchors.Length > expectedRewindCapacity ||
                 rewind.nextCreationOrdinal <= 0L)
                 return Invalid(
                     FormalSaveValidationError.InvalidEnumValue,

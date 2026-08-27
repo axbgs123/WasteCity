@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,8 @@ using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
+using WasteCity.Progression;
+using Object = UnityEngine.Object;
 
 namespace WasteCity.Tests
 {
@@ -27,6 +30,8 @@ namespace WasteCity.Tests
         private const string WarningName = "DefenseWaveWarning";
         private const string TowerPauseButtonName =
             "DefenseDetails.TowerPauseButton";
+        private const string BuildingUpgradeButtonName =
+            "DefenseDetails.BuildingUpgradeButton";
 
         private Keyboard keyboard;
         private Mouse mouse;
@@ -366,6 +371,77 @@ namespace WasteCity.Tests
             Assert.That(hud.SummaryText.text, Does.Contain("核心 0/2000"));
             Assert.That(hud.SummaryText.text,
                 Does.Contain("城市核心失守"));
+        }
+
+        [UnityTest]
+        public IEnumerator RealUpgradeButtonUpgradesSelectedTowerWithoutLeak()
+        {
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxDefenseController3D controller = Object.FindObjectOfType<
+                GrayboxDefenseController3D>();
+            GrayboxDefenseWorldView3D worldView = Object.FindObjectOfType<
+                GrayboxDefenseWorldView3D>();
+            GrayboxBuildingSession3D session = Object.FindObjectOfType<
+                GrayboxBuildingSession3D>();
+            Assert.That(host, Is.Not.Null);
+            GrayboxBuildingInstance3D turret = CreateDefenseChain();
+            yield return WaitForTower(controller, turret.StableInstanceId);
+            string selectedFateId = host.FateRuntime.Capture().SelectedId;
+            Assert.That(selectedFateId, Is.Not.Empty);
+            string error;
+            Assert.That(host.FateRuntime.TryPromoteToLevelTwo(out error),
+                Is.True, error);
+            if (selectedFateId == FormalFateCatalog.PocketUniverseId)
+                Assert.That(host.PocketUniverseEffect.TrySetLevel(
+                    2, out error), Is.True, error);
+            else if (selectedFateId == FormalFateCatalog.VoidDebtId)
+                Assert.That(host.VoidDebtRuntime.TryRestore(
+                    new FormalVoidDebtSnapshot(
+                        2, 0d, 1ul, 1ul,
+                        Array.Empty<FormalVoidDebtEntry>()), out error),
+                    Is.True, error);
+            else
+                Assert.That(host.RewindAnchorMetadata.TrySetFateLevel(
+                    2, out error), Is.True, error);
+            Assert.That(host.Civilization.TryRestore(
+                new FormalCivilizationAscensionSnapshot(
+                    2,
+                    selectedFateId,
+                    2,
+                    true,
+                    1ul), out error), Is.True, error);
+            host.Sequence.Restore(
+                (int)AdvancementSequenceStage.Continued, 0f);
+            session.UnlockResearchForDevelopment(
+                GrayboxBuildingUpgradeController3D.AlloyArmorResearchId);
+            session.Inventory.Set(ResourceIds.Alloy, 100);
+            Assert.That(worldView.TryGetTowerObject(
+                turret.StableInstanceId, out GameObject towerObject), Is.True);
+
+            yield return ClickWorldObject(towerObject);
+            yield return null;
+            GameObject upgrade = RequireSceneObject(BuildingUpgradeButtonName);
+            Assert.That(upgrade.activeInHierarchy, Is.True);
+            Assert.That(upgrade.GetComponent<Button>().interactable, Is.True);
+            int alloyBefore = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Alloy);
+            string selectedBefore = controller.SelectedStableId;
+
+            yield return ClickUiElement(upgrade);
+
+            GrayboxBuildingInstance3D upgraded = session.Instances.Single(
+                value => value.StableInstanceId == turret.StableInstanceId);
+            Assert.That(upgraded, Is.SameAs(turret));
+            Assert.That(upgraded.Placement.Definition,
+                Is.SameAs(BuildingCatalog.HeavyMachineGunTurret));
+            Assert.That(session.CityStorage.GetNetworkAmount(ResourceIds.Alloy),
+                Is.EqualTo(alloyBefore - 20));
+            Assert.That(controller.SelectedStableId, Is.EqualTo(selectedBefore),
+                "Upgrade UI click must not leak into world selection.");
+            Assert.That(RequireSceneObject(
+                    "Defense.Selection.Upgrade.Feedback")
+                .GetComponent<Text>().text, Does.Contain("升级完成"));
         }
 
         [UnityTest]

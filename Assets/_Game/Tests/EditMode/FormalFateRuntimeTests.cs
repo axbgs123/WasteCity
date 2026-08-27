@@ -147,7 +147,7 @@ namespace WasteCity.Tests
             {
                 CreateSnapshot(snapshotType, 2ul, null, 1),
                 CreateSnapshot(snapshotType, 2ul, FixedOffers[0], 0),
-                CreateSnapshot(snapshotType, 2ul, FixedOffers[0], 2),
+                CreateSnapshot(snapshotType, 2ul, FixedOffers[0], 3),
                 CreateSnapshot(snapshotType, 2ul, "unknown.fate.id", 1),
                 CreateSnapshot(
                     snapshotType,
@@ -174,6 +174,29 @@ namespace WasteCity.Tests
                 "TryUpgrade",
                 BindingFlags.Public | BindingFlags.Instance), Is.Null,
                 "Task 2 records the selected Lv.1 state but does not expose upgrades.");
+        }
+
+        [Test]
+        public void IDEA0020_SelectedLevelOnePromotesOnceAndLevelTwoRestores()
+        {
+            object runtime = CreateRuntime();
+            Assert.That(TrySelect(runtime, FixedOffers[0], out _, out _, out _),
+                Is.True);
+            MethodInfo promote = runtime.GetType().GetMethod(
+                "TryPromoteToLevelTwo");
+            Assert.That(promote, Is.Not.Null);
+            object[] arguments = { null };
+            Assert.That((bool)promote.Invoke(runtime, arguments), Is.True,
+                arguments[0] as string);
+            Assert.That(Read<int>(Capture(runtime), "Level"), Is.EqualTo(2));
+            Assert.That((bool)promote.Invoke(runtime, arguments), Is.False);
+
+            object restored = CreateRuntime();
+            object snapshot = CreateSnapshot(
+                RequireType(SnapshotTypeName), 9UL, FixedOffers[0], 2);
+            Assert.That(TryRestore(restored, snapshot, out string error),
+                Is.True, error);
+            Assert.That(Read<int>(Capture(restored), "Level"), Is.EqualTo(2));
         }
 
         [Test]

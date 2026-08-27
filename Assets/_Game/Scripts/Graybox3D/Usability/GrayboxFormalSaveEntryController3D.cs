@@ -195,6 +195,15 @@ namespace WasteCity.Graybox3D.Usability
         {
             if (runtimeHost == null || !runtimeHost.TryStartNewProgress())
             {
+                if (runtimeHost != null && !string.IsNullOrWhiteSpace(
+                        runtimeHost.LastStartNewProgressError))
+                {
+                    FeedbackMessage =
+                        "无法开始新进度：" +
+                        runtimeHost.LastStartNewProgressError;
+                    RefreshView();
+                    return;
+                }
                 ApplyCommandFeedback(
                     false,
                     runtimeHost?.LastStoreResult,

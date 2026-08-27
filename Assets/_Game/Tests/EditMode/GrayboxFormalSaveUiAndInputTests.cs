@@ -157,6 +157,24 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0020_NewGameFailureDoesNotReuseTheEarlierProbeMessage()
+        {
+            string source = File.ReadAllText(EntrySourcePath);
+            string start = ExtractMethodBlock(
+                source,
+                "private void StartNewProgress(");
+
+            int diagnostic = start.IndexOf(
+                "LastStartNewProgressError",
+                StringComparison.Ordinal);
+            int storeFallback = start.IndexOf(
+                "ApplyCommandFeedback(",
+                StringComparison.Ordinal);
+            Assert.That(diagnostic, Is.GreaterThanOrEqualTo(0));
+            Assert.That(storeFallback, Is.GreaterThan(diagnostic));
+        }
+
+        [Test]
         public void IDEA0015_CheckpointWarningUsesStructuredStateAndUsabilityOwnsPlayerCopy()
         {
             Type hostType = typeof(GrayboxFormalSaveRuntimeHost3D);
@@ -212,6 +230,27 @@ namespace WasteCity.Tests
                 EntryTypeName + " must exist for the formal 3D entry flow.");
             Assert.That(type.IsSubclassOf(typeof(MonoBehaviour)), Is.True);
             return type;
+        }
+
+        private static string ExtractMethodBlock(
+            string source,
+            string signature)
+        {
+            int start = source.IndexOf(signature, StringComparison.Ordinal);
+            Assert.That(start, Is.GreaterThanOrEqualTo(0), signature);
+            int open = source.IndexOf('{', start);
+            Assert.That(open, Is.GreaterThanOrEqualTo(0), signature);
+            var depth = 0;
+            for (var index = open; index < source.Length; index++)
+            {
+                if (source[index] == '{') depth++;
+                if (source[index] != '}') continue;
+                depth--;
+                if (depth == 0)
+                    return source.Substring(start, index - start + 1);
+            }
+            Assert.Fail("Method block is incomplete: " + signature);
+            return string.Empty;
         }
 
         private static void AssertPublicReadableProperty(
