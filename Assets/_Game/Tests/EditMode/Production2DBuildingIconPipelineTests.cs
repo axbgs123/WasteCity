@@ -14,15 +14,21 @@ namespace WasteCity.Tests
     {
         private const string Root =
             "Assets/_Game/Art/Production2D/Buildings/";
-        private const string ManifestPath =
+        private const string BaseManifestPath =
             "Docs/Art/IDEA-0016/Manifests/" +
             "idea-0016-building-visual-assets.json";
+        private const string ExtensionManifestPath =
+            "Docs/Art/IDEA-0021/Manifests/" +
+            "idea-0021-building-visual-assets.json";
 
         [Test]
-        public void IDEA0016_BuildingManifestCoversAllThirtyStableIds()
+        public void IDEA0021_LayeredBuildingManifestsCoverAllStableIds()
         {
-            Assert.That(File.Exists(ManifestPath), Is.True);
-            string json = File.ReadAllText(ManifestPath);
+            Assert.That(File.Exists(BaseManifestPath), Is.True);
+            Assert.That(File.Exists(ExtensionManifestPath), Is.True);
+            string baseJson = File.ReadAllText(BaseManifestPath);
+            string extensionJson = File.ReadAllText(ExtensionManifestPath);
+            string json = baseJson + extensionJson;
             foreach (BuildingDefinition definition in BuildingCatalog.All)
             {
                 Assert.That(json, Does.Contain(
@@ -40,6 +46,9 @@ namespace WasteCity.Tests
                 "\"contentId\": \"cultivation.building.sword-riding-platform\""));
             Assert.That(Count(json, "\"catalogEntry\": \"upgrade-only\""),
                 Is.EqualTo(2));
+            Assert.That(Count(baseJson, "\"contentId\":"), Is.EqualTo(30));
+            Assert.That(Count(extensionJson, "\"contentId\":"),
+                Is.EqualTo(5));
         }
 
         [Test]
@@ -52,7 +61,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0016_AllThirtyBuildingSpritesAreTransparent256Singles()
+        public void IDEA0021_AllBuildingSpritesAreTransparent256Singles()
         {
             Assert.That(Directory.Exists(Root), Is.True);
             string[] paths = Directory.GetFiles(
@@ -82,7 +91,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0016_AllThirtyMastersPassAlphaAndSafeAreaValidation()
+        public void IDEA0021_AllMastersPassAlphaAndSafeAreaValidation()
         {
             Production2DBuildingValidationReport report =
                 Production2DBuildingIconCatalogBuilder.ValidateSourceAssets();

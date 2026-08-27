@@ -64,6 +64,11 @@ namespace WasteCity.Tests
                 { "cultivation.building.alchemy-chamber", "Workshop" },
                 { "cultivation.building.puppet-workshop", "Workshop" },
                 { "biological.building.behemoth-pen", "LargeEnclosure" },
+                { "bridge.building.psionic-mech-factory", "LargeEnclosure" },
+                { "bridge.building.high-frequency-sword-forge", "Workshop" },
+                { "bridge.building.bio-hangar", "LargeEnclosure" },
+                { "bridge.building.spirit-plant-garden", "FieldArray" },
+                { "bridge.building.emp-tower", "DefenseFoundation" },
             };
 
         [Test]
@@ -153,8 +158,8 @@ namespace WasteCity.Tests
                 Is.EqualTo(true),
                 validationArguments[0] as string);
 
-            Assert.That(BuildingCatalog.All, Has.Length.EqualTo(30));
-            Assert.That(ExpectedArchetypes, Has.Count.EqualTo(30));
+            Assert.That(BuildingCatalog.All, Has.Length.EqualTo(35));
+            Assert.That(ExpectedArchetypes, Has.Count.EqualTo(35));
             Assert.That(
                 BuildingCatalog.All.Select(value => value.Id.Value),
                 Is.EquivalentTo(ExpectedArchetypes.Keys));
@@ -198,6 +203,7 @@ namespace WasteCity.Tests
                     "core.building.machine-gun-turret",
                     "core.building.laser-tower",
                     "biological.building.spore-tower",
+                    "bridge.building.emp-tower",
                 }));
         }
 

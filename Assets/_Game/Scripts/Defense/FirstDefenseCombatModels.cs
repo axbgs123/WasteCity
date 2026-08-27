@@ -322,6 +322,7 @@ namespace WasteCity.Defense
     {
         private readonly HealthModel health;
         private float attackDamageRemainder;
+        private bool suppressNextMovement;
 
         public DefenseEnemyCombatModel(
             string stableId,
@@ -435,6 +436,11 @@ namespace WasteCity.Defense
         {
             if (IsDead || deltaSeconds <= 0f)
                 return 0f;
+            if (suppressNextMovement)
+            {
+                suppressNextMovement = false;
+                return 0f;
+            }
 
             float offsetX = targetX - X;
             float offsetZ = targetZ - Z;
@@ -487,6 +493,12 @@ namespace WasteCity.Defense
         internal int ApplyDamage(int rawDamage, DamageType damageType)
         {
             return health.Apply(rawDamage, damageType, Definition.Armor);
+        }
+
+        internal void SuppressNextMovement()
+        {
+            if (!IsDead && Definition.IsMechanical)
+                suppressNextMovement = true;
         }
 
         private static bool IsFinite(float value)

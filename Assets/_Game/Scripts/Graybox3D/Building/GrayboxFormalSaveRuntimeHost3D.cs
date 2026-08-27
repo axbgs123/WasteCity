@@ -84,6 +84,7 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxCivilizationAdvancementController3D
             civilizationAdvancementController;
         private GrayboxBuildingUpgradeController3D buildingUpgradeController;
+        private ElixirSessionMutationSequence3D elixirMutationSequence;
         private string buildingUpgradeFeedbackStableId = string.Empty;
         private string buildingUpgradeFeedback = string.Empty;
         private bool buildingUpgradeProjectionInitialized;
@@ -225,6 +226,26 @@ namespace WasteCity.Graybox3D.Building
             }
 
             BindRuleClock();
+            operations.ConfigureCivilizationResearch(
+                () => Civilization.Capture().CivilizationLevel,
+                () => Civilization.Capture().Revision);
+            elixirMutationSequence ??=
+                new ElixirSessionMutationSequence3D(
+                    () => currentSessionId);
+            operations.ConfigureElixirUse(() =>
+            {
+                GrayboxElixirUseResult3D result =
+                    GrayboxElixirUseCommand3D.TryUse(
+                        session.CityStorage,
+                        defense,
+                        session.IsResearchCompleted(
+                            GrayboxElixirUseCommand3D
+                                .FleshElixirResearchId),
+                        elixirMutationSequence.PeekSamplePercent());
+                if (result.Succeeded)
+                    elixirMutationSequence.CommitUse();
+                return result;
+            });
 
             if (!production.TryRebuildAfterPersistenceRestore(
                     out string productionError))
@@ -921,6 +942,7 @@ namespace WasteCity.Graybox3D.Building
                 defense.Hud.BuildingUpgradeRequested -=
                     HandleBuildingUpgradeRequested;
             buildingUpgradeController = null;
+            elixirMutationSequence = null;
             buildingUpgradeFeedbackStableId = string.Empty;
             buildingUpgradeFeedback = string.Empty;
             advancementSequence = null;

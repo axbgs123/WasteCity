@@ -7,6 +7,7 @@ using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
+using WasteCity.Research;
 
 namespace WasteCity.Persistence
 {
@@ -322,7 +323,9 @@ namespace WasteCity.Persistence
             if (result != null) return result;
             result = ValidateCrafting(data.crafting);
             if (result != null) return result;
-            result = ValidateResearch(data.research);
+            result = ValidateResearch(
+                data.research,
+                data.progression.civilization);
             if (result != null) return result;
             result = ValidateProduction(data.production, buildingIds, nodeIds);
             if (result != null) return result;
@@ -1369,9 +1372,11 @@ namespace WasteCity.Persistence
         }
 
         private static FormalSaveValidationResult ValidateResearch(
-            FormalThreeDResearchSaveData research)
+            FormalThreeDResearchSaveData research,
+            FormalThreeDCivilizationSaveData civilization)
         {
             const string path = "formal3D.research";
+            int civilizationLevel = civilization?.level ?? 1;
             if (research.completedResearchIds == null)
                 return Invalid(FormalSaveValidationError.InvalidArray,
                     path + ".completedResearchIds");
@@ -1388,6 +1393,12 @@ namespace WasteCity.Persistence
                 if (!completed.Add(id))
                     return Invalid(FormalSaveValidationError.DuplicateStableId,
                         item);
+                if (CivilizationResearchAvailability.IsGated(id) &&
+                    civilizationLevel <
+                        CivilizationResearchAvailability
+                            .RequiredCivilizationLevel)
+                    return Invalid(FormalSaveValidationError.InvalidResearch,
+                        item);
             }
             FormalSaveValidationResult result = NonNegativeFinite(
                 research.remainingSeconds,
@@ -1402,6 +1413,12 @@ namespace WasteCity.Persistence
                 return Invalid(FormalSaveValidationError.InvalidStableId,
                     path + ".activeResearchId");
             if (completed.Contains(research.activeResearchId))
+                return Invalid(FormalSaveValidationError.InvalidResearch,
+                    path + ".activeResearchId");
+            if (CivilizationResearchAvailability.IsGated(
+                    research.activeResearchId) && civilizationLevel <
+                        CivilizationResearchAvailability
+                            .RequiredCivilizationLevel)
                 return Invalid(FormalSaveValidationError.InvalidResearch,
                     path + ".activeResearchId");
             return null;

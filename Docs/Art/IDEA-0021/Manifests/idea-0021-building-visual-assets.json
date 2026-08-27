@@ -1,0 +1,79 @@
+{
+  "entries": [
+    {
+      "contentId": "bridge.building.psionic-mech-factory",
+      "displayNameZh": "灵能机甲厂",
+      "catalogEntry": "build-menu",
+      "sourceSummaryZh": "完成灵能机甲桥研究后建造。",
+      "useSummaryZh": "融合机械组件、能量电池与灵能增幅器，生产高效控制芯片；实体机甲部署待 F3。",
+      "unlockSummaryZh": "需要精密装配、灵能工坊与灵能机甲桥研究。",
+      "loreBriefZh": "屏蔽装配坞在机械骨架外层写入可控心灵回路，使重型机体的控制核能抵御废土干扰。",
+      "visualKeywordsZh": "宽体装配坞、双机械龙门架、屏蔽机体槽、紫青灵能约束环、蓝钢装甲",
+      "forbiddenElementsZh": "完整机器人、文字、数字、地面、完整背景板、纯奇幻神殿",
+      "runtimeUsages": ["建造目录", "建筑详情", "生产观察", "世界建筑贴图", "管理者修改器"],
+      "filename": "building-psionic-mech-factory.png",
+      "masterPath": "Docs/Art/IDEA-0021/Source/Buildings/building-psionic-mech-factory-master-v1.png",
+      "reviewState": "art-produced"
+    },
+    {
+      "contentId": "bridge.building.high-frequency-sword-forge",
+      "displayNameZh": "高周波飞剑铸造台",
+      "catalogEntry": "build-menu",
+      "sourceSummaryZh": "完成高周波飞剑桥研究后建造。",
+      "useSummaryZh": "以超导线圈快速定型灵铁，高效量产剑类防御塔耗用的飞剑。",
+      "unlockSummaryZh": "需要炼器基础、精密装配与高周波飞剑桥研究。",
+      "loreBriefZh": "工业感应环与炼器夹具在同一拍频中锁定剑胚，把灵流振荡固化为可批量复制的高速刃。",
+      "visualKeywordsZh": "低矮装甲锻台、双青绿感应环、三柄夹持剑胚、小型机械锤臂、铜绿灵纹",
+      "forbiddenElementsZh": "宗教祭坛、单独武器图标、文字、数字、地面、完整背景板",
+      "runtimeUsages": ["建造目录", "建筑详情", "生产观察", "世界建筑贴图", "管理者修改器"],
+      "filename": "building-high-frequency-sword-forge.png",
+      "masterPath": "Docs/Art/IDEA-0021/Source/Buildings/building-high-frequency-sword-forge-master-v1.png",
+      "reviewState": "art-produced"
+    },
+    {
+      "contentId": "bridge.building.bio-hangar",
+      "displayNameZh": "生物机库",
+      "catalogEntry": "build-menu",
+      "sourceSummaryZh": "完成生物机库桥研究后建造。",
+      "useSummaryZh": "融合骨钢、机械组件与活性生物质，高效培育生物武器；半机械巨兽部署待 F3。",
+      "unlockSummaryZh": "需要生物培育、精密装配与生物机库桥研究。",
+      "loreBriefZh": "骨钢维护架约束巨型组织茁的生长，机械起重臂负责换装、喂料与紧急封闭。",
+      "visualKeywordsZh": "3×2宽体密封机库、骨白分段顶盖、绿色生物肋、双维护龙门架、琥珀观察窗",
+      "forbiddenElementsZh": "血腥肢体、完整怪物、文字、数字、地面、完整背景板",
+      "runtimeUsages": ["建造目录", "建筑详情", "生产观察", "世界建筑贴图", "管理者修改器"],
+      "filename": "building-bio-hangar.png",
+      "masterPath": "Docs/Art/IDEA-0021/Source/Buildings/building-bio-hangar-master-v1.png",
+      "reviewState": "art-produced"
+    },
+    {
+      "contentId": "bridge.building.spirit-plant-garden",
+      "displayNameZh": "灵植园",
+      "catalogEntry": "build-menu",
+      "sourceSummaryZh": "完成灵植培育桥研究后建造。",
+      "useSummaryZh": "让灵性流动与活性组织共存，生产血肉灵丹所需的灵植精华。",
+      "unlockSummaryZh": "需要炼器基础、生物培育与灵植培育桥研究。",
+      "loreBriefZh": "四瓣装甲培养槽围绕中央灵液井循环，工业灌溉管将不稳定活性限定在可采收范围。",
+      "visualKeywordsZh": "四瓣装甲花槽、中央青绿灵液井、宽叶灵植、铜色灵纹水管、骨白支架",
+      "forbiddenElementsZh": "自然风景、神殿、文字、数字、地面、完整背景板",
+      "runtimeUsages": ["建造目录", "建筑详情", "生产观察", "世界建筑贴图", "管理者修改器"],
+      "filename": "building-spirit-plant-garden.png",
+      "masterPath": "Docs/Art/IDEA-0021/Source/Buildings/building-spirit-plant-garden-master-v1.png",
+      "reviewState": "art-produced"
+    },
+    {
+      "contentId": "bridge.building.emp-tower",
+      "displayNameZh": "EMP塔",
+      "catalogEntry": "build-menu",
+      "sourceSummaryZh": "完成精神脉冲武器桥研究后建造。",
+      "useSummaryZh": "消耗能量电池发射脉冲，对机械目标形成持续移动压制。",
+      "unlockSummaryZh": "需要灵能工坊、精密装配与精神脉冲武器桥研究。",
+      "loreBriefZh": "成对的脉冲叉环绕紧凑灵能核放电，在目标的机械驱动与感知回路中制造同步空窗。",
+      "visualKeywordsZh": "低矮四脚装甲基座、双电容罐、对开脉冲叉、紫青灵能核、琥珀警示灯",
+      "forbiddenElementsZh": "高细无线电塔、特斯拉线圈、激光炮、文字、数字、地面、完整背景板",
+      "runtimeUsages": ["建造目录", "建筑详情", "防御 HUD", "世界建筑贴图", "管理者修改器"],
+      "filename": "building-emp-tower.png",
+      "masterPath": "Docs/Art/IDEA-0021/Source/Buildings/building-emp-tower-master-v1.png",
+      "reviewState": "art-produced"
+    }
+  ]
+}

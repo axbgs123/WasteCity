@@ -21,6 +21,7 @@ namespace WasteCity.Defense
         private float activeConsumableSeconds;
         private float damageRemainder;
         private string targetStableEnemyId;
+        private float rangeMultiplier = 1f;
 
         public SingleCityDefenseTowerCombatModel(
             string stableInstanceId,
@@ -75,7 +76,7 @@ namespace WasteCity.Defense
         public string BuildingId => definition.BuildingId;
         public DamageType DamageType => definition.DamageType;
         public float DamagePerSecond => definition.DamagePerSecond;
-        public float Range => definition.Range;
+        public float Range => definition.Range * rangeMultiplier;
         public string ConsumableId => definition.ConsumableId;
         public float SecondsPerConsumable =>
             definition.SecondsPerConsumable;
@@ -197,6 +198,32 @@ namespace WasteCity.Defense
             IsPlayerPaused = paused;
         }
 
+        public void SetRangeMultiplier(float multiplier)
+        {
+            rangeMultiplier = !IsFinite(multiplier) || multiplier <= 0f
+                ? 1f
+                : multiplier;
+        }
+
+        public SingleCityDefenseTowerCombatModel RebuildForBuilding(
+            string buildingId,
+            float nextRangeMultiplier)
+        {
+            DefenseTowerDefinition next = DefenseTowerCatalog.For(buildingId);
+            var rebuilt = new SingleCityDefenseTowerCombatModel(
+                StableInstanceId, buildingId, X, Z, LocalConsumableAmount)
+            {
+                activeConsumableSeconds = Math.Min(
+                    activeConsumableSeconds, next.SecondsPerConsumable),
+                damageRemainder = damageRemainder,
+                targetStableEnemyId = targetStableEnemyId,
+                IsLogisticsConnected = IsLogisticsConnected,
+                IsPlayerPaused = IsPlayerPaused,
+            };
+            rebuilt.SetRangeMultiplier(nextRangeMultiplier);
+            return rebuilt;
+        }
+
         public int RefillFrom(
             CityResourceStorageModel cityStorage,
             bool connected)
@@ -248,7 +275,7 @@ namespace WasteCity.Defense
             float selectedDistanceSquared = float.MaxValue;
             if (candidates != null)
             {
-                float rangeSquared = definition.Range * definition.Range;
+                float rangeSquared = Range * Range;
                 for (var index = 0; index < candidates.Count; index++)
                 {
                     SingleCityDefenseEnemySnapshot candidate =
@@ -299,7 +326,7 @@ namespace WasteCity.Defense
                     targetStableEnemyId,
                     X,
                     Z,
-                    definition.Range);
+                    Range);
                 targetStableEnemyId = targetId;
                 if (string.IsNullOrEmpty(targetId))
                     break;
@@ -346,6 +373,9 @@ namespace WasteCity.Defense
                     targetId,
                     definition.BuildingId,
                     resolvedDamage);
+                campaign.SuppressMechanicalMovementNextStep(
+                    targetId,
+                    definition.BuildingId);
             }
 
             return totalAppliedDamage;
@@ -392,6 +422,11 @@ namespace WasteCity.Defense
                 totalAppliedDamage += target.ApplyDamage(
                     rawDamage,
                     definition.DamageType);
+                if (string.Equals(
+                        definition.BuildingId,
+                        BuildingCatalog.EmpTower.Id.Value,
+                        StringComparison.Ordinal))
+                    target.SuppressNextMovement();
             }
 
             return totalAppliedDamage;
@@ -427,7 +462,7 @@ namespace WasteCity.Defense
 
         private bool IsInRange(float targetX, float targetZ)
         {
-            float rangeSquared = definition.Range * definition.Range;
+            float rangeSquared = Range * Range;
             return DistanceSquared(targetX, targetZ) <= rangeSquared;
         }
 
@@ -464,6 +499,18 @@ namespace WasteCity.Defense
                    string.Equals(
                        buildingId,
                        BuildingCatalog.SporeTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.HeavyMachineGunTurret.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.SwordArrayTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.SwordRidingPlatform.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.EmpTower.Id.Value,
                        StringComparison.Ordinal);
         }
 

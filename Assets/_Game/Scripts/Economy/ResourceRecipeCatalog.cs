@@ -112,6 +112,13 @@ namespace WasteCity.Economy
             "psionics.building.consciousness-network";
         private const string PsionicWorkshopId =
             "psionics.building.workshop";
+        private const string PsionicMechFactoryId =
+            "bridge.building.psionic-mech-factory";
+        private const string HighFrequencySwordForgeId =
+            "bridge.building.high-frequency-sword-forge";
+        private const string BioHangarId = "bridge.building.bio-hangar";
+        private const string SpiritPlantGardenId =
+            "bridge.building.spirit-plant-garden";
 
         private static readonly ReadOnlyCollection<ResourceRecipeDefinition>
             all = Array.AsReadOnly(new[]
@@ -445,9 +452,47 @@ namespace WasteCity.Economy
                     defaultForBuilding: false,
                     "放大并压缩意识碎片，得到稳定的精神能量结晶。"),
                 Machine(
+                    "fusion.production.psionic-mech-components",
+                    "灵能机甲控制组件",
+                    PsionicMechFactoryId,
+                    Amounts(
+                        ("technology.resource.mechanical-component", 2),
+                        ("psionics.resource.amplifier", 1),
+                        ("technology.resource.energy-cell", 1)),
+                    Amounts(("technology.resource.control-chip", 2)),
+                    18f,
+                    R("core.research.bridge.psionic-mech"),
+                    defaultForBuilding: true,
+                    "灵能机甲前驱产线；单位部署留待 F3。"),
+                Machine(
+                    "fusion.production.high-frequency-flying-sword",
+                    "高周波飞剑",
+                    HighFrequencySwordForgeId,
+                    Amounts(
+                        ("cultivation.resource.spirit-iron", 2),
+                        ("technology.resource.superconductive-coil", 1)),
+                    Amounts(("cultivation.resource.flying-sword", 3)),
+                    10f,
+                    R("core.research.bridge.high-frequency-sword"),
+                    defaultForBuilding: true,
+                    "把灵铁刃体与超导线圈合成为三柄高周波飞剑。"),
+                Machine(
+                    "fusion.production.bio-hangar-weapons",
+                    "生物机库武装培养",
+                    BioHangarId,
+                    Amounts(
+                        ("biological.resource.bone-steel", 2),
+                        ("technology.resource.mechanical-component", 1),
+                        ("biological.resource.active-biomass", 1)),
+                    Amounts((ResourceIds.BiologicalWeapon, 3)),
+                    14f,
+                    R("core.research.bridge.bio-hangar"),
+                    defaultForBuilding: true,
+                    "半机械巨兽前驱产线；单位部署留待 F3。"),
+                MachineForBuildings(
                     "fusion.production.spirit-plant-extract",
                     "融合灵植精华",
-                    BreedingChamberId,
+                    R(BreedingChamberId, SpiritPlantGardenId),
                     Amounts(
                         ("cultivation.resource.spirit-stone", 1),
                         ("biological.resource.active-biomass", 2),
@@ -527,6 +572,33 @@ namespace WasteCity.Economy
                 chineseName,
                 ResourceRecipeKind.Machine,
                 R(buildingId),
+                inputs,
+                outputs,
+                durationSeconds,
+                requiredResearchIds,
+                defaultForBuilding,
+                MachineIcon(outputs[0].ResourceId),
+                loreBrief,
+                StandardMachineInputCapacity,
+                StandardMachineOutputCapacity);
+        }
+
+        private static ResourceRecipeDefinition MachineForBuildings(
+            string id,
+            string chineseName,
+            string[] buildingIds,
+            ResourceAmount[] inputs,
+            ResourceAmount[] outputs,
+            float durationSeconds,
+            string[] requiredResearchIds,
+            bool defaultForBuilding,
+            string loreBrief)
+        {
+            return new ResourceRecipeDefinition(
+                id,
+                chineseName,
+                ResourceRecipeKind.Machine,
+                buildingIds,
                 inputs,
                 outputs,
                 durationSeconds,

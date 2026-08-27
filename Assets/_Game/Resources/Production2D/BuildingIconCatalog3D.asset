@@ -25,6 +25,16 @@ MonoBehaviour:
     sprite: {fileID: 21300000, guid: d9817cbc60ae24c2e8d8d4de50ce10f0, type: 3}
   - buildingId: biological.building.spore-tower
     sprite: {fileID: 21300000, guid: 9a5cb7e4826bf4250b816a233994df97, type: 3}
+  - buildingId: bridge.building.bio-hangar
+    sprite: {fileID: 21300000, guid: 59e5f461c792841f4b9a19f5b70f7946, type: 3}
+  - buildingId: bridge.building.emp-tower
+    sprite: {fileID: 21300000, guid: c00168d5352414e29a5875f838261057, type: 3}
+  - buildingId: bridge.building.high-frequency-sword-forge
+    sprite: {fileID: 21300000, guid: dff8e69965bf146bea318bb584347f34, type: 3}
+  - buildingId: bridge.building.psionic-mech-factory
+    sprite: {fileID: 21300000, guid: a4aaca5682b8d4cf9ba01203b9fd1fd5, type: 3}
+  - buildingId: bridge.building.spirit-plant-garden
+    sprite: {fileID: 21300000, guid: 22f8fb46bf866489d96407188d5bf584, type: 3}
   - buildingId: core.building.assembler
     sprite: {fileID: 21300000, guid: 2c22f43e37f0746248e781f56a5dfc14, type: 3}
   - buildingId: core.building.automated-repair-bay

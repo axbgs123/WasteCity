@@ -21,6 +21,7 @@ namespace WasteCity.Tests
         private const string LaserId = "building.instance.009102";
         private const string SporeId = "building.instance.009103";
         private const string SmelterId = "building.instance.009104";
+        private const string HeavyMachineGunId = "building.instance.009105";
         private const long ProjectionAllocationBudgetBytes = 512;
 
         private readonly List<UnityEngine.Object> created =
@@ -384,12 +385,12 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void FormalRuntimeSynchronizesThreeCatalogTowersAndCitySupply()
+        public void FormalRuntimeSynchronizesFourCatalogTowersAndCitySupply()
         {
             RuntimeFixture fixture = CreateRuntimeFixture(
                 includeThreeTowers: true,
                 includeSmelter: true);
-            fixture.Session.Inventory.Set(ResourceIds.Ammunition, 30);
+            fixture.Session.Inventory.Set(ResourceIds.Ammunition, 60);
             fixture.Session.Inventory.Set(ResourceIds.EnergyCrystal, 30);
             fixture.Session.Inventory.Set(ResourceIds.BiologicalWeapon, 30);
 
@@ -424,6 +425,11 @@ namespace WasteCity.Tests
                 SporeId,
                 BuildingCatalog.SporeTower.Id.Value,
                 ResourceIds.BiologicalWeapon);
+            AssertTowerSupply(
+                fixture.Runtime,
+                HeavyMachineGunId,
+                BuildingCatalog.HeavyMachineGunTurret.Id.Value,
+                ResourceIds.Ammunition);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.Ammunition), Is.Zero);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
@@ -440,6 +446,9 @@ namespace WasteCity.Tests
             int sporeBefore = CampaignTower(
                 fixture.Runtime,
                 SporeId).LocalConsumableAmount;
+            int heavyBefore = CampaignTower(
+                fixture.Runtime,
+                HeavyMachineGunId).LocalConsumableAmount;
             fixture.Session.Inventory.Set(ResourceIds.Ammunition, 20);
             fixture.Session.Inventory.Set(ResourceIds.EnergyCrystal, 20);
             fixture.Session.Inventory.Set(ResourceIds.BiologicalWeapon, 20);
@@ -456,11 +465,15 @@ namespace WasteCity.Tests
                 .LocalConsumableAmount, Is.EqualTo(laserBefore));
             Assert.That(CampaignTower(fixture.Runtime, SporeId)
                 .LocalConsumableAmount, Is.EqualTo(sporeBefore));
+            Assert.That(CampaignTower(fixture.Runtime, HeavyMachineGunId)
+                .LocalConsumableAmount, Is.EqualTo(heavyBefore));
             Assert.That(CampaignTower(fixture.Runtime, MachineGunId)
                 .IsLogisticsConnected, Is.False);
             Assert.That(CampaignTower(fixture.Runtime, LaserId)
                 .IsLogisticsConnected, Is.False);
             Assert.That(CampaignTower(fixture.Runtime, SporeId)
+                .IsLogisticsConnected, Is.False);
+            Assert.That(CampaignTower(fixture.Runtime, HeavyMachineGunId)
                 .IsLogisticsConnected, Is.False);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.Ammunition), Is.EqualTo(20));
@@ -470,7 +483,13 @@ namespace WasteCity.Tests
                 ResourceIds.BiologicalWeapon), Is.EqualTo(20));
             Assert.That(fixture.Runtime.Snapshot.Towers.Select(value =>
                     value.StableId),
-                Is.EqualTo(new[] { MachineGunId, LaserId, SporeId }));
+                Is.EqualTo(new[]
+                {
+                    MachineGunId,
+                    LaserId,
+                    SporeId,
+                    HeavyMachineGunId
+                }));
         }
 
         [Test]
@@ -820,7 +839,7 @@ namespace WasteCity.Tests
                     14,
                     10));
                 entries.Add(new BuildingEntry(
-                    "building.instance.009105",
+                    HeavyMachineGunId,
                     BuildingCatalog.HeavyMachineGunTurret,
                     16,
                     10));

@@ -16,7 +16,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             public int Current { get; set; }
-            public int Maximum { get; }
+            public int Maximum { get; set; }
             public bool Destroyed { get; set; }
         }
 
@@ -28,6 +28,13 @@ namespace WasteCity.Graybox3D.Building
 
         public void Synchronize(
             IReadOnlyList<GrayboxBuildingInstance3D> instances)
+        {
+            Synchronize(instances, alloyArmorCompleted: false);
+        }
+
+        public void Synchronize(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            bool alloyArmorCompleted)
         {
             if (instances == null) return;
             synchronizedIds.Clear();
@@ -55,16 +62,28 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < instances.Count; index++)
             {
                 GrayboxBuildingInstance3D instance = instances[index];
-                if (!CanEnterCombat(instance) ||
-                    states.ContainsKey(instance.StableInstanceId))
+                if (!CanEnterCombat(instance))
                 {
                     continue;
                 }
 
-                int maximum = instance.Placement.Definition.MaximumHealth;
-                states.Add(
-                    instance.StableInstanceId,
-                    new HealthState(maximum, maximum, destroyed: false));
+                int maximum = WasteCity.Research.RouteTechnologyEffects
+                    .BuildingMaximumHealth(
+                        instance.Placement.Definition.MaximumHealth,
+                        alloyArmorCompleted);
+                if (!states.TryGetValue(
+                        instance.StableInstanceId,
+                        out HealthState existing))
+                {
+                    states.Add(instance.StableInstanceId,
+                        new HealthState(maximum, maximum, destroyed: false));
+                    continue;
+                }
+                if (existing.Maximum == maximum) continue;
+                int missing = Math.Max(0, existing.Maximum - existing.Current);
+                existing.Maximum = maximum;
+                existing.Current = Math.Max(0, maximum - missing);
+                existing.Destroyed = existing.Current == 0;
             }
         }
 
@@ -112,6 +131,41 @@ namespace WasteCity.Graybox3D.Building
                 destroyedNow = true;
             }
             return true;
+        }
+
+        public GrayboxElixirBuildingHealthSnapshot3D[]
+            CaptureElixirHealingTargets()
+        {
+            var result = new GrayboxElixirBuildingHealthSnapshot3D[
+                states.Count];
+            var index = 0;
+            foreach (KeyValuePair<string, HealthState> item in states)
+            {
+                HealthState state = item.Value;
+                result[index++] =
+                    new GrayboxElixirBuildingHealthSnapshot3D(
+                        state.Destroyed ? 0 : state.Current,
+                        state.Maximum);
+            }
+            return result;
+        }
+
+        public int HealAll(int amount)
+        {
+            if (amount <= 0) return 0;
+            var healed = 0;
+            foreach (KeyValuePair<string, HealthState> item in states)
+            {
+                HealthState state = item.Value;
+                if (state.Destroyed || state.Current >= state.Maximum)
+                    continue;
+                int accepted = Math.Min(
+                    amount,
+                    state.Maximum - state.Current);
+                state.Current += accepted;
+                healed += accepted;
+            }
+            return healed;
         }
 
         public FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] Capture()

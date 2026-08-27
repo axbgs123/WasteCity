@@ -38,10 +38,13 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 2c22f43e37f0746248e781f56a5dfc14, type: 3}
     - {fileID: 2800000, guid: 35d05a7acb6ae41f98b7df096f8e2a03, type: 3}
     - {fileID: 2800000, guid: 4aedf27c74dd74908850eeeab620e103, type: 3}
+    - {fileID: 2800000, guid: 59e5f461c792841f4b9a19f5b70f7946, type: 3}
     - {fileID: 2800000, guid: aa6483ef67ef34b14b26aeebfa4341b8, type: 3}
     - {fileID: 2800000, guid: 838a0e0ab4a55433ea47820eb71d0ab2, type: 3}
     - {fileID: 2800000, guid: 8db9adb27de3e4e67a42da39b13d4ada, type: 3}
+    - {fileID: 2800000, guid: c00168d5352414e29a5875f838261057, type: 3}
     - {fileID: 2800000, guid: d97f40d0570ff42988c4679f15ec1118, type: 3}
+    - {fileID: 2800000, guid: dff8e69965bf146bea318bb584347f34, type: 3}
     - {fileID: 2800000, guid: d03b5c1b19a1b4fc6beae0ae94f2dcf5, type: 3}
     - {fileID: 2800000, guid: 154d9e11a66954f4c811c2cf03ed1e41, type: 3}
     - {fileID: 2800000, guid: 842d05765762041a58402da991001abb, type: 3}
@@ -49,6 +52,7 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 75bdf6eaa9f1146f5bfd428a8cd8baac, type: 3}
     - {fileID: 2800000, guid: 401a0edf670bd4b658fdae31d693d461, type: 3}
     - {fileID: 2800000, guid: dff0e5a75eb094be38935e912c97f371, type: 3}
+    - {fileID: 2800000, guid: a4aaca5682b8d4cf9ba01203b9fd1fd5, type: 3}
     - {fileID: 2800000, guid: 97e8cd45d96b143d2bf0b30cd2cf6d59, type: 3}
     - {fileID: 2800000, guid: 9f1e28d87e56147d3935149d1a9eb0a8, type: 3}
     - {fileID: 2800000, guid: d3bb86dfc6430439e87c68422818738b, type: 3}
@@ -57,6 +61,7 @@ SpriteAtlas:
     - {fileID: 2800000, guid: 4d3f17978b7394e22b3f27bf2f287310, type: 3}
     - {fileID: 2800000, guid: c2bd0200ce8644ad18860e832326e876, type: 3}
     - {fileID: 2800000, guid: 88ccb67c113aa42d59d5a08adfe83e22, type: 3}
+    - {fileID: 2800000, guid: 22f8fb46bf866489d96407188d5bf584, type: 3}
     - {fileID: 2800000, guid: 9a5cb7e4826bf4250b816a233994df97, type: 3}
     - {fileID: 2800000, guid: 71d4ec31f3b974bde8de61e6bff43829, type: 3}
     - {fileID: 2800000, guid: 5aac83a35e9064c6b92356a663373c73, type: 3}

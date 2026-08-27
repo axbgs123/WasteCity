@@ -29,6 +29,7 @@ namespace WasteCity.Editor
         public string forbiddenElementsZh;
         public string[] runtimeUsages;
         public string filename;
+        public string masterPath;
         public string reviewState;
     }
 
@@ -61,6 +62,9 @@ namespace WasteCity.Editor
         public const string ManifestPath =
             "Docs/Art/IDEA-0016/Manifests/" +
             "idea-0016-building-visual-assets.json";
+        public const string ExtensionManifestPath =
+            "Docs/Art/IDEA-0021/Manifests/" +
+            "idea-0021-building-visual-assets.json";
         public const string CatalogAssetPath =
             "Assets/_Game/Resources/Production2D/" +
             "BuildingIconCatalog3D.asset";
@@ -148,9 +152,7 @@ namespace WasteCity.Editor
                     StringComparison.Ordinal));
             return entry == null
                 ? string.Empty
-                : BuildingMastersRoot +
-                  Path.GetFileNameWithoutExtension(entry.filename) +
-                  "-master-v1.png";
+                : ResolveMasterPath(entry);
         }
 
         public static Production2DBuildingValidationReport
@@ -238,9 +240,7 @@ namespace WasteCity.Editor
                     errors.Add("Invalid building delivery filename: " +
                         entry.contentId);
 
-                string masterPath = BuildingMastersRoot +
-                    Path.GetFileNameWithoutExtension(entry.filename) +
-                    "-master-v1.png";
+                string masterPath = ResolveMasterPath(entry);
                 if (!File.Exists(masterPath))
                 {
                     errors.Add("Missing formal building alpha master: " +
@@ -305,16 +305,33 @@ namespace WasteCity.Editor
 
         private static BuildingVisualManifestEntry[] ReadManifestEntries()
         {
-            if (!File.Exists(ManifestPath))
+            return ReadManifest(ManifestPath)
+                .Concat(ReadManifest(ExtensionManifestPath))
+                .ToArray();
+        }
+
+        private static BuildingVisualManifestEntry[] ReadManifest(string path)
+        {
+            if (!File.Exists(path))
                 throw new FileNotFoundException(
-                    "Missing IDEA-0016 building visual manifest.",
-                    ManifestPath);
+                    "Missing formal building visual manifest.",
+                    path);
             BuildingVisualManifest manifest = JsonUtility.FromJson<
-                BuildingVisualManifest>(File.ReadAllText(ManifestPath));
+                BuildingVisualManifest>(File.ReadAllText(path));
             if (manifest == null || manifest.entries == null)
                 throw new InvalidDataException(
-                    "IDEA-0016 building visual manifest is invalid JSON.");
+                    "Building visual manifest is invalid JSON: " + path);
             return manifest.entries;
+        }
+
+        private static string ResolveMasterPath(
+            BuildingVisualManifestEntry entry)
+        {
+            return string.IsNullOrWhiteSpace(entry.masterPath)
+                ? BuildingMastersRoot +
+                  Path.GetFileNameWithoutExtension(entry.filename) +
+                  "-master-v1.png"
+                : entry.masterPath.Replace('\\', '/');
         }
 
         private static void ValidatePng(

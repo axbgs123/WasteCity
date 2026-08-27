@@ -17,6 +17,7 @@ using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
+using WasteCity.Progression;
 
 namespace WasteCity.Tests
 {
@@ -731,7 +732,7 @@ namespace WasteCity.Tests
                     "Research.Node." +
                     "core.research.bridge.psionic-mech" +
                     ".State").text,
-                Does.Contain("本阶段未开放"));
+                Does.Contain("前置").And.Not.Contain("本阶段未开放"));
             Assert.That(RequireText(
                     "Research.Node." +
                     ResearchCatalog.PrecisionAssemblyId +
@@ -794,6 +795,174 @@ namespace WasteCity.Tests
                 Is.EqualTo(ironBeforeStart - 2));
             Assert.That(RequireSceneObject("Research.Active", true).activeSelf,
                 Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0021_LevelTwoResearchStartsThroughRealTreeInput()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxOperationsController3D operations = Object.FindObjectOfType<
+                GrayboxOperationsController3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            modifier.SetPopulation(200);
+            modifier.SetResource(ResourceIds.Iron, 100);
+            modifier.SetConstructionSpeed(DevelopmentConstructionSpeed.Fast100);
+
+            yield return TapKey(Key.B);
+            yield return TapKey(Key.Digit5);
+            yield return MoveToInnerCell(
+                Object.FindObjectOfType<GrayboxMobileCityController3D>(), 3, 2);
+            yield return ClickWorld(MouseButton.Left);
+            float deadline = Time.realtimeSinceStartup + 2f;
+            while (session.Instances.Count == 0 &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            GrayboxBuildingInstance3D station = session.Instances[0];
+            while (station.State != GrayboxBuildingInstanceState.Completed &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(station.Placement.Definition,
+                Is.SameAs(BuildingCatalog.ResearchStation));
+            yield return TapKey(Key.Escape);
+            modifier.SetCityMode(CityMode.Fortress);
+
+            string selectedFate = host.FateRuntime.Capture().SelectedId;
+            string error;
+            Assert.That(host.FateRuntime.TryPromoteToLevelTwo(out error),
+                Is.True, error);
+            if (selectedFate == FormalFateCatalog.RewindAnchorId)
+                Assert.That(host.RewindAnchorMetadata.TrySetFateLevel(
+                    2, out error), Is.True, error);
+            else if (selectedFate == FormalFateCatalog.PocketUniverseId)
+                Assert.That(host.PocketUniverseEffect.TrySetLevel(
+                    2, out error), Is.True, error);
+            else
+                Assert.That(host.VoidDebtRuntime.TryRestore(
+                    new FormalVoidDebtSnapshot(
+                        2, 0d, 1ul, 1ul,
+                        System.Array.Empty<FormalVoidDebtEntry>()), out error),
+                    Is.True, error);
+            Assert.That(host.Civilization.TryRestore(
+                new FormalCivilizationAscensionSnapshot(
+                    2, selectedFate, 2, true, 1ul), out error), Is.True, error);
+            host.Sequence.Restore(
+                (int)AdvancementSequenceStage.Continued, 0f);
+
+            session.UnlockResearchForDevelopment(
+                ResearchCatalog.PrecisionAssemblyId);
+            ResearchDefinition alloy = ResearchCatalog.Find(
+                CivilizationResearchAvailability.AlloyArmorId);
+            foreach (ResourceAmount cost in alloy.Costs)
+                modifier.SetResource(cost.ResourceId, cost.Amount);
+
+            yield return TapKey(Key.T);
+            yield return null;
+            Text state = RequireText(
+                "Research.Node." + alloy.Id.Value + ".State");
+            Assert.That(state.text,
+                Does.Not.Contain("本阶段未开放").And.Not.Contain("文明 Lv.2"));
+            InputField search = RequireSceneObject("Research.Search")
+                .GetComponent<InputField>();
+            yield return ClickUiElement(search.gameObject, MouseButton.Left);
+            for (var index = 0; index < alloy.Id.Value.Length; index++)
+                InputSystem.QueueTextEvent(keyboard, alloy.Id.Value[index]);
+            InputSystem.Update();
+            yield return null;
+            Assert.That(search.text, Is.EqualTo(alloy.Id.Value));
+            yield return ClickUiElement(
+                RequireSceneObject("Research.Node." + alloy.Id.Value),
+                MouseButton.Left);
+            Button start = RequireSceneObject("Research.Start")
+                .GetComponent<Button>();
+            Assert.That(start.interactable, Is.True);
+            int alloyBefore = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Alloy);
+            int stoneBefore = session.CityStorage.GetNetworkAmount(
+                ResourceIds.Stone);
+            yield return ClickUiElement(start.gameObject, MouseButton.Left);
+            Assert.That(session.Research.Active.Id.Value,
+                Is.EqualTo(alloy.Id.Value));
+            Assert.That(session.CityStorage.GetNetworkAmount(ResourceIds.Alloy),
+                Is.EqualTo(alloyBefore - 24));
+            Assert.That(session.CityStorage.GetNetworkAmount(ResourceIds.Stone),
+                Is.EqualTo(stoneBefore - 8));
+            Assert.That(operations.Research.Tick(
+                60f, CityMode.Fortress, false, true), Is.True);
+            Assert.That(session.IsResearchCompleted(alloy.Id.Value), Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0021_ElixirUsesThroughRealCityInventoryInput()
+        {
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            GrayboxDefenseController3D defense =
+                Object.FindObjectOfType<GrayboxDefenseController3D>();
+            GrayboxOperationsView3D operationsView =
+                Object.FindObjectOfType<GrayboxOperationsView3D>();
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            modifier.SetPopulation(200);
+            modifier.SetResource(ResourceIds.Iron, 100);
+            modifier.SetConstructionSpeed(
+                DevelopmentConstructionSpeed.Fast100);
+
+            yield return TapKey(Key.B);
+            yield return TapKey(Key.Digit5);
+            yield return MoveToInnerCell(
+                Object.FindObjectOfType<GrayboxMobileCityController3D>(), 3, 2);
+            yield return ClickWorld(MouseButton.Left);
+            float deadline = Time.realtimeSinceStartup + 2f;
+            while (session.Instances.Count == 0 &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            GrayboxBuildingInstance3D station = session.Instances[0];
+            while (station.State != GrayboxBuildingInstanceState.Completed &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            yield return TapKey(Key.Escape);
+            yield return null;
+
+            while (!defense.BuildingHealth.TryGetHealth(
+                       station.StableInstanceId,
+                       out _, out _, out _) &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(defense.BuildingHealth.TryApplyDamage(
+                station.StableInstanceId,
+                150,
+                out int applied,
+                out _), Is.True);
+            Assert.That(applied, Is.EqualTo(150));
+            Assert.That(defense.BuildingHealth.TryGetHealth(
+                station.StableInstanceId,
+                out int healthBefore,
+                out _,
+                out _), Is.True);
+            modifier.SetResource(ResourceIds.Elixir, 1);
+
+            yield return TapKey(Key.E);
+            GameObject elixirRow = RequireSceneObject(
+                "Inventory.City." + ResourceIds.Elixir);
+            yield return ScrollIntoView(
+                RequireSceneObject("Inventory.City.Viewport")
+                    .GetComponent<ScrollRect>(),
+                elixirRow.GetComponent<RectTransform>());
+            yield return ClickUiElement(elixirRow, MouseButton.Left);
+            Assert.That(operationsView.IsInventoryOpen, Is.True,
+                "Selecting city elixir must not navigate to the ledger.");
+            Button use = RequireSceneObject("Inventory.City.UseSelected")
+                .GetComponent<Button>();
+            Assert.That(use.interactable, Is.True);
+            yield return ClickUiElement(use.gameObject, MouseButton.Left);
+
+            Assert.That(session.CityStorage.GetNetworkAmount(
+                ResourceIds.Elixir), Is.Zero);
+            Assert.That(defense.BuildingHealth.TryGetHealth(
+                station.StableInstanceId,
+                out int healthAfter,
+                out _,
+                out _), Is.True);
+            Assert.That(healthAfter, Is.EqualTo(healthBefore + 100));
+            Assert.That(RequireText("Inventory.TransferStatus").text,
+                Does.Contain("灵丹").And.Contain("建筑 +100"));
         }
 
         [UnityTest]

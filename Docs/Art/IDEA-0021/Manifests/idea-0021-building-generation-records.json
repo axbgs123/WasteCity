@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "idea-0021-building-generation-records",
+  "requirementId": "IDEA-0021",
+  "styleId": "idea0016.style.building.industrial-three-quarter",
+  "tool": "OpenAI Codex 内置 imagegen + remove_chroma_key.py",
+  "license": "为 WasteCity 项目生成；按项目资产许可与 OpenAI 服务条款使用。",
+  "transparencyWorkflow": "#FF00FF 纯色键背景，软遮罩、1 px 收边/羽化、溢色清理，1024 母版保留 10% 全透明安全区，派生 256 交付图。",
+  "entries": [
+    {
+      "contentId": "bridge.building.psionic-mech-factory",
+      "promptSummaryZh": "3×2 宽体灵能机甲工厂；枪灰装配厅、双机械龙门架、屏蔽机体槽、紫青约束环；建筑而非机器人，斜俯视废土工业低模感。",
+      "masterSha256": "86775133439dece286a2e486f962a1ce6d65176d501e4e8b0cf49a0d249ad6b5",
+      "deliverySha256": "0bfb8d0c6e816c4e6010c906bc9fa9a460cf1c85521f6236080bfd5e3417040c"
+    },
+    {
+      "contentId": "bridge.building.high-frequency-sword-forge",
+      "promptSummaryZh": "2×2 高周波飞剑铸造台；工业感应砧台、双青绿调谐环、三柄夹持剑胚、小型机械锤臂；生产设施而非神殿或炮塔。",
+      "masterSha256": "747eaf1daa857c2ed8215e3a4aea8c39e772ce3c295d506342d6918a4e16fe94",
+      "deliverySha256": "4da7975488a7336291df08e9dc6a553509a84edf5b169609f065be5441ec77a7"
+    },
+    {
+      "contentId": "bridge.building.bio-hangar",
+      "promptSummaryZh": "3×2 骨钢生物机库；分段骨白密封顶、绿色活体肋、双维护龙门架、营养管与琥珀观察窗；无血腥、不展示完整巨兽。",
+      "masterSha256": "b1463e5cdf0009c60c9f466d43b7cf2db03ba5806834d770834ebcb3c7b28e9e",
+      "deliverySha256": "e3a7f165b5d424d180ffcc86dfa107988c40c9b6188386fd0eadadb3e1b5c69d"
+    },
+    {
+      "contentId": "bridge.building.spirit-plant-garden",
+      "promptSummaryZh": "2×2 灵植园；四瓣装甲培养槽、中央青绿灵液井、宽叶灵植、铜色灵纹灌溉管；工业培育设施而非自然风景。",
+      "masterSha256": "569117017b29ec2ba484674a01574d9f264d631e268bbd68ccac8dcbb6470524",
+      "deliverySha256": "272a3c466a7a8704c5d5abd8603b2f09843c42d64808805be232d9e409a8324a"
+    },
+    {
+      "contentId": "bridge.building.emp-tower",
+      "promptSummaryZh": "1×1 低矮 EMP 防御塔；四脚枪灰基座、双电容罐、对开脉冲叉、紫青紧凑核与琥珀警示灯；不做无线电塔、特斯拉线圈或激光炮。",
+      "masterSha256": "513aabc07b81aae683be5733c51c94ce0bcbfb02444a7649bb00b5ce92ff102e",
+      "deliverySha256": "1cba27666c1a257b3e42f1a5116731473296ec7a773d96191a77c35140ae01cd"
+    }
+  ]
+}

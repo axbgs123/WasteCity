@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 
 namespace WasteCity.Tests
 {
     /// <summary>
-    /// IDEA-0016 RED contracts for the formal 43-node research-tree view.
+    /// IDEA-0021 contracts for the formal 44-node research-tree view.
     /// Pointer gestures and input ownership belong in PlayMode/real-input tests;
     /// this fixture only freezes the generated uGUI hierarchy and layout.
     /// </summary>
@@ -127,6 +129,22 @@ namespace WasteCity.Tests
                     Is.False,
                     graphic.name + " must not block node or viewport input");
             }
+            Transform[] junctions = connections
+                .GetComponentsInChildren<Transform>(true)
+                .Where(value => value.name.StartsWith(
+                    "Research.Junction.", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(junctions, Is.Not.Empty);
+            Assert.That(junctions.Select(value => value.name), Is.Unique);
+            Transform[] trunks = connections
+                .GetComponentsInChildren<Transform>(true)
+                .Where(value => value.name.StartsWith(
+                    "Research.Trunk.", StringComparison.Ordinal))
+                .ToArray();
+            ResearchTreeProjection3D projection =
+                ResearchTreeProjection3D.Create(ResearchCatalog.All);
+            Assert.That(trunks, Has.Length.EqualTo(projection.Trunks.Count));
+            Assert.That(trunks.Select(value => value.name), Is.Unique);
         }
 
         [Test]
@@ -196,6 +214,53 @@ namespace WasteCity.Tests
                         placements[right].Definition.Id.Value);
                 }
             }
+        }
+
+        [Test]
+        public void IDEA0021_ConnectionGraphicBuildsDashedPathsAndJunctionMesh()
+        {
+            var owner = new GameObject(
+                "Research.Connection.Geometry.Test",
+                typeof(RectTransform), typeof(CanvasRenderer),
+                typeof(ResearchTreeConnectionGraphic3D));
+            cleanup.Add(owner);
+            ResearchTreeConnectionGraphic3D graphic =
+                owner.GetComponent<ResearchTreeConnectionGraphic3D>();
+            MethodInfo populate = typeof(ResearchTreeConnectionGraphic3D)
+                .GetMethod(
+                    "OnPopulateMesh",
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[] { typeof(VertexHelper) },
+                    null);
+            Assert.That(populate, Is.Not.Null);
+
+            graphic.ConfigurePath(
+                new[]
+                {
+                    new Vector2(0f, 0f), new Vector2(0f, 96f),
+                    new Vector2(300f, 96f), new Vector2(300f, 240f),
+                },
+                Color.cyan,
+                Color.magenta,
+                3f,
+                true,
+                true);
+            using (var path = new VertexHelper())
+            {
+                populate.Invoke(graphic, new object[] { path });
+                Assert.That(path.currentVertCount, Is.GreaterThan(16));
+            }
+
+            graphic.ConfigureJunction(
+                new Vector2(20f, 30f), Color.yellow, 14f);
+            using (var junction = new VertexHelper())
+            {
+                populate.Invoke(graphic, new object[] { junction });
+                Assert.That(junction.currentVertCount, Is.EqualTo(14));
+                Assert.That(junction.currentIndexCount, Is.EqualTo(36));
+            }
+            Assert.That(graphic.raycastTarget, Is.False);
         }
 
         [Test]

@@ -41,7 +41,11 @@ namespace WasteCity.Graybox3D.Building
         private PlayerBackpackModel backpack;
         private CraftingQueueModel crafting;
         private FormalResearchRuntime research;
+        private Func<int> civilizationLevelProvider = () => 1;
+        private Func<ulong> civilizationRevisionProvider = () => 0UL;
+        private Func<GrayboxElixirUseResult3D> elixirUseCommand;
         private string selectedResearchId;
+        private string selectedCityResourceId;
         private string hoveredResourceId;
         private int selectedBackpackSlot = -1;
         private int selectedBackpackGesture;
@@ -87,12 +91,36 @@ namespace WasteCity.Graybox3D.Building
             RefreshView();
         }
 
+        public void ConfigureCivilizationResearch(
+            Func<int> levelProvider,
+            Func<ulong> revisionProvider)
+        {
+            civilizationLevelProvider = levelProvider ?? (() => 1);
+            civilizationRevisionProvider = revisionProvider ?? (() => 0UL);
+            if (session?.Research != null)
+                research = new FormalResearchRuntime(
+                    session.Research,
+                    civilizationLevelProvider: civilizationLevelProvider);
+            hasViewFingerprint = false;
+        }
+
+        public void ConfigureElixirUse(
+            Func<GrayboxElixirUseResult3D> command)
+        {
+            elixirUseCommand = command;
+            hasViewFingerprint = false;
+        }
+
         public void ToggleInventory()
         {
             if (!EnsureReady()) return;
             bool open = !view.IsInventoryOpen;
             view.SetInventoryOpen(open);
-            if (!open) ClearBackpackSelection();
+            if (!open)
+            {
+                ClearBackpackSelection();
+                selectedCityResourceId = null;
+            }
             if (open)
             {
                 view.SetResearchOpen(false);
@@ -110,6 +138,7 @@ namespace WasteCity.Graybox3D.Building
             if (open)
             {
                 ClearBackpackSelection();
+                selectedCityResourceId = null;
                 view.SetInventoryOpen(false);
                 view.SetLedgerOpen(false);
             }
@@ -133,6 +162,7 @@ namespace WasteCity.Graybox3D.Building
         {
             if (view == null) return;
             ClearBackpackSelection();
+            selectedCityResourceId = null;
             view.SetInventoryOpen(false);
             view.SetResearchOpen(false);
             view.SetLedgerOpen(false);
@@ -256,8 +286,11 @@ namespace WasteCity.Graybox3D.Building
             crafting = new CraftingQueueModel(
                 backpack,
                 session.IsResearchCompleted);
-            research = new FormalResearchRuntime(session.Research);
+            research = new FormalResearchRuntime(
+                session.Research,
+                civilizationLevelProvider: civilizationLevelProvider);
             selectedResearchId = null;
+            selectedCityResourceId = null;
             hoveredResourceId = null;
             productionAccessStatus.Clear();
             inventoryTransferStatus = string.Empty;
@@ -307,7 +340,9 @@ namespace WasteCity.Graybox3D.Building
         {
             if (eventsBound || view == null) return;
             view.ResourceClicked += OpenResourceLedger;
+            view.CityResourceSelected += SelectCityResource;
             view.CityResourceShiftClicked += TransferCityResourceToBackpack;
+            view.CityResourceUseRequested += UseSelectedCityResource;
             view.BackpackSlotClicked += HandleBackpackSlotClick;
             view.CraftRequested += EnqueueCrafting;
             view.CraftCancelRequested += CancelFirstCraft;
@@ -332,7 +367,9 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
             view.ResourceClicked -= OpenResourceLedger;
+            view.CityResourceSelected -= SelectCityResource;
             view.CityResourceShiftClicked -= TransferCityResourceToBackpack;
+            view.CityResourceUseRequested -= UseSelectedCityResource;
             view.BackpackSlotClicked -= HandleBackpackSlotClick;
             view.CraftRequested -= EnqueueCrafting;
             view.CraftCancelRequested -= CancelFirstCraft;
@@ -356,11 +393,46 @@ namespace WasteCity.Graybox3D.Building
             {
                 return;
             }
+            selectedCityResourceId = null;
             selectedProductionId = null;
             selectedWarehouseId = null;
             view.SetInventoryOpen(false);
             view.SetResearchOpen(false);
             view.SetLedgerOpen(true);
+            RefreshView();
+        }
+
+        private void SelectCityResource(string resourceId)
+        {
+            if (!EnsureReady() || !string.Equals(
+                    resourceId,
+                    ResourceIds.Elixir,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+            selectedCityResourceId = string.Equals(
+                    selectedCityResourceId,
+                    resourceId,
+                    StringComparison.Ordinal)
+                ? null
+                : resourceId;
+            inventoryTransferStatus = string.Empty;
+            RefreshView();
+        }
+
+        private void UseSelectedCityResource()
+        {
+            if (!EnsureReady() || !string.Equals(
+                    selectedCityResourceId,
+                    ResourceIds.Elixir,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+            GrayboxElixirUseResult3D result = elixirUseCommand?.Invoke();
+            inventoryTransferStatus = result?.Message ??
+                "灵丹无法使用：防御生命状态未就绪";
             RefreshView();
         }
 
@@ -647,6 +719,16 @@ namespace WasteCity.Graybox3D.Building
                     selectedBackpackSlot,
                     oneByOneAmount,
                     selectedBackpackPlacesOne);
+                view.SetCityResourceSelection(
+                    selectedCityResourceId,
+                    string.Equals(
+                        selectedCityResourceId,
+                        ResourceIds.Elixir,
+                        StringComparison.Ordinal) &&
+                    elixirUseCommand != null &&
+                    session.CityStorage.CanSpendFromNetwork(
+                        ResourceIds.Elixir,
+                        1));
                 view.SetInventoryTransferStatus(inventoryTransferStatus);
                 RefreshCrafting();
             }
@@ -757,8 +839,10 @@ namespace WasteCity.Graybox3D.Building
             ResearchDefinition active = research.Model.Active;
             foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
+                ResearchDefinition display =
+                    research.ResolveForDisplay(definition);
                 view.SetResearchNode(
-                    definition,
+                    display,
                     ResearchStatus(definition, active),
                     string.Equals(
                         selectedResearchId,
@@ -787,7 +871,10 @@ namespace WasteCity.Graybox3D.Building
                 return "已完成";
             if (active != null && active.Id.Equals(definition.Id))
                 return "研究中";
-            if (definition.ReleaseState == ResearchReleaseState.PreviewOnly)
+            if (CivilizationResearchAvailability.IsGated(
+                    definition.Id.Value) && !research.IsAvailable(definition))
+                return CivilizationResearchAvailability.LockedReason;
+            if (!research.IsAvailable(definition))
             {
                 return "本阶段未开放（预览）";
             }
@@ -818,7 +905,7 @@ namespace WasteCity.Graybox3D.Building
             ResearchDefinition definition =
                 ResearchCatalog.Find(selectedResearchId);
             if (definition == null ||
-                definition.ReleaseState != ResearchReleaseState.Researchable ||
+                !research.IsAvailable(definition) ||
                 research.IsCompleted(definition.Id.Value) ||
                 !PrerequisitesCompleted(definition))
             {
@@ -853,8 +940,7 @@ namespace WasteCity.Graybox3D.Building
             ResearchDefinition selected = null;
             foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
-                if (definition.ReleaseState !=
-                        ResearchReleaseState.Researchable ||
+                if (!research.IsAvailable(definition) ||
                     research.IsCompleted(definition.Id.Value) ||
                     !PrerequisitesCompleted(definition))
                 {
@@ -1093,6 +1179,7 @@ namespace WasteCity.Graybox3D.Building
             MixFingerprint(ref value, view != null && view.IsLedgerOpen);
             MixFingerprint(ref value, selectedBackpackSlot);
             MixFingerprint(ref value, selectedBackpackPlacesOne);
+            MixFingerprint(ref value, selectedCityResourceId);
             MixFingerprint(ref value, hoveredResourceId);
             MixFingerprint(ref value, selectedResearchId);
             MixFingerprint(ref value, selectedProductionId);
@@ -1134,6 +1221,8 @@ namespace WasteCity.Graybox3D.Building
             }
             MixFingerprint(ref value, session.CatalogRevision);
             MixFingerprint(ref value, session.CityStorage.Revision);
+            MixFingerprint(ref value, civilizationLevelProvider());
+            MixFingerprint(ref value, civilizationRevisionProvider());
             MixFingerprint(ref value, city == null ? 0 : (int)city.Mode);
             MixFingerprint(ref value, Time.timeScale <= 0f);
             MixFingerprint(ref value, production?.Clock?.Revision ?? 0ul);

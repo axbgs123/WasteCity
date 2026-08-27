@@ -1137,7 +1137,10 @@ namespace WasteCity.Tests
             Assert.That(ruins, Is.GreaterThan(0));
             Assert.That(
                 fixture.Presentation.InstanceRendererCount,
-                Is.LessThanOrEqualTo(BuildingInstanceCount));
+                Is.LessThanOrEqualTo(BuildingInstanceCount * 2));
+            Assert.That(
+                fixture.Presentation.InstanceVisualCount,
+                Is.EqualTo(BuildingInstanceCount));
             Assert.That(
                 fixture.Presentation.InfrastructureRendererCount,
                 Is.LessThanOrEqualTo(8));

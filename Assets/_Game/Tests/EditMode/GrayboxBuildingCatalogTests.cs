@@ -46,7 +46,12 @@ namespace WasteCity.Tests
             new CatalogExpectation(BuildingCatalog.PsionicWorkshop, BuildingMenuCategory.Route, ContentRoute.Psionics),
             new CatalogExpectation(BuildingCatalog.MindSpire, BuildingMenuCategory.Route, ContentRoute.Psionics),
             new CatalogExpectation(BuildingCatalog.ConsciousnessNetwork, BuildingMenuCategory.Route, ContentRoute.Psionics),
-            new CatalogExpectation(BuildingCatalog.ShieldGenerator, BuildingMenuCategory.Route, ContentRoute.Psionics)
+            new CatalogExpectation(BuildingCatalog.ShieldGenerator, BuildingMenuCategory.Route, ContentRoute.Psionics),
+            new CatalogExpectation(BuildingCatalog.PsionicMechFactory, BuildingMenuCategory.Route, ContentRoute.Psionics),
+            new CatalogExpectation(BuildingCatalog.HighFrequencySwordForge, BuildingMenuCategory.Route, ContentRoute.Cultivation),
+            new CatalogExpectation(BuildingCatalog.BioHangar, BuildingMenuCategory.Route, ContentRoute.BiologicalAscension),
+            new CatalogExpectation(BuildingCatalog.SpiritPlantGarden, BuildingMenuCategory.Route, ContentRoute.Cultivation),
+            new CatalogExpectation(BuildingCatalog.EmpTower, BuildingMenuCategory.Defense, ContentRoute.Psionics)
         };
 
         [TearDown]
@@ -65,9 +70,9 @@ namespace WasteCity.Tests
             string[] expectedIds = Expectations.Select(value => value.Definition.Id.Value).ToArray();
 
             TestContext.WriteLine("Task3CatalogIds=" + string.Join(",", expectedIds));
-            Assert.That(GrayboxBuildingCatalogPresenter3D.BuildMenuCount, Is.EqualTo(28));
-            Assert.That(expectedIds, Has.Length.EqualTo(28));
-            Assert.That(expectedIds.Distinct().Count(), Is.EqualTo(28));
+            Assert.That(GrayboxBuildingCatalogPresenter3D.BuildMenuCount, Is.EqualTo(33));
+            Assert.That(expectedIds, Has.Length.EqualTo(33));
+            Assert.That(expectedIds.Distinct().Count(), Is.EqualTo(33));
             Assert.That(BuildingCatalog.BuildMenu.Select(value => value.Id.Value), Is.EquivalentTo(expectedIds));
             Assert.That(expectedIds, Does.Not.Contain(BuildingCatalog.HeavyMachineGunTurret.Id.Value));
             Assert.That(expectedIds, Does.Not.Contain(BuildingCatalog.SwordRidingPlatform.Id.Value));

@@ -236,6 +236,54 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0021_SharedJunctionBranchesAndBridgesAreDeterministic()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            Assert.That(projection.Junctions, Is.Not.Empty);
+            Assert.That(projection.Trunks, Has.Count.EqualTo(
+                projection.Junctions.Count));
+            Assert.That(projection.Trunks.Select(value => value.StableId),
+                Is.Unique);
+            foreach (ResearchTreeEdgeProjection3D edge in projection.Edges)
+            {
+                Assert.That(edge.Points.Count, Is.GreaterThanOrEqualTo(2));
+                for (var index = 1; index < edge.Points.Count; index++)
+                {
+                    Assert.That(edge.Points[index].y,
+                        Is.GreaterThanOrEqualTo(edge.Points[index - 1].y),
+                        EdgeSignature(edge));
+                }
+                if (!string.IsNullOrEmpty(edge.JunctionId))
+                {
+                    ResearchTreeJunctionProjection3D junction =
+                        projection.Junctions.Single(value =>
+                            value.StableId == edge.JunctionId);
+                    Assert.That(edge.Points, Does.Contain(junction.Position));
+                }
+            }
+            ResearchTreeEdgeProjection3D[] bridges = projection.Edges
+                .Where(value => value.IsBridge)
+                .ToArray();
+            Assert.That(bridges, Has.Length.EqualTo(12));
+            Assert.That(bridges.All(value =>
+                value.EndRoute == DevelopmentRoute.Bridge), Is.True);
+
+            ResearchTreeProjection3D reversed =
+                ResearchTreeProjection3D.Create(
+                    ResearchCatalog.All.Reverse().ToArray());
+            Assert.That(reversed.Junctions.Select(value =>
+                    value.StableId + "|" + value.Position),
+                Is.EqualTo(projection.Junctions.Select(value =>
+                    value.StableId + "|" + value.Position)));
+            Assert.That(reversed.Edges.Select(GeometrySignature),
+                Is.EqualTo(projection.Edges.Select(GeometrySignature)));
+            Assert.That(reversed.Trunks.Select(value =>
+                    value.StableId + "|" + string.Join(";", value.Points)),
+                Is.EqualTo(projection.Trunks.Select(value =>
+                    value.StableId + "|" + string.Join(";", value.Points))));
+        }
+
+        [Test]
         public void LatestResearchable_UsesHighestLayoutRowThenCatalogOrder()
         {
             ResearchTreeProjection3D projection = CreateProjection();
@@ -415,6 +463,14 @@ namespace WasteCity.Tests
         {
             return edge.PrerequisiteResearchId + "|" +
                 edge.DependentResearchId;
+        }
+
+        private static string GeometrySignature(
+            ResearchTreeEdgeProjection3D edge)
+        {
+            return EdgeSignature(edge) + "|" + edge.JunctionId + "|" +
+                edge.IsBridge + "|" + string.Join(";", edge.Points.Select(
+                    value => value.x + "," + value.y));
         }
 
         private static void AssertNodesInsideViewport(

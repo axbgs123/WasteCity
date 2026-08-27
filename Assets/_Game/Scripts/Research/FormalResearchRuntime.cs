@@ -11,13 +11,17 @@ namespace WasteCity.Research
         private const float CancelRefundRatio = .8f;
 
         private readonly Func<string, ResearchDefinition> resolver;
+        private readonly Func<int> civilizationLevelProvider;
 
         public FormalResearchRuntime(
             ResearchModel model,
-            Func<string, ResearchDefinition> resolver = null)
+            Func<string, ResearchDefinition> resolver = null,
+            Func<int> civilizationLevelProvider = null)
         {
             Model = model ?? throw new ArgumentNullException(nameof(model));
             this.resolver = resolver ?? ResearchCatalog.Find;
+            this.civilizationLevelProvider = civilizationLevelProvider ??
+                (() => 1);
             Model.GrantCompleted(ResolveExact(ResearchCatalog.ScrapProcessingId));
         }
 
@@ -45,7 +49,7 @@ namespace WasteCity.Research
                 completedResearchIds,
                 activeResearchId,
                 remainingSeconds,
-                resolver,
+                ResolveForPersistence,
                 out plan,
                 out error);
         }
@@ -66,6 +70,26 @@ namespace WasteCity.Research
             return definition != null && Model.IsCompleted(definition.Id);
         }
 
+        public bool IsAvailable(string researchId)
+        {
+            return IsAvailable(ResolveExact(researchId));
+        }
+
+        public bool IsAvailable(ResearchDefinition definition)
+        {
+            return CivilizationResearchAvailability.IsAvailable(
+                definition,
+                CivilizationLevel());
+        }
+
+        public ResearchDefinition ResolveForDisplay(
+            ResearchDefinition definition)
+        {
+            return CivilizationResearchAvailability.Resolve(
+                definition,
+                CivilizationLevel());
+        }
+
         public static float SpeedMultiplier(
             CityMode cityMode,
             bool thoughtAccelerationCompleted)
@@ -83,10 +107,10 @@ namespace WasteCity.Research
             ResourceInventory cityInventory,
             bool hasEligibleResearchStation)
         {
-            ResearchDefinition definition = ResolveExact(researchId);
+            ResearchDefinition definition = ResolveForGameplay(researchId);
             return hasEligibleResearchStation &&
                 definition != null &&
-                definition.ReleaseState == ResearchReleaseState.Researchable &&
+                IsAvailable(definition) &&
                 Model.Start(definition, cityInventory);
         }
 
@@ -95,10 +119,10 @@ namespace WasteCity.Research
             CityResourceStorageModel cityStorage,
             bool hasEligibleResearchStation)
         {
-            ResearchDefinition definition = ResolveExact(researchId);
+            ResearchDefinition definition = ResolveForGameplay(researchId);
             return hasEligibleResearchStation &&
                 definition != null &&
-                definition.ReleaseState == ResearchReleaseState.Researchable &&
+                IsAvailable(definition) &&
                 Model.Start(definition, cityStorage);
         }
 
@@ -142,15 +166,31 @@ namespace WasteCity.Research
         private bool OwnsActiveResearch()
         {
             ResearchDefinition active = Model.Active;
-            if (active == null ||
-                active.ReleaseState != ResearchReleaseState.Researchable)
+            if (active == null || !IsAvailable(active))
             {
                 return false;
             }
 
             ResearchDefinition resolved = ResolveExact(active.Id.Value);
-            return resolved != null &&
-                resolved.ReleaseState == ResearchReleaseState.Researchable;
+            return resolved != null && IsAvailable(resolved);
+        }
+
+        private ResearchDefinition ResolveForGameplay(string researchId)
+        {
+            return CivilizationResearchAvailability.Resolve(
+                ResolveExact(researchId),
+                CivilizationLevel());
+        }
+
+        private ResearchDefinition ResolveForPersistence(string researchId)
+        {
+            return CivilizationResearchAvailability.ResolveForPersistence(
+                ResolveExact(researchId));
+        }
+
+        private int CivilizationLevel()
+        {
+            return Math.Max(1, civilizationLevelProvider());
         }
 
         private ResearchDefinition ResolveExact(string researchId)

@@ -56,8 +56,10 @@ namespace WasteCity.Graybox3D.Building
         private Text craftQueueProgress;
         private Text craftQueueReason;
         private Button craftCancelButton;
+        private Button cityUseButton;
         private Text inventoryTransferStatus;
         private GrayboxInventoryTab3D inventoryTab;
+        private string selectedCityResourceId;
         private int selectedBackpackSlot = -1;
         private int productionStateCount;
         private string hoveredResourceId;
@@ -85,7 +87,9 @@ namespace WasteCity.Graybox3D.Building
             new List<ProductionRow>();
 
         public event Action<string> ResourceClicked;
+        public event Action<string> CityResourceSelected;
         public event Action<string> CityResourceShiftClicked;
+        public event Action CityResourceUseRequested;
         public event Action<int, int> BackpackSlotClicked;
         public event Action<string, int> CraftRequested;
         public event Action CraftCancelRequested;
@@ -133,7 +137,9 @@ namespace WasteCity.Graybox3D.Building
         {
             DestroyUi();
             ResourceClicked = null;
+            CityResourceSelected = null;
             CityResourceShiftClicked = null;
+            CityResourceUseRequested = null;
             BackpackSlotClicked = null;
             CraftRequested = null;
             CraftCancelRequested = null;
@@ -222,6 +228,9 @@ namespace WasteCity.Graybox3D.Building
             if (craftingPage != null)
                 craftingPage.gameObject.SetActive(
                     tab == GrayboxInventoryTab3D.Crafting);
+            if (cityUseButton != null)
+                cityUseButton.gameObject.SetActive(
+                    tab == GrayboxInventoryTab3D.Inventory);
         }
 
         public void SetResource(
@@ -311,6 +320,36 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
             if (inventoryTransferStatus != null)
                 inventoryTransferStatus.text = status ?? string.Empty;
+        }
+
+        public void SetCityResourceSelection(
+            string resourceId,
+            bool canUse)
+        {
+            TryBuildUi();
+            selectedCityResourceId = resourceId;
+            foreach (KeyValuePair<string, Text> item in cityRows)
+            {
+                Button button = item.Value == null
+                    ? null
+                    : item.Value.GetComponentInParent<Button>();
+                if (button != null)
+                {
+                    button.image.color = string.Equals(
+                            item.Key,
+                            selectedCityResourceId,
+                            StringComparison.Ordinal)
+                        ? SelectedColor
+                        : ButtonColor;
+                }
+            }
+            if (cityUseButton != null)
+            {
+                cityUseButton.interactable = canUse;
+                Text label = cityUseButton.GetComponentInChildren<Text>(true);
+                if (label != null)
+                    label.text = canUse ? "使用灵丹" : "选择灵丹后使用";
+            }
         }
 
         public void SetBackpackSlot(int index, string resourceId, int amount)
@@ -1340,6 +1379,13 @@ namespace WasteCity.Graybox3D.Building
                 new Color(.95f, .78f, .42f, 1f);
             SetLayout(inventoryTransferStatus.rectTransform, 0f, 24f, 1f);
 
+            cityUseButton = CreateButton(
+                inventoryCraftingPanel,
+                "Inventory.City.UseSelected",
+                "选择灵丹后使用",
+                () => CityResourceUseRequested?.Invoke());
+            cityUseButton.interactable = false;
+
             CreateButton(
                 inventoryCraftingPanel,
                 "InventoryCrafting.Close",
@@ -1632,6 +1678,11 @@ namespace WasteCity.Graybox3D.Building
                 return;
             if (IsShiftPressed())
                 CityResourceShiftClicked?.Invoke(resourceId);
+            else if (string.Equals(
+                         resourceId,
+                         ResourceIds.Elixir,
+                         StringComparison.Ordinal))
+                CityResourceSelected?.Invoke(resourceId);
         }
 
         private void HandleBackpackSlotClick(
@@ -2097,6 +2148,8 @@ namespace WasteCity.Graybox3D.Building
             craftQueueProgress = null;
             craftQueueReason = null;
             craftCancelButton = null;
+            cityUseButton = null;
+            selectedCityResourceId = null;
             statusRows.Clear();
             ledgerRows.Clear();
             ledgerDiscovered.Clear();

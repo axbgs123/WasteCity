@@ -10,7 +10,8 @@ using WasteCity.Defense;
 namespace WasteCity.Graybox3D.Building
 {
     [DefaultExecutionOrder(100)]
-    public sealed class GrayboxDefenseController3D : MonoBehaviour
+    public sealed class GrayboxDefenseController3D : MonoBehaviour,
+        IGrayboxElixirHealthAuthority3D
     {
         private const float TutorialSpawnDistanceCells = 9f;
         private static readonly ProfilerMarker TickMarker =
@@ -254,6 +255,34 @@ namespace WasteCity.Graybox3D.Building
             formalRuleClock?.SetTerminal(false);
             ApplySpeedPresentation();
             return true;
+        }
+
+        public bool TryCaptureElixirHealth(
+            out GrayboxElixirHealthSnapshot3D health)
+        {
+            health = null;
+            if (!TrySynchronizeRuntime(out _) || runtime == null)
+                return false;
+            SingleCityDefenseCampaignSnapshot owner =
+                runtime.ActiveCampaignSnapshot;
+            if (owner == null) return false;
+            health = new GrayboxElixirHealthSnapshot3D(
+                owner.CoreCurrentHealth,
+                owner.CoreMaximumHealth,
+                buildingHealth.CaptureElixirHealingTargets());
+            return true;
+        }
+
+        public void ApplyElixirHealth(
+            int coreHealing,
+            int buildingHealing,
+            int coreBacklashDamage)
+        {
+            runtime?.ApplyElixirCoreHealth(
+                coreHealing,
+                coreBacklashDamage);
+            buildingHealth.HealAll(buildingHealing);
+            InvalidatePresentation();
         }
 
         public bool Tick(float ruleDeltaSeconds, bool paused)
@@ -726,7 +755,11 @@ namespace WasteCity.Graybox3D.Building
                 cityX,
                 cityY,
                 session.GroundBuildRadius,
-                allowCampaignStart: !IsPersistencePaused);
+                allowCampaignStart: !IsPersistencePaused,
+                swordRidingCompleted: session.IsResearchCompleted(
+                    "core.research.sword-riding"),
+                alloyArmorCompleted: session.IsResearchCompleted(
+                    "core.research.alloy-armor"));
             error = string.Empty;
             return true;
         }

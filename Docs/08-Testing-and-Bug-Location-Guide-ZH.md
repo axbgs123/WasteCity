@@ -96,6 +96,14 @@ Task 10 性能与稳定性运行 `FormalAttentionPerformanceTests`、`FormalFate
 
 上述聚焦证据与最终日常完整 EditMode 2803 项、完整 PlayMode 96 项、项目质量门和三项现役构建共同证明 Task 7 至 Task 10 的自动化与构建门已经完成；这仍不得写成用户试玩或真实 Windows 验收已经完成。晶壳母体和升阶界面的比例、轮廓、文案节奏与操作理解仍需用户人工试玩确认；真实 Windows 10 与 11 的 GPU、显存、内存、字体、输入和视觉结果必须保持未完成。后续仍按[IDEA-0020 设计规格](superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md)继续升级科技自然发布、完整回归和发布门。
 
+## IDEA-0021 Lv.2、六桥节点与建筑贴图检查边界
+
+文明 Lv.2 自然研究先运行 `CivilizationResearchAvailabilityTests`、`CivilizationResearchOperationsTests`、`FormalResearchRuntimeTests` 和 `FormalSaveSchema33ContractTests`：只允许合金装甲/御剑术在 Lv.2 投影为可研究，其余 PreviewOnly 不开放；Operations 状态、Latest 定位、实际扣料和存档交叉验证使用同一可用性规则。真实 `T`、搜索、节点选择和 Start 按钮运行 `GrayboxProductionObservabilityRuntimeInputTests`，不能用 Development grant 代替自然入口。
+
+F2 核心运行 `IDEA0021BridgeCombatTests`、`FormalResearchCatalogTests`、`ResourceRecipeCatalogIntegrityTests`、`GrayboxProductionRuntimeTests`、`GrayboxBuildingCatalogTests` 与正式 Defense 集成测试：固定 44 科技、35 建筑、33 建造卡、33 配方；六桥必须有双前置和 90 秒时长。机甲厂与生物机库只是 F3 前驱产线，不得把资源产出写成已部署机甲/巨兽。EMP 只抑制明确 Mechanical 目标的下一次移动；血肉灵丹的三倍治疗、20% 反噬和失败不扣必须运行 `GrayboxElixirUseCommand3DTests`，并用真实 `E → 城市库存灵丹 → 使用灵丹` 鼠标路径验证。
+
+科技树运行 `ResearchTreeProjection3DTests`与 `ResearchTreeUiContractTests`：44 节点/49 依赖边继续自下向上，共享主干不按子节点重复过绘，junction、分支、向上箭头和金色双路线桥稳定。建筑贴图运行 `Production2DBuildingIconPipelineTests`、`Production2DVisualCatalogAtlasTests`、`GrayboxBuildingProjectionAndViewTests` 和正式场景 PlayMode：30 张旧图 + 5 张新图覆盖 `BuildingCatalog.All`，1024 母版保留 10% 透明安全区，256 交付图进入 Buildings Atlas；完成建筑显示稳定 billboard，施工/遗迹隐藏，原位升级不增加子对象。这些证据不代表正式 3D 建模、用户视觉验收或真实 Windows 验收完成。
+
 ## IDEA-0011 生产与界面的检查边界
 
 `IDEA-0011` 的生产、背包、应急合成、六节点兼容研究和资源状态栏已经实现待验证；`IDEA-0016` 当前正在把它扩展为 31 种资源、30 条配方、正式研究运行时和 43 节点科技树。排查正式研究规则、初始根、倍率、暂停、退款或 schema `31` 恢复时，优先运行 `FormalResearchRuntimeTests` 与 `GrayboxFormalResearchSaveAdapterTests`；排查节点数、依赖边、确定布局、缩放或视图层级时，运行 `ResearchTreeProjection3DTests` 与 `ResearchTreeUiContractTests`；排查真实 T、搜索字符、双 Esc、拖动、滚轮、Home、面板互斥或点击穿透时，必须补跑 `GrayboxProductionObservabilityRuntimeInputTests`。历史 `DemoResearchRuntimeTests` 继续作为六节点和退役内容兼容回归，不得替代正式目录测试。精确类名和当前归属仍以自动生成的[测试清单](Generated/Test-Inventory-ZH.md)为准。

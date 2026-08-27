@@ -1,6 +1,8 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -11,6 +13,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Content;
@@ -67,7 +70,12 @@ namespace WasteCity.Tests
             new CatalogExpectation(BuildingCatalog.PsionicWorkshop, BuildingMenuCategory.Route, ContentRoute.Psionics),
             new CatalogExpectation(BuildingCatalog.MindSpire, BuildingMenuCategory.Route, ContentRoute.Psionics),
             new CatalogExpectation(BuildingCatalog.ConsciousnessNetwork, BuildingMenuCategory.Route, ContentRoute.Psionics),
-            new CatalogExpectation(BuildingCatalog.ShieldGenerator, BuildingMenuCategory.Route, ContentRoute.Psionics)
+            new CatalogExpectation(BuildingCatalog.ShieldGenerator, BuildingMenuCategory.Route, ContentRoute.Psionics),
+            new CatalogExpectation(BuildingCatalog.PsionicMechFactory, BuildingMenuCategory.Route, ContentRoute.Psionics),
+            new CatalogExpectation(BuildingCatalog.HighFrequencySwordForge, BuildingMenuCategory.Route, ContentRoute.Cultivation),
+            new CatalogExpectation(BuildingCatalog.BioHangar, BuildingMenuCategory.Route, ContentRoute.BiologicalAscension),
+            new CatalogExpectation(BuildingCatalog.SpiritPlantGarden, BuildingMenuCategory.Route, ContentRoute.Cultivation),
+            new CatalogExpectation(BuildingCatalog.EmpTower, BuildingMenuCategory.Defense, ContentRoute.Psionics)
         };
 
         [UnitySetUp]
@@ -445,6 +453,66 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
+        public IEnumerator IDEA0021_CompletedWorldBuildingUsesStableBillboard()
+        {
+            GrayboxBuildingWorldView3D presentation =
+                Object.FindObjectOfType<GrayboxBuildingWorldView3D>();
+            Assert.That(presentation, Is.Not.Null);
+            var instance = (GrayboxBuildingInstance3D)Activator.CreateInstance(
+                typeof(GrayboxBuildingInstance3D),
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                null,
+                new object[]
+                {
+                    "building.instance.idea0021.billboard",
+                    new PlacedBuilding(
+                        BuildingCatalog.Housing,
+                        24,
+                        18,
+                        BuildingSite.Ground),
+                    new ConstructionProgress(
+                        BuildingCatalog.Housing.BuildSeconds),
+                    default(ResourceNodeBinding),
+                },
+                null);
+            InvokeInstanceTransition(instance, "Complete");
+            Assert.That(presentation.TryCreate(instance), Is.True);
+            yield return null;
+
+            GameObject root = GameObject.Find(instance.StableInstanceId);
+            Assert.That(root, Is.Not.Null);
+            Assert.That(root.transform.childCount, Is.EqualTo(1));
+            SpriteRenderer icon =
+                root.GetComponentInChildren<SpriteRenderer>(true);
+            Assert.That(icon, Is.Not.Null);
+            Assert.That(icon.enabled, Is.True);
+            Assert.That(icon.sprite, Is.Not.Null);
+            Assert.That(icon.sprite.name, Does.Contain("building-housing"));
+            Assert.That(root.GetComponent<BoxCollider>(), Is.Not.Null);
+            Assert.That(root.GetComponent<MeshRenderer>(), Is.Not.Null);
+            Assert.That(root.GetComponents<GrayboxVisualSlot>(), Is.Not.Empty);
+
+            InvokeInstanceTransition(instance, "DestroyForCombat");
+            presentation.UpdateInstance(instance);
+            yield return null;
+            Assert.That(icon.enabled, Is.False);
+            Assert.That(root.transform.childCount, Is.EqualTo(1));
+            presentation.Remove(instance);
+            yield return null;
+        }
+
+        private static void InvokeInstanceTransition(
+            GrayboxBuildingInstance3D instance,
+            string methodName)
+        {
+            MethodInfo method = typeof(GrayboxBuildingInstance3D).GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null, methodName);
+            method.Invoke(instance, null);
+        }
+
+        [UnityTest]
         public IEnumerator IDEA0011_RealInputBuildsTwoTwoOneProductionChain()
         {
             GrayboxBuildingSession3D session =
@@ -758,7 +826,7 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
-        public IEnumerator DeveloperInjectedCatalog_MapsAllTwentyEightRuntimeCards()
+        public IEnumerator IDEA0021_DeveloperInjectedCatalogMapsAllRuntimeCards()
         {
             GrayboxBuildingSession3D session =
                 Object.FindObjectOfType<GrayboxBuildingSession3D>();
@@ -781,8 +849,8 @@ namespace WasteCity.Tests
             var presenter = new GrayboxBuildingCatalogPresenter3D();
             IReadOnlyList<GrayboxBuildingCatalogItem3D> items =
                 presenter.Query(session, null, null, string.Empty);
-            Assert.That(items, Has.Count.EqualTo(28));
-            Assert.That(CatalogExpectations, Has.Length.EqualTo(28));
+            Assert.That(items, Has.Count.EqualTo(33));
+            Assert.That(CatalogExpectations, Has.Length.EqualTo(33));
             for (var index = 0; index < CatalogExpectations.Length; index++)
             {
                 CatalogExpectation expected = CatalogExpectations[index];

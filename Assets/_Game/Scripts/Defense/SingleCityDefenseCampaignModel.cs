@@ -270,6 +270,8 @@ namespace WasteCity.Defense
             SingleCityDefenseCampaignSpawnAnchorPersistenceState>
             frozenSpawnAnchors = new Dictionary<CampaignSpawnDirection,
                 SingleCityDefenseCampaignSpawnAnchorPersistenceState>();
+        private readonly HashSet<string> movementSuppressedNextStep =
+            new HashSet<string>(StringComparer.Ordinal);
 
         private double fixedStepAccumulatorSeconds;
         private double warningRemainingSeconds;
@@ -563,6 +565,21 @@ namespace WasteCity.Defense
             persistenceGeneration++;
         }
 
+        public void ApplyElixirCoreHealth(
+            int healing,
+            int backlashDamage)
+        {
+            if (coreCurrentHealth <= 0) return;
+            int before = coreCurrentHealth;
+            coreCurrentHealth = Math.Min(
+                CityCoreCombatModel.FormalMaximumHealth,
+                coreCurrentHealth + Math.Max(0, healing));
+            coreCurrentHealth -= Math.Min(
+                coreCurrentHealth,
+                Math.Max(0, backlashDamage));
+            if (coreCurrentHealth != before) persistenceGeneration++;
+        }
+
         public bool NotifyDefenseTowerCompleted(
             string stableInstanceId,
             string buildingId,
@@ -807,6 +824,19 @@ namespace WasteCity.Defense
             return applied;
         }
 
+        internal void SuppressMechanicalMovementNextStep(
+            string stableEnemyId,
+            string towerBuildingId)
+        {
+            if (!string.Equals(
+                    towerBuildingId,
+                    BuildingCatalog.EmpTower.Id.Value,
+                    StringComparison.Ordinal)) return;
+            EnemyState enemy = FindAliveEnemy(stableEnemyId);
+            if (enemy?.Definition.IsMechanical == true)
+                movementSuppressedNextStep.Add(enemy.StableId);
+        }
+
         public int ApplyCoreDamage(int damage)
         {
             if (IsTerminal || damage <= 0) return 0;
@@ -1021,11 +1051,15 @@ namespace WasteCity.Defense
                     ? CityCoreTargetId
                     : buildingTarget.StableId;
 
-                if (!MoveEnemyIntoRange(
-                        enemy,
-                        targetX,
-                        targetZ,
-                        deltaSeconds))
+                bool movementSuppressed =
+                    movementSuppressedNextStep.Remove(enemy.StableId);
+                if (movementSuppressed
+                        ? !IsWithinAttackRange(enemy, targetX, targetZ)
+                        : !MoveEnemyIntoRange(
+                            enemy,
+                            targetX,
+                            targetZ,
+                            deltaSeconds))
                 {
                     continue;
                 }
@@ -1178,6 +1212,18 @@ namespace WasteCity.Defense
                 return false;
             }
             return distance <= attackRange + (float)StepEpsilon;
+        }
+
+        private static bool IsWithinAttackRange(
+            EnemyState enemy,
+            float targetX,
+            float targetZ)
+        {
+            float offsetX = targetX - enemy.X;
+            float offsetZ = targetZ - enemy.Z;
+            float range = Math.Max(0f, enemy.Definition.AttackRange);
+            return offsetX * offsetX + offsetZ * offsetZ <=
+                range * range + (float)StepEpsilon;
         }
 
         private static int WholeDamage(ref float remainder)

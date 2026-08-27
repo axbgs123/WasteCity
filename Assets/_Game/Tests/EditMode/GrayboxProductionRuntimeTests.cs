@@ -652,6 +652,39 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SingleAllowedMachineRecipeBecomesDeterministicDefaultWithoutExplicitFlag()
+        {
+            GrayboxBuildingInstance3D garden = CreateInstance(
+                "building.instance.recipe-list.spirit-plant-garden",
+                BuildingCatalog.SpiritPlantGarden,
+                BuildingSite.Ground,
+                10,
+                10);
+            Complete(garden);
+            var runtime = new GrayboxProductionRuntime3D();
+
+            runtime.Synchronize(
+                new[] { garden },
+                CityMode.Fortress,
+                10,
+                10,
+                BuildingRangeRules.InitialGroundRadius);
+
+            IReadOnlyList<ResourceRecipeDefinition> recipes =
+                GetMachineRecipes(runtime, garden.StableInstanceId);
+            Assert.That(recipes, Has.Count.EqualTo(1));
+            Assert.That(recipes[0].Id,
+                Is.EqualTo("fusion.production.spirit-plant-extract"));
+            Assert.That(recipes[0].DefaultForBuilding, Is.False,
+                "Shared recipe ownership must not change Breeding Chamber selection semantics.");
+            Assert.That(runtime.TryGetState(
+                garden.StableInstanceId,
+                out BuildingProductionState state), Is.True);
+            Assert.That(state.Definition.Id,
+                Is.EqualTo("fusion.production.spirit-plant-extract"));
+        }
+
+        [Test]
         public void RecipeSelectionUsesCatalogDefinitionAndSurvivesSynchronization()
         {
             GrayboxBuildingInstance3D smelter = CreateInstance(

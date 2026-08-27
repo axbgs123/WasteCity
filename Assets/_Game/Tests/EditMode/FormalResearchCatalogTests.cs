@@ -179,28 +179,31 @@ namespace WasteCity.Tests
                 "rule:psionics.effect.multi-city-shared-progress-20-percent"),
 
             Node(37, "core.research.bridge.psionic-mech", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.precision-assembly",
+                "Researchable", Req("core.research.precision-assembly",
                     "core.research.psionic-workshop"),
-                "building:bridge.building.psionic-mech-factory"),
+                "building:bridge.building.psionic-mech-factory",
+                "recipe:fusion.production.psionic-mech-components"),
             Node(38, "core.research.bridge.high-frequency-sword", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.artifact-crafting",
+                "Researchable", Req("core.research.artifact-crafting",
                     "core.research.precision-assembly"),
-                "building:bridge.building.high-frequency-sword-forge"),
+                "building:bridge.building.high-frequency-sword-forge",
+                "recipe:fusion.production.high-frequency-flying-sword"),
             Node(39, "core.research.bridge.bio-hangar", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.bio-cultivation",
+                "Researchable", Req("core.research.bio-cultivation",
                     "core.research.precision-assembly"),
-                "building:bridge.building.bio-hangar"),
+                "building:bridge.building.bio-hangar",
+                "recipe:fusion.production.bio-hangar-weapons"),
             Node(40, "core.research.bridge.spirit-plant", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.artifact-crafting",
+                "Researchable", Req("core.research.artifact-crafting",
                     "core.research.bio-cultivation"),
                 "building:bridge.building.spirit-plant-garden",
                 "recipe:fusion.production.spirit-plant-extract"),
             Node(41, "core.research.bridge.psionic-pulse", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.psionic-workshop",
+                "Researchable", Req("core.research.psionic-workshop",
                     "core.research.precision-assembly"),
                 "building:bridge.building.emp-tower"),
             Node(42, "core.research.bridge.flesh-elixir", "Bridge", 3, 4,
-                "PreviewOnly", Req("core.research.bio-cultivation",
+                "Researchable", Req("core.research.bio-cultivation",
                     "core.research.artifact-crafting"),
                 "recipe:fusion.production.flesh-elixir",
                 "rule:bridge.effect.elixir-triple-with-mutation-risk"),
@@ -370,7 +373,7 @@ namespace WasteCity.Tests
                 Assert.That(ReadInt(bridge, "Tier"), Is.EqualTo(3), bridge.Id.Value);
                 Assert.That(ReadInt(bridge, "LayoutRow"), Is.EqualTo(4), bridge.Id.Value);
                 Assert.That(ReadString(bridge, "ReleaseState"),
-                    Is.EqualTo("PreviewOnly"), bridge.Id.Value);
+                    Is.EqualTo("Researchable"), bridge.Id.Value);
 
                 ResearchDefinition first = byId[requirements[0]];
                 ResearchDefinition second = byId[requirements[1]];

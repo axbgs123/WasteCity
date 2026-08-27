@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using Unity.Profiling;
@@ -2662,7 +2663,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void WorldView_InstanceKeepsOneRootAndRendererAcrossAllStableStates()
+        public void IDEA0021_InstanceKeepsOneRootMeshAndStableBillboardAcrossStates()
         {
             WorldFixture fixture = CreateWorldFixture(
                 OpenCells(),
@@ -2675,13 +2676,17 @@ namespace WasteCity.Tests
                 15,
                 CityMode.Fortress);
             Transform instanceRoot = fixture.InstanceRoot.GetChild(0);
-            Renderer renderer =
-                instanceRoot.GetComponentInChildren<Renderer>(true);
+            MeshRenderer renderer = instanceRoot.GetComponent<MeshRenderer>();
+            SpriteRenderer icon =
+                instanceRoot.GetComponentInChildren<SpriteRenderer>(true);
 
             Assert.That(fixture.InstanceRoot.childCount, Is.EqualTo(1));
             Assert.That(
                 instanceRoot.GetComponentsInChildren<Renderer>(true).Length,
-                Is.EqualTo(1));
+                Is.EqualTo(2));
+            Assert.That(instanceRoot.childCount, Is.EqualTo(1));
+            Assert.That(icon, Is.Not.Null);
+            Assert.That(icon.enabled, Is.False);
             Assert.That(
                 InstanceSlotIds(instanceRoot),
                 Is.EquivalentTo(new[]
@@ -2696,8 +2701,16 @@ namespace WasteCity.Tests
                 fixture.Presentation);
             Assert.That(fixture.InstanceRoot.GetChild(0), Is.SameAs(instanceRoot));
             Assert.That(
-                instanceRoot.GetComponentInChildren<Renderer>(true),
+                instanceRoot.GetComponent<MeshRenderer>(),
                 Is.SameAs(renderer));
+            Assert.That(
+                instanceRoot.GetComponentInChildren<SpriteRenderer>(true),
+                Is.SameAs(icon));
+            Assert.That(icon.enabled, Is.True);
+            Assert.That(
+                AssetDatabase.GetAssetPath(icon.sprite),
+                Is.EqualTo("Assets/_Game/Art/Production2D/Buildings/" +
+                    "building-housing.png"));
             Assert.That(
                 InstanceSlotIds(instanceRoot),
                 Is.EqualTo(new[]
@@ -2711,15 +2724,17 @@ namespace WasteCity.Tests
             fixture.Presentation.UpdateInstance(instance);
             Assert.That(fixture.InstanceRoot.GetChild(0), Is.SameAs(instanceRoot));
             Assert.That(
-                instanceRoot.GetComponentInChildren<Renderer>(true),
+                instanceRoot.GetComponent<MeshRenderer>(),
                 Is.SameAs(renderer));
+            Assert.That(icon.enabled, Is.False);
             Assert.That(
                 InstanceSlotIds(instanceRoot),
                 Is.EqualTo(new[]
                 {
                     "building.ruin." + instance.StableInstanceId
                 }));
-            Assert.That(fixture.Presentation.InstanceRendererCount, Is.EqualTo(1));
+            Assert.That(fixture.Presentation.InstanceVisualCount, Is.EqualTo(1));
+            Assert.That(fixture.Presentation.InstanceRendererCount, Is.EqualTo(2));
         }
 
         [Test]
@@ -2739,13 +2754,78 @@ namespace WasteCity.Tests
 
             Assert.That(fixture.InstanceRoot.childCount, Is.EqualTo(1));
             Transform root = fixture.InstanceRoot.GetChild(0);
-            Assert.That(root.childCount, Is.Zero);
+            Assert.That(root.childCount, Is.EqualTo(1));
             Assert.That(
                 root.GetComponentsInChildren<Renderer>(true).Length,
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
                 root.GetComponentsInChildren<GrayboxVisualSlot>(true).Length,
                 Is.EqualTo(2));
+        }
+
+        [Test]
+        public void IDEA0021_CompletedUpgradeRefreshesSpriteWithoutExtraChildren()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(), CityMode.Fortress);
+            GrayboxBuildingInstance3D instance = Begin(
+                fixture, BuildingCatalog.Housing,
+                BuildingSite.Ground, 20, 15, CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Transform root = fixture.InstanceRoot.GetChild(0);
+            SpriteRenderer renderer =
+                root.GetComponentInChildren<SpriteRenderer>(true);
+            Sprite before = renderer.sprite;
+            SetInstancePlacement(
+                instance,
+                new PlacedBuilding(
+                    BuildingCatalog.Warehouse,
+                    instance.Placement.X,
+                    instance.Placement.Y,
+                    instance.Placement.Site,
+                    instance.Placement.Orientation));
+
+            fixture.Presentation.UpdateInstance(instance);
+
+            Assert.That(root.childCount, Is.EqualTo(1));
+            Assert.That(root.GetComponentInChildren<SpriteRenderer>(true),
+                Is.SameAs(renderer));
+            Assert.That(renderer.sprite, Is.Not.SameAs(before));
+            Assert.That(AssetDatabase.GetAssetPath(renderer.sprite),
+                Does.EndWith("building-warehouse.png"));
+        }
+
+        [Test]
+        public void IDEA0021_BillboardLateUpdateKeepsObjectsAndAllocationsStable()
+        {
+            WorldFixture fixture = CreateWorldFixture(
+                OpenCells(), CityMode.Fortress);
+            GrayboxBuildingInstance3D instance = Begin(
+                fixture, BuildingCatalog.Housing,
+                BuildingSite.Ground, 20, 15, CityMode.Fortress);
+            fixture.Session.CompleteAllConstructionForDevelopment(
+                fixture.Presentation);
+            Transform root = fixture.InstanceRoot.GetChild(0);
+            SpriteRenderer renderer =
+                root.GetComponentInChildren<SpriteRenderer>(true);
+            MethodInfo lateUpdate = typeof(GrayboxBuildingWorldView3D)
+                .GetMethod("LateUpdate",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(lateUpdate, Is.Not.Null);
+            var tick = (Action)Delegate.CreateDelegate(
+                typeof(Action), fixture.Presentation, lateUpdate);
+            tick();
+            tick();
+            AllocationMeasurement measurement = Profile300Calls(tick);
+
+            Assert.That(measurement.ProfiledBytes, Is.Zero);
+            Assert.That(measurement.CurrentThreadBytes, Is.Zero);
+            Assert.That(fixture.InstanceRoot.childCount, Is.EqualTo(1));
+            Assert.That(root.childCount, Is.EqualTo(1));
+            Assert.That(root.GetComponentInChildren<SpriteRenderer>(true),
+                Is.SameAs(renderer));
+            Assert.That(renderer.enabled, Is.True);
         }
 
         [Test]
@@ -3647,6 +3727,17 @@ namespace WasteCity.Tests
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.That(field, Is.Not.Null);
             field.SetValue(instance, state);
+        }
+
+        private static void SetInstancePlacement(
+            GrayboxBuildingInstance3D instance,
+            PlacedBuilding placement)
+        {
+            MethodInfo method = typeof(GrayboxBuildingInstance3D).GetMethod(
+                "ReplacePlacement",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            method.Invoke(instance, new object[] { placement });
         }
 
         private static Transform NewChild(Transform parent, string name)

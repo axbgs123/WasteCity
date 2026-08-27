@@ -344,7 +344,8 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsController.RequiredTestFiles);
-            CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
+            CollectionAssert.AreEqual(new[]
+                { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021" },
                 operationsController.RequirementIds);
 
             ProjectReuseEntry operationsView = FindReuse(catalog,
@@ -381,6 +382,7 @@ namespace WasteCity.Tests
                 "IDEA-0012",
                 "IDEA-0016",
                 "IDEA-0018",
+                "IDEA-0021",
             },
                 operationsView.RequirementIds);
 
@@ -884,7 +886,7 @@ namespace WasteCity.Tests
                     "Assets/_Game/Tests/EditMode/CraftingQueueModelTests.cs",
                     "Assets/_Game/Tests/EditMode/ResourceRecipeCatalogIntegrityTests.cs",
                 },
-                new[] { "IDEA-0011", "IDEA-0016" });
+                new[] { "IDEA-0011", "IDEA-0016", "IDEA-0021" });
             AssertReuseContract(
                 FindReuse(catalog, "crafting-queue-model"),
                 new[]
@@ -1303,7 +1305,8 @@ namespace WasteCity.Tests
                 catalog,
                 "graybox-operations-controller-3d");
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0011", "IDEA-0012", "IDEA-0016" },
+                new[]
+                    { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021" },
                 operationsController.RequirementIds);
             CollectionAssert.Contains(
                 operationsController.RequiredTestFiles,
@@ -1318,6 +1321,7 @@ namespace WasteCity.Tests
                     "IDEA-0012",
                     "IDEA-0016",
                     "IDEA-0018",
+                    "IDEA-0021",
                 },
                 operationsView.RequirementIds);
             CollectionAssert.Contains(

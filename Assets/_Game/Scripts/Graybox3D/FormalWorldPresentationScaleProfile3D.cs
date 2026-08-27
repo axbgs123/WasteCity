@@ -340,6 +340,11 @@ namespace WasteCity.Graybox3D
                 { "cultivation.building.alchemy-chamber", FormalBuildingVisualArchetype3D.Workshop },
                 { "cultivation.building.puppet-workshop", FormalBuildingVisualArchetype3D.Workshop },
                 { "biological.building.behemoth-pen", FormalBuildingVisualArchetype3D.LargeEnclosure },
+                { "bridge.building.psionic-mech-factory", FormalBuildingVisualArchetype3D.LargeEnclosure },
+                { "bridge.building.high-frequency-sword-forge", FormalBuildingVisualArchetype3D.Workshop },
+                { "bridge.building.bio-hangar", FormalBuildingVisualArchetype3D.LargeEnclosure },
+                { "bridge.building.spirit-plant-garden", FormalBuildingVisualArchetype3D.FieldArray },
+                { "bridge.building.emp-tower", FormalBuildingVisualArchetype3D.DefenseFoundation },
             };
         }
     }

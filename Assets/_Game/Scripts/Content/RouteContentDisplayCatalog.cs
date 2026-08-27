@@ -85,6 +85,14 @@ namespace WasteCity.Content
         public static ContentRoute BuildingRoute(BuildingDefinition definition)
         {
             string id = definition?.Id.Value ?? string.Empty;
+            if (id == BuildingCatalog.PsionicMechFactory.Id.Value ||
+                id == BuildingCatalog.EmpTower.Id.Value)
+                return ContentRoute.Psionics;
+            if (id == BuildingCatalog.HighFrequencySwordForge.Id.Value ||
+                id == BuildingCatalog.SpiritPlantGarden.Id.Value)
+                return ContentRoute.Cultivation;
+            if (id == BuildingCatalog.BioHangar.Id.Value)
+                return ContentRoute.BiologicalAscension;
             if (id.StartsWith("technology.", StringComparison.Ordinal)) return ContentRoute.Technology;
             if (id.StartsWith("cultivation.", StringComparison.Ordinal)) return ContentRoute.Cultivation;
             if (id.StartsWith("biological.", StringComparison.Ordinal)) return ContentRoute.BiologicalAscension;
@@ -227,6 +235,14 @@ namespace WasteCity.Content
                     return "每 8 秒为半径 6 格内已完成建筑提供 25 点护盾，护盾上限 100";
                 case "core.building.automated-repair-bay":
                     return "每 6 秒为半径 6 格内已完成建筑恢复 20 点耐久";
+                case "bridge.building.psionic-mech-factory":
+                    return "每 18 秒消耗 2 机械组件 + 1 灵能增幅器 + 1 能量电池，产出 2 控制芯片；实体机甲部署待 F3";
+                case "bridge.building.high-frequency-sword-forge":
+                    return "每 10 秒消耗 2 灵铁 + 1 超导线圈，产出 3 飞剑";
+                case "bridge.building.bio-hangar":
+                    return "每 14 秒消耗 2 骨钢 + 1 机械组件 + 1 活性生物质，产出 3 生物武器；半机械巨兽部署待 F3";
+                case "bridge.building.spirit-plant-garden":
+                    return "每 12 秒消耗 1 灵石 + 2 活性生物质 + 1 水，产出 1 灵植精华";
                 default:
                     return "未登记功能";
             }

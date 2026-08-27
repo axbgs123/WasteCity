@@ -125,6 +125,37 @@ namespace WasteCity.Tests
                 Is.EqualTo(new[] { "first-civilization-ascension" }));
         }
 
+        [TestCase("core.research.alloy-armor")]
+        [TestCase("core.research.sword-riding")]
+        public void IDEA0021_CivilizationGatedResearchRequiresLevelTwoSaveTruth(
+            string researchId)
+        {
+            FormalSaveEnvelope envelope = MigratedFixture();
+            envelope.formal3D.research.completedResearchIds = new[]
+            {
+                researchId,
+            };
+            Rehash(envelope);
+            FormalSaveValidationResult invalid =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+            Assert.That(invalid.IsValid, Is.False);
+            Assert.That(invalid.FieldPath,
+                Does.StartWith("formal3D.research"));
+
+            object progression = ReadField(envelope.formal3D, "progression");
+            object fate = ReadField(progression, "fate");
+            Select(fate, FormalFateCatalog.PocketUniverseId, 2);
+            WriteField(fate, "revision", 2ul);
+            WriteField(ReadField(ReadField(progression, "fateEffects"),
+                "pocketUniverse"), "level", 2);
+            ConfigureCompletedCivilization(
+                ReadField(progression, "civilization"));
+            Rehash(envelope);
+            FormalSaveValidationResult valid =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+            Assert.That(valid.IsValid, Is.True, valid.Message);
+        }
+
         [Test]
         public void IDEA0020_SchemaThirtyThreeProgressionRoundTripsThroughRealCodec()
         {

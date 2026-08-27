@@ -46,6 +46,9 @@ namespace WasteCity.Tests
             "psionics.production.consciousness-shard",
             "psionics.production.amplifier",
             "psionics.production.psionic-crystal",
+            "fusion.production.psionic-mech-components",
+            "fusion.production.high-frequency-flying-sword",
+            "fusion.production.bio-hangar-weapons",
             "fusion.production.spirit-plant-extract",
             "fusion.production.flesh-elixir",
             "fusion.production.hybrid-core"
@@ -113,8 +116,18 @@ namespace WasteCity.Tests
                     new[] { "psionics.building.workshop" },
                 ["psionics.production.psionic-crystal"] =
                     new[] { "psionics.building.consciousness-network" },
+                ["fusion.production.psionic-mech-components"] =
+                    new[] { "bridge.building.psionic-mech-factory" },
+                ["fusion.production.high-frequency-flying-sword"] =
+                    new[] { "bridge.building.high-frequency-sword-forge" },
+                ["fusion.production.bio-hangar-weapons"] =
+                    new[] { "bridge.building.bio-hangar" },
                 ["fusion.production.spirit-plant-extract"] =
-                    new[] { "biological.building.breeding-chamber" },
+                    new[]
+                    {
+                        "biological.building.breeding-chamber",
+                        "bridge.building.spirit-plant-garden"
+                    },
                 ["fusion.production.flesh-elixir"] =
                     new[] { "cultivation.building.alchemy-chamber" },
                 ["fusion.production.hybrid-core"] =
@@ -179,6 +192,12 @@ namespace WasteCity.Tests
                     new[] { "core.research.psionic-workshop" },
                 ["psionics.production.psionic-crystal"] =
                     new[] { "core.research.collective-consciousness" },
+                ["fusion.production.psionic-mech-components"] =
+                    new[] { "core.research.bridge.psionic-mech" },
+                ["fusion.production.high-frequency-flying-sword"] =
+                    new[] { "core.research.bridge.high-frequency-sword" },
+                ["fusion.production.bio-hangar-weapons"] =
+                    new[] { "core.research.bridge.bio-hangar" },
                 ["fusion.production.spirit-plant-extract"] =
                     new[] { "core.research.bridge.spirit-plant" },
                 ["fusion.production.flesh-elixir"] =
@@ -241,7 +260,7 @@ namespace WasteCity.Tests
         [Test]
         public void Recipes_OwnTheExactFormalMachineBufferCapacities()
         {
-            Assert.That(ResourceRecipeCatalog.All, Has.Count.EqualTo(30));
+            Assert.That(ResourceRecipeCatalog.All, Has.Count.EqualTo(33));
 
             foreach (ResourceRecipeDefinition recipe in ResourceRecipeCatalog.All)
             {
@@ -467,7 +486,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void EveryMachineBuilding_HasExactlyOneOrderedDefaultRecipe()
+        public void EveryMachineBuilding_HasOneExplicitDefaultOrOneAllowedRecipe()
         {
             ResourceRecipeDefinition[] machines = ResourceRecipeCatalog.All
                 .Where(recipe => recipe.Kind == ResourceRecipeKind.Machine)
@@ -490,12 +509,14 @@ namespace WasteCity.Tests
                             StringComparer.Ordinal))
                     .ToArray();
                 Assert.That(allowed, Is.Not.Empty, buildingId);
-                Assert.That(
-                    allowed.Count(recipe => ReflectedBool(
-                        recipe,
-                        "DefaultForBuilding")),
-                    Is.EqualTo(1),
-                    $"{buildingId} 必须且只能有一个默认配方");
+                int explicitDefaults = allowed.Count(recipe => ReflectedBool(
+                    recipe,
+                    "DefaultForBuilding"));
+                Assert.That(explicitDefaults, Is.LessThanOrEqualTo(1),
+                    $"{buildingId} 最多只能声明一个默认配方");
+                Assert.That(explicitDefaults == 1 || allowed.Length == 1,
+                    Is.True,
+                    $"{buildingId} 多配方时必须显式声明默认配方");
             }
         }
 

@@ -142,7 +142,7 @@
 
 ### 三维建筑世界视图（仅限场景）
 
-能解决什么：在场景内显示建筑、半透明预览和前向标记，并消费正式尺度 Profile 统一地面/内城与各生命周期表现。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`。怎么复用：在场景内显示建筑、半透明预览和前向标记，并消费正式尺度 Profile 统一地面/内城与各生命周期表现。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现；不得修改 BuildingCatalog 占地或自行决定锚点、旋转合法性、成本和节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`、`FormalWorldPresentationScaleProfile3DTests`。代码名：`GrayboxBuildingWorldView3D`。
+能解决什么：在场景内显示建筑、半透明预览和前向标记，消费正式尺度 Profile，并将 BuildingIconCatalog 的 35 张透明 Sprite 按占地比例投影到已完成建筑。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`。怎么复用：在场景内显示建筑、半透明预览和前向标记，消费正式尺度 Profile，并将 BuildingIconCatalog 的 35 张透明 Sprite 按占地比例投影到已完成建筑。不能负责什么：只负责 GrayboxPrototype3D 的建筑表现；Sprite 是可替换的 billboard，不代表 3D 建模完成，也不得修改 BuildingCatalog 占地或自行决定锚点、旋转合法性、成本和节点兼容性。改后跑哪组测试：`GrayboxBuildingProjectionAndViewTests`、`FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingRuntimeSceneTests`。代码名：`GrayboxBuildingWorldView3D`。
 
 ## UI 与输入
 
@@ -156,11 +156,11 @@
 
 ### 三维生产可观察化控制器（仅限场景）
 
-能解决什么：在 GrayboxPrototype3D 内组合背包、30 条配方目录与两条可执行应急合成、43 节点正式研究、派生资源发现、资源状态栏、真实仓库详情、多配方生产与面板命令，并把真实输入提交到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、30 条配方目录与两条可执行应急合成、43 节点正式研究、派生资源发现、资源状态栏、真实仓库详情、多配方生产与面板命令，并把真实输入提交到正式模型。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 31，也不得接入冻结 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
+能解决什么：在 GrayboxPrototype3D 内组合背包、33 条配方、44 节点正式研究、派生资源发现、资源状态栏、真实仓库详情、多配方生产与城市库存灵丹使用命令，并把真实输入提交到正式模型。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`。怎么复用：在 GrayboxPrototype3D 内组合背包、33 条配方、44 节点正式研究、派生资源发现、资源状态栏、真实仓库详情、多配方生产与城市库存灵丹使用命令，并把真实输入提交到正式模型。不能负责什么：只属于当前 3D 场景的会话与 UI 适配；城市与仓库数量必须读取 CityResourceStorageModel，不替代资源、生产、研究、访问资格或输入路由真值，不进入 schema 33 新字段，也不得接入已退役 2D。改后跑哪组测试：`ManualResourceAccessRulesTests`、`GrayboxWarehouseStorageIntegrationTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsController3D`。
 
 ### 三维生产可观察化视图（仅限场景）
 
-能解决什么：显示当前 3D 场景的文明式横向资源栏、路线/层级可筛选账本、背包与 30 条配方合成面板、43 节点自下向上正式科技树、真实仓库内容、多配方生产通道与共享资源图标；科技树提供确定连线、搜索、路线/状态筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`。怎么复用：显示当前 3D 场景的文明式横向资源栏、路线/层级可筛选账本、背包与 30 条配方合成面板、43 节点自下向上正式科技树、真实仓库内容、多配方生产通道与共享资源图标；科技树提供确定连线、搜索、路线/状态筛选、拖动、指针中心缩放、全树/进行中定位和模态焦点。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；图标必须复用 ResourceIconCatalog3D，视图和输入表面不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间、判断访问资格或进入 schema 31。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`ResearchTreeUiContractTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`、`GrayboxResearchTreeView3D`、`GrayboxResearchTreeViewportInput3D`、`GrayboxResearchSearchFocus3D`、`ResearchTreeConnectionGraphic3D`。
+能解决什么：显示当前 3D 场景的文明式横向资源栏、可筛选账本、背包与 33 条配方、44 节点自下向上科技树、真实仓库和生产通道；科技树使用共享主干、junction、分支和双路线桥，保留搜索、筛选、拖动、指针缩放、Fit/Focus 和模态焦点。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`、`Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`。怎么复用：显示当前 3D 场景的文明式横向资源栏、可筛选账本、背包与 33 条配方、44 节点自下向上科技树、真实仓库和生产通道；科技树使用共享主干、junction、分支和双路线桥，保留搜索、筛选、拖动、指针缩放、Fit/Focus 和模态焦点。不能负责什么：只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；图标必须复用 ResourceIconCatalog3D，视图和输入表面不持有库存、队列、研究或解锁真值，不自行扣资源、推进时间、判断访问资格或进入 schema 33 新字段。改后跑哪组测试：`GrayboxVisualAndWorldTests`、`ResearchTreeUiContractTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`GrayboxOperationsView3D`、`GrayboxResearchTreeView3D`、`GrayboxResearchTreeViewportInput3D`、`GrayboxResearchSearchFocus3D`、`ResearchTreeConnectionGraphic3D`。
 
 ### 三维开发修改器中文目录查询（复用前审查）
 
@@ -238,7 +238,7 @@
 
 ### 正式资源配方目录（推荐复用）
 
-能解决什么：统一提供 30 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。在哪里：`Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`。怎么复用：统一提供 30 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。不能负责什么：只定义正式配方静态配置；FormalProductionDefinitionCatalog 可按建筑和配方 ID 投影机器定义，但本目录不拥有队列、背包、建筑缓存、选择或进度，也不执行资源事务、自动串联或 UI 手势。改后跑哪组测试：`CraftingQueueModelTests`、`ResourceRecipeCatalogIntegrityTests`。代码名：`ResourceRecipeDefinition`、`ResourceRecipeCatalog`。
+能解决什么：统一提供 33 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。在哪里：`Assets/_Game/Scripts/Economy/ResourceRecipeCatalog.cs`。怎么复用：统一提供 33 条正式机器/应急/融合配方的稳定 ID、复数输入输出、周期、建筑适用范围、默认配方、绑定节点动态产出与全量研究前置。不能负责什么：只定义正式配方静态配置；FormalProductionDefinitionCatalog 可按建筑和配方 ID 投影机器定义，但本目录不拥有队列、背包、建筑缓存、选择或进度，也不执行资源事务、自动串联或 UI 手势。改后跑哪组测试：`CraftingQueueModelTests`、`ResourceRecipeCatalogIntegrityTests`。代码名：`ResourceRecipeDefinition`、`ResourceRecipeCatalog`。
 
 ### 应急合成队列（推荐复用）
 
@@ -338,11 +338,11 @@
 
 ### 正式四路线科技运行时（推荐复用）
 
-能解决什么：组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含重新开放的 core.research.legacy-analysis，并提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`、`Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`。怎么复用：组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含重新开放的 core.research.legacy-analysis，并提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。不能负责什么：不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO、关注度或效果表现；legacy-analysis 的完成事件由外部进程路由，未知活动科技继续冻结并可持久化往返。改后跑哪组测试：`FormalResearchCatalogTests`、`FormalResearchRuntimeTests`、`GrayboxFormalResearchSaveAdapterTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`ResearchCatalog`、`FormalResearchRuntime`。
+能解决什么：组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含已开放的 core.research.legacy-analysis，并通过同一文明可用性投影在 Lv.2 自然开放合金装甲/御剑术；同时提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。在哪里：`Assets/_Game/Scripts/Research/ResearchModel.cs`、`Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`。怎么复用：组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含已开放的 core.research.legacy-analysis，并通过同一文明可用性投影在 Lv.2 自然开放合金装甲/御剑术；同时提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。不能负责什么：不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO、关注度或效果表现；文明投影只允许两个白名单 ID，不得顺便开放其余 PreviewOnly。改后跑哪组测试：`FormalResearchCatalogTests`、`FormalResearchRuntimeTests`、`GrayboxFormalResearchSaveAdapterTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`ResearchCatalog`、`CivilizationResearchAvailability`、`FormalResearchRuntime`。
 
 ### 正式科技树确定性投影（复用前审查）
 
-能解决什么：把正式科技目录投影为稳定的 43 节点、48 依赖边、自下向上固定坐标与图空间边界，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。在哪里：`Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs`。怎么复用：把正式科技目录投影为稳定的 43 节点、48 依赖边、自下向上固定坐标与图空间边界，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。不能负责什么：只拥有不可变图空间投影，不创建 Unity 场景对象，不读取输入、库存、研究运行态或存档，也不解析中文状态文案；路线布局常量变更必须同步设计规格与非重叠测试。改后跑哪组测试：`ResearchTreeProjection3DTests`、`ResearchTreeUiContractTests`。代码名：`ResearchTreeProjection3D`、`ResearchTreeNodeProjection3D`、`ResearchTreeEdgeProjection3D`、`ResearchTreeViewportState3D`。
+能解决什么：把正式科技目录投影为稳定的 44 节点、49 依赖边、共享主干/junction/分支/双路线桥与自下向上图空间，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。在哪里：`Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs`。怎么复用：把正式科技目录投影为稳定的 44 节点、49 依赖边、共享主干/junction/分支/双路线桥与自下向上图空间，并提供筛选保持布局、最新可研究选择、Fit/Focus 和指针锚定缩放纯计算。不能负责什么：只拥有不可变图空间投影，不创建 Unity 场景对象，不读取输入、库存、研究运行态或存档，也不解析中文状态文案；路线布局常量变更必须同步设计规格与非重叠测试。改后跑哪组测试：`ResearchTreeProjection3DTests`、`ResearchTreeUiContractTests`。代码名：`ResearchTreeProjection3D`、`ResearchTreeNodeProjection3D`、`ResearchTreeEdgeProjection3D`、`ResearchTreeJunctionProjection3D`、`ResearchTreeViewportState3D`。
 
 ### 三维首版科技目录（推荐复用）
 
@@ -468,15 +468,15 @@
 
 ### 三维共享建筑图标目录（推荐复用）
 
-能解决什么：按 BuildingCatalog 稳定建筑 ID 解析 30 张正式建筑 Sprite 和确定性类别回退，供建造栏、建筑详情与撤离列表共享。在哪里：`Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`。怎么复用：按 BuildingCatalog 稳定建筑 ID 解析 30 张正式建筑 Sprite 和确定性类别回退，供建造栏、建筑详情与撤离列表共享。不能负责什么：只拥有建筑 ID 到 Sprite 的表现映射；不决定建筑可见性、解锁、成本、占地或放置合法性，不把二维图写成三维模型完成。新消费者不得维护平行建筑图标字典。改后跑哪组测试：`Production2DBuildingIconPipelineTests`、`GrayboxBuildingRuntimeSceneTests`。代码名：`BuildingIconOverride3D`、`BuildingIconCatalog3D`。
+能解决什么：按 BuildingCatalog 稳定建筑 ID 解析 35 张正式建筑 Sprite 和确定性类别回退，供建造栏、建筑详情、世界 billboard 与撤离列表共享。在哪里：`Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`。怎么复用：按 BuildingCatalog 稳定建筑 ID 解析 35 张正式建筑 Sprite 和确定性类别回退，供建造栏、建筑详情、世界 billboard 与撤离列表共享。不能负责什么：只拥有建筑 ID 到 Sprite 的表现映射；不决定建筑可见性、解锁、成本、占地或放置合法性，不把二维图写成三维模型完成。新消费者不得维护平行建筑图标字典。改后跑哪组测试：`Production2DBuildingIconPipelineTests`、`GrayboxBuildingRuntimeSceneTests`。代码名：`BuildingIconOverride3D`、`BuildingIconCatalog3D`。
 
 ### 三维共享科技图标目录（推荐复用）
 
-能解决什么：按 ResearchCatalog 的 43 个稳定科技 ID 解析正式科技 Sprite，并提供路线/层级确定性回退，供科技树节点与详情共享。在哪里：`Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`。怎么复用：按 ResearchCatalog 的 43 个稳定科技 ID 解析正式科技 Sprite，并提供路线/层级确定性回退，供科技树节点与详情共享。不能负责什么：只拥有科技 ID 到 Sprite 的表现映射；不决定研究前置、成本、状态、布局或效果是否已接入。缺图回退不能授予科技效果，UI 不得用文件名建立第二套目录。改后跑哪组测试：`Production2DTechnologyIconPipelineTests`、`ResearchTreeUiContractTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`ResearchIconOverride3D`、`ResearchIconCatalog3D`。
+能解决什么：按 ResearchCatalog 的 44 个稳定科技 ID 解析正式科技 Sprite，并提供路线/层级确定性回退，供科技树节点与详情共享。在哪里：`Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`。怎么复用：按 ResearchCatalog 的 44 个稳定科技 ID 解析正式科技 Sprite，并提供路线/层级确定性回退，供科技树节点与详情共享。不能负责什么：只拥有科技 ID 到 Sprite 的表现映射；不决定研究前置、成本、状态、布局或效果是否已接入。缺图回退不能授予科技效果，UI 不得用文件名建立第二套目录。改后跑哪组测试：`Production2DTechnologyIconPipelineTests`、`ResearchTreeUiContractTests`、`GrayboxProductionObservabilityRuntimeInputTests`。代码名：`ResearchIconOverride3D`、`ResearchIconCatalog3D`。
 
 ### 统一二维视觉目录（推荐复用）
 
-能解决什么：用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、43 科技、30 建筑、7 UI、1 人物和 2 世界标记共 114 个视觉条目，并登记 30 条配方的主产物与机器/手工角标投影。在哪里：`Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`。怎么复用：用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、43 科技、30 建筑、7 UI、1 人物和 2 世界标记共 114 个视觉条目，并登记 30 条配方的主产物与机器/手工角标投影。不能负责什么：运行时资产只保存稳定视觉键、Sprite、配方视觉投影和类别回退；机器清单另行保存制作、导入与审核元数据。二者都不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局；未知键只能回退，不能改写玩法 ID。改后跑哪组测试：`Production2DVisualCatalogAtlasTests`。代码名：`Production2DVisualEntry3D`、`Production2DRecipeVisualEntry3D`、`Production2DVisualCatalog3D`。
+能解决什么：用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、44 科技、35 建筑、7 UI、1 人物和 2 世界标记共 120 个视觉条目，并登记 33 条配方的主产物与机器/手工角标投影。在哪里：`Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`。怎么复用：用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、44 科技、35 建筑、7 UI、1 人物和 2 世界标记共 120 个视觉条目，并登记 33 条配方的主产物与机器/手工角标投影。不能负责什么：运行时资产只保存稳定视觉键、Sprite、配方视觉投影和类别回退；机器清单另行保存制作、导入与审核元数据。二者都不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局；未知键只能回退，不能改写玩法 ID。改后跑哪组测试：`Production2DVisualCatalogAtlasTests`。代码名：`Production2DVisualEntry3D`、`Production2DRecipeVisualEntry3D`、`Production2DVisualCatalog3D`。
 
 ### 三维资源矿点标识与图标标记（仅限场景）
 
@@ -488,7 +488,7 @@
 
 ### 正式三维世界表现尺度（复用前审查）
 
-能解决什么：按 BuildingDefinition.Id 解析 30 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`。怎么复用：按 BuildingDefinition.Id 解析 30 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。不能负责什么：只拥有世界表现参数与纯换算；不得定义或修改 BuildingCatalog 占地、资源节点、地图、Sprite 身份、相机输入、正式 UI 图标 token 或存档真值，UI token 继续由 FormalUiLayoutProfile3D 持有。改后跑哪组测试：`FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxVisualAndWorldTests`。代码名：`FormalWorldPresentationScaleProfile3D`、`FormalWorldPresentationScalePolicy3D`、`FormalBuildingVisualMetrics3D`、`FormalWorldMarkerMetrics3D`。
+能解决什么：按 BuildingDefinition.Id 解析 35 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。在哪里：`Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`。怎么复用：按 BuildingDefinition.Id 解析 35 项表现 archetype，统一地面/内城格尺度、精确 .14 DefenseFoundation 和矿点 Near 68、50、22，Mid 56、42、20，Far Icon 28 的世界表现尺度。不能负责什么：只拥有世界表现参数与纯换算；不得定义或修改 BuildingCatalog 占地、资源节点、地图、Sprite 身份、相机输入、正式 UI 图标 token 或存档真值，UI token 继续由 FormalUiLayoutProfile3D 持有。改后跑哪组测试：`FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxVisualAndWorldTests`。代码名：`FormalWorldPresentationScaleProfile3D`、`FormalWorldPresentationScalePolicy3D`、`FormalBuildingVisualMetrics3D`、`FormalWorldMarkerMetrics3D`。
 
 ### 正式三维响应式界面布局（复用前审查）
 
@@ -538,7 +538,7 @@
 
 ### 正式二维目录与图集生成器（复用前审查）
 
-能解决什么：从已复核的类别 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 114 项视觉目录、30 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。在哪里：`Assets/_Game/Editor/Production2DItemIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DBuildingIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DTechnologyIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs`。怎么复用：从已复核的类别 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 114 项视觉目录、30 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。不能负责什么：仅供 Editor 生成和验证已批准的表现资产；不从文件名猜玩法内容，不改场景、配方、研究或建筑规则，不替代 Alpha/缩小联络表与用户视觉验收。Atlas 打包顺序不构成运行时身份。改后跑哪组测试：`Production2DItemIconPipelineTests`、`Production2DBuildingIconPipelineTests`、`Production2DTechnologyIconPipelineTests`、`Production2DUiCharacterMarkerPipelineTests`、`Production2DVisualCatalogAtlasTests`。代码名：`Production2DItemIconCatalogBuilder`、`Production2DBuildingIconCatalogBuilder`、`Production2DTechnologyIconCatalogBuilder`、`Production2DVisualCatalogBuilder`、`Production2DSpriteAtlasBuilder`。
+能解决什么：从已复核的分层 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 120 项视觉目录、33 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。在哪里：`Assets/_Game/Editor/Production2DItemIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DBuildingIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DTechnologyIconCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs`、`Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs`。怎么复用：从已复核的分层 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 120 项视觉目录、33 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。不能负责什么：仅供 Editor 生成和验证已批准的表现资产；不从文件名猜玩法内容，不改场景、配方、研究或建筑规则，不替代 Alpha/缩小联络表与用户视觉验收。Atlas 打包顺序不构成运行时身份。改后跑哪组测试：`Production2DItemIconPipelineTests`、`Production2DBuildingIconPipelineTests`、`Production2DTechnologyIconPipelineTests`、`Production2DUiCharacterMarkerPipelineTests`、`Production2DVisualCatalogAtlasTests`。代码名：`Production2DItemIconCatalogBuilder`、`Production2DBuildingIconCatalogBuilder`、`Production2DTechnologyIconCatalogBuilder`、`Production2DVisualCatalogBuilder`、`Production2DSpriteAtlasBuilder`。
 
 ### 废墟与悬崖视觉证据捕获（复用前审查）
 

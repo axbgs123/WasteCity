@@ -28,6 +28,10 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, NodeRow>(StringComparer.Ordinal);
         private readonly Dictionary<string, ConnectionRow> connectionRows =
             new Dictionary<string, ConnectionRow>(StringComparer.Ordinal);
+        private readonly Dictionary<string, JunctionRow> junctionRows =
+            new Dictionary<string, JunctionRow>(StringComparer.Ordinal);
+        private readonly Dictionary<string, JunctionRow> trunkRows =
+            new Dictionary<string, JunctionRow>(StringComparer.Ordinal);
         private readonly Dictionary<DevelopmentRoute, Button> routeButtons =
             new Dictionary<DevelopmentRoute, Button>();
         private readonly HashSet<DevelopmentRoute> enabledRoutes =
@@ -134,7 +138,7 @@ namespace WasteCity.Graybox3D.Building
             row.State.text = stateText ?? string.Empty;
             row.Button.image.color = isSelected
                 ? SelectedColor
-                : ButtonColor;
+                : NodeColor(definition.Route);
             if (isSelected)
                 selectedResearchId = definition.Id.Value;
             else if (string.Equals(
@@ -436,6 +440,29 @@ namespace WasteCity.Graybox3D.Building
 
         private void BuildConnections()
         {
+            for (var index = 0; index < projection.Trunks.Count; index++)
+            {
+                ResearchTreeTrunkProjection3D trunk = projection.Trunks[index];
+                RectTransform rect = CreateRect(
+                    connectionsLayer,
+                    "Research.Trunk." + trunk.StableId);
+                Stretch(rect);
+                rect.gameObject.AddComponent<CanvasRenderer>();
+                var graphic = rect.gameObject.AddComponent<
+                    ResearchTreeConnectionGraphic3D>();
+                graphic.ConfigurePath(
+                    trunk.Points,
+                    ConnectionColor(trunk.Route),
+                    ConnectionColor(trunk.Route),
+                    8f,
+                    false,
+                    false);
+                trunkRows.Add(
+                    trunk.StableId,
+                    CreateSharedRow(
+                        rect.gameObject,
+                        trunk.PrerequisiteResearchId));
+            }
             for (var index = 0; index < projection.Edges.Count; index++)
             {
                 ResearchTreeEdgeProjection3D edge = projection.Edges[index];
@@ -450,21 +477,52 @@ namespace WasteCity.Graybox3D.Building
                 rect.gameObject.AddComponent<CanvasRenderer>();
                 var graphic = rect.gameObject.AddComponent<
                     ResearchTreeConnectionGraphic3D>();
-                ResearchTreeNodeProjection3D prerequisite =
-                    projection.FindNode(edge.PrerequisiteResearchId);
-                ResearchTreeNodeProjection3D dependent =
-                    projection.FindNode(edge.DependentResearchId);
-                graphic.Configure(
-                    prerequisite.Position,
-                    dependent.Position,
-                    ConnectionColor(dependent.Definition.Route),
-                    4f);
+                graphic.ConfigurePath(
+                    edge.Points,
+                    ConnectionColor(edge.StartRoute),
+                    ConnectionColor(edge.EndRoute),
+                    edge.IsBridge ? 3f : 5f,
+                    edge.IsBridge,
+                    true);
                 connectionRows.Add(
                     key,
                     new ConnectionRow(
                         rect.gameObject,
                         edge.PrerequisiteResearchId,
                         edge.DependentResearchId));
+            }
+            for (var index = 0; index < projection.Junctions.Count; index++)
+            {
+                ResearchTreeJunctionProjection3D junction =
+                    projection.Junctions[index];
+                RectTransform rect = CreateRect(
+                    connectionsLayer,
+                    "Research.Junction." + junction.StableId);
+                Stretch(rect);
+                rect.gameObject.AddComponent<CanvasRenderer>();
+                var graphic = rect.gameObject.AddComponent<
+                    ResearchTreeConnectionGraphic3D>();
+                graphic.ConfigureJunction(
+                    junction.Position,
+                    ConnectionColor(junction.Route),
+                    14f);
+                var dependents = new List<string>();
+                for (var edgeIndex = 0;
+                     edgeIndex < projection.Edges.Count;
+                     edgeIndex++)
+                {
+                    ResearchTreeEdgeProjection3D edge =
+                        projection.Edges[edgeIndex];
+                    if (string.Equals(edge.JunctionId, junction.StableId,
+                            StringComparison.Ordinal))
+                        dependents.Add(edge.DependentResearchId);
+                }
+                junctionRows.Add(
+                    junction.StableId,
+                    new JunctionRow(
+                        rect.gameObject,
+                        junction.PrerequisiteResearchId,
+                        dependents.ToArray()));
             }
         }
 
@@ -835,6 +893,26 @@ namespace WasteCity.Graybox3D.Building
                     visible.Contains(row.PrerequisiteResearchId) &&
                     visible.Contains(row.DependentResearchId));
             }
+            foreach (JunctionRow row in junctionRows.Values)
+            {
+                bool active = visible.Contains(row.PrerequisiteResearchId);
+                var hasVisibleDependent = false;
+                for (var index = 0; index < row.DependentResearchIds.Length;
+                     index++)
+                    hasVisibleDependent |= visible.Contains(
+                        row.DependentResearchIds[index]);
+                row.GameObject.SetActive(active && hasVisibleDependent);
+            }
+            foreach (JunctionRow row in trunkRows.Values)
+            {
+                bool active = visible.Contains(row.PrerequisiteResearchId);
+                var hasVisibleDependent = false;
+                for (var index = 0; index < row.DependentResearchIds.Length;
+                     index++)
+                    hasVisibleDependent |= visible.Contains(
+                        row.DependentResearchIds[index]);
+                row.GameObject.SetActive(active && hasVisibleDependent);
+            }
             if (!string.IsNullOrEmpty(selectedResearchId) &&
                 !visible.Contains(selectedResearchId))
             {
@@ -845,7 +923,7 @@ namespace WasteCity.Graybox3D.Building
                      routeButtons)
             {
                 pair.Value.image.color = enabledRoutes.Contains(pair.Key)
-                    ? SelectedColor
+                    ? ConnectionColor(pair.Key)
                     : FilterDisabledColor;
             }
         }
@@ -962,6 +1040,8 @@ namespace WasteCity.Graybox3D.Building
             ownedRoots.Clear();
             nodeRows.Clear();
             connectionRows.Clear();
+            junctionRows.Clear();
+            trunkRows.Clear();
             routeButtons.Clear();
             resourceIcons.Clear();
             viewport = null;
@@ -1152,8 +1232,29 @@ namespace WasteCity.Graybox3D.Building
                     return new Color(.82f, .4f, .38f, .8f);
                 case DevelopmentRoute.Psionics:
                     return new Color(.7f, .48f, .92f, .8f);
+                case DevelopmentRoute.Bridge:
+                    return new Color(.84f, .71f, .36f, .86f);
                 default:
                     return new Color(.72f, .76f, .78f, .72f);
+            }
+        }
+
+        private static Color NodeColor(DevelopmentRoute route)
+        {
+            switch (route)
+            {
+                case DevelopmentRoute.Technology:
+                    return new Color(.12f, .27f, .35f, 1f);
+                case DevelopmentRoute.Cultivation:
+                    return new Color(.13f, .3f, .23f, 1f);
+                case DevelopmentRoute.BiologicalAscension:
+                    return new Color(.34f, .18f, .18f, 1f);
+                case DevelopmentRoute.Psionics:
+                    return new Color(.27f, .2f, .38f, 1f);
+                case DevelopmentRoute.Bridge:
+                    return new Color(.34f, .29f, .16f, 1f);
+                default:
+                    return ButtonColor;
             }
         }
 
@@ -1203,6 +1304,24 @@ namespace WasteCity.Graybox3D.Building
             return prerequisite + "\n" + child;
         }
 
+        private JunctionRow CreateSharedRow(
+            GameObject gameObject,
+            string prerequisiteResearchId)
+        {
+            var dependents = new List<string>();
+            for (var index = 0; index < projection.Edges.Count; index++)
+                if (string.Equals(
+                        projection.Edges[index].PrerequisiteResearchId,
+                        prerequisiteResearchId,
+                        StringComparison.Ordinal))
+                    dependents.Add(
+                        projection.Edges[index].DependentResearchId);
+            return new JunctionRow(
+                gameObject,
+                prerequisiteResearchId,
+                dependents.ToArray());
+        }
+
         private static void DestroyGenerated(GameObject gameObject)
         {
             if (gameObject == null) return;
@@ -1250,6 +1369,23 @@ namespace WasteCity.Graybox3D.Building
             public GameObject GameObject { get; }
             public string PrerequisiteResearchId { get; }
             public string DependentResearchId { get; }
+        }
+
+        private sealed class JunctionRow
+        {
+            public JunctionRow(
+                GameObject gameObject,
+                string prerequisiteResearchId,
+                string[] dependentResearchIds)
+            {
+                GameObject = gameObject;
+                PrerequisiteResearchId = prerequisiteResearchId;
+                DependentResearchIds = dependentResearchIds ??
+                    Array.Empty<string>();
+            }
+            public GameObject GameObject { get; }
+            public string PrerequisiteResearchId { get; }
+            public string[] DependentResearchIds { get; }
         }
 
         private readonly struct ResourceIconSlot

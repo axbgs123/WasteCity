@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`47d2a57a61d75ef765d3d08b943b79cdb471a4c2f8468d673018a03383873bd5`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`d80d611394040787350205c8afa41c90b8c52a71344dbb8671cbcdd0ff0ea2fd`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -69,6 +69,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperModifierBootstrap3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDeveloperProgressionFacade3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxElixirUseCommand3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperationsController3D.cs`
@@ -305,6 +306,7 @@
 - `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`
 - `Assets/_Game/Scripts/Progression/PocketUniverseFateEffect.cs`
+- `Assets/_Game/Scripts/Research/CivilizationResearchAvailability.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`
 - `Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`

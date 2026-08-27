@@ -84,6 +84,74 @@ namespace WasteCity.Tests
             Assert.That(model.Active, Is.Null);
         }
 
+        [TestCase("core.research.alloy-armor", "core.research.precision-assembly")]
+        [TestCase("core.research.sword-riding", "core.research.sword-array")]
+        public void IDEA0021_CivilizationLevelTwoUnlocksApprovedResearchOnly(
+            string researchId,
+            string prerequisiteId)
+        {
+            var level = 1;
+            var model = new ResearchModel();
+            var runtime = new FormalResearchRuntime(
+                model, null, () => level);
+            model.GrantCompletedForDevelopment(
+                ResearchCatalog.Find(prerequisiteId));
+            ResearchDefinition definition = ResearchCatalog.Find(researchId);
+            var inventory = new ResourceInventory(100);
+            foreach (ResourceAmount cost in definition.Costs)
+                inventory.Add(cost.ResourceId, cost.Amount);
+
+            Assert.That(runtime.IsAvailable(researchId), Is.False);
+            Assert.That(runtime.TryStart(
+                researchId, inventory, true), Is.False);
+            foreach (ResourceAmount cost in definition.Costs)
+                Assert.That(inventory.Get(cost.ResourceId),
+                    Is.EqualTo(cost.Amount));
+
+            level = 2;
+            Assert.That(runtime.IsAvailable(researchId), Is.True);
+            Assert.That(runtime.TryStart(
+                researchId, inventory, true), Is.True);
+            foreach (ResourceAmount cost in definition.Costs)
+                Assert.That(inventory.Get(cost.ResourceId), Is.Zero);
+            Assert.That(runtime.Tick(
+                60f, CityMode.Fortress, false, true), Is.True);
+            Assert.That(runtime.IsCompleted(researchId), Is.True);
+        }
+
+        [Test]
+        public void IDEA0021_PersistenceResolverPreparesLevelTwoActiveBeforeOwnerRestore()
+        {
+            var sourceLevel = 2;
+            var sourceModel = new ResearchModel();
+            var source = new FormalResearchRuntime(
+                sourceModel, null, () => sourceLevel);
+            sourceModel.GrantCompletedForDevelopment(ResearchCatalog.Find(
+                "core.research.precision-assembly"));
+            ResearchDefinition alloy = ResearchCatalog.Find(
+                "core.research.alloy-armor");
+            var inventory = new ResourceInventory(100);
+            foreach (ResourceAmount cost in alloy.Costs)
+                inventory.Add(cost.ResourceId, cost.Amount);
+            Assert.That(source.TryStart(alloy.Id.Value, inventory, true),
+                Is.True);
+            ResearchPersistenceSnapshot saved = source.CaptureForPersistence();
+
+            var targetLevel = 1;
+            var target = new FormalResearchRuntime(
+                new ResearchModel(), null, () => targetLevel);
+            Assert.That(target.TryPrepareRestoreForPersistence(
+                saved.CompletedResearchIds,
+                saved.ActiveResearchId,
+                saved.RemainingSeconds,
+                out ResearchRestorePlan plan,
+                out string error), Is.True, error);
+            Assert.That(target.TryCommitRestoreForPersistence(plan, out error),
+                Is.True, error);
+            Assert.That(target.Model.Active.Id.Value,
+                Is.EqualTo(alloy.Id.Value));
+        }
+
         [Test]
         public void ResearchableNodeWithTwoPrerequisitesRequiresBothBeforeSpending()
         {

@@ -127,7 +127,11 @@ namespace WasteCity.Tests
             Assert.That(building.State,
                 Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
             Assert.That(operations.IsAnyPanelOpen, Is.False);
-            Assert.That(city.transform.position, Is.EqualTo(cityBefore));
+            Assert.That(
+                Vector3.Distance(city.transform.position, cityBefore),
+                Is.LessThan(.0001f),
+                "Fate modal must block meaningful city movement; ignore only " +
+                "sub-pixel floating-point transform noise.");
 
             yield return TapKey(Key.Escape);
             Assert.That(menu.IsOpen, Is.True,

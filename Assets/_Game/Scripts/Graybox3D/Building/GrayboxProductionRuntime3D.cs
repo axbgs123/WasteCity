@@ -107,6 +107,8 @@ namespace WasteCity.Graybox3D.Building
                     }
                     defaultRecipe = entry.Value[index];
                 }
+                if (defaultRecipe == null && entry.Value.Count == 1)
+                    defaultRecipe = entry.Value[0];
                 if (defaultRecipe == null)
                 {
                     throw new InvalidOperationException(

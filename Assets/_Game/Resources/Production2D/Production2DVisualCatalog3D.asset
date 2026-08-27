@@ -338,6 +338,26 @@ MonoBehaviour:
     variant: default
     sprite: {fileID: 21300000, guid: 9a5cb7e4826bf4250b816a233994df97, type: 3}
   - visualClass: 2
+    contentId: bridge.building.bio-hangar
+    variant: default
+    sprite: {fileID: 21300000, guid: 59e5f461c792841f4b9a19f5b70f7946, type: 3}
+  - visualClass: 2
+    contentId: bridge.building.emp-tower
+    variant: default
+    sprite: {fileID: 21300000, guid: c00168d5352414e29a5875f838261057, type: 3}
+  - visualClass: 2
+    contentId: bridge.building.high-frequency-sword-forge
+    variant: default
+    sprite: {fileID: 21300000, guid: dff8e69965bf146bea318bb584347f34, type: 3}
+  - visualClass: 2
+    contentId: bridge.building.psionic-mech-factory
+    variant: default
+    sprite: {fileID: 21300000, guid: a4aaca5682b8d4cf9ba01203b9fd1fd5, type: 3}
+  - visualClass: 2
+    contentId: bridge.building.spirit-plant-garden
+    variant: default
+    sprite: {fileID: 21300000, guid: 22f8fb46bf866489d96407188d5bf584, type: 3}
+  - visualClass: 2
     contentId: core.building.assembler
     variant: default
     sprite: {fileID: 21300000, guid: 2c22f43e37f0746248e781f56a5dfc14, type: 3}
@@ -569,16 +589,31 @@ MonoBehaviour:
     usesBoundResourceVisual: 0
     badgeRule: 0
     primaryOutputSprite: {fileID: 21300000, guid: 73aa3721731e346e6b622a6883dd19b1, type: 3}
+  - recipeId: fusion.production.bio-hangar-weapons
+    primaryOutputContentId: biological.resource.weapon
+    usesBoundResourceVisual: 0
+    badgeRule: 0
+    primaryOutputSprite: {fileID: 21300000, guid: ee12c1a704e1c422fa0699d15f5af0e0, type: 3}
   - recipeId: fusion.production.flesh-elixir
     primaryOutputContentId: cultivation.resource.elixir
     usesBoundResourceVisual: 0
     badgeRule: 0
     primaryOutputSprite: {fileID: 21300000, guid: 1be435102cbc64411a439138b7678426, type: 3}
+  - recipeId: fusion.production.high-frequency-flying-sword
+    primaryOutputContentId: cultivation.resource.flying-sword
+    usesBoundResourceVisual: 0
+    badgeRule: 0
+    primaryOutputSprite: {fileID: 21300000, guid: d8b122e5ab90a4c8a9124418ff8635d4, type: 3}
   - recipeId: fusion.production.hybrid-core
     primaryOutputContentId: fusion.resource.hybrid-core
     usesBoundResourceVisual: 0
     badgeRule: 0
     primaryOutputSprite: {fileID: 21300000, guid: 70ebf85ce802b4ac88640212289de521, type: 3}
+  - recipeId: fusion.production.psionic-mech-components
+    primaryOutputContentId: technology.resource.control-chip
+    usesBoundResourceVisual: 0
+    badgeRule: 0
+    primaryOutputSprite: {fileID: 21300000, guid: 528a21f8d6a4646cc941f076e9c82266, type: 3}
   - recipeId: fusion.production.spirit-plant-extract
     primaryOutputContentId: fusion.resource.spirit-plant-extract
     usesBoundResourceVisual: 0

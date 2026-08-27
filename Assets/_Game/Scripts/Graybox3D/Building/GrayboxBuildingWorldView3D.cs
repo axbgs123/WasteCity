@@ -49,6 +49,8 @@ namespace WasteCity.Graybox3D.Building
             public GrayboxVisualSlot SingleSlot;
             public GrayboxBuildingInstance3D Instance;
             public GrayboxBuildingInstanceState State;
+            public SpriteRenderer IconRenderer;
+            public string BuildingDefinitionId;
         }
 
         private readonly struct BuildingVisualDimensions
@@ -119,7 +121,20 @@ namespace WasteCity.Graybox3D.Building
             nodeHighlights.Count +
             anchorHighlights.Count +
             (preview == null ? 0 : 1);
-        public int InstanceRendererCount => instances.Count;
+        public int InstanceVisualCount => instances.Count;
+        public int InstanceRendererCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (Visual visual in instances.Values)
+                {
+                    if (visual.Renderer != null) count++;
+                    if (visual.IconRenderer != null) count++;
+                }
+                return count;
+            }
+        }
         public bool IsBuildGridVisible => buildGridVisible;
         public int ActiveMiningNodeHighlightCount =>
             ActiveVisualCount(nodeHighlights);
@@ -242,6 +257,7 @@ namespace WasteCity.Graybox3D.Building
             visual.Instance = instance;
             visual.State = instance.State;
             ConfigureInstanceSlots(visual, instance);
+            ConfigureInstanceIcon(visual, instance);
             ApplyInstanceTransform(visual);
             ConfigureCollider(visual);
             instances.Add(instance.StableInstanceId, visual);
@@ -257,11 +273,16 @@ namespace WasteCity.Graybox3D.Building
                     out Visual visual))
                 return;
 
-            if (visual.State != instance.State)
+            string definitionId = instance.Placement.Definition.Id.Value;
+            if (visual.State != instance.State || !string.Equals(
+                    visual.BuildingDefinitionId,
+                    definitionId,
+                    StringComparison.Ordinal))
             {
                 ReplaceMesh(visual, CreateInstanceMesh(instance));
                 visual.State = instance.State;
                 ConfigureInstanceSlots(visual, instance);
+                ConfigureInstanceIcon(visual, instance);
                 ConfigureCollider(visual);
             }
             ApplyInstanceTransform(visual);
@@ -517,10 +538,17 @@ namespace WasteCity.Graybox3D.Building
         private void LateUpdate()
         {
             AlignCityVisuals();
+            Camera mainCamera = Camera.main;
             foreach (Visual visual in instances.Values)
+            {
                 if (visual.Instance.Placement.Site ==
                     BuildingSite.InnerCity)
                     ApplyInstanceTransform(visual);
+                if (mainCamera != null && visual.IconRenderer != null &&
+                    visual.IconRenderer.enabled)
+                    visual.IconRenderer.transform.rotation =
+                        mainCamera.transform.rotation;
+            }
         }
 
         private void Awake()
@@ -710,6 +738,46 @@ namespace WasteCity.Graybox3D.Building
                         ConstructionColor);
                     break;
             }
+        }
+
+        private void ConfigureInstanceIcon(
+            Visual visual,
+            GrayboxBuildingInstance3D instance)
+        {
+            if (visual.IconRenderer == null)
+            {
+                var iconObject = new GameObject(
+                    "BuildingIcon",
+                    typeof(SpriteRenderer));
+                iconObject.transform.SetParent(visual.Root.transform, false);
+                visual.IconRenderer =
+                    iconObject.GetComponent<SpriteRenderer>();
+                visual.IconRenderer.sortingOrder = 40;
+            }
+            BuildingDefinition definition = instance.Placement.Definition;
+            BuildingVisualDimensions dimensions = ResolveDimensions(
+                definition,
+                instance.Placement.Site);
+            Sprite sprite = BuildingIconCatalog3D.Resolve(
+                definition.Id.Value);
+            visual.IconRenderer.sprite = sprite;
+            visual.IconRenderer.enabled =
+                instance.State == GrayboxBuildingInstanceState.Completed &&
+                sprite != null;
+            visual.BuildingDefinitionId = definition.Id.Value;
+            Transform icon = visual.IconRenderer.transform;
+            icon.localPosition = new Vector3(
+                0f,
+                dimensions.VisualHeight * .5f + dimensions.CellSize * .08f,
+                0f);
+            float spriteWidth = sprite == null
+                ? 1f
+                : Mathf.Max(.001f, sprite.bounds.size.x);
+            float targetSize = Mathf.Clamp(
+                Mathf.Max(dimensions.XSize, dimensions.ZSize) * .78f,
+                dimensions.CellSize * .7f,
+                dimensions.CellSize * 2.4f);
+            icon.localScale = Vector3.one * (targetSize / spriteWidth);
         }
 
         private void AddSlot(

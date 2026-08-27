@@ -59,7 +59,7 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxBuildingCatalogPresenter3D
     {
-        public const int BuildMenuCount = 28;
+        public const int BuildMenuCount = 33;
 
         private static readonly IReadOnlyList<string> NoLockReasons =
             new ReadOnlyCollection<string>(Array.Empty<string>());
@@ -94,7 +94,12 @@ namespace WasteCity.Graybox3D.Building
                 { "psionics.building.workshop", BuildingMenuCategory.Route },
                 { "psionics.building.mind-spire", BuildingMenuCategory.Route },
                 { "psionics.building.consciousness-network", BuildingMenuCategory.Route },
-                { "psionics.building.shield-generator", BuildingMenuCategory.Route }
+                { "psionics.building.shield-generator", BuildingMenuCategory.Route },
+                { "bridge.building.psionic-mech-factory", BuildingMenuCategory.Route },
+                { "bridge.building.high-frequency-sword-forge", BuildingMenuCategory.Route },
+                { "bridge.building.bio-hangar", BuildingMenuCategory.Route },
+                { "bridge.building.spirit-plant-garden", BuildingMenuCategory.Route },
+                { "bridge.building.emp-tower", BuildingMenuCategory.Defense }
             };
 
         private static readonly Dictionary<string, BuildingDefinition>

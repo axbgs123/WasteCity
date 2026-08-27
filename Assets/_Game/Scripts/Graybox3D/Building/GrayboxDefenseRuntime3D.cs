@@ -1417,6 +1417,18 @@ namespace WasteCity.Graybox3D.Building
             persistenceGeneration++;
         }
 
+        public void ApplyElixirCoreHealth(
+            int healing,
+            int backlashDamage)
+        {
+            SingleCityDefenseCampaignModel owner = ActiveCampaign;
+            if (owner == null) return;
+            owner.ApplyElixirCoreHealth(healing, backlashDamage);
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            persistenceGeneration++;
+        }
+
         public void Synchronize(
             IReadOnlyList<GrayboxBuildingInstance3D> instances,
             CityMode cityMode,
@@ -1430,7 +1442,9 @@ namespace WasteCity.Graybox3D.Building
                 cityX,
                 cityY,
                 groundRadius,
-                allowCampaignStart: true);
+                allowCampaignStart: true,
+                swordRidingCompleted: false,
+                alloyArmorCompleted: false);
         }
 
         public void Synchronize(
@@ -1439,7 +1453,9 @@ namespace WasteCity.Graybox3D.Building
             int cityX,
             int cityY,
             int groundRadius,
-            bool allowCampaignStart = true)
+            bool allowCampaignStart = true,
+            bool swordRidingCompleted = false,
+            bool alloyArmorCompleted = false)
         {
             if (campaign != null)
             {
@@ -1449,7 +1465,9 @@ namespace WasteCity.Graybox3D.Building
                     cityX,
                     cityY,
                     groundRadius,
-                    allowCampaignStart);
+                    allowCampaignStart,
+                    swordRidingCompleted,
+                    alloyArmorCompleted);
                 return;
             }
 
@@ -1753,7 +1771,9 @@ namespace WasteCity.Graybox3D.Building
             int cityX,
             int cityY,
             int groundRadius,
-            bool allowCampaignStart)
+            bool allowCampaignStart,
+            bool swordRidingCompleted,
+            bool alloyArmorCompleted)
         {
             persistenceGeneration++;
             bool snapshotChanged = false;
@@ -1764,7 +1784,9 @@ namespace WasteCity.Graybox3D.Building
 
             if (instances != null)
             {
-                campaignBuildingHealth.Synchronize(instances);
+                campaignBuildingHealth.Synchronize(
+                    instances,
+                    alloyArmorCompleted);
                 for (var index = 0; index < instances.Count; index++)
                 {
                     if (instances[index] != null)
@@ -1787,19 +1809,41 @@ namespace WasteCity.Graybox3D.Building
                     continue;
                 }
 
+                string currentBuildingId =
+                    instance.Placement.Definition.Id.Value;
+                float rangeMultiplier = WasteCity.Research
+                    .RouteTechnologyEffects.TowerRangeMultiplier(
+                        currentBuildingId,
+                        swordRidingCompleted);
                 if (!campaignTowerById.TryGetValue(
                         instance.StableInstanceId,
                         out SingleCityDefenseTowerCombatModel tower))
                 {
                     tower = new SingleCityDefenseTowerCombatModel(
                         instance.StableInstanceId,
-                        instance.Placement.Definition.Id.Value,
+                        currentBuildingId,
                         instance.Placement.X,
                         instance.Placement.Y);
+                    tower.SetRangeMultiplier(rangeMultiplier);
                     campaignTowerById.Add(instance.StableInstanceId, tower);
                     campaignStatusById[instance.StableInstanceId] =
                         GrayboxDefenseTowerStatus3D.NoTarget;
                     snapshotChanged = true;
+                }
+                else if (!string.Equals(
+                             tower.BuildingId,
+                             currentBuildingId,
+                             StringComparison.Ordinal))
+                {
+                    tower = tower.RebuildForBuilding(
+                        currentBuildingId,
+                        rangeMultiplier);
+                    campaignTowerById[instance.StableInstanceId] = tower;
+                    snapshotChanged = true;
+                }
+                else
+                {
+                    tower.SetRangeMultiplier(rangeMultiplier);
                 }
 
                 bool canRun =
@@ -2767,6 +2811,18 @@ namespace WasteCity.Graybox3D.Building
                    string.Equals(
                        buildingId,
                        BuildingCatalog.SporeTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.HeavyMachineGunTurret.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.SwordArrayTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.SwordRidingPlatform.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.EmpTower.Id.Value,
                        StringComparison.Ordinal);
         }
 
