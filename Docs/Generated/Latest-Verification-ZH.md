@@ -2,19 +2,19 @@
 
 这是已记录的既有验证证据，不是本次运行自动推断的结果。
 
-- 已验证提交：`4ac10b4866ccea51426f3335571e9b0d6ec75ec2`
-- 记录时间：`2026-08-27T12:56:00+08:00`
+- 已验证提交：`8501e7d9ed03cf0137c979ead0763f6e5222eec7`
+- 记录时间：`2026-08-27T17:06:00Z`
 
 ## 1. 自动测试
-- EditMode：2803/2803 通过，失败 0，跳过 0，证据：`/tmp/wastecity-idea0020/final/full/editmode-v2.xml`
-- PlayMode：96/96 通过，失败 0，跳过 0，证据：`/tmp/wastecity-idea0020/final/full/playmode.xml`
+- EditMode：2829/2829 通过，失败 0，跳过 0，证据：`/tmp/wastecity-idea0021/final/editmode-final.xml`
+- PlayMode：99/99 通过，失败 0，跳过 0，证据：`/tmp/wastecity-idea0021/final/playmode-v2.xml`
 
 ## 2. 编译与正式构建
-- 无界面编译：通过，证据：`/tmp/wastecity-idea0020/final/compile-summary.log`
+- 无界面编译：通过，证据：`/tmp/wastecity-idea0021/final/compile-summary.log`
 - 正式构建：3 项，均通过。
-  - 通过：`/tmp/wastecity-idea0020/final/builds/windows-release.log`
-  - 通过：`/tmp/wastecity-idea0020/final/builds/windows-development.log`
-  - 通过：`/tmp/wastecity-idea0020/final/builds/macos-universal.log`
+  - 通过：`/tmp/wastecity-idea0021/final/build-windows-release.log`
+  - 通过：`/tmp/wastecity-idea0021/final/build-windows-development.log`
+  - 通过：`/tmp/wastecity-idea0021/final/build-macos.log`
 
 ## 3. 人工试玩
 - 状态：等待用户复验
