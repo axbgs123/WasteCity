@@ -37,7 +37,6 @@ namespace WasteCity.Graybox3D.Building
             FormalThreeDCivilizationExpansionSaveData source,
             out string error)
         {
-            error = string.Empty;
             if (source == null || !string.Equals(
                     source.configurationSignature,
                     FormalThreeDCivilizationExpansionSaveData
@@ -47,7 +46,40 @@ namespace WasteCity.Graybox3D.Building
                 error = "文明扩展存档配置签名无效";
                 return false;
             }
+            if (source.armyLeader?.leader == null ||
+                source.charactersPolitics == null ||
+                !string.Equals(
+                    source.armyLeader.leader.characterId,
+                    source.charactersPolitics.currentLeaderId,
+                    StringComparison.Ordinal))
+            {
+                error = "军队领袖投影与政治当前领袖不一致";
+                return false;
+            }
             CivilizationExpansionRuntime runtime = RequireRuntime();
+            FormalThreeDCivilizationExpansionSaveData rollback = Capture();
+            if (TryRestoreCore(runtime, source, out error))
+            {
+                controller.Refresh(force: true);
+                return true;
+            }
+            string applyError = error;
+            if (!TryRestoreCore(runtime, rollback, out string rollbackError))
+            {
+                error = applyError + "；文明扩展域内回滚失败：" +
+                    rollbackError;
+                return false;
+            }
+            error = applyError;
+            controller.Refresh(force: true);
+            return false;
+        }
+
+        private static bool TryRestoreCore(
+            CivilizationExpansionRuntime runtime,
+            FormalThreeDCivilizationExpansionSaveData source,
+            out string error)
+        {
             if (!TryRestoreArmy(runtime, source.armyLeader, out error) ||
                 !TryRestoreWorld(runtime, source.worldLayer, out error) ||
                 !TryRestorePolitics(
@@ -57,7 +89,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 return false;
             }
-            controller.Refresh(force: true);
+            error = string.Empty;
             return true;
         }
 
@@ -128,6 +160,8 @@ namespace WasteCity.Graybox3D.Building
                 controlledLosses = command.ControlledLosses,
                 unitIds = UnitIds(army.Units),
             };
+            CharacterLifeRuntime currentLeader = runtime.FindCharacter(
+                runtime.Politics.CurrentLeaderId);
             return new FormalThreeDArmyLeaderSaveData
             {
                 nextUnitOrdinal = (ulong)army.NextUnitOrdinal,
@@ -140,6 +174,16 @@ namespace WasteCity.Graybox3D.Building
                 losses = losses,
                 squads = new[] { squad },
                 expedition = CaptureExpedition(runtime.Expedition),
+                leader = new FormalThreeDLeaderSaveData
+                {
+                    characterId = runtime.Politics.CurrentLeaderId,
+                    recruited = currentLeader != null &&
+                        currentLeader.State != CharacterLifeState.Dead,
+                    injured = currentLeader != null &&
+                        currentLeader.State != CharacterLifeState.Active,
+                    x = currentLeader?.X ?? 0,
+                    y = currentLeader?.Y ?? 0,
+                },
             };
         }
 
@@ -289,6 +333,8 @@ namespace WasteCity.Graybox3D.Building
                     downedElapsedSeconds = item.DownedElapsedSeconds,
                     downCount = item.DownCount,
                     downedCauseId = item.DownedCauseId,
+                    damageRevision = item.DamageRevision,
+                    lastDamageRuleTick = ulong.MaxValue,
                     equipmentIds = Copy(item.EquipmentIds),
                     rescue = ToSaveRescue(item),
                 };
@@ -351,6 +397,7 @@ namespace WasteCity.Graybox3D.Building
             }
             return new FormalThreeDCharactersPoliticsSaveData
             {
+                revision = 0ul,
                 nextOfferOrdinal = diplomacy.NextOfferOrdinal,
                 diplomacySessionId = diplomacy.SessionId,
                 convoyInterceptionImmunityCharges =
@@ -437,8 +484,8 @@ namespace WasteCity.Graybox3D.Building
                 manufacturing,
                 units,
                 command,
-                source.leaderAssigned || squad.leaderAssigned,
-                source.leaderHealthy || squad.leaderHealthy,
+                source.leaderAssigned,
+                source.leaderHealthy,
                 losses);
             if (!runtime.Army.TryPrepareRestoreForPersistence(
                     snapshot,
@@ -676,6 +723,7 @@ namespace WasteCity.Graybox3D.Building
                     return false;
                 runtime.ReplaceDiplomacyForRestore(diplomacy);
             }
+            runtime.RestoreRuleTick(0ul);
             error = string.Empty;
             return true;
         }
@@ -719,7 +767,8 @@ namespace WasteCity.Graybox3D.Building
                         (CharacterRescueMethod)source.rescue.method,
                         source.rescue.sourceId,
                         source.rescue.remainingSeconds,
-                        source.rescue.reservedBiomass),
+                        source.rescue.reservedBiomass,
+                        source.rescue.sourceDamageRevision),
                 source.permanentInjuryIds ?? Array.Empty<string>(),
                 source.equipmentIds ?? Array.Empty<string>(),
                 corpse == null
@@ -730,7 +779,9 @@ namespace WasteCity.Graybox3D.Building
                         corpse.x,
                         corpse.y,
                         corpse.equipmentIds,
-                        corpse.recovered));
+                        corpse.recovered),
+                source.damageRevision,
+                source.lastDamageRuleTick);
         }
 
         private static FormalThreeDRescueSaveData ToSaveRescue(
@@ -747,6 +798,8 @@ namespace WasteCity.Graybox3D.Building
                     progressSeconds = source.Rescue.RemainingSeconds,
                     remainingSeconds = source.Rescue.RemainingSeconds,
                     reservedBiomass = source.Rescue.ReservedBiomass,
+                    sourceDamageRevision =
+                        source.Rescue.SourceDamageRevision,
                 };
         }
 

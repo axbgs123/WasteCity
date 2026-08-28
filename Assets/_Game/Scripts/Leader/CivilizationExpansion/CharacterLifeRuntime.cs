@@ -36,6 +36,114 @@ namespace WasteCity.Leader.CivilizationExpansion
         Died,
     }
 
+    public enum CharacterRescueValidityCode
+    {
+        Valid,
+        TargetNotDowned,
+        SourceMissing,
+        SourceIsTarget,
+        SourceNotActive,
+        SourceDamagedThisTick,
+        SourceOutOfRange,
+        CityMissing,
+        CityOutOfRange,
+    }
+
+    public sealed class CharacterRescueValidity
+    {
+        internal CharacterRescueValidity(
+            CharacterRescueValidityCode code,
+            float distance)
+        {
+            Code = code;
+            Distance = distance;
+        }
+
+        public CharacterRescueValidityCode Code { get; }
+        public bool IsValid => Code == CharacterRescueValidityCode.Valid;
+        public float Distance { get; }
+    }
+
+    public static class CharacterRescueRules
+    {
+        public const float CharacterContactMaximumDistance = 1.5f;
+        public const float CityMedicalMaximumDistance = 3f;
+
+        public static CharacterRescueValidity EvaluateCharacterContact(
+            CharacterLifeRuntime target,
+            CharacterLifeRuntime source,
+            ulong ruleTick)
+        {
+            if (target == null || target.State != CharacterLifeState.Downed)
+            {
+                return Invalid(CharacterRescueValidityCode.TargetNotDowned);
+            }
+            if (source == null)
+                return Invalid(CharacterRescueValidityCode.SourceMissing);
+            if (ReferenceEquals(target, source) || string.Equals(
+                    target.Definition.Id.Value,
+                    source.Definition.Id.Value,
+                    StringComparison.Ordinal))
+            {
+                return Invalid(CharacterRescueValidityCode.SourceIsTarget);
+            }
+            if (source.State != CharacterLifeState.Active)
+                return Invalid(CharacterRescueValidityCode.SourceNotActive);
+            if (source.WasDamagedAtRuleTick(ruleTick))
+            {
+                return Invalid(
+                    CharacterRescueValidityCode.SourceDamagedThisTick);
+            }
+            float distance = Distance(target.X, target.Y, source.X, source.Y);
+            return distance <= CharacterContactMaximumDistance
+                ? new CharacterRescueValidity(
+                    CharacterRescueValidityCode.Valid,
+                    distance)
+                : new CharacterRescueValidity(
+                    CharacterRescueValidityCode.SourceOutOfRange,
+                    distance);
+        }
+
+        public static CharacterRescueValidity EvaluateCityMedical(
+            CharacterLifeRuntime target,
+            string settlementId,
+            int settlementX,
+            int settlementY)
+        {
+            if (target == null || target.State != CharacterLifeState.Downed)
+            {
+                return Invalid(CharacterRescueValidityCode.TargetNotDowned);
+            }
+            if (string.IsNullOrWhiteSpace(settlementId))
+                return Invalid(CharacterRescueValidityCode.CityMissing);
+            float distance = Distance(
+                target.X,
+                target.Y,
+                settlementX,
+                settlementY);
+            return distance <= CityMedicalMaximumDistance
+                ? new CharacterRescueValidity(
+                    CharacterRescueValidityCode.Valid,
+                    distance)
+                : new CharacterRescueValidity(
+                    CharacterRescueValidityCode.CityOutOfRange,
+                    distance);
+        }
+
+        private static CharacterRescueValidity Invalid(
+            CharacterRescueValidityCode code)
+        {
+            return new CharacterRescueValidity(code, float.PositiveInfinity);
+        }
+
+        private static float Distance(int ax, int ay, int bx, int by)
+        {
+            double dx = ax - bx;
+            double dy = ay - by;
+            return (float)Math.Sqrt(dx * dx + dy * dy);
+        }
+    }
+
     public sealed class CharacterLifeTickResult
     {
         private CharacterLifeTickResult(
@@ -135,17 +243,29 @@ namespace WasteCity.Leader.CivilizationExpansion
             string sourceId,
             float remainingSeconds,
             int reservedBiomass)
+            : this(method, sourceId, remainingSeconds, reservedBiomass, 0ul)
+        {
+        }
+
+        public CharacterRescueSnapshot(
+            CharacterRescueMethod method,
+            string sourceId,
+            float remainingSeconds,
+            int reservedBiomass,
+            ulong sourceDamageRevision)
         {
             Method = method;
             SourceId = sourceId;
             RemainingSeconds = remainingSeconds;
             ReservedBiomass = reservedBiomass;
+            SourceDamageRevision = sourceDamageRevision;
         }
 
         public CharacterRescueMethod Method { get; }
         public string SourceId { get; }
         public float RemainingSeconds { get; }
         public int ReservedBiomass { get; }
+        public ulong SourceDamageRevision { get; }
     }
 
     public sealed class CharacterCorpseSnapshot
@@ -207,6 +327,47 @@ namespace WasteCity.Leader.CivilizationExpansion
             IReadOnlyList<string> permanentInjuryIds,
             IReadOnlyList<string> equipmentIds,
             CharacterCorpseSnapshot corpse)
+            : this(
+                characterId,
+                state,
+                currentHealth,
+                loyalty,
+                assignedSettlementId,
+                x,
+                y,
+                downedRemainingSeconds,
+                recoveryRemainingSeconds,
+                downedElapsedSeconds,
+                downCount,
+                downedCauseId,
+                rescue,
+                permanentInjuryIds,
+                equipmentIds,
+                corpse,
+                0ul,
+                ulong.MaxValue)
+        {
+        }
+
+        public CharacterLifeSnapshot(
+            string characterId,
+            CharacterLifeState state,
+            int currentHealth,
+            int loyalty,
+            string assignedSettlementId,
+            int x,
+            int y,
+            float downedRemainingSeconds,
+            float recoveryRemainingSeconds,
+            float downedElapsedSeconds,
+            int downCount,
+            string downedCauseId,
+            CharacterRescueSnapshot rescue,
+            IReadOnlyList<string> permanentInjuryIds,
+            IReadOnlyList<string> equipmentIds,
+            CharacterCorpseSnapshot corpse,
+            ulong damageRevision,
+            ulong lastDamageRuleTick)
         {
             CharacterId = characterId;
             State = state;
@@ -224,6 +385,8 @@ namespace WasteCity.Leader.CivilizationExpansion
             this.permanentInjuryIds = Copy(permanentInjuryIds);
             this.equipmentIds = Copy(equipmentIds);
             Corpse = corpse;
+            DamageRevision = damageRevision;
+            LastDamageRuleTick = lastDamageRuleTick;
         }
 
         public string CharacterId { get; }
@@ -242,6 +405,8 @@ namespace WasteCity.Leader.CivilizationExpansion
         public IReadOnlyList<string> PermanentInjuryIds => permanentInjuryIds;
         public IReadOnlyList<string> EquipmentIds => equipmentIds;
         public CharacterCorpseSnapshot Corpse { get; }
+        public ulong DamageRevision { get; }
+        public ulong LastDamageRuleTick { get; }
 
         private static ReadOnlyCollection<string> Copy(
             IReadOnlyList<string> source)
@@ -269,8 +434,11 @@ namespace WasteCity.Leader.CivilizationExpansion
         private CharacterRescueMethod rescueMethod;
         private string rescueSourceId = string.Empty;
         private int reservedBiomass;
+        private ulong rescueSourceDamageRevision;
         private float downedElapsedSeconds;
         private int downCount;
+        private ulong damageRevision;
+        private ulong lastDamageRuleTick = ulong.MaxValue;
 
         public CharacterLifeRuntime(CharacterDefinition definition)
         {
@@ -300,6 +468,8 @@ namespace WasteCity.Leader.CivilizationExpansion
             new ReadOnlyCollection<string>(permanentInjuryIds);
         public CharacterCorpseRecord Corpse { get; private set; }
         public string DownedCauseId { get; private set; } = string.Empty;
+        public ulong DamageRevision => damageRevision;
+        public ulong LastDamageRuleTick => lastDamageRuleTick;
 
         public void SetPosition(string settlementId, int x, int y)
         {
@@ -324,11 +494,44 @@ namespace WasteCity.Leader.CivilizationExpansion
             string causeId,
             out bool enteredDowned)
         {
+            return TryApplyDamageCore(
+                rawDamage,
+                causeId,
+                ulong.MaxValue,
+                out enteredDowned);
+        }
+
+        public bool TryApplyDamageAtRuleTick(
+            int rawDamage,
+            string causeId,
+            ulong ruleTick,
+            out bool enteredDowned)
+        {
+            return TryApplyDamageCore(
+                rawDamage,
+                causeId,
+                ruleTick,
+                out enteredDowned);
+        }
+
+        public bool WasDamagedAtRuleTick(ulong ruleTick)
+        {
+            return ruleTick != ulong.MaxValue && lastDamageRuleTick == ruleTick;
+        }
+
+        private bool TryApplyDamageCore(
+            int rawDamage,
+            string causeId,
+            ulong ruleTick,
+            out bool enteredDowned)
+        {
             enteredDowned = false;
             if (State != CharacterLifeState.Active || rawDamage <= 0)
                 return false;
             int applied = Math.Min(CurrentHealth, rawDamage);
             CurrentHealth -= applied;
+            unchecked { damageRevision++; }
+            lastDamageRuleTick = ruleTick;
             if (CurrentHealth > 0) return true;
 
             State = CharacterLifeState.Downed;
@@ -341,6 +544,65 @@ namespace WasteCity.Leader.CivilizationExpansion
             downCount++;
             enteredDowned = true;
             return true;
+        }
+
+        public bool TryBeginCharacterContactRescue(
+            CharacterLifeRuntime source,
+            ulong ruleTick,
+            int availableBiomass,
+            out int biomassToReserve,
+            out string error)
+        {
+            CharacterRescueValidity validity =
+                CharacterRescueRules.EvaluateCharacterContact(
+                    this,
+                    source,
+                    ruleTick);
+            if (!validity.IsValid)
+            {
+                biomassToReserve = 0;
+                error = RescueValidityMessage(validity.Code);
+                return false;
+            }
+            if (!TryBeginRescue(
+                    CharacterRescueMethod.CharacterContact,
+                    source.Definition.Id.Value,
+                    availableBiomass,
+                    out biomassToReserve,
+                    out error))
+            {
+                return false;
+            }
+            rescueSourceDamageRevision = source.DamageRevision;
+            return true;
+        }
+
+        public bool TryBeginCityMedicalRescue(
+            string settlementId,
+            int settlementX,
+            int settlementY,
+            int availableBiomass,
+            out int biomassToReserve,
+            out string error)
+        {
+            CharacterRescueValidity validity =
+                CharacterRescueRules.EvaluateCityMedical(
+                    this,
+                    settlementId,
+                    settlementX,
+                    settlementY);
+            if (!validity.IsValid)
+            {
+                biomassToReserve = 0;
+                error = RescueValidityMessage(validity.Code);
+                return false;
+            }
+            return TryBeginRescue(
+                CharacterRescueMethod.CityMedical,
+                settlementId,
+                availableBiomass,
+                out biomassToReserve,
+                out error);
         }
 
         public bool TryBeginRescue(
@@ -392,6 +654,68 @@ namespace WasteCity.Leader.CivilizationExpansion
             biomassToReserve = RescueBiomassCost;
             error = string.Empty;
             return true;
+        }
+
+        public CharacterLifeTickResult TickFormalRescue(
+            float deltaSeconds,
+            bool paused,
+            CharacterLifeRuntime sourceCharacter,
+            string settlementId,
+            int settlementX,
+            int settlementY,
+            ulong ruleTick)
+        {
+            if (!HasActiveRescue || paused)
+            {
+                return Tick(
+                    deltaSeconds,
+                    paused,
+                    rescueInRange: true,
+                    rescuerWasHit: false);
+            }
+            if (rescueMethod == CharacterRescueMethod.CharacterContact)
+            {
+                bool sourceMatches = sourceCharacter != null && string.Equals(
+                    rescueSourceId,
+                    sourceCharacter.Definition.Id.Value,
+                    StringComparison.Ordinal);
+                bool sourceWasDamaged = sourceMatches &&
+                    (sourceCharacter.DamageRevision !=
+                        rescueSourceDamageRevision ||
+                     sourceCharacter.WasDamagedAtRuleTick(ruleTick));
+                CharacterRescueValidity validity = sourceMatches
+                    ? CharacterRescueRules.EvaluateCharacterContact(
+                        this,
+                        sourceCharacter,
+                        ruleTick)
+                    : new CharacterRescueValidity(
+                        CharacterRescueValidityCode.SourceMissing,
+                        float.PositiveInfinity);
+                return Tick(
+                    deltaSeconds,
+                    false,
+                    rescueInRange: sourceWasDamaged || validity.IsValid,
+                    rescuerWasHit: sourceWasDamaged);
+            }
+
+            bool cityMatches = string.Equals(
+                rescueSourceId,
+                settlementId,
+                StringComparison.Ordinal);
+            CharacterRescueValidity cityValidity = cityMatches
+                ? CharacterRescueRules.EvaluateCityMedical(
+                    this,
+                    settlementId,
+                    settlementX,
+                    settlementY)
+                : new CharacterRescueValidity(
+                    CharacterRescueValidityCode.CityMissing,
+                    float.PositiveInfinity);
+            return Tick(
+                deltaSeconds,
+                false,
+                rescueInRange: cityValidity.IsValid,
+                rescuerWasHit: false);
         }
 
         public CharacterLifeTickResult Tick(
@@ -466,7 +790,8 @@ namespace WasteCity.Leader.CivilizationExpansion
                     rescueMethod,
                     rescueSourceId,
                     RescueRemainingSeconds,
-                    reservedBiomass)
+                    reservedBiomass,
+                    rescueSourceDamageRevision)
                 : null;
             CharacterCorpseSnapshot corpse = Corpse == null
                 ? null
@@ -493,7 +818,9 @@ namespace WasteCity.Leader.CivilizationExpansion
                 rescue,
                 permanentInjuryIds,
                 equipmentIds,
-                corpse);
+                corpse,
+                damageRevision,
+                lastDamageRuleTick);
         }
 
         public bool TryRestore(CharacterLifeSnapshot snapshot, out string error)
@@ -524,12 +851,15 @@ namespace WasteCity.Leader.CivilizationExpansion
             equipmentIds.Clear();
             equipmentIds.AddRange(equipment);
             Corpse = corpse;
+            damageRevision = snapshot.DamageRevision;
+            lastDamageRuleTick = snapshot.LastDamageRuleTick;
             if (snapshot.Rescue == null)
             {
                 rescueMethod = default;
                 rescueSourceId = string.Empty;
                 RescueRemainingSeconds = 0f;
                 reservedBiomass = 0;
+                rescueSourceDamageRevision = 0ul;
             }
             else
             {
@@ -537,6 +867,8 @@ namespace WasteCity.Leader.CivilizationExpansion
                 rescueSourceId = snapshot.Rescue.SourceId;
                 RescueRemainingSeconds = snapshot.Rescue.RemainingSeconds;
                 reservedBiomass = snapshot.Rescue.ReservedBiomass;
+                rescueSourceDamageRevision =
+                    snapshot.Rescue.SourceDamageRevision;
             }
             error = string.Empty;
             return true;
@@ -588,7 +920,28 @@ namespace WasteCity.Leader.CivilizationExpansion
             reservedBiomass = 0;
             rescueSourceId = string.Empty;
             RescueRemainingSeconds = 0f;
+            rescueSourceDamageRevision = 0ul;
             return previous;
+        }
+
+        private static string RescueValidityMessage(
+            CharacterRescueValidityCode code)
+        {
+            switch (code)
+            {
+                case CharacterRescueValidityCode.SourceNotActive:
+                    return "救援角色必须处于可行动状态";
+                case CharacterRescueValidityCode.SourceDamagedThisTick:
+                    return "救援角色本规则 tick 已受击";
+                case CharacterRescueValidityCode.SourceOutOfRange:
+                    return "角色救援距离超过 1.5 格";
+                case CharacterRescueValidityCode.CityOutOfRange:
+                    return "城市医疗距离超过 3 格";
+                case CharacterRescueValidityCode.TargetNotDowned:
+                    return "目标未处于倒地状态";
+                default:
+                    return "救援来源无效";
+            }
         }
 
         private bool TryValidateRestore(

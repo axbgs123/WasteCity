@@ -242,6 +242,12 @@ namespace WasteCity.Graybox3D.Building
                         "文明扩展运行时初始化失败：" + expansionError;
                     return false;
                 }
+                production.ConfigureCivilizationEfficiencySource(
+                    () => expansionController
+                        .CivilizationEfficiencyMultiplier);
+                operations.ConfigureCivilizationResearchEfficiency(
+                    () => expansionController
+                        .ResearchEfficiencyMultiplier);
             }
             operations.ConfigureCivilizationResearch(
                 () => Civilization.Capture().CivilizationLevel,
@@ -933,6 +939,8 @@ namespace WasteCity.Graybox3D.Building
             coordinator?.UnbindCheckpointPolicy();
             checkpointPolicy = null;
             coordinator = null;
+            production?.ConfigureCivilizationEfficiencySource(null);
+            operations?.ConfigureCivilizationResearchEfficiency(null);
             expansionController = null;
             store = null;
             waveRetryStore = null;
@@ -1120,7 +1128,8 @@ namespace WasteCity.Graybox3D.Building
                    operations != null &&
                    production != null &&
                    defense != null &&
-                   evacuation != null;
+                   evacuation != null &&
+                   expansionController != null;
         }
 
         private void BindRuleClock()

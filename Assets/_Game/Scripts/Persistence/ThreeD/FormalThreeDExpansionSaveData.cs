@@ -253,6 +253,8 @@ namespace WasteCity.Persistence.ThreeD
         public float downedElapsedSeconds;
         public int downCount;
         public string downedCauseId;
+        public ulong damageRevision;
+        public ulong lastDamageRuleTick = ulong.MaxValue;
         public string[] equipmentIds = Array.Empty<string>();
         public FormalThreeDRescueSaveData rescue;
     }
@@ -281,6 +283,7 @@ namespace WasteCity.Persistence.ThreeD
         public float progressSeconds;
         public float remainingSeconds;
         public int reservedBiomass;
+        public ulong sourceDamageRevision;
     }
 
     [Serializable]

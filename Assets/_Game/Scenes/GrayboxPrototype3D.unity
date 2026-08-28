@@ -2307,6 +2307,7 @@ MonoBehaviour:
   fateOperationsView: {fileID: 1804086900}
   advancementView: {fileID: 1804086901}
   civilizationExpansionView: {fileID: 1804086902}
+  civilizationExpansionController: {fileID: 46154811}
 --- !u!1 &1545501224
 GameObject:
   m_ObjectHideFlags: 0

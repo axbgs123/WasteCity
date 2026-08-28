@@ -645,7 +645,7 @@ namespace WasteCity.Leader.CivilizationExpansion
             }
             if (snapshot.IsInterimCouncilActive
                     ? current.State != CharacterLifeState.Dead
-                    : current.State != CharacterLifeState.Active)
+                    : current.State == CharacterLifeState.Dead)
             {
                 error = "领袖生命状态与议会状态不一致";
                 return false;

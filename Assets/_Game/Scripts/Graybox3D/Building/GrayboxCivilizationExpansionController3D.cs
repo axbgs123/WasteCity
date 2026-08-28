@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using WasteCity.Building;
 using WasteCity.CivilizationExpansion;
 using WasteCity.City;
@@ -13,6 +14,14 @@ using WasteCity.World.CivilizationExpansion;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public enum GrayboxCivilizationMapTargetKind3D
+    {
+        None,
+        Expedition,
+        SecondaryCity,
+        Outpost,
+    }
+
     public sealed class GrayboxCivilizationExpansionController3D :
         MonoBehaviour
     {
@@ -37,10 +46,16 @@ namespace WasteCity.Graybox3D.Building
         private Material convoyMarkerMaterial;
         private float leaderTravelRemainingSeconds;
         private string leaderTravelDestinationId = string.Empty;
+        private GrayboxCivilizationMapTargetKind3D pendingMapTarget;
+        private int lastObservedCoreHealth = -1;
 
         public CivilizationExpansionRuntime Runtime { get; private set; }
         public bool IsInitialized => Runtime != null;
         public string LastFeedback { get; private set; } = string.Empty;
+        public bool HasPendingMapTarget =>
+            pendingMapTarget != GrayboxCivilizationMapTargetKind3D.None;
+        public GrayboxCivilizationMapTargetKind3D PendingMapTarget =>
+            pendingMapTarget;
 
         public void Configure(
             GrayboxMobileCityController3D city,
@@ -80,16 +95,18 @@ namespace WasteCity.Graybox3D.Building
                 error = "文明扩展场景引用或主城格尚未就绪";
                 return false;
             }
-            primaryAccount = new PrimarySettlementAccount(session);
+            primaryAccount = new PrimarySettlementAccount(
+                session,
+                () => Runtime);
             Runtime = new CivilizationExpansionRuntime(
                 world.Model,
                 cityX,
                 cityY,
                 primaryAccount);
-            Runtime.Army.SetLeaderAssignment(
-                leader?.Model?.Recruited == true,
-                leader?.Model?.Injured == false);
+            SynchronizeArmyLeader();
             BindView();
+            lastObservedCoreHealth =
+                defense?.CampaignSnapshot?.CoreCurrentHealth ?? -1;
             Refresh(force: true);
             error = string.Empty;
             return true;
@@ -99,9 +116,8 @@ namespace WasteCity.Graybox3D.Building
         {
             if (!TryInitialize(out _)) return;
             Runtime.EnsureDiplomacySession(sessionIdProvider?.Invoke());
-            Runtime.Army.SetLeaderAssignment(
-                leader?.Model?.Recruited == true,
-                leader?.Model?.Injured == false);
+            SynchronizeArmyLeader();
+            ApplyFormalCharacterDamageFromDefense();
             Runtime.Tick(
                 ruleDeltaSeconds,
                 paused,
@@ -137,6 +153,9 @@ namespace WasteCity.Graybox3D.Building
             guardDamageRemainders.Clear();
             leaderTravelRemainingSeconds = 0f;
             leaderTravelDestinationId = string.Empty;
+            pendingMapTarget = GrayboxCivilizationMapTargetKind3D.None;
+            lastObservedCoreHealth =
+                defense?.CampaignSnapshot?.CoreCurrentHealth ?? -1;
             bool initialized = TryInitialize(out error);
             if (initialized)
                 Runtime.EnsureDiplomacySession(sessionIdProvider?.Invoke());
@@ -151,6 +170,27 @@ namespace WasteCity.Graybox3D.Building
             presentationFingerprint = next;
             view.Apply(BuildPresentation(view.Page));
             RefreshWorldMarkers();
+        }
+
+        public float CivilizationEfficiencyMultiplier =>
+            Runtime?.CivilizationEfficiencyMultiplier ?? 1f;
+
+        public float ResearchEfficiencyMultiplier
+        {
+            get
+            {
+                return Runtime?.ResearchEfficiencyMultiplier ?? 1f;
+            }
+        }
+
+        private void SynchronizeArmyLeader()
+        {
+            if (Runtime == null) return;
+            CharacterLifeRuntime current = Runtime.FindCharacter(
+                Runtime.Politics.CurrentLeaderId);
+            bool healthy = current != null &&
+                current.State == CharacterLifeState.Active;
+            Runtime.Army.SetLeaderAssignment(healthy, healthy);
         }
 
         private void BindView()
@@ -183,7 +223,9 @@ namespace WasteCity.Graybox3D.Building
                     HandleSecondaryCityCommand();
                     break;
                 default:
-                    AdvanceDiplomacy(ExternalFactionCatalog.AshCaravan.Id.Value);
+                    if (!TryBeginCharacterContactRescue())
+                        AdvanceDiplomacy(
+                            ExternalFactionCatalog.AshCaravan.Id.Value);
                     break;
             }
         }
@@ -222,7 +264,9 @@ namespace WasteCity.Graybox3D.Building
                     }
                     else
                     {
-                        TryStartExpedition();
+                        BeginMapTarget(
+                            GrayboxCivilizationMapTargetKind3D.Expedition,
+                            "请在地图上选择已揭示可通行的远征目标");
                     }
                     break;
                 case GrayboxCivilizationExpansionPage3D.World:
@@ -234,13 +278,8 @@ namespace WasteCity.Graybox3D.Building
             }
         }
 
-        private void TryStartExpedition()
+        private void TryStartExpedition(int x, int y)
         {
-            if (!TryFindOpenCell(minimumDistance: 6, out int x, out int y))
-            {
-                Feedback("当前没有合适的已揭示远征格");
-                return;
-            }
             string sessionId = sessionIdProvider?.Invoke();
             if (Runtime.TryStartExpedition(
                     sessionId,
@@ -260,21 +299,9 @@ namespace WasteCity.Graybox3D.Building
                 Feedback("次城已经建立");
                 return;
             }
-            if (!TryFindOpenCell(8, out int x, out int y))
-            {
-                Feedback("没有合适的次城落点");
-                return;
-            }
-            bool succeeded = Runtime.WorldLayer.TryEstablishSecondary(
-                x,
-                y,
-                SettlementAutonomyTemplate.Industrial,
-                primaryAccount,
-                out _,
-                out string error);
-            Feedback(succeeded
-                ? "工业次城已建立，拥有独立 150 容量库存"
-                : error);
+            BeginMapTarget(
+                GrayboxCivilizationMapTargetKind3D.SecondaryCity,
+                "请在地图上选择次城位置");
         }
 
         private void HandleSecondaryCityCommand()
@@ -354,14 +381,79 @@ namespace WasteCity.Graybox3D.Building
                 Feedback("前哨已经建立");
                 return;
             }
-            if (!TryFindOpenCell(5, out int x, out int y))
+            BeginMapTarget(
+                GrayboxCivilizationMapTargetKind3D.Outpost,
+                "请在地图上选择前哨位置");
+        }
+
+        public void CancelMapTarget()
+        {
+            if (!HasPendingMapTarget) return;
+            pendingMapTarget = GrayboxCivilizationMapTargetKind3D.None;
+            LastFeedback = "已取消地图目标选择";
+        }
+
+        public bool TryCommitMapTarget(Vector2 screenPosition)
+        {
+            if (!HasPendingMapTarget || world == null) return false;
+            Camera camera = Camera.main;
+            if (camera == null) return false;
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            var plane = new Plane(Vector3.up, Vector3.zero);
+            if (!plane.Raycast(ray, out float enter) ||
+                !world.TryWorldToCell(
+                    ray.GetPoint(enter),
+                    out int cellX,
+                    out int cellY))
             {
-                Feedback("没有合适的前哨落点");
-                return;
+                LastFeedback = "指针不在地图有效范围内";
+                return false;
             }
+            GrayboxCivilizationMapTargetKind3D target = pendingMapTarget;
+            pendingMapTarget = GrayboxCivilizationMapTargetKind3D.None;
+            switch (target)
+            {
+                case GrayboxCivilizationMapTargetKind3D.Expedition:
+                    TryStartExpedition(cellX, cellY);
+                    break;
+                case GrayboxCivilizationMapTargetKind3D.SecondaryCity:
+                    CommitSecondaryCity(cellX, cellY);
+                    break;
+                case GrayboxCivilizationMapTargetKind3D.Outpost:
+                    CommitOutpost(cellX, cellY);
+                    break;
+            }
+            return true;
+        }
+
+        private void BeginMapTarget(
+            GrayboxCivilizationMapTargetKind3D target,
+            string message)
+        {
+            pendingMapTarget = target;
+            LastFeedback = message;
+            view?.Close();
+        }
+
+        private void CommitSecondaryCity(int cellX, int cellY)
+        {
+            bool succeeded = Runtime.WorldLayer.TryEstablishSecondary(
+                cellX,
+                cellY,
+                SettlementAutonomyTemplate.Industrial,
+                primaryAccount,
+                out _,
+                out string error);
+            Feedback(succeeded
+                ? "工业次城已建立，拥有独立 150 容量库存"
+                : error);
+        }
+
+        private void CommitOutpost(int cellX, int cellY)
+        {
             bool succeeded = Runtime.WorldLayer.TryEstablishOutpost(
-                x,
-                y,
+                cellX,
+                cellY,
                 primaryAccount,
                 out _,
                 out string error);
@@ -425,17 +517,53 @@ namespace WasteCity.Graybox3D.Building
                     : offerError);
                 return;
             }
-            Feedback(Runtime.Diplomacy.TryAcceptOffer(
+            if (Keyboard.current != null &&
+                (Keyboard.current.leftShiftKey.isPressed ||
+                 Keyboard.current.rightShiftKey.isPressed))
+            {
+                Feedback(Runtime.Diplomacy.TryRejectOffer(
+                        factionId,
+                        out string rejectError)
+                    ? "已拒绝报价，关系 -1"
+                    : rejectError);
+                return;
+            }
+            bool accepted = Runtime.Diplomacy.TryAcceptOffer(
                     factionId,
                     primaryAccount,
                     out _,
-                    out string settleError)
-                ? "外交交易已经原子结算"
-                : settleError);
+                    out string settleError);
+            if (!accepted)
+            {
+                Feedback(settleError + "；按住 Shift 点击可拒绝报价");
+                return;
+            }
+            DiplomacyFactionSnapshot after = Runtime.Diplomacy.GetFaction(
+                factionId);
+            if (after.Relation >= DiplomacyRuntime.DefensePactThreshold)
+                Runtime.Diplomacy.TrySignDefensePact(factionId, out _);
+            else if (after.Relation >= DiplomacyRuntime
+                         .TradeAgreementThreshold)
+                Runtime.Diplomacy.TrySignTradeAgreement(factionId, out _);
+            Feedback("外交交易已经原子结算");
         }
 
         private void TryPoliticalAction()
         {
+            for (var index = 0; index < Runtime.Characters.Count; index++)
+            {
+                CharacterLifeRuntime character = Runtime.Characters[index];
+                if (character.Corpse != null &&
+                    !character.Corpse.IsRecovered &&
+                    character.TryRecoverCorpse(
+                        out string[] recoveredEquipment))
+                {
+                    Feedback("已回收 " + character.Definition.DisplayName +
+                        " 的遗体与 " + recoveredEquipment.Length +
+                        " 件装备");
+                    return;
+                }
+            }
             for (var index = 0; index < Runtime.Characters.Count; index++)
             {
                 CharacterLifeRuntime character = Runtime.Characters[index];
@@ -455,9 +583,25 @@ namespace WasteCity.Graybox3D.Building
                     Feedback("救援需要 2 生物质");
                     return;
                 }
-                if (!character.TryBeginRescue(
-                        CharacterRescueMethod.CityMedical,
-                        character.AssignedSettlementId,
+                SettlementRuntime settlement = Runtime.WorldLayer
+                    .GetSettlement(character.AssignedSettlementId);
+                if (settlement == null)
+                {
+                    session.CityStorage.TryCommitBatch(
+                        Array.Empty<ResourceAmount>(),
+                        new[]
+                        {
+                            new ResourceAmount(
+                                CharacterLifeRuntime.RescueResourceId,
+                                CharacterLifeRuntime.RescueBiomassCost),
+                        });
+                    Feedback("角色所在城市不存在");
+                    return;
+                }
+                if (!character.TryBeginCityMedicalRescue(
+                        settlement.StableId,
+                        settlement.X,
+                        settlement.Y,
                         available,
                         out _,
                         out string rescueError))
@@ -507,6 +651,97 @@ namespace WasteCity.Graybox3D.Building
                     ? "林溪已接任文明领袖"
                     : "低支持度强推触发政变危机"
                 : selectionError);
+        }
+
+        private bool TryBeginCharacterContactRescue()
+        {
+            CharacterLifeRuntime target = null;
+            for (var index = 0; index < Runtime.Characters.Count; index++)
+            {
+                if (Runtime.Characters[index].State ==
+                    CharacterLifeState.Downed)
+                {
+                    target = Runtime.Characters[index];
+                    break;
+                }
+            }
+            if (target == null) return false;
+            if (target.HasActiveRescue)
+            {
+                Feedback("已有救援正在进行");
+                return true;
+            }
+            CharacterLifeRuntime source = null;
+            for (var index = 0; index < Runtime.Characters.Count; index++)
+            {
+                CharacterLifeRuntime candidate = Runtime.Characters[index];
+                if (!ReferenceEquals(candidate, target) &&
+                    candidate.State == CharacterLifeState.Active)
+                {
+                    source = candidate;
+                    break;
+                }
+            }
+            int available = session.CityStorage.GetNetworkAmount(
+                CharacterLifeRuntime.RescueResourceId);
+            if (source == null ||
+                available < CharacterLifeRuntime.RescueBiomassCost ||
+                !session.CityStorage.TrySpendFromNetwork(
+                    CharacterLifeRuntime.RescueResourceId,
+                    CharacterLifeRuntime.RescueBiomassCost))
+            {
+                Feedback(source == null
+                    ? "没有可行动的接触救援角色"
+                    : "救援需要 2 生物质");
+                return true;
+            }
+            if (!target.TryBeginCharacterContactRescue(
+                    source,
+                    Runtime.RuleTick,
+                    available,
+                    out _,
+                    out string error))
+            {
+                session.CityStorage.TryCommitBatch(
+                    Array.Empty<ResourceAmount>(),
+                    new[]
+                    {
+                        new ResourceAmount(
+                            CharacterLifeRuntime.RescueResourceId,
+                            CharacterLifeRuntime.RescueBiomassCost),
+                    });
+                Feedback(error);
+                return true;
+            }
+            Feedback(source.Definition.DisplayName +
+                " 已开始接触救援，需保持 8 秒");
+            return true;
+        }
+
+        private void ApplyFormalCharacterDamageFromDefense()
+        {
+            int current = defense?.CampaignSnapshot?.CoreCurrentHealth ?? -1;
+            if (current < 0)
+            {
+                lastObservedCoreHealth = current;
+                return;
+            }
+            if (lastObservedCoreHealth < 0 || current > lastObservedCoreHealth)
+            {
+                lastObservedCoreHealth = current;
+                return;
+            }
+            int damage = lastObservedCoreHealth - current;
+            lastObservedCoreHealth = current;
+            if (damage <= 0) return;
+            if (Runtime.TryApplyCharacterDamage(
+                    Runtime.Politics.CurrentLeaderId,
+                    damage,
+                    "combat.defense.core-breach",
+                    out bool enteredDowned) && enteredDowned)
+            {
+                LastFeedback = "领袖在城市防线受击后倒地，60 秒内需要救援";
+            }
         }
 
         private GrayboxCivilizationExpansionPresentation3D BuildPresentation(
@@ -660,6 +895,8 @@ namespace WasteCity.Graybox3D.Building
 
         private int CountOperationalBuildings(string buildingId)
         {
+            if (!city.TryGetCurrentCell(out int cityX, out int cityY))
+                return 0;
             int count = 0;
             IReadOnlyList<GrayboxBuildingInstance3D> instances =
                 session.Instances;
@@ -668,6 +905,16 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxBuildingInstance3D instance = instances[index];
                 if (instance.IsPlayerOwned &&
                     instance.State == GrayboxBuildingInstanceState.Completed &&
+                    GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                        instance,
+                        city.Mode) &&
+                    GrayboxBuildingOperationalAccess3D
+                        .IsLogisticsConnected(
+                            instance,
+                            city.Mode,
+                            cityX,
+                            cityY,
+                            session.GroundBuildRadius) &&
                     string.Equals(
                         instance.Placement.Definition.Id.Value,
                         buildingId,
@@ -712,49 +959,6 @@ namespace WasteCity.Graybox3D.Building
                         whole,
                         pair.Key);
             }
-        }
-
-        private bool TryFindOpenCell(
-            int minimumDistance,
-            out int cellX,
-            out int cellY)
-        {
-            SettlementRuntime primary = Runtime.WorldLayer.PrimaryCity;
-            for (var radius = Math.Max(1, minimumDistance);
-                 radius < Math.Max(world.Model.Width, world.Model.Height);
-                 radius++)
-            {
-                for (var y = 0; y < world.Model.Height; y++)
-                for (var x = 0; x < world.Model.Width; x++)
-                {
-                    if (Math.Abs(x - primary.X) + Math.Abs(y - primary.Y) <
-                        radius ||
-                        !world.Model.IsRevealed(x, y) ||
-                        !CityTerrainRules.IsPassable(world.Model.Get(x, y)))
-                        continue;
-                    bool occupied = false;
-                    WorldLayerRuntimeSnapshot snapshot =
-                        Runtime.WorldLayer.Capture();
-                    for (var index = 0;
-                         index < snapshot.Settlements.Count;
-                         index++)
-                    {
-                        if (snapshot.Settlements[index].X == x &&
-                            snapshot.Settlements[index].Y == y)
-                        {
-                            occupied = true;
-                            break;
-                        }
-                    }
-                    if (occupied) continue;
-                    cellX = x;
-                    cellY = y;
-                    return true;
-                }
-            }
-            cellX = -1;
-            cellY = -1;
-            return false;
         }
 
         private void Feedback(string message)
@@ -942,12 +1146,17 @@ namespace WasteCity.Graybox3D.Building
             ILeadershipPoliticsResolutionAuthority
         {
             private readonly GrayboxBuildingSession3D session;
+            private readonly Func<CivilizationExpansionRuntime>
+                expansionProvider;
 
             public PrimarySettlementAccount(
-                GrayboxBuildingSession3D session)
+                GrayboxBuildingSession3D session,
+                Func<CivilizationExpansionRuntime> expansionProvider)
             {
                 this.session = session ??
                     throw new ArgumentNullException(nameof(session));
+                this.expansionProvider = expansionProvider ??
+                    throw new ArgumentNullException(nameof(expansionProvider));
             }
 
             public string StableSettlementId =>
@@ -1009,7 +1218,15 @@ namespace WasteCity.Graybox3D.Building
             {
                 bool succeeded = session.CityStorage.TryCommitBatch(
                     new[] { new ResourceAmount(costResourceId, costAmount) },
-                    new[] { new ResourceAmount(rewardResourceId, rewardAmount) });
+                    rewardAmount > 0 &&
+                    !string.IsNullOrWhiteSpace(rewardResourceId)
+                        ? new[]
+                        {
+                            new ResourceAmount(
+                                rewardResourceId,
+                                rewardAmount),
+                        }
+                        : Array.Empty<ResourceAmount>());
                 error = succeeded ? string.Empty : "外交交易所需资源或容量不足";
                 return succeeded;
             }
@@ -1031,13 +1248,16 @@ namespace WasteCity.Graybox3D.Building
                 int delta,
                 out string error)
             {
-                error = string.Equals(
-                    settlementId,
-                    WorldLayerCatalog.PrimaryCity.Id,
-                    StringComparison.Ordinal)
-                    ? string.Empty
-                    : "目标城市不存在";
-                return string.IsNullOrEmpty(error);
+                SettlementRuntime settlement = expansionProvider()
+                    ?.WorldLayer.GetSettlement(settlementId);
+                if (settlement == null)
+                {
+                    error = "目标城市不存在";
+                    return false;
+                }
+                settlement.SetLoyalty(settlement.Loyalty + delta);
+                error = string.Empty;
+                return true;
             }
         }
     }

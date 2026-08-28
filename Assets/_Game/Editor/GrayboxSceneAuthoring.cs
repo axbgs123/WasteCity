@@ -1249,7 +1249,8 @@ namespace WasteCity.Editor
                 ("advancementView", advancementView));
             SetReferences(
                 coordinator,
-                ("civilizationExpansionView", expansionView));
+                ("civilizationExpansionView", expansionView),
+                ("civilizationExpansionController", expansionController));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
@@ -1276,6 +1277,14 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The graybox scene fate operations view is not unique.");
+            }
+            if (RequireSingle<GrayboxCivilizationExpansionView3D>(scene) !=
+                    expansionView ||
+                RequireSingle<GrayboxCivilizationExpansionController3D>(
+                    scene) != expansionController)
+            {
+                throw new InvalidOperationException(
+                    "The civilization expansion view/controller is not unique.");
             }
             if (RequireSingle<GrayboxCivilizationAdvancementView3D>(scene) !=
                     advancementView)

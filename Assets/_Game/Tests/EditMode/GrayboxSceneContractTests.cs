@@ -936,6 +936,9 @@ namespace WasteCity.Tests
             GrayboxCivilizationAdvancementView3D advancementView =
                 operationsTransform.GetComponent<
                     GrayboxCivilizationAdvancementView3D>();
+            GrayboxCivilizationExpansionView3D expansionView =
+                operationsTransform.GetComponent<
+                    GrayboxCivilizationExpansionView3D>();
             Transform systems = RequiredChild(root, "GrayboxSystems");
             GrayboxOperationsController3D controller =
                 RequiredComponent<GrayboxOperationsController3D>(
@@ -949,6 +952,11 @@ namespace WasteCity.Tests
                 RequiredComponent<GrayboxFormalSaveRuntimeHost3D>(
                     systems,
                     "GrayboxFormalSaveRuntimeHost");
+            GrayboxCivilizationExpansionController3D expansionController =
+                RequiredComponent<
+                    GrayboxCivilizationExpansionController3D>(
+                    systems,
+                    "GrayboxCivilizationExpansionController");
             GrayboxBuildingInputRouter3D buildingInput =
                 Object.FindObjectOfType<GrayboxBuildingInputRouter3D>(true);
             GrayboxDeveloperModifierBootstrap3D developer =
@@ -972,6 +980,7 @@ namespace WasteCity.Tests
             Assert.That(fateSelectionView, Is.Not.Null);
             Assert.That(fateOperationsView, Is.Not.Null);
             Assert.That(advancementView, Is.Not.Null);
+            Assert.That(expansionView, Is.Not.Null);
             Assert.That(developer, Is.Not.Null);
             Assert.That(
                 Object.FindObjectsOfType<GrayboxOperationsView3D>(true),
@@ -994,12 +1003,17 @@ namespace WasteCity.Tests
                 Object.FindObjectsOfType<
                     GrayboxCivilizationAdvancementView3D>(true),
                 Has.Length.EqualTo(1));
+            Assert.That(
+                Object.FindObjectsOfType<
+                    GrayboxCivilizationExpansionController3D>(true),
+                Has.Length.EqualTo(1));
 
             AssertReference(view, "canvas", operationsCanvas);
             AssertReference(progressionView, "canvas", operationsCanvas);
             AssertReference(fateSelectionView, "canvas", operationsCanvas);
             AssertReference(fateOperationsView, "canvas", operationsCanvas);
             AssertReference(advancementView, "canvas", operationsCanvas);
+            AssertReference(expansionView, "canvas", operationsCanvas);
             AssertReference(
                 formalSaveHost,
                 "progressionView",
@@ -1022,6 +1036,10 @@ namespace WasteCity.Tests
                 coordinator);
             AssertReference(
                 formalSaveHost,
+                "expansionController",
+                expansionController);
+            AssertReference(
+                formalSaveHost,
                 "developerModifier",
                 developer);
             AssertReference(
@@ -1040,6 +1058,14 @@ namespace WasteCity.Tests
                 coordinator,
                 "advancementView",
                 advancementView);
+            AssertReference(
+                coordinator,
+                "civilizationExpansionView",
+                expansionView);
+            AssertReference(
+                coordinator,
+                "civilizationExpansionController",
+                expansionController);
             AssertReference(
                 controller,
                 "session",

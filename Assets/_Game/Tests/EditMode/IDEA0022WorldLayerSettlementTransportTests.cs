@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using WasteCity.CivilizationExpansion;
+using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.World;
 using WasteCity.World.CivilizationExpansion;
@@ -298,6 +300,176 @@ namespace WasteCity.Tests
             Assert.That(convoy.RiskResolved, Is.True);
             Assert.That(convoy.AppliedRiskPercent, Is.Zero);
             Assert.That(convoy.Status, Is.Not.EqualTo(ConvoyStatus.Destroyed));
+        }
+
+        [Test]
+        public void SafeDeterministicRollDoesNotConsumeInterceptionImmunity()
+        {
+            WorldMapModel map = OpenWorld(7, 3);
+            WorldLayerRuntime layer = LayerWithSecondary(
+                map,
+                out ExternalInventoryEndpoint primary,
+                secondaryX: 2);
+            primary.Inventory.Add(ResourceIds.Stone, 4);
+            var immunity = new ImmunityEscortProvider(1);
+            var transport = new TransportRuntime(map, layer, immunity);
+            Assert.That(transport.TryDispatch(
+                FindSessionForRoll(25, 99),
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                new[] { new ResourceAmount(ResourceIds.Stone, 4) },
+                string.Empty,
+                out string convoyId,
+                out string error), Is.True, error);
+
+            transport.Tick(.1f);
+
+            ConvoySnapshot convoy = transport.GetConvoy(convoyId);
+            Assert.That(immunity.Charges, Is.EqualTo(1));
+            Assert.That(convoy.RiskResolved, Is.True);
+            Assert.That(convoy.AppliedRiskPercent,
+                Is.EqualTo(WorldLayerCatalog.UnescortedInterceptionPercent));
+            Assert.That(convoy.Status, Is.EqualTo(ConvoyStatus.InTransit));
+        }
+
+        [Test]
+        public void UnfinishedConvoyExclusivelyOwnsItsEscortSquad()
+        {
+            const string squadId = "core.squad.000001";
+            WorldMapModel map = OpenWorld(5, 3);
+            WorldLayerRuntime layer = LayerWithSecondary(
+                map,
+                out ExternalInventoryEndpoint primary,
+                secondaryX: 1);
+            primary.Inventory.Add(ResourceIds.Iron, 8);
+            var provider = new EscortStatusProvider(squadId, active: true);
+            var transport = new TransportRuntime(map, layer, provider);
+            string sessionId = FindSessionForRoll(25, 99);
+            ResourceAmount[] cargo =
+            {
+                new ResourceAmount(ResourceIds.Iron, 4),
+            };
+            Assert.That(transport.TryDispatch(
+                sessionId,
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                cargo,
+                squadId,
+                out string firstId,
+                out string error), Is.True, error);
+
+            Assert.That(transport.TryDispatch(
+                sessionId,
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                cargo,
+                squadId,
+                out _,
+                out error), Is.False);
+            Assert.That(error, Does.Contain("护送"));
+            Assert.That(primary.Inventory.Get(ResourceIds.Iron), Is.EqualTo(4));
+
+            transport.Tick(1.5f);
+            Assert.That(transport.GetConvoy(firstId).Status,
+                Is.EqualTo(ConvoyStatus.Delivered));
+            Assert.That(transport.TryDispatch(
+                sessionId,
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                cargo,
+                squadId,
+                out _,
+                out error), Is.True, error);
+        }
+
+        [Test]
+        public void ExpeditionSquadCannotBeAssignedAsConvoyEscort()
+        {
+            const string squadId = SingleCityArmyModel.DefaultSquadId;
+            WorldMapModel map = OpenWorld(7, 3);
+            var primary = new ExternalInventoryEndpoint(
+                WorldLayerCatalog.PrimaryCity.Id, 150);
+            primary.Inventory.Add(ResourceIds.Iron, 4);
+            var expansion = new CivilizationExpansionRuntime(
+                map, 0, 1, primary);
+            ConstructionAccount account = FullConstructionAccount();
+            Assert.That(expansion.WorldLayer.TryEstablishSecondary(
+                2,
+                1,
+                SettlementAutonomyTemplate.Industrial,
+                account,
+                out _,
+                out string error), Is.True, error);
+            using var storage = new CityResourceStorageModel(
+                new ResourceInventory(150));
+            Assert.That(storage.AddToNetwork(ResourceIds.Alloy, 1),
+                Is.EqualTo(1));
+            Assert.That(storage.AddToNetwork(ResourceIds.SpiritIron, 1),
+                Is.EqualTo(1));
+            Assert.That(expansion.Army.TickManufacturing(
+                ArmyUnitCatalog.CombatPuppetId,
+                20f,
+                1,
+                false,
+                storage), Is.EqualTo(1));
+            Assert.That(expansion.TryStartExpedition(
+                "test.expedition.session",
+                4,
+                1,
+                out error), Is.True, error);
+            Assert.That(expansion.Expedition.Status,
+                Is.EqualTo(ArmyExpeditionStatus.Outbound));
+
+            Assert.That(expansion.Transport.TryDispatch(
+                FindSessionForRoll(25, 99),
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                new[] { new ResourceAmount(ResourceIds.Iron, 4) },
+                squadId,
+                out _,
+                out error), Is.False);
+            Assert.That(error, Does.Contain("护送"));
+            Assert.That(primary.Inventory.Get(ResourceIds.Iron), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void ConvoyEscortSquadCannotStartExpeditionUntilReleased()
+        {
+            const string squadId = SingleCityArmyModel.DefaultSquadId;
+            WorldMapModel map = OpenWorld(7, 3);
+            var primary = new ExternalInventoryEndpoint(
+                WorldLayerCatalog.PrimaryCity.Id, 150);
+            primary.Inventory.Add(ResourceIds.Iron, 4);
+            var expansion = new CivilizationExpansionRuntime(
+                map, 0, 1, primary);
+            ConstructionAccount account = FullConstructionAccount();
+            Assert.That(expansion.WorldLayer.TryEstablishSecondary(
+                2, 1, SettlementAutonomyTemplate.Industrial, account,
+                out _, out string error), Is.True, error);
+            using var storage = new CityResourceStorageModel(
+                new ResourceInventory(150));
+            storage.AddToNetwork(ResourceIds.Alloy, 1);
+            storage.AddToNetwork(ResourceIds.SpiritIron, 1);
+            Assert.That(expansion.Army.TickManufacturing(
+                ArmyUnitCatalog.CombatPuppetId,
+                20f, 1, false, storage), Is.EqualTo(1));
+            Assert.That(expansion.Transport.TryDispatch(
+                FindSessionForRoll(25, 99),
+                WorldLayerCatalog.PrimaryCity.Id,
+                WorldLayerCatalog.SecondaryCity.Id,
+                new[] { new ResourceAmount(ResourceIds.Iron, 4) },
+                squadId,
+                out _,
+                out error), Is.True, error);
+
+            Assert.That(expansion.TryStartExpedition(
+                "test.reverse-occupancy.session",
+                4,
+                1,
+                out error), Is.False);
+            Assert.That(error, Does.Contain("护送"));
+            Assert.That(expansion.Expedition.Status,
+                Is.EqualTo(ArmyExpeditionStatus.Idle));
         }
 
         [Test]

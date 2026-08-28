@@ -16,6 +16,9 @@ namespace WasteCity.CivilizationExpansion
         private readonly WorldMapModel map;
         private readonly List<CharacterLifeRuntime> characters;
         private int nextExpeditionOrdinal = 1;
+        private ulong ruleTick;
+        private double characterAccumulatorSeconds;
+        private const double CharacterFixedStepSeconds = .1d;
 
         public CivilizationExpansionRuntime(
             WorldMapModel map,
@@ -60,6 +63,30 @@ namespace WasteCity.CivilizationExpansion
         public LeadershipPoliticsRuntime Politics { get; }
         public DiplomacyRuntime Diplomacy { get; private set; }
         public int NextExpeditionOrdinal => nextExpeditionOrdinal;
+        public ulong RuleTick => ruleTick;
+        public float CivilizationEfficiencyMultiplier =>
+            Politics.EfficiencyMultiplier;
+        public float ResearchEfficiencyMultiplier
+        {
+            get
+            {
+                float result = Politics.EfficiencyMultiplier;
+                WorldLayerRuntimeSnapshot snapshot = WorldLayer.Capture();
+                for (var index = 0;
+                     index < snapshot.Settlements.Count;
+                     index++)
+                {
+                    SettlementRuntime settlement = WorldLayer.GetSettlement(
+                        snapshot.Settlements[index].StableId);
+                    if (settlement != null)
+                        result = Math.Max(
+                            result,
+                            Politics.EfficiencyMultiplier *
+                            settlement.ResearchContributionMultiplier);
+                }
+                return result;
+            }
+        }
 
         public CharacterLifeRuntime FindCharacter(string characterId)
         {
@@ -86,6 +113,12 @@ namespace WasteCity.CivilizationExpansion
                 Expedition.Status != ArmyExpeditionStatus.Retreated)
             {
                 error = "已有远征正在进行或等待战利品入库";
+                return false;
+            }
+            if (Transport.IsEscortCommittedToUnfinishedConvoy(
+                    SingleCityArmyModel.DefaultSquadId))
+            {
+                error = "默认小队正在护送运输队，不能同时出征";
                 return false;
             }
             SettlementRuntime primary = WorldLayer.PrimaryCity;
@@ -155,12 +188,31 @@ namespace WasteCity.CivilizationExpansion
             if (primaryStorage == null || operationalBuildingCount == null)
                 return;
             float delta = Math.Max(0f, ruleDeltaSeconds);
+            int characterSteps = 0;
+            if (!globallyPaused && delta > 0f)
+            {
+                characterAccumulatorSeconds += delta;
+                characterSteps = (int)Math.Floor(
+                    (characterAccumulatorSeconds + .000001d) /
+                    CharacterFixedStepSeconds);
+                if (characterSteps > 0)
+                {
+                    characterAccumulatorSeconds -=
+                        characterSteps * CharacterFixedStepSeconds;
+                    unchecked { ruleTick += (ulong)characterSteps; }
+                }
+            }
+            float characterDelta = (float)(
+                characterSteps * CharacterFixedStepSeconds);
+            float productionDelta = delta * Math.Max(
+                0f,
+                Politics.EfficiencyMultiplier);
             for (var index = 0; index < ArmyUnitCatalog.All.Count; index++)
             {
                 ArmyUnitDefinition definition = ArmyUnitCatalog.All[index];
                 Army.TickManufacturing(
                     definition.Id,
-                    delta,
+                    productionDelta,
                     Math.Max(
                         0,
                         operationalBuildingCount(
@@ -169,7 +221,7 @@ namespace WasteCity.CivilizationExpansion
                     primaryStorage);
             }
             Army.TickMaintenance(
-                delta,
+                productionDelta,
                 globallyPaused,
                 primaryStorage);
 
@@ -186,17 +238,31 @@ namespace WasteCity.CivilizationExpansion
 
             if (!globallyPaused)
             {
-                WorldLayer.Tick(delta);
+                WorldLayer.Tick(productionDelta);
                 Transport.Tick(delta);
             }
             for (var index = 0; index < characters.Count; index++)
             {
                 CharacterLifeRuntime character = characters[index];
-                CharacterLifeTickResult result = character.Tick(
-                    delta,
-                    globallyPaused,
-                    rescueInRange: true,
-                    rescuerWasHit: false);
+                CharacterLifeSnapshot characterSnapshot = character.Capture();
+                CharacterRescueSnapshot rescue = characterSnapshot.Rescue;
+                CharacterLifeRuntime rescueSource = rescue != null &&
+                    rescue.Method == CharacterRescueMethod.CharacterContact
+                        ? FindCharacter(rescue.SourceId)
+                        : null;
+                SettlementRuntime rescueSettlement = rescue != null &&
+                    rescue.Method == CharacterRescueMethod.CityMedical
+                        ? WorldLayer.GetSettlement(rescue.SourceId)
+                        : null;
+                CharacterLifeTickResult result =
+                    character.TickFormalRescue(
+                        characterDelta,
+                        globallyPaused || characterSteps == 0,
+                        rescueSource,
+                        rescueSettlement?.StableId,
+                        rescueSettlement?.X ?? 0,
+                        rescueSettlement?.Y ?? 0,
+                        ruleTick);
                 if (result.ReleasedBiomass > 0)
                 {
                     primaryStorage.TryCommitBatch(
@@ -220,6 +286,30 @@ namespace WasteCity.CivilizationExpansion
             Diplomacy.Tick(delta, globallyPaused);
         }
 
+        public bool TryApplyCharacterDamage(
+            string characterId,
+            int rawDamage,
+            string causeId,
+            out bool enteredDowned)
+        {
+            CharacterLifeRuntime character = FindCharacter(characterId);
+            if (character == null)
+            {
+                enteredDowned = false;
+                return false;
+            }
+            return character.TryApplyDamageAtRuleTick(
+                rawDamage,
+                causeId,
+                ruleTick,
+                out enteredDowned);
+        }
+
+        public void RestoreRuleTick(ulong value)
+        {
+            ruleTick = value;
+        }
+
         public bool IsKnownSquad(string stableSquadId)
         {
             return string.Equals(
@@ -231,6 +321,9 @@ namespace WasteCity.CivilizationExpansion
         public bool IsNonDormant(string stableSquadId)
         {
             if (!IsKnownSquad(stableSquadId)) return false;
+            if (Expedition.Status == ArmyExpeditionStatus.Outbound ||
+                Expedition.Status == ArmyExpeditionStatus.Returning)
+                return false;
             IReadOnlyList<ArmyUnitSnapshot> units = Army.Units;
             for (var index = 0; index < units.Count; index++)
                 if (units[index].IsActive) return true;

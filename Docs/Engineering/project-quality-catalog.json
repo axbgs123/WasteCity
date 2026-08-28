@@ -3939,8 +3939,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以统一信封区分 legacy 2D schema 1 至 30、正式 3D schema 31、32、当前 schema 33 和未来版本，提供确定性编码、逐版本历史 payload hash、结构与跨引用验证，以及 31→32→33 单向迁移。",
-      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，32→33 不从旧建筑、研究或战斗反推关注度、命轨和文明历史。",
+      "UseSummary": "以统一信封区分 legacy 2D schema 1 至 30、正式 3D schema 31、32、33、当前 schema 34 和未来版本，提供确定性编码、逐版本历史 payload hash、结构与跨引用验证，以及 31→32→33→34 单向迁移。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，32→33 不反推关注度历史，33→34 不反推军队、多城或角色政治历史。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
@@ -3948,13 +3948,15 @@
         "Assets/_Game/Tests/EditMode/FormalSaveDestroyedRuinSchema32Tests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0015",
         "IDEA-0017",
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0022"
       ]
     },
     {
@@ -4065,17 +4067,19 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按 world/city、building/storage、economy、production、defense、progression、evacuation、pause 固定依赖顺序协调 schema 33 capture 与恢复，使活动压力进程在主战役真值恢复后再绑定；先完整验证，再事务式应用，失败时回滚八个权威领域并在成功提交后统一重建派生状态。",
+      "UseSummary": "按 world/city、building/storage、economy、production、defense、progression、evacuation、civilizationExpansion、pause 固定依赖顺序协调 schema 34 capture 与恢复；先完整验证，再事务式应用，失败时回滚九个权威领域并在成功提交后统一重建派生状态。",
       "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、目标或 UI 入档；回滚失败会保留安全屏障，调用方不得伪装成成功。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0022"
       ]
     },
     {
@@ -4089,7 +4093,7 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 组合 schema 33 八领域 coordinator、Attention/Fate/Civilization/三项效果唯一 owner、四项升阶资格采集、原子 1→2 命令、AdvancementSequence、独立暂停、UGUI/真实 U、检查点与保存恢复。",
+      "UseSummary": "在 GrayboxPrototype3D 组合 schema 34 九领域 coordinator、Attention/Fate/Civilization 与文明扩展唯一 owner、规则效率、UGUI/真实 U/M/N/P、检查点与保存恢复。",
       "BoundarySummary": "只作为正式 3D 场景组合根；资格从 Research/Building/Pressure/Production 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO 规则或建筑升级规则；内部重试档和回溯锚点都不是第二玩家存档槽。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
@@ -4100,12 +4104,14 @@
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
         "IDEA-0017",
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0022"
       ]
     },
     {

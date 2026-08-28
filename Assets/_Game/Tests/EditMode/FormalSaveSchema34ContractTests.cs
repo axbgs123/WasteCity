@@ -124,5 +124,154 @@ namespace WasteCity.Tests
                 .charactersPolitics.currentLeaderId,
                 Is.EqualTo("core.character.cen-jin"));
         }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsUnknownArmyManufacturingDefinition()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.armyLeader.manufacturing = new[]
+            {
+                new FormalThreeDArmyManufacturingSaveData
+                {
+                    definitionId = "unknown.unit",
+                    progressSeconds = 1f,
+                },
+            };
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("manufacturing"));
+        }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsConvoyWithoutSettlementReferences()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.worldLayer.convoys = new[]
+            {
+                new FormalThreeDConvoySaveData
+                {
+                    stableConvoyId = "core.convoy.000001",
+                    sourceSettlementId = "core.city.000001",
+                    destinationSettlementId = "core.city.000002",
+                    path = Array.Empty<FormalThreeDGridPointSaveData>(),
+                    cargo = Array.Empty<FormalThreeDResourceAmountSaveData>(),
+                },
+            };
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("convoys"));
+        }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsArmyPoliticsLeaderMismatch()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.armyLeader.leader.characterId =
+                "core.character.lin-xi";
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("leader.characterId"));
+        }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsContradictorySquadLeaderFlags()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.armyLeader.leaderAssigned = true;
+            expansion.armyLeader.leaderHealthy = true;
+            expansion.armyLeader.squads = new[]
+            {
+                new FormalThreeDArmySquadSaveData
+                {
+                    stableSquadId = "core.squad.000001",
+                    leaderAssigned = false,
+                    leaderHealthy = false,
+                },
+            };
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("squads[0]"));
+        }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsSettlementOutsideFormalMap()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.worldLayer.settlements = new[]
+            {
+                new FormalThreeDSettlementSaveData
+                {
+                    stableSettlementId = "core.city.000001",
+                    kind = 0,
+                    autonomousTemplate = 0,
+                    x = 64,
+                    y = 0,
+                    population = 0,
+                    populationCapacity = 0,
+                    loyalty = 70,
+                    inventory = Array.Empty<
+                        FormalThreeDResourceAmountSaveData>(),
+                },
+            };
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("settlements[0]"));
+        }
+
+        [Test]
+        public void IDEA0022_ValidatorRejectsUnapprovedExpeditionLoot()
+        {
+            var expansion = new FormalThreeDCivilizationExpansionSaveData();
+            expansion.armyLeader.expedition =
+                new FormalThreeDArmyExpeditionSaveData
+                {
+                    phase = 1,
+                    squadId = "core.squad.000001",
+                    sessionId = "test.session",
+                    expeditionOrdinal = 1,
+                    outboundDurationSeconds = 45f,
+                    returnDurationSeconds = 0f,
+                    remainingSeconds = 1f,
+                    units = Array.Empty<
+                        FormalThreeDArmyExpeditionUnitSaveData>(),
+                    enemyDefinitionIds = Array.Empty<string>(),
+                    casualtyStableUnitIds = Array.Empty<string>(),
+                    pendingLoot = new[]
+                    {
+                        new FormalThreeDResourceAmountSaveData
+                        {
+                            resourceId = "core.resource.iron",
+                            amount = 1,
+                        },
+                    },
+                };
+
+            FormalSaveValidationResult result = ValidateExpansion(expansion);
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.FieldPath, Does.Contain("pendingLoot"));
+        }
+
+        private static FormalSaveValidationResult ValidateExpansion(
+            FormalThreeDCivilizationExpansionSaveData expansion)
+        {
+            MethodInfo method = typeof(FormalSaveValidator).GetMethod(
+                "ValidateCivilizationExpansion",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            return (FormalSaveValidationResult)method.Invoke(
+                null,
+                new object[] { expansion });
+        }
     }
 }

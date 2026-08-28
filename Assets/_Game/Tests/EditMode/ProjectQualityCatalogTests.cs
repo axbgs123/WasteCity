@@ -689,7 +689,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
             }, runtimeHost.RequiredTestFiles);
-            StringAssert.Contains("八领域", runtimeHost.UseSummary);
+            StringAssert.Contains("九领域", runtimeHost.UseSummary);
 
             ProjectReuseEntry entry = FindReuse(
                 catalog,

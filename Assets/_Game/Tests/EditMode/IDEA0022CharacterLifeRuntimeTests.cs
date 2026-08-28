@@ -278,6 +278,177 @@ namespace WasteCity.Tests.EditMode
                 Is.EqualTo(corpse.Corpse.EquipmentIds));
         }
 
+        [Test]
+        public void FormalCharacterContactRequiresActiveSourceWithinOnePointFive()
+        {
+            var target = new CharacterLifeRuntime(CharacterCatalog.CenJin);
+            var rescuer = new CharacterLifeRuntime(CharacterCatalog.LinXi);
+            target.SetPosition(string.Empty, 10, 10);
+            rescuer.SetPosition(string.Empty, 11, 11);
+            target.TryApplyDamageAtRuleTick(
+                1000,
+                "combat.enemy.hit",
+                4ul,
+                out _);
+
+            CharacterRescueValidity valid =
+                CharacterRescueRules.EvaluateCharacterContact(
+                    target,
+                    rescuer,
+                    5ul);
+            Assert.That(valid.IsValid, Is.True);
+            Assert.That(valid.Distance, Is.LessThanOrEqualTo(1.5f));
+            Assert.That(target.TryBeginCharacterContactRescue(
+                rescuer,
+                5ul,
+                2,
+                out int reserve,
+                out string error), Is.True, error);
+            Assert.That(reserve, Is.EqualTo(2));
+
+            CharacterLifeTickResult interrupted = target.TickFormalRescue(
+                1f,
+                false,
+                rescuer,
+                null,
+                0,
+                0,
+                6ul);
+            Assert.That(interrupted.Kind, Is.EqualTo(CharacterLifeTickKind.None));
+
+            rescuer.SetPosition(string.Empty, 12, 10);
+            interrupted = target.TickFormalRescue(
+                1f,
+                false,
+                rescuer,
+                null,
+                0,
+                0,
+                7ul);
+            Assert.That(interrupted.Kind,
+                Is.EqualTo(CharacterLifeTickKind.RescueInterrupted));
+            Assert.That(interrupted.InterruptionReason,
+                Is.EqualTo(CharacterRescueInterruptionReason.LeftRange));
+            Assert.That(interrupted.ReleasedBiomass, Is.EqualTo(2));
+
+            var inactive = new CharacterLifeRuntime(CharacterCatalog.HanGu);
+            inactive.SetPosition(string.Empty, 10, 11);
+            inactive.TryApplyDamageAtRuleTick(
+                1000,
+                "combat.enemy.hit",
+                7ul,
+                out _);
+            CharacterRescueValidity invalid =
+                CharacterRescueRules.EvaluateCharacterContact(
+                    target,
+                    inactive,
+                    8ul);
+            Assert.That(invalid.Code,
+                Is.EqualTo(CharacterRescueValidityCode.SourceNotActive));
+        }
+
+        [Test]
+        public void RescuerDamageRevisionInterruptsSameTickAndRefundsReservation()
+        {
+            var target = new CharacterLifeRuntime(CharacterCatalog.CenJin);
+            var rescuer = new CharacterLifeRuntime(CharacterCatalog.LinXi);
+            target.SetPosition(string.Empty, 3, 3);
+            rescuer.SetPosition(string.Empty, 4, 3);
+            target.TryApplyDamageAtRuleTick(
+                1000,
+                "combat.enemy.hit",
+                10ul,
+                out _);
+            target.TryBeginCharacterContactRescue(
+                rescuer,
+                11ul,
+                2,
+                out _,
+                out _);
+
+            ulong beforeRevision = rescuer.DamageRevision;
+            Assert.That(rescuer.TryApplyDamageAtRuleTick(
+                1,
+                "combat.enemy.hit",
+                12ul,
+                out _), Is.True);
+            Assert.That(rescuer.DamageRevision, Is.EqualTo(beforeRevision + 1ul));
+            Assert.That(rescuer.WasDamagedAtRuleTick(12ul), Is.True);
+
+            CharacterLifeTickResult result = target.TickFormalRescue(
+                1f,
+                false,
+                rescuer,
+                null,
+                0,
+                0,
+                12ul);
+            Assert.That(result.Kind,
+                Is.EqualTo(CharacterLifeTickKind.RescueInterrupted));
+            Assert.That(result.InterruptionReason,
+                Is.EqualTo(CharacterRescueInterruptionReason.RescuerDamaged));
+            Assert.That(result.ReleasedBiomass, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void FormalCityMedicalRequiresTargetWithinThreeCellsAndCanComplete()
+        {
+            var target = new CharacterLifeRuntime(CharacterCatalog.HanGu);
+            target.SetPosition(string.Empty, 20, 20);
+            target.TryApplyDamageAtRuleTick(
+                1000,
+                "combat.enemy.hit",
+                20ul,
+                out _);
+
+            Assert.That(CharacterRescueRules.EvaluateCityMedical(
+                    target,
+                    CharacterCatalog.MainCityId,
+                    23,
+                    20).IsValid,
+                Is.True);
+            Assert.That(target.TryBeginCityMedicalRescue(
+                CharacterCatalog.MainCityId,
+                23,
+                20,
+                2,
+                out _,
+                out string error), Is.True, error);
+            CharacterLifeTickResult completed = target.TickFormalRescue(
+                4f,
+                false,
+                null,
+                CharacterCatalog.MainCityId,
+                23,
+                20,
+                21ul);
+            Assert.That(completed.Kind,
+                Is.EqualTo(CharacterLifeTickKind.RescueCompleted));
+
+            var tooFar = new CharacterLifeRuntime(CharacterCatalog.CenJin);
+            tooFar.SetPosition(string.Empty, 20, 20);
+            tooFar.TryApplyDamageAtRuleTick(
+                1000,
+                "combat.enemy.hit",
+                20ul,
+                out _);
+            CharacterRescueValidity invalid =
+                CharacterRescueRules.EvaluateCityMedical(
+                    tooFar,
+                    CharacterCatalog.MainCityId,
+                    24,
+                    20);
+            Assert.That(invalid.Code,
+                Is.EqualTo(CharacterRescueValidityCode.CityOutOfRange));
+            Assert.That(tooFar.TryBeginCityMedicalRescue(
+                CharacterCatalog.MainCityId,
+                24,
+                20,
+                2,
+                out _,
+                out _), Is.False);
+        }
+
         private static void AssertCharacterSnapshotsEqual(
             CharacterLifeSnapshot expected,
             CharacterLifeSnapshot actual)
@@ -293,6 +464,10 @@ namespace WasteCity.Tests.EditMode
                 Is.EqualTo(expected.Rescue?.RemainingSeconds));
             Assert.That(actual.PermanentInjuryIds,
                 Is.EqualTo(expected.PermanentInjuryIds));
+            Assert.That(actual.DamageRevision,
+                Is.EqualTo(expected.DamageRevision));
+            Assert.That(actual.LastDamageRuleTick,
+                Is.EqualTo(expected.LastDamageRuleTick));
         }
     }
 }

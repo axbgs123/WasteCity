@@ -43,6 +43,9 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxCivilizationAdvancementView3D advancementView;
         [SerializeField]
         private GrayboxCivilizationExpansionView3D civilizationExpansionView;
+        [SerializeField]
+        private GrayboxCivilizationExpansionController3D
+            civilizationExpansionController;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
         private Func<bool> tryAdvanceOrOpen;
@@ -72,6 +75,15 @@ namespace WasteCity.Graybox3D.Usability
         {
             civilizationExpansionView = view ??
                 throw new ArgumentNullException(nameof(view));
+        }
+
+        public void ConfigureCivilizationExpansion(
+            GrayboxCivilizationExpansionView3D view,
+            GrayboxCivilizationExpansionController3D controller)
+        {
+            ConfigureCivilizationExpansion(view);
+            civilizationExpansionController = controller ??
+                throw new ArgumentNullException(nameof(controller));
         }
 
         public void ConfigureFormalSaveEntry(
@@ -279,6 +291,27 @@ namespace WasteCity.Graybox3D.Usability
                     keyboard.homeKey.wasPressedThisFrame)
                 {
                     operations.FitResearchTree();
+                }
+                return SuppressAll();
+            }
+
+            if (civilizationExpansionController != null &&
+                civilizationExpansionController.HasPendingMapTarget)
+            {
+                Mouse mouse = Mouse.current;
+                bool cancelTarget = escapePressed ||
+                    mouse != null &&
+                    mouse.rightButton.wasPressedThisFrame;
+                if (cancelTarget)
+                {
+                    civilizationExpansionController.CancelMapTarget();
+                    return SuppressAll();
+                }
+                if (mouse != null &&
+                    mouse.leftButton.wasPressedThisFrame)
+                {
+                    civilizationExpansionController.TryCommitMapTarget(
+                        mouse.position.ReadValue());
                 }
                 return SuppressAll();
             }
@@ -493,6 +526,7 @@ namespace WasteCity.Graybox3D.Usability
             fateOperationsView = null;
             advancementView = null;
             civilizationExpansionView = null;
+            civilizationExpansionController = null;
             tryAdvanceOrOpen = null;
             tryContinueAdvancement = null;
             developmentPanel = null;

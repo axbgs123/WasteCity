@@ -206,6 +206,12 @@ namespace WasteCity.World.CivilizationExpansion
                 : null;
         }
 
+        public bool IsEscortCommittedToUnfinishedConvoy(string squadId)
+        {
+            return !string.IsNullOrWhiteSpace(squadId) &&
+                IsEscortAssignedToUnfinishedConvoy(squadId);
+        }
+
         public bool TryDispatch(
             string sessionId,
             string sourceSettlementId,
@@ -226,6 +232,13 @@ namespace WasteCity.World.CivilizationExpansion
                  escortStatus?.IsKnownSquad(escortSquadId) != true))
             {
                 error = "Convoy escort squad ID is invalid.";
+                return false;
+            }
+            if (!string.IsNullOrWhiteSpace(escortSquadId) &&
+                (escortStatus?.IsNonDormant(escortSquadId) != true ||
+                 IsEscortAssignedToUnfinishedConvoy(escortSquadId)))
+            {
+                error = "护送小队正在出征、休眠或已被运输队占用";
                 return false;
             }
             if (!worldLayer.TryGetInventoryEndpoint(
@@ -358,6 +371,7 @@ namespace WasteCity.World.CivilizationExpansion
             }
             var candidate = new SortedDictionary<string, ConvoyState>(
                 StringComparer.Ordinal);
+            var assignedEscorts = new HashSet<string>(StringComparer.Ordinal);
             var maximumOrdinal = 0;
             for (var index = 0; index < snapshot.Convoys.Count; index++)
             {
@@ -368,7 +382,10 @@ namespace WasteCity.World.CivilizationExpansion
                         out ConvoyState restored,
                         out int ordinal,
                         out error) ||
-                    !candidate.TryAdd(restored.StableId, restored))
+                    !candidate.TryAdd(restored.StableId, restored) ||
+                    IsUnfinished(restored.Status) &&
+                    !string.IsNullOrWhiteSpace(restored.EscortSquadId) &&
+                    !assignedEscorts.Add(restored.EscortSquadId))
                 {
                     if (string.IsNullOrEmpty(error))
                         error = "Transport snapshot contains duplicate convoys.";
@@ -406,23 +423,24 @@ namespace WasteCity.World.CivilizationExpansion
 
         private bool ResolveRisk(ConvoyState state)
         {
-            if (escortStatus is IConvoyInterceptionImmunityProvider immunity &&
-                immunity.TryConsumeConvoyInterceptionImmunity())
-            {
-                state.AppliedRiskPercent = 0;
-                state.RiskResolved = true;
-                AdvanceRevision();
-                return true;
-            }
             bool escorted = !string.IsNullOrWhiteSpace(state.EscortSquadId) &&
                 escortStatus?.IsNonDormant(state.EscortSquadId) == true;
             state.AppliedRiskPercent = escorted
                 ? WorldLayerCatalog.EscortedInterceptionPercent
                 : WorldLayerCatalog.UnescortedInterceptionPercent;
             state.RiskResolved = true;
-            if (DeterministicRiskRoll(state.SessionId, state.StableId) >=
-                state.AppliedRiskPercent)
+            int roll = DeterministicRiskRoll(
+                state.SessionId,
+                state.StableId);
+            if (roll >= state.AppliedRiskPercent)
             {
+                AdvanceRevision();
+                return true;
+            }
+            if (escortStatus is IConvoyInterceptionImmunityProvider immunity &&
+                immunity.TryConsumeConvoyInterceptionImmunity())
+            {
+                state.AppliedRiskPercent = 0;
                 AdvanceRevision();
                 return true;
             }
@@ -510,6 +528,7 @@ namespace WasteCity.World.CivilizationExpansion
                             saved.Status == ConvoyStatus.Destroyed;
             if (terminal != (cargoTotal == 0) ||
                 saved.RiskResolved &&
+                saved.AppliedRiskPercent != 0 &&
                 saved.AppliedRiskPercent !=
                     WorldLayerCatalog.UnescortedInterceptionPercent &&
                 saved.AppliedRiskPercent !=
@@ -547,6 +566,26 @@ namespace WasteCity.World.CivilizationExpansion
             };
             error = string.Empty;
             return true;
+        }
+
+        private bool IsEscortAssignedToUnfinishedConvoy(string squadId)
+        {
+            foreach (KeyValuePair<string, ConvoyState> item in convoys)
+            {
+                if (IsUnfinished(item.Value.Status) &&
+                    string.Equals(
+                        item.Value.EscortSquadId,
+                        squadId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool IsUnfinished(ConvoyStatus status)
+        {
+            return status == ConvoyStatus.InTransit ||
+                   status == ConvoyStatus.WaitingForCapacity;
         }
 
         private bool ValidatePath(

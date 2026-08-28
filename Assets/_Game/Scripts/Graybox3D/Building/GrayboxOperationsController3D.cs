@@ -51,6 +51,7 @@ namespace WasteCity.Graybox3D.Building
         private int selectedBackpackGesture;
         private bool selectedBackpackPlacesOne;
         private bool eventsBound;
+        private Func<float> civilizationResearchEfficiencySource;
         private string inventoryTransferStatus;
         private string craftingFeedback;
         private string selectedProductionId;
@@ -101,6 +102,13 @@ namespace WasteCity.Graybox3D.Building
                 research = new FormalResearchRuntime(
                     session.Research,
                     civilizationLevelProvider: civilizationLevelProvider);
+            hasViewFingerprint = false;
+        }
+
+        public void ConfigureCivilizationResearchEfficiency(
+            Func<float> source)
+        {
+            civilizationResearchEfficiencySource = source;
             hasViewFingerprint = false;
         }
 
@@ -241,7 +249,9 @@ namespace WasteCity.Graybox3D.Building
             bool paused = ruleDeltaSeconds <= 0f;
             crafting.Tick(ruleDeltaSeconds, paused);
             research.Tick(
-                ruleDeltaSeconds,
+                ruleDeltaSeconds * Mathf.Max(
+                    0f,
+                    civilizationResearchEfficiencySource?.Invoke() ?? 1f),
                 city.Mode,
                 paused,
                 HasEligibleResearchStation());
@@ -971,7 +981,11 @@ namespace WasteCity.Graybox3D.Building
                 FormalResearchRuntime.SpeedMultiplier(
                     city.Mode,
                     research.IsCompleted(
-                        ResearchCatalog.ThoughtAccelerationId)) * 100f);
+                        ResearchCatalog.ThoughtAccelerationId)) *
+                Mathf.Max(
+                    0f,
+                    civilizationResearchEfficiencySource?.Invoke() ?? 1f) *
+                100f);
             return Mathf.RoundToInt(normalized * 100f) + "% · 剩余 " +
                 research.Model.Remaining.ToString("0.0") +
                 " 秒 · 效率 " + efficiency + "%" + pausedReason;

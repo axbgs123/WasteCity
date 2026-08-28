@@ -769,8 +769,6 @@ namespace WasteCity.World.CivilizationExpansion
                         out error) ||
                     !candidate.TryAdd(restored.StableId, restored) ||
                     !IsPassableCell(restored.X, restored.Y) ||
-                    restored.Kind != SettlementKind.PrimaryCity &&
-                    !map.IsRevealed(restored.X, restored.Y) ||
                     !occupied.Add(CellKey(restored.X, restored.Y)))
                 {
                     if (string.IsNullOrEmpty(error))

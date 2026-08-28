@@ -523,9 +523,41 @@ namespace WasteCity.Persistence
                 expansion.worldLayer,
                 path + ".worldLayer");
             if (result != null) return result;
-            return ValidateExpansionPolitics(
+            result = ValidateExpansionPolitics(
                 expansion.charactersPolitics,
+                expansion.worldLayer,
                 path + ".charactersPolitics");
+            if (result != null) return result;
+            if (!string.Equals(
+                    expansion.armyLeader.leader.characterId,
+                    expansion.charactersPolitics.currentLeaderId,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".armyLeader.leader.characterId");
+            if (expansion.charactersPolitics.characters.Length > 0)
+            {
+                FormalThreeDCharacterSaveData current = null;
+                for (var index = 0;
+                     index < expansion.charactersPolitics.characters.Length;
+                     index++)
+                    if (string.Equals(
+                            expansion.charactersPolitics.characters[index]
+                                .characterId,
+                            expansion.charactersPolitics.currentLeaderId,
+                            StringComparison.Ordinal))
+                        current = expansion.charactersPolitics
+                            .characters[index];
+                if (current == null ||
+                    expansion.armyLeader.leader.recruited !=
+                        (current.state != (int)CharacterLifeState.Dead) ||
+                    expansion.armyLeader.leader.injured !=
+                        (current.state != (int)CharacterLifeState.Active))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".armyLeader.leader");
+            }
+            return null;
         }
 
         private static FormalSaveValidationResult ValidateExpansionArmy(
@@ -537,11 +569,15 @@ namespace WasteCity.Persistence
                 army.nextExpeditionOrdinal < 1 ||
                 army.units.Length > SingleCityArmyModel
                     .DefaultSquadMaximumUnits ||
-                army.leaderHealthy && !army.leaderAssigned)
+                army.leaderHealthy && !army.leaderAssigned ||
+                army.leader == null ||
+                !IsStableId(army.leader.characterId) ||
+                !IsFinite(army.leader.x) || !IsFinite(army.leader.y))
                 return Invalid(
                     FormalSaveValidationError.InvalidHighWaterMark,
                     path);
             var unitIds = new HashSet<string>(StringComparer.Ordinal);
+            ulong maximumUnitOrdinal = 0;
             for (var index = 0; index < army.units.Length; index++)
             {
                 FormalThreeDArmyUnitSaveData unit = army.units[index];
@@ -564,6 +600,52 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidArray,
                         item);
+                string suffix = unit.stableUnitId.StartsWith(
+                        "core.army-unit.",
+                        StringComparison.Ordinal)
+                    ? unit.stableUnitId.Substring(
+                        "core.army-unit.".Length)
+                    : string.Empty;
+                if (!ulong.TryParse(
+                        suffix,
+                        NumberStyles.None,
+                        CultureInfo.InvariantCulture,
+                        out ulong ordinal) || ordinal == 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        item + ".stableUnitId");
+                maximumUnitOrdinal = Math.Max(maximumUnitOrdinal, ordinal);
+            }
+            if (army.nextUnitOrdinal <= maximumUnitOrdinal)
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".nextUnitOrdinal");
+            var manufacturingIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < army.manufacturing.Length; index++)
+            {
+                FormalThreeDArmyManufacturingSaveData item =
+                    army.manufacturing[index];
+                ArmyUnitDefinition definition = item == null
+                    ? null
+                    : ArmyUnitCatalog.Find(item.definitionId);
+                if (definition == null ||
+                    !manufacturingIds.Add(item.definitionId) ||
+                    !IsFinite(item.progressSeconds) ||
+                    item.progressSeconds < 0f ||
+                    item.progressSeconds > definition.ManufactureSeconds)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".manufacturing[" + index + "]");
+            }
+            var lossIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < army.losses.Length; index++)
+            {
+                FormalThreeDArmyLossSaveData item = army.losses[index];
+                if (item == null || ArmyUnitCatalog.Find(item.definitionId) ==
+                        null || !lossIds.Add(item.definitionId) || item.count <= 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".losses[" + index + "]");
             }
             if (army.units.Length > 0 && army.squads.Length != 1)
                 return Invalid(
@@ -582,7 +664,9 @@ namespace WasteCity.Persistence
                     squad.hasExpeditionTarget !=
                         (squad.command == (int)
                             FriendlySquadCommandType.Expedition) ||
-                    squad.unitIds == null)
+                    squad.unitIds == null ||
+                    squad.leaderAssigned != army.leaderAssigned ||
+                    squad.leaderHealthy != army.leaderHealthy)
                     return Invalid(
                         FormalSaveValidationError.InvalidArray,
                         path + ".squads[0]");
@@ -619,6 +703,69 @@ namespace WasteCity.Persistence
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
                     path + ".expedition");
+            if (army.expedition != null &&
+                army.expedition.phase != (int)ArmyExpeditionStatus.Idle)
+            {
+                FormalThreeDArmyExpeditionSaveData expedition =
+                    army.expedition;
+                if (string.IsNullOrWhiteSpace(expedition.sessionId) ||
+                    !IsFinite(expedition.remainingSeconds) ||
+                    !IsFinite(expedition.outboundDurationSeconds) ||
+                    !IsFinite(expedition.returnDurationSeconds) ||
+                    expedition.remainingSeconds < 0f ||
+                    expedition.outboundDurationSeconds < 0f ||
+                    expedition.returnDurationSeconds < 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".expedition");
+                FormalSaveValidationResult amounts = ValidateAmounts(
+                    expedition.pendingLoot,
+                    path + ".expedition.pendingLoot");
+                if (amounts != null) return amounts;
+                for (var index = 0;
+                     index < expedition.pendingLoot.Length;
+                     index++)
+                    if (!IsValidExpeditionLoot(
+                            expedition.pendingLoot[index]))
+                        return Invalid(
+                            FormalSaveValidationError.InvalidArray,
+                            path + ".expedition.pendingLoot[" + index + "]");
+                var expeditionUnits = new HashSet<string>(
+                    StringComparer.Ordinal);
+                for (var index = 0; index < expedition.units.Length; index++)
+                {
+                    FormalThreeDArmyExpeditionUnitSaveData unit =
+                        expedition.units[index];
+                    if (unit == null || !IsStableId(unit.stableUnitId) ||
+                        !expeditionUnits.Add(unit.stableUnitId) ||
+                        ArmyUnitCatalog.Find(unit.definitionId) == null ||
+                        unit.currentHealth <= 0)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidArray,
+                            path + ".expedition.units[" + index + "]");
+                }
+                for (var index = 0;
+                     index < expedition.casualtyStableUnitIds.Length;
+                     index++)
+                {
+                    if (!expeditionUnits.Contains(
+                            expedition.casualtyStableUnitIds[index]))
+                        return Invalid(
+                            FormalSaveValidationError
+                                .MissingStableReference,
+                            path + ".expedition.casualtyStableUnitIds");
+                }
+                for (var index = 0;
+                     index < expedition.enemyDefinitionIds.Length;
+                     index++)
+                {
+                    if (!IsKnownEnemy(expedition.enemyDefinitionIds[index]))
+                        return Invalid(
+                            FormalSaveValidationError.InvalidStableId,
+                            path + ".expedition.enemyDefinitionIds[" +
+                            index + "]");
+                }
+            }
             return null;
         }
 
@@ -643,6 +790,7 @@ namespace WasteCity.Persistence
                             .MissingStableReference,
                         path + ".convoys");
             var settlements = new HashSet<string>(StringComparer.Ordinal);
+            var occupied = new HashSet<string>(StringComparer.Ordinal);
             for (var index = 0; index < world.settlements.Length; index++)
             {
                 FormalThreeDSettlementSaveData item =
@@ -662,6 +810,19 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidWorld,
                         path + ".settlements[" + index + "]");
+                SettlementDefinition definition = WorldLayerCatalog.Find(
+                    item.stableSettlementId);
+                if (definition == null || (int)definition.Kind != item.kind ||
+                    item.x < 0 || item.x >= 64 ||
+                    item.y < 0 || item.y >= 48 ||
+                    !occupied.Add(item.x + "," + item.y))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidWorld,
+                        path + ".settlements[" + index + "]");
+                FormalSaveValidationResult amounts = ValidateAmounts(
+                    item.inventory,
+                    path + ".settlements[" + index + "].inventory");
+                if (amounts != null) return amounts;
             }
             if (!settlements.Contains(world.primaryCityId) ||
                 !settlements.Contains(world.focusedSettlementId) ||
@@ -690,12 +851,46 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidWorld,
                         path + ".convoys[" + index + "]");
+                if (!string.IsNullOrWhiteSpace(item.escortSquadId) &&
+                    !string.Equals(
+                        item.escortSquadId,
+                        SingleCityArmyModel.DefaultSquadId,
+                        StringComparison.Ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        path + ".convoys[" + index + "].escortSquadId");
+                FormalSaveValidationResult cargo = ValidateAmounts(
+                    item.cargo,
+                    path + ".convoys[" + index + "].cargo");
+                if (cargo != null) return cargo;
+                for (var pointIndex = 0;
+                     pointIndex < item.path.Length;
+                     pointIndex++)
+                {
+                    if (item.path[pointIndex] == null ||
+                        item.path[pointIndex].x < 0 ||
+                        item.path[pointIndex].x >= 64 ||
+                        item.path[pointIndex].y < 0 ||
+                        item.path[pointIndex].y >= 48 ||
+                        pointIndex > 0 &&
+                        Math.Abs(
+                            item.path[pointIndex].x -
+                            item.path[pointIndex - 1].x) +
+                        Math.Abs(
+                            item.path[pointIndex].y -
+                            item.path[pointIndex - 1].y) != 1)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidWorld,
+                            path + ".convoys[" + index + "].path[" +
+                            pointIndex + "]");
+                }
             }
             return null;
         }
 
         private static FormalSaveValidationResult ValidateExpansionPolitics(
             FormalThreeDCharactersPoliticsSaveData politics,
+            FormalThreeDWorldLayerSaveData world,
             string path)
         {
             if (politics.characters.Length == 0)
@@ -719,22 +914,75 @@ namespace WasteCity.Persistence
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
                     path);
+            var settlementIds = new HashSet<string>(StringComparer.Ordinal);
+            if (world.settlements.Length == 0)
+                settlementIds.Add(WorldLayerCatalog.PrimaryCity.Id);
+            else
+                for (var index = 0; index < world.settlements.Length; index++)
+                    settlementIds.Add(
+                        world.settlements[index].stableSettlementId);
+            var corpseByCharacter = new Dictionary<
+                string,
+                FormalThreeDCorpseSaveData>(StringComparer.Ordinal);
+            for (var index = 0; index < politics.corpses.Length; index++)
+            {
+                FormalThreeDCorpseSaveData corpse = politics.corpses[index];
+                if (corpse == null || !IsStableId(corpse.corpseId) ||
+                    !IsStableId(corpse.characterId) ||
+                    !settlementIds.Contains(corpse.settlementId) ||
+                    corpse.equipmentIds == null ||
+                    !corpseByCharacter.TryAdd(corpse.characterId, corpse))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".corpses[" + index + "]");
+            }
             var characterIds = new HashSet<string>(StringComparer.Ordinal);
             for (var index = 0; index < politics.characters.Length; index++)
             {
                 FormalThreeDCharacterSaveData item =
                     politics.characters[index];
-                if (item == null || !IsStableId(item.characterId) ||
+                CharacterDefinition definition = item == null
+                    ? null
+                    : CharacterCatalog.Find(item.characterId);
+                bool hasCorpse = item != null &&
+                    corpseByCharacter.ContainsKey(item.characterId);
+                if (item == null || definition == null ||
                     !characterIds.Add(item.characterId) ||
                     !Enum.IsDefined(typeof(CharacterLifeState), item.state) ||
                     item.currentHealth < 0 ||
                     item.currentHealth > item.maximumHealth ||
+                    item.maximumHealth != definition.MaximumHealth ||
                     item.loyalty < 0 || item.loyalty > 100 ||
+                    !settlementIds.Contains(item.assignedSettlementId) ||
+                    !IsFinite(item.downedRemainingSeconds) ||
+                    !IsFinite(item.recoveryRemainingSeconds) ||
+                    !IsFinite(item.downedElapsedSeconds) ||
+                    item.downedRemainingSeconds < 0f ||
+                    item.recoveryRemainingSeconds < 0f ||
                     item.permanentInjuryIds == null ||
-                    item.equipmentIds == null)
+                    item.equipmentIds == null ||
+                    item.lastDamageRuleTick != ulong.MaxValue &&
+                    item.lastDamageRuleTick > politics.revision ||
+                    !CharacterStateMatches(item, hasCorpse))
                     return Invalid(
                         FormalSaveValidationError.InvalidArray,
                         path + ".characters[" + index + "]");
+                if (item.rescue != null &&
+                    !string.IsNullOrWhiteSpace(item.rescue.sourceId) &&
+                    (!Enum.IsDefined(
+                         typeof(CharacterRescueMethod),
+                         item.rescue.method) ||
+                     item.rescue.reservedBiomass !=
+                         CharacterLifeRuntime.RescueBiomassCost ||
+                     !IsFinite(item.rescue.remainingSeconds) ||
+                     item.rescue.remainingSeconds <= 0f ||
+                     !string.Equals(
+                         item.rescue.targetCharacterId,
+                         item.characterId,
+                         StringComparison.Ordinal)))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".characters[" + index + "].rescue");
             }
             if (!characterIds.Contains(politics.currentLeaderId) ||
                 !string.IsNullOrWhiteSpace(
@@ -750,7 +998,8 @@ namespace WasteCity.Persistence
             {
                 FormalThreeDInternalFactionSaveData item =
                     politics.internalFactions[index];
-                if (item == null || !IsStableId(item.factionId) ||
+                if (item == null ||
+                    !IsKnownInternalFaction(item.factionId) ||
                     !factionIds.Add(item.factionId) ||
                     item.influence < 0 || item.influence > 100 ||
                     item.loyalty < 0 || item.loyalty > 100 ||
@@ -758,7 +1007,35 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidArray,
                         path + ".internalFactions[" + index + "]");
+                var supportedCharacters = new HashSet<string>(
+                    StringComparer.Ordinal);
+                for (var supportIndex = 0;
+                     supportIndex < item.candidateSupports.Length;
+                     supportIndex++)
+                {
+                    FormalThreeDFactionCandidateSupportSaveData support =
+                        item.candidateSupports[supportIndex];
+                    if (support == null ||
+                        !characterIds.Contains(support.characterId) ||
+                        !supportedCharacters.Add(support.characterId) ||
+                        support.support < 0 || support.support > 100)
+                        return Invalid(
+                            FormalSaveValidationError.InvalidArray,
+                            path + ".internalFactions[" + index +
+                            "].candidateSupports");
+                }
             }
+            if (politics.succession != null &&
+                politics.succession.phase != 0 &&
+                (politics.succession.phase != 1 ||
+                 !characterIds.Contains(
+                     politics.succession.selectedCandidateId) ||
+                 !IsFinite(politics.succession.support) ||
+                 politics.succession.support < 0f ||
+                 politics.succession.support > 100f))
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".succession");
             factionIds.Clear();
             for (var index = 0;
                  index < politics.externalFactions.Length;
@@ -766,7 +1043,8 @@ namespace WasteCity.Persistence
             {
                 FormalThreeDExternalFactionSaveData item =
                     politics.externalFactions[index];
-                if (item == null || !IsStableId(item.factionId) ||
+                if (item == null ||
+                    !IsKnownExternalFaction(item.factionId) ||
                     !factionIds.Add(item.factionId) ||
                     item.relation < DiplomacyRuntime.MinimumRelation ||
                     item.relation > DiplomacyRuntime.MaximumRelation ||
@@ -780,8 +1058,151 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidArray,
                         path + ".externalFactions[" + index + "]");
+                if (item.activeOffer != null &&
+                    !string.IsNullOrWhiteSpace(item.activeOffer.offerId) &&
+                    !ValidateDiplomacyOffer(
+                        item.activeOffer,
+                        item.factionId))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".externalFactions[" + index +
+                        "].activeOffer");
             }
+            FormalThreeDCharacterSaveData leader = null;
+            for (var index = 0; index < politics.characters.Length; index++)
+                if (string.Equals(
+                        politics.characters[index].characterId,
+                        politics.currentLeaderId,
+                        StringComparison.Ordinal))
+                    leader = politics.characters[index];
+            if (leader == null ||
+                (politics.leadershipState == 1) !=
+                    (leader.state == (int)CharacterLifeState.Dead) ||
+                politics.leadershipState != 0 &&
+                politics.leadershipState != 1 ||
+                !IsFinite(politics.councilEfficiencyMultiplier) ||
+                Math.Abs(
+                    politics.councilEfficiencyMultiplier -
+                    (politics.leadershipState == 1 ? .75f : 1f)) > .0001f)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".leadershipState");
             return null;
+        }
+
+        private static bool CharacterStateMatches(
+            FormalThreeDCharacterSaveData item,
+            bool hasCorpse)
+        {
+            switch ((CharacterLifeState)item.state)
+            {
+                case CharacterLifeState.Active:
+                    return item.currentHealth > 0 &&
+                        item.downedRemainingSeconds == 0f &&
+                        item.recoveryRemainingSeconds == 0f &&
+                        !hasCorpse &&
+                        (item.rescue == null ||
+                         string.IsNullOrWhiteSpace(item.rescue.sourceId));
+                case CharacterLifeState.Downed:
+                    return item.currentHealth == 0 &&
+                        item.downedRemainingSeconds > 0f &&
+                        item.downCount > 0 &&
+                        !string.IsNullOrWhiteSpace(item.downedCauseId) &&
+                        !hasCorpse;
+                case CharacterLifeState.Recovering:
+                    return item.currentHealth > 0 &&
+                        item.recoveryRemainingSeconds > 0f &&
+                        item.downCount > 0 && !hasCorpse;
+                case CharacterLifeState.Dead:
+                    return item.currentHealth == 0 && hasCorpse &&
+                        item.equipmentIds.Length == 0;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsValidExpeditionLoot(
+            FormalThreeDResourceAmountSaveData amount)
+        {
+            if (amount == null) return false;
+            if (amount.resourceId == ResourceIds.Alloy)
+                return amount.amount >= 10 && amount.amount <= 24;
+            if (amount.resourceId == ResourceIds.Biomass)
+                return amount.amount >= 8 && amount.amount <= 20;
+            if (amount.resourceId == ResourceIds.EnergyCrystal)
+                return amount.amount >= 4 && amount.amount <= 12;
+            return false;
+        }
+
+        private static bool IsKnownEnemy(string id)
+        {
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+                if (string.Equals(
+                        EnemyCatalog.All[index].Id.Value,
+                        id,
+                        StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+
+        private static bool IsKnownInternalFaction(string id)
+        {
+            for (var index = 0;
+                 index < InternalFactionCatalog.All.Count;
+                 index++)
+                if (string.Equals(
+                        InternalFactionCatalog.All[index].Id.Value,
+                        id,
+                        StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+
+        private static bool IsKnownExternalFaction(string id)
+        {
+            for (var index = 0;
+                 index < ExternalFactionCatalog.All.Count;
+                 index++)
+                if (string.Equals(
+                        ExternalFactionCatalog.All[index].Id.Value,
+                        id,
+                        StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+
+        private static bool ValidateDiplomacyOffer(
+            FormalThreeDDiplomacyOfferSaveData offer,
+            string factionId)
+        {
+            if (!IsStableId(offer.offerId) || !string.Equals(
+                    offer.factionId,
+                    factionId,
+                    StringComparison.Ordinal) ||
+                !Enum.IsDefined(typeof(DiplomacyOfferKind), offer.kind) ||
+                !IsFinite(offer.remainingSeconds) ||
+                offer.remainingSeconds <= 0f ||
+                offer.remainingSeconds > DiplomacyRuntime.OfferRefreshSeconds)
+                return false;
+            switch ((DiplomacyOfferKind)offer.kind)
+            {
+                case DiplomacyOfferKind.AlloyForStone:
+                    return offer.giveResourceId == ResourceIds.Alloy &&
+                        offer.giveAmount == 10 &&
+                        offer.receiveResourceId == ResourceIds.Stone &&
+                        offer.receiveAmount == 20;
+                case DiplomacyOfferKind.BiomassForEnergyCrystal:
+                    return offer.giveResourceId == ResourceIds.Biomass &&
+                        offer.giveAmount == 12 &&
+                        offer.receiveResourceId == ResourceIds.EnergyCrystal &&
+                        offer.receiveAmount == 8;
+                default:
+                    return offer.giveResourceId == ResourceIds.Ammunition &&
+                        offer.giveAmount == 15 &&
+                        string.IsNullOrEmpty(offer.receiveResourceId) &&
+                        offer.receiveAmount == 0 &&
+                        offer.grantsConvoyImmunity;
+            }
         }
 
         private static FormalSaveValidationResult ValidateProgression(

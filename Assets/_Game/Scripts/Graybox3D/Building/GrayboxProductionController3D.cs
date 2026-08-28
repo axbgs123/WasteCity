@@ -88,6 +88,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxWorldView3D worldView;
 
         private Func<bool> persistencePauseSource;
+        private Func<float> civilizationEfficiencySource;
 
         public GrayboxProductionClock3D Clock { get; } =
             new GrayboxProductionClock3D();
@@ -102,6 +103,12 @@ namespace WasteCity.Graybox3D.Building
         public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
         {
             persistencePauseSource = pauseSource;
+        }
+
+        public void ConfigureCivilizationEfficiencySource(
+            Func<float> source)
+        {
+            civilizationEfficiencySource = source;
         }
 
         public void Configure(
@@ -175,7 +182,9 @@ namespace WasteCity.Graybox3D.Building
                 }
 
                 Clock.Tick(
-                    ruleDeltaSeconds,
+                    ruleDeltaSeconds * Mathf.Max(
+                        0f,
+                        civilizationEfficiencySource?.Invoke() ?? 1f),
                     paused || IsPersistencePaused,
                     session.Instances,
                     city.Mode,
