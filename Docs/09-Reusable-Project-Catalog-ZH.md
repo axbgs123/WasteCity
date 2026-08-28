@@ -548,6 +548,26 @@
 
 能解决什么：用于编辑器生成正式灰盒场景，并保证文明升阶 View、Host、输入协调器及既有命轨/存档组件为稳定单实例引用。在哪里：`Assets/_Game/Editor/GrayboxSceneAuthoring.cs`。怎么复用：用于编辑器生成正式灰盒场景，并保证文明升阶 View、Host、输入协调器及既有命轨/存档组件为稳定单实例引用。不能负责什么：只在编辑器场景生成与修复时调用，不执行升阶领域命令、不保存运行时状态，也不替代 GrayboxSceneContractTests 的单实例和引用验证。改后跑哪组测试：`GrayboxSceneContractTests`。代码名：`GrayboxSceneAuthoring`。
 
+### 文明扩展组合运行时（复用前审查）
+
+能解决什么：组合唯一军队、远征、世界层、运输、角色、内政和外交owner，并把正式3D库存、建筑、地图、领袖、Defense与规则时钟作为窄接口注入。在哪里：`Assets/_Game/Scripts/CivilizationExpansion/CivilizationExpansionRuntime.cs`、`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`。怎么复用：组合唯一军队、远征、世界层、运输、角色、内政和外交owner，并把正式3D库存、建筑、地图、领袖、Defense与规则时钟作为窄接口注入。不能负责什么：不复制主城库存、地图、放置或敌人真值；程序化标记和M/N/P面板只读快照并提交命令，不能反向拥有领域状态。改后跑哪组测试：`GrayboxCivilizationExpansionUiInputTests`、`GrayboxCivilizationExpansionRuntimeInputTests`。代码名：`CivilizationExpansionRuntime`、`GrayboxCivilizationExpansionController3D`。
+
+### 军队制造与远征运行时（推荐复用）
+
+能解决什么：提供四类配置化单位、单稳定小队、原子制造与维护休眠、五类命令、确定性远征和返城战利品。在哪里：`Assets/_Game/Scripts/Combat/ArmyUnitCatalog.cs`、`Assets/_Game/Scripts/Combat/SingleCityArmyModel.cs`、`Assets/_Game/Scripts/Combat/ArmyExpeditionModel.cs`。怎么复用：提供四类配置化单位、单稳定小队、原子制造与维护休眠、五类命令、确定性远征和返城战利品。不能负责什么：只消费城市库存与既有敌人目录；不拥有建筑完成、地图揭示、Defense敌人或Unity表现真值。改后跑哪组测试：`ArmyUnitCatalogTests`、`SingleCityArmyModelTests`、`ArmyExpeditionModelTests`、`ArmyPersistenceModelTests`。代码名：`ArmyUnitCatalog`、`SingleCityArmyModel`、`ArmyExpeditionModel`。
+
+### 多城市世界层与运输运行时（推荐复用）
+
+能解决什么：提供主城引用、一次城、一前哨、独立库存/自治、查看与控制权以及存在时间、货物和风险的实体运输队。在哪里：`Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs`、`Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs`、`Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs`。怎么复用：提供主城引用、一次城、一前哨、独立库存/自治、查看与控制权以及存在时间、货物和风险的实体运输队。不能负责什么：主城仍引用既有库存，位置和路径只消费WorldMapModel与CityPathfinder；不创建第二张地图或第二套主城建筑网格。改后跑哪组测试：`IDEA0022WorldLayerSettlementTransportTests`。代码名：`WorldLayerRuntime`、`SettlementRuntime`、`TransportRuntime`。
+
+### 角色生命、继承与外交运行时（推荐复用）
+
+能解决什么：提供三角色倒地/救援/恢复/死亡遗体、议会/继承/政变和两外部势力接触/报价/协议状态。在哪里：`Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterLifeRuntime.cs`、`Assets/_Game/Scripts/Leader/CivilizationExpansion/LeadershipPoliticsRuntime.cs`、`Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs`。怎么复用：提供三角色倒地/救援/恢复/死亡遗体、议会/继承/政变和两外部势力接触/报价/协议状态。不能负责什么：资源代价和城市忠诚通过显式authority提交；不拥有城市库存、settlement或UI，不实现实体内战和完整AI文明。改后跑哪组测试：`IDEA0022CharacterLifeRuntimeTests`、`IDEA0022LeadershipPoliticsRuntimeTests`、`IDEA0022DiplomacyRuntimeTests`。代码名：`CharacterLifeRuntime`、`LeadershipPoliticsRuntime`、`DiplomacyRuntime`。
+
+### schema 34 文明扩展存档适配器（复用前审查）
+
+能解决什么：在文明扩展各领域不可变快照与schema 34单一聚合DTO之间执行确定性映射，并由正式存档协调器参与回滚。在哪里：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs`、`Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs`。怎么复用：在文明扩展各领域不可变快照与schema 34单一聚合DTO之间执行确定性映射，并由正式存档协调器参与回滚。不能负责什么：不拥有文件IO、领域tick或场景发现；schema 33只迁移为空的显式初态，不反推不存在的历史。改后跑哪组测试：`FormalSaveSchema34ContractTests`、`GrayboxCivilizationExpansionRuntimeInputTests`。代码名：`GrayboxCivilizationExpansionSaveAdapter3D`、`FormalThreeDCivilizationExpansionSaveData`。
+
 ### 正式构建工具（复用前审查）
 
 能解决什么：用于三类现役 3D 构建：Windows Release、Windows Development 和 universal x86_64+arm64 macOS；构建期间临时登记批准的 URP 管线，带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。在哪里：`Assets/_Game/Editor/FormalBuildTools.cs`。怎么复用：用于三类现役 3D 构建：Windows Release、Windows Development 和 universal x86_64+arm64 macOS；构建期间临时登记批准的 URP 管线，带 -quit 的正式命令行构建还会在编辑器最终退出时恢复受保护文件。不能负责什么：不修改游戏规则，也不提供已退役的 2D 构建入口；构建作用域与命令行最终退出恢复必须还原进入构建前的渲染管线、Quality 序列化状态和四个受保护文件的精确字节：Assets/_Game/Rendering/Graybox3D/GrayboxURP.asset、ProjectSettings/GraphicsSettings.asset、ProjectSettings/QualitySettings.asset、ProjectSettings/ProjectSettings.asset。普通 GUI 构建不得遗留最终退出标记或备份；改后必须运行 GrayboxBuildAndPerformanceTests 中的 universal macOS 与 final-exit 合同，并执行受影响平台的真实构建后哈希检查。改后跑哪组测试：`GrayboxBuildAndPerformanceTests`。代码名：`FormalBuildTools`、`GrayboxRenderPipelineBuildScope`。

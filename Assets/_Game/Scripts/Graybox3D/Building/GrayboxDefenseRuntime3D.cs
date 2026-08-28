@@ -783,6 +783,34 @@ namespace WasteCity.Graybox3D.Building
         public bool HasActivePressureCampaign =>
             activePressureCampaign != null && !activePressureCampaign.IsTerminal;
 
+        public int TryApplyArmyGuardDamage(
+            int rawDamage,
+            DamageType damageType)
+        {
+            SingleCityDefenseCampaignModel targetCampaign = ActiveCampaign;
+            SingleCityDefenseCampaignSnapshot targetSnapshot =
+                targetCampaign?.Snapshot;
+            if (targetSnapshot == null || rawDamage <= 0) return 0;
+            for (var index = 0; index < targetSnapshot.Enemies.Count; index++)
+            {
+                SingleCityDefenseEnemySnapshot enemy =
+                    targetSnapshot.Enemies[index];
+                if (enemy.CurrentHealth <= 0) continue;
+                int applied = targetCampaign.ApplyFriendlyUnitDamage(
+                    enemy.StableId,
+                    SingleCityArmyModel.DefaultSquadId,
+                    rawDamage,
+                    damageType);
+                if (applied > 0)
+                {
+                    campaignSnapshotDirty = true;
+                    snapshotDirty = true;
+                }
+                return applied;
+            }
+            return 0;
+        }
+
         public event Action<string, SingleCityDefenseCampaignResult>
             PressureCampaignTerminalCommitted;
         public event Action<string> CrystalBroodmotherDefeated;

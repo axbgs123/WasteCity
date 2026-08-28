@@ -22,6 +22,9 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDPauseSaveData pause;
         public FormalThreeDProgressionSaveData progression =
             new FormalThreeDProgressionSaveData();
+        public FormalThreeDCivilizationExpansionSaveData
+            civilizationExpansion =
+                new FormalThreeDCivilizationExpansionSaveData();
     }
 
     [Serializable]

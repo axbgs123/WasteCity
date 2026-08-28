@@ -294,6 +294,56 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 39003984}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &46154810
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 46154812}
+  - component: {fileID: 46154811}
+  m_Layer: 0
+  m_Name: GrayboxCivilizationExpansionController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &46154811
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46154810}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c843270a66d3490aab4dd1576f433245, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  city: {fileID: 505702829}
+  world: {fileID: 962754566}
+  session: {fileID: 764810524}
+  defense: {fileID: 293867046}
+  leader: {fileID: 883727725}
+  view: {fileID: 1804086902}
+--- !u!4 &46154812
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 46154810}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 940661388}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &113905060
 GameObject:
   m_ObjectHideFlags: 0
@@ -1684,6 +1734,7 @@ Transform:
   - {fileID: 293867047}
   - {fileID: 1959787200}
   - {fileID: 1259927448}
+  - {fileID: 46154812}
   m_Father: {fileID: 1557591921}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &962754565
@@ -2255,6 +2306,7 @@ MonoBehaviour:
   fateSelectionView: {fileID: 1804086899}
   fateOperationsView: {fileID: 1804086900}
   advancementView: {fileID: 1804086901}
+  civilizationExpansionView: {fileID: 1804086902}
 --- !u!1 &1545501224
 GameObject:
   m_ObjectHideFlags: 0
@@ -2618,6 +2670,7 @@ GameObject:
   - component: {fileID: 1804086899}
   - component: {fileID: 1804086900}
   - component: {fileID: 1804086901}
+  - component: {fileID: 1804086902}
   m_Layer: 5
   m_Name: ProductionObservabilityCanvas
   m_TagString: Untagged
@@ -2787,6 +2840,19 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   canvas: {fileID: 1804086896}
+--- !u!114 &1804086902
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804086891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8f7b79f1de64ca18c17c35a86f5f41c, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  canvas: {fileID: 1804086896}
 --- !u!1 &1959787198
 GameObject:
   m_ObjectHideFlags: 0
@@ -2830,6 +2896,7 @@ MonoBehaviour:
   fateOperationsView: {fileID: 1804086900}
   developerModifier: {fileID: 1573738604}
   advancementView: {fileID: 1804086901}
+  expansionController: {fileID: 46154811}
   inputCoordinator: {fileID: 1513971949}
 --- !u!4 &1959787200
 Transform:

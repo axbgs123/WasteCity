@@ -83,5 +83,21 @@ namespace WasteCity.Tests
             Assert.That(decision.Type, Is.EqualTo(FriendlyUnitDecisionType.Attack));
             Assert.That(decision.TargetId, Is.EqualTo(10));
         }
+
+        [Test]
+        public void FollowLeaderMovesUntilArrivalToleranceThenHolds()
+        {
+            FriendlyUnitDecision moving =
+                FriendlyUnitTacticalRules.DecideFollowLeader(
+                    0f, 0f, 3f, 4f, 1.25f);
+            FriendlyUnitDecision arrived =
+                FriendlyUnitTacticalRules.DecideFollowLeader(
+                    3.5f, 4f, 3f, 4f, 1.25f);
+
+            Assert.That(moving.Type,
+                Is.EqualTo(FriendlyUnitDecisionType.FollowLeader));
+            Assert.That(arrived.Type,
+                Is.EqualTo(FriendlyUnitDecisionType.Hold));
+        }
     }
 }

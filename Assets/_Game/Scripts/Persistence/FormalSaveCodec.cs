@@ -57,6 +57,25 @@ namespace WasteCity.Persistence
             public FormalThreeDPauseSaveData pause;
         }
 
+        [Serializable]
+        private sealed class SchemaThirtyThreePayload
+        {
+            public string sessionId;
+            public FormalThreeDWorldSaveData world;
+            public FormalThreeDCitySaveData city;
+            public FormalThreeDBuildingsSaveData buildings;
+            public FormalThreeDStorageSaveData storage;
+            public FormalThreeDBackpackSaveData backpack;
+            public FormalThreeDCraftingSaveData crafting;
+            public FormalThreeDResearchSaveData research;
+            public FormalThreeDProductionSaveData production;
+            public FormalThreeDDefenseSaveData defense;
+            public FormalThreeDDefenseCampaignSaveData defenseCampaign;
+            public FormalThreeDEvacuationSaveData evacuation;
+            public FormalThreeDPauseSaveData pause;
+            public FormalThreeDProgressionSaveData progression;
+        }
+
         public static string Encode(FormalSaveData data)
         {
             return JsonUtility.ToJson(data, true);
@@ -108,7 +127,9 @@ namespace WasteCity.Persistence
                 return ComputeSchemaThirtyOnePayloadHash(payload);
             if (payload.progression == null)
                 return ComputeSchemaThirtyTwoPayloadHash(payload);
-            return ComputeSchemaThirtyThreePayloadHash(payload);
+            if (payload.civilizationExpansion == null)
+                return ComputeSchemaThirtyThreePayloadHash(payload);
+            return ComputeSchemaThirtyFourPayloadHash(payload);
         }
 
         private static string ComputeSha256(string value)
@@ -193,6 +214,7 @@ namespace WasteCity.Persistence
             if (hasEnvelopeSchema &&
                 (probe.saveSchemaVersion == 31 ||
                  probe.saveSchemaVersion == 32 ||
+                 probe.saveSchemaVersion == 33 ||
                  probe.saveSchemaVersion ==
                     FormalSaveEnvelope.CurrentSchemaVersion))
             {
@@ -245,6 +267,7 @@ namespace WasteCity.Persistence
                     }
                     envelope = MigrateSchemaThirtyOneToThirtyTwo(envelope);
                     envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
+                    envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
                 }
                 else if (probe.saveSchemaVersion == 32)
                 {
@@ -260,6 +283,22 @@ namespace WasteCity.Persistence
                             "旧版存档校验失败");
                     }
                     envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
+                    envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
+                }
+                else if (probe.saveSchemaVersion == 33)
+                {
+                    string legacyHash = ComputeSchemaThirtyThreePayloadHash(
+                        envelope.formal3D);
+                    if (!string.Equals(
+                            legacyHash,
+                            envelope.payloadHashSha256,
+                            StringComparison.Ordinal))
+                    {
+                        return FormalSaveDecodeResult.Failed(
+                            FormalSaveDecodeError.MalformedJson,
+                            "旧版存档校验失败");
+                    }
+                    envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
                 }
                 return FormalSaveDecodeResult.ThreeD(envelope, json);
             }
@@ -361,6 +400,31 @@ namespace WasteCity.Persistence
         private static string ComputeSchemaThirtyThreePayloadHash(
             FormalThreeDSaveData source)
         {
+            FormalThreeDSaveData canonical =
+                CopyPayloadWithCanonicalCampaign(source);
+            var legacy = new SchemaThirtyThreePayload
+            {
+                sessionId = canonical.sessionId,
+                world = canonical.world,
+                city = canonical.city,
+                buildings = canonical.buildings,
+                storage = canonical.storage,
+                backpack = canonical.backpack,
+                crafting = canonical.crafting,
+                research = canonical.research,
+                production = canonical.production,
+                defense = canonical.defense,
+                defenseCampaign = canonical.defenseCampaign,
+                evacuation = canonical.evacuation,
+                pause = canonical.pause,
+                progression = canonical.progression,
+            };
+            return ComputeSha256(JsonUtility.ToJson(legacy, false));
+        }
+
+        private static string ComputeSchemaThirtyFourPayloadHash(
+            FormalThreeDSaveData source)
+        {
             return ComputeSha256(JsonUtility.ToJson(
                 CopyPayloadWithCanonicalCampaign(source),
                 false));
@@ -401,6 +465,7 @@ namespace WasteCity.Persistence
                 evacuation = source.evacuation,
                 pause = source.pause,
                 progression = CopyProgression(source.progression),
+                civilizationExpansion = source.civilizationExpansion,
             };
         }
 
@@ -947,6 +1012,17 @@ namespace WasteCity.Persistence
             envelope.saveSchemaVersion = 33;
             envelope.payloadHashSha256 =
                 ComputeSchemaThirtyThreePayloadHash(envelope.formal3D);
+            return envelope;
+        }
+
+        private static FormalSaveEnvelope MigrateSchemaThirtyThreeToThirtyFour(
+            FormalSaveEnvelope envelope)
+        {
+            envelope.formal3D.civilizationExpansion =
+                new FormalThreeDCivilizationExpansionSaveData();
+            envelope.saveSchemaVersion = 34;
+            envelope.payloadHashSha256 =
+                ComputeSchemaThirtyFourPayloadHash(envelope.formal3D);
             return envelope;
         }
 

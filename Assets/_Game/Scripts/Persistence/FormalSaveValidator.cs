@@ -5,9 +5,12 @@ using System.Text.RegularExpressions;
 using WasteCity.Building;
 using WasteCity.Combat;
 using WasteCity.Defense;
+using WasteCity.Economy;
+using WasteCity.Leader.CivilizationExpansion;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
 using WasteCity.Research;
+using WasteCity.World.CivilizationExpansion;
 
 namespace WasteCity.Persistence
 {
@@ -339,6 +342,9 @@ namespace WasteCity.Persistence
             if (result != null) return result;
             result = ValidateProgression(data.progression);
             if (result != null) return result;
+            result = ValidateCivilizationExpansion(
+                data.civilizationExpansion);
+            if (result != null) return result;
 
             string computedHash =
                 FormalSaveCodec.ComputePayloadHashSha256(data);
@@ -453,6 +459,328 @@ namespace WasteCity.Persistence
             if (data.pause == null) return Missing("formal3D.pause");
             if (data.progression == null)
                 return Missing("formal3D.progression");
+            if (data.civilizationExpansion == null)
+                return Missing("formal3D.civilizationExpansion");
+            return null;
+        }
+
+        private static FormalSaveValidationResult
+            ValidateCivilizationExpansion(
+                FormalThreeDCivilizationExpansionSaveData expansion)
+        {
+            const string path = "formal3D.civilizationExpansion";
+            if (!string.Equals(
+                    expansion.configurationSignature,
+                    FormalThreeDCivilizationExpansionSaveData
+                        .ConfigurationSignature,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".configurationSignature");
+            if (expansion.armyLeader == null)
+                return Missing(path + ".armyLeader");
+            if (expansion.worldLayer == null)
+                return Missing(path + ".worldLayer");
+            if (expansion.charactersPolitics == null)
+                return Missing(path + ".charactersPolitics");
+            if (expansion.armyLeader.leader == null)
+                return Missing(path + ".armyLeader.leader");
+            if (expansion.armyLeader.units == null ||
+                expansion.armyLeader.squads == null ||
+                expansion.armyLeader.manufacturing == null ||
+                expansion.armyLeader.losses == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".armyLeader");
+            if (expansion.worldLayer.settlements == null ||
+                expansion.worldLayer.convoys == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".worldLayer");
+            if (!IsStableId(expansion.worldLayer.primaryCityId) ||
+                !IsStableId(expansion.worldLayer.focusedSettlementId) ||
+                !IsStableId(expansion.worldLayer.controlledCityId))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".worldLayer");
+            if (expansion.charactersPolitics.characters == null ||
+                expansion.charactersPolitics.corpses == null ||
+                expansion.charactersPolitics.internalFactions == null ||
+                expansion.charactersPolitics.externalFactions == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".charactersPolitics");
+            if (!IsStableId(
+                    expansion.charactersPolitics.currentLeaderId))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".charactersPolitics.currentLeaderId");
+            FormalSaveValidationResult result = ValidateExpansionArmy(
+                expansion.armyLeader,
+                path + ".armyLeader");
+            if (result != null) return result;
+            result = ValidateExpansionWorld(
+                expansion.worldLayer,
+                path + ".worldLayer");
+            if (result != null) return result;
+            return ValidateExpansionPolitics(
+                expansion.charactersPolitics,
+                path + ".charactersPolitics");
+        }
+
+        private static FormalSaveValidationResult ValidateExpansionArmy(
+            FormalThreeDArmyLeaderSaveData army,
+            string path)
+        {
+            if (army.nextUnitOrdinal < 1 ||
+                army.nextSquadOrdinal != 2 ||
+                army.nextExpeditionOrdinal < 1 ||
+                army.units.Length > SingleCityArmyModel
+                    .DefaultSquadMaximumUnits ||
+                army.leaderHealthy && !army.leaderAssigned)
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path);
+            var unitIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < army.units.Length; index++)
+            {
+                FormalThreeDArmyUnitSaveData unit = army.units[index];
+                string item = path + ".units[" + index + "]";
+                ArmyUnitDefinition definition = unit == null
+                    ? null
+                    : ArmyUnitCatalog.Find(unit.definitionId);
+                if (unit == null || !IsStableId(unit.stableUnitId) ||
+                    !unitIds.Add(unit.stableUnitId) || definition == null ||
+                    !string.Equals(
+                        unit.squadId,
+                        SingleCityArmyModel.DefaultSquadId,
+                        StringComparison.Ordinal) ||
+                    unit.currentHealth <= 0 ||
+                    unit.currentHealth > definition.MaximumHealth ||
+                    !IsFinite(unit.maintenanceElapsedSeconds) ||
+                    unit.maintenanceElapsedSeconds < 0f ||
+                    unit.maintenanceElapsedSeconds >
+                        definition.MaintenanceSeconds)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        item);
+            }
+            if (army.units.Length > 0 && army.squads.Length != 1)
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".squads");
+            if (army.squads.Length > 0)
+            {
+                FormalThreeDArmySquadSaveData squad = army.squads[0];
+                if (squad == null || !string.Equals(
+                        squad.stableSquadId,
+                        SingleCityArmyModel.DefaultSquadId,
+                        StringComparison.Ordinal) ||
+                    !Enum.IsDefined(
+                        typeof(FriendlySquadCommandType),
+                        squad.command) ||
+                    squad.hasExpeditionTarget !=
+                        (squad.command == (int)
+                            FriendlySquadCommandType.Expedition) ||
+                    squad.unitIds == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".squads[0]");
+                var squadIds = new HashSet<string>(StringComparer.Ordinal);
+                for (var index = 0; index < squad.unitIds.Length; index++)
+                {
+                    if (!unitIds.Contains(squad.unitIds[index]) ||
+                        !squadIds.Add(squad.unitIds[index]))
+                        return Invalid(
+                            FormalSaveValidationError
+                                .MissingStableReference,
+                            path + ".squads[0].unitIds");
+                }
+                if (squadIds.Count != unitIds.Count)
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        path + ".squads[0].unitIds");
+            }
+            if (army.expedition != null &&
+                army.expedition.phase !=
+                    (int)ArmyExpeditionStatus.Idle &&
+                (!Enum.IsDefined(
+                     typeof(ArmyExpeditionStatus),
+                     army.expedition.phase) ||
+                 !string.Equals(
+                     army.expedition.squadId,
+                     SingleCityArmyModel.DefaultSquadId,
+                     StringComparison.Ordinal) ||
+                 army.expedition.expeditionOrdinal < 1 ||
+                 army.expedition.units == null ||
+                 army.expedition.pendingLoot == null ||
+                 army.expedition.enemyDefinitionIds == null ||
+                 army.expedition.casualtyStableUnitIds == null))
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".expedition");
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateExpansionWorld(
+            FormalThreeDWorldLayerSaveData world,
+            string path)
+        {
+            if (!string.Equals(
+                    world.primaryCityId,
+                    WorldLayerCatalog.PrimaryCity.Id,
+                    StringComparison.Ordinal) ||
+                world.nextSettlementOrdinal != 3 ||
+                world.nextConvoyOrdinal < 1)
+                return Invalid(
+                    FormalSaveValidationError.InvalidWorld,
+                    path);
+            if (world.settlements.Length == 0)
+                return world.convoys.Length == 0
+                    ? null
+                    : Invalid(
+                        FormalSaveValidationError
+                            .MissingStableReference,
+                        path + ".convoys");
+            var settlements = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < world.settlements.Length; index++)
+            {
+                FormalThreeDSettlementSaveData item =
+                    world.settlements[index];
+                if (item == null || !IsStableId(item.stableSettlementId) ||
+                    !settlements.Add(item.stableSettlementId) ||
+                    !Enum.IsDefined(typeof(SettlementKind), item.kind) ||
+                    !Enum.IsDefined(
+                        typeof(SettlementAutonomyTemplate),
+                        item.autonomousTemplate) ||
+                    item.population < 0 ||
+                    item.populationCapacity < item.population ||
+                    item.loyalty < 0 || item.loyalty > 100 ||
+                    item.inventory == null ||
+                    !IsFinite(item.productionRemainingSeconds) ||
+                    item.productionRemainingSeconds < 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidWorld,
+                        path + ".settlements[" + index + "]");
+            }
+            if (!settlements.Contains(world.primaryCityId) ||
+                !settlements.Contains(world.focusedSettlementId) ||
+                !settlements.Contains(world.controlledCityId))
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path);
+            var convoys = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < world.convoys.Length; index++)
+            {
+                FormalThreeDConvoySaveData item = world.convoys[index];
+                if (item == null || !IsStableId(item.stableConvoyId) ||
+                    !convoys.Add(item.stableConvoyId) ||
+                    !settlements.Contains(item.sourceSettlementId) ||
+                    !settlements.Contains(item.destinationSettlementId) ||
+                    string.Equals(
+                        item.sourceSettlementId,
+                        item.destinationSettlementId,
+                        StringComparison.Ordinal) ||
+                    !Enum.IsDefined(typeof(ConvoyStatus), item.status) ||
+                    item.path == null || item.cargo == null ||
+                    item.completedPathCells < 0 ||
+                    item.completedPathCells > item.path.Length ||
+                    !IsFinite(item.segmentProgressSeconds) ||
+                    item.segmentProgressSeconds < 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidWorld,
+                        path + ".convoys[" + index + "]");
+            }
+            return null;
+        }
+
+        private static FormalSaveValidationResult ValidateExpansionPolitics(
+            FormalThreeDCharactersPoliticsSaveData politics,
+            string path)
+        {
+            if (politics.characters.Length == 0)
+            {
+                return politics.corpses.Length == 0 &&
+                       politics.internalFactions.Length == 0 &&
+                       politics.externalFactions.Length == 0
+                    ? null
+                    : Invalid(
+                        FormalSaveValidationError
+                            .MissingStableReference,
+                        path);
+            }
+            if (politics.characters.Length != CharacterCatalog.All.Count ||
+                politics.internalFactions.Length !=
+                    InternalFactionCatalog.All.Count ||
+                politics.externalFactions.Length !=
+                    ExternalFactionCatalog.All.Count ||
+                politics.nextOfferOrdinal < 1 ||
+                politics.convoyInterceptionImmunityCharges < 0)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path);
+            var characterIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < politics.characters.Length; index++)
+            {
+                FormalThreeDCharacterSaveData item =
+                    politics.characters[index];
+                if (item == null || !IsStableId(item.characterId) ||
+                    !characterIds.Add(item.characterId) ||
+                    !Enum.IsDefined(typeof(CharacterLifeState), item.state) ||
+                    item.currentHealth < 0 ||
+                    item.currentHealth > item.maximumHealth ||
+                    item.loyalty < 0 || item.loyalty > 100 ||
+                    item.permanentInjuryIds == null ||
+                    item.equipmentIds == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".characters[" + index + "]");
+            }
+            if (!characterIds.Contains(politics.currentLeaderId) ||
+                !string.IsNullOrWhiteSpace(
+                    politics.designatedSuccessorId) &&
+                !characterIds.Contains(politics.designatedSuccessorId))
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".currentLeaderId");
+            var factionIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0;
+                 index < politics.internalFactions.Length;
+                 index++)
+            {
+                FormalThreeDInternalFactionSaveData item =
+                    politics.internalFactions[index];
+                if (item == null || !IsStableId(item.factionId) ||
+                    !factionIds.Add(item.factionId) ||
+                    item.influence < 0 || item.influence > 100 ||
+                    item.loyalty < 0 || item.loyalty > 100 ||
+                    item.candidateSupports == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".internalFactions[" + index + "]");
+            }
+            factionIds.Clear();
+            for (var index = 0;
+                 index < politics.externalFactions.Length;
+                 index++)
+            {
+                FormalThreeDExternalFactionSaveData item =
+                    politics.externalFactions[index];
+                if (item == null || !IsStableId(item.factionId) ||
+                    !factionIds.Add(item.factionId) ||
+                    item.relation < DiplomacyRuntime.MinimumRelation ||
+                    item.relation > DiplomacyRuntime.MaximumRelation ||
+                    !Enum.IsDefined(
+                        typeof(DiplomacyRelationshipState),
+                        item.state) ||
+                    !IsFinite(item.offerCooldownRemainingSeconds) ||
+                    item.offerCooldownRemainingSeconds < 0f ||
+                    item.offerCooldownRemainingSeconds >
+                        DiplomacyRuntime.OfferRefreshSeconds)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        path + ".externalFactions[" + index + "]");
+            }
             return null;
         }
 
@@ -2902,6 +3230,11 @@ namespace WasteCity.Persistence
         {
             while (start < end && char.IsWhiteSpace(json[start])) start++;
             return start;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

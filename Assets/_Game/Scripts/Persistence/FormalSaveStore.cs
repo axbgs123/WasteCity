@@ -161,7 +161,7 @@ namespace WasteCity.Persistence
 
             string json = FormalSaveCodec.EncodeEnvelope(envelope);
             byte[] bytes = Utf8.GetBytes(json);
-            if (!ValidateBytes(bytes))
+            if (!TryValidateBytes(bytes, out string validationDiagnostic))
             {
                 RestoreEnvelopeMetadata(
                     envelope,
@@ -170,7 +170,8 @@ namespace WasteCity.Persistence
                     originalSchemaVersion,
                     originalRuntimeKind,
                     originalPayloadHash);
-                return FailedWrite("保存前语义验证失败");
+                return FailedWrite(
+                    "保存前语义验证失败：" + validationDiagnostic);
             }
 
             FormalSaveFileTransactionResult committed =
@@ -414,17 +415,40 @@ namespace WasteCity.Persistence
 
         private static bool ValidateBytes(byte[] bytes)
         {
-            if (bytes == null) return false;
+            return TryValidateBytes(bytes, out _);
+        }
+
+        private static bool TryValidateBytes(
+            byte[] bytes,
+            out string diagnostic)
+        {
+            diagnostic = string.Empty;
+            if (bytes == null)
+            {
+                diagnostic = "bytes=null";
+                return false;
+            }
             try
             {
                 string json = Utf8.GetString(bytes);
                 FormalSaveDecodeResult decoded =
                     FormalSaveCodec.DecodeAny(json);
-                return decoded.Success &&
-                       FormalSaveValidator.ValidateDecoded(decoded).IsValid;
+                if (!decoded.Success)
+                {
+                    diagnostic = decoded.Message;
+                    return false;
+                }
+                FormalSaveValidationResult validation =
+                    FormalSaveValidator.ValidateDecoded(decoded);
+                if (validation.IsValid) return true;
+                diagnostic = validation.Error + "@" +
+                    validation.FieldPath + ":" + validation.Message;
+                return false;
             }
-            catch
+            catch (Exception exception)
             {
+                diagnostic = exception.GetType().Name + ":" +
+                    exception.Message;
                 return false;
             }
         }

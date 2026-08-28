@@ -24,9 +24,9 @@ namespace WasteCity.Tests
         };
 
         [Test]
-        public void IDEA0020_CurrentSchemaIsThirtyThreeAndOwnsProgressionDto()
+        public void IDEA0020_SchemaThirtyThreeProgressionContractRemainsReadable()
         {
-            Assert.That(FormalSaveEnvelope.CurrentSchemaVersion, Is.EqualTo(33));
+            Assert.That(FormalSaveEnvelope.CurrentSchemaVersion, Is.EqualTo(34));
 
             FieldInfo progression = RequireField(
                 typeof(FormalThreeDSaveData),
@@ -208,7 +208,7 @@ namespace WasteCity.Tests
             string json = FormalSaveCodec.EncodeEnvelope(envelope);
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(json);
             Assert.That(decoded.Success, Is.True, decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(33));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(34));
             Assert.That(
                 FormalSaveValidator.ValidateDecoded(decoded).IsValid,
                 Is.True,
@@ -409,7 +409,7 @@ namespace WasteCity.Tests
                 ReadFixture("schema-31-formal-3d.json"));
             Assert.That(decoded.Success, Is.True, decoded.Message);
             Assert.That(decoded.Envelope, Is.Not.Null);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(33));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(34));
             Assert.That(ReadField(decoded.Envelope.formal3D, "progression"),
                 Is.Not.Null);
             return decoded.Envelope;

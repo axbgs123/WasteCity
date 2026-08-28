@@ -601,7 +601,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0020_CoordinatorOwnsProgressionAsEighthTransactionalDomain()
+        public void IDEA0020_ProgressionRemainsInExpandedTransactionalOrder()
         {
             Type coordinator = RequireType(
                 "WasteCity.Graybox3D.Building." +
@@ -627,6 +627,7 @@ namespace WasteCity.Tests
                 "Defense",
                 "Progression",
                 "Evacuation",
+                "CivilizationExpansion",
                 "Pause",
             }));
 
@@ -641,7 +642,7 @@ namespace WasteCity.Tests
             StringAssert.Contains("source.progression", source);
             StringAssert.Contains("for (var index = 0; index < domains.Length; index++)",
                 source,
-                "Capture, apply and rollback must include the eighth domain " +
+                "Capture, apply and rollback must include every domain " +
                 "through the single ordered domain array.");
         }
 

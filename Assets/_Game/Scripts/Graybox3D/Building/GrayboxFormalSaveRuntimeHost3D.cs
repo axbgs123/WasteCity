@@ -64,6 +64,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField]
         private GrayboxCivilizationAdvancementView3D advancementView;
         [SerializeField]
+        private GrayboxCivilizationExpansionController3D expansionController;
+        [SerializeField]
         private MonoBehaviour inputCoordinator;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
@@ -175,6 +177,9 @@ namespace WasteCity.Graybox3D.Building
             fateSelectionController;
         public GrayboxFateOperationsController3D FateOperationsController =>
             fateOperationsController;
+        public GrayboxCivilizationExpansionController3D
+            CivilizationExpansionController => expansionController;
+        public string CurrentSessionId => currentSessionId;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -226,6 +231,18 @@ namespace WasteCity.Graybox3D.Building
             }
 
             BindRuleClock();
+            if (expansionController != null)
+            {
+                expansionController.ConfigureSessionIdProvider(
+                    () => currentSessionId);
+                if (!expansionController.TryInitialize(
+                        out string expansionError))
+                {
+                    LastInitializationError =
+                        "文明扩展运行时初始化失败：" + expansionError;
+                    return false;
+                }
+            }
             operations.ConfigureCivilizationResearch(
                 () => Civilization.Capture().CivilizationLevel,
                 () => Civilization.Capture().Revision);
@@ -373,6 +390,11 @@ namespace WasteCity.Graybox3D.Building
                 defense.Runtime);
             var evacuationAdapter = new GrayboxEvacuationSaveAdapter3D(
                 evacuation);
+            GrayboxCivilizationExpansionSaveAdapter3D expansionAdapter =
+                expansionController == null
+                    ? null
+                    : new GrayboxCivilizationExpansionSaveAdapter3D(
+                        expansionController);
             var rebuilder = new GrayboxFormalControllerRebuilder3D(
                 production,
                 defense,
@@ -392,7 +414,8 @@ namespace WasteCity.Graybox3D.Building
                 rebuilder,
                 production,
                 defense,
-                evacuation);
+                evacuation,
+                expansionAdapter);
             checkpointPolicy = new FormalSaveCheckpointPolicy(
                 TryWriteCheckpoint,
                 () => session.CheckpointRuleTimeSeconds);
@@ -511,6 +534,14 @@ namespace WasteCity.Graybox3D.Building
 
             ResetCheckpointBaseline();
             currentSessionId = Guid.NewGuid().ToString("N");
+            if (expansionController != null &&
+                !expansionController.ResetForNewProgress(
+                    out string expansionResetError))
+            {
+                LastStartNewProgressError =
+                    "文明扩展新进度初始化失败：" + expansionResetError;
+                return false;
+            }
             rewindAnchorStore?.Clear();
             writeIntent.BeginNewProgress(
                 existing.Code == FormalSaveStoreCode.Legacy2DOnly);
@@ -867,6 +898,15 @@ namespace WasteCity.Graybox3D.Building
 
         private void LateUpdate()
         {
+            if (IsInitialized && expansionController != null)
+            {
+                float expansionDelta = RuleClock.ResolveRuleDelta(
+                    Time.unscaledDeltaTime);
+                expansionController.Tick(
+                    expansionDelta,
+                    expansionDelta <= 0f ||
+                    coordinator?.IsTransactionPaused == true);
+            }
             TickCivilizationAdvancement();
             TickVoidDebt();
             TickAttentionPressure();
@@ -893,6 +933,7 @@ namespace WasteCity.Graybox3D.Building
             coordinator?.UnbindCheckpointPolicy();
             checkpointPolicy = null;
             coordinator = null;
+            expansionController = null;
             store = null;
             waveRetryStore = null;
             ruleClock = null;

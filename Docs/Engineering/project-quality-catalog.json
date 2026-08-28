@@ -837,6 +837,48 @@
       "MinimumVerification": "WindowsBuilds"
     },
     {
+      "Id": "civilization-expansion",
+      "ChineseName": "军队、多城市与外交继承",
+      "SourceGlobs": [
+        "Assets/_Game/Scripts/CivilizationExpansion/**",
+        "Assets/_Game/Scripts/Combat/Army*.cs",
+        "Assets/_Game/Scripts/Combat/FriendlyUnitCommandModel.cs",
+        "Assets/_Game/Scripts/Leader/CivilizationExpansion/**",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansion*.cs",
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs"
+      ],
+      "PrimarySourceGlobs": [
+        "Assets/_Game/Scripts/CivilizationExpansion/**",
+        "Assets/_Game/Scripts/Combat/Army*.cs",
+        "Assets/_Game/Scripts/Leader/CivilizationExpansion/**",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/**"
+      ],
+      "FailureLocationSummary": "先检查军队制造/命令/远征、settlement与运输、角色生命/继承/外交，再检查schema 34适配与M/N/P接线",
+      "TestFileGlobs": [
+        "Assets/_Game/Tests/EditMode/Army*.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityArmyModelTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0022*.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
+      ],
+      "ScenePaths": [
+        "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
+      ],
+      "RequirementIds": [
+        "IDEA-0002",
+        "IDEA-0022"
+      ],
+      "HumanDocumentPaths": [
+        "Docs/01-Game-Design-Document-ZH.md",
+        "Docs/05-Formal-Development-Roadmap-ZH.md",
+        "Docs/06-User-Feedback-and-Change-Control-ZH.md",
+        "Docs/superpowers/specs/2026-08-28-idea-0022-civilization-expansion-design.md"
+      ],
+      "MinimumVerification": "WindowsBuilds"
+    },
+    {
       "Id": "legacy-rules-compatibility",
       "ChineseName": "历史规则与存档兼容",
       "SourceGlobs": [
@@ -4117,6 +4159,130 @@
       ]
     },
     {
+      "Id": "civilization-expansion-runtime",
+      "ChineseName": "文明扩展组合运行时",
+      "TypeNames": [
+        "CivilizationExpansionRuntime",
+        "GrayboxCivilizationExpansionController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/CivilizationExpansion/CivilizationExpansionRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "组合唯一军队、远征、世界层、运输、角色、内政和外交owner，并把正式3D库存、建筑、地图、领袖、Defense与规则时钟作为窄接口注入。",
+      "BoundarySummary": "不复制主城库存、地图、放置或敌人真值；程序化标记和M/N/P面板只读快照并提交命令，不能反向拥有领域状态。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0022"
+      ]
+    },
+    {
+      "Id": "army-expedition-runtime",
+      "ChineseName": "军队制造与远征运行时",
+      "TypeNames": [
+        "ArmyUnitCatalog",
+        "SingleCityArmyModel",
+        "ArmyExpeditionModel"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Combat/ArmyUnitCatalog.cs",
+        "Assets/_Game/Scripts/Combat/SingleCityArmyModel.cs",
+        "Assets/_Game/Scripts/Combat/ArmyExpeditionModel.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供四类配置化单位、单稳定小队、原子制造与维护休眠、五类命令、确定性远征和返城战利品。",
+      "BoundarySummary": "只消费城市库存与既有敌人目录；不拥有建筑完成、地图揭示、Defense敌人或Unity表现真值。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ArmyUnitCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/SingleCityArmyModelTests.cs",
+        "Assets/_Game/Tests/EditMode/ArmyExpeditionModelTests.cs",
+        "Assets/_Game/Tests/EditMode/ArmyPersistenceModelTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0022"
+      ]
+    },
+    {
+      "Id": "world-layer-transport-runtime",
+      "ChineseName": "多城市世界层与运输运行时",
+      "TypeNames": [
+        "WorldLayerRuntime",
+        "SettlementRuntime",
+        "TransportRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供主城引用、一次城、一前哨、独立库存/自治、查看与控制权以及存在时间、货物和风险的实体运输队。",
+      "BoundarySummary": "主城仍引用既有库存，位置和路径只消费WorldMapModel与CityPathfinder；不创建第二张地图或第二套主城建筑网格。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0022WorldLayerSettlementTransportTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0022"
+      ]
+    },
+    {
+      "Id": "character-politics-diplomacy-runtime",
+      "ChineseName": "角色生命、继承与外交运行时",
+      "TypeNames": [
+        "CharacterLifeRuntime",
+        "LeadershipPoliticsRuntime",
+        "DiplomacyRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterLifeRuntime.cs",
+        "Assets/_Game/Scripts/Leader/CivilizationExpansion/LeadershipPoliticsRuntime.cs",
+        "Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "提供三角色倒地/救援/恢复/死亡遗体、议会/继承/政变和两外部势力接触/报价/协议状态。",
+      "BoundarySummary": "资源代价和城市忠诚通过显式authority提交；不拥有城市库存、settlement或UI，不实现实体内战和完整AI文明。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0022CharacterLifeRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0022LeadershipPoliticsRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0022DiplomacyRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0002",
+        "IDEA-0022"
+      ]
+    },
+    {
+      "Id": "civilization-expansion-save-adapter",
+      "ChineseName": "schema 34 文明扩展存档适配器",
+      "TypeNames": [
+        "GrayboxCivilizationExpansionSaveAdapter3D",
+        "FormalThreeDCivilizationExpansionSaveData"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "在文明扩展各领域不可变快照与schema 34单一聚合DTO之间执行确定性映射，并由正式存档协调器参与回滚。",
+      "BoundarySummary": "不拥有文件IO、领域tick或场景发现；schema 33只迁移为空的显式初态，不反推不存在的历史。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0022"
+      ]
+    },
+    {
       "Id": "rewind-anchor-rules",
       "ChineseName": "回溯锚点纯规则",
       "TypeNames": [
@@ -4169,6 +4335,17 @@
     }
   ],
   "UiEntries": [
+    {
+      "Id": "graybox-civilization-expansion",
+      "ChineseName": "军队、世界与政务面板",
+      "OwnerTypeName": "GrayboxCivilizationExpansionView3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "系统菜单、命轨、升阶和结算模态优先；无高优先界面时M/N/P互斥打开军队、世界和角色政务页，面板内Esc关闭并阻断建造、城市、领袖和镜头输入。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
+      ]
+    },
     {
       "Id": "graybox-building-menu",
       "ChineseName": "灰盒建筑菜单",

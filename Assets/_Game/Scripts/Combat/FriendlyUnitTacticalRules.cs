@@ -7,7 +7,8 @@ namespace WasteCity.Combat
         Hold,
         ReturnToRally,
         Chase,
-        Attack
+        Attack,
+        FollowLeader,
     }
 
     public readonly struct FriendlyTacticalProfile
@@ -59,6 +60,21 @@ namespace WasteCity.Combat
 
     public static class FriendlyUnitTacticalRules
     {
+        public static FriendlyUnitDecision DecideFollowLeader(
+            float unitX,
+            float unitY,
+            float leaderX,
+            float leaderY,
+            float arrivalTolerance)
+        {
+            float safeTolerance = Math.Max(0f, arrivalTolerance);
+            return DistanceSquared(unitX, unitY, leaderX, leaderY) >
+                   safeTolerance * safeTolerance
+                ? new FriendlyUnitDecision(
+                    FriendlyUnitDecisionType.FollowLeader)
+                : new FriendlyUnitDecision(FriendlyUnitDecisionType.Hold);
+        }
+
         public static FriendlyUnitDecision Decide(
             float unitX,
             float unitY,

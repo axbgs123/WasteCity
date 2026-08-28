@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`d80d611394040787350205c8afa41c90b8c52a71344dbb8671cbcdd0ff0ea2fd`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`9b3b4dee0889a6ddeeb41aa4f66bf46a24aab501cbc09c493a3110f2e77dab7b`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -53,6 +53,9 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementPresentationController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
@@ -113,7 +116,25 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxMobileCityController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs`
+- 军队、多城市与外交继承（`civilization-expansion`）：
+- `Assets/_Game/Scripts/CivilizationExpansion/CivilizationExpansionRuntime.cs`
+- `Assets/_Game/Scripts/Combat/ArmyExpeditionModel.cs`
+- `Assets/_Game/Scripts/Combat/ArmyUnitCatalog.cs`
+- `Assets/_Game/Scripts/Combat/FriendlyUnitCommandModel.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterCatalog.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterLifeRuntime.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/LeadershipPoliticsRuntime.cs`
+- `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs`
 - 战斗与路线（`combat-routes`）：
+- `Assets/_Game/Scripts/Combat/ArmyExpeditionModel.cs`
+- `Assets/_Game/Scripts/Combat/ArmyUnitCatalog.cs`
 - `Assets/_Game/Scripts/Combat/AttentionPressureCampaignCatalog.cs`
 - `Assets/_Game/Scripts/Combat/BehemothBreedingModel.cs`
 - `Assets/_Game/Scripts/Combat/BossEncounterModel.cs`
@@ -135,6 +156,7 @@
 - `Assets/_Game/Scripts/Combat/PuppetFabricationModel.cs`
 - `Assets/_Game/Scripts/Combat/PuppetMaintenanceModel.cs`
 - `Assets/_Game/Scripts/Combat/ShieldPulseModel.cs`
+- `Assets/_Game/Scripts/Combat/SingleCityArmyModel.cs`
 - `Assets/_Game/Scripts/Combat/SwordIntentModel.cs`
 - `Assets/_Game/Scripts/Combat/TechnologyOverloadModel.cs`
 - `Assets/_Game/Scripts/Combat/TurretWeaponModel.cs`
@@ -206,6 +228,10 @@
 - 领袖直接控制（`leader-direct-control`）：
 - `Assets/_Game/Scripts/Graybox3D/GrayboxDirectControlCoordinator.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxLeaderController3D.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterCatalog.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterLifeRuntime.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs`
+- `Assets/_Game/Scripts/Leader/CivilizationExpansion/LeadershipPoliticsRuntime.cs`
 - `Assets/_Game/Scripts/Leader/LeaderModel.cs`
 - 历史规则与存档兼容（`legacy-rules-compatibility`）：
 - `Assets/_Game/Scripts/Legacy/ForesightFlashModel.cs`
@@ -243,6 +269,7 @@
 - `Assets/_Game/Scripts/Persistence/Legacy2D/BuildingSnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/EnemySnapshot.cs`
 - `Assets/_Game/Scripts/Persistence/Legacy2D/FriendlyUnitSnapshot.cs`
+- `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs`
 - `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs`
 - `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
 - 展示与美术整合（`presentation-art-integration`）：
@@ -380,6 +407,9 @@
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs`
 - `Assets/_Game/Scripts/World/CameraFollowModel.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs`
 - `Assets/_Game/Scripts/World/ConsciousnessNetworkRules.cs`
 - `Assets/_Game/Scripts/World/RescueSiteModel.cs`
 - `Assets/_Game/Scripts/World/ScoutDroneModel.cs`
@@ -396,6 +426,8 @@
 - `WasteCity.Graybox3D.Building.GrayboxBuildingSurfaceProjector3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingSurfaceProjector3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxBuildingWorldView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxBuildingWorldView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxCivilizationAdvancementView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancementView3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxCivilizationExpansionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`
+- `WasteCity.Graybox3D.Building.GrayboxCivilizationExpansionView3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxConstructionController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseController3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
 - `WasteCity.Graybox3D.Building.GrayboxDefenseHud3D`：`Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseHud3D.cs`
@@ -446,6 +478,7 @@
 - `WasteCity.Presentation.VisualLibrary`：`Assets/_Game/Scripts/Presentation/VisualLibrary.cs`
 ## 7. 界面所有者
 - 灰盒建筑菜单：`GrayboxBuildingMenuView3D`，场景 `graybox-prototype-3d`
+- 军队、世界与政务面板：`GrayboxCivilizationExpansionView3D`，场景 `graybox-prototype-3d`
 - 灰盒首版防御 HUD：`GrayboxDefenseHudView3D`，场景 `graybox-prototype-3d`
 - 灰盒防御终局结算模态：`GrayboxDefenseSettlementController3D`，场景 `graybox-prototype-3d`
 - 正式三维存档启动与退出入口：`GrayboxFormalSaveEntryController3D`，场景 `graybox-prototype-3d`

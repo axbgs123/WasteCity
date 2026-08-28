@@ -40,6 +40,12 @@ UI 比例先查 `FormalUiLayoutPolicy3DTests`、`FormalUiResponsiveLayout3DTests
 
 日常实现阶段若没有修改地形源、导入规则、Texture2DArray Builder 或数组本身，仍按普通 EditMode 路由，不因 WorldMap 内容变化反复重建四个 2K 数组；正式收口按本需求批准的发布级验收补跑一次 `TerrainAssetDeep`，随后完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役构建、GUI 固定证据、文档生成/校验和 `RecordVerification`。自动化不能替代用户对地貌布局、矿区密度、建筑/图标比例、遮挡和真实 Windows GPU/显存/内存的判断。
 
+## IDEA-0022：军队、多城市与外交继承
+
+F3 聚焦运行 `ArmyUnitCatalogTests`、`SingleCityArmyModelTests`、`ArmyExpeditionModelTests`、`ArmyPersistenceModelTests` 与旧 `FriendlyUnitTacticalRulesTests`，检查四单位数值、制造/维护、休眠、五类命令、领袖 1.2 倍、确定性远征、伤亡和返城战利品。F4A 运行 `IDEA0022WorldLayerSettlementTransportTests`，检查主城引用、一次城、一前哨、独立库存/自治、查看与控制权、1.5 秒/格运输、5%/25% 风险和一次外交免疫。F5A 运行 `IDEA0022CharacterCatalogTests`、`IDEA0022CharacterLifeRuntimeTests`、`IDEA0022LeadershipPoliticsRuntimeTests`、`IDEA0022DiplomacyRuntimeTests`，检查倒地救援/预约退款、恢复伤势、死亡遗体、议会、继承/政变、派系支持、接触/报价/协议和关系门。
+
+schema `34` 必须运行 `FormalSaveSchema34ContractTests`、既有 schema `31→32→33→34` 迁移回归、`GrayboxFormalSaveCoordinatorTests` 和真实 `GrayboxCivilizationExpansionRuntimeInputTests`。后者必须从正式启动页开始，以真实键盘 `M/N/P/Esc` 和真实 UGUI 指针操作面板，并至少保存/继续一次已改变的小队命令；只直接调用内部方法不能替代该输入证据。地图仍固定 `64×48`、seed `8128` 和 24 个资源节点，本轮未修改地形源、导入规则、数组 Builder 或数组内容，因此日常完整 EditMode 使用 `-testCategory '!TerrainAssetDeep'`；自动化不能写成用户已验收单位标记比例、次城/前哨辨识度或政治信息可读性。
+
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 
 `IDEA-0020` 当前为“已实现待验证”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。

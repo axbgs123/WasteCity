@@ -89,7 +89,16 @@ namespace WasteCity.Tests
                     "formal-world.json")),
                 Is.True,
                 "Starting a fresh formal progress must checkpoint only into " +
-                "the isolated PlayMode slot.");
+                "the isolated PlayMode slot. coordinator=" +
+                (diagnosticHost?.LastCoordinatorResult?.Code.ToString() ??
+                 "null") + " message=" +
+                (diagnosticHost?.LastCoordinatorResult?.Message ?? "null") +
+                " store=" +
+                (diagnosticHost?.LastStoreResult?.Code.ToString() ?? "null") +
+                " storeMessage=" +
+                (diagnosticHost?.LastStoreResult?.Message ?? "null") +
+                " diagnostic=" +
+                (diagnosticHost?.LastStoreResult?.Diagnostic ?? "null"));
             if (completeFateSelection)
             {
                 yield return ClickButton(

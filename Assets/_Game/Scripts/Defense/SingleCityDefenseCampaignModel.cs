@@ -737,6 +737,37 @@ namespace WasteCity.Defense
             return applied;
         }
 
+        public int ApplyFriendlyUnitDamage(
+            string stableEnemyId,
+            string stableSquadId,
+            int rawDamage,
+            DamageType damageType)
+        {
+            if (IsTerminal || rawDamage <= 0 ||
+                string.IsNullOrWhiteSpace(stableSquadId) ||
+                !Enum.IsDefined(typeof(DamageType), damageType))
+                return 0;
+            EnemyState enemy = FindAliveEnemy(stableEnemyId);
+            if (enemy == null) return 0;
+            int resolved = DamageMatrix.Apply(
+                rawDamage,
+                damageType,
+                enemy.Definition.Armor);
+            int applied = Math.Min(enemy.CurrentHealth, resolved);
+            if (applied <= 0) return 0;
+            enemy.CurrentHealth -= applied;
+            RegisterDamage(stableSquadId, applied);
+            if (enemy.CurrentHealth == 0)
+            {
+                RegisterKill(enemy.Definition.Id.Value, stableSquadId);
+                EnemyDefeated?.Invoke(
+                    enemy.StableId,
+                    enemy.Definition.Id.Value);
+            }
+            persistenceGeneration++;
+            return applied;
+        }
+
         internal string AcquireTowerTarget(
             string lockedStableEnemyId,
             float towerX,
@@ -2045,7 +2076,11 @@ namespace WasteCity.Defense
                 if (known && kind == MetricKind.Enemy)
                     known = FindEnemyDefinition(item.StableId) != null;
                 else if (known && kind == MetricKind.Tower)
-                    known = DefenseTowerCatalog.For(item.StableId) != null;
+                    known = DefenseTowerCatalog.For(item.StableId) != null ||
+                        string.Equals(
+                            item.StableId,
+                            SingleCityArmyModel.DefaultSquadId,
+                            StringComparison.Ordinal);
                 else if (known && kind == MetricKind.Building)
                     known = FindBuildingDefinition(item.StableId) != null;
                 if (!known || result.ContainsKey(item.StableId))

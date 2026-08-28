@@ -19,6 +19,7 @@ namespace WasteCity.Graybox3D.Building
         Progression,
         Defense,
         Evacuation,
+        CivilizationExpansion,
         Pause,
     }
 
@@ -264,6 +265,7 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxFormalSaveDomainId3D.Defense,
                 GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Evacuation,
+                GrayboxFormalSaveDomainId3D.CivilizationExpansion,
                 GrayboxFormalSaveDomainId3D.Pause,
             });
 
@@ -301,7 +303,8 @@ namespace WasteCity.Graybox3D.Building
             IFormalThreeDDerivedStateRebuilder derivedState,
             GrayboxProductionController3D productionController,
             GrayboxDefenseController3D defenseController,
-            GrayboxEvacuationController3D evacuationController)
+            GrayboxEvacuationController3D evacuationController,
+            GrayboxCivilizationExpansionSaveAdapter3D expansion = null)
         {
             if (worldCity == null)
                 throw new ArgumentNullException(nameof(worldCity));
@@ -440,6 +443,27 @@ namespace WasteCity.Graybox3D.Building
                         evacuation.TryRestore(
                             source.evacuation,
                             out error)),
+                new DelegateDomain(
+                    GrayboxFormalSaveDomainId3D.CivilizationExpansion,
+                    destination =>
+                        destination.civilizationExpansion = expansion == null
+                            ? destination.civilizationExpansion ??
+                                new FormalThreeDCivilizationExpansionSaveData()
+                            : expansion.Capture(),
+                    (FormalThreeDSaveData source, out string error) =>
+                    {
+                        if (source.civilizationExpansion == null)
+                        {
+                            error = "正式 3D 文明扩展状态不能为空";
+                            return false;
+                        }
+                        if (expansion != null)
+                            return expansion.TryRestore(
+                                source.civilizationExpansion,
+                                out error);
+                        error = string.Empty;
+                        return true;
+                    }),
                 pauseDomain,
             };
             var coordinator = new GrayboxFormalSaveCoordinator3D(

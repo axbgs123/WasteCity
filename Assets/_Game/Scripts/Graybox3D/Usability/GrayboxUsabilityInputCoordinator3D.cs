@@ -41,6 +41,8 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxFateOperationsView3D fateOperationsView;
         [SerializeField]
         private GrayboxCivilizationAdvancementView3D advancementView;
+        [SerializeField]
+        private GrayboxCivilizationExpansionView3D civilizationExpansionView;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
         private Func<bool> tryAdvanceOrOpen;
@@ -63,6 +65,13 @@ namespace WasteCity.Graybox3D.Usability
                 throw new ArgumentNullException(nameof(tryAdvanceOrOpen));
             tryContinueAdvancement = tryContinue ??
                 throw new ArgumentNullException(nameof(tryContinue));
+        }
+
+        public void ConfigureCivilizationExpansion(
+            GrayboxCivilizationExpansionView3D view)
+        {
+            civilizationExpansionView = view ??
+                throw new ArgumentNullException(nameof(view));
         }
 
         public void ConfigureFormalSaveEntry(
@@ -211,6 +220,29 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
+            if (civilizationExpansionView != null &&
+                civilizationExpansionView.IsOpen)
+            {
+                bool armyPressed = keyboard != null &&
+                    keyboard.mKey.wasPressedThisFrame;
+                bool worldPressed = keyboard != null &&
+                    keyboard.nKey.wasPressedThisFrame;
+                bool politicsPressed = keyboard != null &&
+                    keyboard.pKey.wasPressedThisFrame;
+                if (escapePressed)
+                    civilizationExpansionView.Close();
+                else if (armyPressed)
+                    civilizationExpansionView.Toggle(
+                        GrayboxCivilizationExpansionPage3D.Army);
+                else if (worldPressed)
+                    civilizationExpansionView.Toggle(
+                        GrayboxCivilizationExpansionPage3D.World);
+                else if (politicsPressed)
+                    civilizationExpansionView.Toggle(
+                        GrayboxCivilizationExpansionPage3D.Politics);
+                return SuppressAll();
+            }
+
             EnsureDevelopmentPanelAdapter();
             if (developmentPanel != null && developmentPanel.IsOpen)
                 return ProcessOpenDevelopmentPanelInput(
@@ -248,6 +280,30 @@ namespace WasteCity.Graybox3D.Usability
                 {
                     operations.FitResearchTree();
                 }
+                return SuppressAll();
+            }
+
+            bool armyPanelPressed = keyboard != null &&
+                keyboard.mKey.wasPressedThisFrame;
+            bool worldPanelPressed = keyboard != null &&
+                keyboard.nKey.wasPressedThisFrame;
+            bool politicsPanelPressed = keyboard != null &&
+                keyboard.pKey.wasPressedThisFrame;
+            if (civilizationExpansionView != null &&
+                (armyPanelPressed || worldPanelPressed ||
+                 politicsPanelPressed) &&
+                !HasActiveTextInputFocus() &&
+                (buildingInput == null ||
+                 !buildingInput.IsBuildInteractionActive))
+            {
+                operations?.ClosePanels();
+                buildingInput?.TryCloseForOperations();
+                civilizationExpansionView.Open(
+                    armyPanelPressed
+                        ? GrayboxCivilizationExpansionPage3D.Army
+                        : worldPanelPressed
+                            ? GrayboxCivilizationExpansionPage3D.World
+                            : GrayboxCivilizationExpansionPage3D.Politics);
                 return SuppressAll();
             }
 
@@ -436,6 +492,7 @@ namespace WasteCity.Graybox3D.Usability
             fateSelectionView = null;
             fateOperationsView = null;
             advancementView = null;
+            civilizationExpansionView = null;
             tryAdvanceOrOpen = null;
             tryContinueAdvancement = null;
             developmentPanel = null;

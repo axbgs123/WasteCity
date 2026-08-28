@@ -1093,6 +1093,9 @@ namespace WasteCity.Editor
             GrayboxCivilizationAdvancementView3D advancementView =
                 EnsureComponent<GrayboxCivilizationAdvancementView3D>(
                     operationsTransform);
+            GrayboxCivilizationExpansionView3D expansionView =
+                EnsureComponent<GrayboxCivilizationExpansionView3D>(
+                    operationsTransform);
             RemoveMissingMonoBehavioursFromExactObject(
                 operationsTransform.gameObject);
             GrayboxDefenseHud3D defenseHud =
@@ -1135,6 +1138,12 @@ namespace WasteCity.Editor
             GrayboxUsabilityInputCoordinator3D coordinator =
                 EnsureComponent<GrayboxUsabilityInputCoordinator3D>(
                     coordinatorTransform);
+            Transform expansionControllerTransform = EnsureChild(
+                buildingReferences.Systems,
+                "GrayboxCivilizationExpansionController");
+            GrayboxCivilizationExpansionController3D expansionController =
+                EnsureComponent<GrayboxCivilizationExpansionController3D>(
+                    expansionControllerTransform);
             Transform formalSaveHostTransform = EnsureChild(
                 buildingReferences.Systems,
                 "GrayboxFormalSaveRuntimeHost");
@@ -1171,8 +1180,17 @@ namespace WasteCity.Editor
                 ("fateSelectionView", fateSelectionView),
                 ("fateOperationsView", fateOperationsView),
                 ("advancementView", advancementView),
+                ("expansionController", expansionController),
                 ("developerModifier", buildingReferences.Developer),
                 ("inputCoordinator", coordinator));
+            SetReferences(
+                expansionController,
+                ("city", buildingReferences.City),
+                ("world", buildingReferences.World),
+                ("session", buildingReferences.Session),
+                ("defense", buildingReferences.DefenseController),
+                ("leader", buildingReferences.Leader),
+                ("view", expansionView));
             SetReferences(
                 formalSaveEntry,
                 ("runtimeHost", formalSaveHost),
@@ -1187,6 +1205,7 @@ namespace WasteCity.Editor
             SetReferences(fateSelectionView, ("canvas", operationsCanvas));
             SetReferences(fateOperationsView, ("canvas", operationsCanvas));
             SetReferences(advancementView, ("canvas", operationsCanvas));
+            SetReferences(expansionView, ("canvas", operationsCanvas));
             SetReferences(
                 defenseHud,
                 ("canvas", operationsCanvas),
@@ -1228,6 +1247,9 @@ namespace WasteCity.Editor
                 ("fateSelectionView", fateSelectionView),
                 ("fateOperationsView", fateOperationsView),
                 ("advancementView", advancementView));
+            SetReferences(
+                coordinator,
+                ("civilizationExpansionView", expansionView));
             SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));

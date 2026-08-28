@@ -1323,6 +1323,10 @@ namespace WasteCity.Tests
                     case GrayboxFormalSaveDomainId3D.Evacuation:
                         destination.evacuation = copy.evacuation;
                         break;
+                    case GrayboxFormalSaveDomainId3D.CivilizationExpansion:
+                        destination.civilizationExpansion =
+                            copy.civilizationExpansion;
+                        break;
                     case GrayboxFormalSaveDomainId3D.Pause:
                         destination.pause = copy.pause;
                         break;

@@ -2307,6 +2307,10 @@ namespace WasteCity.Editor
                 case GrayboxFormalSaveDomainId3D.Evacuation:
                     destination.evacuation = source.evacuation;
                     return;
+                case GrayboxFormalSaveDomainId3D.CivilizationExpansion:
+                    destination.civilizationExpansion =
+                        source.civilizationExpansion;
+                    return;
                 case GrayboxFormalSaveDomainId3D.Pause:
                     destination.pause = source.pause;
                     return;

@@ -235,6 +235,7 @@ namespace WasteCity.Tests
                 "persistence-migration|先检查存档格式、迁移步骤和读写边界|Assets/_Game/Scripts/Persistence/**|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs|Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs|Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs|Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs",
                 "presentation-art-integration|先检查视觉槽、材质接入、投影与相机场景引用|Assets/_Game/Scripts/Presentation/**|Assets/_Game/Scripts/ArtIntegration3D/**|Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs",
                 "scene-editor-build-performance|先检查编辑工具、场景生成、构建配置和性能边界|Assets/_Game/Editor/ProjectQuality/**|Assets/_Game/Editor/FormalBuildTools.cs|Assets/_Game/Editor/GrayboxSceneAuthoring.cs",
+                "civilization-expansion|先检查军队制造/命令/远征、settlement与运输、角色生命/继承/外交，再检查schema 34适配与M/N/P接线|Assets/_Game/Scripts/CivilizationExpansion/**|Assets/_Game/Scripts/Combat/Army*.cs|Assets/_Game/Scripts/Leader/CivilizationExpansion/**|Assets/_Game/Scripts/World/CivilizationExpansion/**",
                 "legacy-rules-compatibility|先检查历史规则、schema 1–30 兼容与固定回归样本|Assets/_Game/Scripts/Legacy/**|Assets/_Game/Scripts/Persistence/Legacy2D/**",
             };
             CollectionAssert.AreEqual(expectedFailureLocations, catalog.FeatureGroups.Select(feature =>
