@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`9b3b4dee0889a6ddeeb41aa4f66bf46a24aab501cbc09c493a3110f2e77dab7b`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`df5bded55417b86c32eaac7e8599f5e432853cd12e5ccbe79dc709e5cff06ef1`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -56,6 +56,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionVisualPresenter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCombatDestructionCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxConstructionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseController3D.cs`
@@ -117,6 +118,9 @@
 - `Assets/_Game/Scripts/Graybox3D/GrayboxWorldLayout3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/PlanarCoordinateMapper3D.cs`
 - 军队、多城市与外交继承（`civilization-expansion`）：
+- `Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs`
+- `Assets/_Game/Editor/Production2DUnitImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs`
 - `Assets/_Game/Scripts/CivilizationExpansion/CivilizationExpansionRuntime.cs`
 - `Assets/_Game/Scripts/Combat/ArmyExpeditionModel.cs`
 - `Assets/_Game/Scripts/Combat/ArmyUnitCatalog.cs`
@@ -124,6 +128,8 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionVisualPresenter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
 - `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterCatalog.cs`
 - `Assets/_Game/Scripts/Leader/CivilizationExpansion/CharacterLifeRuntime.cs`
 - `Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs`
@@ -356,6 +362,7 @@
 - `Assets/_Game/Editor/Production2DTechnologyIconCatalogBuilder.cs`
 - `Assets/_Game/Editor/Production2DTechnologyImportPolicy.cs`
 - `Assets/_Game/Editor/Production2DUiCharacterMarkerImportPolicy.cs`
+- `Assets/_Game/Editor/Production2DUnitImportPolicy.cs`
 - `Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectDocumentationGenerator.cs`
 - `Assets/_Game/Editor/ProjectQuality/ProjectQualityCatalogLoader.cs`

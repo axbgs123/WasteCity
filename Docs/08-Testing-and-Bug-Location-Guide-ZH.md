@@ -52,7 +52,7 @@ schema `34` 必须运行 `FormalSaveSchema34ContractTests`、既有 schema `31�
 
 消费者接线运行 `GrayboxCivilizationExpansionVisualIntegrationTests`，并补跑 `Production2DVisualCatalogAtlasTests`、`Production2DUiCharacterMarkerPipelineTests`、`GrayboxCivilizationExpansionUiInputTests` 与真实 `GrayboxCivilizationExpansionRuntimeInputTests`。Presenter/View/Controller 只按稳定内容 ID 解析 Sprite，将单位与角色投影为 UI 图像，把有权威坐标的小队、次城、前哨和运输队投影为垂直世界公告板，并由当前领域状态选择徽记；没有独立坐标的角色不得伪造世界位置。坐标、单位组成、生命、运输进度、通信、忠诚、选择和命令仍来自 CivilizationExpansion 权威快照。比例、世界高度、锚点、排序、运行时染色和 fallback 都是表现配置，不得写入 schema `34` 或反向改变领域状态。
 
-本轮的 20 张透明图和公告板只是“无需建模即可完成”的 F6 表现层，不代表单位、角色、城市或车辆的正式 3D 模型、骨骼、动画、VFX、SFX 已完成。自动化检查 Alpha、尺寸、目录键、导入、Atlas、fallback、稳定对象数和真实输入；用户仍需试玩确认人物风格、单位轮廓、近中远比例、遮挡和信息密度，真实 Windows 10/11 仍需实际检查 GPU、显存和内存。只有修改地形源、导入规则、Texture2DArray Builder、数组生成或准备发布时才运行 `TerrainAssetDeep`；新增 Units/Characters/WorldMarkers/UI 图片不触发地形深度套件。
+本轮的 20 张透明图和公告板只是“无需建模即可完成”的 F6 表现层，不代表单位、角色、城市或车辆的正式 3D 模型、骨骼、动画、VFX、SFX 已完成。自动化检查 Alpha、尺寸、目录键、导入、Atlas、fallback、稳定对象数和真实输入；用户仍需试玩确认人物风格、单位轮廓、近中远比例、遮挡和信息密度，真实 Windows 10 与 Windows 11 仍需实际检查 GPU、显存和内存。只有修改地形源、导入规则、Texture2DArray Builder、数组生成或准备发布时才运行 `TerrainAssetDeep`；新增 Units/Characters/WorldMarkers/UI 图片不触发地形深度套件。
 
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 

@@ -2214,6 +2214,9 @@ namespace WasteCity.Tests
             InputSystem.Update();
             Assert.That(Keyboard.current, Is.SameAs(keyboard));
             Assert.That(keyboard.leftShiftKey.isPressed, Is.True);
+            yield return null;
+            Assert.That(keyboard.leftShiftKey.isPressed, Is.True,
+                "Shift must remain held through the UI module frame before clicking.");
             QueueMouse(position, MouseButton.Left);
             yield return null;
             QueueMouse(position);
