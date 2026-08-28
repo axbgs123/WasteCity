@@ -50,23 +50,27 @@ namespace WasteCity.Editor
                 Production2DBuildingImportPolicy.Root,
                 35),
             new Production2DAtlasDefinition(
+                "Units",
+                Production2DUnitImportPolicy.Root,
+                4),
+            new Production2DAtlasDefinition(
                 "UI",
                 Production2DUiCharacterMarkerImportPolicy.UiRoot,
-                7),
+                18),
             new Production2DAtlasDefinition(
                 "Characters",
                 Production2DUiCharacterMarkerImportPolicy.CharacterRoot,
-                1),
+                3),
             new Production2DAtlasDefinition(
                 "WorldMarkers",
                 Production2DUiCharacterMarkerImportPolicy.WorldMarkerRoot,
-                2),
+                5),
         };
 
         public static IReadOnlyList<Production2DAtlasDefinition> Definitions =>
             definitions;
 
-        [MenuItem("WasteCity/Art/Production 2D/Build Six Sprite Atlases")]
+        [MenuItem("WasteCity/Art/Production 2D/Build Seven Sprite Atlases")]
         public static void BuildAtlases()
         {
             EnsureFolder("Assets/_Game/Art/Production2D");

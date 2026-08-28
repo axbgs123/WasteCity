@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using WasteCity.Combat;
+using WasteCity.Graybox3D;
+using WasteCity.Leader.CivilizationExpansion;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -23,7 +27,8 @@ namespace WasteCity.Graybox3D.Building
             string secondaryLabel,
             bool secondaryEnabled,
             string tertiaryLabel,
-            bool tertiaryEnabled)
+            bool tertiaryEnabled,
+            string[] statusVisualIds = null)
         {
             Heading = heading ?? string.Empty;
             Summary = summary ?? string.Empty;
@@ -34,6 +39,9 @@ namespace WasteCity.Graybox3D.Building
             SecondaryEnabled = secondaryEnabled;
             TertiaryLabel = tertiaryLabel ?? string.Empty;
             TertiaryEnabled = tertiaryEnabled;
+            StatusVisualIds = Array.AsReadOnly(statusVisualIds == null
+                ? Array.Empty<string>()
+                : (string[])statusVisualIds.Clone());
         }
 
         public string Heading { get; }
@@ -45,6 +53,7 @@ namespace WasteCity.Graybox3D.Building
         public bool SecondaryEnabled { get; }
         public string TertiaryLabel { get; }
         public bool TertiaryEnabled { get; }
+        public IReadOnlyList<string> StatusVisualIds { get; }
     }
 
     public sealed class GrayboxCivilizationExpansionView3D : MonoBehaviour
@@ -59,6 +68,9 @@ namespace WasteCity.Graybox3D.Building
         private Text primaryLabel;
         private Text secondaryLabel;
         private Text tertiaryLabel;
+        private readonly Image[] pageVisuals = new Image[4];
+        private readonly Image[] tabIcons = new Image[3];
+        private readonly Image[] statusVisuals = new Image[4];
 
         public bool IsOpen { get; private set; }
         public GrayboxCivilizationExpansionPage3D Page { get; private set; }
@@ -92,6 +104,7 @@ namespace WasteCity.Graybox3D.Building
             Page = page;
             IsOpen = true;
             panelRoot.SetActive(true);
+            RefreshPageVisuals();
             PageChanged?.Invoke(Page);
         }
 
@@ -101,6 +114,7 @@ namespace WasteCity.Graybox3D.Building
             Page = page;
             IsOpen = true;
             panelRoot.SetActive(true);
+            RefreshPageVisuals();
             PageChanged?.Invoke(Page);
         }
 
@@ -127,6 +141,7 @@ namespace WasteCity.Graybox3D.Building
             ApplyButton(
                 TertiaryButton, tertiaryLabel,
                 value.TertiaryLabel, value.TertiaryEnabled);
+            ApplyStatusVisuals(value.StatusVisualIds);
         }
 
         private void EnsureUi()
@@ -172,6 +187,10 @@ namespace WasteCity.Graybox3D.Building
             SetAnchors(panel, .13f, .10f, .87f, .90f);
             Image panelImage = panel.gameObject.AddComponent<Image>();
             panelImage.color = new Color(.055f, .085f, .105f, .99f);
+            ApplyFormalUiSprite(
+                panelImage,
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .PrimaryPanelVisualId);
 
             RectTransform accent = CreateRect(
                 panel, "CivilizationExpansion.Accent");
@@ -181,8 +200,44 @@ namespace WasteCity.Graybox3D.Building
 
             headingText = CreateText(
                 panel, "Heading", 28, TextAnchor.MiddleLeft,
-                .055f, .82f, .945f, .95f);
+                .055f, .82f, .64f, .95f);
             headingText.color = new Color(.83f, .95f, .92f, 1f);
+            CreateTabIcon(
+                panel,
+                "CivilizationExpansion.Tab.Army.Icon",
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .ArmyTabVisualId,
+                .68f,
+                .75f,
+                0);
+            CreateTabIcon(
+                panel,
+                "CivilizationExpansion.Tab.World.Icon",
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .WorldTabVisualId,
+                .78f,
+                .85f,
+                1);
+            CreateTabIcon(
+                panel,
+                "CivilizationExpansion.Tab.Politics.Icon",
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .PoliticsTabVisualId,
+                .88f,
+                .95f,
+                2);
+
+            RectTransform divider = CreateRect(
+                panel,
+                "CivilizationExpansion.TerminalDivider");
+            SetAnchors(divider, .055f, .805f, .945f, .82f);
+            Image dividerImage = divider.gameObject.AddComponent<Image>();
+            dividerImage.color = Color.white;
+            dividerImage.raycastTarget = false;
+            ApplyFormalUiSprite(
+                dividerImage,
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .TerminalDividerVisualId);
             summaryText = CreateText(
                 panel, "Summary", 18, TextAnchor.UpperLeft,
                 .055f, .55f, .40f, .80f);
@@ -191,10 +246,12 @@ namespace WasteCity.Graybox3D.Building
                 new Color(.075f, .125f, .145f, 1f));
             detailsText = CreateText(
                 panel, "Details", 17, TextAnchor.UpperLeft,
-                .425f, .25f, .945f, .80f);
+                .425f, .25f, .945f, .69f);
             detailsText.color = new Color(.90f, .92f, .86f, 1f);
             AddBackdrop(detailsText.transform.parent as RectTransform,
                 new Color(.09f, .105f, .125f, 1f));
+            CreatePageVisualStrip(panel);
+            CreateStatusVisualStrip(panel);
 
             PrimaryButton = CreateButton(
                 panel, "Primary", .055f, .40f, .40f, .52f,
@@ -214,9 +271,10 @@ namespace WasteCity.Graybox3D.Building
 
             Text hint = CreateText(
                 panel, "Hint", 15, TextAnchor.MiddleRight,
-                .425f, .10f, .945f, .21f);
+                .70f, .10f, .945f, .21f);
             hint.text = "M 军队  ·  N 世界  ·  P 政务  ·  Esc 关闭";
             hint.color = new Color(.56f, .68f, .70f, 1f);
+            RefreshPageVisuals();
             panelRoot.SetActive(IsOpen);
         }
 
@@ -244,6 +302,10 @@ namespace WasteCity.Graybox3D.Building
             SetAnchors(rect, minX, minY, maxX, maxY);
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = new Color(.17f, .39f, .43f, 1f);
+            ApplyFormalUiSprite(
+                image,
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .PrimaryButtonVisualId);
             Button button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             label = CreateText(
@@ -286,7 +348,184 @@ namespace WasteCity.Graybox3D.Building
             Image image = rect.gameObject.AddComponent<Image>();
             image.color = color;
             image.raycastTarget = false;
+            ApplyFormalUiSprite(
+                image,
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .SecondaryCardVisualId);
             image.transform.SetAsFirstSibling();
+        }
+
+        private void CreateTabIcon(
+            Transform parent,
+            string name,
+            string visualId,
+            float minX,
+            float maxX,
+            int index)
+        {
+            RectTransform rect = CreateRect(parent, name);
+            SetAnchors(rect, minX, .855f, maxX, .935f);
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = Color.white;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            ApplyFormalUiSprite(image, visualId);
+            tabIcons[index] = image;
+        }
+
+        private void CreatePageVisualStrip(Transform parent)
+        {
+            RectTransform strip = CreateRect(
+                parent,
+                "CivilizationExpansion.PageVisualStrip");
+            SetAnchors(strip, .425f, .70f, .945f, .80f);
+            AddBackdrop(strip, new Color(.09f, .105f, .125f, 1f));
+            for (var index = 0; index < pageVisuals.Length; index++)
+            {
+                RectTransform rect = CreateRect(
+                    strip,
+                    "CivilizationExpansion.PageVisual." + index);
+                float segment = 1f / pageVisuals.Length;
+                SetAnchors(
+                    rect,
+                    index * segment + .025f,
+                    .08f,
+                    (index + 1) * segment - .025f,
+                    .92f);
+                Image image = rect.gameObject.AddComponent<Image>();
+                image.color = Color.white;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                pageVisuals[index] = image;
+            }
+        }
+
+        private void RefreshPageVisuals()
+        {
+            if (pageVisuals[0] == null) return;
+            RefreshTabColors();
+            switch (Page)
+            {
+                case GrayboxCivilizationExpansionPage3D.Army:
+                    SetPageVisual(0, Production2DVisualClass.Unit,
+                        ArmyUnitCatalog.CombatPuppetId);
+                    SetPageVisual(1, Production2DVisualClass.Unit,
+                        ArmyUnitCatalog.BredBehemothId);
+                    SetPageVisual(2, Production2DVisualClass.Unit,
+                        ArmyUnitCatalog.PsionicMechId);
+                    SetPageVisual(3, Production2DVisualClass.Unit,
+                        ArmyUnitCatalog.BioMechanicalBehemothId);
+                    break;
+                case GrayboxCivilizationExpansionPage3D.World:
+                    SetPageVisual(0, Production2DVisualClass.WorldMarker,
+                        GrayboxCivilizationExpansionVisualPresenter3D
+                            .SecondaryCityMarkerVisualId);
+                    SetPageVisual(1, Production2DVisualClass.WorldMarker,
+                        GrayboxCivilizationExpansionVisualPresenter3D
+                            .OutpostMarkerVisualId);
+                    SetPageVisual(2, Production2DVisualClass.WorldMarker,
+                        GrayboxCivilizationExpansionVisualPresenter3D
+                            .ConvoyMarkerVisualId);
+                    HidePageVisual(3);
+                    break;
+                case GrayboxCivilizationExpansionPage3D.Politics:
+                    SetPageVisual(0, Production2DVisualClass.Character,
+                        CharacterCatalog.CenJinId);
+                    SetPageVisual(1, Production2DVisualClass.Character,
+                        CharacterCatalog.LinXiId);
+                    SetPageVisual(2, Production2DVisualClass.Character,
+                        CharacterCatalog.HanGuId);
+                    HidePageVisual(3);
+                    break;
+            }
+        }
+
+        private void RefreshTabColors()
+        {
+            Color selected = new Color(.35f, .95f, .92f, 1f);
+            Color idle = new Color(.50f, .58f, .60f, 1f);
+            for (var index = 0; index < tabIcons.Length; index++)
+            {
+                if (tabIcons[index] == null) continue;
+                tabIcons[index].color = index == (int)Page
+                    ? selected
+                    : idle;
+            }
+        }
+
+        private void CreateStatusVisualStrip(Transform parent)
+        {
+            RectTransform strip = CreateRect(
+                parent,
+                "CivilizationExpansion.StatusVisualStrip");
+            SetAnchors(strip, .425f, .105f, .69f, .225f);
+            for (var index = 0; index < statusVisuals.Length; index++)
+            {
+                RectTransform rect = CreateRect(
+                    strip,
+                    "CivilizationExpansion.StatusVisual." + index);
+                float segment = 1f / statusVisuals.Length;
+                SetAnchors(rect, index * segment + .04f, .08f,
+                    (index + 1) * segment - .04f, .92f);
+                Image image = rect.gameObject.AddComponent<Image>();
+                image.color = Color.white;
+                image.preserveAspect = true;
+                image.raycastTarget = false;
+                image.gameObject.SetActive(false);
+                statusVisuals[index] = image;
+            }
+        }
+
+        private void ApplyStatusVisuals(IReadOnlyList<string> visualIds)
+        {
+            for (var index = 0; index < statusVisuals.Length; index++)
+            {
+                Image image = statusVisuals[index];
+                if (image == null) continue;
+                string visualId = visualIds != null && index < visualIds.Count
+                    ? visualIds[index]
+                    : null;
+                image.sprite = string.IsNullOrWhiteSpace(visualId)
+                    ? null
+                    : Production2DVisualCatalog3D.Resolve(
+                        Production2DVisualClass.Ui,
+                        visualId);
+                image.gameObject.SetActive(image.sprite != null);
+            }
+        }
+
+        private void SetPageVisual(
+            int index,
+            Production2DVisualClass visualClass,
+            string contentId)
+        {
+            Image image = pageVisuals[index];
+            image.sprite = Production2DVisualCatalog3D.Resolve(
+                visualClass,
+                contentId);
+            image.gameObject.SetActive(image.sprite != null);
+        }
+
+        private void HidePageVisual(int index)
+        {
+            pageVisuals[index].sprite = null;
+            pageVisuals[index].gameObject.SetActive(false);
+        }
+
+        private static void ApplyFormalUiSprite(
+            Image image,
+            string visualId)
+        {
+            if (image == null) return;
+            image.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                visualId);
+            if (image.sprite != null)
+                image.color = Color.white;
+            image.type = image.sprite != null &&
+                         image.sprite.border.sqrMagnitude > 0f
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
         }
 
         private void ClearSelectedObject()
@@ -316,6 +555,12 @@ namespace WasteCity.Graybox3D.Building
             primaryLabel = null;
             secondaryLabel = null;
             tertiaryLabel = null;
+            for (var index = 0; index < pageVisuals.Length; index++)
+                pageVisuals[index] = null;
+            for (var index = 0; index < tabIcons.Length; index++)
+                tabIcons[index] = null;
+            for (var index = 0; index < statusVisuals.Length; index++)
+                statusVisuals[index] = null;
         }
 
         private void OnDestroy()

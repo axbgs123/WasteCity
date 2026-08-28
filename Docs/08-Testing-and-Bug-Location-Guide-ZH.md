@@ -46,6 +46,14 @@ F3 聚焦运行 `ArmyUnitCatalogTests`、`SingleCityArmyModelTests`、`ArmyExped
 
 schema `34` 必须运行 `FormalSaveSchema34ContractTests`、既有 schema `31→32→33→34` 迁移回归、`GrayboxFormalSaveCoordinatorTests` 和真实 `GrayboxCivilizationExpansionRuntimeInputTests`。后者必须从正式启动页开始，以真实键盘 `M/N/P/Esc` 和真实 UGUI 指针操作面板，并至少保存/继续一次已改变的小队命令；只直接调用内部方法不能替代该输入证据。地图仍固定 `64×48`、seed `8128` 和 24 个资源节点，本轮未修改地形源、导入规则、数组 Builder 或数组内容，因此日常完整 EditMode 使用 `-testCategory '!TerrainAssetDeep'`；自动化不能写成用户已验收单位标记比例、次城/前哨辨识度或政治信息可读性。
 
+## IDEA-0023：文明扩展透明图与公告板
+
+资产与管线聚焦运行 `Production2DCivilizationExpansionVisualPipelineTests`：增量 manifest 必须精确包含 Unit 4、Character 2、WorldMarker 3、UI 页签 3 和状态徽记 8，共 20 项；母版和交付图必须为真 Alpha PNG，符合精确尺寸、安全区和透明四角，并逐项锁定 Unity GUID、源图/交付图 SHA-256、Pivot 与 Border；`Production2DUnitImportPolicy` 只能接管 `Assets/_Game/Art/Production2D/Units/` 顶层四张 PNG。`Production2DVisualClass.Unit` 只能追加在旧枚举末尾，不能重排既有序列化值；统一目录最终精确为 140 项，七个 Atlas 的扩展计数为 Units 4、Characters 3、WorldMarkers 5、UI 18。
+
+消费者接线运行 `GrayboxCivilizationExpansionVisualIntegrationTests`，并补跑 `Production2DVisualCatalogAtlasTests`、`Production2DUiCharacterMarkerPipelineTests`、`GrayboxCivilizationExpansionUiInputTests` 与真实 `GrayboxCivilizationExpansionRuntimeInputTests`。Presenter/View/Controller 只按稳定内容 ID 解析 Sprite，将单位与角色投影为 UI 图像，把有权威坐标的小队、次城、前哨和运输队投影为垂直世界公告板，并由当前领域状态选择徽记；没有独立坐标的角色不得伪造世界位置。坐标、单位组成、生命、运输进度、通信、忠诚、选择和命令仍来自 CivilizationExpansion 权威快照。比例、世界高度、锚点、排序、运行时染色和 fallback 都是表现配置，不得写入 schema `34` 或反向改变领域状态。
+
+本轮的 20 张透明图和公告板只是“无需建模即可完成”的 F6 表现层，不代表单位、角色、城市或车辆的正式 3D 模型、骨骼、动画、VFX、SFX 已完成。自动化检查 Alpha、尺寸、目录键、导入、Atlas、fallback、稳定对象数和真实输入；用户仍需试玩确认人物风格、单位轮廓、近中远比例、遮挡和信息密度，真实 Windows 10/11 仍需实际检查 GPU、显存和内存。只有修改地形源、导入规则、Texture2DArray Builder、数组生成或准备发布时才运行 `TerrainAssetDeep`；新增 Units/Characters/WorldMarkers/UI 图片不触发地形深度套件。
+
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 
 `IDEA-0020` 当前为“已实现待验证”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。
@@ -126,7 +134,7 @@ F2 核心运行 `IDEA0021BridgeCombatTests`、`FormalResearchCatalogTests`、`Re
 
 修改器目录、中文搜索和正式命令分别由 `GrayboxDeveloperModifierCatalogTests`、`GrayboxDeveloperModifierTests` 保护；数字键 `0`、文本焦点、双 Esc、世界输入抑制和 Release 无入口必须再跑 `GrayboxDeveloperModifierRuntimeInputTests` 与相关易用性测试。测试必须通过正式 Input System 主循环，不能只直接调用按钮方法。`F10` 继续无行为，stable ID 只用于内部键，主列表必须显示游戏中文名。
 
-二维资产按类别运行 `Production2DItemIconPipelineTests`、`Production2DBuildingIconPipelineTests`、`Production2DTechnologyIconPipelineTests` 和 `Production2DUiCharacterMarkerPipelineTests`；统一视觉目录与 SpriteAtlas 运行 `Production2DVisualCatalogAtlasTests`。当前统一目录/图集的六项聚焦 EditMode 检查已通过，只证明 114 个稳定视觉键、30 条配方视觉投影、六类 Atlas 和重复构建稳定性，不代表本轮完整回归或用户视觉验收。失败时先区分四层：源母版和透明 Alpha、Unity 交付 PNG 与 `.meta`、导入规则、运行时目录/消费者。导入器只能作用于 `Assets/_Game/Art/Production2D/`，不得触碰地形；GUID、尺寸、安全区、九宫格 Border、世界标记中央透明孔和重复构建字节稳定必须由资产测试读取。联络表、Alpha 检查和静态测试不能替代用户对正式图片的视觉判断，也不能推断真实 Windows GPU、显存和内存。
+二维资产按类别运行 `Production2DItemIconPipelineTests`、`Production2DBuildingIconPipelineTests`、`Production2DTechnologyIconPipelineTests`、`Production2DUiCharacterMarkerPipelineTests` 和 `Production2DCivilizationExpansionVisualPipelineTests`；统一视觉目录与 SpriteAtlas 运行 `Production2DVisualCatalogAtlasTests`，文明扩展消费者运行 `GrayboxCivilizationExpansionVisualIntegrationTests`。当前目标目录为 140 个稳定视觉键、33 条配方视觉投影和七类 Atlas；失败时先区分四层：源母版和透明 Alpha、Unity 交付 PNG 与 `.meta`、导入规则、运行时目录/消费者。导入器只能作用于 `Assets/_Game/Art/Production2D/` 的批准子目录，不得触碰地形；GUID、尺寸、安全区、九宫格 Border、公告板锚点/比例、世界标记中央透明孔和重复构建字节稳定必须由资产测试读取。联络表、Alpha 检查和静态测试不能替代用户对正式图片的视觉判断，也不能推断真实 Windows GPU、显存和内存。
 
 真实 UI 回归统一补跑 `GrayboxProductionObservabilityRuntimeInputTests` 与受影响的建筑运行时输入测试，至少检查全部配方可滚动、只有两条应急手工配方可排队、资源账本筛选、机器配方选择、科技图标、建筑图标和所有文字输入焦点不穿透。最终仍须按顺序完成日常完整 EditMode、完整 PlayMode、项目质量门、三项现役 3D 构建、官方文档生成/验证和 `RecordVerification`；在这些门完成前，不得把 IDEA-0016 写成“已验证”。本轮未修改地形源、地形导入规则、Texture2DArray Builder 或数组生成，因此日常回归不运行 `TerrainAssetDeep`；只有真正进入发布准备时才单独补跑。
 

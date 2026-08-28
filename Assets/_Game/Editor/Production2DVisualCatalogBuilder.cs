@@ -33,7 +33,10 @@ namespace WasteCity.Editor
         public const string PresentationManifestPath =
             "Docs/Art/IDEA-0016/Manifests/" +
             "idea-0016-ui-character-marker-visual-assets.json";
-        public const int ExpectedVisualCount = 120;
+        public const string CivilizationExpansionManifestPath =
+            "Docs/Art/IDEA-0023/Manifests/" +
+            "idea-0023-civilization-expansion-visual-assets.json";
+        public const int ExpectedVisualCount = 140;
         public const int ExpectedRecipeCount = 33;
 
         [MenuItem("WasteCity/Art/Production 2D/Build Unified Visual Catalog")]
@@ -113,7 +116,7 @@ namespace WasteCity.Editor
             }
 
             UnifiedPresentationManifestEntry[] presentation =
-                ReadPresentationManifest();
+                ReadPresentationManifests();
             foreach (UnifiedPresentationManifestEntry entry in presentation)
             {
                 result.Add(CreateRequiredEntry(
@@ -131,9 +134,10 @@ namespace WasteCity.Editor
             ValidateClassCount(ordered, Production2DVisualClass.Item, 31);
             ValidateClassCount(ordered, Production2DVisualClass.Technology, 44);
             ValidateClassCount(ordered, Production2DVisualClass.Building, 35);
-            ValidateClassCount(ordered, Production2DVisualClass.Ui, 7);
-            ValidateClassCount(ordered, Production2DVisualClass.Character, 1);
-            ValidateClassCount(ordered, Production2DVisualClass.WorldMarker, 2);
+            ValidateClassCount(ordered, Production2DVisualClass.Ui, 18);
+            ValidateClassCount(ordered, Production2DVisualClass.Character, 3);
+            ValidateClassCount(ordered, Production2DVisualClass.WorldMarker, 5);
+            ValidateClassCount(ordered, Production2DVisualClass.Unit, 4);
             return ordered;
         }
 
@@ -239,18 +243,28 @@ namespace WasteCity.Editor
         }
 
         private static UnifiedPresentationManifestEntry[]
-            ReadPresentationManifest()
+            ReadPresentationManifests()
         {
-            if (!File.Exists(PresentationManifestPath))
+            return ReadPresentationManifest(
+                    PresentationManifestPath,
+                    "IDEA-0016 UI/character/world-marker")
+                .Concat(ReadPresentationManifest(
+                    CivilizationExpansionManifestPath,
+                    "IDEA-0023 civilization-expansion"))
+                .ToArray();
+        }
+
+        private static UnifiedPresentationManifestEntry[]
+            ReadPresentationManifest(string path, string label)
+        {
+            if (!File.Exists(path))
                 throw new FileNotFoundException(
-                    "Missing IDEA-0016 UI/character/world-marker manifest.",
-                    PresentationManifestPath);
+                    "Missing " + label + " manifest.",
+                    path);
             UnifiedPresentationManifest manifest = JsonUtility.FromJson<
-                UnifiedPresentationManifest>(
-                File.ReadAllText(PresentationManifestPath));
+                UnifiedPresentationManifest>(File.ReadAllText(path));
             if (manifest == null || manifest.entries == null)
-                throw new InvalidDataException(
-                    "IDEA-0016 UI/character/world-marker manifest is invalid.");
+                throw new InvalidDataException(label + " manifest is invalid.");
             return manifest.entries;
         }
 
@@ -264,6 +278,8 @@ namespace WasteCity.Editor
                     return Production2DVisualClass.Character;
                 case "world-marker":
                     return Production2DVisualClass.WorldMarker;
+                case "unit":
+                    return Production2DVisualClass.Unit;
                 default:
                     throw new InvalidDataException(
                         "Unsupported presentation visualClass: " + value);
@@ -293,7 +309,7 @@ namespace WasteCity.Editor
                 value.VisualClass == visualClass);
             if (actual != expected)
                 throw new InvalidDataException(
-                    "IDEA-0016 visual class " + visualClass +
+                    "Unified visual class " + visualClass +
                     " requires " + expected + " entries, got " + actual + ".");
         }
 

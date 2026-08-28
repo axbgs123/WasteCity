@@ -739,6 +739,8 @@
         "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
       ],
       "ScenePaths": [
@@ -750,7 +752,8 @@
         "IDEA-0016",
         "IDEA-0018",
         "IDEA-0019",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0023"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -846,6 +849,10 @@
         "Assets/_Game/Scripts/Leader/CivilizationExpansion/**",
         "Assets/_Game/Scripts/World/CivilizationExpansion/**",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansion*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs",
+        "Assets/_Game/Editor/Production2DUnitImportPolicy.cs",
+        "Assets/_Game/Editor/Production2DVisualCatalogBuilder.cs",
+        "Assets/_Game/Editor/Production2DSpriteAtlasBuilder.cs",
         "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs"
       ],
       "PrimarySourceGlobs": [
@@ -861,6 +868,8 @@
         "Assets/_Game/Tests/EditMode/IDEA0022*.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
       ],
       "ScenePaths": [
@@ -868,7 +877,8 @@
       ],
       "RequirementIds": [
         "IDEA-0002",
-        "IDEA-0022"
+        "IDEA-0022",
+        "IDEA-0023"
       ],
       "HumanDocumentPaths": [
         "Docs/01-Game-Design-Document-ZH.md",
@@ -3423,14 +3433,17 @@
       ],
       "FeatureGroupId": "presentation-art-integration",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、44 科技、35 建筑、7 UI、1 人物和 2 世界标记共 120 个视觉条目，并登记 33 条配方的主产物与机器/手工角标投影。",
+      "UseSummary": "用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、44 科技、35 建筑、4 单位、18 UI、3 人物和 5 世界标记共 140 个视觉条目，并登记 33 条配方的主产物与机器/手工角标投影。",
       "BoundarySummary": "运行时资产只保存稳定视觉键、Sprite、配方视觉投影和类别回退；机器清单另行保存制作、导入与审核元数据。二者都不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局；未知键只能回退，不能改写玩法 ID。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0016",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0023"
       ]
     },
     {
@@ -3440,27 +3453,31 @@
         "Production2DItemImportPolicy",
         "Production2DBuildingImportPolicy",
         "Production2DTechnologyImportPolicy",
-        "Production2DUiCharacterMarkerImportPolicy"
+        "Production2DUiCharacterMarkerImportPolicy",
+        "Production2DUnitImportPolicy"
       ],
       "AssetPaths": [
         "Assets/_Game/Editor/Production2DItemImportPolicy.cs",
         "Assets/_Game/Editor/Production2DBuildingImportPolicy.cs",
         "Assets/_Game/Editor/Production2DTechnologyImportPolicy.cs",
-        "Assets/_Game/Editor/Production2DUiCharacterMarkerImportPolicy.cs"
+        "Assets/_Game/Editor/Production2DUiCharacterMarkerImportPolicy.cs",
+        "Assets/_Game/Editor/Production2DUnitImportPolicy.cs"
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "只在 Assets/_Game/Art/Production2D 的六类批准目录内统一 Sprite、Alpha、sRGB、Clamp、无 mipmap、FullRect、Pivot 和 UI Border 导入合同。",
+      "UseSummary": "只在 Assets/_Game/Art/Production2D 的七类批准目录内统一 Sprite、Alpha、sRGB、Clamp、无 mipmap、FullRect、Pivot 和 UI Border 导入合同；Unit importer 只接管 Units 根目录顶层四张透明 PNG。",
       "BoundarySummary": "只管理限定二维交付目录的 TextureImporter；不生成内容简介、中文名、运行时映射或视觉验收结论，绝不能扫描或修改地形及其它既有纹理。扩展目录前必须同步 manifest 和导入测试。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
-        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs"
+        "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0016",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0023"
       ]
     },
     {
@@ -3482,18 +3499,20 @@
       ],
       "FeatureGroupId": "scene-editor-build-performance",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "从已复核的分层 manifest 以稳定 ID 顺序生成资源、建筑、科技及统一 120 项视觉目录、33 条配方视觉投影和六类 SpriteAtlas；内容相同的重复构建保持资产与 meta 字节不变。",
+      "UseSummary": "从 IDEA-0016 基础 manifest 与 IDEA-0023 增量 manifest 以稳定 ID 顺序生成统一 140 项视觉目录、33 条配方视觉投影和七类 SpriteAtlas；Units=4、Characters=3、WorldMarkers=5、UI=18，内容相同的重复构建保持资产与 meta 字节不变。",
       "BoundarySummary": "仅供 Editor 生成和验证已批准的表现资产；不从文件名猜玩法内容，不改场景、配方、研究或建筑规则，不替代 Alpha/缩小联络表与用户视觉验收。Atlas 打包顺序不构成运行时身份。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/Production2DItemIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DBuildingIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DTechnologyIconPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DUiCharacterMarkerPipelineTests.cs",
-        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs"
+        "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0016",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0023"
       ]
     },
     {
@@ -4169,22 +4188,29 @@
       "ChineseName": "文明扩展组合运行时",
       "TypeNames": [
         "CivilizationExpansionRuntime",
-        "GrayboxCivilizationExpansionController3D"
+        "GrayboxCivilizationExpansionController3D",
+        "GrayboxCivilizationExpansionView3D",
+        "GrayboxCivilizationExpansionVisualPresenter3D"
       ],
       "AssetPaths": [
         "Assets/_Game/Scripts/CivilizationExpansion/CivilizationExpansionRuntime.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationExpansionVisualPresenter3D.cs"
       ],
       "FeatureGroupId": "civilization-expansion",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "组合唯一军队、远征、世界层、运输、角色、内政和外交owner，并把正式3D库存、建筑、地图、领袖、Defense与规则时钟作为窄接口注入。",
-      "BoundarySummary": "不复制主城库存、地图、放置或敌人真值；程序化标记和M/N/P面板只读快照并提交命令，不能反向拥有领域状态。",
+      "UseSummary": "组合唯一军队、远征、世界层、运输、角色、内政和外交owner，并由 Presenter 把四单位、三角色、次城、前哨、运输队、三个 M/N/P 页签和八个状态徽记的 140 项统一视觉目录投影到 UI 与有权威坐标的世界公告板。",
+      "BoundarySummary": "不复制主城库存、地图、放置、敌人、单位位置或运输状态真值；Sprite、比例、公告板锚点、染色和 fallback 只属表现，View/Presenter/Controller 只能读取快照和提交命令，不能反向拥有领域状态或冒充已完成 3D 建模。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
+        "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0022"
+        "IDEA-0022",
+        "IDEA-0023"
       ]
     },
     {

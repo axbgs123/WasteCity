@@ -8,6 +8,7 @@ using UnityEditor.U2D;
 using UnityEngine;
 using UnityEngine.U2D;
 using WasteCity.Building;
+using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Editor;
 using WasteCity.Graybox3D;
@@ -26,10 +27,21 @@ namespace WasteCity.Tests
             "core.ui.divider.terminal-horizontal",
             "core.ui.connector.technology-branch",
             "core.ui.icon.search",
+            "core.ui.tab.army",
+            "core.ui.tab.world",
+            "core.ui.tab.politics",
+            "core.ui.status.guard",
+            "core.ui.status.follow",
+            "core.ui.status.expedition",
+            "core.ui.status.retreat",
+            "core.ui.status.transport",
+            "core.ui.status.communication",
+            "core.ui.status.loyalty",
+            "core.ui.status.rescue",
         };
 
         [Test]
-        public void IDEA0016_UnifiedCatalogAndSixAtlasAssetsExistAfterBuild()
+        public void IDEA0016_IDEA0023_UnifiedCatalogAndSevenAtlasAssetsExistAfterBuild()
         {
             Assert.That(AssetDatabase.LoadAssetAtPath<
                     Production2DVisualCatalog3D>(
@@ -37,7 +49,7 @@ namespace WasteCity.Tests
                 Is.Not.Null,
                 Production2DVisualCatalogBuilder.CatalogAssetPath);
             Assert.That(Production2DSpriteAtlasBuilder.Definitions.Count,
-                Is.EqualTo(6));
+                Is.EqualTo(7));
             foreach (Production2DAtlasDefinition definition in
                      Production2DSpriteAtlasBuilder.Definitions)
             {
@@ -63,12 +75,28 @@ namespace WasteCity.Tests
                 BuildingCatalog.All.Select(value => value.Id.Value));
             AssertClass(catalog, Production2DVisualClass.Ui, UiIds);
             AssertClass(catalog, Production2DVisualClass.Character,
-                new[] { "core.character.cen-jin" });
+                new[]
+                {
+                    "core.character.cen-jin",
+                    "core.character.lin-xi",
+                    "core.character.han-gu",
+                });
             AssertClass(catalog, Production2DVisualClass.WorldMarker,
                 new[]
                 {
                     "core.world-marker.resource-node",
                     "core.world-marker.selection-reticle",
+                    "core.world-marker.secondary-city",
+                    "core.world-marker.outpost",
+                    "core.world-marker.convoy",
+                });
+            AssertClass(catalog, Production2DVisualClass.Unit,
+                new[]
+                {
+                    ArmyUnitCatalog.CombatPuppetId,
+                    ArmyUnitCatalog.BredBehemothId,
+                    ArmyUnitCatalog.PsionicMechId,
+                    ArmyUnitCatalog.BioMechanicalBehemothId,
                 });
 
             string[] keys = catalog.Entries.Select(value =>

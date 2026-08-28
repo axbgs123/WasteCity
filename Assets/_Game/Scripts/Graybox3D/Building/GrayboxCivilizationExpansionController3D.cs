@@ -40,6 +40,13 @@ namespace WasteCity.Graybox3D.Building
         private Transform markerRoot;
         private readonly List<GameObject> worldMarkers =
             new List<GameObject>();
+        private readonly Dictionary<string, GameObject> worldMarkerByName =
+            new Dictionary<string, GameObject>(StringComparer.Ordinal);
+        private readonly HashSet<string> activeWorldMarkerNames =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<string> staleWorldMarkerNames =
+            new List<string>();
+        private GrayboxCivilizationExpansionVisualPresenter3D visualPresenter;
         private Material settlementMarkerMaterial;
         private Material outpostMarkerMaterial;
         private Material squadMarkerMaterial;
@@ -126,6 +133,7 @@ namespace WasteCity.Graybox3D.Building
             TickLeaderTravel(ruleDeltaSeconds, paused);
             ApplyGuardDamage(ruleDeltaSeconds, paused);
             Refresh(force: false);
+            OrientSpriteMarkers();
         }
 
         public void TogglePage(GrayboxCivilizationExpansionPage3D page)
@@ -796,7 +804,8 @@ namespace WasteCity.Graybox3D.Building
                 "跟随领袖",
                 true,
                 active ? "撤回远征" : "派出远征",
-                active || Runtime.Army.Units.Count > 0);
+                active || Runtime.Army.Units.Count > 0,
+                ArmyStatusVisuals());
         }
 
         private GrayboxCivilizationExpansionPresentation3D WorldPresentation()
@@ -839,7 +848,8 @@ namespace WasteCity.Graybox3D.Building
                     WorldLayerCatalog.Outpost.Id) == null,
                 "派出石料运输队",
                 Runtime.WorldLayer.GetSettlement(
-                    WorldLayerCatalog.SecondaryCity.Id) != null);
+                    WorldLayerCatalog.SecondaryCity.Id) != null,
+                WorldStatusVisuals(worldSnapshot, transportSnapshot));
         }
 
         private GrayboxCivilizationExpansionPresentation3D
@@ -890,7 +900,48 @@ namespace WasteCity.Graybox3D.Building
                     : Runtime.Politics.IsInterimCouncilActive
                         ? "推举林溪"
                         : "指定林溪为继承人",
-                true);
+                true,
+                PoliticsStatusVisuals(hasDowned));
+        }
+
+        private string[] ArmyStatusVisuals()
+        {
+            return GrayboxCivilizationExpansionVisualPresenter3D
+                .ArmyStatusVisuals(Runtime.Army.Commands.Command);
+        }
+
+        private static string[] WorldStatusVisuals(
+            WorldLayerRuntimeSnapshot worldSnapshot,
+            TransportRuntimeSnapshot transportSnapshot)
+        {
+            bool hasActiveTransport = false;
+            for (var index = 0; index < transportSnapshot.Convoys.Count;
+                 index++)
+            {
+                ConvoyStatus status = transportSnapshot.Convoys[index].Status;
+                hasActiveTransport |= status == ConvoyStatus.InTransit ||
+                    status == ConvoyStatus.WaitingForCapacity;
+            }
+            bool hasCommunication = false;
+            for (var index = 0; index < worldSnapshot.Settlements.Count;
+                 index++)
+            {
+                SettlementRuntimeSnapshot settlement =
+                    worldSnapshot.Settlements[index];
+                hasCommunication |= settlement.Kind !=
+                    SettlementKind.PrimaryCity &&
+                    settlement.IsCommunicationActive;
+            }
+            return GrayboxCivilizationExpansionVisualPresenter3D
+                .WorldStatusVisuals(
+                    hasActiveTransport,
+                    hasCommunication);
+        }
+
+        private static string[] PoliticsStatusVisuals(bool hasDowned)
+        {
+            return GrayboxCivilizationExpansionVisualPresenter3D
+                .PoliticsStatusVisuals(hasDowned);
         }
 
         private int CountOperationalBuildings(string buildingId)
@@ -986,13 +1037,13 @@ namespace WasteCity.Graybox3D.Building
 
         private void RefreshWorldMarkers()
         {
-            for (var index = 0; index < worldMarkers.Count; index++)
-                DestroyObject(worldMarkers[index]);
-            worldMarkers.Clear();
             markerRoot ??= new GameObject(
                 "CivilizationExpansion.WorldMarkers").transform;
             markerRoot.SetParent(transform, false);
+            visualPresenter ??=
+                GrayboxCivilizationExpansionVisualPresenter3D.CreateFormal();
             EnsureMarkerMaterials();
+            activeWorldMarkerNames.Clear();
 
             WorldLayerRuntimeSnapshot layer = Runtime.WorldLayer.Capture();
             for (var index = 0; index < layer.Settlements.Count; index++)
@@ -1000,7 +1051,9 @@ namespace WasteCity.Graybox3D.Building
                 SettlementRuntimeSnapshot settlement =
                     layer.Settlements[index];
                 if (settlement.Kind == SettlementKind.PrimaryCity) continue;
-                AddMarker(
+                AddOrUpdateMarker(
+                    settlement.StableId,
+                    primaryUnitDefinitionId: null,
                     settlement.Kind == SettlementKind.Outpost
                         ? PrimitiveType.Cylinder
                         : PrimitiveType.Cube,
@@ -1018,7 +1071,11 @@ namespace WasteCity.Graybox3D.Building
             if (Runtime.Army.Units.Count > 0)
             {
                 SettlementRuntime primary = Runtime.WorldLayer.PrimaryCity;
-                AddMarker(
+                string primaryUnitDefinitionId =
+                    Runtime.Army.Units[0].DefinitionId;
+                AddOrUpdateMarker(
+                    SingleCityArmyModel.DefaultSquadId,
+                    primaryUnitDefinitionId,
                     PrimitiveType.Sphere,
                     "SquadMarker." + SingleCityArmyModel.DefaultSquadId,
                     primary.X + 1,
@@ -1039,7 +1096,9 @@ namespace WasteCity.Graybox3D.Building
                     convoy.CompletedPathCells,
                     0,
                     convoy.Path.Count - 1);
-                AddMarker(
+                AddOrUpdateMarker(
+                    convoy.StableId,
+                    primaryUnitDefinitionId: null,
                     PrimitiveType.Cube,
                     "ConvoyMarker." + convoy.StableId,
                     convoy.Path[pathIndex].X,
@@ -1048,9 +1107,31 @@ namespace WasteCity.Graybox3D.Building
                     convoyMarkerMaterial,
                     .30f);
             }
+            foreach (KeyValuePair<string, GameObject> item in
+                     worldMarkerByName)
+            {
+                bool active = activeWorldMarkerNames.Contains(item.Key);
+                item.Value.SetActive(active);
+                if (!active && item.Key.StartsWith(
+                        "ConvoyMarker.",
+                        StringComparison.Ordinal))
+                    staleWorldMarkerNames.Add(item.Key);
+            }
+            for (var index = 0; index < staleWorldMarkerNames.Count; index++)
+            {
+                string markerName = staleWorldMarkerNames[index];
+                if (worldMarkerByName.TryGetValue(
+                        markerName,
+                        out GameObject stale))
+                    ReplaceMarker(markerName, stale);
+            }
+            staleWorldMarkerNames.Clear();
+            OrientSpriteMarkers();
         }
 
-        private void AddMarker(
+        private void AddOrUpdateMarker(
+            string stableRuntimeId,
+            string primaryUnitDefinitionId,
             PrimitiveType primitive,
             string markerName,
             int cellX,
@@ -1059,6 +1140,15 @@ namespace WasteCity.Graybox3D.Building
             Material material,
             float height)
         {
+            GrayboxCivilizationWorldMarkerVisual3D visual =
+                visualPresenter.DescribeWorldMarker(
+                    stableRuntimeId,
+                    primaryUnitDefinitionId);
+            if (visual != null)
+            {
+                scale = visual.WorldScale;
+                height = visual.WorldHeight;
+            }
             if (world?.Coordinates == null ||
                 !world.Coordinates.TryCellToWorld(
                     cellX,
@@ -1066,19 +1156,100 @@ namespace WasteCity.Graybox3D.Building
                     height,
                     out Vector3 position))
                 return;
+            GameObject marker;
+            if (visual != null && !visual.UsesProgrammaticFallback)
+            {
+                marker = EnsureSpriteMarker(markerName);
+                SpriteRenderer renderer = marker.GetComponent<SpriteRenderer>();
+                renderer.sprite = visual.Sprite;
+                renderer.color = Color.white;
+                renderer.sortingOrder = 20;
+                float spriteWidth = Math.Max(
+                    .0001f,
+                    visual.Sprite.bounds.size.x);
+                float factor = scale / spriteWidth;
+                marker.transform.localScale = Vector3.one * factor;
+                float displayedHeight =
+                    visual.Sprite.bounds.size.y * factor;
+                position.y += displayedHeight *
+                    (.5f - visual.Anchor.y);
+                marker.transform.position = position;
+            }
+            else
+            {
+                marker = EnsurePrimitiveMarker(markerName, primitive);
+                marker.transform.position = position;
+                marker.transform.rotation = Quaternion.identity;
+                marker.transform.localScale = new Vector3(
+                    scale,
+                    primitive == PrimitiveType.Cylinder ? .36f : scale,
+                    scale);
+                Renderer renderer = marker.GetComponent<Renderer>();
+                if (renderer != null) renderer.sharedMaterial = material;
+            }
+            marker.SetActive(true);
+            activeWorldMarkerNames.Add(markerName);
+        }
+
+        private GameObject EnsureSpriteMarker(string markerName)
+        {
+            if (worldMarkerByName.TryGetValue(
+                    markerName,
+                    out GameObject existing) &&
+                existing.GetComponent<SpriteRenderer>() != null)
+                return existing;
+            ReplaceMarker(markerName, existing);
+            var marker = new GameObject(markerName, typeof(SpriteRenderer));
+            marker.transform.SetParent(markerRoot, false);
+            worldMarkers.Add(marker);
+            worldMarkerByName.Add(markerName, marker);
+            return marker;
+        }
+
+        private GameObject EnsurePrimitiveMarker(
+            string markerName,
+            PrimitiveType primitive)
+        {
+            if (worldMarkerByName.TryGetValue(
+                    markerName,
+                    out GameObject existing) &&
+                existing.GetComponent<SpriteRenderer>() == null)
+                return existing;
+            ReplaceMarker(markerName, existing);
             GameObject marker = GameObject.CreatePrimitive(primitive);
             marker.name = markerName;
             marker.transform.SetParent(markerRoot, false);
-            marker.transform.position = position;
-            marker.transform.localScale = new Vector3(
-                scale,
-                primitive == PrimitiveType.Cylinder ? .36f : scale,
-                scale);
             Collider collider = marker.GetComponent<Collider>();
             if (collider != null) DestroyObject(collider);
-            Renderer renderer = marker.GetComponent<Renderer>();
-            if (renderer != null) renderer.sharedMaterial = material;
             worldMarkers.Add(marker);
+            worldMarkerByName.Add(markerName, marker);
+            return marker;
+        }
+
+        private void ReplaceMarker(string markerName, GameObject existing)
+        {
+            if (existing == null) return;
+            worldMarkerByName.Remove(markerName);
+            worldMarkers.Remove(existing);
+            DestroyObject(existing);
+        }
+
+        private void OrientSpriteMarkers()
+        {
+            Camera camera = Camera.main;
+            if (camera == null) return;
+            foreach (KeyValuePair<string, GameObject> item in
+                     worldMarkerByName)
+            {
+                GameObject marker = item.Value;
+                if (!marker.activeInHierarchy ||
+                    marker.GetComponent<SpriteRenderer>() == null)
+                    continue;
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .OrientVerticalBillboard(
+                        marker.transform,
+                        camera.transform.position);
+            }
         }
 
         private void EnsureMarkerMaterials()
@@ -1125,6 +1296,9 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < worldMarkers.Count; index++)
                 DestroyObject(worldMarkers[index]);
             worldMarkers.Clear();
+            worldMarkerByName.Clear();
+            activeWorldMarkerNames.Clear();
+            staleWorldMarkerNames.Clear();
             DestroyObject(markerRoot?.gameObject);
             DestroyObject(settlementMarkerMaterial);
             DestroyObject(outpostMarkerMaterial);

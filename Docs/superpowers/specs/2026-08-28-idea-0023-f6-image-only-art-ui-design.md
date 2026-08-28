@@ -24,7 +24,7 @@
 
 - 领域稳定 ID 继续由 Army、WorldLayer、Transport 和 Character 目录拥有。
 - 新视觉目录只负责“稳定视觉 ID → Sprite + 展示参数”；现有枚举末尾追加 Unit 类，单位进入独立受控目录与 Units Atlas，人物、世界标记和 UI 继续沿用既有分类。
-- 世界表现读取视觉目录生成 SpriteRenderer/公告板，目录缺失时回退现有程序化标记。
+- 世界表现只为已有权威世界坐标的小队、地点和运输读取视觉目录生成 SpriteRenderer/公告板，目录缺失时回退现有程序化标记；角色没有独立坐标时只进入政务头像区。
 - 三面板读取同一 UI 视觉目录，所有文字、数值、按钮行为和模态优先级仍由现有 View/Controller/Input System 负责。
 - 图片、目录和显示对象均不进入存档。
 

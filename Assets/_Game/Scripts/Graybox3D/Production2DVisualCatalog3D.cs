@@ -15,6 +15,7 @@ namespace WasteCity.Graybox3D
         Ui,
         Character,
         WorldMarker,
+        Unit,
     }
 
     public enum Production2DRecipeBadgeRule
@@ -286,6 +287,7 @@ namespace WasteCity.Graybox3D
                 case Production2DVisualClass.Ui:
                 case Production2DVisualClass.Character:
                 case Production2DVisualClass.WorldMarker:
+                case Production2DVisualClass.Unit:
                     return CreateClassFallback(visualClass, contentId);
                 default:
                     return null;
@@ -375,6 +377,8 @@ namespace WasteCity.Graybox3D
                     return new Color32(89, 177, 187, 255);
                 case Production2DVisualClass.WorldMarker:
                     return new Color32(195, 139, 72, 255);
+                case Production2DVisualClass.Unit:
+                    return new Color32(112, 171, 116, 255);
                 default:
                     return new Color32(102, 132, 145, 255);
             }
