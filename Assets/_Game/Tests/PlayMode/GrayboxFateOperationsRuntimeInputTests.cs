@@ -347,7 +347,11 @@ namespace WasteCity.Tests
             Assert.That(building.State,
                 Is.EqualTo(GrayboxBuildingInteractionState.Inactive));
             Assert.That(operations.IsAnyPanelOpen, Is.False);
-            Assert.That(city.transform.position, Is.EqualTo(before));
+            Assert.That(
+                Vector3.Distance(city.transform.position, before),
+                Is.LessThan(.0001f),
+                "The modal blocks meaningful city movement; ignore only " +
+                "sub-pixel transform noise.");
         }
 
         private IEnumerator HoldKey(Key key, int frames)

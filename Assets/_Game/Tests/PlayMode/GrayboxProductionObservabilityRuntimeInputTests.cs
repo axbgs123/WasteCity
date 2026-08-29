@@ -1857,6 +1857,8 @@ namespace WasteCity.Tests
             yield return ShiftClickUiElement(input);
             Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(4));
             AssertBackpackSlot(operations, 0, null, 0);
+            output = RequireSceneObject(
+                productionRowName + ".OutputTransfer." + ResourceIds.Alloy);
             yield return ShiftClickUiElement(output);
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
             AssertBackpackSlot(
@@ -1873,6 +1875,8 @@ namespace WasteCity.Tests
             operations.RefreshIfChanged();
             int cityAlloyBeforeLogisticsDenied =
                 session.Inventory.Get(ResourceIds.Alloy);
+            output = RequireSceneObject(
+                productionRowName + ".OutputTransfer." + ResourceIds.Alloy);
             yield return ClickUiElement(output, MouseButton.Left);
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
             Assert.That(session.Inventory.Get(ResourceIds.Alloy),
@@ -1900,6 +1904,10 @@ namespace WasteCity.Tests
             operations.Backpack.Add(ResourceIds.Iron, 3);
             int cityAlloyBeforeDenied =
                 session.Inventory.Get(ResourceIds.Alloy);
+            input = RequireSceneObject(
+                productionRowName + ".InputTransfer." + ResourceIds.Iron);
+            output = RequireSceneObject(
+                productionRowName + ".OutputTransfer." + ResourceIds.Alloy);
             yield return ShiftClickUiElement(input);
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(1));
             yield return ClickUiElement(output, MouseButton.Left);
@@ -2290,10 +2298,9 @@ namespace WasteCity.Tests
             Assert.That(platform, Is.Not.Null);
             BoxCollider surface = platform.GetComponent<BoxCollider>();
             Assert.That(surface, Is.Not.Null);
-            Vector3 worldPoint = city.transform.TransformPoint(new Vector3(
-                -1.28f + (x + .5f) * .32f,
-                0f,
-                -.96f + (y + .5f) * .32f));
+            Vector3 worldPoint = city.transform.TransformPoint(
+                FormalInnerCityPresentationPolicy3D.CellCenterLocal(
+                    x, y, 0f));
             worldPoint.y = surface.bounds.max.y;
             QueueMouse(Camera.main.WorldToScreenPoint(worldPoint));
             yield return null;

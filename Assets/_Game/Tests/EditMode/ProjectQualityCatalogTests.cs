@@ -373,7 +373,9 @@ namespace WasteCity.Tests
             }, operationsView.AssetPaths);
             CollectionAssert.AreEqual(new[]
             {
+                "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
+                "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
                 "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsView.RequiredTestFiles);
@@ -384,6 +386,7 @@ namespace WasteCity.Tests
                 "IDEA-0016",
                 "IDEA-0018",
                 "IDEA-0021",
+                "IDEA-0024",
             },
                 operationsView.RequirementIds);
 
@@ -1323,6 +1326,7 @@ namespace WasteCity.Tests
                     "IDEA-0016",
                     "IDEA-0018",
                     "IDEA-0021",
+                    "IDEA-0024",
                 },
                 operationsView.RequirementIds);
             CollectionAssert.Contains(

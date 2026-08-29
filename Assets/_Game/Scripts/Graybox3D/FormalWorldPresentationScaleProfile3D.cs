@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Building;
+using WasteCity.City;
 
 namespace WasteCity.Graybox3D
 {
@@ -93,21 +94,50 @@ namespace WasteCity.Graybox3D
         public const string ResourcesPath =
             "Presentation/FormalWorldPresentationScaleProfile3D";
         public const float GroundCellSize = 1f;
-        public const float InnerCellSize = .32f;
+        public const float InnerCellSize = 1f;
+        public const int InnerGridWidthCells = 8;
+        public const int InnerGridHeightCells = 6;
+        public const float InnerPlatformThickness = .01f;
+        public const float InnerContentLift = .01f;
         public const float ReferenceWidth = 1920f;
         public const float ReferenceHeight = 1080f;
+
+        private static readonly Vector3 MobileVisualSize =
+            new Vector3(8.6f, .65f, 6.6f);
+        private static readonly Vector3 FortressVisualSize =
+            new Vector3(8.8f, .8f, 6.8f);
+        private static readonly Vector3 MobileColliderSize =
+            new Vector3(3f, 1f, 2f);
+        private static readonly Vector3 FortressColliderSize =
+            new Vector3(3f, 1.5f, 3f);
 
         private static readonly Dictionary<string,
             FormalBuildingVisualArchetype3D> BuildingArchetypes =
                 CreateBuildingArchetypes();
 
-        [SerializeField] private float innerVerticalEmphasis = 1.15f;
+        [SerializeField] private float innerVerticalEmphasis = 1f;
         [SerializeField] private float nearUnitScreenHeight = .045f;
         [SerializeField] private float midUnitScreenHeight = .027f;
         [SerializeField] private float markerSeparationReferencePixels = 6f;
         [SerializeField] private float selectionLineReferencePixels = 2f;
 
         public float InnerVerticalEmphasis => innerVerticalEmphasis;
+        public int InnerGridWidth => InnerGridWidthCells;
+        public int InnerGridHeight => InnerGridHeightCells;
+        public Vector2 InnerGridAnchor => new Vector2(
+            -InnerGridWidthCells * InnerCellSize * .5f,
+            -InnerGridHeightCells * InnerCellSize * .5f);
+        public Vector2 InnerPlatformSize => new Vector2(
+            InnerGridWidthCells * InnerCellSize,
+            InnerGridHeightCells * InnerCellSize);
+        public Vector3 MobileCityVisualSize => MobileVisualSize;
+        public Vector3 FortressCityVisualSize => FortressVisualSize;
+        public Vector3 MobileGameplayColliderSize => MobileColliderSize;
+        public Vector3 FortressGameplayColliderSize => FortressColliderSize;
+        public float MobileDeckLocalY => MobileVisualSize.y - .5f;
+        public float FortressDeckLocalY => FortressVisualSize.y - .5f;
+        public float BuildingIconWidthRatio => .78f;
+        public float BuildingIconRoofClearance => .08f;
         public float NearUnitScreenHeight => nearUnitScreenHeight;
         public float MidUnitScreenHeight => midUnitScreenHeight;
         public float MarkerSeparationReferencePixels =>
@@ -182,10 +212,33 @@ namespace WasteCity.Graybox3D
                 : GroundCellSize;
         }
 
+        public Vector3 CityVisualSize(CityMode mode, float fortressFactor)
+        {
+            return Vector3.Lerp(
+                MobileVisualSize,
+                FortressVisualSize,
+                Mathf.Clamp01(fortressFactor));
+        }
+
+        public Vector3 GameplayColliderSize(float fortressFactor)
+        {
+            return Vector3.Lerp(
+                MobileColliderSize,
+                FortressColliderSize,
+                Mathf.Clamp01(fortressFactor));
+        }
+
+        public float DeckLocalY(float fortressFactor)
+        {
+            return Mathf.Lerp(
+                MobileDeckLocalY,
+                FortressDeckLocalY,
+                Mathf.Clamp01(fortressFactor));
+        }
+
         public bool TryValidate(out string error)
         {
-            if (!IsFinitePositive(innerVerticalEmphasis) ||
-                !IsFinitePositive(nearUnitScreenHeight) ||
+            if (!IsFinitePositive(nearUnitScreenHeight) ||
                 !IsFinitePositive(midUnitScreenHeight) ||
                 nearUnitScreenHeight <= midUnitScreenHeight ||
                 !IsFinitePositive(markerSeparationReferencePixels) ||
@@ -193,6 +246,18 @@ namespace WasteCity.Graybox3D
             {
                 error = "World presentation scale values must be finite, " +
                     "positive, and ordered.";
+                return false;
+            }
+            if (!Mathf.Approximately(innerVerticalEmphasis, 1f) ||
+                InnerGridWidthCells != 8 || InnerGridHeightCells != 6 ||
+                InnerCellSize != GroundCellSize ||
+                MobileVisualSize.x < InnerGridWidthCells * InnerCellSize ||
+                MobileVisualSize.z < InnerGridHeightCells * InnerCellSize ||
+                FortressVisualSize.x < MobileVisualSize.x ||
+                FortressVisualSize.z < MobileVisualSize.z ||
+                !IsFinitePositive(BuildingIconRoofClearance))
+            {
+                error = "Mobile-city presentation metrics are invalid.";
                 return false;
             }
             if (BuildingArchetypes.Count != BuildingCatalog.All.Length)

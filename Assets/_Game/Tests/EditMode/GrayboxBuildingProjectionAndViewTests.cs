@@ -49,7 +49,7 @@ namespace WasteCity.Tests
             InnerSurfaceFixture inner = CreateInnerSurface(fixture.City);
             GrayboxBuildingSurfaceProjector3D projector =
                 CreateProjector(fixture, inner.Collider);
-            Vector3 localCenter = new Vector3(-1.12f, 1.06f, -.8f);
+            Vector3 localCenter = new Vector3(-3.5f, 0f, -2.5f);
             PositionCameraOver(fixture.Camera, inner.Root.TransformPoint(localCenter));
             Physics.SyncTransforms();
 
@@ -65,10 +65,10 @@ namespace WasteCity.Tests
             Assert.That(hit.SurfaceLabel, Is.EqualTo("内城"));
             Assert.That(
                 inner.Root.InverseTransformPoint(hit.WorldPoint).x,
-                Is.EqualTo(-1.12f).Within(.001f));
+                Is.EqualTo(-3.5f).Within(.001f));
             Assert.That(
                 inner.Root.InverseTransformPoint(hit.WorldPoint).z,
-                Is.EqualTo(-.8f).Within(.001f));
+                Is.EqualTo(-2.5f).Within(.001f));
         }
 
         [Test]
@@ -76,12 +76,12 @@ namespace WasteCity.Tests
         {
             WorldFixture fixture = CreateWorldFixture();
             InnerSurfaceFixture inner = CreateInnerSurface(fixture.City);
-            inner.Collider.size = new Vector3(2.8f, .1f, 2.2f);
+            inner.Collider.size = new Vector3(8.8f, .1f, 6.8f);
             GrayboxBuildingSurfaceProjector3D projector =
                 CreateProjector(fixture, inner.Collider);
             PositionCameraOver(
                 fixture.Camera,
-                inner.Root.TransformPoint(new Vector3(1.3f, 1.06f, 0f)));
+                inner.Root.TransformPoint(new Vector3(4.2f, 0f, 0f)));
             Physics.SyncTransforms();
 
             Assert.That(
@@ -97,7 +97,7 @@ namespace WasteCity.Tests
             InnerSurfaceFixture inner = CreateInnerSurface(fixture.City);
             GrayboxBuildingSurfaceProjector3D projector =
                 CreateProjector(fixture, inner.Collider);
-            Vector3 localCenter = new Vector3(.16f, 1.06f, .16f);
+            Vector3 localCenter = new Vector3(.5f, 0f, .5f);
             PositionCameraOver(fixture.Camera, inner.Root.TransformPoint(localCenter));
             Physics.SyncTransforms();
             Assert.That(
@@ -2436,8 +2436,8 @@ namespace WasteCity.Tests
             float expectedGroundWidth =
                 BuildingCatalog.Housing.Width * metrics.FootprintFillRatio;
             float expectedGroundHeight = metrics.VisualHeightInCells;
-            float expectedInnerWidth = expectedGroundWidth * .32f;
-            float expectedInnerHeight = expectedGroundHeight * .32f * 1.15f;
+            float expectedInnerWidth = expectedGroundWidth;
+            float expectedInnerHeight = expectedGroundHeight;
             Assert.That(
                 groundBounds.size.x,
                 Is.EqualTo(expectedGroundWidth).Within(.02f));
@@ -2458,7 +2458,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(expectedInnerHeight).Within(.02f));
             Assert.That(
                 innerBounds.size.y / groundBounds.size.y,
-                Is.EqualTo(.32f * 1.15f).Within(.02f));
+                Is.EqualTo(1f).Within(.02f));
         }
 
         [Test]
@@ -3101,9 +3101,12 @@ namespace WasteCity.Tests
         {
             GameObject surface = Track(new GameObject("inner-surface"));
             surface.transform.SetParent(city.transform, false);
-            surface.transform.localPosition = new Vector3(0f, 1f, 0f);
+            surface.transform.localPosition = new Vector3(
+                0f,
+                city.InnerContentLocalY,
+                0f);
             BoxCollider collider = surface.AddComponent<BoxCollider>();
-            collider.size = new Vector3(2.56f, .1f, 1.92f);
+            collider.size = new Vector3(8f, .1f, 6f);
             return new InnerSurfaceFixture(surface.transform, collider);
         }
 

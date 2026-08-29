@@ -622,14 +622,26 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0007_DevelopmentAndReleaseExposeIdenticalControls()
+        public void IDEA0007_PlayerControlsStayIdenticalApartFromIdea0024Tools()
         {
             IReadOnlyList<string> development =
                 GrayboxSystemMenuView3D.ResolveVisibleControlIds(true);
             IReadOnlyList<string> release =
                 GrayboxSystemMenuView3D.ResolveVisibleControlIds(false);
 
-            Assert.That(development, Is.EqualTo(release));
+            string[] acceptanceControls =
+            {
+                "Start.AcceptanceConsole",
+                "Acceptance.Continue",
+                "Acceptance.NewGame",
+                "Acceptance.Back",
+            };
+            Assert.That(development.Except(acceptanceControls),
+                Is.EqualTo(release));
+            Assert.That(release.Intersect(acceptanceControls), Is.Empty);
+            CollectionAssert.IsSubsetOf(
+                acceptanceControls,
+                development.ToArray());
             Assert.That(development, Does.Contain("Main.Continue"));
             Assert.That(development, Does.Contain("Settings.Apply"));
             Assert.That(development, Does.Contain("Exit.SaveAndQuit"));

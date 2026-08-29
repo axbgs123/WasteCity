@@ -35,6 +35,7 @@ namespace WasteCity.Graybox3D.Building
         private GameObject fallbackCanvasObject;
         private GameObject modalRoot;
         private GameObject confirmationRoot;
+        private CanvasGroup confirmationVisibility;
         private Button confirmButton;
         private Button cancelButton;
         private IReadOnlyList<GrayboxFateSelectionCard3D> cards =
@@ -85,7 +86,7 @@ namespace WasteCity.Graybox3D.Building
             IsOpen = false;
             IsConfirmationOpen = false;
             PendingFateId = string.Empty;
-            if (confirmationRoot != null) confirmationRoot.SetActive(false);
+            SetConfirmationVisible(false);
             if (modalRoot != null) modalRoot.SetActive(false);
         }
 
@@ -94,14 +95,14 @@ namespace WasteCity.Graybox3D.Building
             EnsureUi();
             PendingFateId = fateId ?? string.Empty;
             IsConfirmationOpen = true;
-            confirmationRoot.SetActive(true);
+            SetConfirmationVisible(true);
         }
 
         public void CancelConfirmation()
         {
             PendingFateId = string.Empty;
             IsConfirmationOpen = false;
-            if (confirmationRoot != null) confirmationRoot.SetActive(false);
+            SetConfirmationVisible(false);
         }
 
         public void SetSelectedStatus(string value)
@@ -181,6 +182,8 @@ namespace WasteCity.Graybox3D.Building
                 confirmation.gameObject.AddComponent<Image>();
             confirmationImage.color = new Color(.12f, .08f, .08f, .99f);
             confirmationRoot = confirmation.gameObject;
+            confirmationVisibility =
+                confirmation.gameObject.AddComponent<CanvasGroup>();
 
             confirmButton = CreateButton(
                 confirmation, "FateSelection.Confirm", .08f, .48f, "确认命轨");
@@ -188,8 +191,22 @@ namespace WasteCity.Graybox3D.Building
                 confirmation, "FateSelection.Cancel", .52f, .92f, "返回");
             confirmButton.onClick.AddListener(() => ConfirmRequested?.Invoke());
             cancelButton.onClick.AddListener(() => CancelRequested?.Invoke());
-            confirmationRoot.SetActive(false);
+            SetConfirmationVisible(IsConfirmationOpen);
             modalRoot.SetActive(IsOpen);
+        }
+
+        private void SetConfirmationVisible(bool visible)
+        {
+            if (confirmationRoot == null) return;
+            if (confirmationVisibility == null)
+            {
+                confirmationVisibility =
+                    confirmationRoot.GetComponent<CanvasGroup>();
+            }
+            if (confirmationVisibility == null) return;
+            confirmationVisibility.alpha = visible ? 1f : 0f;
+            confirmationVisibility.interactable = visible;
+            confirmationVisibility.blocksRaycasts = visible;
         }
 
         private Button CreateButton(
@@ -218,6 +235,7 @@ namespace WasteCity.Graybox3D.Building
             if (modalRoot != null) DestroyObject(modalRoot);
             modalRoot = null;
             confirmationRoot = null;
+            confirmationVisibility = null;
             confirmButton = null;
             cancelButton = null;
         }

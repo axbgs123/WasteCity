@@ -56,7 +56,7 @@ namespace WasteCity.Editor
             new Production2DAtlasDefinition(
                 "UI",
                 Production2DUiCharacterMarkerImportPolicy.UiRoot,
-                18),
+                19),
             new Production2DAtlasDefinition(
                 "Characters",
                 Production2DUiCharacterMarkerImportPolicy.CharacterRoot,

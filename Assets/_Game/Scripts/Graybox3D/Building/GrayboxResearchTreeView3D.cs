@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -11,6 +12,39 @@ using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public enum ResearchNodePresentationState3D
+    {
+        Locked,
+        Researchable,
+        Active,
+        Completed,
+    }
+
+    /// <summary>
+    /// Immutable view data. The controller derives this from the formal
+    /// research runtime so the view never infers state from localized text.
+    /// </summary>
+    public sealed class ResearchNodePresentation3D
+    {
+        public ResearchNodePresentation3D(
+            ResearchDefinition definition,
+            ResearchNodePresentationState3D state,
+            string statusText,
+            bool selected)
+        {
+            Definition = definition ??
+                throw new ArgumentNullException(nameof(definition));
+            State = state;
+            StatusText = statusText ?? string.Empty;
+            Selected = selected;
+        }
+
+        public ResearchDefinition Definition { get; }
+        public ResearchNodePresentationState3D State { get; }
+        public string StatusText { get; }
+        public bool Selected { get; }
+    }
+
     /// <summary>
     /// IDEA-0016 generated uGUI view for the formal research tree. Research
     /// state remains owned by the caller; this component only projects it.
@@ -34,6 +68,12 @@ namespace WasteCity.Graybox3D.Building
             new Dictionary<string, JunctionRow>(StringComparer.Ordinal);
         private readonly Dictionary<DevelopmentRoute, Button> routeButtons =
             new Dictionary<DevelopmentRoute, Button>();
+        private readonly Dictionary<ResearchNodePresentationState3D, Button>
+            stateButtons = new Dictionary<
+                ResearchNodePresentationState3D, Button>();
+        private readonly Dictionary<string, ResearchNodePresentation3D>
+            presentations = new Dictionary<string,
+                ResearchNodePresentation3D>(StringComparer.Ordinal);
         private readonly HashSet<DevelopmentRoute> enabledRoutes =
             new HashSet<DevelopmentRoute>();
         private readonly List<ResourceIconSlot> resourceIcons =
@@ -49,6 +89,15 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform nodesLayer;
         private RectTransform connectionsLayer;
         private RectTransform activeRoot;
+        private RectTransform footer;
+        private RectTransform detailCosts;
+        private Image detailIcon;
+        private Text detailName;
+        private Text detailDuration;
+        private Text detailPrerequisites;
+        private Text detailDescription;
+        private Button allRoutesButton;
+        private Button allStatesButton;
         private Text activeName;
         private Text activeProgress;
         private InputField searchInput;
@@ -64,7 +113,9 @@ namespace WasteCity.Graybox3D.Building
         private ResearchTreeViewportState3D viewportState;
         private string activeResearchId;
         private string selectedResearchId;
+        private string detailResearchId;
         private bool userNavigated;
+        private ResearchNodePresentationState3D? stateFilter;
         private bool searchHasFocus;
         private bool observesInputDevices;
         private InputAction backspaceAction;
@@ -127,20 +178,51 @@ namespace WasteCity.Graybox3D.Building
             string stateText,
             bool isSelected)
         {
+            if (definition == null) return;
+            SetNode(new ResearchNodePresentation3D(
+                definition,
+                ResearchNodePresentationState3D.Locked,
+                stateText,
+                isSelected));
+        }
+
+        public void SetNode(ResearchNodePresentation3D presentation)
+        {
+            ApplyNodePresentation(presentation);
+            ApplyFilter();
+        }
+
+        public void SetNodes(
+            IReadOnlyList<ResearchNodePresentation3D> values)
+        {
+            if (values == null) return;
+            for (var index = 0; index < values.Count; index++)
+                ApplyNodePresentation(values[index]);
+            ApplyFilter();
+        }
+
+        private void ApplyNodePresentation(
+            ResearchNodePresentation3D presentation)
+        {
+            ResearchDefinition definition = presentation?.Definition;
             if (definition == null ||
                 !nodeRows.TryGetValue(definition.Id.Value, out NodeRow row))
             {
                 return;
             }
 
+            presentations[definition.Id.Value] = presentation;
             row.Name.text = definition.Name;
-            row.Details.text = ResearchDetails(definition);
-            row.State.text = stateText ?? string.Empty;
-            row.Button.image.color = isSelected
+            row.Details.text = definition.EffectSummary ?? string.Empty;
+            row.State.text = presentation.StatusText;
+            row.Button.image.color = presentation.Selected
                 ? SelectedColor
                 : NodeColor(definition.Route);
-            if (isSelected)
+            if (presentation.Selected)
+            {
                 selectedResearchId = definition.Id.Value;
+                PopulateFooter(presentation);
+            }
             else if (string.Equals(
                          selectedResearchId,
                          definition.Id.Value,
@@ -263,68 +345,131 @@ namespace WasteCity.Graybox3D.Building
 
         private void BuildUi()
         {
-            Text title = CreateLabel(
+            RectTransform backgroundRect = CreateRect(
                 panel,
+                "Research.Background");
+            Stretch(backgroundRect);
+            Image background = backgroundRect.gameObject.AddComponent<Image>();
+            background.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Ui,
+                "core.ui.background.research-tree");
+            background.color = Color.white;
+            background.preserveAspect = false;
+            background.raycastTarget = false;
+            backgroundRect.SetAsFirstSibling();
+            ownedRoots.Add(backgroundRect.gameObject);
+
+            RectTransform header = CreateRect(panel, "Research.Header");
+            SetNormalizedRect(header, 0f, .8963f, 1f, 1f);
+            Image headerImage = header.gameObject.AddComponent<Image>();
+            headerImage.color = new Color(.035f, .055f, .07f, .96f);
+            headerImage.raycastTarget = false;
+            ownedRoots.Add(header.gameObject);
+
+            Text title = CreateLabel(
+                header,
                 "Research.Title",
                 "正式四路线科技树",
                 20);
-            SetTopRect(title.rectTransform, 10f, 12f, 32f);
-            ownedRoots.Add(title.gameObject);
+            title.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(title.rectTransform, .012f, .53f, .15f, .96f);
 
-            searchInput = CreateInputField(panel, "Research.Search");
+            searchInput = CreateInputField(header, "Research.Search");
             RectTransform searchRect = searchInput.GetComponent<RectTransform>();
-            searchRect.anchorMin = new Vector2(0f, 1f);
-            searchRect.anchorMax = new Vector2(0f, 1f);
-            searchRect.pivot = new Vector2(0f, 1f);
-            searchRect.anchoredPosition = new Vector2(12f, -50f);
-            searchRect.sizeDelta = new Vector2(300f, 32f);
+            SetNormalizedRect(searchRect, .155f, .56f, .34f, .94f);
             searchInput.onValueChanged.AddListener(HandleSearchChanged);
             searchInput.onEndEdit.AddListener(_ => searchHasFocus = false);
             searchInput.gameObject
                 .AddComponent<GrayboxResearchSearchFocus3D>()
                 .Configure(value => searchHasFocus = value);
-            ownedRoots.Add(searchInput.gameObject);
 
-            RectTransform filters = CreateRect(panel, "Research.Filters");
-            filters.anchorMin = new Vector2(1f, 1f);
-            filters.anchorMax = new Vector2(1f, 1f);
-            filters.pivot = new Vector2(1f, 1f);
-            filters.anchoredPosition = new Vector2(-12f, -50f);
-            filters.sizeDelta = new Vector2(548f, 32f);
-            var filterLayout = filters.gameObject
+            RectTransform routeFilters = CreateRect(
+                header,
+                "Research.Filters.Route");
+            SetNormalizedRect(routeFilters, .35f, .55f, .75f, .95f);
+            var filterLayout = routeFilters.gameObject
                 .AddComponent<HorizontalLayoutGroup>();
-            filterLayout.spacing = 6f;
+            filterLayout.spacing = 4f;
             filterLayout.childForceExpandWidth = true;
             filterLayout.childForceExpandHeight = true;
-            ownedRoots.Add(filters.gameObject);
+            allRoutesButton = CreateButton(
+                routeFilters,
+                "Research.Filter.Route.All",
+                "全路线",
+                EnableAllRoutes);
             CreateRouteFilter(
-                filters,
+                routeFilters,
                 DevelopmentRoute.Technology,
                 "Technology",
                 "科技");
             CreateRouteFilter(
-                filters,
+                routeFilters,
                 DevelopmentRoute.Cultivation,
                 "Cultivation",
                 "修仙");
             CreateRouteFilter(
-                filters,
+                routeFilters,
                 DevelopmentRoute.Biological,
                 "Biological",
                 "血肉");
             CreateRouteFilter(
-                filters,
+                routeFilters,
                 DevelopmentRoute.Psionics,
                 "Psionics",
                 "灵能");
 
+            RectTransform statusFilters = CreateRect(
+                header,
+                "Research.Filters.Status");
+            SetNormalizedRect(statusFilters, .35f, .08f, .75f, .48f);
+            var statusLayout = statusFilters.gameObject
+                .AddComponent<HorizontalLayoutGroup>();
+            statusLayout.spacing = 4f;
+            statusLayout.childForceExpandWidth = true;
+            statusLayout.childForceExpandHeight = true;
+            allStatesButton = CreateButton(
+                statusFilters,
+                "Research.Filter.Status.All",
+                "全状态",
+                () => SetStateFilter(null));
+            CreateStateFilter(statusFilters,
+                ResearchNodePresentationState3D.Researchable,
+                "Researchable", "可研究");
+            CreateStateFilter(statusFilters,
+                ResearchNodePresentationState3D.Active,
+                "Active", "研究中");
+            CreateStateFilter(statusFilters,
+                ResearchNodePresentationState3D.Completed,
+                "Completed", "已完成");
+            CreateStateFilter(statusFilters,
+                ResearchNodePresentationState3D.Locked,
+                "Locked", "锁定");
+
+            RectTransform focus = CreateRect(header, "Research.Focus");
+            SetNormalizedRect(focus, .76f, .08f, .988f, .95f);
+            var focusLayout = focus.gameObject
+                .AddComponent<HorizontalLayoutGroup>();
+            focusLayout.spacing = 5f;
+            focusLayout.childForceExpandWidth = true;
+            focusLayout.childForceExpandHeight = true;
+            focusActiveButton = CreateButton(
+                focus,
+                "Research.FocusCurrent",
+                "当前研究",
+                FocusCurrentResearch);
+            focusActiveButton.interactable = false;
+            CreateButton(focus, "Research.FocusLatest", "最新可研究",
+                FocusLatestResearchable);
+            CreateButton(focus, "Research.FitAll", "显示全树", FitAll);
+            CreateButton(focus, "Research.Close", "关闭",
+                () => closeRequested?.Invoke());
+
             viewport = CreateRect(panel, "Research.Viewport");
-            viewport.anchorMin = Vector2.zero;
-            viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = new Vector2(12f, 112f);
-            viewport.offsetMax = new Vector2(-12f, -94f);
+            SetNormalizedRect(viewport, 0f, .2f, 1f, .8963f);
+            viewport.offsetMin = new Vector2(8f, 4f);
+            viewport.offsetMax = new Vector2(-8f, -4f);
             Image viewportImage = viewport.gameObject.AddComponent<Image>();
-            viewportImage.color = new Color(.035f, .05f, .06f, .98f);
+            viewportImage.color = new Color(.025f, .04f, .05f, .8f);
             viewportImage.raycastTarget = true;
             viewport.gameObject.AddComponent<RectMask2D>();
             viewport.gameObject
@@ -359,11 +504,11 @@ namespace WasteCity.Graybox3D.Building
             Stretch(connectionsLayer);
             nodesLayer = CreateRect(content, "Research.Nodes");
             Stretch(nodesLayer);
+            BuildRouteHeaders();
             BuildNodes();
             BuildConnections();
 
-            BuildActiveResearch();
-            BuildActions();
+            BuildFooter();
         }
 
         private void BuildNodes()
@@ -384,7 +529,8 @@ namespace WasteCity.Graybox3D.Building
                 rect.anchorMax = new Vector2(.5f, .5f);
                 rect.pivot = new Vector2(.5f, .5f);
                 rect.anchoredPosition = projected.Position;
-                rect.sizeDelta = ResearchTreeProjection3D.NodeSize;
+                rect.sizeDelta =
+                    ResearchTreeVisualLayoutProfile3D.CompactNodeSize;
 
                 Image icon = CreateResearchIcon(rect, researchId);
 
@@ -393,24 +539,24 @@ namespace WasteCity.Graybox3D.Building
                     "Research.Node." + researchId + ".Name",
                     definition.Name,
                     14);
-                Anchor(name.rectTransform, .72f, 1f);
-                name.rectTransform.offsetMin = new Vector2(56f, 0f);
+                Anchor(name.rectTransform, .5f, 1f);
+                name.rectTransform.offsetMin = new Vector2(42f, 0f);
                 name.rectTransform.offsetMax = new Vector2(-5f, 0f);
                 Text details = CreateLabel(
                     rect,
                     "Research.Node." + researchId + ".Details",
-                    ResearchDetails(definition),
-                    9);
+                    definition.EffectSummary,
+                    11);
                 details.alignment = TextAnchor.MiddleLeft;
-                Anchor(details.rectTransform, .18f, .72f);
-                details.rectTransform.offsetMin = new Vector2(56f, 0f);
+                Anchor(details.rectTransform, .25f, .5f);
+                details.rectTransform.offsetMin = new Vector2(42f, 0f);
                 details.rectTransform.offsetMax = new Vector2(-5f, 0f);
                 Text state = CreateLabel(
                     rect,
                     "Research.Node." + researchId + ".State",
                     "待刷新",
                     11);
-                Anchor(state.rectTransform, 0f, .18f);
+                Anchor(state.rectTransform, 0f, .25f);
                 AddCostIcons(rect, definition);
                 nodeRows.Add(
                     researchId,
@@ -428,14 +574,45 @@ namespace WasteCity.Graybox3D.Building
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.zero;
             rect.pivot = Vector2.zero;
-            rect.anchoredPosition = new Vector2(6f, 50f);
-            rect.sizeDelta = new Vector2(48f, 48f);
+            rect.anchoredPosition = new Vector2(5f, 28f);
+            rect.sizeDelta =
+                ResearchTreeVisualLayoutProfile3D.CompactNodeIconSize;
             Image image = rect.gameObject.AddComponent<Image>();
             image.sprite = ResearchIconCatalog3D.Resolve(researchId);
             image.preserveAspect = true;
             image.raycastTarget = false;
             image.gameObject.SetActive(image.sprite != null);
             return image;
+        }
+
+        private void BuildRouteHeaders()
+        {
+            float[] lanes =
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters;
+            string[] names =
+            {
+                "Technology", "Cultivation", "Biological", "Psionics",
+            };
+            string[] labels =
+            {
+                "科技路线", "修仙路线", "生物路线", "灵能路线",
+            };
+            float top = projection.Bounds.yMax + 48f;
+            for (var index = 0; index < lanes.Length; index++)
+            {
+                Text label = CreateLabel(
+                    nodesLayer,
+                    "Research.RouteHeader." + names[index],
+                    labels[index],
+                    16);
+                RectTransform rect = label.rectTransform;
+                rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+                rect.pivot = new Vector2(.5f, .5f);
+                rect.anchoredPosition = new Vector2(lanes[index], top);
+                rect.sizeDelta = new Vector2(300f, 42f);
+                label.color = ConnectionColor(
+                    (DevelopmentRoute)index);
+            }
         }
 
         private void BuildConnections()
@@ -526,41 +703,74 @@ namespace WasteCity.Graybox3D.Building
             }
         }
 
-        private void BuildActiveResearch()
+        private void BuildFooter()
         {
-            activeRoot = CreateRect(panel, "Research.Active");
-            activeRoot.anchorMin = new Vector2(0f, 0f);
-            activeRoot.anchorMax = new Vector2(1f, 0f);
-            activeRoot.pivot = new Vector2(.5f, 0f);
-            activeRoot.offsetMin = new Vector2(12f, 54f);
-            activeRoot.offsetMax = new Vector2(-12f, 102f);
-            Image background = activeRoot.gameObject.AddComponent<Image>();
-            background.color = new Color(.1f, .16f, .18f, .96f);
-            background.raycastTarget = false;
-            activeName = CreateLabel(
-                activeRoot,
-                "Research.Active.Name",
-                string.Empty,
-                14);
-            Anchor(activeName.rectTransform, .5f, 1f);
-            activeProgress = CreateLabel(
-                activeRoot,
-                "Research.Active.Progress",
+            footer = CreateRect(panel, "Research.Footer");
+            SetNormalizedRect(footer, 0f, 0f, 1f, .2f);
+            Image footerBackground = footer.gameObject.AddComponent<Image>();
+            footerBackground.color = new Color(.035f, .055f, .07f, .97f);
+            footerBackground.raycastTarget = false;
+            ownedRoots.Add(footer.gameObject);
+
+            RectTransform iconRect = CreateRect(
+                footer,
+                "Research.Detail.Icon");
+            SetNormalizedRect(iconRect, .012f, .18f, .088f, .84f);
+            detailIcon = iconRect.gameObject.AddComponent<Image>();
+            detailIcon.preserveAspect = true;
+            detailIcon.raycastTarget = false;
+
+            detailName = CreateLabel(
+                footer,
+                "Research.Detail.Name",
+                "选择一项科技查看详情",
+                18);
+            detailName.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(
+                detailName.rectTransform, .1f, .66f, .32f, .93f);
+            detailDuration = CreateLabel(
+                footer,
+                "Research.Detail.Duration",
                 string.Empty,
                 13);
-            Anchor(activeProgress.rectTransform, 0f, .5f);
-            activeRoot.gameObject.SetActive(false);
-            ownedRoots.Add(activeRoot.gameObject);
-        }
+            detailDuration.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(
+                detailDuration.rectTransform, .1f, .45f, .32f, .66f);
+            detailPrerequisites = CreateLabel(
+                footer,
+                "Research.Detail.Prerequisites",
+                "前置：未选择",
+                13);
+            detailPrerequisites.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(
+                detailPrerequisites.rectTransform, .1f, .2f, .32f, .45f);
+            detailDescription = CreateLabel(
+                footer,
+                "Research.Detail.Description",
+                string.Empty,
+                13);
+            detailDescription.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(
+                detailDescription.rectTransform, .335f, .2f, .585f, .9f);
 
-        private void BuildActions()
-        {
-            RectTransform actions = CreateRect(panel, "Research.Actions");
-            actions.anchorMin = Vector2.zero;
-            actions.anchorMax = new Vector2(1f, 0f);
-            actions.pivot = new Vector2(.5f, 0f);
-            actions.offsetMin = new Vector2(12f, 10f);
-            actions.offsetMax = new Vector2(-12f, 44f);
+            detailCosts = CreateRect(footer, "Research.Detail.Costs");
+            SetNormalizedRect(detailCosts, .595f, .18f, .75f, .9f);
+            var costLayout = detailCosts.gameObject
+                .AddComponent<VerticalLayoutGroup>();
+            costLayout.spacing = 3f;
+            costLayout.childForceExpandHeight = false;
+            costLayout.childForceExpandWidth = true;
+
+            Text legend = CreateLabel(
+                footer,
+                "Research.StatusLegend",
+                "锁定  ·  可研究  ·  研究中  ·  已完成",
+                12);
+            legend.alignment = TextAnchor.MiddleLeft;
+            SetNormalizedRect(legend.rectTransform, .012f, .02f, .58f, .18f);
+
+            RectTransform actions = CreateRect(footer, "Research.Actions");
+            SetNormalizedRect(actions, .765f, .08f, .988f, .42f);
             var layout = actions.gameObject
                 .AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 8f;
@@ -576,23 +786,25 @@ namespace WasteCity.Graybox3D.Building
                 "Research.Cancel",
                 "取消研究",
                 () => cancelRequested?.Invoke());
-            CreateButton(
-                actions,
-                "Research.FitAll",
-                "显示全树",
-                FitAll);
-            focusActiveButton = CreateButton(
-                actions,
-                "Research.FocusActive",
-                "定位进行中",
-                () => FocusResearch(activeResearchId, force: true));
-            focusActiveButton.interactable = false;
-            CreateButton(
-                actions,
-                "Research.Close",
-                "关闭",
-                () => closeRequested?.Invoke());
-            ownedRoots.Add(actions.gameObject);
+
+            activeRoot = CreateRect(footer, "Research.Active");
+            SetNormalizedRect(activeRoot, .765f, .48f, .988f, .93f);
+            Image activeBackground = activeRoot.gameObject.AddComponent<Image>();
+            activeBackground.color = new Color(.1f, .16f, .18f, .96f);
+            activeBackground.raycastTarget = false;
+            activeName = CreateLabel(
+                activeRoot,
+                "Research.Active.Name",
+                string.Empty,
+                14);
+            Anchor(activeName.rectTransform, .5f, 1f);
+            activeProgress = CreateLabel(
+                activeRoot,
+                "Research.Active.Progress",
+                string.Empty,
+                13);
+            Anchor(activeProgress.rectTransform, 0f, .5f);
+            activeRoot.gameObject.SetActive(false);
         }
 
         private void CreateRouteFilter(
@@ -616,6 +828,66 @@ namespace WasteCity.Graybox3D.Building
             ApplyFilter();
         }
 
+        private void EnableAllRoutes()
+        {
+            EnablePrimaryRoutes();
+            ApplyFilter();
+        }
+
+        private void CreateStateFilter(
+            Transform parent,
+            ResearchNodePresentationState3D state,
+            string stableName,
+            string label)
+        {
+            Button button = CreateButton(
+                parent,
+                "Research.Filter.Status." + stableName,
+                label,
+                () => SetStateFilter(state));
+            stateButtons.Add(state, button);
+        }
+
+        private void SetStateFilter(
+            ResearchNodePresentationState3D? value)
+        {
+            stateFilter = value;
+            ApplyFilter();
+        }
+
+        private void FocusLatestResearchable()
+        {
+            ResearchTreeNodeProjection3D latest =
+                projection?.SelectLatestResearchable(
+                    presentations.Values
+                        .Where(value => value.State ==
+                            ResearchNodePresentationState3D.Researchable &&
+                            IsVisibleByCurrentFilter(value.Definition))
+                        .Select(value => value.Definition.Id.Value));
+            if (latest != null)
+                FocusResearch(latest.ResearchId, force: true);
+        }
+
+        private void FocusCurrentResearch()
+        {
+            if (string.IsNullOrEmpty(activeResearchId)) return;
+            ResearchTreeNodeProjection3D node =
+                projection?.FindNode(activeResearchId);
+            if (node == null) return;
+            if (!IsVisibleByCurrentFilter(node.Definition))
+            {
+                enabledRoutes.Clear();
+                enabledRoutes.Add(DevelopmentRoute.Technology);
+                enabledRoutes.Add(DevelopmentRoute.Cultivation);
+                enabledRoutes.Add(DevelopmentRoute.BiologicalAscension);
+                enabledRoutes.Add(DevelopmentRoute.Psionics);
+                stateFilter = null;
+                searchInput?.SetTextWithoutNotify(string.Empty);
+                ApplyFilter();
+            }
+            FocusResearch(activeResearchId, force: true);
+        }
+
         private void HandleSearchChanged(string value)
         {
             ApplyFilter();
@@ -626,7 +898,9 @@ namespace WasteCity.Graybox3D.Building
             {
                 ResearchDefinition definition =
                     projection.Nodes[index].Definition;
-                if (RouteEnabled(definition) && Matches(definition, query))
+                if (RouteEnabled(definition) &&
+                    StateEnabled(definition.Id.Value) &&
+                    Matches(definition, query))
                     matches.Add(definition.Id.Value);
             }
             if (matches.Count > 0)
@@ -880,8 +1154,15 @@ namespace WasteCity.Graybox3D.Building
             {
                 ResearchDefinition definition =
                     projection.Nodes[index].Definition;
-                if (RouteEnabled(definition) && Matches(definition, query))
-                    AddWithPrerequisites(definition.Id.Value, visible);
+                if (RouteEnabled(definition) &&
+                    StateEnabled(definition.Id.Value) &&
+                    Matches(definition, query))
+                {
+                    if (stateFilter.HasValue)
+                        visible.Add(definition.Id.Value);
+                    else
+                        AddWithPrerequisites(definition.Id.Value, visible);
+                }
             }
 
             foreach (KeyValuePair<string, NodeRow> pair in nodeRows)
@@ -926,6 +1207,41 @@ namespace WasteCity.Graybox3D.Building
                     ? ConnectionColor(pair.Key)
                     : FilterDisabledColor;
             }
+            if (allRoutesButton != null)
+                allRoutesButton.image.color = enabledRoutes.Count == 4
+                    ? SelectedColor
+                    : FilterDisabledColor;
+            foreach (KeyValuePair<ResearchNodePresentationState3D, Button>
+                     pair in stateButtons)
+            {
+                pair.Value.image.color = stateFilter == pair.Key
+                    ? SelectedColor
+                    : FilterDisabledColor;
+            }
+            if (allStatesButton != null)
+                allStatesButton.image.color = stateFilter.HasValue
+                    ? FilterDisabledColor
+                    : SelectedColor;
+        }
+
+        private bool StateEnabled(string researchId)
+        {
+            if (!stateFilter.HasValue) return true;
+            return presentations.TryGetValue(
+                    researchId,
+                    out ResearchNodePresentation3D presentation) &&
+                presentation.State == stateFilter.Value;
+        }
+
+        private bool IsVisibleByCurrentFilter(ResearchDefinition definition)
+        {
+            string query = searchInput == null
+                ? string.Empty
+                : (searchInput.text ?? string.Empty).Trim();
+            return definition != null &&
+                RouteEnabled(definition) &&
+                StateEnabled(definition.Id.Value) &&
+                Matches(definition, query);
         }
 
         private void AddWithPrerequisites(
@@ -1030,7 +1346,85 @@ namespace WasteCity.Graybox3D.Building
         private void SelectResearch(string researchId)
         {
             selectedResearchId = researchId;
+            if (presentations.TryGetValue(
+                    researchId,
+                    out ResearchNodePresentation3D presentation))
+            {
+                PopulateFooter(presentation);
+            }
             selected?.Invoke(researchId);
+        }
+
+        private void PopulateFooter(ResearchNodePresentation3D presentation)
+        {
+            if (presentation == null || detailIcon == null) return;
+            ResearchDefinition definition = presentation.Definition;
+            detailIcon.sprite = ResearchIconCatalog3D.Resolve(
+                definition.Id.Value);
+            detailIcon.gameObject.SetActive(detailIcon.sprite != null);
+            detailName.text = definition.Name;
+            detailDuration.text = "研究时间：" + definition.Duration.ToString(
+                "0.##",
+                CultureInfo.InvariantCulture) + " 秒 · " +
+                presentation.StatusText;
+            detailPrerequisites.text = "前置：" +
+                PrerequisiteNames(definition);
+            detailDescription.text = definition.EffectSummary ?? string.Empty;
+
+            if (string.Equals(
+                    detailResearchId,
+                    definition.Id.Value,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+            detailResearchId = definition.Id.Value;
+            for (var index = detailCosts.childCount - 1; index >= 0; index--)
+                DestroyGenerated(detailCosts.GetChild(index).gameObject);
+            for (var index = 0; index < definition.Costs.Count; index++)
+            {
+                ResourceAmount amount = definition.Costs[index];
+                string rowName =
+                    "Research.Detail.Cost." + amount.ResourceId;
+                RectTransform row = CreateRect(detailCosts, rowName);
+                var element = row.gameObject.AddComponent<LayoutElement>();
+                element.preferredHeight = 34f;
+                Image rowBackground = row.gameObject.AddComponent<Image>();
+                rowBackground.color = new Color(.1f, .14f, .17f, .9f);
+                rowBackground.raycastTarget = false;
+
+                RectTransform iconRect = CreateRect(
+                    row,
+                    rowName + ".Icon");
+                SetNormalizedRect(iconRect, .02f, .08f, .24f, .92f);
+                Image icon = iconRect.gameObject.AddComponent<Image>();
+                icon.sprite = resourceIconResolver?.Invoke(
+                    amount.ResourceId) ??
+                    ResourceIconCatalog3D.Resolve(amount.ResourceId);
+                icon.preserveAspect = true;
+                icon.raycastTarget = false;
+
+                Text value = CreateLabel(
+                    row,
+                    rowName + ".Amount",
+                    amount.Amount.ToString(CultureInfo.InvariantCulture),
+                    14);
+                value.alignment = TextAnchor.MiddleLeft;
+                SetNormalizedRect(value.rectTransform, .29f, 0f, .98f, 1f);
+            }
+        }
+
+        private static string PrerequisiteNames(
+            ResearchDefinition definition)
+        {
+            if (definition.RequiredResearchIds.Count == 0) return "无";
+            var names = new string[definition.RequiredResearchIds.Count];
+            for (var index = 0; index < names.Length; index++)
+            {
+                string id = definition.RequiredResearchIds[index];
+                names[index] = ResearchCatalog.Find(id)?.Name ?? id;
+            }
+            return string.Join("、", names);
         }
 
         private void ClearGeneratedUi()
@@ -1043,11 +1437,20 @@ namespace WasteCity.Graybox3D.Building
             junctionRows.Clear();
             trunkRows.Clear();
             routeButtons.Clear();
+            stateButtons.Clear();
+            presentations.Clear();
             resourceIcons.Clear();
             viewport = null;
             content = null;
             nodesLayer = null;
             connectionsLayer = null;
+            footer = null;
+            detailCosts = null;
+            detailIcon = null;
+            detailName = null;
+            detailDuration = null;
+            detailPrerequisites = null;
+            detailDescription = null;
             activeRoot = null;
             activeName = null;
             activeProgress = null;
@@ -1056,8 +1459,12 @@ namespace WasteCity.Graybox3D.Building
             startButton = null;
             cancelButton = null;
             focusActiveButton = null;
+            allRoutesButton = null;
+            allStatesButton = null;
             activeResearchId = null;
             selectedResearchId = null;
+            detailResearchId = null;
+            stateFilter = null;
             viewportState = default;
             userNavigated = false;
         }
@@ -1192,6 +1599,19 @@ namespace WasteCity.Graybox3D.Building
         {
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        private static void SetNormalizedRect(
+            RectTransform rect,
+            float minimumX,
+            float minimumY,
+            float maximumX,
+            float maximumY)
+        {
+            rect.anchorMin = new Vector2(minimumX, minimumY);
+            rect.anchorMax = new Vector2(maximumX, maximumY);
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
         }

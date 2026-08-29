@@ -422,7 +422,13 @@ namespace WasteCity.Tests
             Assert.That(
                 placement.CurrentHit.Site,
                 Is.EqualTo(BuildingSite.InnerCity));
-            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            Assert.That(
+                placement.CurrentEvaluation.IsValid,
+                Is.True,
+                placement.CurrentHit.Site + " [" +
+                placement.CurrentHit.X + "," + placement.CurrentHit.Y +
+                "] " + string.Join(",",
+                    placement.CurrentEvaluation.Failures));
             int countBefore = session.Instances.Count;
             yield return ClickMouse(
                 MouseButton.Left,
@@ -1251,6 +1257,7 @@ namespace WasteCity.Tests
             Assert.That(presentation.IsBuildGridVisible, Is.True);
 
             modifier.SetResource(ResourceIds.Stone, 1000);
+            interaction.Select(BuildingCatalog.Housing);
             yield return MoveToValidGroundPreview(city, world, placement);
             yield return HoldMovementAndAssertPreview(
                 leader.transform,
@@ -1532,8 +1539,13 @@ namespace WasteCity.Tests
                     out int cityX,
                     out int cityY),
                 Is.True);
+            BoxCollider cityDeck = city.transform
+                .Find("InnerCityPlatform")
+                .GetComponent<BoxCollider>();
+            cityDeck.enabled = false;
             yield return MoveToGroundCell(world, cityX + 1, cityY);
             AssertFailure(placement, BuildingPlacementFailure.CityOccupied);
+            cityDeck.enabled = true;
 
             yield return MoveToTraversal(
                 world,
@@ -2162,10 +2174,9 @@ namespace WasteCity.Tests
             Assert.That(platform, Is.Not.Null);
             BoxCollider surface = platform.GetComponent<BoxCollider>();
             Assert.That(surface, Is.Not.Null);
-            Vector3 worldPoint = city.transform.TransformPoint(new Vector3(
-                -1.28f + (x + .5f) * .32f,
-                0f,
-                -.96f + (y + .5f) * .32f));
+            Vector3 worldPoint = city.transform.TransformPoint(
+                FormalInnerCityPresentationPolicy3D.CellCenterLocal(
+                    x, y, 0f));
             worldPoint.y = surface.bounds.max.y;
             yield return MoveMouse(Camera.main.WorldToScreenPoint(
                 worldPoint));
@@ -2404,7 +2415,13 @@ namespace WasteCity.Tests
                 GrayboxBuildingInteractionState.Previewing));
             Assert.That(interaction.Selected, Is.SameAs(selected));
             Assert.That(interaction.Orientation, Is.EqualTo(orientation));
-            Assert.That(placement.CurrentEvaluation.IsValid, Is.True);
+            Assert.That(
+                placement.CurrentEvaluation.IsValid,
+                Is.True,
+                placement.CurrentHit.Site + " [" +
+                placement.CurrentHit.X + "," + placement.CurrentHit.Y +
+                "] " + string.Join(",",
+                    placement.CurrentEvaluation.Failures));
         }
 
         private static void AssertPositionUnchanged(

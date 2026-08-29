@@ -70,6 +70,7 @@ namespace WasteCity.Graybox3D.Building
         private Text tertiaryLabel;
         private readonly Image[] pageVisuals = new Image[4];
         private readonly Image[] tabIcons = new Image[3];
+        private readonly Button[] tabButtons = new Button[3];
         private readonly Image[] statusVisuals = new Image[4];
 
         public bool IsOpen { get; private set; }
@@ -202,25 +203,25 @@ namespace WasteCity.Graybox3D.Building
                 panel, "Heading", 28, TextAnchor.MiddleLeft,
                 .055f, .82f, .64f, .95f);
             headingText.color = new Color(.83f, .95f, .92f, 1f);
-            CreateTabIcon(
+            CreateTabButton(
                 panel,
-                "CivilizationExpansion.Tab.Army.Icon",
+                "CivilizationExpansion.Tab.Army",
                 GrayboxCivilizationExpansionVisualPresenter3D
                     .ArmyTabVisualId,
                 .68f,
                 .75f,
                 0);
-            CreateTabIcon(
+            CreateTabButton(
                 panel,
-                "CivilizationExpansion.Tab.World.Icon",
+                "CivilizationExpansion.Tab.World",
                 GrayboxCivilizationExpansionVisualPresenter3D
                     .WorldTabVisualId,
                 .78f,
                 .85f,
                 1);
-            CreateTabIcon(
+            CreateTabButton(
                 panel,
-                "CivilizationExpansion.Tab.Politics.Icon",
+                "CivilizationExpansion.Tab.Politics",
                 GrayboxCivilizationExpansionVisualPresenter3D
                     .PoliticsTabVisualId,
                 .88f,
@@ -355,7 +356,7 @@ namespace WasteCity.Graybox3D.Building
             image.transform.SetAsFirstSibling();
         }
 
-        private void CreateTabIcon(
+        private void CreateTabButton(
             Transform parent,
             string name,
             string visualId,
@@ -365,12 +366,23 @@ namespace WasteCity.Graybox3D.Building
         {
             RectTransform rect = CreateRect(parent, name);
             SetAnchors(rect, minX, .855f, maxX, .935f);
-            Image image = rect.gameObject.AddComponent<Image>();
-            image.color = Color.white;
-            image.preserveAspect = true;
-            image.raycastTarget = false;
-            ApplyFormalUiSprite(image, visualId);
-            tabIcons[index] = image;
+            Image target = rect.gameObject.AddComponent<Image>();
+            target.color = new Color(1f, 1f, 1f, .001f);
+            target.raycastTarget = true;
+            Button button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = target;
+            button.onClick.AddListener(() => Open(
+                (GrayboxCivilizationExpansionPage3D)index));
+            tabButtons[index] = button;
+
+            RectTransform iconRect = CreateRect(rect, name + ".Icon");
+            Stretch(iconRect);
+            Image icon = iconRect.gameObject.AddComponent<Image>();
+            icon.color = Color.white;
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            ApplyFormalUiSprite(icon, visualId);
+            tabIcons[index] = icon;
         }
 
         private void CreatePageVisualStrip(Transform parent)
@@ -544,6 +556,11 @@ namespace WasteCity.Graybox3D.Building
             PrimaryButton?.onClick.RemoveAllListeners();
             SecondaryButton?.onClick.RemoveAllListeners();
             TertiaryButton?.onClick.RemoveAllListeners();
+            for (var index = 0; index < tabButtons.Length; index++)
+            {
+                tabButtons[index]?.onClick.RemoveAllListeners();
+                tabButtons[index] = null;
+            }
             if (panelRoot != null) DestroyObject(panelRoot);
             panelRoot = null;
             headingText = null;

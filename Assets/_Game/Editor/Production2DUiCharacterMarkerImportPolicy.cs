@@ -108,8 +108,13 @@ namespace WasteCity.Editor
             importer.mipmapEnabled = false;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.filterMode = FilterMode.Bilinear;
-            importer.maxTextureSize = path.StartsWith(CharacterRoot, StringComparison.Ordinal) ||
-                path.EndsWith("world-marker-resource-node.png", StringComparison.Ordinal)
+            importer.maxTextureSize = path.EndsWith(
+                    "ui-research-tree-background.png",
+                    StringComparison.Ordinal)
+                ? 2048
+                : path.StartsWith(CharacterRoot, StringComparison.Ordinal) ||
+                  path.EndsWith("world-marker-resource-node.png",
+                      StringComparison.Ordinal)
                     ? 512
                     : 256;
             importer.textureCompression = TextureImporterCompression.CompressedHQ;

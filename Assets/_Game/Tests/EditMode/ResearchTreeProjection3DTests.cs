@@ -32,40 +32,25 @@ namespace WasteCity.Tests
             "core.research.legacy-analysis";
 
         private static readonly float[] RowY =
-        {
-            0f,
-            280f,
-            600f,
-            920f,
-            1260f,
-        };
+            ResearchTreeVisualLayoutProfile3D.RowCenters;
 
         private static readonly Dictionary<DevelopmentRoute, float>
             RouteCenterX = new Dictionary<DevelopmentRoute, float>
         {
-            { DevelopmentRoute.Technology, -1200f },
-            { DevelopmentRoute.Cultivation, -400f },
-            { DevelopmentRoute.Biological, 400f },
-            { DevelopmentRoute.Psionics, 1200f },
+            { DevelopmentRoute.Technology,
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters[0] },
+            { DevelopmentRoute.Cultivation,
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters[1] },
+            { DevelopmentRoute.Biological,
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters[2] },
+            { DevelopmentRoute.Psionics,
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters[3] },
         };
 
         private static readonly float[] BranchOffsets =
-        {
-            -270f,
-            -90f,
-            90f,
-            270f,
-        };
-
+            ResearchTreeVisualLayoutProfile3D.SubcolumnOffsets;
         private static readonly float[] BridgeX =
-        {
-            -1000f,
-            -600f,
-            -200f,
-            200f,
-            600f,
-            1000f,
-        };
+            ResearchTreeVisualLayoutProfile3D.BridgeGutterCenters;
 
         [Test]
         public void FormalCatalog_ProjectsAllNodesAndAllPrerequisiteEdgesUpward()
@@ -129,13 +114,6 @@ namespace WasteCity.Tests
             Assert.That(projection.FindNode(PsionicsT1Id).Position.x,
                 Is.EqualTo(RouteCenterX[DevelopmentRoute.Psionics]));
 
-            foreach (ResearchTreeNodeProjection3D node in projection.Nodes)
-            {
-                Assert.That(node.Position.y,
-                    Is.EqualTo(RowY[node.Definition.LayoutRow]),
-                    node.ResearchId);
-            }
-
             foreach (DevelopmentRoute route in RouteCenterX.Keys)
             {
                 for (var row = 2; row <= 3; row++)
@@ -151,7 +129,13 @@ namespace WasteCity.Tests
                     {
                         Assert.That(nodes[index].Position.x,
                             Is.EqualTo(RouteCenterX[route] +
-                                BranchOffsets[index]),
+                                BranchOffsets[index % BranchOffsets.Length]),
+                            nodes[index].ResearchId);
+                        Assert.That(nodes[index].Position.y,
+                            Is.EqualTo(RowY[row] +
+                                index / BranchOffsets.Length *
+                                ResearchTreeVisualLayoutProfile3D
+                                    .NodeSublaneStep),
                             nodes[index].ResearchId);
                     }
                 }
@@ -162,13 +146,30 @@ namespace WasteCity.Tests
                     DevelopmentRoute.Bridge)
                 .OrderBy(node => node.Definition.CatalogOrder)
                 .ToArray();
-            Assert.That(bridges, Has.Length.EqualTo(BridgeX.Length));
+            Assert.That(bridges,
+                Has.Length.EqualTo(BridgeX.Length * 2));
             for (var index = 0; index < bridges.Length; index++)
             {
-                Assert.That(bridges[index].Position,
-                    Is.EqualTo(new Vector2(BridgeX[index], RowY[4])),
+                ResearchDefinition bridge = bridges[index].Definition;
+                float[] prerequisiteCenters = bridge.RequiredResearchIds
+                    .Select(ResearchCatalog.Find)
+                    .Where(value => value != null &&
+                        RouteCenterX.ContainsKey(value.Route))
+                    .Select(value => RouteCenterX[value.Route])
+                    .Distinct()
+                    .ToArray();
+                Assert.That(prerequisiteCenters, Is.Not.Empty,
+                    bridges[index].ResearchId);
+                Assert.That(bridges[index].Position.x,
+                    Is.EqualTo(prerequisiteCenters.Average()).Within(.001f),
+                    bridges[index].ResearchId +
+                    " must sit at the actual prerequisite convergence.");
+                Assert.That(bridges[index].Position.y,
+                    Is.GreaterThanOrEqualTo(RowY[4]),
                     bridges[index].ResearchId);
             }
+            Assert.That(bridges.Select(value => value.Position).Distinct()
+                .Count(), Is.EqualTo(bridges.Length));
 
             foreach (IGrouping<float, ResearchTreeNodeProjection3D> row in
                      projection.Nodes.GroupBy(node => node.Position.y))
@@ -352,7 +353,7 @@ namespace WasteCity.Tests
         public void Zoom_ClampsAndKeepsThePointerGraphAnchorFixed()
         {
             Assert.That(ResearchTreeProjection3D.ClampZoom(-10f),
-                Is.EqualTo(.4f));
+                Is.EqualTo(.34f));
             Assert.That(ResearchTreeProjection3D.ClampZoom(.9f),
                 Is.EqualTo(.9f));
             Assert.That(ResearchTreeProjection3D.ClampZoom(10f),

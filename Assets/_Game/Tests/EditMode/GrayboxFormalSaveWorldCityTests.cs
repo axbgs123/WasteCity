@@ -573,11 +573,11 @@ namespace WasteCity.Tests
                 Is.EqualTo(remainingSeconds).Within(.0001f));
             Assert.That(
                 fixture.VisualTransform.localScale,
-                Is.EqualTo(ExpectedCitySize(mode, remainingSeconds))
+                Is.EqualTo(ExpectedCityVisualSize(mode, remainingSeconds))
                     .Using(Vector3ComparerWithEqualsOperator.Instance));
             Assert.That(
                 fixture.BodyCollider.size,
-                Is.EqualTo(ExpectedCitySize(mode, remainingSeconds))
+                Is.EqualTo(ExpectedCityColliderSize(mode, remainingSeconds))
                     .Using(Vector3ComparerWithEqualsOperator.Instance));
 
             Assert.That(fixture.City.TryToggleDeployment(out _), Is.True);
@@ -1067,19 +1067,37 @@ namespace WasteCity.Tests
             };
         }
 
-        private static Vector3 ExpectedCitySize(
+        private static Vector3 ExpectedCityVisualSize(
             CityMode mode,
             float remainingSeconds)
         {
-            float fortressFactor = mode == CityMode.Deploying
-                ? 1f - remainingSeconds /
-                  CityDeploymentRules.FormalDeployDurationSeconds
-                : remainingSeconds /
-                  CityDeploymentRules.FormalPackDurationSeconds;
+            float fortressFactor = FortressFactor(mode, remainingSeconds);
+            return Vector3.Lerp(
+                new Vector3(8.6f, .65f, 6.6f),
+                new Vector3(8.8f, .8f, 6.8f),
+                fortressFactor);
+        }
+
+        private static Vector3 ExpectedCityColliderSize(
+            CityMode mode,
+            float remainingSeconds)
+        {
+            float fortressFactor = FortressFactor(mode, remainingSeconds);
             return Vector3.Lerp(
                 new Vector3(3f, 1f, 2f),
                 new Vector3(3f, 1.5f, 3f),
                 fortressFactor);
+        }
+
+        private static float FortressFactor(
+            CityMode mode,
+            float remainingSeconds)
+        {
+            return mode == CityMode.Deploying
+                ? 1f - remainingSeconds /
+                  CityDeploymentRules.FormalDeployDurationSeconds
+                : remainingSeconds /
+                  CityDeploymentRules.FormalPackDurationSeconds;
         }
 
         private static void AssertDestination(

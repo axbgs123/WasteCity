@@ -12,34 +12,8 @@ namespace WasteCity.Graybox3D.Usability
     /// </summary>
     public sealed class ResearchTreeProjection3D
     {
-        public static readonly Vector2 NodeSize = new Vector2(180f, 112f);
-
-        private static readonly float[] RowY =
-        {
-            0f,
-            280f,
-            600f,
-            920f,
-            1260f,
-        };
-
-        private static readonly float[] BranchOffsets =
-        {
-            -270f,
-            -90f,
-            90f,
-            270f,
-        };
-
-        private static readonly float[] BridgeX =
-        {
-            -1000f,
-            -600f,
-            -200f,
-            200f,
-            600f,
-            1000f,
-        };
+        public static readonly Vector2 NodeSize =
+            ResearchTreeVisualLayoutProfile3D.CompactNodeSize;
 
         private readonly ReadOnlyCollection<ResearchTreeNodeProjection3D>
             nodes;
@@ -325,7 +299,7 @@ namespace WasteCity.Graybox3D.Usability
 
         public static float ClampZoom(float zoom)
         {
-            return Mathf.Clamp(zoom, .4f, 1.45f);
+            return Mathf.Clamp(zoom, .34f, 1.45f);
         }
 
         public static Vector2 GraphToScreen(
@@ -408,17 +382,19 @@ namespace WasteCity.Graybox3D.Usability
             ResearchDefinition definition)
         {
             int row = definition.LayoutRow;
-            float y = RowY[Mathf.Clamp(row, 0, RowY.Length - 1)];
+            float[] rows = ResearchTreeVisualLayoutProfile3D.RowCenters;
+            float y = rows[Mathf.Clamp(row, 0, rows.Length - 1)];
             if (definition.Route == DevelopmentRoute.Common)
                 return new Vector2(0f, y);
             if (definition.Route == DevelopmentRoute.Bridge)
             {
-                int bridgeIndex = OrdinalInGroup(
-                    ordered,
-                    definition,
-                    DevelopmentRoute.Bridge,
-                    row);
-                return new Vector2(BridgeX[bridgeIndex], y);
+                float bridgeCenter = BridgeCenterFor(ordered, definition);
+                int bridgeIndex = BridgeOrdinalAtCenter(
+                    ordered, definition, bridgeCenter);
+                return new Vector2(
+                    bridgeCenter,
+                    y + bridgeIndex *
+                    ResearchTreeVisualLayoutProfile3D.BridgeLevelStep);
             }
 
             float center = RouteCenter(definition.Route);
@@ -428,7 +404,12 @@ namespace WasteCity.Graybox3D.Usability
                 definition,
                 definition.Route,
                 row);
-            return new Vector2(center + BranchOffsets[ordinal], y);
+            float[] subcolumns =
+                ResearchTreeVisualLayoutProfile3D.SubcolumnOffsets;
+            return new Vector2(
+                center + subcolumns[ordinal % subcolumns.Length],
+                y + ordinal / subcolumns.Length *
+                ResearchTreeVisualLayoutProfile3D.NodeSublaneStep);
         }
 
         private static int OrdinalInGroup(
@@ -456,20 +437,88 @@ namespace WasteCity.Graybox3D.Usability
             return 0;
         }
 
+        private static float BridgeCenterFor(
+            IList<ResearchDefinition> ordered,
+            ResearchDefinition bridge)
+        {
+            var routes = new HashSet<DevelopmentRoute>();
+            float sum = 0f;
+            for (var index = 0;
+                 index < bridge.RequiredResearchIds.Count;
+                 index++)
+            {
+                ResearchDefinition prerequisite = FindDefinition(
+                    ordered,
+                    bridge.RequiredResearchIds[index]);
+                if (prerequisite == null ||
+                    prerequisite.Route == DevelopmentRoute.Common ||
+                    prerequisite.Route == DevelopmentRoute.Bridge ||
+                    !routes.Add(prerequisite.Route))
+                {
+                    continue;
+                }
+                sum += RouteCenter(prerequisite.Route);
+            }
+            return routes.Count == 0 ? 0f : sum / routes.Count;
+        }
+
+        private static int BridgeOrdinalAtCenter(
+            IList<ResearchDefinition> ordered,
+            ResearchDefinition target,
+            float center)
+        {
+            var ordinal = 0;
+            for (var index = 0; index < ordered.Count; index++)
+            {
+                ResearchDefinition candidate = ordered[index];
+                if (candidate.Route != DevelopmentRoute.Bridge ||
+                    candidate.LayoutRow != target.LayoutRow ||
+                    !Mathf.Approximately(
+                        BridgeCenterFor(ordered, candidate),
+                        center))
+                {
+                    continue;
+                }
+                if (string.Equals(
+                        candidate.Id.Value,
+                        target.Id.Value,
+                        StringComparison.Ordinal))
+                {
+                    return ordinal;
+                }
+                ordinal++;
+            }
+            return 0;
+        }
+
+        private static ResearchDefinition FindDefinition(
+            IList<ResearchDefinition> ordered,
+            string researchId)
+        {
+            for (var index = 0; index < ordered.Count; index++)
+            {
+                if (string.Equals(
+                        ordered[index].Id.Value,
+                        researchId,
+                        StringComparison.Ordinal))
+                {
+                    return ordered[index];
+                }
+            }
+            return null;
+        }
+
         private static float RouteCenter(DevelopmentRoute route)
         {
+            float[] lanes =
+                ResearchTreeVisualLayoutProfile3D.RouteLaneCenters;
             switch (route)
             {
-                case DevelopmentRoute.Technology:
-                    return -1200f;
-                case DevelopmentRoute.Cultivation:
-                    return -400f;
-                case DevelopmentRoute.BiologicalAscension:
-                    return 400f;
-                case DevelopmentRoute.Psionics:
-                    return 1200f;
-                default:
-                    return 0f;
+                case DevelopmentRoute.Technology: return lanes[0];
+                case DevelopmentRoute.Cultivation: return lanes[1];
+                case DevelopmentRoute.BiologicalAscension: return lanes[2];
+                case DevelopmentRoute.Psionics: return lanes[3];
+                default: return 0f;
             }
         }
 

@@ -406,6 +406,7 @@ namespace WasteCity.Tests
                 2);
             AssertPresentation(
                 fixture,
+                new Vector3(8.6f, .65f, 6.6f),
                 new Vector3(3f, 1f, 2f),
                 "core.city.mobile");
 
@@ -415,12 +416,14 @@ namespace WasteCity.Tests
             fixture.Controller.TickDeployment(2.5f);
             AssertPresentation(
                 fixture,
+                new Vector3(8.7f, .725f, 6.7f),
                 new Vector3(3f, 1.25f, 2.5f),
                 "core.city.mobile");
 
             fixture.Controller.TickDeployment(2.5f);
             AssertPresentation(
                 fixture,
+                new Vector3(8.8f, .8f, 6.8f),
                 new Vector3(3f, 1.5f, 3f),
                 "core.city.mobile");
 
@@ -430,12 +433,14 @@ namespace WasteCity.Tests
             fixture.Controller.TickDeployment(4f);
             AssertPresentation(
                 fixture,
+                new Vector3(8.7f, .725f, 6.7f),
                 new Vector3(3f, 1.25f, 2.5f),
                 "core.city.mobile");
 
             fixture.Controller.TickDeployment(4f);
             AssertPresentation(
                 fixture,
+                new Vector3(8.6f, .65f, 6.6f),
                 new Vector3(3f, 1f, 2f),
                 "core.city.mobile");
         }
@@ -794,15 +799,18 @@ namespace WasteCity.Tests
 
         private static void AssertPresentation(
             ControllerFixture fixture,
-            Vector3 expectedSize,
+            Vector3 expectedVisualSize,
+            Vector3 expectedColliderSize,
             string expectedStableId)
         {
-            Assert.That(
-                fixture.VisualTransform.localScale,
-                Is.EqualTo(expectedSize));
-            Assert.That(
-                fixture.BodyCollider.size,
-                Is.EqualTo(expectedSize));
+            Assert.That(Vector3.Distance(
+                    fixture.VisualTransform.localScale,
+                    expectedVisualSize),
+                Is.LessThan(.0001f));
+            Assert.That(Vector3.Distance(
+                    fixture.BodyCollider.size,
+                    expectedColliderSize),
+                Is.LessThan(.0001f));
             Assert.That(
                 fixture.Visual.StableId,
                 Is.EqualTo(expectedStableId));

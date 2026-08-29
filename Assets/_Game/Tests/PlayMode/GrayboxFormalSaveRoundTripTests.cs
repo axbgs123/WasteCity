@@ -910,10 +910,8 @@ namespace WasteCity.Tests
             for (var x = 0; x < 8; x++)
             {
                 Vector3 worldPoint = city.transform.TransformPoint(
-                    new Vector3(
-                        -1.28f + (x + .5f) * .32f,
-                        0f,
-                        -.96f + (y + .5f) * .32f));
+                    FormalInnerCityPresentationPolicy3D.CellCenterLocal(
+                        x, y, 0f));
                 worldPoint.y = surface.bounds.max.y;
                 QueueMouse(Camera.main.WorldToScreenPoint(worldPoint));
                 yield return null;

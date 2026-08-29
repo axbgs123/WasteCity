@@ -36,7 +36,10 @@ namespace WasteCity.Editor
         public const string CivilizationExpansionManifestPath =
             "Docs/Art/IDEA-0023/Manifests/" +
             "idea-0023-civilization-expansion-visual-assets.json";
-        public const int ExpectedVisualCount = 140;
+        public const string ResearchTreeManifestPath =
+            "Docs/Art/IDEA-0024/Manifests/" +
+            "idea-0024-research-tree-background-visual-assets.json";
+        public const int ExpectedVisualCount = 141;
         public const int ExpectedRecipeCount = 33;
 
         [MenuItem("WasteCity/Art/Production 2D/Build Unified Visual Catalog")]
@@ -134,7 +137,7 @@ namespace WasteCity.Editor
             ValidateClassCount(ordered, Production2DVisualClass.Item, 31);
             ValidateClassCount(ordered, Production2DVisualClass.Technology, 44);
             ValidateClassCount(ordered, Production2DVisualClass.Building, 35);
-            ValidateClassCount(ordered, Production2DVisualClass.Ui, 18);
+            ValidateClassCount(ordered, Production2DVisualClass.Ui, 19);
             ValidateClassCount(ordered, Production2DVisualClass.Character, 3);
             ValidateClassCount(ordered, Production2DVisualClass.WorldMarker, 5);
             ValidateClassCount(ordered, Production2DVisualClass.Unit, 4);
@@ -251,6 +254,9 @@ namespace WasteCity.Editor
                 .Concat(ReadPresentationManifest(
                     CivilizationExpansionManifestPath,
                     "IDEA-0023 civilization-expansion"))
+                .Concat(ReadPresentationManifest(
+                    ResearchTreeManifestPath,
+                    "IDEA-0024 research-tree background"))
                 .ToArray();
         }
 

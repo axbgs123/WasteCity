@@ -847,18 +847,22 @@ namespace WasteCity.Graybox3D.Building
         private void RefreshResearch()
         {
             ResearchDefinition active = research.Model.Active;
+            var presentations = new List<ResearchNodePresentation3D>(
+                ResearchCatalog.All.Length);
             foreach (ResearchDefinition definition in ResearchCatalog.All)
             {
                 ResearchDefinition display =
                     research.ResolveForDisplay(definition);
-                view.SetResearchNode(
+                presentations.Add(new ResearchNodePresentation3D(
                     display,
+                    ResearchPresentationState(definition, active),
                     ResearchStatus(definition, active),
                     string.Equals(
                         selectedResearchId,
                         definition.Id.Value,
-                        StringComparison.Ordinal));
+                        StringComparison.Ordinal)));
             }
+            view.SetResearchNodes(presentations);
 
             bool hasActive = active != null;
             string progress = hasActive
@@ -902,6 +906,33 @@ namespace WasteCity.Graybox3D.Building
                     return "资源不足";
             }
             return "可研究";
+        }
+
+        private ResearchNodePresentationState3D ResearchPresentationState(
+            ResearchDefinition definition,
+            ResearchDefinition active)
+        {
+            if (research.IsCompleted(definition.Id.Value))
+                return ResearchNodePresentationState3D.Completed;
+            if (active != null && active.Id.Equals(definition.Id))
+                return ResearchNodePresentationState3D.Active;
+            if (research.IsAvailable(definition) &&
+                PrerequisitesCompleted(definition) &&
+                HasEligibleResearchStation())
+            {
+                for (var index = 0; index < definition.Costs.Count; index++)
+                {
+                    ResourceAmount cost = definition.Costs[index];
+                    if (!session.CityStorage.CanSpendFromNetwork(
+                            cost.ResourceId,
+                            cost.Amount))
+                    {
+                        return ResearchNodePresentationState3D.Locked;
+                    }
+                }
+                return ResearchNodePresentationState3D.Researchable;
+            }
+            return ResearchNodePresentationState3D.Locked;
         }
 
         private bool CanStartSelectedResearch()

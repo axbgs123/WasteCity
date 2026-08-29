@@ -8,6 +8,7 @@ using UnityEngine.UI;
 using WasteCity.Editor;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 
 namespace WasteCity.Tests
@@ -145,8 +146,12 @@ namespace WasteCity.Tests
                     .ExpectedAssetPath(definition.Id.Value);
                 Sprite expected = AssetDatabase.LoadAssetAtPath<Sprite>(path);
                 Assert.That(expected, Is.Not.Null, path);
-                Assert.That(catalog.ResolveIcon(definition.Id.Value),
-                    Is.SameAs(expected), definition.Id.Value);
+                Sprite actual = catalog.ResolveIcon(definition.Id.Value);
+                Assert.That(actual, Is.Not.Null, definition.Id.Value);
+                Assert.That(
+                    AssetDatabase.GetAssetPath(actual),
+                    Is.EqualTo(AssetDatabase.GetAssetPath(expected)),
+                    definition.Id.Value);
             }
         }
 
@@ -255,7 +260,8 @@ namespace WasteCity.Tests
                                 .ExpectedAssetPath(definition.Id.Value)),
                         expectedName);
                     Assert.That(image.rectTransform.sizeDelta,
-                        Is.EqualTo(new Vector2(48f, 48f)), expectedName);
+                        Is.EqualTo(ResearchTreeVisualLayoutProfile3D
+                            .CompactNodeIconSize), expectedName);
                 }
             }
             finally

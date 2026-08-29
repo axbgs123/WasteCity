@@ -34,13 +34,6 @@ namespace WasteCity.Graybox3D.Building
 
     public sealed class GrayboxBuildingSurfaceProjector3D : MonoBehaviour
     {
-        private const float InnerAnchorX = -1.28f;
-        private const float InnerAnchorZ = -.96f;
-        private const float InnerCellSize = .32f;
-        private const int InnerWidth = 8;
-        private const int InnerHeight = 6;
-        private const float PreviewLift = .01f;
-
         [SerializeField] private Camera controlledCamera;
         [SerializeField] private GrayboxWorldView3D worldView;
         [SerializeField] private GrayboxMobileCityController3D city;
@@ -110,24 +103,21 @@ namespace WasteCity.Graybox3D.Building
             out BuildingSurfaceHit hit)
         {
             hit = BuildingSurfaceHit.Invalid;
-            Vector3 local = city.transform.InverseTransformPoint(platformPoint);
-            int x = Mathf.FloorToInt(
-                (local.x - InnerAnchorX) / InnerCellSize);
-            int y = Mathf.FloorToInt(
-                (local.z - InnerAnchorZ) / InnerCellSize);
-            if (x < 0 || y < 0 || x >= InnerWidth || y >= InnerHeight)
+            if (!FormalInnerCityPresentationPolicy3D.TryProjectWorldPoint(
+                    city.transform.position,
+                    city.transform.rotation,
+                    platformPoint,
+                    city.InnerContentLocalY,
+                    out int x,
+                    out int y,
+                    out Vector3 centerWorld))
                 return false;
-
-            Vector3 centerLocal = new Vector3(
-                InnerAnchorX + (x + .5f) * InnerCellSize,
-                local.y + PreviewLift,
-                InnerAnchorZ + (y + .5f) * InnerCellSize);
             hit = new BuildingSurfaceHit(
                 true,
                 BuildingSite.InnerCity,
                 x,
                 y,
-                city.transform.TransformPoint(centerLocal),
+                centerWorld,
                 "内城");
             return true;
         }

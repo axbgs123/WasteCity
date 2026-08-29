@@ -34,6 +34,15 @@ namespace WasteCity.Graybox3D.Usability
             "Exit.QuitWithoutSaving",
             "Exit.Cancel"
         };
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private static readonly string[] AcceptanceControlIds =
+        {
+            "Start.AcceptanceConsole",
+            "Acceptance.Continue",
+            "Acceptance.NewGame",
+            "Acceptance.Back"
+        };
+#endif
 
         [SerializeField] private Canvas canvas;
         [SerializeField] private EventSystem eventSystem;
@@ -49,9 +58,18 @@ namespace WasteCity.Graybox3D.Usability
         private RectTransform settingsPage;
         private RectTransform operationGuidePage;
         private RectTransform exitConfirmPage;
+        private Text startTitle;
         private Button startContinueButton;
         private Button startNewGameButton;
         private Button startNewGameCancelButton;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private RectTransform acceptancePage;
+        private Button startAcceptanceButton;
+        private Button acceptanceContinueButton;
+        private Button acceptanceNewGameButton;
+        private Button acceptanceBackButton;
+        private bool isAcceptancePageOpen;
+#endif
         private Button continueButton;
         private Dropdown resolutionDropdown;
         private Dropdown windowModeDropdown;
@@ -92,10 +110,33 @@ namespace WasteCity.Graybox3D.Usability
 
         public GrayboxSystemMenuPage3D VisiblePage { get; private set; } =
             GrayboxSystemMenuPage3D.Main;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool IsAcceptancePageOpen => isAcceptancePageOpen;
+#endif
 
         public static IReadOnlyList<string> ResolveVisibleControlIds(
             bool developmentBuild)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (developmentBuild)
+            {
+                var combined = new string[
+                    VisibleControlIds.Length + AcceptanceControlIds.Length];
+                Array.Copy(
+                    VisibleControlIds,
+                    0,
+                    combined,
+                    0,
+                    VisibleControlIds.Length);
+                Array.Copy(
+                    AcceptanceControlIds,
+                    0,
+                    combined,
+                    VisibleControlIds.Length,
+                    AcceptanceControlIds.Length);
+                return Array.AsReadOnly(combined);
+            }
+#endif
             return Array.AsReadOnly((string[])VisibleControlIds.Clone());
         }
 
@@ -143,6 +184,9 @@ namespace WasteCity.Graybox3D.Usability
             isStartPageOpen = open;
             isNewGameConfirmationOpen =
                 open && newGameConfirmationOpen;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!open) isAcceptancePageOpen = false;
+#endif
             if (uiRoot == null) return;
 
             startPage.gameObject.SetActive(
@@ -150,13 +194,54 @@ namespace WasteCity.Graybox3D.Usability
             newGameConfirmPage.gameObject.SetActive(
                 open && isNewGameConfirmationOpen);
             startContinueButton.interactable = canContinue;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (acceptanceContinueButton != null)
+                acceptanceContinueButton.interactable = canContinue;
+            ApplyStartAcceptanceVisibility();
+#endif
             SetFormalSaveFeedback(feedbackMessage);
             UpdateRootVisibility();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            RefreshStartPageGraphics();
+#endif
             if (open)
                 FocusStartPage();
             else if (!isOpen && eventSystem != null)
                 eventSystem.SetSelectedGameObject(null);
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public void RenderAcceptancePage(bool open, string feedbackMessage)
+        {
+            TryBuildUi();
+            isAcceptancePageOpen = open && isStartPageOpen;
+            if (uiRoot == null) return;
+            if (isAcceptancePageOpen)
+            {
+                uiRoot.SetAsLastSibling();
+            }
+            startPage.gameObject.SetActive(
+                isStartPageOpen && !isNewGameConfirmationOpen);
+            ApplyStartAcceptanceVisibility();
+            RefreshStartPageGraphics();
+            newGameConfirmPage.gameObject.SetActive(
+                isStartPageOpen && isNewGameConfirmationOpen);
+            SetFormalSaveFeedback(feedbackMessage);
+            UpdateRootVisibility();
+            if (eventSystem != null)
+            {
+                GameObject target = isAcceptancePageOpen
+                    ? acceptanceContinueButton != null &&
+                      acceptanceContinueButton.interactable
+                        ? acceptanceContinueButton.gameObject
+                        : acceptanceBackButton?.gameObject
+                    : startContinueButton.interactable
+                        ? startContinueButton.gameObject
+                        : startNewGameButton.gameObject;
+                eventSystem.SetSelectedGameObject(target);
+            }
+        }
+#endif
 
         public void SetFormalSaveFeedback(string message)
         {
@@ -233,6 +318,9 @@ namespace WasteCity.Graybox3D.Usability
             isOpen = false;
             isStartPageOpen = false;
             isNewGameConfirmationOpen = false;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            isAcceptancePageOpen = false;
+#endif
             if (uiRoot != null)
                 uiRoot.gameObject.SetActive(false);
             if (speedControlsRoot != null)
@@ -352,11 +440,12 @@ namespace WasteCity.Graybox3D.Usability
             pausedTitle.gameObject.SetActive(false);
 
             startPage = CreatePage(uiRoot, "Page.Start");
-            Text startTitle = CreateLabel(
+            startTitle = CreateLabel(
                 startPage,
                 "Start.Title",
                 "废土移动城");
             SetReadableFontSize(startTitle, 26f);
+            SetLayout((RectTransform)startTitle.transform, 0f, 48f, 1f);
             startContinueButton = CreateButton(
                 startPage,
                 "Start.Continue",
@@ -367,6 +456,52 @@ namespace WasteCity.Graybox3D.Usability
                 "Start.NewGame",
                 "新游戏",
                 () => formalSaveEntry?.RequestNewGame());
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            startAcceptanceButton = CreateButton(
+                startPage,
+                "Start.AcceptanceConsole",
+                "验收管理台",
+                () => RenderAcceptancePage(
+                    true,
+                    "验收工具仅用于 Editor / Development"));
+
+            acceptancePage = CreateRect(startPage, "Page.Acceptance");
+            SetLayout(acceptancePage, 0f, 92f, 1f);
+            var acceptanceLayout = acceptancePage.gameObject
+                .AddComponent<VerticalLayoutGroup>();
+            acceptanceLayout.spacing = 4f;
+            acceptanceLayout.childAlignment = TextAnchor.MiddleCenter;
+            acceptanceLayout.childForceExpandWidth = true;
+            acceptanceLayout.childForceExpandHeight = false;
+            Text acceptanceTitle = CreateLabel(
+                acceptancePage,
+                "Acceptance.Title",
+                "开发验收管理台");
+            SetReadableFontSize(acceptanceTitle, 24f);
+            Text acceptanceWarning = CreateLabel(
+                acceptancePage,
+                "Acceptance.Warning",
+                "继续或新建仍使用正式存档入口；进入游戏后才打开开发修改器。");
+            SetReadableFontSize(acceptanceWarning, 17f);
+            SetLayout((RectTransform)acceptanceTitle.transform, 0f, 34f, 1f);
+            SetLayout((RectTransform)acceptanceWarning.transform, 0f, 48f, 1f);
+            acceptanceContinueButton = CreateButton(
+                startPage,
+                "Acceptance.Continue",
+                "继续并打开修改器",
+                () => formalSaveEntry?.RequestAcceptanceContinue());
+            acceptanceNewGameButton = CreateButton(
+                startPage,
+                "Acceptance.NewGame",
+                "新游戏并打开修改器",
+                () => formalSaveEntry?.RequestAcceptanceNewGame());
+            acceptanceBackButton = CreateButton(
+                startPage,
+                "Acceptance.Back",
+                "返回",
+                () => formalSaveEntry?.RequestAcceptanceBack());
+            ApplyStartAcceptanceVisibility();
+#endif
 
             newGameConfirmPage = CreatePage(
                 uiRoot,
@@ -508,6 +643,9 @@ namespace WasteCity.Graybox3D.Usability
             formalSaveFeedback.gameObject.SetActive(false);
 
             startPage.gameObject.SetActive(false);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            ApplyStartAcceptanceVisibility();
+#endif
             newGameConfirmPage.gameObject.SetActive(false);
             speedControlsRoot.gameObject.SetActive(true);
             RefreshFormalLayout();
@@ -561,6 +699,17 @@ namespace WasteCity.Graybox3D.Usability
         private void FocusStartPage()
         {
             if (eventSystem == null) return;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (isAcceptancePageOpen && !isNewGameConfirmationOpen)
+            {
+                eventSystem.SetSelectedGameObject(
+                    acceptanceContinueButton != null &&
+                    acceptanceContinueButton.interactable
+                        ? acceptanceContinueButton.gameObject
+                        : acceptanceBackButton?.gameObject);
+                return;
+            }
+#endif
             GameObject target = isNewGameConfirmationOpen
                 ? startNewGameCancelButton.gameObject
                 : startContinueButton.interactable
@@ -568,6 +717,60 @@ namespace WasteCity.Graybox3D.Usability
                     : startNewGameButton.gameObject;
             eventSystem.SetSelectedGameObject(target);
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private void ApplyStartAcceptanceVisibility()
+        {
+            if (startTitle == null || acceptancePage == null) return;
+            bool acceptance = isStartPageOpen && isAcceptancePageOpen &&
+                !isNewGameConfirmationOpen;
+            SetLayoutPresentationVisible(
+                startTitle.transform as RectTransform,
+                !acceptance);
+            SetLayoutPresentationVisible(
+                startContinueButton?.transform as RectTransform,
+                !acceptance);
+            SetLayoutPresentationVisible(
+                startNewGameButton?.transform as RectTransform,
+                !acceptance);
+            SetLayoutPresentationVisible(
+                startAcceptanceButton?.transform as RectTransform,
+                !acceptance);
+            SetLayoutPresentationVisible(acceptancePage, acceptance);
+            SetLayoutPresentationVisible(
+                acceptanceContinueButton?.transform as RectTransform,
+                acceptance);
+            SetLayoutPresentationVisible(
+                acceptanceNewGameButton?.transform as RectTransform,
+                acceptance);
+            SetLayoutPresentationVisible(
+                acceptanceBackButton?.transform as RectTransform,
+                acceptance);
+        }
+
+        private static void SetLayoutPresentationVisible(
+            RectTransform rect,
+            bool visible)
+        {
+            if (rect == null) return;
+            LayoutElement element = rect.GetComponent<LayoutElement>();
+            if (element != null) element.ignoreLayout = !visible;
+            CanvasGroup group = rect.GetComponent<CanvasGroup>();
+            if (group == null) group = rect.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = visible ? 1f : 0f;
+            group.interactable = visible;
+            group.blocksRaycasts = visible;
+        }
+
+        private void RefreshStartPageGraphics()
+        {
+            if (startPage == null || !startPage.gameObject.activeSelf) return;
+            startPage.gameObject.SetActive(false);
+            startPage.gameObject.SetActive(true);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(startPage);
+            Canvas.ForceUpdateCanvases();
+        }
+#endif
 
         private void UpdateRootVisibility()
         {
@@ -696,9 +899,18 @@ namespace WasteCity.Graybox3D.Usability
             settingsPage = null;
             operationGuidePage = null;
             exitConfirmPage = null;
+            startTitle = null;
             startContinueButton = null;
             startNewGameButton = null;
             startNewGameCancelButton = null;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            acceptancePage = null;
+            startAcceptanceButton = null;
+            acceptanceContinueButton = null;
+            acceptanceNewGameButton = null;
+            acceptanceBackButton = null;
+            isAcceptancePageOpen = false;
+#endif
             continueButton = null;
             resolutionDropdown = null;
             windowModeDropdown = null;

@@ -17,6 +17,11 @@ namespace WasteCity.Graybox3D.Building
         private bool junction;
         private bool arrowCap;
 
+        public bool HasOuterStroke =>
+            !junction && points.Length >= 2 && lineWidth > 0f;
+        public bool IsDashed => dashed;
+        public bool HasArrowCap => arrowCap;
+
         public void Configure(
             Vector2 startPoint,
             Vector2 endPoint,
@@ -86,6 +91,32 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
             if (points.Length < 2 || lineWidth <= 0f) return;
+            float innerWidth = lineWidth;
+            Color innerStart = color;
+            Color innerEnd = endColor;
+            float outerWidth = innerWidth + Mathf.Max(3f, innerWidth * .8f);
+            Color outerStart = new Color(
+                .015f, .025f, .03f, innerStart.a * .9f);
+            Color outerEnd = new Color(
+                .015f, .025f, .03f, innerEnd.a * .9f);
+            PopulatePath(
+                vertexHelper,
+                outerWidth,
+                outerStart,
+                outerEnd);
+            PopulatePath(
+                vertexHelper,
+                innerWidth,
+                innerStart,
+                innerEnd);
+        }
+
+        private void PopulatePath(
+            VertexHelper vertexHelper,
+            float width,
+            Color startColor,
+            Color targetColor)
+        {
             for (var index = 1; index < points.Length; index++)
             {
                 float t0 = (index - 1f) / (points.Length - 1f);
@@ -96,8 +127,9 @@ namespace WasteCity.Graybox3D.Building
                         vertexHelper,
                         points[index - 1],
                         points[index],
-                        Color.Lerp(color, endColor, t0),
-                        Color.Lerp(color, endColor, t1));
+                        Color.Lerp(startColor, targetColor, t0),
+                        Color.Lerp(startColor, targetColor, t1),
+                        width);
                 }
                 else
                 {
@@ -105,14 +137,19 @@ namespace WasteCity.Graybox3D.Building
                         vertexHelper,
                         points[index - 1],
                         points[index],
-                        Color.Lerp(color, endColor, t0),
-                        Color.Lerp(color, endColor, t1));
+                        Color.Lerp(startColor, targetColor, t0),
+                        Color.Lerp(startColor, targetColor, t1),
+                        width);
                 }
             }
-            if (arrowCap) PopulateArrowCap(vertexHelper);
+            if (arrowCap)
+                PopulateArrowCap(vertexHelper, width, targetColor);
         }
 
-        private void PopulateArrowCap(VertexHelper helper)
+        private void PopulateArrowCap(
+            VertexHelper helper,
+            float width,
+            Color targetColor)
         {
             if (points.Length < 2) return;
             Vector2 tip = points[points.Length - 1];
@@ -120,11 +157,11 @@ namespace WasteCity.Graybox3D.Building
             if (direction.sqrMagnitude <= Mathf.Epsilon) return;
             direction.Normalize();
             Vector2 normal = new Vector2(-direction.y, direction.x);
-            float length = Mathf.Max(10f, lineWidth * 3f);
-            float halfWidth = Mathf.Max(5f, lineWidth * 1.7f);
+            float length = Mathf.Max(10f, width * 3f);
+            float halfWidth = Mathf.Max(5f, width * 1.7f);
             Vector2 baseCenter = tip - direction * length;
             int first = helper.currentVertCount;
-            Color32 capColor = endColor;
+            Color32 capColor = targetColor;
             AddVertex(helper, tip, capColor);
             AddVertex(helper, baseCenter + normal * halfWidth, capColor);
             AddVertex(helper, baseCenter - normal * halfWidth, capColor);
@@ -136,7 +173,8 @@ namespace WasteCity.Graybox3D.Building
             Vector2 start,
             Vector2 end,
             Color startColor,
-            Color targetColor)
+            Color targetColor,
+            float width)
         {
             const float dashLength = 26f;
             const float gapLength = 14f;
@@ -154,7 +192,8 @@ namespace WasteCity.Graybox3D.Building
                     start + direction * offset,
                     start + direction * dashEnd,
                     Color.Lerp(startColor, targetColor, t0),
-                    Color.Lerp(startColor, targetColor, t1));
+                    Color.Lerp(startColor, targetColor, t1),
+                    width);
             }
         }
 
@@ -163,12 +202,13 @@ namespace WasteCity.Graybox3D.Building
             Vector2 start,
             Vector2 end,
             Color32 startColor,
-            Color32 targetColor)
+            Color32 targetColor,
+            float width)
         {
             Vector2 direction = end - start;
             if (direction.sqrMagnitude <= Mathf.Epsilon) return;
             Vector2 normal = new Vector2(-direction.y, direction.x)
-                .normalized * (lineWidth * .5f);
+                .normalized * (width * .5f);
             int first = helper.currentVertCount;
             AddVertex(helper, start - normal, startColor);
             AddVertex(helper, start + normal, startColor);

@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`df5bded55417b86c32eaac7e8599f5e432853cd12e5ccbe79dc709e5cff06ef1`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`b06975cbadebb5714486578d14ca7795dd0458dcb5234c596f29ca7093557b0c`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -291,6 +291,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalInnerCityPresentationPolicy3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`
@@ -401,6 +402,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/ResearchTreeVisualLayoutProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsAdapters3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxDisplaySettingsModel3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
@@ -536,6 +538,7 @@
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainRenderer3D.cs`
 - `Assets/_Game/Scripts/ArtIntegration3D/FirstArtTerrainVisualStyle3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/FormalInnerCityPresentationPolicy3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalMapNavigationProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldPresentationScaleProfile3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/GrayboxCameraController3D.cs`

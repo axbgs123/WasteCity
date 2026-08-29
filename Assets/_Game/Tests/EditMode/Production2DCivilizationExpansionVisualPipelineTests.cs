@@ -323,7 +323,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0023_UnifiedCatalogEndsAtExactOneHundredFortyEntries()
+        public void IDEA0023_IDEA0024_UnifiedCatalogEndsAtExactOneHundredFortyOneEntries()
         {
             Type builder = Type.GetType(VisualBuilderType);
             Assert.That(builder, Is.Not.Null);
@@ -331,7 +331,7 @@ namespace WasteCity.Tests
                 "ExpectedVisualCount",
                 BindingFlags.Public | BindingFlags.Static);
             Assert.That(expectedCount, Is.Not.Null);
-            Assert.That(expectedCount.GetValue(null), Is.EqualTo(140));
+            Assert.That(expectedCount.GetValue(null), Is.EqualTo(141));
             MethodInfo create = builder.GetMethod(
                 "CreateExpectedVisualEntries",
                 BindingFlags.Public | BindingFlags.Static);
@@ -357,14 +357,14 @@ namespace WasteCity.Tests
                 total++;
             }
 
-            Assert.That(total, Is.EqualTo(140));
+            Assert.That(total, Is.EqualTo(141));
             Assert.That(counts["Item"], Is.EqualTo(31));
             Assert.That(counts["Technology"], Is.EqualTo(44));
             Assert.That(counts["Building"], Is.EqualTo(35));
             Assert.That(counts["Unit"], Is.EqualTo(4));
             Assert.That(counts["Character"], Is.EqualTo(3));
             Assert.That(counts["WorldMarker"], Is.EqualTo(5));
-            Assert.That(counts["Ui"], Is.EqualTo(18));
+            Assert.That(counts["Ui"], Is.EqualTo(19));
         }
 
         private static string Sha256(string projectPath)

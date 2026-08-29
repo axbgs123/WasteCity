@@ -11,8 +11,6 @@ namespace WasteCity.Graybox3D.Building
     {
         private const int GroundWidth = GrayboxWorldLayout3D.WorldWidth;
         private const int GroundHeight = GrayboxWorldLayout3D.WorldHeight;
-        private const float InnerAnchorX = -1.28f;
-        private const float InnerAnchorZ = -.96f;
         private const float InnerCellSize =
             FormalWorldPresentationScaleProfile3D.InnerCellSize;
         private const float GroundCellSize =
@@ -546,8 +544,10 @@ namespace WasteCity.Graybox3D.Building
                     ApplyInstanceTransform(visual);
                 if (mainCamera != null && visual.IconRenderer != null &&
                     visual.IconRenderer.enabled)
-                    visual.IconRenderer.transform.rotation =
-                        mainCamera.transform.rotation;
+                    FormalInnerCityPresentationPolicy3D
+                        .OrientVerticalBillboard(
+                            visual.IconRenderer.transform,
+                            mainCamera.transform.position);
             }
         }
 
@@ -773,11 +773,29 @@ namespace WasteCity.Graybox3D.Building
             float spriteWidth = sprite == null
                 ? 1f
                 : Mathf.Max(.001f, sprite.bounds.size.x);
+            float spriteHeight = sprite == null
+                ? 1f
+                : Mathf.Max(.001f, sprite.bounds.size.y);
+            FormalWorldPresentationScaleProfile3D profile =
+                ResolvePresentationScaleProfile();
+            float widthRatio = profile == null
+                ? .78f
+                : profile.BuildingIconWidthRatio;
+            float roofClearance = profile == null
+                ? .08f
+                : profile.BuildingIconRoofClearance;
             float targetSize = Mathf.Clamp(
-                Mathf.Max(dimensions.XSize, dimensions.ZSize) * .78f,
+                Mathf.Max(dimensions.XSize, dimensions.ZSize) * widthRatio,
                 dimensions.CellSize * .7f,
                 dimensions.CellSize * 2.4f);
-            icon.localScale = Vector3.one * (targetSize / spriteWidth);
+            float scale = targetSize / spriteWidth;
+            float displayedHeight = spriteHeight * scale;
+            icon.localScale = Vector3.one * scale;
+            icon.localPosition = new Vector3(
+                0f,
+                dimensions.VisualHeight + roofClearance +
+                    displayedHeight * .5f,
+                0f);
         }
 
         private void AddSlot(
@@ -832,9 +850,11 @@ namespace WasteCity.Graybox3D.Building
         {
             FormalWorldPresentationScaleProfile3D profile =
                 ResolvePresentationScaleProfile();
-            float cellSize = site == BuildingSite.InnerCity
-                ? InnerCellSize
-                : GroundCellSize;
+            float cellSize = profile == null
+                ? site == BuildingSite.InnerCity
+                    ? InnerCellSize
+                    : GroundCellSize
+                : profile.CellSize(site);
             FormalBuildingVisualMetrics3D metrics = default;
             bool usesFormalMetrics = profile != null &&
                 profile.TryResolveBuilding(definition, out metrics);
@@ -1355,34 +1375,43 @@ namespace WasteCity.Graybox3D.Building
             };
         }
 
-        private static Mesh CreateInnerGridMesh()
+        private Mesh CreateInnerGridMesh()
         {
-            const int width = 8;
-            const int height = 6;
+            FormalWorldPresentationScaleProfile3D profile =
+                ResolvePresentationScaleProfile();
+            int width = profile?.InnerGridWidth ??
+                FormalWorldPresentationScaleProfile3D.InnerGridWidthCells;
+            int height = profile?.InnerGridHeight ??
+                FormalWorldPresentationScaleProfile3D.InnerGridHeightCells;
+            float cellSize = profile?.CellSize(BuildingSite.InnerCity) ??
+                InnerCellSize;
+            Vector2 anchor = profile?.InnerGridAnchor ??
+                new Vector2(-width * cellSize * .5f,
+                    -height * cellSize * .5f);
             const float line = .012f;
             var matrices = new List<Matrix4x4>(width + height + 2);
             for (var x = 0; x <= width; x++)
                 matrices.Add(
                     Matrix4x4.TRS(
                         new Vector3(
-                            InnerAnchorX + x * InnerCellSize,
-                            1.061f,
+                            anchor.x + x * cellSize,
+                            0f,
                             0f),
                         Quaternion.identity,
                         new Vector3(
                             line,
                             .008f,
-                            height * InnerCellSize)));
+                            height * cellSize)));
             for (var y = 0; y <= height; y++)
                 matrices.Add(
                     Matrix4x4.TRS(
                         new Vector3(
                             0f,
-                            1.061f,
-                            InnerAnchorZ + y * InnerCellSize),
+                            0f,
+                            anchor.y + y * cellSize),
                         Quaternion.identity,
                         new Vector3(
-                            width * InnerCellSize,
+                            width * cellSize,
                             .008f,
                             line)));
             return GrayboxMeshBuilder.CombinePrimitive(
@@ -1402,12 +1431,14 @@ namespace WasteCity.Graybox3D.Building
                 placement.Orientation);
             if (placement.Site == BuildingSite.InnerCity)
             {
-                Vector3 local = new Vector3(
-                    InnerAnchorX +
-                    (placement.X + width * .5f) * InnerCellSize,
-                    1.07f,
-                    InnerAnchorZ +
-                    (placement.Y + height * .5f) * InnerCellSize);
+                Vector3 local =
+                    FormalInnerCityPresentationPolicy3D
+                        .FootprintCenterLocal(
+                            placement.X,
+                            placement.Y,
+                            width,
+                            height,
+                            city.InnerContentLocalY);
                 visual.Root.transform.position =
                     city.transform.TransformPoint(local);
                 visual.Root.transform.rotation = SiteRotation(
@@ -1459,7 +1490,10 @@ namespace WasteCity.Graybox3D.Building
             if (innerGrid == null || city == null)
                 return;
             innerGrid.Root.transform.SetPositionAndRotation(
-                city.transform.position,
+                city.transform.TransformPoint(new Vector3(
+                    0f,
+                    city.InnerContentLocalY,
+                    0f)),
                 city.transform.rotation);
         }
 

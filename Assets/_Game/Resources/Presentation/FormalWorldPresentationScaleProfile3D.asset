@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 845222ce93bd4000a4570029f900a7b5, type: 3}
   m_Name: FormalWorldPresentationScaleProfile3D
   m_EditorClassIdentifier:
-  innerVerticalEmphasis: 1.15
+  innerVerticalEmphasis: 1
   nearUnitScreenHeight: 0.045
   midUnitScreenHeight: 0.027
   markerSeparationReferencePixels: 6

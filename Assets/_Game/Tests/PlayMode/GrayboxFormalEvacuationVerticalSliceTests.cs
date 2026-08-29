@@ -813,7 +813,9 @@ namespace WasteCity.Tests
         {
             UnityEngine.UI.Button button = Object
                 .FindObjectsOfType<UnityEngine.UI.Button>(true)
-                .SingleOrDefault(value => value.name == name);
+                .SingleOrDefault(value =>
+                    value.name == name &&
+                    value.gameObject.activeInHierarchy);
             Assert.That(button, Is.Not.Null, name);
             Assert.That(button.gameObject.activeInHierarchy, Is.True, name);
             EventSystem.current.SetSelectedGameObject(button.gameObject);
@@ -832,10 +834,9 @@ namespace WasteCity.Tests
             Assert.That(platform, Is.Not.Null);
             BoxCollider surface = platform.GetComponent<BoxCollider>();
             Assert.That(surface, Is.Not.Null);
-            Vector3 worldPoint = city.transform.TransformPoint(new Vector3(
-                -1.28f + (x + .5f) * .32f,
-                0f,
-                -.96f + (y + .5f) * .32f));
+            Vector3 worldPoint = city.transform.TransformPoint(
+                FormalInnerCityPresentationPolicy3D.CellCenterLocal(
+                    x, y, 0f));
             worldPoint.y = surface.bounds.max.y;
             QueueMouse(Camera.main.WorldToScreenPoint(worldPoint));
             yield return null;

@@ -588,6 +588,19 @@ namespace WasteCity.Tests
                 Object.FindObjectsOfType<GrayboxProductionController3D>(true),
                 Has.Length.EqualTo(1));
             Camera camera = Camera.main;
+            Transform cityVisual = RequiredChild(
+                city.gameObject,
+                "MobileCityVisual");
+            Assert.That(
+                Vector3.Distance(
+                    cityVisual.localScale,
+                    new Vector3(8.6f, .65f, 6.6f)),
+                Is.LessThan(.001f));
+            Assert.That(
+                Vector3.Distance(
+                    cityVisual.localPosition,
+                    new Vector3(0f, -.175f, 0f)),
+                Is.LessThan(.001f));
             Transform platform = RequiredChild(
                 city.gameObject,
                 "InnerCityPlatform");
@@ -614,24 +627,22 @@ namespace WasteCity.Tests
             Vector3 selectionSize = Vector3.Scale(
                 innerSurface.size,
                 absoluteScale);
-            Assert.That(visibleSize.x, Is.EqualTo(2.56f).Within(.001f));
-            Assert.That(visibleSize.z, Is.EqualTo(1.92f).Within(.001f));
-            Assert.That(selectionSize.x, Is.EqualTo(2.56f).Within(.001f));
-            Assert.That(selectionSize.z, Is.EqualTo(1.92f).Within(.001f));
+            Assert.That(visibleSize.x, Is.EqualTo(8f).Within(.001f));
+            Assert.That(visibleSize.z, Is.EqualTo(6f).Within(.001f));
+            Assert.That(selectionSize.x, Is.EqualTo(8f).Within(.001f));
+            Assert.That(selectionSize.z, Is.EqualTo(6f).Within(.001f));
             Assert.That(
                 platformRenderer.sharedMaterial,
                 Is.SameAs(
                     AssetDatabase.LoadAssetAtPath<Material>(MaterialPath)));
-            BoxCollider cityCollider = city.GetComponent<BoxCollider>();
-            float cityBodyTop =
-                cityCollider.center.y + cityCollider.size.y * .5f;
             float platformTop =
                 platform.localPosition.y +
                 absoluteScale.y *
                 (innerSurface.center.y + innerSurface.size.y * .5f);
             Assert.That(
                 platformTop,
-                Is.EqualTo(cityBodyTop + .01f).Within(.001f));
+                Is.EqualTo(.16f).Within(.001f));
+            Assert.That(innerSurface.isTrigger, Is.True);
 
             AssertReference(presentation, "instanceRoot", instanceRoot);
             AssertReference(

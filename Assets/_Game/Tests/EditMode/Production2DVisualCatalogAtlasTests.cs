@@ -38,6 +38,7 @@ namespace WasteCity.Tests
             "core.ui.status.communication",
             "core.ui.status.loyalty",
             "core.ui.status.rescue",
+            "core.ui.background.research-tree",
         };
 
         [Test]

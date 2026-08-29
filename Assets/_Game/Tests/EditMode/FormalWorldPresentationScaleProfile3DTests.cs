@@ -222,12 +222,12 @@ namespace WasteCity.Tests
                 Is.EqualTo(1f));
             Assert.That(
                 cellSize.Invoke(profile, new object[] { BuildingSite.InnerCity }),
-                Is.EqualTo(.32f));
+                Is.EqualTo(1f));
 
             Type profileType = profile.GetType();
             Assert.That(
                 ReadPublicFloat(profile, profileType, "InnerVerticalEmphasis"),
-                Is.EqualTo(1.15f).Within(.0001f));
+                Is.EqualTo(1f).Within(.0001f));
         }
 
         [Test]

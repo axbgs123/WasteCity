@@ -855,9 +855,13 @@ namespace WasteCity.Editor
             GrayboxLeaderController3D leader =
                 RequireSingle<GrayboxLeaderController3D>(scene);
             Camera camera = RequireSingle<Camera>(scene);
+            EnsureMobileCityVisual(
+                city.transform,
+                presentationScaleProfile);
             BoxCollider innerSurface = EnsureInnerCityPlatform(
                 city.transform,
-                material);
+                material,
+                presentationScaleProfile);
 
             Transform ui = EnsureChild(root.transform, "GrayboxUI");
             Transform canvasTransform = EnsureChild(ui, "BuildingCanvas");
@@ -2177,8 +2181,16 @@ namespace WasteCity.Editor
                 GameObject.CreatePrimitive(PrimitiveType.Cube);
             visual.name = "MobileCityVisual";
             visual.transform.SetParent(cityTransform, false);
-            visual.transform.localScale =
-                new Vector3(3f, 1f, 2f);
+            FormalWorldPresentationScaleProfile3D profile =
+                AssetDatabase.LoadAssetAtPath<
+                    FormalWorldPresentationScaleProfile3D>(
+                    WorldPresentationScaleProfilePath);
+            Vector3 visualSize = profile == null
+                ? new Vector3(8.6f, .65f, 6.6f)
+                : profile.MobileCityVisualSize;
+            visual.transform.localScale = visualSize;
+            visual.transform.localPosition = new Vector3(
+                0f, visualSize.y * .5f - .5f, 0f);
             UnityEngine.Object.DestroyImmediate(
                 visual.GetComponent<Collider>());
             MeshRenderer renderer =
@@ -2278,7 +2290,8 @@ namespace WasteCity.Editor
 
         private static BoxCollider EnsureInnerCityPlatform(
             Transform city,
-            Material material)
+            Material material,
+            FormalWorldPresentationScaleProfile3D profile)
         {
             Transform platform = FindDirectChild(city, "InnerCityPlatform");
             if (platform == null)
@@ -2290,27 +2303,47 @@ namespace WasteCity.Editor
                 platform = primitive.transform;
             }
 
-            BoxCollider cityCollider =
-                RequireComponent<BoxCollider>(city.gameObject);
-            const float platformThickness = .01f;
-            float cityBodyTop =
-                cityCollider.center.y + cityCollider.size.y * .5f;
+            float platformThickness =
+                FormalWorldPresentationScaleProfile3D.InnerPlatformThickness;
+            Vector2 platformSize = profile?.InnerPlatformSize ??
+                new Vector2(8f, 6f);
+            float deckY = profile?.MobileDeckLocalY ?? .15f;
             platform.localPosition = new Vector3(
                 0f,
-                cityBodyTop + platformThickness * .5f,
+                deckY + platformThickness * .5f,
                 0f);
             platform.localRotation = Quaternion.identity;
             platform.localScale = new Vector3(
-                2.56f,
+                platformSize.x,
                 platformThickness,
-                1.92f);
+                platformSize.y);
             BoxCollider collider = EnsureComponent<BoxCollider>(platform);
             collider.center = Vector3.zero;
             collider.size = Vector3.one;
+            collider.isTrigger = true;
             MeshRenderer renderer =
                 EnsureComponent<MeshRenderer>(platform);
             renderer.sharedMaterial = material;
             return collider;
+        }
+
+        private static void EnsureMobileCityVisual(
+            Transform city,
+            FormalWorldPresentationScaleProfile3D profile)
+        {
+            Transform visual = FindDirectChild(city, "MobileCityVisual");
+            if (visual == null)
+            {
+                throw new InvalidOperationException(
+                    "MobileCityVisual is required for stable scene repair.");
+            }
+            Vector3 visualSize = profile.MobileCityVisualSize;
+            visual.localPosition = new Vector3(
+                0f,
+                visualSize.y * .5f - .5f,
+                0f);
+            visual.localRotation = Quaternion.identity;
+            visual.localScale = visualSize;
         }
 
         private static Scene NormalizeSceneBytes(string scenePath)

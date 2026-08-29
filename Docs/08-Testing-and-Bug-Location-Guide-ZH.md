@@ -54,6 +54,16 @@ schema `34` 必须运行 `FormalSaveSchema34ContractTests`、既有 schema `31�
 
 本轮的 20 张透明图和公告板只是“无需建模即可完成”的 F6 表现层，不代表单位、角色、城市或车辆的正式 3D 模型、骨骼、动画、VFX、SFX 已完成。自动化检查 Alpha、尺寸、目录键、导入、Atlas、fallback、稳定对象数和真实输入；用户仍需试玩确认人物风格、单位轮廓、近中远比例、遮挡和信息密度，真实 Windows 10 与 Windows 11 仍需实际检查 GPU、显存和内存。只有修改地形源、导入规则、Texture2DArray Builder、数组生成或准备发布时才运行 `TerrainAssetDeep`；新增 Units/Characters/WorldMarkers/UI 图片不触发地形深度套件。
 
+## IDEA-0024：科技树、开发验收台、城市比例与建筑世界图
+
+`IDEA-0024` 当前为“已实现待验证”，没有修改 `64×48` v2 地图、ResearchCatalog 真值或正式 schema `34`。科技树聚焦运行 `IDEA0024ResearchTreePresentationTests`、`ResearchTreeProjection3DTests` 和 `ResearchTreeUiContractTests`：背景 manifest、母版和交付图必须保持同一 `1920×1080` RGBA 不透明面板 PNG 与稳定 GUID/SHA-256；Production2D 统一目录精确为 `141` 项，UI Atlas 精确为 `19` 项，`core.ui.background.research-tree` 只能出现一次。视图必须实际绑定该 Sprite，并保持 Header/Tree/Footer、五路线筛选、五结构化状态筛选、Current/Latest、四路线牌、所选科技详情和真实材料图标。投影仍必须由正式目录派生 `44` 节点、`49` 边和 `6` 个双前置桥，四路线使用固定泳道与双子列，桥按两条真实前置路线的汇合中心分层；连线保持外描边/内层、桥虚线、箭头且不拦截 raycast。状态筛选只能消费 `Locked/Researchable/Active/Completed` DTO，不能解析中文状态文案。
+
+Development 验收入口和可点击页签先运行 `IDEA0024AcceptanceAndClickableTabsTests`，再运行真实 Input System 的 `IDEA0024AcceptanceAndTabsRuntimeInputTests`。Release 的启动控件必须保持原集合；只有 Editor/Development 可以追加“验收管理台、继续、新游戏、返回”四个控件。验收命令必须复用正式继续、新游戏、覆盖确认和 EnterGameplay，只有成功进入游戏后才可打开开发修改器。M/N/P 仍可由键盘互斥打开，面板内三枚真实 UGUI 页签必须复用同一个面板，每次点击只发布一次页变更，持续阻断世界点击，且不得改变城市目的地或创建待提交地图目标。
+
+城市与建筑表现运行 `IDEA0024CityBuildingPresentationTests`，并补跑 `FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxMobileCityController3DTests`、`GrayboxSceneContractTests` 和真实 `GrayboxBuildingRuntimeSceneTests`。正式 Profile 必须冻结 `8×6` 内城平台、`(-4,-3)` 锚点、`8×6` 平台尺寸和地面/内城均为 `1` 世界单位的格尺度；`MobileCity`、`MobileCityVisual`、`InnerCityPlatform` 的场景身份保持稳定，视觉体量与玩法碰撞体分离。BuildingCatalog 全部 `35` 项已完成建筑必须只有一个可见、屋顶净空、竖直且朝向相机的 world Sprite；施工中与废墟隐藏，重复 300 次更新不得增长子物体或监听。Sprite 是 billboard 回退，不等于正式建筑 3D 模型。
+
+以上自动化只证明目录、布局、输入、坐标和表现合同已经接线；本轮正式建模、用户对科技树密度、背景、城市比例、建筑轮廓与 M-N-P 点击手感的人工视觉验收，以及真实 Windows 10 和 11 的视觉、GPU、显存和内存验证均未完成。没有修改地形源、地形导入规则、Texture2DArray Builder 或数组内容时，日常检查不运行 `TerrainAssetDeep`；准备发布时仍按发布门执行。任何自动化或 Development 验收台结果都不得写成上述人工与 Windows 验收已完成。
+
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 
 `IDEA-0020` 当前为“已实现待验证”。第一片只建立纯 C# 正式关注度来源目录与运行时，不接场景、HUD、命轨选择、压力战斗或存档 schema。来源配置先运行 `FormalAttentionCatalogTests`：必须精确登记 GDD A16.6 的 22 项稳定来源、初始 `10`、范围 `0–100`、历史容量 `128`、最近原因 `3` 条和 `30`、`60`、`90` 三个阈值，未知 ID 不得回退到任意默认项。

@@ -60,10 +60,6 @@ namespace WasteCity.Graybox3D
         private const float CombatPackingAdvanceMultiplier = .7f;
         private const string CityStableId = "core.city.mobile";
 
-        private static readonly Vector3 MobileSize =
-            new Vector3(3f, 1f, 2f);
-        private static readonly Vector3 FortressSize =
-            new Vector3(3f, 1.5f, 3f);
         private static readonly Color MobileColor =
             new Color(.9f, .48f, .1f);
         private static readonly Color FortressColor =
@@ -90,6 +86,8 @@ namespace WasteCity.Graybox3D
         private Vector3 colliderBaseCenter;
         private bool presentationCaptured;
         private MaterialPropertyBlock visualBlock;
+        private FormalWorldPresentationScaleProfile3D presentationProfile;
+        private Transform innerCityPlatform;
         private IGrayboxRuleTimeSource3D configuredRuleTimeSource;
         private GrayboxFormalRuleClock3D formalRuleClock;
         private Func<int> aliveEnemyCountSource;
@@ -109,6 +107,21 @@ namespace WasteCity.Graybox3D
         public WorldGridPoint? Destination => destination;
         public Vector3 WorldPosition =>
             body == null ? transform.position : body.position;
+        public float InnerDeckLocalY
+        {
+            get
+            {
+                FormalWorldPresentationScaleProfile3D profile =
+                    ResolvePresentationProfile();
+                return profile == null
+                    ? .15f
+                    : profile.DeckLocalY(ResolveFortressFactor());
+            }
+        }
+        public float InnerContentLocalY =>
+            InnerDeckLocalY +
+            FormalWorldPresentationScaleProfile3D.InnerPlatformThickness +
+            FormalWorldPresentationScaleProfile3D.InnerContentLift;
         public CityDeploymentFailure LastDeploymentFailure
         {
             get;
@@ -140,6 +153,7 @@ namespace WasteCity.Graybox3D
             visualSlot =
                 GetComponentInChildren<GrayboxVisualSlot>(true);
             visualTransform = visualSlot?.Renderer?.transform;
+            innerCityPlatform = transform.Find("InnerCityPlatform");
             if (!presentationCaptured)
             {
                 if (visualTransform != null)
@@ -631,25 +645,58 @@ namespace WasteCity.Graybox3D
         private void UpdatePresentation()
         {
             float fortressFactor = ResolveFortressFactor();
-            Vector3 size =
-                Vector3.Lerp(MobileSize, FortressSize, fortressFactor);
-            float verticalOffset =
-                (size.y - MobileSize.y) * .5f;
+            FormalWorldPresentationScaleProfile3D profile =
+                ResolvePresentationProfile();
+            Vector3 visualSize = profile == null
+                ? new Vector3(8.6f, .65f, 6.6f)
+                : profile.CityVisualSize(Mode, fortressFactor);
+            Vector3 colliderSize = profile == null
+                ? Vector3.Lerp(
+                    new Vector3(3f, 1f, 2f),
+                    new Vector3(3f, 1.5f, 3f),
+                    fortressFactor)
+                : profile.GameplayColliderSize(fortressFactor);
+            float visualCenterY = visualSize.y * .5f - .5f;
+            float colliderCenterY = colliderSize.y * .5f - .5f;
 
             if (visualTransform != null)
             {
-                visualTransform.localScale = size;
-                visualTransform.localPosition =
-                    visualBaseLocalPosition +
-                    Vector3.up * verticalOffset;
+                visualTransform.localScale = visualSize;
+                visualTransform.localPosition = new Vector3(
+                    visualBaseLocalPosition.x,
+                    visualCenterY,
+                    visualBaseLocalPosition.z);
             }
 
             if (bodyCollider != null)
             {
-                bodyCollider.size = size;
-                bodyCollider.center =
-                    colliderBaseCenter +
-                    Vector3.up * verticalOffset;
+                bodyCollider.size = colliderSize;
+                bodyCollider.center = new Vector3(
+                    colliderBaseCenter.x,
+                    colliderCenterY,
+                    colliderBaseCenter.z);
+            }
+
+            if (innerCityPlatform != null)
+            {
+                Vector2 platformSize = profile == null
+                    ? new Vector2(8f, 6f)
+                    : profile.InnerPlatformSize;
+                float deckY = profile == null
+                    ? visualSize.y - .5f
+                    : profile.DeckLocalY(fortressFactor);
+                innerCityPlatform.localPosition = new Vector3(
+                    0f,
+                    deckY +
+                        FormalWorldPresentationScaleProfile3D
+                            .InnerPlatformThickness * .5f,
+                    0f);
+                innerCityPlatform.localRotation = Quaternion.identity;
+                innerCityPlatform.localScale = new Vector3(
+                    platformSize.x,
+                    FormalWorldPresentationScaleProfile3D
+                        .InnerPlatformThickness,
+                    platformSize.y);
             }
 
             MeshRenderer renderer = visualSlot?.Renderer;
@@ -667,6 +714,18 @@ namespace WasteCity.Graybox3D
             visualBlock.SetColor(BaseColorId, color);
             visualBlock.SetColor(ColorId, color);
             renderer.SetPropertyBlock(visualBlock);
+        }
+
+        private FormalWorldPresentationScaleProfile3D
+            ResolvePresentationProfile()
+        {
+            if (presentationProfile == null)
+            {
+                presentationProfile = Resources.Load<
+                    FormalWorldPresentationScaleProfile3D>(
+                    FormalWorldPresentationScaleProfile3D.ResourcesPath);
+            }
+            return presentationProfile;
         }
 
         private float ResolveFortressFactor()

@@ -23,6 +23,9 @@ namespace WasteCity.Graybox3D.Usability
         private GrayboxUsabilityInputCoordinator3D inputCoordinator;
 
         private bool slotRequiresOverwriteConfirmation;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        private bool openDeveloperModifierAfterEntry;
+#endif
 
         public bool IsStartPageOpen { get; private set; }
         public bool CanContinue { get; private set; }
@@ -71,6 +74,33 @@ namespace WasteCity.Graybox3D.Usability
             }
             StartNewProgress();
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public void RequestAcceptanceContinue()
+        {
+            if (!IsStartPageOpen || !CanContinue || runtimeHost == null)
+                return;
+            openDeveloperModifierAfterEntry = true;
+            RequestContinue();
+            if (!IsRuntimeReady) openDeveloperModifierAfterEntry = false;
+        }
+
+        public void RequestAcceptanceNewGame()
+        {
+            if (!IsStartPageOpen || runtimeHost == null) return;
+            openDeveloperModifierAfterEntry = true;
+            RequestNewGame();
+            if (!IsRuntimeReady && !IsNewGameConfirmationOpen)
+                openDeveloperModifierAfterEntry = false;
+        }
+
+        public void RequestAcceptanceBack()
+        {
+            openDeveloperModifierAfterEntry = false;
+            view?.RenderAcceptancePage(false, FeedbackMessage);
+            RefreshView();
+        }
+#endif
 
         public void ConfirmNewGame()
         {
@@ -221,6 +251,10 @@ namespace WasteCity.Graybox3D.Usability
 
         private void EnterGameplay()
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            bool openDeveloperModifier = openDeveloperModifierAfterEntry;
+            openDeveloperModifierAfterEntry = false;
+#endif
             IsRuntimeReady = true;
             IsStartPageOpen = false;
             IsNewGameConfirmationOpen = false;
@@ -228,6 +262,13 @@ namespace WasteCity.Graybox3D.Usability
             runtimeHost.Speed.SetPaused(GamePauseReason.Title, false);
             Time.timeScale = runtimeHost.Speed.Speed;
             RefreshView();
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (openDeveloperModifier)
+            {
+                FindObjectOfType<GrayboxDeveloperModifierBootstrap3D>()
+                    ?.TryTogglePanel();
+            }
+#endif
         }
 
         private void ApplyProbe(FormalSaveStoreResult result)

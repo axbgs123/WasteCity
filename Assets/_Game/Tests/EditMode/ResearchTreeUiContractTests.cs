@@ -158,6 +158,8 @@ namespace WasteCity.Tests
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(content);
             Canvas.ForceUpdateCanvases();
+            ResearchTreeProjection3D projection =
+                ResearchTreeProjection3D.Create(ResearchCatalog.All);
 
             var placements = ResearchCatalog.All.Select(definition =>
             {
@@ -170,6 +172,14 @@ namespace WasteCity.Tests
                     definition.Id.Value);
                 Assert.That(bounds.size.y, Is.GreaterThan(0f),
                     definition.Id.Value);
+                Vector2 expected = projection.FindNode(
+                    definition.Id.Value).Position;
+                Assert.That(bounds.center.x,
+                    Is.EqualTo(expected.x).Within(.5f),
+                    definition.Id.Value + " x");
+                Assert.That(bounds.center.y,
+                    Is.EqualTo(expected.y).Within(.5f),
+                    definition.Id.Value + " y");
                 return new Placement(definition, bounds);
             }).ToArray();
 
@@ -178,24 +188,21 @@ namespace WasteCity.Tests
                 .OrderBy(value => value.Key)
                 .Select(group =>
                 {
-                    Placement first = group.First();
-                    foreach (Placement placement in group)
-                    {
-                        Assert.That(
-                            placement.Bounds.center.y,
-                            Is.EqualTo(first.Bounds.center.y).Within(.5f),
-                            "all nodes in LayoutRow " + group.Key +
-                            " must share one Y coordinate");
-                    }
-                    return first;
+                    return group.OrderBy(value =>
+                        value.Bounds.center.y).First();
                 })
                 .ToArray();
 
             for (var index = 1; index < rows.Length; index++)
             {
                 Assert.That(
-                    rows[index].Bounds.center.y,
-                    Is.GreaterThan(rows[index - 1].Bounds.center.y),
+                    placements.Where(value => value.Definition.LayoutRow ==
+                            rows[index].Definition.LayoutRow)
+                        .Min(value => value.Bounds.center.y),
+                    Is.GreaterThan(placements.Where(value =>
+                            value.Definition.LayoutRow ==
+                            rows[index - 1].Definition.LayoutRow)
+                        .Max(value => value.Bounds.center.y)),
                     "higher LayoutRow values must appear above lower rows");
             }
 
@@ -390,7 +397,7 @@ namespace WasteCity.Tests
 
             view.FitResearchTree();
             Assert.That(content.localScale.x,
-                Is.InRange(.4f, 1.45f));
+                Is.InRange(.34f, 1.45f));
             Assert.That(view.GetComponents<MonoBehaviour>()
                     .Count(component => component != null &&
                         component.GetType().GetMethod(

@@ -720,6 +720,21 @@ namespace WasteCity.Graybox3D.Building
             researchTreeView?.SetNode(definition, stateText, selected);
         }
 
+        public void SetResearchNode(ResearchNodePresentation3D presentation)
+        {
+            if (presentation == null) return;
+            TryBuildUi();
+            researchTreeView?.SetNode(presentation);
+        }
+
+        public void SetResearchNodes(
+            IReadOnlyList<ResearchNodePresentation3D> presentations)
+        {
+            if (presentations == null) return;
+            TryBuildUi();
+            researchTreeView?.SetNodes(presentations);
+        }
+
         public void SetResearchActive(
             string name,
             string progressText,

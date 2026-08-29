@@ -480,7 +480,9 @@ namespace WasteCity.Tests
             QueueKeyboard();
             yield return null;
 
-            Assert.That(city.transform.position, Is.EqualTo(cityBefore));
+            Assert.That(
+                Vector3.Distance(city.transform.position, cityBefore),
+                Is.LessThan(.0001f));
             Assert.That(
                 cameraController.Mode,
                 Is.EqualTo(CameraFollowMode.Free));
@@ -494,8 +496,13 @@ namespace WasteCity.Tests
             Assert.That(
                 cameraController.Mode,
                 Is.EqualTo(CameraFollowMode.Following));
-            Assert.That(rig.position.x, Is.EqualTo(city.transform.position.x));
-            Assert.That(rig.position.z, Is.EqualTo(city.transform.position.z));
+            Assert.That(
+                Vector2.Distance(
+                    new Vector2(rig.position.x, rig.position.z),
+                    new Vector2(
+                        city.transform.position.x,
+                        city.transform.position.z)),
+                Is.LessThan(.0001f));
             Assert.That(city.AutopilotActive, Is.EqualTo(autopilotBefore));
             Assert.That(city.Mode, Is.EqualTo(modeBefore));
             Assert.That(
