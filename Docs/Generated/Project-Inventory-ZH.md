@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`7e0d4904cf3d9d1740ad11810c31fc28bfe763accc4f27fceab7152bfe3d1c3e`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`017f654a0c5cf64f39d3b968a469a628fd999eef1dad5c5c23da440c30efe72f`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -106,6 +106,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/ResearchEffectPresentationCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs`
 - 城市导航与部署（`city-navigation-deployment`）：
 - `Assets/_Game/Scripts/City/CityDeploymentModel.cs`
@@ -345,6 +346,7 @@
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`
 - `Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`
+- `Assets/_Game/Scripts/Research/ResearchEffectCatalog.cs`
 - `Assets/_Game/Scripts/Research/ResearchModel.cs`
 - `Assets/_Game/Scripts/Research/RouteTechnologyEffects.cs`
 - 场景编辑构建与性能（`scene-editor-build-performance`）：

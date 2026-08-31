@@ -427,6 +427,47 @@ namespace WasteCity.Tests
                 ResourceIds.Ammunition), Is.Zero);
         }
 
+        [Test]
+        public void ResearchDamageMultiplierChangesRealTowerDamage()
+        {
+            const string buildingId = "core.building.machine-gun-turret";
+            SingleCityDefenseCampaignModel baselineCampaign =
+                CampaignWithFirstSpawnedEnemy();
+            SingleCityDefenseCampaignModel boostedCampaign =
+                CampaignWithFirstSpawnedEnemy();
+            SingleCityDefenseEnemySnapshot baselineTarget =
+                baselineCampaign.Snapshot.Enemies.Single();
+            SingleCityDefenseEnemySnapshot boostedTarget =
+                boostedCampaign.Snapshot.Enemies.Single();
+            object baseline = CreateTower(
+                "building.instance.research.baseline", buildingId,
+                baselineTarget.X, baselineTarget.Z);
+            object boosted = CreateTower(
+                "building.instance.research.boosted", buildingId,
+                boostedTarget.X, boostedTarget.Z);
+            using CityResourceStorageModel baselineStorage = StorageWith(
+                ResourceIds.Ammunition, 20);
+            using CityResourceStorageModel boostedStorage = StorageWith(
+                ResourceIds.Ammunition, 20);
+            Refill(baseline, baselineStorage, connected: true);
+            Refill(boosted, boostedStorage, connected: true);
+
+            RequireMethod(
+                    boosted.GetType(),
+                    "SetDamageMultiplier",
+                    typeof(void),
+                    typeof(float))
+                .Invoke(boosted, new object[] { 1f / .9f });
+
+            int baselineDamage = Tick(
+                baseline, 1f, baselineCampaign, globallyPaused: false);
+            int boostedDamage = Tick(
+                boosted, 1f, boostedCampaign, globallyPaused: false);
+
+            Assert.That(baselineDamage, Is.GreaterThan(0));
+            Assert.That(boostedDamage, Is.GreaterThan(baselineDamage));
+        }
+
         private static Type RequireTowerType()
         {
             Type type = typeof(SingleCityDefenseCampaignModel).Assembly.GetType(

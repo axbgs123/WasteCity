@@ -395,7 +395,8 @@ namespace WasteCity.Graybox3D.Building
                     true,
                     entry,
                     affectedCount: 0,
-                    message: "科技已经解锁：" + entry.DisplayName);
+                    message: "科技已经解锁：" + entry.DisplayName +
+                        EffectFeedback(entry.StableId));
             }
 
             session.UnlockResearchForDevelopment(entry.StableId);
@@ -405,7 +406,29 @@ namespace WasteCity.Graybox3D.Building
                 true,
                 entry,
                 affectedCount: 1,
-                message: "已解锁科技：" + entry.DisplayName);
+                message: "已解锁科技：" + entry.DisplayName +
+                    EffectFeedback(entry.StableId));
+        }
+
+        private static string EffectFeedback(string researchId)
+        {
+            string names = string.Empty;
+            foreach (ResearchEffectDefinition effect in
+                     ResearchEffectCatalog.ForResearch(researchId))
+            {
+                if (!effect.IsExecutable ||
+                    effect.Activation != ResearchEffectActivation.Active ||
+                    effect.Kind == ResearchEffectKind.UnlockContent)
+                {
+                    continue;
+                }
+                names += string.IsNullOrEmpty(names)
+                    ? effect.DisplayName
+                    : "、" + effect.DisplayName;
+            }
+            return string.IsNullOrEmpty(names)
+                ? string.Empty
+                : "；已生效：" + names;
         }
 
         public bool UnlockRoute(ContentRoute route)

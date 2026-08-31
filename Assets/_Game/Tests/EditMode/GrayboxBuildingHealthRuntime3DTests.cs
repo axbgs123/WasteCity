@@ -128,6 +128,39 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void AlloyArmorDerivedMaximumRestoresWithoutChangingSchema()
+        {
+            GrayboxBuildingInstance3D instance = Instance(
+                "building.instance.health.alloy-restore",
+                BuildingCatalog.Warehouse,
+                GrayboxBuildingInstanceState.Completed);
+            var source = new GrayboxBuildingHealthRuntime3D();
+            source.Synchronize(new[] { instance }, alloyArmorCompleted: true);
+            Assert.That(source.TryApplyDamage(
+                instance.StableInstanceId, 10, out _, out _), Is.True);
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] saved =
+                source.Capture();
+            var restored = new GrayboxBuildingHealthRuntime3D();
+
+            Assert.That(restored.TryRestore(
+                saved,
+                new[] { instance },
+                alloyArmorCompleted: true,
+                out string error), Is.True, error);
+            int expectedMaximum = RouteTechnologyEffects.BuildingMaximumHealth(
+                BuildingCatalog.Warehouse.MaximumHealth,
+                alloyArmor: true);
+            Assert.That(restored.TryGetHealth(
+                instance.StableInstanceId,
+                out int current,
+                out int maximum,
+                out bool destroyed), Is.True);
+            Assert.That(maximum, Is.EqualTo(expectedMaximum));
+            Assert.That(current, Is.EqualTo(expectedMaximum - 10));
+            Assert.That(destroyed, Is.False);
+        }
+
+        [Test]
         public void DamageClampsAtZeroAndPublishesDestroyedOnlyOnce()
         {
             GrayboxBuildingInstance3D instance = Instance(

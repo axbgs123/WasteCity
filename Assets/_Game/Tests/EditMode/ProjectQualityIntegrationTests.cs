@@ -622,7 +622,7 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(137));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(139));
             StringAssert.Contains(
                 "### 正式关注度压力纯运行时（复用前审查）",
                 content);

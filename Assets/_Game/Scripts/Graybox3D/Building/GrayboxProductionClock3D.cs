@@ -54,6 +54,7 @@ namespace WasteCity.Graybox3D.Building
         private readonly List<ProductionStateMeasurement> stepMeasurements =
             new List<ProductionStateMeasurement>();
         private IFormalProductionOutputModifier outputModifier;
+        private IFormalProductionResearchModifier researchModifier;
 
         public GrayboxProductionRuntime3D Runtime { get; } =
             new GrayboxProductionRuntime3D();
@@ -82,6 +83,12 @@ namespace WasteCity.Graybox3D.Building
             IFormalProductionOutputModifier modifier)
         {
             outputModifier = modifier;
+        }
+
+        public void ConfigureResearchModifier(
+            IFormalProductionResearchModifier modifier)
+        {
+            researchModifier = modifier;
         }
 
         public void Tick(
@@ -124,7 +131,8 @@ namespace WasteCity.Graybox3D.Building
                     cityCapacity,
                     Runtime.ActiveWarehouseCount,
                     globallyPaused: false,
-                    outputModifier: outputModifier);
+                    outputModifier: outputModifier,
+                    researchModifier: researchModifier);
                 CompleteStepMeasurements(
                     ref completedProductionBatchCount,
                     ref productionActiveProgressSeconds);
@@ -179,7 +187,8 @@ namespace WasteCity.Graybox3D.Building
                     world,
                     cityStorage,
                     globallyPaused: false,
-                    outputModifier: outputModifier);
+                    outputModifier: outputModifier,
+                    researchModifier: researchModifier);
                 CompleteStepMeasurements(
                     ref completedProductionBatchCount,
                     ref productionActiveProgressSeconds);

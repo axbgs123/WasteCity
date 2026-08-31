@@ -85,6 +85,20 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void RichCombatResearchTargetsOnlyItsApprovedTowerFamilies()
+        {
+            Assert.That(RouteTechnologyEffects.TowerDamageMultiplier(
+                "core.building.machine-gun-turret", true, false),
+                Is.EqualTo(1f / .9f).Within(.0001f));
+            Assert.That(RouteTechnologyEffects.TowerDamageMultiplier(
+                "cultivation.building.sword-array-tower", false, true),
+                Is.EqualTo(1.15f));
+            Assert.That(RouteTechnologyEffects.TowerDamageMultiplier(
+                "core.building.laser-tower", true, true),
+                Is.EqualTo(1f));
+        }
+
+        [Test]
         public void FormationAndOrbitalResearchExpandLogisticsRange()
         {
             Assert.That(RouteTechnologyEffects.LogisticsRange(false, false), Is.EqualTo(8));

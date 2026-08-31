@@ -214,6 +214,7 @@ namespace WasteCity.Graybox3D.Building
 
             presentations[definition.Id.Value] = presentation;
             row.Name.text = definition.Name;
+            row.EffectTag.text = EffectTagText(definition);
             row.State.text = StateGlyph(presentation.State);
             row.State.color = StateColor(presentation.State);
             row.Button.image.color = presentation.Selected
@@ -655,10 +656,23 @@ namespace WasteCity.Graybox3D.Building
                 Anchor(state.rectTransform, .55f, 1f);
                 state.rectTransform.offsetMin = new Vector2(0f, 2f);
                 state.rectTransform.offsetMax = new Vector2(-5f, -2f);
+                Text effectTag = CreateLabel(
+                    rect,
+                    "Research.Node." + researchId + ".EffectTag",
+                    EffectTagText(definition),
+                    9);
+                effectTag.alignment = TextAnchor.MiddleLeft;
+                effectTag.color = new Color(.7f, .82f, .86f, .95f);
+                Anchor(effectTag.rectTransform, .16f, .39f);
+                effectTag.rectTransform.offsetMin = definition.Route ==
+                    DevelopmentRoute.Bridge
+                        ? new Vector2(8f, 0f)
+                        : new Vector2(42f, 0f);
+                effectTag.rectTransform.offsetMax = new Vector2(-5f, 0f);
                 AddCostIcons(rect, definition);
                 nodeRows.Add(
                     researchId,
-                    new NodeRow(button, icon, name, state));
+                    new NodeRow(button, icon, name, state, effectTag));
             }
         }
 
@@ -1652,7 +1666,9 @@ namespace WasteCity.Graybox3D.Building
             detailDuration.text = FormatDuration(definition.Duration);
             detailStatus.text = presentation.StatusText;
             detailPrerequisites.text = PrerequisiteStatusLines(definition);
-            detailDescription.text = definition.EffectSummary ?? string.Empty;
+            detailDescription.text = EffectDescription(
+                definition,
+                presentation.State == ResearchNodePresentationState3D.Completed);
 
             if (string.Equals(
                     detailResearchId,
@@ -1700,6 +1716,50 @@ namespace WasteCity.Graybox3D.Building
                 value.alignment = TextAnchor.MiddleLeft;
                 SetNormalizedRect(value.rectTransform, .29f, 0f, .98f, 1f);
             }
+        }
+
+        private static string EffectDescription(
+            ResearchDefinition definition,
+            bool completed)
+        {
+            IReadOnlyList<ResearchEffectLinePresentation3D> lines =
+                ResearchEffectPresentationCatalog3D.Resolve(
+                    definition,
+                    completed);
+            if (lines.Count == 0)
+                return definition.EffectSummary ?? string.Empty;
+
+            var values = new string[lines.Count];
+            for (var index = 0; index < lines.Count; index++)
+            {
+                ResearchEffectLinePresentation3D line = lines[index];
+                values[index] = line.Tag + " " + line.Summary + "\n" +
+                    line.Scope + " · " + line.Stacking + " · " +
+                    line.Activation;
+            }
+            return string.Join("\n", values);
+        }
+
+        private static string EffectTagText(ResearchDefinition definition)
+        {
+            IReadOnlyList<ResearchEffectDefinition> effects =
+                ResearchEffectCatalog.ForResearch(definition.Id.Value);
+            bool unlock = effects.Any(value =>
+                value.Kind == ResearchEffectKind.UnlockContent);
+            bool rule = effects.Any(value =>
+                value.Kind == ResearchEffectKind.RuleToggle ||
+                value.Kind == ResearchEffectKind.Risk);
+            bool passive = effects.Any(value =>
+                value.Kind != ResearchEffectKind.UnlockContent &&
+                value.Kind != ResearchEffectKind.RuleToggle &&
+                value.Kind != ResearchEffectKind.Risk);
+            var tags = new List<string>(3);
+            if (unlock) tags.Add("解锁");
+            if (passive) tags.Add("被动");
+            if (rule) tags.Add("规则");
+            return tags.Count == 0
+                ? "[效果]"
+                : "[" + string.Join("+", tags) + "]";
         }
 
         private static string PrerequisiteNames(
@@ -2160,18 +2220,21 @@ namespace WasteCity.Graybox3D.Building
                 Button button,
                 Image icon,
                 Text name,
-                Text state)
+                Text state,
+                Text effectTag)
             {
                 Button = button;
                 Icon = icon;
                 Name = name;
                 State = state;
+                EffectTag = effectTag;
             }
 
             public Button Button { get; }
             public Image Icon { get; }
             public Text Name { get; }
             public Text State { get; }
+            public Text EffectTag { get; }
         }
 
         private sealed class ConnectionRow

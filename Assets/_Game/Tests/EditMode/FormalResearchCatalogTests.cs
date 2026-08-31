@@ -75,7 +75,7 @@ namespace WasteCity.Tests
                 "building:cultivation.building.artifact-workshop",
                 "recipe:cultivation.production.flying-sword"),
             Node(10, "core.research.sword-array", "Cultivation", 2, 2,
-                "PreviewOnly", Req("core.research.spirit-sensing"),
+                "Researchable", Req("core.research.spirit-sensing"),
                 "building:cultivation.building.sword-array-tower"),
             Node(11, "core.research.spirit-gathering", "Cultivation", 2, 2,
                 "Researchable", Req("core.research.spirit-sensing"),

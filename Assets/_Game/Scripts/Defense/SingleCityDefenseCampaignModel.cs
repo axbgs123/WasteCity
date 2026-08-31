@@ -287,6 +287,7 @@ namespace WasteCity.Defense
         private ulong persistenceGeneration;
         private ulong terminalRevision;
         private readonly SingleCityDefenseCampaignDefinition definition;
+        private float warningMultiplier = 1f;
 
         public SingleCityDefenseCampaignModel(float coreX, float coreZ)
             : this(coreX, coreZ, CampaignWaveCatalog.Default)
@@ -315,6 +316,11 @@ namespace WasteCity.Defense
         public event Action<SingleCityDefenseCampaignResult>
             TerminalCommitted;
         public event Action<string, string> EnemyDefeated;
+
+        public void SetWarningMultiplier(float multiplier)
+        {
+            warningMultiplier = Math.Max(1f, multiplier);
+        }
 
         public bool TryInjectReinforcements(
             string stableEventId,
@@ -1373,7 +1379,8 @@ namespace WasteCity.Defense
             }
 
             currentWave = definition.Waves[catalogIndex];
-            warningRemainingSeconds = currentWave.WarningSeconds;
+            warningRemainingSeconds =
+                currentWave.WarningSeconds * warningMultiplier;
             spawnClockSeconds = 0d;
             nextSpawnIndex = 0;
             enemies.Clear();
@@ -1701,7 +1708,8 @@ namespace WasteCity.Defense
                 return Fail("Next enemy ordinal exceeds the wave plan.", out error);
             }
             if (wave != null &&
-                state.WarningRemainingSeconds > wave.WarningSeconds + .0001f)
+                state.WarningRemainingSeconds >
+                    wave.WarningSeconds * warningMultiplier + .0001f)
             {
                 return Fail("Warning clock exceeds the wave definition.", out error);
             }

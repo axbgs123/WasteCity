@@ -137,7 +137,9 @@ namespace WasteCity.Tests
             Assert.That(controllers[0].Snapshot.TutorialWaveTriggerCount,
                 Is.EqualTo(1));
             Assert.That(controllers[0].Snapshot.WarningRemainingSeconds,
-                Is.GreaterThan(0f).And.LessThanOrEqualTo(15f));
+                Is.EqualTo(22.5f).Within(.0001f),
+                "The fixture unlocks all research, so precognitive sense " +
+                "must extend the formal 15-second warning by 50%. ");
             Assert.That(huds[0].WarningVisible, Is.True);
             Assert.That(RequireSceneObject(WarningName).activeInHierarchy,
                 Is.True);
@@ -327,7 +329,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(GrayboxBuildingInteractionState.CatalogOpen));
             yield return TapKey(Key.Escape);
 
-            controller.Tick(20.1f, paused: false);
+            controller.Tick(27.6f, paused: false);
             yield return null;
             Assert.That(controller.Snapshot.Enemies, Is.Not.Empty);
             string enemyId = controller.Snapshot.Enemies[0].StableId;
@@ -469,7 +471,7 @@ namespace WasteCity.Tests
             Assert.That(controller.Snapshot.Towers.Single().PlayerPaused,
                 Is.True);
 
-            controller.Tick(20.1f, paused: false);
+            controller.Tick(27.6f, paused: false);
             yield return null;
             Assert.That(controller.Snapshot.Enemies, Is.Not.Empty);
             string enemyId = controller.Snapshot.Enemies[0].StableId;

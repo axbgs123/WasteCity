@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using WasteCity.Building;
+using WasteCity.Economy;
 using WasteCity.Persistence.ThreeD;
 
 namespace WasteCity.Graybox3D.Building
@@ -8,16 +10,24 @@ namespace WasteCity.Graybox3D.Building
     {
         private sealed class HealthState
         {
-            public HealthState(int current, int maximum, bool destroyed)
+            public HealthState(
+                int current,
+                int maximum,
+                bool destroyed,
+                bool isWall)
             {
                 Current = current;
                 Maximum = maximum;
                 Destroyed = destroyed;
+                IsWall = isWall;
             }
 
             public int Current { get; set; }
             public int Maximum { get; set; }
             public bool Destroyed { get; set; }
+            public bool IsWall { get; set; }
+            public float TissueRemainder { get; set; }
+            public float CarapaceClock { get; set; }
         }
 
         private readonly SortedDictionary<string, HealthState> states =
@@ -35,6 +45,15 @@ namespace WasteCity.Graybox3D.Building
         public void Synchronize(
             IReadOnlyList<GrayboxBuildingInstance3D> instances,
             bool alloyArmorCompleted)
+        {
+            Synchronize(
+                instances,
+                alloyArmorCompleted ? 1.3f : 1f);
+        }
+
+        public void Synchronize(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            float buildingHealthMultiplier)
         {
             if (instances == null) return;
             synchronizedIds.Clear();
@@ -67,18 +86,22 @@ namespace WasteCity.Graybox3D.Building
                     continue;
                 }
 
-                int maximum = WasteCity.Research.RouteTechnologyEffects
-                    .BuildingMaximumHealth(
-                        instance.Placement.Definition.MaximumHealth,
-                        alloyArmorCompleted);
+                int maximum = ResolveMaximumHealth(
+                    instance.Placement.Definition.MaximumHealth,
+                    buildingHealthMultiplier);
                 if (!states.TryGetValue(
                         instance.StableInstanceId,
                         out HealthState existing))
                 {
                     states.Add(instance.StableInstanceId,
-                        new HealthState(maximum, maximum, destroyed: false));
+                        new HealthState(
+                            maximum,
+                            maximum,
+                            false,
+                            IsWall(instance)));
                     continue;
                 }
+                existing.IsWall = IsWall(instance);
                 if (existing.Maximum == maximum) continue;
                 int missing = Math.Max(0, existing.Maximum - existing.Current);
                 existing.Maximum = maximum;
@@ -168,6 +191,55 @@ namespace WasteCity.Graybox3D.Building
             return healed;
         }
 
+        public bool TryAdvanceRegeneration(
+            string stableInstanceId,
+            float deltaSeconds,
+            bool tissueRegeneration,
+            bool carapaceGrowth,
+            ResourceInventory inventory,
+            out int healed)
+        {
+            healed = 0;
+            if (string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !states.TryGetValue(stableInstanceId, out HealthState state))
+            {
+                return false;
+            }
+            healed = AdvanceRegeneration(
+                state,
+                deltaSeconds,
+                tissueRegeneration,
+                carapaceGrowth,
+                inventory,
+                cityStorage: null);
+            return true;
+        }
+
+        public int AdvanceRegeneration(
+            float deltaSeconds,
+            bool tissueRegeneration,
+            bool carapaceGrowth,
+            CityResourceStorageModel cityStorage)
+        {
+            if (deltaSeconds <= 0f ||
+                !tissueRegeneration && !carapaceGrowth)
+            {
+                return 0;
+            }
+            var healed = 0;
+            foreach (KeyValuePair<string, HealthState> item in states)
+            {
+                healed += AdvanceRegeneration(
+                    item.Value,
+                    deltaSeconds,
+                    tissueRegeneration,
+                    carapaceGrowth,
+                    inventory: null,
+                    cityStorage: cityStorage);
+            }
+            return healed;
+        }
+
         public FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] Capture()
         {
             var result =
@@ -190,6 +262,32 @@ namespace WasteCity.Graybox3D.Building
         public bool TryRestore(
             FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] restored,
             IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            out string error)
+        {
+            return TryRestore(
+                restored,
+                instances,
+                alloyArmorCompleted: false,
+                out error);
+        }
+
+        public bool TryRestore(
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] restored,
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            bool alloyArmorCompleted,
+            out string error)
+        {
+            return TryRestore(
+                restored,
+                instances,
+                alloyArmorCompleted ? 1.3f : 1f,
+                out error);
+        }
+
+        public bool TryRestore(
+            FormalThreeDDefenseCampaignBuildingHealthStateSaveData[] restored,
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            float buildingHealthMultiplier,
             out string error)
         {
             if (restored == null || instances == null)
@@ -231,7 +329,9 @@ namespace WasteCity.Graybox3D.Building
                     return false;
                 }
 
-                int maximum = instance.Placement.Definition.MaximumHealth;
+                int maximum = ResolveMaximumHealth(
+                    instance.Placement.Definition.MaximumHealth,
+                    buildingHealthMultiplier);
                 if (entry.currentHealth < 0 ||
                     entry.currentHealth > maximum ||
                     entry.isDestroyed != (entry.currentHealth == 0))
@@ -244,7 +344,8 @@ namespace WasteCity.Graybox3D.Building
                     new HealthState(
                         entry.currentHealth,
                         maximum,
-                        entry.isDestroyed));
+                        entry.isDestroyed,
+                        IsWall(instance)));
             }
 
             states.Clear();
@@ -252,6 +353,17 @@ namespace WasteCity.Graybox3D.Building
                 states.Add(item.Key, item.Value);
             error = string.Empty;
             return true;
+        }
+
+        private static int ResolveMaximumHealth(
+            int baseHealth,
+            float multiplier)
+        {
+            return Math.Max(
+                1,
+                (int)Math.Round(
+                    Math.Max(1, baseHealth) * Math.Max(1f, multiplier),
+                    MidpointRounding.AwayFromZero));
         }
 
         private static bool CanEnterCombat(GrayboxBuildingInstance3D instance)
@@ -262,6 +374,77 @@ namespace WasteCity.Graybox3D.Building
                 instance.State == GrayboxBuildingInstanceState.Completed &&
                 instance.IsPlayerOwned &&
                 !instance.IsEvacuationLocked;
+        }
+
+        private static bool IsWall(GrayboxBuildingInstance3D instance)
+        {
+            return string.Equals(
+                instance?.Placement?.Definition?.Id.Value,
+                BuildingCatalog.Wall.Id.Value,
+                StringComparison.Ordinal);
+        }
+
+        private static int AdvanceRegeneration(
+            HealthState state,
+            float deltaSeconds,
+            bool tissueRegeneration,
+            bool carapaceGrowth,
+            ResourceInventory inventory,
+            CityResourceStorageModel cityStorage)
+        {
+            if (state == null || state.Destroyed ||
+                state.Current >= state.Maximum)
+            {
+                return 0;
+            }
+
+            float delta = Math.Max(0f, deltaSeconds);
+            var healed = 0;
+            if (tissueRegeneration)
+            {
+                state.TissueRemainder += delta;
+                int amount = (int)Math.Floor(state.TissueRemainder);
+                if (amount > 0)
+                {
+                    healed += Heal(state, amount);
+                    state.TissueRemainder -= amount;
+                }
+            }
+
+            if (!state.IsWall || !carapaceGrowth ||
+                state.Current >= state.Maximum)
+            {
+                return healed;
+            }
+
+            state.CarapaceClock += delta;
+            while (state.CarapaceClock + .0001f >= 5f &&
+                   state.Current < state.Maximum)
+            {
+                bool spent = inventory != null
+                    ? inventory.TrySpend(ResourceIds.Biomass, 1)
+                    : cityStorage != null && cityStorage.TrySpendFromNetwork(
+                        ResourceIds.Biomass, 1);
+                if (!spent)
+                {
+                    state.CarapaceClock = 5f;
+                    break;
+                }
+                state.CarapaceClock = Math.Max(
+                    0f,
+                    state.CarapaceClock - 5f);
+                healed += Heal(state, 10);
+            }
+            return healed;
+        }
+
+        private static int Heal(HealthState state, int amount)
+        {
+            int accepted = Math.Min(
+                Math.Max(0, amount),
+                state.Maximum - state.Current);
+            state.Current += accepted;
+            return accepted;
         }
     }
 }

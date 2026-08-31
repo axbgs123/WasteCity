@@ -7,7 +7,10 @@ namespace WasteCity.Research
 {
     public sealed class FormalResearchRuntime
     {
-        private const float ThoughtAccelerationMultiplier = 1.25f;
+        private static readonly float ThoughtAccelerationMultiplier =
+            ResearchEffectResolver.Resolve(new[]
+                { ResearchCatalog.ThoughtAccelerationId })
+                .ResearchSpeedMultiplier;
         private const float CancelRefundRatio = .8f;
 
         private readonly Func<string, ResearchDefinition> resolver;

@@ -346,7 +346,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsController.RequiredTestFiles);
             CollectionAssert.AreEqual(new[]
-                { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021" },
+                { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021", "IDEA-0026" },
                 operationsController.RequirementIds);
 
             ProjectReuseEntry operationsView = FindReuse(catalog,
@@ -362,6 +362,8 @@ namespace WasteCity.Tests
                 "GrayboxResearchTreeViewportInput3D",
                 "GrayboxResearchSearchFocus3D",
                 "ResearchTreeConnectionGraphic3D",
+                "ResearchEffectLinePresentation3D",
+                "ResearchEffectPresentationCatalog3D",
             }, operationsView.TypeNames);
             CollectionAssert.AreEqual(new[]
             {
@@ -370,6 +372,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs",
                 "Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs",
+                "Assets/_Game/Scripts/Graybox3D/Building/ResearchEffectPresentationCatalog3D.cs",
             }, operationsView.AssetPaths);
             CollectionAssert.AreEqual(new[]
             {
@@ -377,6 +380,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
                 "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
                 "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
+                "Assets/_Game/Tests/EditMode/ResearchEffectPresentationTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
             }, operationsView.RequiredTestFiles);
             CollectionAssert.AreEqual(new[]
@@ -387,6 +391,7 @@ namespace WasteCity.Tests
                 "IDEA-0018",
                 "IDEA-0021",
                 "IDEA-0024",
+                "IDEA-0026",
             },
                 operationsView.RequirementIds);
 
@@ -1310,7 +1315,7 @@ namespace WasteCity.Tests
                 "graybox-operations-controller-3d");
             CollectionAssert.AreEqual(
                 new[]
-                    { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021" },
+                    { "IDEA-0011", "IDEA-0012", "IDEA-0016", "IDEA-0021", "IDEA-0026" },
                 operationsController.RequirementIds);
             CollectionAssert.Contains(
                 operationsController.RequiredTestFiles,
@@ -1327,6 +1332,7 @@ namespace WasteCity.Tests
                     "IDEA-0018",
                     "IDEA-0021",
                     "IDEA-0024",
+                    "IDEA-0026",
                 },
                 operationsView.RequirementIds);
             CollectionAssert.Contains(
@@ -1388,6 +1394,47 @@ namespace WasteCity.Tests
             }, demoRuntime.RequiredTestFiles);
             CollectionAssert.AreEqual(new[] { "IDEA-0011", "IDEA-0015" },
                 demoRuntime.RequirementIds);
+        }
+
+        [Test]
+        public void CommittedCatalog_MapsIdea0026ResearchEffectsAndPresentation()
+        {
+            ProjectQualityCatalog catalog =
+                ProjectQualityCatalogLoader.LoadFromFile(CatalogPath());
+            ProjectReuseEntry effects = FindReuse(
+                catalog,
+                "research-effect-catalog");
+            CollectionAssert.Contains(
+                effects.TypeNames,
+                "ResearchEffectResolver");
+            CollectionAssert.Contains(
+                effects.TypeNames,
+                "ResearchKillRewardResolver");
+            CollectionAssert.Contains(
+                effects.AssetPaths,
+                "Assets/_Game/Scripts/Research/ResearchEffectCatalog.cs");
+            CollectionAssert.Contains(
+                effects.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/ResearchRuntimeEffectIntegrationTests.cs");
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0026" },
+                effects.RequirementIds);
+
+            ProjectReuseEntry presentation = FindReuse(
+                catalog,
+                "research-effect-presentation-3d");
+            CollectionAssert.Contains(
+                presentation.TypeNames,
+                "ResearchEffectPresentationCatalog3D");
+            CollectionAssert.Contains(
+                presentation.AssetPaths,
+                "Assets/_Game/Scripts/Graybox3D/Building/ResearchEffectPresentationCatalog3D.cs");
+            CollectionAssert.Contains(
+                presentation.RequiredTestFiles,
+                "Assets/_Game/Tests/EditMode/ResearchEffectPresentationTests.cs");
+            CollectionAssert.AreEqual(
+                new[] { "IDEA-0026" },
+                presentation.RequirementIds);
         }
 
         [Test]

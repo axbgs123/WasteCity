@@ -6,6 +6,8 @@ using UnityEngine.UI;
 using WasteCity.Combat;
 using WasteCity.Core;
 using WasteCity.Defense;
+using WasteCity.Economy;
+using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -189,6 +191,9 @@ namespace WasteCity.Graybox3D.Building
                     HandleCampaignTerminalCommitted;
             }
             runtime?.DetachPresentationRecovery();
+            if (runtime != null)
+                runtime.EnemyDefeatedForRewards -=
+                    HandleEnemyDefeatedForRewards;
             DisposeSettlementPresentation();
             runtime = null;
             campaign = null;
@@ -310,6 +315,15 @@ namespace WasteCity.Graybox3D.Building
                     ruleDeltaSeconds,
                     effectivePaused,
                     session.CityStorage);
+                ResearchEffectSnapshot effects = production?.ResearchEffects;
+                int regenerated = buildingHealth.AdvanceRegeneration(
+                    ruleDeltaSeconds,
+                    effects?.TissueRegeneration ?? session.IsResearchCompleted(
+                        "core.research.tissue-regeneration"),
+                    effects?.CarapaceGrowth ?? session.IsResearchCompleted(
+                        "core.research.carapace-growth"),
+                    session.CityStorage);
+                if (regenerated > 0) InvalidatePresentation();
                 snapshot = runtime.Snapshot;
                 SynchronizeFormalSpeedRuntime();
                 TryPresentTerminalSettlement();
@@ -469,6 +483,9 @@ namespace WasteCity.Graybox3D.Building
                     HandleCampaignTerminalCommitted;
             }
             runtime?.DetachPresentationRecovery();
+            if (runtime != null)
+                runtime.EnemyDefeatedForRewards -=
+                    HandleEnemyDefeatedForRewards;
             DisposeSettlementPresentation();
             session = null;
             city = null;
@@ -513,6 +530,8 @@ namespace WasteCity.Graybox3D.Building
                 coreZ,
                 spawnX,
                 coreZ);
+            runtime.EnemyDefeatedForRewards +=
+                HandleEnemyDefeatedForRewards;
             if (production == null) return;
 
             campaign = new SingleCityDefenseCampaignModel(coreX, coreZ);
@@ -749,17 +768,28 @@ namespace WasteCity.Graybox3D.Building
             }
             EnsureRuntime(logicalCoreX, logicalCoreZ);
             runtime.SetCorePosition(logicalCoreX, logicalCoreZ);
+            ResearchEffectSnapshot researchEffects =
+                production?.ResearchEffects;
+            if (researchEffects == null)
+            {
+                var completedResearchIds = new List<string>();
+                foreach (ResearchDefinition definition in ResearchCatalog.All)
+                {
+                    if (session.IsResearchCompleted(definition.Id.Value))
+                        completedResearchIds.Add(definition.Id.Value);
+                }
+                researchEffects = ResearchEffectResolver.Resolve(
+                    completedResearchIds);
+            }
             runtime.Synchronize(
                 session.Instances,
                 city.Mode,
                 cityX,
                 cityY,
-                session.GroundBuildRadius,
+                researchEffects.ResolveLogisticsRange(
+                    session.GroundBuildRadius),
                 allowCampaignStart: !IsPersistencePaused,
-                swordRidingCompleted: session.IsResearchCompleted(
-                    "core.research.sword-riding"),
-                alloyArmorCompleted: session.IsResearchCompleted(
-                    "core.research.alloy-armor"));
+                researchEffects: researchEffects);
             error = string.Empty;
             return true;
         }
@@ -792,6 +822,35 @@ namespace WasteCity.Graybox3D.Building
             logicalX = cityX + cityOffset.x;
             logicalZ = cityY + cityOffset.z;
             return true;
+        }
+
+        private void HandleEnemyDefeatedForRewards(
+            string stableEnemyId,
+            string enemyDefinitionId)
+        {
+            EnemyDefinition definition = null;
+            for (var index = 0; index < EnemyCatalog.All.Length; index++)
+            {
+                if (string.Equals(
+                        EnemyCatalog.All[index].Id.Value,
+                        enemyDefinitionId,
+                        StringComparison.Ordinal))
+                {
+                    definition = EnemyCatalog.All[index];
+                    break;
+                }
+            }
+            if (definition == null || session?.CityStorage == null) return;
+            ResearchEffectSnapshot effects = production?.ResearchEffects ??
+                ResearchEffectResolver.Resolve(session.IsResearchCompleted(
+                    "core.research.metabolic-acceleration")
+                        ? new[] { "core.research.metabolic-acceleration" }
+                        : Array.Empty<string>());
+            int amount = ResearchKillRewardResolver.ResolveBiomassDrop(
+                definition.BiomassDrop,
+                qualityMultiplier: 1f,
+                effects);
+            session.CityStorage.AddToNetwork(ResourceIds.Biomass, amount);
         }
 
         private void ApplyPresentation(bool force = false)

@@ -1133,6 +1133,8 @@ namespace WasteCity.Tests
                 Is.EqualTo(GrayboxDeveloperCommandCode3D.Success));
             Assert.That(unlocked.AffectedCount, Is.EqualTo(1));
             Assert.That(unlocked.Message, Does.Contain("已解锁科技：灵火淬炼"));
+            Assert.That(unlocked.Message,
+                Does.Contain("已生效：灵铁淬炼效率"));
             Assert.That(fixture.Session.IsResearchCompleted(
                 "core.research.spirit-sensing"), Is.True);
 

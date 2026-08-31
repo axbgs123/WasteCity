@@ -7,6 +7,7 @@ using WasteCity.Combat;
 using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -729,6 +730,8 @@ namespace WasteCity.Graybox3D.Building
         private Func<string, bool> campaignPresentationRecovery;
         private ulong settledAttackEventSequence;
         private ulong settlementSequence;
+        private float warningMultiplier = 1f;
+        private float buildingHealthMultiplier = 1f;
 
         public GrayboxDefenseRuntime3D(
             float coreX,
@@ -814,6 +817,7 @@ namespace WasteCity.Graybox3D.Building
         public event Action<string, SingleCityDefenseCampaignResult>
             PressureCampaignTerminalCommitted;
         public event Action<string> CrystalBroodmotherDefeated;
+        public event Action<string, string> EnemyDefeatedForRewards;
 
         private SingleCityDefenseCampaignModel ActiveCampaign =>
             activePressureCampaign != null && !activePressureCampaign.IsTerminal
@@ -834,6 +838,7 @@ namespace WasteCity.Graybox3D.Building
             }
             var pressure = new SingleCityDefenseCampaignModel(
                 requestedCoreX, requestedCoreZ, definition);
+            pressure.SetWarningMultiplier(warningMultiplier);
             if (!pressure.TryStartAfterExternalWarning())
             {
                 error = "压力遭遇定义无法启动";
@@ -878,6 +883,7 @@ namespace WasteCity.Graybox3D.Building
                 requestedCoreX,
                 requestedCoreZ,
                 definition);
+            candidate.SetWarningMultiplier(warningMultiplier);
             if (!candidate.TryPrepareRestore(
                     state,
                     out SingleCityDefenseCampaignRestorePlan plan,
@@ -890,6 +896,7 @@ namespace WasteCity.Graybox3D.Building
             activePressureCampaign = candidate;
             activePressureEncounterId = definition.Id;
             candidate.TerminalCommitted += HandlePressureTerminal;
+            candidate.EnemyDefeated += HandlePressureEnemyDefeated;
             campaignSnapshotDirty = true;
             snapshotDirty = true;
             error = string.Empty;
@@ -901,6 +908,8 @@ namespace WasteCity.Graybox3D.Building
             if (activePressureCampaign == null) return false;
             activePressureCampaign.TerminalCommitted -=
                 HandlePressureTerminal;
+            activePressureCampaign.EnemyDefeated -=
+                HandlePressureEnemyDefeated;
             activePressureCampaign = null;
             activePressureEncounterId = null;
             campaignSnapshotDirty = true;
@@ -932,8 +941,12 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingHealthRuntime3D buildingHealth,
             GrayboxCombatDestructionCoordinator3D destructionCoordinator)
         {
+            if (this.campaign != null)
+                this.campaign.EnemyDefeated -= HandleCampaignEnemyDefeated;
             this.campaign = campaign ??
                 throw new ArgumentNullException(nameof(campaign));
+            this.campaign.SetWarningMultiplier(warningMultiplier);
+            this.campaign.EnemyDefeated += HandleCampaignEnemyDefeated;
             campaignBuildingHealth = buildingHealth ??
                 throw new ArgumentNullException(nameof(buildingHealth));
             campaignDestructionCoordinator = destructionCoordinator ??
@@ -1135,6 +1148,7 @@ namespace WasteCity.Graybox3D.Building
             if (!healthValidator.TryRestore(
                     health,
                     instances,
+                    buildingHealthMultiplier,
                     out error) ||
                 !campaign.TryPrepareRestore(
                     snapshot.Campaign,
@@ -1178,6 +1192,7 @@ namespace WasteCity.Graybox3D.Building
             if (!campaignBuildingHealth.TryRestore(
                     plan.Health,
                     plan.Instances,
+                    buildingHealthMultiplier,
                     out error))
             {
                 return false;
@@ -1472,7 +1487,10 @@ namespace WasteCity.Graybox3D.Building
                 groundRadius,
                 allowCampaignStart: true,
                 swordRidingCompleted: false,
-                alloyArmorCompleted: false);
+                alloyArmorCompleted: false,
+                automatedDefenseCompleted: false,
+                swordArrayCompleted: false,
+                precognitiveSenseCompleted: false);
         }
 
         public void Synchronize(
@@ -1483,7 +1501,40 @@ namespace WasteCity.Graybox3D.Building
             int groundRadius,
             bool allowCampaignStart = true,
             bool swordRidingCompleted = false,
-            bool alloyArmorCompleted = false)
+            bool alloyArmorCompleted = false,
+            bool automatedDefenseCompleted = false,
+            bool swordArrayCompleted = false,
+            bool precognitiveSenseCompleted = false)
+        {
+            var completed = new List<string>(5);
+            if (swordRidingCompleted)
+                completed.Add("core.research.sword-riding");
+            if (alloyArmorCompleted)
+                completed.Add("core.research.alloy-armor");
+            if (automatedDefenseCompleted)
+                completed.Add(ResearchCatalog.AutomatedDefenseId);
+            if (swordArrayCompleted)
+                completed.Add("core.research.sword-array");
+            if (precognitiveSenseCompleted)
+                completed.Add("core.research.precognitive-sense");
+            Synchronize(
+                instances,
+                cityMode,
+                cityX,
+                cityY,
+                groundRadius,
+                allowCampaignStart,
+                ResearchEffectResolver.Resolve(completed));
+        }
+
+        public void Synchronize(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            bool allowCampaignStart,
+            ResearchEffectSnapshot researchEffects)
         {
             if (campaign != null)
             {
@@ -1494,8 +1545,7 @@ namespace WasteCity.Graybox3D.Building
                     cityY,
                     groundRadius,
                     allowCampaignStart,
-                    swordRidingCompleted,
-                    alloyArmorCompleted);
+                    researchEffects);
                 return;
             }
 
@@ -1800,10 +1850,16 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius,
             bool allowCampaignStart,
-            bool swordRidingCompleted,
-            bool alloyArmorCompleted)
+            ResearchEffectSnapshot researchEffects)
         {
+            researchEffects = researchEffects ??
+                ResearchEffectResolver.Resolve(Array.Empty<string>());
             persistenceGeneration++;
+            warningMultiplier = researchEffects.WarningDurationMultiplier;
+            buildingHealthMultiplier =
+                researchEffects.BuildingHealthMultiplier;
+            campaign.SetWarningMultiplier(warningMultiplier);
+            activePressureCampaign?.SetWarningMultiplier(warningMultiplier);
             bool snapshotChanged = false;
             orderedInstances.Clear();
             campaignTowers.Clear();
@@ -1814,7 +1870,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 campaignBuildingHealth.Synchronize(
                     instances,
-                    alloyArmorCompleted);
+                    buildingHealthMultiplier);
                 for (var index = 0; index < instances.Count; index++)
                 {
                     if (instances[index] != null)
@@ -1839,10 +1895,10 @@ namespace WasteCity.Graybox3D.Building
 
                 string currentBuildingId =
                     instance.Placement.Definition.Id.Value;
-                float rangeMultiplier = WasteCity.Research
-                    .RouteTechnologyEffects.TowerRangeMultiplier(
-                        currentBuildingId,
-                        swordRidingCompleted);
+                float rangeMultiplier = researchEffects
+                    .ResolveTowerRangeMultiplier(currentBuildingId);
+                float damageMultiplier = researchEffects
+                    .ResolveTowerDamageMultiplier(currentBuildingId);
                 if (!campaignTowerById.TryGetValue(
                         instance.StableInstanceId,
                         out SingleCityDefenseTowerCombatModel tower))
@@ -1853,6 +1909,7 @@ namespace WasteCity.Graybox3D.Building
                         instance.Placement.X,
                         instance.Placement.Y);
                     tower.SetRangeMultiplier(rangeMultiplier);
+                    tower.SetDamageMultiplier(damageMultiplier);
                     campaignTowerById.Add(instance.StableInstanceId, tower);
                     campaignStatusById[instance.StableInstanceId] =
                         GrayboxDefenseTowerStatus3D.NoTarget;
@@ -1866,12 +1923,14 @@ namespace WasteCity.Graybox3D.Building
                     tower = tower.RebuildForBuilding(
                         currentBuildingId,
                         rangeMultiplier);
+                    tower.SetDamageMultiplier(damageMultiplier);
                     campaignTowerById[instance.StableInstanceId] = tower;
                     snapshotChanged = true;
                 }
                 else
                 {
                     tower.SetRangeMultiplier(rangeMultiplier);
+                    tower.SetDamageMultiplier(damageMultiplier);
                 }
 
                 bool canRun =
@@ -2056,6 +2115,9 @@ namespace WasteCity.Graybox3D.Building
             string stableEnemyId,
             string enemyDefinitionId)
         {
+            EnemyDefeatedForRewards?.Invoke(
+                stableEnemyId,
+                enemyDefinitionId);
             if (activePressureCampaign == null ||
                 activeBroodmotherEncounter == null ||
                 !string.Equals(enemyDefinitionId,
@@ -2069,6 +2131,15 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < commands.Count; index++)
                 if (commands[index].Kind == CrystalBroodmotherCommandKind.Defeated)
                     CrystalBroodmotherDefeated?.Invoke(stableEnemyId);
+        }
+
+        private void HandleCampaignEnemyDefeated(
+            string stableEnemyId,
+            string enemyDefinitionId)
+        {
+            EnemyDefeatedForRewards?.Invoke(
+                stableEnemyId,
+                enemyDefinitionId);
         }
 
         private static void ApplyBroodmotherCommands(

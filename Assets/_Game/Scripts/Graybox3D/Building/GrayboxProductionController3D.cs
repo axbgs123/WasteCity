@@ -1,6 +1,7 @@
 using System;
 using Unity.Profiling;
 using UnityEngine;
+using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -89,6 +90,10 @@ namespace WasteCity.Graybox3D.Building
 
         private Func<bool> persistencePauseSource;
         private Func<float> civilizationEfficiencySource;
+        private ResearchModel researchEffectSource;
+        private int researchEffectCompletedCount = -1;
+        private ResearchEffectSnapshot researchEffects =
+            ResearchEffectResolver.Resolve(Array.Empty<string>());
 
         public GrayboxProductionClock3D Clock { get; } =
             new GrayboxProductionClock3D();
@@ -99,6 +104,7 @@ namespace WasteCity.Graybox3D.Building
             persistencePauseSource != null && persistencePauseSource();
         public bool IsConfigured =>
             session != null && city != null && worldView != null;
+        public ResearchEffectSnapshot ResearchEffects => researchEffects;
 
         public void ConfigurePersistencePauseSource(Func<bool> pauseSource)
         {
@@ -122,10 +128,12 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentNullException(nameof(city));
             this.worldView = worldView ??
                 throw new ArgumentNullException(nameof(worldView));
+            RefreshResearchModifier(force: true);
         }
 
         public bool TryRebuildAfterPersistenceRestore(out string error)
         {
+            RefreshResearchModifier(force: true);
             if (!IsConfigured ||
                 session.Inventory == null ||
                 session.CityStorage == null ||
@@ -148,7 +156,7 @@ namespace WasteCity.Graybox3D.Building
                 city.Mode,
                 cityX,
                 cityY,
-                session.GroundBuildRadius,
+                EffectiveLogisticsRadius(),
                 worldView.Model,
                 session.CityStorage);
             Clock.Runtime.Synchronize(
@@ -156,7 +164,7 @@ namespace WasteCity.Graybox3D.Building
                 city.Mode,
                 cityX,
                 cityY,
-                session.GroundBuildRadius,
+                EffectiveLogisticsRadius(),
                 session.CityStorage);
             Clock.PublishObservabilityIfChanged();
             error = string.Empty;
@@ -167,6 +175,7 @@ namespace WasteCity.Graybox3D.Building
         {
             using (TickMarker.Auto())
             {
+                RefreshResearchModifier(force: false);
                 if (!IsConfigured ||
                     session.Inventory == null ||
                     session.CityStorage == null ||
@@ -190,7 +199,7 @@ namespace WasteCity.Graybox3D.Building
                     city.Mode,
                     cityX,
                     cityY,
-                    session.GroundBuildRadius,
+                    EffectiveLogisticsRadius(),
                     worldView.Model,
                     session.CityStorage);
                 return true;
@@ -205,6 +214,33 @@ namespace WasteCity.Graybox3D.Building
             Tick(
                 ruleDeltaSeconds,
                 paused: ruleDeltaSeconds <= 0f);
+        }
+
+        private void RefreshResearchModifier(bool force)
+        {
+            ResearchModel current = session == null
+                ? null
+                : session.Research;
+            int completedCount = current?.CompletedCount ?? 0;
+            if (!force && ReferenceEquals(current, researchEffectSource) &&
+                completedCount == researchEffectCompletedCount)
+            {
+                return;
+            }
+
+            researchEffectSource = current;
+            researchEffectCompletedCount = completedCount;
+            researchEffects = ResearchEffectResolver.Resolve(current == null
+                ? Array.Empty<string>()
+                : current.CaptureCompleted());
+            Clock.ConfigureResearchModifier(
+                new FormalProductionResearchModifierAdapter(researchEffects));
+        }
+
+        private int EffectiveLogisticsRadius()
+        {
+            return researchEffects.ResolveLogisticsRange(
+                session?.GroundBuildRadius ?? 0);
         }
     }
 }

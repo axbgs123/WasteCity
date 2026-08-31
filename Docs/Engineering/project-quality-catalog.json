@@ -473,6 +473,11 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveEconomyTests.cs",
         "Assets/_Game/Tests/EditMode/PopulationAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectProductionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchProductionEffectIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchRuntimeEffectIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/RouteTechnologyEffectTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
         "Assets/_Game/Tests/EditMode/FormalAttentionCatalogTests.cs",
@@ -519,12 +524,14 @@
         "IDEA-0015",
         "IDEA-0016",
         "IDEA-0020",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0026"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
-        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md"
+        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
+        "Docs/superpowers/specs/2026-08-31-idea-0026-rich-research-effects-design.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -1228,7 +1235,7 @@
       "FeatureGroupId": "building-construction-evacuation",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "在文明 Lv.2、对应研究完成且城市网络材料充足时，把机枪塔原位升级为重机枪塔，或把剑阵塔原位升级为御剑台；Host 把缓存的可用性投影接到 Defense 选中建筑 HUD，真实按钮只发布稳定实例升级命令并显示反馈。",
-      "BoundarySummary": "Controller/Session 保持稳定实例、占格、站点、朝向、完成状态和建筑数量，并在失败时零写或完整回滚；HUD 已接且不重算规则。`core.research.alloy-armor` 与 `core.research.sword-riding` 仍是 PreviewOnly，所以开发夹具可验证按钮，但自然玩家研究入口尚未开放。",
+      "BoundarySummary": "Controller/Session 保持稳定实例、占格、站点、朝向、完成状态和建筑数量，并在失败时零写或完整回滚；HUD 已接且不重算规则。两项科技在基础目录仍为 PreviewOnly，仅由文明 Lv.2 白名单投影自然开放；不得在 Lv.1 提前开放。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/BuildingUpgradeTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildingUpgradeControllerTests.cs",
@@ -1706,7 +1713,8 @@
         "IDEA-0011",
         "IDEA-0012",
         "IDEA-0016",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0026"
       ]
     },
     {
@@ -1717,24 +1725,28 @@
         "GrayboxResearchTreeView3D",
         "GrayboxResearchTreeViewportInput3D",
         "GrayboxResearchSearchFocus3D",
-        "ResearchTreeConnectionGraphic3D"
+        "ResearchTreeConnectionGraphic3D",
+        "ResearchEffectLinePresentation3D",
+        "ResearchEffectPresentationCatalog3D"
       ],
       "AssetPaths": [
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/ResearchTreeConnectionGraphic3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/ResearchEffectPresentationCatalog3D.cs"
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "显示当前 3D 场景的资源栏、账本、背包、33 条配方、仓库和生产通道，并以 reference-fidelity v3 的 1920×1080 蚀刻工业全屏背景、单排顶部工具栏、四路线细框节点、真实科技与材料图标、默认全树概览和底部六段详情舱呈现正式 44 节点科技树。",
-      "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；视图消费结构化研究 DTO 与共享图标目录，不持有库存、队列、研究或解锁真值，不从中文文案推断状态，也不自行扣资源、推进时间或增加 schema 字段。",
+      "UseSummary": "让正式科技目录、统一效果 DTO 和共享图标目录共同驱动树与底部详情，不在 View 复制数值或研究状态。",
+      "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；不持有库存、队列、研究或解锁真值，不从中文文案推断状态，也不自行扣资源、推进时间或增加 schema 字段；未接线效果必须显示为仅预览。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxVisualAndWorldTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeProjection3DTests.cs",
         "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
       ],
       "RequirementIds": [
@@ -1743,7 +1755,8 @@
         "IDEA-0016",
         "IDEA-0018",
         "IDEA-0021",
-        "IDEA-0024"
+        "IDEA-0024",
+        "IDEA-0026"
       ]
     },
     {
@@ -2867,11 +2880,12 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含已开放的 core.research.legacy-analysis，并通过同一文明可用性投影在 Lv.2 自然开放合金装甲/御剑术；同时提交稳定 ID 研究启动、倍率推进、暂停、80% 原子退款与正式目录恢复。",
+      "UseSummary": "组合统一 ResearchModel 与正式 44 节点 ResearchCatalog，包含 core.research.legacy-analysis；运行时只管理研究生命周期，科技效果交给独立 ResearchEffectCatalog 从完成集合派生。",
       "BoundarySummary": "不持有研究站、城市模式、暂停或库存真值，不处理 Unity 输入、科技树布局、文件 IO、关注度或效果表现；文明投影只允许两个白名单 ID，不得顺便开放其余 PreviewOnly。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalResearchCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/FormalResearchRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalResearchSaveAdapterTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
       ],
@@ -2879,7 +2893,58 @@
         "IDEA-0015",
         "IDEA-0016",
         "IDEA-0020",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0026"
+      ]
+    },
+    {
+      "Id": "research-effect-catalog",
+      "ChineseName": "正式科技复合效果目录",
+      "TypeNames": [
+        "ResearchEffectDefinition",
+        "ResearchEffectCatalog",
+        "ResearchEffectSnapshot",
+        "ResearchEffectResolver",
+        "ResearchKillRewardResolver",
+        "FormalProductionResearchModifierAdapter"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Research/ResearchEffectCatalog.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "按 44 个正式科技稳定 ID 提供类型化复合效果、前后数值、作用范围、叠加规则与 Executable/Preview 接线状态，并从已完成科技集合确定性派生生产、研究、物流、耐久、预警、再生和击杀回收快照。",
+      "BoundarySummary": "不持有完成科技真值、不保存 applied 标志、不处理 UI 或输入；临时特质、护盾和跨帧减益保持 Preview。整数吞吐增益通过周期缩短表达，schema 保持 34。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResearchEffectCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchProductionEffectIntegrationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchEffectProductionRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchRuntimeEffectIntegrationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0026"
+      ]
+    },
+    {
+      "Id": "research-effect-presentation-3d",
+      "ChineseName": "正式科技复合效果展示投影",
+      "TypeNames": [
+        "ResearchEffectLinePresentation3D",
+        "ResearchEffectPresentationCatalog3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/ResearchEffectPresentationCatalog3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "把统一科技效果目录投影为科技树和开发修改器可读的解锁/被动标签、前后值、范围、叠加与已生效/研究后生效/仅预览状态。",
+      "BoundarySummary": "只格式化正式效果 DTO，不复制数值、不解析中文说明为玩法真值；未接线或 Preview activation 效果不得显示为已生效，已由管理台或文明门完成的可执行节点按 completed 真值显示。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/ResearchEffectPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/ResearchTreeUiContractTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0026"
       ]
     },
     {

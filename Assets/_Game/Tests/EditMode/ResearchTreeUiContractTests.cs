@@ -337,6 +337,31 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0026_SelectedNodeFooterUsesStructuredEffects()
+        {
+            GrayboxOperationsView3D view = CreateView(out Transform root);
+            ResearchDefinition definition = ResearchCatalog.Find(
+                ResearchCatalog.ThoughtAccelerationId);
+
+            view.SetResearchNode(
+                definition,
+                "可研究",
+                selected: true);
+
+            Text description = Required(
+                    root,
+                    "Research.Detail.Description")
+                .GetComponent<Text>();
+            Assert.That(description.text, Does.Contain("[被动]"));
+            Assert.That(description.text, Does.Contain("100% → 125%"));
+            Assert.That(description.text, Does.Contain("范围：全城研究"));
+            Assert.That(description.text, Does.Contain("研究完成后生效"));
+            Assert.That(
+                description.text,
+                Does.Not.Contain("规则效果待运行系统接入"));
+        }
+
+        [Test]
         public void IDEA0016_SearchThatHidesSelectedNodeClearsSelection()
         {
             GrayboxOperationsView3D view = CreateView(out Transform root);

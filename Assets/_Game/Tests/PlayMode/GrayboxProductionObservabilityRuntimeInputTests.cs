@@ -745,6 +745,16 @@ namespace WasteCity.Tests
                     "Research.Node." +
                     ResearchCatalog.AutomatedMachineryId),
                 MouseButton.Left);
+            Assert.That(RequireText(
+                    "Research.Node." +
+                    ResearchCatalog.AutomatedMachineryId +
+                    ".EffectTag").text,
+                Is.EqualTo("[解锁+被动]"));
+            Assert.That(RequireText("Research.Detail.Description").text,
+                Does.Contain("合金冶炼效率")
+                    .And.Contain("100% → 111%")
+                    .And.Contain("范围：全部冶炼厂")
+                    .And.Contain("研究完成后生效"));
             InputField search = RequireSceneObject("Research.Search")
                 .GetComponent<InputField>();
             yield return ClickUiElement(search.gameObject, MouseButton.Left);

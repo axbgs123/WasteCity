@@ -10,6 +10,13 @@ namespace WasteCity.Economy
         int OutputMultiplier(string stableInstanceId);
     }
 
+    public interface IFormalProductionResearchModifier
+    {
+        float ResolveCycleDurationSeconds(
+            string recipeId,
+            float baseDurationSeconds);
+    }
+
     public sealed class FormalProductionSimulation
     {
         private readonly List<BuildingProductionState> orderedStates =
@@ -24,6 +31,29 @@ namespace WasteCity.Economy
             int activeWarehouseCount,
             bool globallyPaused,
             IFormalProductionOutputModifier outputModifier = null)
+        {
+            Tick(
+                states,
+                deltaSeconds,
+                world,
+                cityInventory,
+                cityCapacity,
+                activeWarehouseCount,
+                globallyPaused,
+                outputModifier,
+                researchModifier: null);
+        }
+
+        public void Tick(
+            IReadOnlyList<BuildingProductionState> states,
+            float deltaSeconds,
+            WorldMapModel world,
+            ResourceInventory cityInventory,
+            ResourceCapacityPolicy cityCapacity,
+            int activeWarehouseCount,
+            bool globallyPaused,
+            IFormalProductionOutputModifier outputModifier,
+            IFormalProductionResearchModifier researchModifier)
         {
             if (states == null || cityInventory == null || cityCapacity == null)
                 return;
@@ -58,7 +88,8 @@ namespace WasteCity.Economy
                     safeDelta,
                     world,
                     cityInventory,
-                    outputModifier: outputModifier);
+                    outputModifier: outputModifier,
+                    researchModifier: researchModifier);
             }
         }
 
@@ -68,7 +99,8 @@ namespace WasteCity.Economy
             WorldMapModel world,
             CityResourceStorageModel cityStorage,
             bool globallyPaused,
-            IFormalProductionOutputModifier outputModifier = null)
+            IFormalProductionOutputModifier outputModifier = null,
+            IFormalProductionResearchModifier researchModifier = null)
         {
             if (states == null || cityStorage == null) return;
 
@@ -92,7 +124,8 @@ namespace WasteCity.Economy
                     world,
                     cityInventory: null,
                     cityStorage: cityStorage,
-                    outputModifier: outputModifier);
+                    outputModifier: outputModifier,
+                    researchModifier: researchModifier);
             }
         }
 
@@ -266,7 +299,8 @@ namespace WasteCity.Economy
             WorldMapModel world,
             ResourceInventory cityInventory,
             CityResourceStorageModel cityStorage = null,
-            IFormalProductionOutputModifier outputModifier = null)
+            IFormalProductionOutputModifier outputModifier = null,
+            IFormalProductionResearchModifier researchModifier = null)
         {
             if (state.IsPlayerPaused)
             {
@@ -275,6 +309,9 @@ namespace WasteCity.Economy
             }
 
             float remaining = deltaSeconds;
+            float cycleDuration = ResolveCycleDuration(
+                state.Definition,
+                researchModifier);
             while (true)
             {
                 if (!state.HasReservedInputs &&
@@ -290,7 +327,7 @@ namespace WasteCity.Economy
 
                 float needed = Math.Max(
                     0f,
-                    state.Definition.DurationSeconds - state.ProgressSeconds);
+                    cycleDuration - state.ProgressSeconds);
                 if (remaining < needed)
                 {
                     state.Advance(remaining);
@@ -732,6 +769,19 @@ namespace WasteCity.Economy
             return Math.Max(
                 1,
                 outputModifier.OutputMultiplier(state.StableInstanceId));
+        }
+
+        private static float ResolveCycleDuration(
+            FormalProductionDefinition definition,
+            IFormalProductionResearchModifier researchModifier)
+        {
+            if (definition == null) return .001f;
+            float duration = researchModifier == null
+                ? definition.DurationSeconds
+                : researchModifier.ResolveCycleDurationSeconds(
+                    definition.Id,
+                    definition.DurationSeconds);
+            return Math.Max(.001f, duration);
         }
 
         private static string ResolveOutputResourceId(

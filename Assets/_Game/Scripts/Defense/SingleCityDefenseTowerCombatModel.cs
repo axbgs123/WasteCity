@@ -22,6 +22,7 @@ namespace WasteCity.Defense
         private float damageRemainder;
         private string targetStableEnemyId;
         private float rangeMultiplier = 1f;
+        private float damageMultiplier = 1f;
 
         public SingleCityDefenseTowerCombatModel(
             string stableInstanceId,
@@ -76,6 +77,7 @@ namespace WasteCity.Defense
         public string BuildingId => definition.BuildingId;
         public DamageType DamageType => definition.DamageType;
         public float DamagePerSecond => definition.DamagePerSecond;
+        public float DamageMultiplier => damageMultiplier;
         public float Range => definition.Range * rangeMultiplier;
         public string ConsumableId => definition.ConsumableId;
         public float SecondsPerConsumable =>
@@ -201,6 +203,13 @@ namespace WasteCity.Defense
         public void SetRangeMultiplier(float multiplier)
         {
             rangeMultiplier = !IsFinite(multiplier) || multiplier <= 0f
+                ? 1f
+                : multiplier;
+        }
+
+        public void SetDamageMultiplier(float multiplier)
+        {
+            damageMultiplier = !IsFinite(multiplier) || multiplier <= 0f
                 ? 1f
                 : multiplier;
         }
@@ -364,7 +373,7 @@ namespace WasteCity.Defense
                     continue;
                 }
                 damageRemainder += definition.DamagePerSecond * multiplier *
-                    activeSeconds;
+                    damageMultiplier * activeSeconds;
                 int resolvedDamage = WholeDamage(ref damageRemainder);
                 if (resolvedDamage <= 0)
                     continue;
