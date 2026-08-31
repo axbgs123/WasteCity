@@ -1164,16 +1164,30 @@ namespace WasteCity.Graybox3D.Building
                 renderer.sprite = visual.Sprite;
                 renderer.color = Color.white;
                 renderer.sortingOrder = 20;
-                float spriteWidth = Math.Max(
-                    .0001f,
-                    visual.Sprite.bounds.size.x);
-                float factor = scale / spriteWidth;
+                Rect visibleBounds = Production2DVisualCatalog3D
+                    .ResolveVisibleBounds(
+                        visual.VisualClass,
+                        visual.VisualContentId);
+                float factor = Production2DVisualScalePolicy3D
+                    .ResolveSpriteWorldScale(
+                        visual.Sprite,
+                        visibleBounds,
+                        scale);
                 marker.transform.localScale = Vector3.one * factor;
-                float displayedHeight =
-                    visual.Sprite.bounds.size.y * factor;
-                position.y += displayedHeight *
-                    (.5f - visual.Anchor.y);
-                marker.transform.position = position;
+                if (Camera.main != null)
+                    GrayboxCivilizationExpansionVisualPresenter3D
+                        .OrientVerticalBillboard(
+                            marker.transform,
+                            Camera.main.transform.position);
+                Vector2 localAnchor = Production2DVisualScalePolicy3D
+                    .ResolveVisibleAnchorLocal(
+                        visual.Sprite,
+                        visibleBounds,
+                        visual.Anchor,
+                        factor);
+                Vector3 worldAnchor = marker.transform.TransformDirection(
+                    new Vector3(localAnchor.x, localAnchor.y, 0f));
+                marker.transform.position = position - worldAnchor;
             }
             else
             {

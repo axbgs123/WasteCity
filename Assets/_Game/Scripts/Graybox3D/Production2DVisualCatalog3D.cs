@@ -31,23 +31,41 @@ namespace WasteCity.Graybox3D
         [SerializeField] private string contentId;
         [SerializeField] private string variant;
         [SerializeField] private Sprite sprite;
+        [SerializeField] private Rect visibleBoundsNormalized;
 
         public Production2DVisualEntry3D(
             Production2DVisualClass visualClass,
             string contentId,
             string variant,
             Sprite sprite)
+            : this(
+                visualClass,
+                contentId,
+                variant,
+                sprite,
+                new Rect(0f, 0f, 1f, 1f))
+        {
+        }
+
+        public Production2DVisualEntry3D(
+            Production2DVisualClass visualClass,
+            string contentId,
+            string variant,
+            Sprite sprite,
+            Rect visibleBoundsNormalized)
         {
             this.visualClass = visualClass;
             this.contentId = contentId;
             this.variant = variant;
             this.sprite = sprite;
+            this.visibleBoundsNormalized = visibleBoundsNormalized;
         }
 
         public Production2DVisualClass VisualClass => visualClass;
         public string ContentId => contentId;
         public string Variant => variant;
         public Sprite Sprite => sprite;
+        public Rect VisibleBoundsNormalized => visibleBoundsNormalized;
     }
 
     [Serializable]
@@ -184,9 +202,12 @@ namespace WasteCity.Graybox3D
                 Production2DVisualEntry3D candidate = entries[index];
                 if (candidate == null || candidate.Sprite == null ||
                     string.IsNullOrWhiteSpace(candidate.ContentId) ||
-                    string.IsNullOrWhiteSpace(candidate.Variant))
+                    string.IsNullOrWhiteSpace(candidate.Variant) ||
+                    !Production2DVisualScalePolicy3D.IsValid(
+                        candidate.VisibleBoundsNormalized))
                 {
-                    error = "Production 2D visual entries require a key and Sprite.";
+                    error = "Production 2D visual entries require a key, " +
+                        "Sprite and valid visible Alpha bounds.";
                     return false;
                 }
                 string key = Key(
@@ -240,6 +261,50 @@ namespace WasteCity.Graybox3D
                 visualClass,
                 contentId,
                 variant);
+        }
+
+        public bool TryResolveEntry(
+            Production2DVisualClass visualClass,
+            string contentId,
+            out Production2DVisualEntry3D entry,
+            string variant = DefaultVariant)
+        {
+            for (var index = 0;
+                 entries != null && index < entries.Length;
+                 index++)
+            {
+                Production2DVisualEntry3D candidate = entries[index];
+                if (candidate != null &&
+                    candidate.VisualClass == visualClass &&
+                    string.Equals(candidate.ContentId, contentId,
+                        StringComparison.Ordinal) &&
+                    string.Equals(candidate.Variant, variant,
+                        StringComparison.Ordinal))
+                {
+                    entry = candidate;
+                    return true;
+                }
+            }
+
+            entry = null;
+            return false;
+        }
+
+        public static Rect ResolveVisibleBounds(
+            Production2DVisualClass visualClass,
+            string contentId,
+            string variant = DefaultVariant)
+        {
+            if (loaded == null)
+                loaded = Resources.Load<Production2DVisualCatalog3D>(
+                    ResourcesPath);
+            return loaded != null && loaded.TryResolveEntry(
+                    visualClass,
+                    contentId,
+                    out Production2DVisualEntry3D entry,
+                    variant)
+                ? entry.VisibleBoundsNormalized
+                : new Rect(0f, 0f, 1f, 1f);
         }
 
         public static Sprite ResolveFromCatalogOrFallback(

@@ -176,7 +176,17 @@ namespace WasteCity.Tests
                 Assert.That(icon.sprite, Is.Not.Null, definition.Id.Value);
                 Assert.That(icon.enabled, Is.True, definition.Id.Value);
                 InvokeLateUpdate(fixture.View);
-                Assert.That(icon.bounds.min.y,
+                Rect visibleBounds = Production2DVisualCatalog3D
+                    .ResolveVisibleBounds(
+                        Production2DVisualClass.Building,
+                        definition.Id.Value);
+                float visibleBottom = icon.transform.position.y +
+                    Production2DVisualScalePolicy3D
+                        .ResolveVisibleBottomLocal(
+                            icon.sprite,
+                            visibleBounds,
+                            icon.transform.lossyScale.y);
+                Assert.That(visibleBottom,
                     Is.GreaterThan(mesh.bounds.max.y), definition.Id.Value);
                 Assert.That(Vector3.Dot(icon.transform.up, Vector3.up),
                     Is.GreaterThan(.999f), definition.Id.Value);

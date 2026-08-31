@@ -3,8 +3,8 @@
   "requirementId": "IDEA-0024",
   "unityVersion": "2022.3.62f1",
   "generationTool": "OpenAI image_gen (GPT Image)",
-  "generationDate": "2026-08-28",
-  "promptVersion": "idea0024-research-background-v1",
+  "generationDate": "2026-08-31",
+  "promptVersion": "idea0024-research-background-reference-fidelity-v3",
   "licenseSummaryZh": "项目内原创生成内容；图二只作布局与材质参考，未复制第三方美术。",
   "entries": [
     {
@@ -13,16 +13,16 @@
       "visualClass": "ui",
       "useSummaryZh": "承载图二式科技树的顶部工具栏、中部树画布和底部详情区域，动态内容全部由 UGUI 绘制。",
       "loreBriefZh": "移动城把跨路线研究汇入一块宽屏工业终端，旧铜框架保护运算面板，青色状态灯只负责设备自检。",
-      "visualKeywordsZh": "宽屏工业终端、枪灰装甲、旧铜角件、克制青灯、安静深色中央、底部三段信息槽",
-      "forbiddenElementsZh": "文字、数字、科技图标、材料图标、科技节点、按钮、路线颜色、徽标、水印、人物、场景",
-      "promptSummaryZh": "原创16:9工业指挥终端科技树背景，顶部窄栏、中部大面积低噪声树画布、底部详情槽，不含动态内容。",
-      "sourceAssetPath": "Docs/Art/IDEA-0024/Source/UI/ui-research-tree-background-master-v1.png",
+      "visualKeywordsZh": "宽屏工业终端、蚀刻枪灰金属、旧铜镶边、六边工程纹、分区暗纹、单排顶部工具栏、四色底部导管、底部六段信息舱",
+      "forbiddenElementsZh": "文字、数字、科技图标、材料图标、科技节点、按钮、徽标、水印、人物、场景、厚重装甲角件、巨大螺栓",
+      "promptSummaryZh": "以用户图二为布局和材质标尺，把空黑画布升级为接近一比一的16:9工业科技树空底板；补入蚀刻金属、六边工程纹、线路暗纹、磨损和精密边框，顶部工具栏、中部路线画布和底部六段详情舱仍不烘焙动态内容。",
+      "sourceAssetPath": "Docs/Art/IDEA-0024/Source/UI/ui-research-tree-background-master-v3.png",
       "unitySpritePath": "Assets/_Game/Art/Production2D/UI/ui-research-tree-background.png",
       "masterSizePx": [1920, 1080],
       "deliverySizePx": [1920, 1080],
       "unityGuid": "5b47fbc1f7b69474ca1d26202ec12dc6",
-      "sourceSha256": "6b28319d94f4f9a0f92955c696a43e803ca3dbc8ac97e44daafa021be39b97eb",
-      "deliverySha256": "6b28319d94f4f9a0f92955c696a43e803ca3dbc8ac97e44daafa021be39b97eb",
+      "sourceSha256": "e860f035d4040bf265ba37c4610013c24ae699c2600f2019ad037c0c4a482723",
+      "deliverySha256": "e860f035d4040bf265ba37c4610013c24ae699c2600f2019ad037c0c4a482723",
       "reviewState": "integrated"
     }
   ]

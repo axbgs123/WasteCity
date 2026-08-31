@@ -9,6 +9,7 @@ using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
@@ -23,7 +24,7 @@ namespace WasteCity.Tests
             "idea-0024-research-tree-background-visual-assets.json";
         private const string MasterPath =
             "Docs/Art/IDEA-0024/Source/UI/" +
-            "ui-research-tree-background-master-v1.png";
+            "ui-research-tree-background-master-v3.png";
         private const string DeliveryPath =
             "Assets/_Game/Art/Production2D/UI/" +
             "ui-research-tree-background.png";
@@ -152,18 +153,119 @@ namespace WasteCity.Tests
             Assert.That(Static<Rect>(profile, "FooterRect"),
                 Is.EqualTo(new Rect(0f, 0f, 1920f, 216f)));
             Assert.That(Static<Vector2>(profile, "CompactNodeSize"),
-                Is.EqualTo(new Vector2(156f, 74f)));
+                Is.EqualTo(new Vector2(180f, 58f)));
+            Assert.That(Static<Vector2>(profile, "BridgeNodeSize"),
+                Is.EqualTo(new Vector2(90f, 112f)));
+            Assert.That(Static<Vector2>(profile, "CommonNodeSize"),
+                Is.EqualTo(new Vector2(350f, 74f)));
+
+            Assert.That(Static<Rect>(profile, "TitleSlotRect"),
+                Is.EqualTo(new Rect(18f, 982f, 322f, 74f)));
+            Assert.That(Static<Rect>(profile, "SearchSlotRect"),
+                Is.EqualTo(new Rect(365f, 987f, 210f, 62f)));
+            Assert.That(Static<Rect>(profile, "RouteFilterSlotRect"),
+                Is.EqualTo(new Rect(596f, 984f, 520f, 68f)));
+            Assert.That(Static<Rect>(profile, "StatusFilterSlotRect"),
+                Is.EqualTo(new Rect(1150f, 984f, 440f, 68f)));
+            Assert.That(Static<Rect>(profile, "FocusSlotRect"),
+                Is.EqualTo(new Rect(1612f, 984f, 290f, 68f)));
+
+            Rect[] footerSlots = Static<Rect[]>(profile, "FooterSlots");
+            Assert.That(footerSlots, Is.EqualTo(new[]
+            {
+                new Rect(8f, 10f, 535f, 196f),
+                new Rect(548f, 10f, 402f, 196f),
+                new Rect(960f, 10f, 205f, 196f),
+                new Rect(1175f, 10f, 255f, 196f),
+                new Rect(1440f, 10f, 275f, 196f),
+                new Rect(1725f, 10f, 187f, 196f),
+            }));
 
             float[] lanes = Static<float[]>(profile, "RouteLaneCenters");
             float[] subcolumns = Static<float[]>(profile, "SubcolumnOffsets");
             float[] gutters = Static<float[]>(profile, "BridgeGutterCenters");
             Assert.That(lanes, Has.Length.EqualTo(4));
             Assert.That(lanes, Is.Ordered.Ascending);
-            Assert.That(subcolumns, Is.EqualTo(new[] { -86f, 86f }));
+            Assert.That(lanes, Is.EqualTo(new[]
+            {
+                -720f, -240f, 240f, 720f,
+            }));
+            Assert.That(subcolumns, Is.EqualTo(new[] { -96f, 96f }));
             Assert.That(gutters, Has.Length.EqualTo(3));
+            Assert.That(Static<float[]>(profile, "BridgeRows"),
+                Is.EqualTo(new[] { 590f, 720f }));
             for (var index = 0; index < gutters.Length; index++)
                 Assert.That(gutters[index],
                     Is.EqualTo((lanes[index] + lanes[index + 1]) * .5f));
+        }
+
+        [Test]
+        public void IDEA0024_ReferenceFidelityUsesFullscreenSingleToolbarAndSixFooterBays()
+        {
+            string operationsSource = File.ReadAllText(Path.Combine(
+                ProjectRoot(),
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxOperationsView3D.cs"));
+            Assert.That(operationsSource,
+                Does.Not.Contain("new Vector2(1500f, 850f)"));
+            Assert.That(operationsSource,
+                Does.Contain("ResearchTreeVisualLayoutProfile3D." +
+                    "ReferenceResolution"));
+
+            CreateView(out Transform root);
+            Transform panel = Required(root, "ResearchTreePanel");
+            Canvas researchCanvas = panel.GetComponent<Canvas>();
+            Assert.That(researchCanvas, Is.Not.Null);
+            Assert.That(researchCanvas.overrideSorting, Is.True);
+            Assert.That(researchCanvas.sortingOrder,
+                Is.GreaterThan(50).And.LessThan(100),
+                "Research must cover operations HUD but stay below system menu.");
+            Assert.That(panel.GetComponent<GraphicRaycaster>(), Is.Not.Null);
+            Assert.That(panel.GetComponent<Image>().raycastTarget, Is.True,
+                "The fullscreen research surface must block world input.");
+            foreach (string bay in new[]
+                     {
+                         "Identity", "Costs", "Time", "Actions",
+                         "Prerequisites", "Legend",
+                     })
+            {
+                Required(panel, "Research.Footer." + bay);
+            }
+            RectTransform status = (RectTransform)Required(
+                panel, "Research.Detail.Status");
+            RectTransform active = (RectTransform)Required(
+                panel, "Research.Active");
+            Assert.That(status.anchorMin.y,
+                Is.GreaterThanOrEqualTo(active.anchorMax.y),
+                "Idle status and active progress must not overlap.");
+
+            Transform header = Required(panel, "Research.Header");
+            RectTransform route = (RectTransform)Required(
+                header, "Research.Filters.Route");
+            RectTransform statusFilters = (RectTransform)Required(
+                header, "Research.Filters.Status");
+            Assert.That(Mathf.Abs(route.anchoredPosition.y -
+                                  statusFilters.anchoredPosition.y),
+                Is.LessThan(2f),
+                "Route and state filters must share one toolbar row.");
+        }
+
+        [Test]
+        public void IDEA0024_OpenSelectsLatestButKeepsReferenceOverview()
+        {
+            GrayboxOperationsView3D view = CreateView(out Transform root);
+            RectTransform content = (RectTransform)Required(
+                root,
+                "Research.Content");
+            view.FitResearchTree();
+            Vector3 fittedScale = content.localScale;
+            Vector2 fittedPosition = content.anchoredPosition;
+
+            view.FocusResearchTreeOnOpen(
+                ResearchCatalog.AutomatedMachineryId);
+
+            Assert.That(content.localScale, Is.EqualTo(fittedScale));
+            Assert.That(content.anchoredPosition, Is.EqualTo(fittedPosition));
         }
 
         [Test]
@@ -272,10 +374,34 @@ namespace WasteCity.Tests
                 Type.GetType(ProfileTypeName),
                 "CompactNodeSize");
             foreach (ResearchDefinition definition in ResearchCatalog.All)
-                Assert.That(((RectTransform)Required(
-                        nodes,
-                        "Research.Node." + definition.Id.Value)).sizeDelta,
-                    Is.EqualTo(compact), definition.Id.Value);
+            {
+                Vector2 expected = definition.Route == DevelopmentRoute.Bridge
+                    ? Static<Vector2>(Type.GetType(ProfileTypeName),
+                        "BridgeNodeSize")
+                    : definition.Route == DevelopmentRoute.Common
+                        ? Static<Vector2>(Type.GetType(ProfileTypeName),
+                            "CommonNodeSize")
+                        : compact;
+                Transform node = Required(
+                    nodes,
+                    "Research.Node." + definition.Id.Value);
+                Assert.That(((RectTransform)node).sizeDelta,
+                    Is.EqualTo(expected), definition.Id.Value);
+                Assert.That(node.GetComponent<Outline>(), Is.Not.Null,
+                    definition.Id.Value + " must use a thin route outline.");
+                Assert.That(node.GetComponentsInChildren<Text>(true)
+                    .Any(value => value.name.EndsWith(
+                        ".Details", StringComparison.Ordinal)),
+                    Is.False,
+                    definition.Id.Value +
+                    " must keep long effect text in the footer only.");
+                foreach (ResourceAmount cost in definition.Costs)
+                {
+                    Required(node,
+                        "Research.Node." + definition.Id.Value + ".Cost." +
+                        cost.ResourceId + ".Amount");
+                }
+            }
         }
 
         [Test]
@@ -372,7 +498,8 @@ namespace WasteCity.Tests
             Image background = Required(root, "Research.Background")
                 .GetComponent<Image>();
             Assert.That(background.sprite, Is.SameAs(expected));
-            Assert.That(background.preserveAspect, Is.False);
+            Assert.That(background.preserveAspect, Is.True,
+                "The 16:9 authored frame must not stretch on 16:10 or ultrawide displays.");
             Assert.That(background.raycastTarget, Is.False);
         }
 

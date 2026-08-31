@@ -56,13 +56,19 @@ schema `34` 必须运行 `FormalSaveSchema34ContractTests`、既有 schema `31�
 
 ## IDEA-0024：科技树、开发验收台、城市比例与建筑世界图
 
-`IDEA-0024` 当前为“已实现待验证”，没有修改 `64×48` v2 地图、ResearchCatalog 真值或正式 schema `34`。科技树聚焦运行 `IDEA0024ResearchTreePresentationTests`、`ResearchTreeProjection3DTests` 和 `ResearchTreeUiContractTests`：背景 manifest、母版和交付图必须保持同一 `1920×1080` RGBA 不透明面板 PNG 与稳定 GUID/SHA-256；Production2D 统一目录精确为 `141` 项，UI Atlas 精确为 `19` 项，`core.ui.background.research-tree` 只能出现一次。视图必须实际绑定该 Sprite，并保持 Header/Tree/Footer、五路线筛选、五结构化状态筛选、Current/Latest、四路线牌、所选科技详情和真实材料图标。投影仍必须由正式目录派生 `44` 节点、`49` 边和 `6` 个双前置桥，四路线使用固定泳道与双子列，桥按两条真实前置路线的汇合中心分层；连线保持外描边/内层、桥虚线、箭头且不拦截 raycast。状态筛选只能消费 `Locked/Researchable/Active/Completed` DTO，不能解析中文状态文案。
+`IDEA-0024` 当前为“已实现待用户复验”，没有修改 `64×48` v2 地图、ResearchCatalog 真值或正式 schema `34`。用户先后否决了只复刻三段结构的 v1 和质感偏空黑的 v2，因此科技树聚焦必须运行 `IDEA0024ResearchTreePresentationTests`、`ResearchTreeProjection3DTests` 和 `ResearchTreeUiContractTests` 的 reference-fidelity v3 几何门：背景 manifest、v3 母版和交付图保持同一 `1920×1080` 不透明面板 PNG 与稳定 GUID/SHA-256；视图必须全屏且位于普通 HUD 之上、系统菜单之下，顶部五组槽在同一行，底部六舱逐一存在，普通/桥/公共根三种尺寸分别为 `180×58`、`90×112`、`350×74`。Production2D 目录仍为 `141` 项、UI Atlas `19` 项，背景不能烘焙文字、科技/材料图标、节点或按钮；运行时节点必须复用项目已有科技 Sprite、材料 Sprite 与真实数量。投影继续派生正式 `44` 节点、`49` 边和 `6` 个双前置桥，两张桥卡按真实前置路线语义占据三个路线间沟槽与两层货架，所有连线仍连接真实前置并保持外描边/内层、桥虚线、向上方向且不拦截 raycast。状态只能消费 `Locked/Researchable/Active/Completed` DTO，不能解析中文文案；打开时选中最新可研究项但保持全树概览。
 
 Development 验收入口和可点击页签先运行 `IDEA0024AcceptanceAndClickableTabsTests`，再运行真实 Input System 的 `IDEA0024AcceptanceAndTabsRuntimeInputTests`。Release 的启动控件必须保持原集合；只有 Editor/Development 可以追加“验收管理台、继续、新游戏、返回”四个控件。验收命令必须复用正式继续、新游戏、覆盖确认和 EnterGameplay，只有成功进入游戏后才可打开开发修改器。M/N/P 仍可由键盘互斥打开，面板内三枚真实 UGUI 页签必须复用同一个面板，每次点击只发布一次页变更，持续阻断世界点击，且不得改变城市目的地或创建待提交地图目标。
 
 城市与建筑表现运行 `IDEA0024CityBuildingPresentationTests`，并补跑 `FormalWorldPresentationScaleProfile3DTests`、`GrayboxBuildingProjectionAndViewTests`、`GrayboxMobileCityController3DTests`、`GrayboxSceneContractTests` 和真实 `GrayboxBuildingRuntimeSceneTests`。正式 Profile 必须冻结 `8×6` 内城平台、`(-4,-3)` 锚点、`8×6` 平台尺寸和地面/内城均为 `1` 世界单位的格尺度；`MobileCity`、`MobileCityVisual`、`InnerCityPlatform` 的场景身份保持稳定，视觉体量与玩法碰撞体分离。BuildingCatalog 全部 `35` 项已完成建筑必须只有一个可见、屋顶净空、竖直且朝向相机的 world Sprite；施工中与废墟隐藏，重复 300 次更新不得增长子物体或监听。Sprite 是 billboard 回退，不等于正式建筑 3D 模型。
 
 以上自动化只证明目录、布局、输入、坐标和表现合同已经接线；本轮正式建模、用户对科技树密度、背景、城市比例、建筑轮廓与 M-N-P 点击手感的人工视觉验收，以及真实 Windows 10 和 11 的视觉、GPU、显存和内存验证均未完成。没有修改地形源、地形导入规则、Texture2DArray Builder 或数组内容时，日常检查不运行 `TerrainAssetDeep`；准备发布时仍按发布门执行。任何自动化或 Development 验收台结果都不得写成上述人工与 Windows 验收已完成。
+
+## IDEA-0025：透明主体比例定位
+
+先运行 `IDEA0025Production2DVisualScaleTests` 和 `Production2DVisualCatalogAtlasTests`。目录 141 项必须全部具有 `0..1` 内的非零 `visibleBoundsNormalized`；同一语义槽中，不同透明留白的图经过 `Production2DVisualScalePolicy3D` 后必须得到相同可见长边占比。若图标仍忽大忽小，先检查目录是否重建、稳定 ID 是否解析到正式 Sprite，再检查消费者是否调用统一 framing；不要先改 PNG、PPU 或在单个界面追加倍率。
+
+矿点比例先运行 `GrayboxVisualAndWorldTests` 检查既有 Near/Mid/Far 和 Marker 稳定性，再在 Player 截图中确认 Item Sprite 的 Quad 只显示 Alpha 主体、frame 保持完整，并确认三档投影高度对应实际主体；当前自动化不单独证明最终屏幕像素观感。建筑运行 `IDEA0024CityBuildingPresentationTests`，用可见主体底边而不是完整透明 Sprite bounds 检查屋顶净空。科技和其余 UI 运行 `IDEA0024ResearchTreePresentationTests`、`ResearchTreeUiContractTests`、`Production2DTechnologyIconPipelineTests`、`GrayboxCivilizationExpansionVisualIntegrationTests`，并用真实 `GrayboxProductionObservabilityRuntimeInputTests` 检查背包、合成、仓库与科技树输入链。背景必须 `preserveAspect=true`。这些自动化不能代替用户对 1920×1080、1280×720、2560×1440 和 16:10 的实际视觉判断。
 
 ## IDEA-0020 关注度、命轨与文明升阶检查边界
 

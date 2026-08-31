@@ -758,7 +758,8 @@ namespace WasteCity.Graybox3D.Building
             BuildingVisualDimensions dimensions = ResolveDimensions(
                 definition,
                 instance.Placement.Site);
-            Sprite sprite = BuildingIconCatalog3D.Resolve(
+            Sprite sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Building,
                 definition.Id.Value);
             visual.IconRenderer.sprite = sprite;
             visual.IconRenderer.enabled =
@@ -770,12 +771,10 @@ namespace WasteCity.Graybox3D.Building
                 0f,
                 dimensions.VisualHeight * .5f + dimensions.CellSize * .08f,
                 0f);
-            float spriteWidth = sprite == null
-                ? 1f
-                : Mathf.Max(.001f, sprite.bounds.size.x);
-            float spriteHeight = sprite == null
-                ? 1f
-                : Mathf.Max(.001f, sprite.bounds.size.y);
+            Rect visibleBounds = Production2DVisualCatalog3D
+                .ResolveVisibleBounds(
+                    Production2DVisualClass.Building,
+                    definition.Id.Value);
             FormalWorldPresentationScaleProfile3D profile =
                 ResolvePresentationScaleProfile();
             float widthRatio = profile == null
@@ -788,13 +787,20 @@ namespace WasteCity.Graybox3D.Building
                 Mathf.Max(dimensions.XSize, dimensions.ZSize) * widthRatio,
                 dimensions.CellSize * .7f,
                 dimensions.CellSize * 2.4f);
-            float scale = targetSize / spriteWidth;
-            float displayedHeight = spriteHeight * scale;
+            float scale = Production2DVisualScalePolicy3D
+                .ResolveSpriteWorldScale(
+                    sprite,
+                    visibleBounds,
+                    targetSize);
+            float visibleBottom = Production2DVisualScalePolicy3D
+                .ResolveVisibleBottomLocal(
+                    sprite,
+                    visibleBounds,
+                    scale);
             icon.localScale = Vector3.one * scale;
             icon.localPosition = new Vector3(
                 0f,
-                dimensions.VisualHeight + roofClearance +
-                    displayedHeight * .5f,
+                dimensions.VisualHeight + roofClearance - visibleBottom,
                 0f);
         }
 

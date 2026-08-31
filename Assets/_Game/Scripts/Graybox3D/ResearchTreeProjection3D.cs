@@ -129,7 +129,11 @@ namespace WasteCity.Graybox3D.Usability
                         ? "junction:" + prerequisiteId
                         : string.Empty;
                     Vector2[] points = ConnectionPoints(
-                        prerequisite.Position, child.Position, shared);
+                        prerequisite.Position,
+                        prerequisite.Definition.Route,
+                        child.Position,
+                        child.Definition.Route,
+                        shared);
                     bool bridge = dependent.Route == DevelopmentRoute.Bridge ||
                         prerequisite.Definition.Route != dependent.Route &&
                         prerequisite.Definition.Route != DevelopmentRoute.Common;
@@ -216,12 +220,21 @@ namespace WasteCity.Graybox3D.Usability
 
         private static Vector2[] ConnectionPoints(
             Vector2 prerequisite,
+            DevelopmentRoute prerequisiteRoute,
             Vector2 dependent,
+            DevelopmentRoute dependentRoute,
             bool shared)
         {
-            Vector2 start = prerequisite + Vector2.up * (NodeSize.y * .5f);
-            Vector2 end = dependent - Vector2.up * (NodeSize.y * .5f);
-            float junctionY = Mathf.Min(end.y - 24f, start.y + 96f);
+            Vector2 start = prerequisite + Vector2.up *
+                (NodeSizeFor(prerequisiteRoute).y * .5f);
+            Vector2 end = dependent - Vector2.up *
+                (NodeSizeFor(dependentRoute).y * .5f);
+            float junctionY = shared
+                ? start.y + 44f
+                : Mathf.Clamp(
+                    (start.y + end.y) * .5f,
+                    start.y + 18f,
+                    end.y - 18f);
             Vector2 junction = new Vector2(prerequisite.x, junctionY);
             if (!shared &&
                 Mathf.Approximately(prerequisite.x, dependent.x))
@@ -241,6 +254,15 @@ namespace WasteCity.Graybox3D.Usability
                     new Vector2(dependent.x, junctionY),
                     end,
                 };
+        }
+
+        private static Vector2 NodeSizeFor(DevelopmentRoute route)
+        {
+            if (route == DevelopmentRoute.Bridge)
+                return ResearchTreeVisualLayoutProfile3D.BridgeNodeSize;
+            if (route == DevelopmentRoute.Common)
+                return ResearchTreeVisualLayoutProfile3D.CommonNodeSize;
+            return NodeSize;
         }
 
         public ResearchTreeNodeProjection3D SelectLatestResearchable(
@@ -361,15 +383,20 @@ namespace WasteCity.Graybox3D.Usability
         {
             if (source == null || source.Count == 0)
                 return new Rect(Vector2.zero, Vector2.zero);
-            Vector2 half = NodeSize * .5f;
+            Vector2 half = NodeSizeFor(
+                source[0].Definition.Route) * .5f;
             Vector2 minimum = source[0].Position - half;
             Vector2 maximum = source[0].Position + half;
             for (var index = 1; index < source.Count; index++)
             {
                 Vector2 position = source[index].Position;
+                half = NodeSizeFor(
+                    source[index].Definition.Route) * .5f;
                 minimum = Vector2.Min(minimum, position - half);
                 maximum = Vector2.Max(maximum, position + half);
             }
+            maximum.y += ResearchTreeVisualLayoutProfile3D
+                .RouteHeaderBoundsPadding;
             return Rect.MinMaxRect(
                 minimum.x,
                 minimum.y,
@@ -388,13 +415,19 @@ namespace WasteCity.Graybox3D.Usability
                 return new Vector2(0f, y);
             if (definition.Route == DevelopmentRoute.Bridge)
             {
-                float bridgeCenter = BridgeCenterFor(ordered, definition);
-                int bridgeIndex = BridgeOrdinalAtCenter(
-                    ordered, definition, bridgeCenter);
+                int gutterIndex = BridgeGutterIndexFor(
+                    ordered, definition);
+                int shelfIndex = BridgeOrdinalInGutter(
+                    ordered, definition, gutterIndex);
+                float[] gutters =
+                    ResearchTreeVisualLayoutProfile3D.BridgeGutterCenters;
+                float[] shelves =
+                    ResearchTreeVisualLayoutProfile3D.BridgeRows;
                 return new Vector2(
-                    bridgeCenter,
-                    y + bridgeIndex *
-                    ResearchTreeVisualLayoutProfile3D.BridgeLevelStep);
+                    gutters[Mathf.Clamp(
+                        gutterIndex, 0, gutters.Length - 1)],
+                    shelves[Mathf.Clamp(
+                        shelfIndex, 0, shelves.Length - 1)]);
             }
 
             float center = RouteCenter(definition.Route);
@@ -437,75 +470,70 @@ namespace WasteCity.Graybox3D.Usability
             return 0;
         }
 
-        private static float BridgeCenterFor(
-            IList<ResearchDefinition> ordered,
-            ResearchDefinition bridge)
-        {
-            var routes = new HashSet<DevelopmentRoute>();
-            float sum = 0f;
-            for (var index = 0;
-                 index < bridge.RequiredResearchIds.Count;
-                 index++)
-            {
-                ResearchDefinition prerequisite = FindDefinition(
-                    ordered,
-                    bridge.RequiredResearchIds[index]);
-                if (prerequisite == null ||
-                    prerequisite.Route == DevelopmentRoute.Common ||
-                    prerequisite.Route == DevelopmentRoute.Bridge ||
-                    !routes.Add(prerequisite.Route))
-                {
-                    continue;
-                }
-                sum += RouteCenter(prerequisite.Route);
-            }
-            return routes.Count == 0 ? 0f : sum / routes.Count;
-        }
-
-        private static int BridgeOrdinalAtCenter(
+        private static int BridgeOrdinalInGutter(
             IList<ResearchDefinition> ordered,
             ResearchDefinition target,
-            float center)
+            int gutterIndex)
         {
             var ordinal = 0;
             for (var index = 0; index < ordered.Count; index++)
             {
                 ResearchDefinition candidate = ordered[index];
                 if (candidate.Route != DevelopmentRoute.Bridge ||
-                    candidate.LayoutRow != target.LayoutRow ||
-                    !Mathf.Approximately(
-                        BridgeCenterFor(ordered, candidate),
-                        center))
-                {
+                    BridgeGutterIndexFor(ordered, candidate) != gutterIndex)
                     continue;
-                }
-                if (string.Equals(
-                        candidate.Id.Value,
-                        target.Id.Value,
+                if (ReferenceEquals(candidate, target) ||
+                    string.Equals(candidate.Id.Value, target.Id.Value,
                         StringComparison.Ordinal))
-                {
                     return ordinal;
-                }
                 ordinal++;
             }
             return 0;
         }
 
-        private static ResearchDefinition FindDefinition(
+        private static int BridgeGutterIndexFor(
             IList<ResearchDefinition> ordered,
-            string researchId)
+            ResearchDefinition definition)
         {
-            for (var index = 0; index < ordered.Count; index++)
+            bool technology = HasPrerequisiteRoute(
+                ordered, definition, DevelopmentRoute.Technology);
+            bool cultivation = HasPrerequisiteRoute(
+                ordered, definition, DevelopmentRoute.Cultivation);
+            bool biological = HasPrerequisiteRoute(
+                ordered, definition, DevelopmentRoute.BiologicalAscension);
+            bool psionics = HasPrerequisiteRoute(
+                ordered, definition, DevelopmentRoute.Psionics);
+
+            if (technology && cultivation) return 0;
+            if (technology && biological) return 0;
+            if (cultivation && biological) return 1;
+            if (technology && psionics) return 2;
+            if (biological && psionics) return 2;
+            return 1;
+        }
+
+        private static bool HasPrerequisiteRoute(
+            IList<ResearchDefinition> ordered,
+            ResearchDefinition definition,
+            DevelopmentRoute route)
+        {
+            for (var requirementIndex = 0;
+                 requirementIndex < definition.RequiredResearchIds.Count;
+                 requirementIndex++)
             {
-                if (string.Equals(
-                        ordered[index].Id.Value,
-                        researchId,
-                        StringComparison.Ordinal))
+                string requiredId =
+                    definition.RequiredResearchIds[requirementIndex];
+                for (var index = 0; index < ordered.Count; index++)
                 {
-                    return ordered[index];
+                    ResearchDefinition candidate = ordered[index];
+                    if (candidate.Route == route && string.Equals(
+                            candidate.Id.Value,
+                            requiredId,
+                            StringComparison.Ordinal))
+                        return true;
                 }
             }
-            return null;
+            return false;
         }
 
         private static float RouteCenter(DevelopmentRoute route)

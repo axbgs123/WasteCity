@@ -13,6 +13,8 @@ namespace WasteCity.Graybox3D
 
         private static readonly Dictionary<Sprite, Mesh> IconMeshes =
             new Dictionary<Sprite, Mesh>();
+        private static readonly Dictionary<Sprite, Mesh> FrameMeshes =
+            new Dictionary<Sprite, Mesh>();
         private static readonly Dictionary<Texture, Material> IconMaterials =
             new Dictionary<Texture, Material>();
 
@@ -183,7 +185,12 @@ namespace WasteCity.Graybox3D
             this.icon = icon;
             iconFilter.sharedMesh = icon == null
                 ? null
-                : ResolveIconMesh(icon);
+                : ResolveIconMesh(
+                    icon,
+                    Production2DVisualCatalog3D.ResolveVisibleBounds(
+                        Production2DVisualClass.Item,
+                        ResourceId),
+                    IconMeshes);
             iconRenderer.sharedMaterial = icon == null
                 ? null
                 : ResolveIconMaterial(icon.texture);
@@ -195,7 +202,10 @@ namespace WasteCity.Graybox3D
             this.frame = frame;
             frameFilter.sharedMesh = frame == null
                 ? null
-                : ResolveIconMesh(frame);
+                : ResolveIconMesh(
+                    frame,
+                    new Rect(0f, 0f, 1f, 1f),
+                    FrameMeshes);
             frameRenderer.sharedMaterial = frame == null
                 ? null
                 : ResolveIconMaterial(frame.texture);
@@ -299,11 +309,22 @@ namespace WasteCity.Graybox3D
             shadowLabel.GetComponent<MeshRenderer>().enabled = visible;
         }
 
-        private static Mesh ResolveIconMesh(Sprite sprite)
+        private static Mesh ResolveIconMesh(
+            Sprite sprite,
+            Rect visibleBounds,
+            IDictionary<Sprite, Mesh> cache)
         {
-            if (IconMeshes.TryGetValue(sprite, out Mesh cached))
+            if (cache.TryGetValue(sprite, out Mesh cached))
                 return cached;
             Rect rect = sprite.textureRect;
+            Rect crop = Production2DVisualScalePolicy3D.IsValid(visibleBounds)
+                ? visibleBounds
+                : new Rect(0f, 0f, 1f, 1f);
+            rect = new Rect(
+                rect.x + crop.x * rect.width,
+                rect.y + crop.y * rect.height,
+                crop.width * rect.width,
+                crop.height * rect.height);
             float inverseWidth = 1f / sprite.texture.width;
             float inverseHeight = 1f / sprite.texture.height;
             float left = rect.xMin * inverseWidth;
@@ -339,7 +360,7 @@ namespace WasteCity.Graybox3D
                 },
             };
             mesh.RecalculateBounds();
-            IconMeshes.Add(sprite, mesh);
+            cache.Add(sprite, mesh);
             return mesh;
         }
 

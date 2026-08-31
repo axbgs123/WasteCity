@@ -166,19 +166,21 @@ namespace WasteCity.Tests
                 RectTransform rect = (RectTransform)Required(
                     nodes,
                     "Research.Node." + definition.Id.Value);
-                Bounds bounds = RectTransformUtility
-                    .CalculateRelativeRectTransformBounds(content, rect);
+                Bounds bounds = RectBounds(content, rect);
                 Assert.That(bounds.size.x, Is.GreaterThan(0f),
                     definition.Id.Value);
                 Assert.That(bounds.size.y, Is.GreaterThan(0f),
                     definition.Id.Value);
                 Vector2 expected = projection.FindNode(
                     definition.Id.Value).Position;
+                Assert.That(rect.anchoredPosition,
+                    Is.EqualTo(expected),
+                    definition.Id.Value + " anchored position");
                 Assert.That(bounds.center.x,
-                    Is.EqualTo(expected.x).Within(.5f),
+                    Is.EqualTo(expected.x).Within(4f),
                     definition.Id.Value + " x");
                 Assert.That(bounds.center.y,
-                    Is.EqualTo(expected.y).Within(.5f),
+                    Is.EqualTo(expected.y).Within(4f),
                     definition.Id.Value + " y");
                 return new Placement(definition, bounds);
             }).ToArray();
@@ -221,6 +223,20 @@ namespace WasteCity.Tests
                         placements[right].Definition.Id.Value);
                 }
             }
+        }
+
+        private static Bounds RectBounds(
+            RectTransform relativeTo,
+            RectTransform rect)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            Vector3 first = relativeTo.InverseTransformPoint(corners[0]);
+            var bounds = new Bounds(first, Vector3.zero);
+            for (var index = 1; index < corners.Length; index++)
+                bounds.Encapsulate(
+                    relativeTo.InverseTransformPoint(corners[index]));
+            return bounds;
         }
 
         [Test]

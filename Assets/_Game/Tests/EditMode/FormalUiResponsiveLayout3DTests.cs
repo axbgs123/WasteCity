@@ -109,7 +109,6 @@ namespace WasteCity.Tests
             {
                 "FullResourceLedgerPanel",
                 "InventoryCraftingPanel",
-                "ResearchTreePanel",
             };
             foreach (string panelName in panelNames)
             {
@@ -118,10 +117,19 @@ namespace WasteCity.Tests
                 Assert.That(panel.localScale, Is.EqualTo(Vector3.one));
             }
 
+            RectTransform researchPanel = Required(
+                canvas.transform,
+                "ResearchTreePanel");
+            Assert.That(CanvasRect(canvas, researchPanel),
+                Is.EqualTo(new Rect(0f, 0f, width, height)),
+                "IDEA-0024 promotes the research tree to a full-screen terminal.");
+            Assert.That(researchPanel.localScale, Is.EqualTo(Vector3.one));
+
             Text researchDetails = canvas
                 .GetComponentsInChildren<Text>(true)
-                .First(value => value.name.EndsWith(
-                    ".Details",
+                .First(value => string.Equals(
+                    value.name,
+                    "Research.Detail.Description",
                     StringComparison.Ordinal));
             Assert.That(
                 researchDetails.fontSize,

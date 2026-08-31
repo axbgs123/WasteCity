@@ -242,7 +242,51 @@ namespace WasteCity.Editor
                 visualClass,
                 contentId,
                 Production2DVisualCatalog3D.DefaultVariant,
-                sprite);
+                sprite,
+                ReadVisibleAlphaBounds(assetPath));
+        }
+
+        private static Rect ReadVisibleAlphaBounds(string assetPath)
+        {
+            byte[] bytes = File.ReadAllBytes(assetPath);
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                if (!ImageConversion.LoadImage(texture, bytes, false))
+                    throw new InvalidDataException(
+                        "Could not decode production 2D visual: " + assetPath);
+                Color32[] pixels = texture.GetPixels32();
+                int minX = texture.width;
+                int minY = texture.height;
+                int maxX = -1;
+                int maxY = -1;
+                for (var y = 0; y < texture.height; y++)
+                for (var x = 0; x < texture.width; x++)
+                {
+                    if (pixels[y * texture.width + x].a < 16) continue;
+                    minX = Math.Min(minX, x);
+                    minY = Math.Min(minY, y);
+                    maxX = Math.Max(maxX, x);
+                    maxY = Math.Max(maxY, y);
+                }
+                if (maxX < minX || maxY < minY)
+                    throw new InvalidDataException(
+                        "Production 2D visual has no visible Alpha subject: " +
+                        assetPath);
+                minX = Math.Max(0, minX - 1);
+                minY = Math.Max(0, minY - 1);
+                maxX = Math.Min(texture.width - 1, maxX + 1);
+                maxY = Math.Min(texture.height - 1, maxY + 1);
+                return new Rect(
+                    minX / (float)texture.width,
+                    minY / (float)texture.height,
+                    (maxX - minX + 1f) / texture.width,
+                    (maxY - minY + 1f) / texture.height);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
         }
 
         private static UnifiedPresentationManifestEntry[]
@@ -347,7 +391,10 @@ namespace WasteCity.Editor
                         expected.Variant,
                         StringComparison.Ordinal) ||
                     item.FindPropertyRelative("sprite").objectReferenceValue !=
-                        expected.Sprite)
+                        expected.Sprite ||
+                    item.FindPropertyRelative("visibleBoundsNormalized") == null ||
+                    item.FindPropertyRelative("visibleBoundsNormalized")
+                        .rectValue != expected.VisibleBoundsNormalized)
                     return false;
             }
             for (var index = 0; index < expectedRecipes.Count; index++)

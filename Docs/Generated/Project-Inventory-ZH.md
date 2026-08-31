@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`b06975cbadebb5714486578d14ca7795dd0458dcb5234c596f29ca7093557b0c`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`7e0d4904cf3d9d1740ad11810c31fc28bfe763accc4f27fceab7152bfe3d1c3e`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -304,6 +304,7 @@
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Production2DVisualScalePolicy3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`
@@ -551,6 +552,7 @@
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs`
 - `Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Production2DVisualScalePolicy3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/ResourceIconCatalog3D.cs`
 - `Assets/_Game/Scripts/Presentation/VisualDefinition.cs`

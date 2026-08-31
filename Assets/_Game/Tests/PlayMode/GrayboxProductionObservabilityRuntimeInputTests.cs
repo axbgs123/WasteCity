@@ -215,13 +215,17 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject("Research.Search.Icon")
                     .GetComponent<Image>().sprite.name,
                 Is.EqualTo("ui-search"));
-            Assert.That(RequireSceneObject("Research.BranchConnectorLegend")
-                    .GetComponent<Image>().sprite.name,
-                Is.EqualTo("ui-technology-branch-connector"));
+            Assert.That(FindSceneObject(
+                    "Research.BranchConnectorLegend",
+                    includeInactive: true),
+                Is.Null,
+                "Reference-faithful UI removes the orphan connector legend.");
             string firstResearchId = ResearchCatalog.All[0].Id.Value;
-            Assert.That(RequireSceneObject("Research.Node." + firstResearchId)
-                    .GetComponent<Image>().sprite.name,
-                Is.EqualTo("ui-technology-node"));
+            GameObject firstNode = RequireSceneObject(
+                "Research.Node." + firstResearchId);
+            Assert.That(firstNode.GetComponent<Image>().sprite, Is.Null,
+                "Nodes use a thin route outline, not the old thick frame.");
+            Assert.That(firstNode.GetComponent<Outline>(), Is.Not.Null);
             Assert.That(RequireSceneObject(
                     "Research.Filter.Route.Technology")
                     .GetComponent<Image>().sprite.name,
@@ -719,25 +723,22 @@ namespace WasteCity.Tests
                     ResearchCatalog.AutomatedDefenseId +
                     ".State")
                 .text;
-            Assert.That(automatedDefenseState, Does.Contain("前置"));
-            Assert.That(
-                automatedDefenseState,
-                Does.Not.Contain("本阶段未开放"));
+            Assert.That(automatedDefenseState, Is.EqualTo("◆"));
             Assert.That(RequireText(
                     "Research.Node." +
                     "core.research.ballistics" +
                     ".State").text,
-                Does.Contain("本阶段未开放"));
+                Is.EqualTo("◆"));
             Assert.That(RequireText(
                     "Research.Node." +
                     "core.research.bridge.psionic-mech" +
                     ".State").text,
-                Does.Contain("前置").And.Not.Contain("本阶段未开放"));
+                Is.EqualTo("◆"));
             Assert.That(RequireText(
                     "Research.Node." +
                     ResearchCatalog.PrecisionAssemblyId +
                     ".State").text,
-                Does.Contain("前置"));
+                Is.EqualTo("◆"));
 
             yield return ClickUiElement(
                 RequireSceneObject(
@@ -1829,14 +1830,28 @@ namespace WasteCity.Tests
                 Does.StartWith("输出：").And.Not.Contains("输出：输出："));
             Assert.That(RequireText(productionRowName + ".Status").text,
                 Does.Contain("物流已连接"));
-            Assert.That(RequireSceneObject(
+            Image productionInputIcon = RequireSceneObject(
                     productionRowName + ".Input.Icon")
-                    .GetComponent<Image>().sprite,
-                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
-            Assert.That(RequireSceneObject(
+                .GetComponent<Image>();
+            Image productionOutputIcon = RequireSceneObject(
                     productionRowName + ".Output.Icon")
-                    .GetComponent<Image>().sprite,
+                .GetComponent<Image>();
+            Assert.That(productionInputIcon.sprite,
+                Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Iron)));
+            Assert.That(productionOutputIcon.sprite,
                 Is.SameAs(ResolvePresentedResourceIcon(ResourceIds.Alloy)));
+            Assert.That(productionInputIcon.rectTransform.localScale.x,
+                Is.EqualTo(Production2DVisualScalePolicy3D.Resolve(
+                    Production2DVisualClass.Item,
+                    Production2DVisualCatalog3D.ResolveVisibleBounds(
+                        Production2DVisualClass.Item,
+                        ResourceIds.Iron)).Scale).Within(.001f));
+            Assert.That(productionOutputIcon.rectTransform.localScale.x,
+                Is.EqualTo(Production2DVisualScalePolicy3D.Resolve(
+                    Production2DVisualClass.Item,
+                    Production2DVisualCatalog3D.ResolveVisibleBounds(
+                        Production2DVisualClass.Item,
+                        ResourceIds.Alloy)).Scale).Within(.001f));
 
             yield return ClickUiElement(pause, MouseButton.Left);
             Assert.That(state.IsPlayerPaused, Is.True);

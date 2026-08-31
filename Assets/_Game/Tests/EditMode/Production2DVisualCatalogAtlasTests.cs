@@ -112,6 +112,11 @@ namespace WasteCity.Tests
                     StringComparison.Ordinal)), Is.True);
             Assert.That(catalog.TryValidate(out string error),
                 Is.True, error);
+            Assert.That(catalog.Entries.All(value =>
+                    Production2DVisualScalePolicy3D.IsValid(
+                        value.VisibleBoundsNormalized)),
+                Is.True,
+                "Every formal visual must publish reusable visible Alpha bounds.");
         }
 
         [Test]

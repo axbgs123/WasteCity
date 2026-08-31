@@ -911,6 +911,13 @@ namespace WasteCity.Graybox3D.Building
                 "core.world-marker.selection-reticle");
             reticle.preserveAspect = true;
             reticle.raycastTarget = false;
+            Production2DVisualScalePolicy3D.ApplyToUiImage(
+                reticle,
+                Production2DVisualClass.WorldMarker,
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    Production2DVisualClass.WorldMarker,
+                    "core.world-marker.selection-reticle"),
+                new Vector2(6f, 0f));
             placementStatusRoot.gameObject.SetActive(false);
 
             miningGuidanceLegendRoot = CreatePanel(
@@ -1106,6 +1113,11 @@ namespace WasteCity.Graybox3D.Building
                 buildingIcon.rectTransform,
                 new Vector2(6f, 4f),
                 Vector2.one * FormalUiLayoutProfile3D.Standard.IconHero);
+            ApplyVisualFraming(
+                buildingIcon,
+                Production2DVisualClass.Building,
+                definition.Id.Value,
+                buildingIcon.rectTransform.anchoredPosition);
 
             RectTransform summary = CreateRect(rect, "Summary");
             PlaceFixed(summary, new Vector2(100f, 0f), new Vector2(126f, 96f));
@@ -1141,6 +1153,11 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(0f, .64f),
                 new Vector2(4f, 0f),
                 new Vector2(28f, 0f));
+            ApplyVisualFraming(
+                costIcon,
+                Production2DVisualClass.Item,
+                definition.CostId,
+                costIcon.rectTransform.anchoredPosition);
             if (!string.IsNullOrEmpty(item.PrimaryLockReason))
             {
                 Text reason = CreateLabel(
@@ -1246,10 +1263,27 @@ namespace WasteCity.Graybox3D.Building
         {
             RectTransform rect = CreateRect(parent, name);
             var icon = rect.gameObject.AddComponent<Image>();
-            icon.sprite = BuildingIconCatalog3D.Resolve(buildingId);
+            icon.sprite = Production2DVisualCatalog3D.Resolve(
+                Production2DVisualClass.Building,
+                buildingId);
             icon.preserveAspect = true;
             icon.raycastTarget = false;
             return icon;
+        }
+
+        private static void ApplyVisualFraming(
+            Image image,
+            Production2DVisualClass visualClass,
+            string contentId,
+            Vector2 baseAnchoredPosition)
+        {
+            Production2DVisualScalePolicy3D.ApplyToUiImage(
+                image,
+                visualClass,
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    visualClass,
+                    contentId),
+                baseAnchoredPosition);
         }
 
         private static string ResourceName(string resourceId)

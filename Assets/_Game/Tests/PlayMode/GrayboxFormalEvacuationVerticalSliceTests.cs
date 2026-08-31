@@ -819,7 +819,6 @@ namespace WasteCity.Tests
             Assert.That(button, Is.Not.Null, name);
             Assert.That(button.gameObject.activeInHierarchy, Is.True, name);
             EventSystem.current.SetSelectedGameObject(button.gameObject);
-            yield return null;
             Assert.That(EventSystem.current.currentSelectedGameObject,
                 Is.SameAs(button.gameObject), name);
             yield return TapKey(Key.Enter);

@@ -516,6 +516,13 @@ namespace WasteCity.Graybox3D.Building
                 visualClass,
                 contentId);
             image.gameObject.SetActive(image.sprite != null);
+            Production2DVisualScalePolicy3D.ApplyToUiImage(
+                image,
+                visualClass,
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    visualClass,
+                    contentId),
+                image.rectTransform.anchoredPosition);
         }
 
         private void HidePageVisual(int index)

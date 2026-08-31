@@ -17,566 +17,1412 @@ MonoBehaviour:
     contentId: biological.resource.acid-gland
     variant: default
     sprite: {fileID: 21300000, guid: b2d9a31c9668c4dc1b0fda92c7bebfc4, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.21875
+      width: 0.58203125
+      height: 0.61328125
   - visualClass: 0
     contentId: biological.resource.active-biomass
     variant: default
     sprite: {fileID: 21300000, guid: 8d549eaaa772a43de9ee1a81d4534c02, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23046875
+      y: 0.2265625
+      width: 0.5390625
+      height: 0.56640625
   - visualClass: 0
     contentId: biological.resource.biomass-concentrate
     variant: default
     sprite: {fileID: 21300000, guid: 1cb55b424f38f4024a1b1c3db4a01c73, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.19140625
+      width: 0.58984375
+      height: 0.640625
   - visualClass: 0
     contentId: biological.resource.bone-steel
     variant: default
     sprite: {fileID: 21300000, guid: 6e8ef1436c3c5418ea3238ddcc7ec19a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.18359375
+      y: 0.2109375
+      width: 0.625
+      height: 0.5625
   - visualClass: 0
     contentId: biological.resource.mutant-gene
     variant: default
     sprite: {fileID: 21300000, guid: d271622560a5c427093c519e1ea079a1, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.22265625
+      y: 0.21875
+      width: 0.55859375
+      height: 0.59765625
   - visualClass: 0
     contentId: biological.resource.weapon
     variant: default
     sprite: {fileID: 21300000, guid: ee12c1a704e1c422fa0699d15f5af0e0, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.23046875
+      width: 0.6484375
+      height: 0.58984375
   - visualClass: 0
     contentId: core.resource.biomass
     variant: default
     sprite: {fileID: 21300000, guid: ea8466c548c834fac9158ff45e69658e, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1875
+      y: 0.234375
+      width: 0.62890625
+      height: 0.5390625
   - visualClass: 0
     contentId: core.resource.carbon-fiber
     variant: default
     sprite: {fileID: 21300000, guid: 82f5a494a300f443d905ada87dc3416f, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.22265625
+      width: 0.671875
+      height: 0.55859375
   - visualClass: 0
     contentId: core.resource.coolant
     variant: default
     sprite: {fileID: 21300000, guid: a16f80462fcb84166b6bb0732793ae1e, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.22265625
+      y: 0.1953125
+      width: 0.5390625
+      height: 0.625
   - visualClass: 0
     contentId: core.resource.energy-crystal
     variant: default
     sprite: {fileID: 21300000, guid: 7b0feb39d58764cd78f54bd3800b06a2, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2421875
+      y: 0.17578125
+      width: 0.53515625
+      height: 0.6484375
   - visualClass: 0
     contentId: core.resource.iron
     variant: default
     sprite: {fileID: 21300000, guid: a0fd68e5792014409a84dba61c0c3faf, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.15625
+      y: 0.21484375
+      width: 0.69921875
+      height: 0.578125
   - visualClass: 0
     contentId: core.resource.refined-stone
     variant: default
     sprite: {fileID: 21300000, guid: fd2ff94611f444402b8e86aa7d309113, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1875
+      y: 0.1796875
+      width: 0.62890625
+      height: 0.60546875
   - visualClass: 0
     contentId: core.resource.stone
     variant: default
     sprite: {fileID: 21300000, guid: 701a923c0dea94c9fb3abc8a054715e3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.21484375
+      width: 0.58984375
+      height: 0.5703125
   - visualClass: 0
     contentId: core.resource.water
     variant: default
     sprite: {fileID: 21300000, guid: cdd1e0fd6d5274e4bbe31ddca64b6069, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.25390625
+      y: 0.1953125
+      width: 0.5
+      height: 0.62109375
   - visualClass: 0
     contentId: cultivation.resource.elixir
     variant: default
     sprite: {fileID: 21300000, guid: 1be435102cbc64411a439138b7678426, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.24609375
+      y: 0.23828125
+      width: 0.5078125
+      height: 0.53515625
   - visualClass: 0
     contentId: cultivation.resource.flying-sword
     variant: default
     sprite: {fileID: 21300000, guid: d8b122e5ab90a4c8a9124418ff8635d4, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.26953125
+      y: 0.16015625
+      width: 0.5078125
+      height: 0.6796875
   - visualClass: 0
     contentId: cultivation.resource.formation-core
     variant: default
     sprite: {fileID: 21300000, guid: f45ff07d6c5a54bed95d1d01bef06681, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.1796875
+      width: 0.65625
+      height: 0.59765625
   - visualClass: 0
     contentId: cultivation.resource.spirit-iron
     variant: default
     sprite: {fileID: 21300000, guid: 73aa3721731e346e6b622a6883dd19b1, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16796875
+      y: 0.2421875
+      width: 0.671875
+      height: 0.515625
   - visualClass: 0
     contentId: cultivation.resource.spirit-stone
     variant: default
     sprite: {fileID: 21300000, guid: 41086ad6034f640ecaf10fbec5999756, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.28125
+      y: 0.234375
+      width: 0.4375
+      height: 0.53515625
   - visualClass: 0
     contentId: fusion.resource.hybrid-core
     variant: default
     sprite: {fileID: 21300000, guid: 70ebf85ce802b4ac88640212289de521, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.15234375
+      y: 0.1640625
+      width: 0.6953125
+      height: 0.671875
   - visualClass: 0
     contentId: fusion.resource.spirit-plant-extract
     variant: default
     sprite: {fileID: 21300000, guid: e8d54f385388c459da72c653aadaefdb, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.33203125
+      y: 0.2109375
+      width: 0.32421875
+      height: 0.578125
   - visualClass: 0
     contentId: psionics.resource.amplifier
     variant: default
     sprite: {fileID: 21300000, guid: 907f66794103c4ef3afe8e7728208f52, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.25390625
+      y: 0.21875
+      width: 0.49609375
+      height: 0.57421875
   - visualClass: 0
     contentId: psionics.resource.consciousness-shard
     variant: default
     sprite: {fileID: 21300000, guid: 10559f9a4710241e98fbefab7dd74f54, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.234375
+      y: 0.22265625
+      width: 0.5234375
+      height: 0.578125
   - visualClass: 0
     contentId: psionics.resource.psionic-crystal
     variant: default
     sprite: {fileID: 21300000, guid: 4285c25e7e01a48f8a407af17b2dbecd, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.234375
+      y: 0.2734375
+      width: 0.52734375
+      height: 0.484375
   - visualClass: 0
     contentId: psionics.resource.resonance-metal
     variant: default
     sprite: {fileID: 21300000, guid: 08e20a83a63464de782628c0f4076fa8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2109375
+      y: 0.203125
+      width: 0.5546875
+      height: 0.578125
   - visualClass: 0
     contentId: technology.resource.alloy
     variant: default
     sprite: {fileID: 21300000, guid: f7490fca6775b4c08aab6012fead6527, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.18359375
+      y: 0.21875
+      width: 0.6328125
+      height: 0.56640625
   - visualClass: 0
     contentId: technology.resource.ammunition
     variant: default
     sprite: {fileID: 21300000, guid: 677e39f8512cf4cb4ad110315d1bda64, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.22265625
+      y: 0.20703125
+      width: 0.5703125
+      height: 0.57421875
   - visualClass: 0
     contentId: technology.resource.control-chip
     variant: default
     sprite: {fileID: 21300000, guid: 528a21f8d6a4646cc941f076e9c82266, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.203125
+      width: 0.65625
+      height: 0.6015625
   - visualClass: 0
     contentId: technology.resource.energy-cell
     variant: default
     sprite: {fileID: 21300000, guid: c98015ff0e94e4646a38d850a8d9f3d4, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2890625
+      y: 0.17578125
+      width: 0.421875
+      height: 0.66015625
   - visualClass: 0
     contentId: technology.resource.mechanical-component
     variant: default
     sprite: {fileID: 21300000, guid: eaa4b3a11f65245d2b9da4274a962ef7, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.1953125
+      width: 0.63671875
+      height: 0.62890625
   - visualClass: 0
     contentId: technology.resource.superconductive-coil
     variant: default
     sprite: {fileID: 21300000, guid: 2a001a538d51d4f4bbe1f4eeab6b6e10, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23046875
+      y: 0.23828125
+      width: 0.55078125
+      height: 0.5625
   - visualClass: 1
     contentId: core.research.acid-spit
     variant: default
     sprite: {fileID: 21300000, guid: bada0d68296ef4d76b1c4ec68e787fdd, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.23828125
+      width: 0.6171875
+      height: 0.5234375
   - visualClass: 1
     contentId: core.research.adaptive-tissue
     variant: default
     sprite: {fileID: 21300000, guid: 31ceddcb9f13144e5ab558b89b372d13, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.24609375
+      y: 0.26953125
+      width: 0.51171875
+      height: 0.484375
   - visualClass: 1
     contentId: core.research.alchemy
     variant: default
     sprite: {fileID: 21300000, guid: 9b78a133263a54018aa8575d9cfd64b9, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.234375
+      y: 0.19921875
+      width: 0.53125
+      height: 0.609375
   - visualClass: 1
     contentId: core.research.alloy-armor
     variant: default
     sprite: {fileID: 21300000, guid: 0a273c0e4194140589e8a94480ba5822, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.25
+      width: 0.60546875
+      height: 0.5
   - visualClass: 1
     contentId: core.research.artifact-crafting
     variant: default
     sprite: {fileID: 21300000, guid: 604f030694b02414b8f062e50e6fdb34, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.17578125
+      width: 0.59375
+      height: 0.65625
   - visualClass: 1
     contentId: core.research.automated-defense
     variant: default
     sprite: {fileID: 21300000, guid: 2a1943c6b7d28454caa5eb3860ee8130, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23046875
+      y: 0.16796875
+      width: 0.53515625
+      height: 0.640625
   - visualClass: 1
     contentId: core.research.automated-machinery
     variant: default
     sprite: {fileID: 21300000, guid: 27dad5fa7eeda4a23981ab65ecd478e3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.20703125
+      y: 0.23046875
+      width: 0.58203125
+      height: 0.546875
   - visualClass: 1
     contentId: core.research.ballistics
     variant: default
     sprite: {fileID: 21300000, guid: 08bfbf10f15aa43e0a9c2c6911e571c4, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.1953125
+      width: 0.60546875
+      height: 0.60546875
   - visualClass: 1
     contentId: core.research.behemoth-breeding
     variant: default
     sprite: {fileID: 21300000, guid: b0c64e817740c42c1aa3fca139fed8ef, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.21875
+      y: 0.21484375
+      width: 0.59765625
+      height: 0.57421875
   - visualClass: 1
     contentId: core.research.bio-cultivation
     variant: default
     sprite: {fileID: 21300000, guid: be085083c66a74c99a0999fe239cfb69, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.20703125
+      y: 0.17578125
+      width: 0.5859375
+      height: 0.66015625
   - visualClass: 1
     contentId: core.research.bridge.bio-hangar
     variant: default
     sprite: {fileID: 21300000, guid: 54b89212407004e15afc661f486290d8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16796875
+      y: 0.22265625
+      width: 0.6640625
+      height: 0.5625
   - visualClass: 1
     contentId: core.research.bridge.flesh-elixir
     variant: default
     sprite: {fileID: 21300000, guid: edd4f11bbe5994fe5a3821215129eab5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.27734375
+      y: 0.20703125
+      width: 0.45703125
+      height: 0.58203125
   - visualClass: 1
     contentId: core.research.bridge.high-frequency-sword
     variant: default
     sprite: {fileID: 21300000, guid: 26d1e6b04b0824720bd9fdf870d9b8e3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23046875
+      y: 0.1953125
+      width: 0.546875
+      height: 0.62109375
   - visualClass: 1
     contentId: core.research.bridge.psionic-mech
     variant: default
     sprite: {fileID: 21300000, guid: e3530e6dd22d941e6bf3104f3e701a4d, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2578125
+      y: 0.23046875
+      width: 0.48046875
+      height: 0.546875
   - visualClass: 1
     contentId: core.research.bridge.psionic-pulse
     variant: default
     sprite: {fileID: 21300000, guid: bff44a60a25e447ac83d14edd5e9bd5a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2109375
+      y: 0.28515625
+      width: 0.5625
+      height: 0.43359375
   - visualClass: 1
     contentId: core.research.bridge.spirit-plant
     variant: default
     sprite: {fileID: 21300000, guid: 4f3740fb904c7439b9598f16b294bff8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.27734375
+      y: 0.1640625
+      width: 0.44921875
+      height: 0.6640625
   - visualClass: 1
     contentId: core.research.carapace-growth
     variant: default
     sprite: {fileID: 21300000, guid: 2c36bdd4f3420448ab5d9b793bbe34fb, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.20703125
+      width: 0.6171875
+      height: 0.59765625
   - visualClass: 1
     contentId: core.research.collective-consciousness
     variant: default
     sprite: {fileID: 21300000, guid: c9c4cfed9bdd24c0c86d86f5cff21ca0, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.21875
+      y: 0.23046875
+      width: 0.5625
+      height: 0.5390625
   - visualClass: 1
     contentId: core.research.consciousness-network
     variant: default
     sprite: {fileID: 21300000, guid: 52ebaeeae3be6496ab6634cfe8e0a91a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2265625
+      y: 0.234375
+      width: 0.546875
+      height: 0.5546875
   - visualClass: 1
     contentId: core.research.energy-weapons
     variant: default
     sprite: {fileID: 21300000, guid: 1af11e05f304e424986aa7b0ee75edfe, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2109375
+      y: 0.2109375
+      width: 0.625
+      height: 0.578125
   - visualClass: 1
     contentId: core.research.formation-reinforcement
     variant: default
     sprite: {fileID: 21300000, guid: 06d0e37f60b15447ba4f9c7c7b3cd47a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2421875
+      y: 0.2265625
+      width: 0.515625
+      height: 0.5546875
   - visualClass: 1
     contentId: core.research.gene-splicing
     variant: default
     sprite: {fileID: 21300000, guid: 170bcac84cb734f40ab2e0fc80099eff, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.359375
+      y: 0.203125
+      width: 0.27734375
+      height: 0.59765625
   - visualClass: 1
     contentId: core.research.legacy-analysis
     variant: default
     sprite: {fileID: 21300000, guid: 6bb76ab04a7074333850a4890c5c012a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.17578125
+      width: 0.59375
+      height: 0.65625
   - visualClass: 1
     contentId: core.research.metabolic-acceleration
     variant: default
     sprite: {fileID: 21300000, guid: 7578def23dc984baf9893e71c5eccfae, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.20703125
+      width: 0.6328125
+      height: 0.58984375
   - visualClass: 1
     contentId: core.research.mind-control
     variant: default
     sprite: {fileID: 21300000, guid: 036829adbf6b14a6d967e231e85d47a5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.31640625
+      y: 0.1796875
+      width: 0.35546875
+      height: 0.6328125
   - visualClass: 1
     contentId: core.research.mind-resonance
     variant: default
     sprite: {fileID: 21300000, guid: c335397470cdc4c0082bd534d98b1b84, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.16015625
+      width: 0.671875
+      height: 0.67578125
   - visualClass: 1
     contentId: core.research.mind-shield
     variant: default
     sprite: {fileID: 21300000, guid: ae194461c5bca4639829f7b5ff34fed8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.265625
+      y: 0.20703125
+      width: 0.45703125
+      height: 0.578125
   - visualClass: 1
     contentId: core.research.mind-spire
     variant: default
     sprite: {fileID: 21300000, guid: c8a788ddd825a4f4f839fce9ba2a1103, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.28125
+      y: 0.15234375
+      width: 0.4375
+      height: 0.71484375
   - visualClass: 1
     contentId: core.research.orbital-supply
     variant: default
     sprite: {fileID: 21300000, guid: a78613c8d1d0247768dbc543ff9bd085, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.203125
+      y: 0.19140625
+      width: 0.5859375
+      height: 0.609375
   - visualClass: 1
     contentId: core.research.precision-assembly
     variant: default
     sprite: {fileID: 21300000, guid: 98d37af72ae2245268f263e2bb480f3f, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16015625
+      y: 0.1953125
+      width: 0.67578125
+      height: 0.6171875
   - visualClass: 1
     contentId: core.research.precognitive-sense
     variant: default
     sprite: {fileID: 21300000, guid: da7f80718c59b47d39b79e2cef618d3f, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.26953125
+      y: 0.21484375
+      width: 0.46875
+      height: 0.5625
   - visualClass: 1
     contentId: core.research.psionic-workshop
     variant: default
     sprite: {fileID: 21300000, guid: 5825efc9996eb460390d19a708cec1f3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.25
+      y: 0.20703125
+      width: 0.4921875
+      height: 0.59765625
   - visualClass: 1
     contentId: core.research.puppetry
     variant: default
     sprite: {fileID: 21300000, guid: 168529bb5957d48bc80ca320203a8771, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.26171875
+      y: 0.16796875
+      width: 0.52734375
+      height: 0.67578125
   - visualClass: 1
     contentId: core.research.scrap-processing
     variant: default
     sprite: {fileID: 21300000, guid: f33847b7bd2584ae288661e6f373455a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.21484375
+      y: 0.21484375
+      width: 0.5703125
+      height: 0.6015625
   - visualClass: 1
     contentId: core.research.spirit-gathering
     variant: default
     sprite: {fileID: 21300000, guid: 883fa1afcb6214bca8740b19e15267ee, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2109375
+      y: 0.2265625
+      width: 0.578125
+      height: 0.5703125
   - visualClass: 1
     contentId: core.research.spirit-sensing
     variant: default
     sprite: {fileID: 21300000, guid: 58de700a92bc24805aa3158945792e1d, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2265625
+      y: 0.1484375
+      width: 0.5546875
+      height: 0.7109375
   - visualClass: 1
     contentId: core.research.spore-dispersal
     variant: default
     sprite: {fileID: 21300000, guid: b56d96970d1a1467b89672e5eeec8726, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.24609375
+      width: 0.60546875
+      height: 0.5625
   - visualClass: 1
     contentId: core.research.sword-array
     variant: default
     sprite: {fileID: 21300000, guid: 3efab4b03f1fc4cf99f62b96f0b5fba9, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.26953125
+      y: 0.22265625
+      width: 0.51171875
+      height: 0.5
   - visualClass: 1
     contentId: core.research.sword-riding
     variant: default
     sprite: {fileID: 21300000, guid: a611004e6081e4ac594de9db32f54971, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2109375
+      y: 0.23828125
+      width: 0.609375
+      height: 0.55859375
   - visualClass: 1
     contentId: core.research.talisman-basics
     variant: default
     sprite: {fileID: 21300000, guid: 488c71796511b4ed794adb648362738c, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.22265625
+      y: 0.1875
+      width: 0.546875
+      height: 0.62109375
   - visualClass: 1
     contentId: core.research.thermal-engineering
     variant: default
     sprite: {fileID: 21300000, guid: 47d4cad99db694f1e9d3ce55bf1db67f, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23828125
+      y: 0.203125
+      width: 0.5078125
+      height: 0.60546875
   - visualClass: 1
     contentId: core.research.thought-acceleration
     variant: default
     sprite: {fileID: 21300000, guid: 641e4776de1b048c7bf51e06360b4d50, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.19140625
+      y: 0.21484375
+      width: 0.63671875
+      height: 0.5703125
   - visualClass: 1
     contentId: core.research.tissue-regeneration
     variant: default
     sprite: {fileID: 21300000, guid: 8224cdf09f8484f4eae5f409aff17cea, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.20703125
+      y: 0.17578125
+      width: 0.59375
+      height: 0.66015625
   - visualClass: 1
     contentId: core.research.unmanned-systems
     variant: default
     sprite: {fileID: 21300000, guid: cbf3c6ff323044cdeb4a96422bdc66bf, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1953125
+      y: 0.25
+      width: 0.609375
+      height: 0.52734375
   - visualClass: 2
     contentId: biological.building.acid-tower
     variant: default
     sprite: {fileID: 21300000, guid: 1549e2a7c03ee4211ad22f70df6a8368, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.19140625
+      y: 0.1796875
+      width: 0.60546875
+      height: 0.66796875
   - visualClass: 2
     contentId: biological.building.behemoth-pen
     variant: default
     sprite: {fileID: 21300000, guid: 4aedf27c74dd74908850eeeab620e103, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.125
+      y: 0.26171875
+      width: 0.75390625
+      height: 0.47265625
   - visualClass: 2
     contentId: biological.building.breeding-chamber
     variant: default
     sprite: {fileID: 21300000, guid: aa6483ef67ef34b14b26aeebfa4341b8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.125
+      y: 0.203125
+      width: 0.75
+      height: 0.5625
   - visualClass: 2
     contentId: biological.building.colony-pool
     variant: default
     sprite: {fileID: 21300000, guid: 838a0e0ab4a55433ea47820eb71d0ab2, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.140625
+      y: 0.234375
+      width: 0.71875
+      height: 0.55859375
   - visualClass: 2
     contentId: biological.building.metabolic-furnace
     variant: default
     sprite: {fileID: 21300000, guid: d9817cbc60ae24c2e8d8d4de50ce10f0, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12890625
+      y: 0.1484375
+      width: 0.74609375
+      height: 0.67578125
   - visualClass: 2
     contentId: biological.building.spore-tower
     variant: default
     sprite: {fileID: 21300000, guid: 9a5cb7e4826bf4250b816a233994df97, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23828125
+      y: 0.1328125
+      width: 0.53515625
+      height: 0.7421875
   - visualClass: 2
     contentId: bridge.building.bio-hangar
     variant: default
     sprite: {fileID: 21300000, guid: 59e5f461c792841f4b9a19f5b70f7946, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.27734375
+      width: 0.640625
+      height: 0.47265625
   - visualClass: 2
     contentId: bridge.building.emp-tower
     variant: default
     sprite: {fileID: 21300000, guid: c00168d5352414e29a5875f838261057, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.234375
+      y: 0.18359375
+      width: 0.51953125
+      height: 0.625
   - visualClass: 2
     contentId: bridge.building.high-frequency-sword-forge
     variant: default
     sprite: {fileID: 21300000, guid: dff8e69965bf146bea318bb584347f34, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.15625
+      y: 0.16796875
+      width: 0.69140625
+      height: 0.6640625
   - visualClass: 2
     contentId: bridge.building.psionic-mech-factory
     variant: default
     sprite: {fileID: 21300000, guid: a4aaca5682b8d4cf9ba01203b9fd1fd5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.19140625
+      y: 0.2578125
+      width: 0.6171875
+      height: 0.5
   - visualClass: 2
     contentId: bridge.building.spirit-plant-garden
     variant: default
     sprite: {fileID: 21300000, guid: 22f8fb46bf866489d96407188d5bf584, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.1953125
+      width: 0.69140625
+      height: 0.60546875
   - visualClass: 2
     contentId: core.building.assembler
     variant: default
     sprite: {fileID: 21300000, guid: 2c22f43e37f0746248e781f56a5dfc14, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1171875
+      y: 0.21875
+      width: 0.76953125
+      height: 0.546875
   - visualClass: 2
     contentId: core.building.automated-repair-bay
     variant: default
     sprite: {fileID: 21300000, guid: 35d05a7acb6ae41f98b7df096f8e2a03, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16796875
+      y: 0.1875
+      width: 0.67578125
+      height: 0.625
   - visualClass: 2
     contentId: core.building.heavy-machine-gun-turret
     variant: default
     sprite: {fileID: 21300000, guid: d97f40d0570ff42988c4679f15ec1118, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.16015625
+      width: 0.7109375
+      height: 0.671875
   - visualClass: 2
     contentId: core.building.housing
     variant: default
     sprite: {fileID: 21300000, guid: d03b5c1b19a1b4fc6beae0ae94f2dcf5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2265625
+      y: 0.203125
+      width: 0.5625
+      height: 0.6015625
   - visualClass: 2
     contentId: core.building.laser-tower
     variant: default
     sprite: {fileID: 21300000, guid: 154d9e11a66954f4c811c2cf03ed1e41, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.18359375
+      y: 0.15625
+      width: 0.62109375
+      height: 0.64453125
   - visualClass: 2
     contentId: core.building.machine-gun-turret
     variant: default
     sprite: {fileID: 21300000, guid: 842d05765762041a58402da991001abb, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.2265625
+      y: 0.21875
+      width: 0.5625
+      height: 0.54296875
   - visualClass: 2
     contentId: core.building.mining-station
     variant: default
     sprite: {fileID: 21300000, guid: 401a0edf670bd4b658fdae31d693d461, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1484375
+      y: 0.1875
+      width: 0.703125
+      height: 0.63671875
   - visualClass: 2
     contentId: core.building.research-station
     variant: default
     sprite: {fileID: 21300000, guid: d3bb86dfc6430439e87c68422818738b, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.19140625
+      width: 0.671875
+      height: 0.64453125
   - visualClass: 2
     contentId: core.building.smelter
     variant: default
     sprite: {fileID: 21300000, guid: 4d3f17978b7394e22b3f27bf2f287310, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1796875
+      y: 0.15625
+      width: 0.65234375
+      height: 0.6953125
   - visualClass: 2
     contentId: core.building.wall
     variant: default
     sprite: {fileID: 21300000, guid: d112b9c7cd7a64e3ab7d246e1112ab76, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.125
+      y: 0.18359375
+      width: 0.7578125
+      height: 0.62890625
   - visualClass: 2
     contentId: core.building.warehouse
     variant: default
     sprite: {fileID: 21300000, guid: 84e0150187f1f41bbad4da74faeeb372, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.140625
+      y: 0.17578125
+      width: 0.7265625
+      height: 0.66015625
   - visualClass: 2
     contentId: cultivation.building.alchemy-chamber
     variant: default
     sprite: {fileID: 21300000, guid: f7fccba22124c4529b996b0c7f4d7af6, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.19140625
+      y: 0.16796875
+      width: 0.6171875
+      height: 0.671875
   - visualClass: 2
     contentId: cultivation.building.artifact-workshop
     variant: default
     sprite: {fileID: 21300000, guid: 6abe66c54bd3d4db08e562273e47272d, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.17578125
+      width: 0.66796875
+      height: 0.66015625
   - visualClass: 2
     contentId: cultivation.building.puppet-workshop
     variant: default
     sprite: {fileID: 21300000, guid: 9f1e28d87e56147d3935149d1a9eb0a8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16015625
+      y: 0.14453125
+      width: 0.6875
+      height: 0.7265625
   - visualClass: 2
     contentId: cultivation.building.spirit-fire-furnace
     variant: default
     sprite: {fileID: 21300000, guid: c2bd0200ce8644ad18860e832326e876, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.171875
+      y: 0.171875
+      width: 0.6640625
+      height: 0.66796875
   - visualClass: 2
     contentId: cultivation.building.spirit-gathering-array
     variant: default
     sprite: {fileID: 21300000, guid: 88ccb67c113aa42d59d5a08adfe83e22, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.13671875
+      y: 0.140625
+      width: 0.7265625
+      height: 0.66796875
   - visualClass: 2
     contentId: cultivation.building.sword-array-tower
     variant: default
     sprite: {fileID: 21300000, guid: 71d4ec31f3b974bde8de61e6bff43829, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1875
+      y: 0.171875
+      width: 0.62109375
+      height: 0.6484375
   - visualClass: 2
     contentId: cultivation.building.sword-riding-platform
     variant: default
     sprite: {fileID: 21300000, guid: 5aac83a35e9064c6b92356a663373c73, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.171875
+      y: 0.171875
+      width: 0.6640625
+      height: 0.66015625
   - visualClass: 2
     contentId: psionics.building.consciousness-network
     variant: default
     sprite: {fileID: 21300000, guid: 8db9adb27de3e4e67a42da39b13d4ada, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.13671875
+      y: 0.25390625
+      width: 0.72265625
+      height: 0.53515625
   - visualClass: 2
     contentId: psionics.building.mind-spire
     variant: default
     sprite: {fileID: 21300000, guid: 75bdf6eaa9f1146f5bfd428a8cd8baac, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.24609375
+      y: 0.1328125
+      width: 0.53125
+      height: 0.74609375
   - visualClass: 2
     contentId: psionics.building.resonance-furnace
     variant: default
     sprite: {fileID: 21300000, guid: 18cc07884bec345cc854331a79527728, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.16796875
+      width: 0.64453125
+      height: 0.6640625
   - visualClass: 2
     contentId: psionics.building.shield-generator
     variant: default
     sprite: {fileID: 21300000, guid: 0847600ab619c4d18ae1864d66ee4d81, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.13671875
+      y: 0.17578125
+      width: 0.71484375
+      height: 0.640625
   - visualClass: 2
     contentId: psionics.building.workshop
     variant: default
     sprite: {fileID: 21300000, guid: 97e8cd45d96b143d2bf0b30cd2cf6d59, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16015625
+      y: 0.23046875
+      width: 0.6796875
+      height: 0.5625
   - visualClass: 2
     contentId: technology.building.power-plant
     variant: default
     sprite: {fileID: 21300000, guid: dff0e5a75eb094be38935e912c97f371, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.1640625
+      y: 0.19140625
+      width: 0.66015625
+      height: 0.61328125
   - visualClass: 3
     contentId: core.ui.background.research-tree
     variant: default
     sprite: {fileID: 21300000, guid: 5b47fbc1f7b69474ca1d26202ec12dc6, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0
+      y: 0
+      width: 1
+      height: 1
   - visualClass: 3
     contentId: core.ui.connector.technology-branch
     variant: default
     sprite: {fileID: 21300000, guid: a19f9c72689104ccb9cb4b950948b8ac, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.125
+      y: 0.15234375
+      width: 0.75
+      height: 0.6953125
   - visualClass: 3
     contentId: core.ui.control.primary-button
     variant: default
     sprite: {fileID: 21300000, guid: ec7d265b0e0f244c9aad854c6fb96b36, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.10546875
+      y: 0.31640625
+      width: 0.7890625
+      height: 0.3671875
   - visualClass: 3
     contentId: core.ui.divider.terminal-horizontal
     variant: default
     sprite: {fileID: 21300000, guid: f482264ae17ee460d88d86e9450fd40f, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.05859375
+      y: 0.4375
+      width: 0.8828125
+      height: 0.125
   - visualClass: 3
     contentId: core.ui.frame.primary-panel
     variant: default
     sprite: {fileID: 21300000, guid: 89c8128c2ce4a4bc5848e1dbf115d634, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.078125
+      y: 0.078125
+      width: 0.84765625
+      height: 0.84375
   - visualClass: 3
     contentId: core.ui.frame.secondary-card
     variant: default
     sprite: {fileID: 21300000, guid: dea4b189404cf47858be936ad3eaf8d5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.09375
+      y: 0.09765625
+      width: 0.8125
+      height: 0.80859375
   - visualClass: 3
     contentId: core.ui.frame.technology-node
     variant: default
     sprite: {fileID: 21300000, guid: 40de41f2e001a4fa1a0a9fb4d84347b4, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12890625
+      y: 0.10546875
+      width: 0.73828125
+      height: 0.7890625
   - visualClass: 3
     contentId: core.ui.icon.search
     variant: default
     sprite: {fileID: 21300000, guid: 0007c89ee6e1145c49cf2dead8252cbd, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.13671875
+      y: 0.125
+      width: 0.7265625
+      height: 0.75
   - visualClass: 3
     contentId: core.ui.status.communication
     variant: default
     sprite: {fileID: 21300000, guid: f4f111bf8f1df42888096945df00e497, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.15625
+      y: 0.12109375
+      width: 0.6875
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.status.expedition
     variant: default
     sprite: {fileID: 21300000, guid: e6aba3d2060a048a78054ac6a8a911e5, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.16796875
+      y: 0.12109375
+      width: 0.6640625
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.status.follow
     variant: default
     sprite: {fileID: 21300000, guid: 63cc3bb84b9c94e35b2ad38ff1a8ef2c, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12109375
+      y: 0.2265625
+      width: 0.7578125
+      height: 0.55078125
   - visualClass: 3
     contentId: core.ui.status.guard
     variant: default
     sprite: {fileID: 21300000, guid: d9a93390535dd43aa81fcad688fb592e, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.15625
+      y: 0.12109375
+      width: 0.68359375
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.status.loyalty
     variant: default
     sprite: {fileID: 21300000, guid: 8ae49c46e824c43cca85bcb11e45a7e0, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.140625
+      y: 0.12109375
+      width: 0.71875
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.status.rescue
     variant: default
     sprite: {fileID: 21300000, guid: 80c26dc27e6d24dbd9ce55ec77b6c5ab, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12109375
+      y: 0.125
+      width: 0.7578125
+      height: 0.75
   - visualClass: 3
     contentId: core.ui.status.retreat
     variant: default
     sprite: {fileID: 21300000, guid: 3654ffeff85884807b9c11790519ddfe, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12890625
+      y: 0.12109375
+      width: 0.73828125
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.status.transport
     variant: default
     sprite: {fileID: 21300000, guid: fd56451d08d514b399b9381623f3a3bf, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12109375
+      y: 0.28125
+      width: 0.7578125
+      height: 0.4375
   - visualClass: 3
     contentId: core.ui.tab.army
     variant: default
     sprite: {fileID: 21300000, guid: 410d8f643268d4989b4fe886aff4ddb3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.19140625
+      y: 0.12109375
+      width: 0.61328125
+      height: 0.7578125
   - visualClass: 3
     contentId: core.ui.tab.politics
     variant: default
     sprite: {fileID: 21300000, guid: 85d5378e3abb64446ab26713222dc6ac, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12109375
+      y: 0.13671875
+      width: 0.7578125
+      height: 0.73046875
   - visualClass: 3
     contentId: core.ui.tab.world
     variant: default
     sprite: {fileID: 21300000, guid: 0463cff851fc147228bc7580bdcf367e, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.12109375
+      y: 0.12109375
+      width: 0.75390625
+      height: 0.7578125
   - visualClass: 4
     contentId: core.character.cen-jin
     variant: default
     sprite: {fileID: 21300000, guid: 44f516807b69f4b14b4b9f6a92d70ec3, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.22265625
+      y: 0.099609375
+      width: 0.5546875
+      height: 0.80078125
   - visualClass: 4
     contentId: core.character.han-gu
     variant: default
     sprite: {fileID: 21300000, guid: 8c49e8107a4df41e482aa27f93175d1a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.18945312
+      y: 0.099609375
+      width: 0.6191406
+      height: 0.8027344
   - visualClass: 4
     contentId: core.character.lin-xi
     variant: default
     sprite: {fileID: 21300000, guid: 6388bbbfe9ca04ac2abd7d5eb3928f12, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.26171875
+      y: 0.099609375
+      width: 0.4765625
+      height: 0.8027344
   - visualClass: 5
     contentId: core.world-marker.convoy
     variant: default
     sprite: {fileID: 21300000, guid: c9db832d97bd94473ad8d273492403c8, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.07421875
+      y: 0.296875
+      width: 0.84765625
+      height: 0.41145834
   - visualClass: 5
     contentId: core.world-marker.outpost
     variant: default
     sprite: {fileID: 21300000, guid: 4ec54b5939d5040c68f6d7013c977c6b, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.125
+      y: 0.078125
+      width: 0.74609375
+      height: 0.84765625
   - visualClass: 5
     contentId: core.world-marker.resource-node
     variant: default
     sprite: {fileID: 21300000, guid: b2cb732e047b94104802e920092eb789, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.08203125
+      y: 0.0625
+      width: 0.8359375
+      height: 0.875
   - visualClass: 5
     contentId: core.world-marker.secondary-city
     variant: default
     sprite: {fileID: 21300000, guid: 0948d962e3f364f7ca73f513d0dae41c, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.07421875
+      y: 0.08984375
+      width: 0.84765625
+      height: 0.8203125
   - visualClass: 5
     contentId: core.world-marker.selection-reticle
     variant: default
     sprite: {fileID: 21300000, guid: 0f1631c005257449cb6890762a28da58, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.0859375
+      y: 0.0859375
+      width: 0.828125
+      height: 0.828125
   - visualClass: 6
     contentId: biological.unit.bred-behemoth
     variant: default
     sprite: {fileID: 21300000, guid: bf1cf1e468fe748898a575812876147a, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.09765625
+      y: 0.19921875
+      width: 0.8027344
+      height: 0.6015625
   - visualClass: 6
     contentId: cultivation.unit.combat-puppet
     variant: default
     sprite: {fileID: 21300000, guid: 132ee440585ea477481c324073c367d0, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.33007812
+      y: 0.099609375
+      width: 0.33789062
+      height: 0.8027344
   - visualClass: 6
     contentId: fusion.unit.bio-mechanical-behemoth
     variant: default
     sprite: {fileID: 21300000, guid: a1d9bfb97f4e24a488f60b75b3d79e67, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.09765625
+      y: 0.18164062
+      width: 0.8027344
+      height: 0.63671875
   - visualClass: 6
     contentId: fusion.unit.psionic-mech
     variant: default
     sprite: {fileID: 21300000, guid: f210dd4a94bca467aad2d9841bff8418, type: 3}
+    visibleBoundsNormalized:
+      serializedVersion: 2
+      x: 0.23242188
+      y: 0.099609375
+      width: 0.53515625
+      height: 0.8027344
   recipes:
   - recipeId: biological.production.acid-gland
     primaryOutputContentId: biological.resource.acid-gland

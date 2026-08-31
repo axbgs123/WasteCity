@@ -722,6 +722,7 @@
         "Assets/_Game/Scripts/Graybox3D/BuildingIconCatalog3D.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchIconCatalog3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Production2DVisualScalePolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/GrayboxWorldView3D.cs",
         "Assets/_Game/Scripts/Graybox3D/IGrayboxInputInterceptor.cs",
         "Assets/_Game/Scripts/Graybox3D/IGrayboxTerrainPresentation3D.cs",
@@ -750,6 +751,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0024CityBuildingPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0025Production2DVisualScaleTests.cs",
         "Assets/_Game/Tests/EditMode/VisualSlotTests.cs"
       ],
       "ScenePaths": [
@@ -763,7 +765,8 @@
         "IDEA-0019",
         "IDEA-0021",
         "IDEA-0023",
-        "IDEA-0024"
+        "IDEA-0024",
+        "IDEA-0025"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -1725,7 +1728,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "显示当前 3D 场景的资源栏、账本、背包、33 条配方、仓库和生产通道，并以 1920×1080 不透明背景、Header/Tree/Footer、四路线泳道/双子列、五路线与五结构化状态筛选、Current/Latest 和固定详情区呈现正式 44 节点科技树。",
+      "UseSummary": "显示当前 3D 场景的资源栏、账本、背包、33 条配方、仓库和生产通道，并以 reference-fidelity v3 的 1920×1080 蚀刻工业全屏背景、单排顶部工具栏、四路线细框节点、真实科技与材料图标、默认全树概览和底部六段详情舱呈现正式 44 节点科技树。",
       "BoundarySummary": "只负责 GrayboxPrototype3D 的 UGUI 结构、表现态与命令事件；视图消费结构化研究 DTO 与共享图标目录，不持有库存、队列、研究或解锁真值，不从中文文案推断状态，也不自行扣资源、推进时间或增加 schema 字段。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
@@ -2896,7 +2899,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "把正式科技目录投影为稳定的 44 节点、49 依赖边和 6 个双前置桥；统一 Profile 拥有三段参考区、四路线泳道、双子列、真实前置汇合点和紧凑节点尺寸，并保留最新可研究、Fit/Focus 与指针锚定缩放纯计算。",
+      "UseSummary": "把正式科技目录投影为稳定的 44 节点、49 依赖边和 6 个双前置桥；统一 Profile 固定 1920×1080 三段区域、顶部五组槽、底部六舱、四路线泳道/双子列、180×58 普通节点、90×112 桥节点和 350×74 公共根，并保留 Fit/Focus 与指针锚定缩放纯计算。",
       "BoundarySummary": "只从 ResearchCatalog 派生图真值与表现坐标，不创建场景对象，不读取输入、库存、研究运行态或存档，也不解析中文状态文案；Profile 不得成为第二套科技目录。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
@@ -3452,20 +3455,24 @@
     {
       "Id": "production2d-visual-catalog-3d",
       "ChineseName": "统一二维视觉目录",
-    "TypeNames": [
-      "Production2DVisualEntry3D",
-      "Production2DRecipeVisualEntry3D",
-      "Production2DVisualCatalog3D"
-    ],
-    "AssetPaths": [
-      "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs"
+      "TypeNames": [
+        "Production2DVisualEntry3D",
+        "Production2DRecipeVisualEntry3D",
+        "Production2DVisualCatalog3D",
+        "Production2DVisualFraming3D",
+        "Production2DVisualScalePolicy3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Production2DVisualCatalog3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Production2DVisualScalePolicy3D.cs"
       ],
       "FeatureGroupId": "presentation-art-integration",
       "ReuseLevel": "Recommended",
-      "UseSummary": "用稳定三元组 visualClass/contentId/variant 统一解析 31 物品、44 科技、35 建筑、4 单位、19 UI、3 人物和 5 世界标记共 141 个视觉条目，并登记 33 条配方的主产物与机器/手工角标投影；第 19 项 UI 是正式科技树背景。",
-      "BoundarySummary": "运行时资产只保存稳定视觉键、Sprite、配方视觉投影和类别回退；机器清单另行保存制作、导入与审核元数据。二者都不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局；未知键只能回退，不能改写玩法 ID。",
+      "UseSummary": "用稳定三元组 visualClass/contentId/variant 统一解析 141 个视觉条目、33 条配方视觉投影及每张图的归一化 Alpha 主体边界；尺度策略按物品/科技/建筑/人物/单位/世界标记语义把不同透明留白归一为一致可见主体占比。",
+      "BoundarySummary": "运行时资产只保存稳定视觉键、Sprite、可见边界、配方视觉投影和类别回退；尺度策略只修正表现，不拥有资源数量、配方数值、科技状态、建筑规则或 UI 布局。UI 面板/边框不按内容图标裁切，未知键只能安全回退。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0025Production2DVisualScaleTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DVisualCatalogAtlasTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs"
@@ -3474,7 +3481,8 @@
         "IDEA-0016",
         "IDEA-0021",
         "IDEA-0023",
-        "IDEA-0024"
+        "IDEA-0024",
+        "IDEA-0025"
       ]
     },
     {

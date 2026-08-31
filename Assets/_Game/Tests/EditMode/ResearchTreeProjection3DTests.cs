@@ -148,26 +148,31 @@ namespace WasteCity.Tests
                 .ToArray();
             Assert.That(bridges,
                 Has.Length.EqualTo(BridgeX.Length * 2));
-            for (var index = 0; index < bridges.Length; index++)
+            float[] bridgeRows =
+                ResearchTreeVisualLayoutProfile3D.BridgeRows;
+            var expectedBridgeGutters = new Dictionary<string, int>
             {
-                ResearchDefinition bridge = bridges[index].Definition;
-                float[] prerequisiteCenters = bridge.RequiredResearchIds
-                    .Select(ResearchCatalog.Find)
-                    .Where(value => value != null &&
-                        RouteCenterX.ContainsKey(value.Route))
-                    .Select(value => RouteCenterX[value.Route])
-                    .Distinct()
-                    .ToArray();
-                Assert.That(prerequisiteCenters, Is.Not.Empty,
-                    bridges[index].ResearchId);
-                Assert.That(bridges[index].Position.x,
-                    Is.EqualTo(prerequisiteCenters.Average()).Within(.001f),
-                    bridges[index].ResearchId +
-                    " must sit at the actual prerequisite convergence.");
-                Assert.That(bridges[index].Position.y,
-                    Is.GreaterThanOrEqualTo(RowY[4]),
-                    bridges[index].ResearchId);
+                { "core.research.bridge.high-frequency-sword", 0 },
+                { "core.research.bridge.bio-hangar", 0 },
+                { "core.research.bridge.spirit-plant", 1 },
+                { "core.research.bridge.flesh-elixir", 1 },
+                { "core.research.bridge.psionic-mech", 2 },
+                { "core.research.bridge.psionic-pulse", 2 },
+            };
+            foreach (ResearchTreeNodeProjection3D bridge in bridges)
+            {
+                int gutter = expectedBridgeGutters[bridge.ResearchId];
+                Assert.That(bridge.Position.x, Is.EqualTo(BridgeX[gutter]),
+                    bridge.ResearchId +
+                    " must occupy the gutter shared by its prerequisite routes.");
+                Assert.That(bridgeRows, Does.Contain(bridge.Position.y),
+                    bridge.ResearchId +
+                    " must occupy one of the deterministic bridge shelves.");
             }
+            foreach (float gutter in BridgeX)
+                Assert.That(bridges.Count(value =>
+                    Mathf.Approximately(value.Position.x, gutter)),
+                    Is.EqualTo(2));
             Assert.That(bridges.Select(value => value.Position).Distinct()
                 .Count(), Is.EqualTo(bridges.Length));
 
@@ -205,6 +210,36 @@ namespace WasteCity.Tests
                 first.Edges.Select(EdgeSignature).ToArray(),
                 second.Edges.Select(EdgeSignature).ToArray());
             Assert.That(second.Bounds, Is.EqualTo(first.Bounds));
+        }
+
+        [Test]
+        public void Bounds_IncludeTrueNodeSizesAndRouteHeaderClearance()
+        {
+            ResearchTreeProjection3D projection = CreateProjection();
+            float highestNodeTop = projection.Nodes.Max(node =>
+                node.Position.y + (node.Definition.Route ==
+                    DevelopmentRoute.Bridge
+                        ? ResearchTreeVisualLayoutProfile3D.BridgeNodeSize.y
+                        : node.Definition.Route == DevelopmentRoute.Common
+                            ? ResearchTreeVisualLayoutProfile3D.CommonNodeSize.y
+                            : ResearchTreeVisualLayoutProfile3D.CompactNodeSize.y) *
+                .5f);
+
+            Assert.That(projection.Bounds.yMax,
+                Is.GreaterThanOrEqualTo(highestNodeTop +
+                    ResearchTreeVisualLayoutProfile3D
+                        .RouteHeaderBoundsPadding));
+            Assert.That(projection.Bounds.xMin,
+                Is.LessThanOrEqualTo(projection.Nodes.Min(node =>
+                    node.Position.x - (node.Definition.Route ==
+                        DevelopmentRoute.Common
+                            ? ResearchTreeVisualLayoutProfile3D
+                                .CommonNodeSize.x
+                            : node.Definition.Route == DevelopmentRoute.Bridge
+                                ? ResearchTreeVisualLayoutProfile3D
+                                    .BridgeNodeSize.x
+                                : ResearchTreeVisualLayoutProfile3D
+                                    .CompactNodeSize.x) * .5f)));
         }
 
         [Test]

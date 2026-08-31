@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using WasteCity.Economy;
+using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
@@ -22,6 +23,8 @@ namespace WasteCity.Graybox3D.Building
     {
         private const float ProductionRowBaseHeight = 192f;
         private const float ProductionTransferButtonHeight = 28f;
+        private static readonly Vector2 ProductionRowResourceIconPosition =
+            new Vector2(11f, 0f);
         private static readonly Color PanelColor =
             new Color(.07f, .09f, .11f, .96f);
         private static readonly Color ButtonColor =
@@ -368,6 +371,11 @@ namespace WasteCity.Graybox3D.Building
                     amount > 0;
                 icon.sprite = visible ? ResolveIcon(resourceId) : null;
                 icon.gameObject.SetActive(visible && icon.sprite != null);
+                if (visible)
+                    ApplyResourceFraming(
+                        icon,
+                        resourceId,
+                        new Vector2(40f, 14f));
             }
         }
 
@@ -570,8 +578,14 @@ namespace WasteCity.Graybox3D.Building
             TryBuildUi();
             if (index < 0 || productionStateContent == null) return;
             ProductionRow row = EnsureProductionRow(index);
-            SetIcon(row.InputIcon, inputResourceId);
-            SetIcon(row.OutputIcon, outputResourceId);
+            SetIcon(
+                row.InputIcon,
+                inputResourceId,
+                ProductionRowResourceIconPosition);
+            SetIcon(
+                row.OutputIcon,
+                outputResourceId,
+                ProductionRowResourceIconPosition);
         }
 
         public void SetWarehouseDetail(
@@ -1325,6 +1339,13 @@ namespace WasteCity.Graybox3D.Building
                 "core.character.cen-jin");
             portrait.preserveAspect = true;
             portrait.raycastTarget = false;
+            Production2DVisualScalePolicy3D.ApplyToUiImage(
+                portrait,
+                Production2DVisualClass.Character,
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    Production2DVisualClass.Character,
+                    "core.character.cen-jin"),
+                portraitRect.anchoredPosition);
 
             Text title = CreateLabel(
                 inventoryCraftingPanel,
@@ -1616,7 +1637,15 @@ namespace WasteCity.Graybox3D.Building
                 "ResearchTreePanel",
                 new Vector2(.5f, .5f),
                 Vector2.zero,
-                new Vector2(1500f, 850f));
+                ResearchTreeVisualLayoutProfile3D.ReferenceResolution);
+            Canvas researchCanvas =
+                researchTreePanel.gameObject.AddComponent<Canvas>();
+            researchCanvas.overrideSorting = true;
+            researchCanvas.sortingOrder = 90;
+            Image inputBlocker = researchTreePanel.GetComponent<Image>();
+            if (inputBlocker != null)
+                inputBlocker.raycastTarget = true;
+            researchTreePanel.gameObject.AddComponent<GraphicRaycaster>();
             researchTreeView = researchTreePanel.gameObject.AddComponent<
                 GrayboxResearchTreeView3D>();
             researchTreeView.Initialize(
@@ -1670,6 +1699,10 @@ namespace WasteCity.Graybox3D.Building
                 name + ".Icon",
                 resourceId);
             SetLayout(icon.rectTransform, compact ? 20f : 24f, 0f, 0f);
+            ApplyResourceFraming(
+                icon,
+                resourceId,
+                icon.rectTransform.anchoredPosition);
             Text nameLabel = CreateLabel(header, name + ".Name", title, 12);
             SetLayout(nameLabel.rectTransform, 0f, 0f, 1f);
 
@@ -1819,7 +1852,7 @@ namespace WasteCity.Graybox3D.Building
                 "ProductionState.Item." + index + ".Input.Icon",
                 null,
                 20f,
-                new Vector2(11f, 0f));
+                ProductionRowResourceIconPosition);
             inputIcon.gameObject.SetActive(false);
             input.rectTransform.offsetMin = new Vector2(28f, 0f);
             SetLayout(input.rectTransform, 0f, 32f, 1f);
@@ -1834,7 +1867,7 @@ namespace WasteCity.Graybox3D.Building
                 "ProductionState.Item." + index + ".Output.Icon",
                 null,
                 20f,
-                new Vector2(11f, 0f));
+                ProductionRowResourceIconPosition);
             outputIcon.gameObject.SetActive(false);
             output.rectTransform.offsetMin = new Vector2(28f, 0f);
             SetLayout(output.rectTransform, 0f, 32f, 1f);
@@ -2100,10 +2133,9 @@ namespace WasteCity.Graybox3D.Building
                 inventoryCraftingPanel,
                 layout.MainModalArea,
                 new Vector2(920f, 610f));
-            ApplyCenteredPanel(
+            ApplyCanvasRect(
                 researchTreePanel,
-                layout.MainModalArea,
-                new Vector2(1500f, 850f));
+                new Rect(Vector2.zero, size));
         }
 
         private static void ApplyCenteredPanel(
@@ -2283,6 +2315,8 @@ namespace WasteCity.Graybox3D.Building
             rect.pivot = new Vector2(.5f, .5f);
             rect.anchoredPosition = anchoredPosition;
             rect.sizeDelta = new Vector2(size, size);
+            if (!string.IsNullOrWhiteSpace(resourceId))
+                ApplyResourceFraming(icon, resourceId, anchoredPosition);
             return icon;
         }
 
@@ -2312,11 +2346,33 @@ namespace WasteCity.Graybox3D.Building
                 : resourceIconCatalog.ResolveIcon(resourceId);
         }
 
-        private void SetIcon(Image icon, string resourceId)
+        private static void ApplyResourceFraming(
+            Image image,
+            string resourceId,
+            Vector2 baseAnchoredPosition)
+        {
+            Production2DVisualScalePolicy3D.ApplyToUiImage(
+                image,
+                Production2DVisualClass.Item,
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    Production2DVisualClass.Item,
+                    resourceId),
+                baseAnchoredPosition);
+        }
+
+        private void SetIcon(
+            Image icon,
+            string resourceId,
+            Vector2 baseAnchoredPosition)
         {
             if (icon == null) return;
             icon.sprite = ResolveIcon(resourceId);
             icon.gameObject.SetActive(icon.sprite != null);
+            if (icon.sprite != null)
+                ApplyResourceFraming(
+                    icon,
+                    resourceId,
+                    baseAnchoredPosition);
         }
 
         private static Text CreateLabel(
