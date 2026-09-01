@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`017f654a0c5cf64f39d3b968a469a628fd999eef1dad5c5c23da440c30efe72f`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`3e278ccb8fbaa736f865302dc0290e75febf8cffde1d30562f6a5f8535119ca1`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -97,6 +97,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchEffectStateSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
@@ -174,6 +175,7 @@
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignModel.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseCampaignPersistenceState.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseSettlement.cs`
+- `Assets/_Game/Scripts/Defense/SingleCityDefenseTechnologyState.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerCombatModel.cs`
 - `Assets/_Game/Scripts/Defense/SingleCityDefenseTowerPersistenceState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressureDefenseController3D.cs`
@@ -261,6 +263,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchEffectStateSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Usability/GrayboxFormalSaveEntryController3D.cs`
@@ -348,6 +351,7 @@
 - `Assets/_Game/Scripts/Research/FormalResearchRuntime.cs`
 - `Assets/_Game/Scripts/Research/ResearchEffectCatalog.cs`
 - `Assets/_Game/Scripts/Research/ResearchModel.cs`
+- `Assets/_Game/Scripts/Research/ResearchStatusCatalog.cs`
 - `Assets/_Game/Scripts/Research/RouteTechnologyEffects.cs`
 - 场景编辑构建与性能（`scene-editor-build-performance`）：
 - `Assets/_Game/Editor/FirstArtPassImportPolicy.cs`
@@ -398,6 +402,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionHudView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchEffectStateSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchSearchFocus3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`

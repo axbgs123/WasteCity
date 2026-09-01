@@ -350,7 +350,8 @@ namespace WasteCity.Graybox3D.Building
                     stats.productionActiveProgressSeconds,
                     stats.productionEligibleSeconds,
                     stats.cityWasPackedAfterCampaignStart,
-                    stats.developmentModifierUsed),
+                    stats.developmentModifierUsed,
+                    stats.controlledUnitLossCount),
                 injected);
             error = string.Empty;
             return true;
@@ -418,7 +419,8 @@ namespace WasteCity.Graybox3D.Building
                     positionZ = item.Z, currentHealth = item.CurrentHealth,
                     movementRemainder = item.MovementRemainder,
                     attackDamageRemainder = item.AttackDamageRemainder,
-                    targetStableId = item.TargetStableId };
+                    targetStableId = item.TargetStableId,
+                    isControlled = item.IsControlled };
             }
             return result;
         }
@@ -436,7 +438,7 @@ namespace WasteCity.Graybox3D.Building
                         item.stableEnemyId, item.archetypeId, item.spawnOrder,
                         item.positionX, item.positionZ, item.currentHealth,
                         item.movementRemainder, item.attackDamageRemainder,
-                        item.targetStableId);
+                        item.targetStableId, item.isControlled);
             }
             return result;
         }
@@ -462,7 +464,8 @@ namespace WasteCity.Graybox3D.Building
                 productionEligibleSeconds = source.ProductionEligibleSeconds,
                 cityWasPackedAfterCampaignStart = source.CityWasPackedAfterCampaignStart,
                 developmentModifierUsed = source.DevelopmentModifierUsed,
-                partialFromMigration = source.PartialFromMigration };
+                partialFromMigration = source.PartialFromMigration,
+                controlledUnitLossCount = source.ControlledUnitLossCount };
         }
 
         private static FormalThreeDDefenseCampaignMetricSaveData[] Metrics(

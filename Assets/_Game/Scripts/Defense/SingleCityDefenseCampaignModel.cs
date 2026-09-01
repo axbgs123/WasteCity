@@ -111,7 +111,8 @@ namespace WasteCity.Defense
             float x,
             float z,
             int currentHealth,
-            string targetStableId = null)
+            string targetStableId = null,
+            bool isControlled = false)
         {
             StableId = stableId;
             EnemyDefinitionId = enemyDefinitionId;
@@ -120,6 +121,7 @@ namespace WasteCity.Defense
             Z = z;
             CurrentHealth = Math.Max(0, currentHealth);
             TargetStableId = targetStableId;
+            IsControlled = isControlled;
         }
 
         public string StableId { get; }
@@ -129,6 +131,7 @@ namespace WasteCity.Defense
         public float Z { get; }
         public int CurrentHealth { get; }
         public string TargetStableId { get; }
+        public bool IsControlled { get; }
     }
 
     public sealed class SingleCityDefenseCampaignStatisticsSnapshot
@@ -145,7 +148,8 @@ namespace WasteCity.Defense
             int coreCurrentHealth,
             int coreMaximumHealth,
             int highestAliveEnemyCount,
-            bool partialFromMigration = false)
+            bool partialFromMigration = false,
+            int controlledUnitLossCount = 0)
         {
             ElapsedRuleSeconds = Math.Max(0f, elapsedRuleSeconds);
             CompletedWaveCount = Math.Max(0, completedWaveCount);
@@ -160,6 +164,7 @@ namespace WasteCity.Defense
             CoreMaximumHealth = Math.Max(1, coreMaximumHealth);
             HighestAliveEnemyCount = Math.Max(0, highestAliveEnemyCount);
             PartialFromMigration = partialFromMigration;
+            ControlledUnitLossCount = Math.Max(0, controlledUnitLossCount);
         }
 
         public float ElapsedRuleSeconds { get; }
@@ -183,6 +188,7 @@ namespace WasteCity.Defense
         public int CoreMaximumHealth { get; }
         public int HighestAliveEnemyCount { get; }
         public bool PartialFromMigration { get; }
+        public int ControlledUnitLossCount { get; }
 
         private static IReadOnlyDictionary<string, int> Copy(
             IReadOnlyDictionary<string, int> source)
@@ -213,7 +219,8 @@ namespace WasteCity.Defense
             int coreMaximumHealth,
             SingleCityDefenseCampaignResult result,
             IEnumerable<SingleCityDefenseEnemySnapshot> enemies,
-            SingleCityDefenseCampaignStatisticsSnapshot statistics)
+            SingleCityDefenseCampaignStatisticsSnapshot statistics,
+            int coreShield = 0)
         {
             CurrentWaveNumber = Math.Max(0, currentWaveNumber);
             Phase = phase;
@@ -224,6 +231,7 @@ namespace WasteCity.Defense
             CoreCurrentHealth = Math.Max(0, coreCurrentHealth);
             CoreMaximumHealth = Math.Max(1, coreMaximumHealth);
             Result = result;
+            CoreShield = Math.Max(0, coreShield);
             this.enemies = Array.AsReadOnly(
                 new List<SingleCityDefenseEnemySnapshot>(
                     enemies ?? Array.Empty<SingleCityDefenseEnemySnapshot>())
@@ -241,6 +249,7 @@ namespace WasteCity.Defense
         public int CoreCurrentHealth { get; }
         public int CoreMaximumHealth { get; }
         public SingleCityDefenseCampaignResult Result { get; }
+        public int CoreShield { get; }
         public IReadOnlyList<SingleCityDefenseEnemySnapshot> Enemies => enemies;
         public SingleCityDefenseCampaignStatisticsSnapshot Statistics
         {
@@ -255,6 +264,8 @@ namespace WasteCity.Defense
 
         private const double FixedStepSeconds = .1d;
         private const double StepEpsilon = .000001d;
+        private const DamageType ControlledFriendlyDamageType =
+            DamageType.Physical;
 
         private float coreX;
         private float coreZ;
@@ -284,6 +295,8 @@ namespace WasteCity.Defense
         private bool campaignTriggered;
         private int nextSpawnIndex;
         private int coreCurrentHealth = CityCoreCombatModel.FormalMaximumHealth;
+        private int coreShield;
+        private int controlledUnitLossCount;
         private ulong persistenceGeneration;
         private ulong terminalRevision;
         private readonly SingleCityDefenseCampaignDefinition definition;
@@ -316,6 +329,7 @@ namespace WasteCity.Defense
         public event Action<SingleCityDefenseCampaignResult>
             TerminalCommitted;
         public event Action<string, string> EnemyDefeated;
+        public event Action<string, string> EnemyControlled;
 
         public void SetWarningMultiplier(float multiplier)
         {
@@ -373,7 +387,9 @@ namespace WasteCity.Defense
             {
                 EnemyState enemy = enemies[index];
                 if (enemy.CurrentHealth <= 0) continue;
-                Add(alive, enemy.Definition.Id.Value, 1);
+                if (currentWave != null && IsEnemyFromWave(
+                        enemy.StableId, currentWave.Number))
+                    Add(alive, enemy.Definition.Id.Value, 1);
                 persistedEnemies.Add(
                     new SingleCityDefenseCampaignEnemyPersistenceState(
                         enemy.StableId,
@@ -384,7 +400,8 @@ namespace WasteCity.Defense
                         enemy.CurrentHealth,
                         0f,
                         enemy.AttackDamageRemainder,
-                        enemy.TargetStableId));
+                        enemy.TargetStableId,
+                        enemy.IsControlled));
             }
 
             var defeated = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -440,7 +457,8 @@ namespace WasteCity.Defense
                     capturedStatistics.ProductionActiveProgressSeconds,
                     capturedStatistics.ProductionEligibleSeconds,
                     capturedStatistics.CityWasPackedAfterCampaignStart,
-                    capturedStatistics.DevelopmentModifierUsed),
+                    capturedStatistics.DevelopmentModifierUsed,
+                    controlledUnitLossCount),
                 InjectedPersistenceStates());
         }
 
@@ -523,6 +541,7 @@ namespace WasteCity.Defense
                 candidate.FixedStepAccumulatorSeconds;
             nextSpawnIndex = candidate.NextSpawnIndex;
             coreCurrentHealth = candidate.CoreCurrentHealth;
+            controlledUnitLossCount = candidate.ControlledUnitLossCount;
             var restoredStatistics = new SessionStatisticsSnapshot(
                 (float)candidate.ElapsedRuleSeconds,
                 candidate.CompletedWaveCount,
@@ -797,7 +816,8 @@ namespace WasteCity.Defense
             for (var index = 0; index < enemies.Count; index++)
             {
                 EnemyState candidate = enemies[index];
-                if (candidate.CurrentHealth <= 0) continue;
+                if (candidate.CurrentHealth <= 0 || candidate.IsControlled)
+                    continue;
                 float distanceSquared = DistanceSquared(
                     towerX,
                     towerZ,
@@ -816,6 +836,19 @@ namespace WasteCity.Defense
                 }
             }
             return selected?.StableId;
+        }
+
+        public string PeekTowerTarget(
+            string lockedStableEnemyId,
+            float towerX,
+            float towerZ,
+            float range)
+        {
+            return AcquireTowerTarget(
+                lockedStableEnemyId,
+                towerX,
+                towerZ,
+                range);
         }
 
         internal float ResolveTowerDamageMultiplier(
@@ -861,6 +894,38 @@ namespace WasteCity.Defense
             return applied;
         }
 
+        public int ApplyTechnologyDamage(
+            string stableEnemyId,
+            string sourceBuildingId,
+            int resolvedDamage)
+        {
+            return ApplyResolvedTowerDamage(
+                stableEnemyId,
+                sourceBuildingId,
+                resolvedDamage);
+        }
+
+        public bool TryControlEnemy(
+            string stableEnemyId,
+            string sourceBuildingId)
+        {
+            if (IsTerminal ||
+                DefenseTowerCatalog.For(sourceBuildingId) == null)
+            {
+                return false;
+            }
+            EnemyState enemy = FindAliveEnemy(stableEnemyId);
+            if (enemy == null || enemy.Definition.IsHeavy) return false;
+            enemy.IsControlled = true;
+            enemy.TargetStableId = null;
+            enemy.AttackDamageRemainder = 0f;
+            EnemyControlled?.Invoke(
+                enemy.StableId,
+                enemy.Definition.Id.Value);
+            persistenceGeneration++;
+            return true;
+        }
+
         internal void SuppressMechanicalMovementNextStep(
             string stableEnemyId,
             string towerBuildingId)
@@ -877,7 +942,11 @@ namespace WasteCity.Defense
         public int ApplyCoreDamage(int damage)
         {
             if (IsTerminal || damage <= 0) return 0;
-            int applied = Math.Min(coreCurrentHealth, damage);
+            int incoming = damage;
+            int absorbed = Math.Min(coreShield, incoming);
+            coreShield -= absorbed;
+            incoming -= absorbed;
+            int applied = Math.Min(coreCurrentHealth, incoming);
             coreCurrentHealth -= applied;
             if (coreCurrentHealth == 0)
             {
@@ -885,7 +954,44 @@ namespace WasteCity.Defense
                     SingleCityDefenseCampaignResult.Defeat);
             }
             persistenceGeneration++;
-            return applied;
+            return absorbed + applied;
+        }
+
+        public int GrantCoreShield(int amount)
+        {
+            return GrantCoreShield(
+                amount,
+                SingleCityDefenseTechnologyRules.MaximumShield);
+        }
+
+        public int GrantCoreShield(int amount, int maximumShield)
+        {
+            if (amount <= 0 || IsTerminal) return 0;
+            int accepted = Math.Min(
+                amount,
+                Math.Max(0, maximumShield - coreShield));
+            coreShield += accepted;
+            if (accepted > 0) persistenceGeneration++;
+            return accepted;
+        }
+
+        public bool TryRestoreCoreShieldForPersistence(
+            int value,
+            int maximumShield,
+            out string error)
+        {
+            if (maximumShield < 0 || value < 0 || value > maximumShield)
+            {
+                error = "Persisted city core shield is outside its bounds.";
+                return false;
+            }
+            if (coreShield != value)
+            {
+                coreShield = value;
+                persistenceGeneration++;
+            }
+            error = string.Empty;
+            return true;
         }
 
         public void RegisterConsumableSpent(string resourceId, int amount)
@@ -1074,6 +1180,42 @@ namespace WasteCity.Defense
                 EnemyState enemy = enemies[index];
                 if (enemy.CurrentHealth <= 0) continue;
 
+                if (enemy.IsControlled)
+                {
+                    StepControlledFriendly(enemy, deltaSeconds);
+                    continue;
+                }
+
+                EnemyState controlledTarget = AcquireControlledTarget(
+                    enemy.TargetStableId,
+                    enemy.X,
+                    enemy.Z);
+                if (controlledTarget != null)
+                {
+                    enemy.TargetStableId = controlledTarget.StableId;
+                    bool suppressed = movementSuppressedNextStep.Remove(
+                        enemy.StableId);
+                    if (suppressed
+                            ? !IsWithinAttackRange(
+                                enemy,
+                                controlledTarget.X,
+                                controlledTarget.Z)
+                            : !MoveEnemyIntoRange(
+                                enemy,
+                                controlledTarget.X,
+                                controlledTarget.Z,
+                                deltaSeconds))
+                    {
+                        continue;
+                    }
+                    ApplyUnitAttack(
+                        enemy,
+                        controlledTarget,
+                        deltaSeconds,
+                        targetIsControlledFriendly: true);
+                    continue;
+                }
+
                 string targetStableId = ResolveEnemyCombatTarget(
                     enemy,
                     buildingTargets,
@@ -1121,12 +1263,80 @@ namespace WasteCity.Defense
             }
         }
 
+        private void StepControlledFriendly(
+            EnemyState friendly,
+            float deltaSeconds)
+        {
+            EnemyState target = AcquireHostileTarget(
+                friendly.TargetStableId,
+                friendly.X,
+                friendly.Z);
+            if (target == null)
+            {
+                friendly.TargetStableId = null;
+                return;
+            }
+            friendly.TargetStableId = target.StableId;
+            if (!MoveEnemyIntoRange(
+                    friendly,
+                    target.X,
+                    target.Z,
+                    deltaSeconds))
+            {
+                return;
+            }
+            ApplyUnitAttack(
+                friendly,
+                target,
+                deltaSeconds,
+                targetIsControlledFriendly: false);
+        }
+
+        private void ApplyUnitAttack(
+            EnemyState attacker,
+            EnemyState target,
+            float deltaSeconds,
+            bool targetIsControlledFriendly)
+        {
+            float remainder = attacker.AttackDamageRemainder +
+                attacker.Definition.DamagePerSecond * deltaSeconds;
+            int rawDamage = WholeDamage(ref remainder);
+            attacker.AttackDamageRemainder = remainder;
+            if (rawDamage <= 0) return;
+            int resolved = DamageMatrix.Apply(
+                rawDamage,
+                ControlledFriendlyDamageType,
+                target.Definition.Armor);
+            int applied = Math.Min(target.CurrentHealth, resolved);
+            if (applied <= 0) return;
+            target.CurrentHealth -= applied;
+            if (targetIsControlledFriendly)
+            {
+                if (target.CurrentHealth == 0)
+                {
+                    controlledUnitLossCount++;
+                    target.TargetStableId = null;
+                }
+                return;
+            }
+            RegisterDamage(SingleCityArmyModel.DefaultSquadId, applied);
+            if (target.CurrentHealth == 0)
+            {
+                RegisterKill(
+                    target.Definition.Id.Value,
+                    SingleCityArmyModel.DefaultSquadId);
+                EnemyDefeated?.Invoke(
+                    target.StableId,
+                    target.Definition.Id.Value);
+            }
+        }
+
         private bool HasBuildingSeekingEnemy()
         {
             for (var index = 0; index < enemies.Count; index++)
             {
                 EnemyState enemy = enemies[index];
-                if (enemy.CurrentHealth > 0 &&
+                if (enemy.CurrentHealth > 0 && !enemy.IsControlled &&
                     enemy.Definition.TargetPriority !=
                         EnemyTargetPriority.Core)
                 {
@@ -1383,7 +1593,11 @@ namespace WasteCity.Defense
                 currentWave.WarningSeconds * warningMultiplier;
             spawnClockSeconds = 0d;
             nextSpawnIndex = 0;
-            enemies.Clear();
+            for (var index = enemies.Count - 1; index >= 0; index--)
+                if (enemies[index].CurrentHealth <= 0 ||
+                    !enemies[index].IsControlled)
+                    enemies.RemoveAt(index);
+            movementSuppressedNextStep.Clear();
             BuildSpawnSequence(currentWave);
             FreezeSpawnAnchors(currentWave);
             phase = SingleCityDefenseCampaignPhase.Warning;
@@ -1522,7 +1736,8 @@ namespace WasteCity.Defense
                 int count = 0;
                 for (var index = 0; index < enemies.Count; index++)
                 {
-                    if (enemies[index].CurrentHealth > 0) count++;
+                    if (enemies[index].CurrentHealth > 0 &&
+                        !enemies[index].IsControlled) count++;
                 }
                 return count;
             }
@@ -1534,7 +1749,7 @@ namespace WasteCity.Defense
             for (var index = 0; index < enemies.Count; index++)
             {
                 EnemyState enemy = enemies[index];
-                if (enemy.CurrentHealth > 0 &&
+                if (enemy.CurrentHealth > 0 && !enemy.IsControlled &&
                     string.Equals(
                         enemy.StableId,
                         stableEnemyId,
@@ -1544,6 +1759,67 @@ namespace WasteCity.Defense
                 }
             }
             return null;
+        }
+
+        private EnemyState AcquireControlledTarget(
+            string lockedStableId,
+            float x,
+            float z)
+        {
+            EnemyState locked = FindLivingControlled(lockedStableId);
+            if (locked != null) return locked;
+            return FindNearestLivingUnit(x, z, controlled: true);
+        }
+
+        private EnemyState AcquireHostileTarget(
+            string lockedStableId,
+            float x,
+            float z)
+        {
+            EnemyState locked = FindAliveEnemy(lockedStableId);
+            if (locked != null) return locked;
+            return FindNearestLivingUnit(x, z, controlled: false);
+        }
+
+        private EnemyState FindLivingControlled(string stableId)
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) return null;
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                EnemyState candidate = enemies[index];
+                if (candidate.CurrentHealth > 0 && candidate.IsControlled &&
+                    string.Equals(candidate.StableId, stableId,
+                        StringComparison.Ordinal))
+                    return candidate;
+            }
+            return null;
+        }
+
+        private EnemyState FindNearestLivingUnit(
+            float x,
+            float z,
+            bool controlled)
+        {
+            EnemyState selected = null;
+            float distance = float.MaxValue;
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                EnemyState candidate = enemies[index];
+                if (candidate.CurrentHealth <= 0 ||
+                    candidate.IsControlled != controlled) continue;
+                float candidateDistance = DistanceSquared(
+                    x, z, candidate.X, candidate.Z);
+                if (selected == null || candidateDistance < distance ||
+                    candidateDistance == distance &&
+                    string.CompareOrdinal(
+                        candidate.StableId,
+                        selected.StableId) < 0)
+                {
+                    selected = candidate;
+                    distance = candidateDistance;
+                }
+            }
+            return selected;
         }
 
         private SingleCityDefenseCampaignSnapshot CreateSnapshot()
@@ -1562,7 +1838,8 @@ namespace WasteCity.Defense
                     enemy.X,
                     enemy.Z,
                     enemy.CurrentHealth,
-                    enemy.TargetStableId));
+                    enemy.TargetStableId,
+                    enemy.IsControlled));
             }
 
             return new SingleCityDefenseCampaignSnapshot(
@@ -1591,7 +1868,9 @@ namespace WasteCity.Defense
                     coreCurrentHealth,
                     CityCoreCombatModel.FormalMaximumHealth,
                     capturedStatistics.HighestAliveEnemyCount,
-                    capturedStatistics.PartialFromMigration));
+                    capturedStatistics.PartialFromMigration,
+                    controlledUnitLossCount),
+                coreShield);
         }
 
         private bool TryBuildRestoreCandidate(
@@ -1780,7 +2059,6 @@ namespace WasteCity.Defense
             var aliveByDefinition = new Dictionary<string, int>(
                 StringComparer.Ordinal);
             var stableIds = new HashSet<string>(StringComparer.Ordinal);
-            var spawnOrders = new HashSet<int>();
             if (state.Enemies == null)
                 return Fail("Enemy collection is required.", out error);
             for (var index = 0; index < state.Enemies.Count; index++)
@@ -1789,9 +2067,7 @@ namespace WasteCity.Defense
                     state.Enemies[index];
                 if (persisted == null ||
                     !stableIds.Add(persisted.StableId) ||
-                    !spawnOrders.Add(persisted.SpawnOrder) ||
                     persisted.SpawnOrder < 0 ||
-                    persisted.SpawnOrder >= state.NextEnemyOrdinal ||
                     !IsFinite(persisted.X) || !IsFinite(persisted.Z) ||
                     !IsFinite(persisted.MovementRemainder) ||
                     Math.Abs(persisted.MovementRemainder) > .000001f ||
@@ -1806,16 +2082,38 @@ namespace WasteCity.Defense
                 }
                 EnemyDefinition definition = FindEnemyDefinition(
                     persisted.EnemyDefinitionId);
-                SpawnDefinition expected = sequence[persisted.SpawnOrder];
-                string expectedStableId = EnemyStableId(
-                    wave.Number,
-                    persisted.SpawnOrder);
+                bool currentWaveEnemy = wave != null &&
+                    IsEnemyFromWave(persisted.StableId, wave.Number);
+                SpawnDefinition expected = default;
+                bool validSlot;
+                if (currentWaveEnemy)
+                {
+                    validSlot = persisted.SpawnOrder <
+                        state.NextEnemyOrdinal &&
+                        persisted.SpawnOrder < sequence.Count &&
+                        string.Equals(
+                            persisted.StableId,
+                            EnemyStableId(
+                                wave.Number,
+                                persisted.SpawnOrder),
+                            StringComparison.Ordinal);
+                    expected = validSlot
+                        ? sequence[persisted.SpawnOrder]
+                        : default;
+                }
+                else
+                {
+                    validSlot = persisted.IsControlled &&
+                        TryResolveHistoricalControlledSlot(
+                            persisted.StableId,
+                            persisted.SpawnOrder,
+                            state.CurrentWaveNumber,
+                            out expected);
+                }
                 if (definition == null ||
+                    !validSlot ||
                     !string.Equals(definition.Id.Value,
                         expected.Definition.Id.Value,
-                        StringComparison.Ordinal) ||
-                    !string.Equals(persisted.StableId,
-                        expectedStableId,
                         StringComparison.Ordinal) ||
                     persisted.CurrentHealth <= 0 ||
                     persisted.CurrentHealth > definition.MaximumHealth)
@@ -1831,8 +2129,10 @@ namespace WasteCity.Defense
                     persisted.Z,
                     persisted.CurrentHealth,
                     persisted.AttackDamageRemainder,
-                    persisted.TargetStableId));
-                Add(aliveByDefinition, definition.Id.Value, 1);
+                    persisted.TargetStableId,
+                    persisted.IsControlled));
+                if (currentWaveEnemy)
+                    Add(aliveByDefinition, definition.Id.Value, 1);
             }
 
             var expectedDefeated = new Dictionary<string, int>(
@@ -1848,14 +2148,14 @@ namespace WasteCity.Defense
             if (!DictionariesEqual(defeated, expectedDefeated))
                 return Fail("Defeated enemy counts are inconsistent.", out error);
             if (state.Phase == SingleCityDefenseCampaignPhase.Victory &&
-                restoredEnemies.Count != 0)
+                restoredEnemies.Exists(value => !value.IsControlled))
             {
                 return Fail("Victory cannot retain living enemies.", out error);
             }
 
             if (!TryReadStatistics(
                     state,
-                    restoredEnemies.Count,
+                    CountHostiles(restoredEnemies),
                     out Dictionary<string, int> restoredKills,
                     out Dictionary<string, int> restoredDamage,
                     out Dictionary<string, int> restoredTowerKills,
@@ -1886,6 +2186,7 @@ namespace WasteCity.Defense
                 statistics.ProductionEligibleSeconds,
                 statistics.CityWasPackedAfterCampaignStart,
                 statistics.DevelopmentModifierUsed,
+                statistics.ControlledUnitLossCount,
                 state.CoreCurrentHealth,
                 sequence,
                 restoredEnemies,
@@ -1925,6 +2226,7 @@ namespace WasteCity.Defense
                 statistics.BuildingLossCount < 0 ||
                 statistics.CoreDamageTaken < 0 ||
                 statistics.CompletedProductionBatchCount < 0 ||
+                statistics.ControlledUnitLossCount < 0 ||
                 !IsFiniteNonNegative(
                     statistics.ProductionActiveProgressSeconds) ||
                 !IsFiniteNonNegative(
@@ -2250,6 +2552,46 @@ namespace WasteCity.Defense
                     CultureInfo.InvariantCulture);
         }
 
+        private static bool IsEnemyFromWave(
+            string stableId,
+            int waveNumber)
+        {
+            return !string.IsNullOrWhiteSpace(stableId) &&
+                stableId.StartsWith(
+                    "campaign.enemy.wave-" +
+                    waveNumber.ToString("00", CultureInfo.InvariantCulture) +
+                    ".",
+                    StringComparison.Ordinal);
+        }
+
+        private bool TryResolveHistoricalControlledSlot(
+            string stableId,
+            int spawnOrder,
+            int currentWaveNumber,
+            out SpawnDefinition expected)
+        {
+            expected = default;
+            for (var waveIndex = 0;
+                 waveIndex < definition.Waves.Count;
+                 waveIndex++)
+            {
+                CampaignWaveDefinition historical =
+                    definition.Waves[waveIndex];
+                if (historical.Number >= currentWaveNumber) break;
+                if (!string.Equals(
+                        stableId,
+                        EnemyStableId(historical.Number, spawnOrder),
+                        StringComparison.Ordinal)) continue;
+                var sequence = new List<SpawnDefinition>();
+                BuildSpawnSequenceFor(historical, sequence);
+                if (spawnOrder < 0 || spawnOrder >= sequence.Count)
+                    return false;
+                expected = sequence[spawnOrder];
+                return true;
+            }
+            return false;
+        }
+
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
@@ -2306,6 +2648,7 @@ namespace WasteCity.Defense
                 Mix(ref hash, item.MovementRemainder);
                 Mix(ref hash, item.AttackDamageRemainder);
                 Mix(ref hash, item.TargetStableId);
+                Mix(ref hash, item.IsControlled ? 1 : 0);
             }
             SingleCityDefenseCampaignStatisticsPersistenceState statistics =
                 state.Statistics;
@@ -2333,6 +2676,7 @@ namespace WasteCity.Defense
             Mix(ref hash,
                 statistics.CityWasPackedAfterCampaignStart ? 1 : 0);
             Mix(ref hash, statistics.DevelopmentModifierUsed ? 1 : 0);
+            Mix(ref hash, statistics.ControlledUnitLossCount);
             return hash;
         }
 
@@ -2482,6 +2826,15 @@ namespace WasteCity.Defense
             return null;
         }
 
+        private static int CountHostiles(IReadOnlyList<EnemyState> values)
+        {
+            var count = 0;
+            for (var index = 0; index < values.Count; index++)
+                if (values[index].CurrentHealth > 0 &&
+                    !values[index].IsControlled) count++;
+            return count;
+        }
+
         private static BuildingDefinition FindBuildingDefinition(string stableId)
         {
             if (string.IsNullOrWhiteSpace(stableId)) return null;
@@ -2568,12 +2921,14 @@ namespace WasteCity.Defense
                 float z,
                 int currentHealth,
                 float attackDamageRemainder,
-                string targetStableId)
+                string targetStableId,
+                bool isControlled = false)
                 : this(stableId, definition, spawnOrder, x, z)
             {
                 CurrentHealth = currentHealth;
                 AttackDamageRemainder = attackDamageRemainder;
                 TargetStableId = targetStableId;
+                IsControlled = isControlled;
             }
 
             public string StableId { get; }
@@ -2584,6 +2939,7 @@ namespace WasteCity.Defense
             public int CurrentHealth { get; set; }
             public float AttackDamageRemainder { get; set; }
             public string TargetStableId { get; set; }
+            public bool IsControlled { get; set; }
         }
 
         private sealed class EnemyStateProcessingComparer :
@@ -2646,6 +3002,7 @@ namespace WasteCity.Defense
                 float productionEligibleSeconds,
                 bool cityWasPackedAfterCampaignStart,
                 bool developmentModifierUsed,
+                int controlledUnitLossCount,
                 int coreCurrentHealth,
                 List<SpawnDefinition> spawnSequence,
                 List<EnemyState> enemies,
@@ -2679,6 +3036,7 @@ namespace WasteCity.Defense
                 CityWasPackedAfterCampaignStart =
                     cityWasPackedAfterCampaignStart;
                 DevelopmentModifierUsed = developmentModifierUsed;
+                ControlledUnitLossCount = controlledUnitLossCount;
                 CoreCurrentHealth = coreCurrentHealth;
                 SpawnSequence = spawnSequence;
                 Enemies = enemies;
@@ -2708,6 +3066,7 @@ namespace WasteCity.Defense
             public float ProductionEligibleSeconds { get; }
             public bool CityWasPackedAfterCampaignStart { get; }
             public bool DevelopmentModifierUsed { get; }
+            public int ControlledUnitLossCount { get; }
             public int CoreCurrentHealth { get; }
             public List<SpawnDefinition> SpawnSequence { get; }
             public List<EnemyState> Enemies { get; }

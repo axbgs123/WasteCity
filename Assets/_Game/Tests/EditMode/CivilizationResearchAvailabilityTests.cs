@@ -12,11 +12,12 @@ namespace WasteCity.Tests
         {
             ResearchDefinition source = ResearchCatalog.Find(researchId);
             Assert.That(source.ReleaseState,
-                Is.EqualTo(ResearchReleaseState.PreviewOnly));
+                Is.EqualTo(ResearchReleaseState.Researchable));
             Assert.That(CivilizationResearchAvailability.IsAvailable(
                 source, 1), Is.False);
             Assert.That(CivilizationResearchAvailability.Resolve(
-                source, 1), Is.SameAs(source));
+                source, 1).ReleaseState,
+                Is.EqualTo(ResearchReleaseState.PreviewOnly));
 
             ResearchDefinition levelTwo =
                 CivilizationResearchAvailability.Resolve(source, 2);
@@ -33,14 +34,14 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0021_OtherPreviewNodesRemainClosedAtLevelTwo()
+        public void IDEA0027_OtherReleasedNodesRemainAvailableAtLevelTwo()
         {
             ResearchDefinition ballistics = ResearchCatalog.Find(
                 "core.research.ballistics");
             Assert.That(ballistics.ReleaseState,
-                Is.EqualTo(ResearchReleaseState.PreviewOnly));
+                Is.EqualTo(ResearchReleaseState.Researchable));
             Assert.That(CivilizationResearchAvailability.IsAvailable(
-                ballistics, 2), Is.False);
+                ballistics, 2), Is.True);
             Assert.That(CivilizationResearchAvailability.Resolve(
                 ballistics, 2), Is.SameAs(ballistics));
         }

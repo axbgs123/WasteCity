@@ -14,12 +14,19 @@ namespace WasteCity.Graybox3D.Building
     public sealed class GrayboxCivilizationExpansionSaveAdapter3D
     {
         private readonly GrayboxCivilizationExpansionController3D controller;
+        private GrayboxResearchEffectStateSaveAdapter3D effectState;
 
         public GrayboxCivilizationExpansionSaveAdapter3D(
             GrayboxCivilizationExpansionController3D controller)
         {
             this.controller = controller ??
                 throw new ArgumentNullException(nameof(controller));
+        }
+
+        public void ConfigureResearchEffectStateAdapter(
+            GrayboxResearchEffectStateSaveAdapter3D value)
+        {
+            effectState = value;
         }
 
         public FormalThreeDCivilizationExpansionSaveData Capture()
@@ -58,13 +65,24 @@ namespace WasteCity.Graybox3D.Building
             }
             CivilizationExpansionRuntime runtime = RequireRuntime();
             FormalThreeDCivilizationExpansionSaveData rollback = Capture();
-            if (TryRestoreCore(runtime, source, out error))
+            FormalThreeDResearchEffectStateSaveData effectRollback =
+                effectState?.Capture();
+            if (TryRestoreCore(runtime, source, effectState, out error))
             {
                 controller.Refresh(force: true);
                 return true;
             }
             string applyError = error;
-            if (!TryRestoreCore(runtime, rollback, out string rollbackError))
+            if (effectState != null &&
+                !effectState.TryPrepareRestore(
+                    effectRollback, out string effectRollbackError))
+            {
+                error = applyError + "；研究效果域内回滚准备失败：" +
+                    effectRollbackError;
+                return false;
+            }
+            if (!TryRestoreCore(
+                    runtime, rollback, effectState, out string rollbackError))
             {
                 error = applyError + "；文明扩展域内回滚失败：" +
                     rollbackError;
@@ -78,9 +96,13 @@ namespace WasteCity.Graybox3D.Building
         private static bool TryRestoreCore(
             CivilizationExpansionRuntime runtime,
             FormalThreeDCivilizationExpansionSaveData source,
+            GrayboxResearchEffectStateSaveAdapter3D effectState,
             out string error)
         {
             if (!TryRestoreArmy(runtime, source.armyLeader, out error) ||
+                effectState != null &&
+                !effectState.TryApplyPendingExpansionState(
+                    runtime, out error) ||
                 !TryRestoreWorld(runtime, source.worldLayer, out error) ||
                 !TryRestorePolitics(
                     runtime,

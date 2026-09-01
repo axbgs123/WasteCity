@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.UI;
+using WasteCity.Building;
 using WasteCity.Combat;
 using WasteCity.Core;
 using WasteCity.Defense;
@@ -69,6 +70,10 @@ namespace WasteCity.Graybox3D.Building
             destructionCoordinator;
         public GrayboxCombatDestructionResult3D LastDestructionResult =>
             runtime?.LastDestructionResult;
+        public SingleCityDefenseTechnologyStateSnapshot TechnologyState =>
+            runtime?.TechnologyState;
+        public GrayboxBuildingTechnologySnapshot3D BuildingTechnologyState =>
+            runtime?.BuildingTechnologyState;
         public GrayboxDefenseWorldView3D WorldView => worldView;
         public GrayboxDefenseHudView3D Hud => hud;
         public bool HasSelection =>
@@ -93,6 +98,93 @@ namespace WasteCity.Graybox3D.Building
         public event Action<string> FirstMachineGunCompleted;
         public event Action<string> TutorialCombatStarted;
         public event Action<int> CampaignWaveWarningStarted;
+
+        public bool TryActivateTechnologyOverload(string towerStableId)
+        {
+            bool activated = runtime != null &&
+                runtime.TryActivateTechnologyOverload(towerStableId);
+            if (activated)
+            {
+                InvalidatePresentation();
+                ApplyPresentation(force: true);
+            }
+            return activated;
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool TryClearTechnologyFixturesForDevelopment()
+        {
+            bool cleared = runtime != null &&
+                runtime.TryClearTechnologyFixturesForDevelopment();
+            if (cleared)
+            {
+                InvalidatePresentation();
+                ApplyPresentation(force: true);
+            }
+            return cleared;
+        }
+
+        public bool TrySetSelectedEnemyTechnologyStatusForDevelopment(
+            string statusId,
+            bool fillStacks)
+        {
+            return TryApplySelectedTechnologyFixtureChange(
+                selectedKind == GrayboxDefenseSelectionKind3D.Enemy &&
+                runtime != null &&
+                runtime.TrySetEnemyTechnologyStatusForDevelopment(
+                    selectedStableId,
+                    statusId,
+                    fillStacks));
+        }
+
+        public bool TryClearSelectedEnemyTechnologyStatusForDevelopment(
+            string statusId)
+        {
+            return TryApplySelectedTechnologyFixtureChange(
+                selectedKind == GrayboxDefenseSelectionKind3D.Enemy &&
+                runtime != null &&
+                runtime.TryClearEnemyTechnologyStatusForDevelopment(
+                    selectedStableId,
+                    statusId));
+        }
+
+        public bool TryExpireSelectedEnemyTechnologyStatusForDevelopment(
+            string statusId)
+        {
+            return TryApplySelectedTechnologyFixtureChange(
+                selectedKind == GrayboxDefenseSelectionKind3D.Enemy &&
+                runtime != null &&
+                runtime.TryExpireEnemyTechnologyStatusForDevelopment(
+                    selectedStableId,
+                    statusId));
+        }
+
+        public bool TryExpireSelectedOverloadForDevelopment()
+        {
+            return TryApplySelectedTechnologyFixtureChange(
+                selectedKind == GrayboxDefenseSelectionKind3D.Tower &&
+                runtime != null &&
+                runtime.TryExpireTechnologyOverloadForDevelopment(
+                    selectedStableId));
+        }
+
+        public bool TryClearSelectedOverloadForDevelopment()
+        {
+            return TryApplySelectedTechnologyFixtureChange(
+                selectedKind == GrayboxDefenseSelectionKind3D.Tower &&
+                runtime != null &&
+                runtime.TryClearTechnologyOverloadForDevelopment(
+                    selectedStableId));
+        }
+
+        private bool TryApplySelectedTechnologyFixtureChange(bool changed)
+        {
+            if (!changed) return false;
+            InvalidatePresentation();
+            ApplyPresentation(force: true);
+            return true;
+        }
+#endif
 
         public void Configure(
             GrayboxBuildingSession3D session,
@@ -781,6 +873,32 @@ namespace WasteCity.Graybox3D.Building
                 researchEffects = ResearchEffectResolver.Resolve(
                     completedResearchIds);
             }
+            runtime.ConfigureTechnologyStates(
+                new SingleCityDefenseTechnologyUnlocks(
+                    energyOverload: session.IsResearchCompleted(
+                        "core.research.energy-weapons"),
+                    swordIntent: session.IsResearchCompleted(
+                        "core.research.sword-array"),
+                    infection: session.IsResearchCompleted(
+                        "core.research.spore-dispersal"),
+                    resonance: session.IsResearchCompleted(
+                        "core.research.mind-spire"),
+                    mindControl: session.IsResearchCompleted(
+                        "core.research.mind-control"),
+                    acidSpit: session.IsResearchCompleted(
+                        "core.research.acid-spit"),
+                    talismanBasics: session.IsResearchCompleted(
+                        "core.research.talisman-basics"),
+                    automatedRepair: session.IsResearchCompleted(
+                        "core.research.unmanned-systems"),
+                    mindShield: session.IsResearchCompleted(
+                        "core.research.mind-shield"),
+                    acidHeavyDamageMultiplier: researchEffects
+                        .ResolveHeavyArmorDamageMultiplier(
+                            BuildingCatalog.AcidTower.Id.Value),
+                    wallPhysicalDamageMultiplier: researchEffects
+                        .ResolvePhysicalDamageTakenMultiplier(
+                            BuildingCatalog.Wall.Id.Value)));
             runtime.Synchronize(
                 session.Instances,
                 city.Mode,
@@ -789,9 +907,26 @@ namespace WasteCity.Graybox3D.Building
                 researchEffects.ResolveLogisticsRange(
                     session.GroundBuildRadius),
                 allowCampaignStart: !IsPersistencePaused,
-                researchEffects: researchEffects);
+                researchEffects: researchEffects,
+                isPlayerPaused: IsBuildingPlayerPaused);
             error = string.Empty;
             return true;
+        }
+
+        private bool IsBuildingPlayerPaused(string stableInstanceId)
+        {
+            if (production?.Clock?.Runtime != null &&
+                production.Clock.Runtime.TryGetState(
+                    stableInstanceId,
+                    out BuildingProductionState productionState) &&
+                productionState.IsPlayerPaused)
+            {
+                return true;
+            }
+            return runtime != null && runtime.TryGetCampaignTowerState(
+                    stableInstanceId,
+                    out SingleCityDefenseTowerCombatModel tower) &&
+                tower.IsPlayerPaused;
         }
 
         private bool TryResolveCityPosition(
@@ -884,8 +1019,14 @@ namespace WasteCity.Graybox3D.Building
                     production?.Snapshot ??
                         ProductionObservabilitySnapshot.Empty,
                     simulationPaused,
-                    selectedDestructionResult);
+                    selectedDestructionResult,
+                    runtime?.TechnologyState,
+                    runtime?.BuildingTechnologyState,
+                    session?.IsResearchCompleted(
+                        "core.research.energy-weapons") == true);
             worldView?.Apply(snapshot, session.Instances);
+            hud?.ApplyCoreShield(
+                runtime?.ActiveCampaignSnapshot?.CoreShield ?? 0);
             hud?.Apply(
                 snapshot,
                 selectedKind,
@@ -1033,13 +1174,19 @@ namespace WasteCity.Graybox3D.Building
             if (hud == null || hudBound || !isActiveAndEnabled)
                 return;
             hud.TowerPauseRequested += HandleTowerPauseRequested;
+            hud.TechnologyOverloadRequested +=
+                HandleTechnologyOverloadRequested;
             hudBound = true;
         }
 
         private void UnbindHud()
         {
             if (hudBound && hud != null)
+            {
                 hud.TowerPauseRequested -= HandleTowerPauseRequested;
+                hud.TechnologyOverloadRequested -=
+                    HandleTechnologyOverloadRequested;
+            }
             hudBound = false;
         }
 
@@ -1054,6 +1201,19 @@ namespace WasteCity.Graybox3D.Building
                 return;
             }
             TryToggleSelectedTowerPause();
+        }
+
+        private void HandleTechnologyOverloadRequested(string stableId)
+        {
+            if (selectedKind != GrayboxDefenseSelectionKind3D.Tower ||
+                !string.Equals(
+                    selectedStableId,
+                    stableId,
+                    StringComparison.Ordinal))
+            {
+                return;
+            }
+            TryActivateTechnologyOverload(stableId);
         }
     }
 }

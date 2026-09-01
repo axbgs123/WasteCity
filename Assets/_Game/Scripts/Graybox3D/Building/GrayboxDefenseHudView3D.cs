@@ -28,6 +28,8 @@ namespace WasteCity.Graybox3D.Building
         private RectTransform uiRoot;
         private Button towerPauseButton;
         private Text towerPauseButtonText;
+        private Button technologyOverloadButton;
+        private Text technologyOverloadButtonText;
         private Button buildingUpgradeButton;
         private Text buildingUpgradeButtonText;
         private Text buildingUpgradeFeedbackText;
@@ -39,6 +41,8 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxDefenseSelectionSnapshot3D selectedDetails;
         private bool usesSelectionDetails;
         private bool selectedCanToggleTowerPause;
+        private bool selectedCanActivateTechnologyOverload;
+        private int coreShield;
         private float requestedSpeed = 1f;
         private float effectiveSpeed = 1f;
         private bool hasAppliedProjection;
@@ -59,7 +63,23 @@ namespace WasteCity.Graybox3D.Building
         public int RefreshCount { get; private set; }
 
         public event Action<string> TowerPauseRequested;
+        public event Action<string> TechnologyOverloadRequested;
         public event Action<string> BuildingUpgradeRequested;
+
+        public bool IsTechnologyOverloadVisible { get; private set; }
+        public bool CanActivateTechnologyOverload { get; private set; }
+        public string TechnologyOverloadButtonLabel { get; private set; } =
+            "启动能量过载";
+
+        public void ApplyCoreShield(int value)
+        {
+            int normalized = Math.Max(0, value);
+            if (coreShield == normalized) return;
+            coreShield = normalized;
+            EnsureFallbackConfiguration();
+            if (SummaryText != null)
+                SummaryText.text = FormatSummary(LastSnapshot, coreShield);
+        }
 
         public bool IsBuildingUpgradeVisible { get; private set; }
         public bool CanUpgradeSelectedBuilding { get; private set; }
@@ -187,7 +207,7 @@ namespace WasteCity.Graybox3D.Building
                 WarningVisible = snapshot != null &&
                     snapshot.WavePhase == WavePhase.Warning;
 
-                string summary = FormatSummary(snapshot);
+                string summary = FormatSummary(snapshot, coreShield);
                 bool visible;
                 bool towerSelected;
                 bool towerPaused;
@@ -214,6 +234,19 @@ namespace WasteCity.Graybox3D.Building
                 }
                 IsSelectionVisible = visible;
                 selectedCanToggleTowerPause = towerSelected;
+                IsTechnologyOverloadVisible = useDetails &&
+                    details?.IsTechnologyOverloadVisible == true;
+                CanActivateTechnologyOverload =
+                    IsTechnologyOverloadVisible &&
+                    details.CanActivateTechnologyOverload;
+                selectedCanActivateTechnologyOverload =
+                    CanActivateTechnologyOverload;
+                TechnologyOverloadButtonLabel =
+                    IsTechnologyOverloadVisible &&
+                    !string.IsNullOrWhiteSpace(
+                        details.TechnologyOverloadButtonLabel)
+                        ? details.TechnologyOverloadButtonLabel
+                        : "启动能量过载";
                 TowerPauseButtonLabel = towerPaused
                     ? "恢复运行"
                     : "暂停运行";
@@ -234,6 +267,19 @@ namespace WasteCity.Graybox3D.Building
                 }
                 if (towerPauseButtonText != null)
                     towerPauseButtonText.text = TowerPauseButtonLabel;
+                if (technologyOverloadButton != null)
+                {
+                    technologyOverloadButton.gameObject.SetActive(
+                        IsTechnologyOverloadVisible);
+                    technologyOverloadButton.interactable =
+                        CanActivateTechnologyOverload;
+                    if (technologyOverloadButton.targetGraphic != null)
+                        technologyOverloadButton.targetGraphic.raycastTarget =
+                            IsTechnologyOverloadVisible;
+                }
+                if (technologyOverloadButtonText != null)
+                    technologyOverloadButtonText.text =
+                        TechnologyOverloadButtonLabel;
             }
         }
 
@@ -241,6 +287,9 @@ namespace WasteCity.Graybox3D.Building
         {
             if (towerPauseButton != null)
                 towerPauseButton.onClick.RemoveListener(HandlePauseClicked);
+            if (technologyOverloadButton != null)
+                technologyOverloadButton.onClick.RemoveListener(
+                    HandleTechnologyOverloadClicked);
             if (buildingUpgradeButton != null)
                 buildingUpgradeButton.onClick.RemoveListener(
                     HandleBuildingUpgradeClicked);
@@ -342,13 +391,13 @@ namespace WasteCity.Graybox3D.Building
                 new Vector2(1f, .5f),
                 new Vector2(1f, .5f),
                 new Vector2(-20f, 0f),
-                new Vector2(310f, 300f));
+                new Vector2(340f, 500f));
             selectionGroup = SelectionRect.gameObject
                 .AddComponent<CanvasGroup>();
             SelectionText = CreateText(
                 SelectionRect,
                 "Defense.Selection.Text",
-                new Vector2(14f, 54f),
+                new Vector2(14f, 150f),
                 new Vector2(-28f, -68f),
                 16,
                 TextAnchor.UpperLeft);
@@ -372,13 +421,40 @@ namespace WasteCity.Graybox3D.Building
             towerPauseButtonText.rectTransform.offsetMin = Vector2.zero;
             towerPauseButtonText.rectTransform.offsetMax = Vector2.zero;
             towerPauseButton.onClick.AddListener(HandlePauseClicked);
+            technologyOverloadButton = CreateButton(
+                SelectionRect,
+                "DefenseDetails.TechnologyOverloadButton",
+                new Vector2(.5f, 0f),
+                new Vector2(.5f, 0f),
+                new Vector2(.5f, 0f),
+                new Vector2(0f, 56f),
+                new Vector2(220f, 38f));
+            technologyOverloadButtonText = CreateText(
+                technologyOverloadButton.GetComponent<RectTransform>(),
+                "Defense.Selection.TechnologyOverload.Text",
+                Vector2.zero,
+                Vector2.zero,
+                15,
+                TextAnchor.MiddleCenter);
+            technologyOverloadButtonText.rectTransform.anchorMin =
+                Vector2.zero;
+            technologyOverloadButtonText.rectTransform.anchorMax =
+                Vector2.one;
+            technologyOverloadButtonText.rectTransform.offsetMin =
+                Vector2.zero;
+            technologyOverloadButtonText.rectTransform.offsetMax =
+                Vector2.zero;
+            technologyOverloadButton.onClick.AddListener(
+                HandleTechnologyOverloadClicked);
+            technologyOverloadButton.gameObject.SetActive(false);
+            technologyOverloadButton.targetGraphic.raycastTarget = false;
             buildingUpgradeButton = CreateButton(
                 SelectionRect,
                 "DefenseDetails.BuildingUpgradeButton",
                 new Vector2(.5f, 0f),
                 new Vector2(.5f, 0f),
                 new Vector2(.5f, 0f),
-                new Vector2(0f, 56f),
+                new Vector2(0f, 100f),
                 new Vector2(220f, 38f));
             buildingUpgradeButtonText = CreateText(
                 buildingUpgradeButton.GetComponent<RectTransform>(),
@@ -396,15 +472,15 @@ namespace WasteCity.Graybox3D.Building
             buildingUpgradeFeedbackText = CreateText(
                 SelectionRect,
                 "Defense.Selection.Upgrade.Feedback",
-                new Vector2(14f, 96f),
-                new Vector2(-14f, -150f),
+                new Vector2(14f, 140f),
+                new Vector2(-14f, -194f),
                 14,
                 TextAnchor.LowerCenter);
             buildingUpgradeButton.gameObject.SetActive(false);
             buildingUpgradeButton.targetGraphic.raycastTarget = false;
             buildingUpgradeFeedbackText.gameObject.SetActive(false);
 
-            SummaryText.text = FormatSummary(LastSnapshot);
+            SummaryText.text = FormatSummary(LastSnapshot, coreShield);
             SpeedText.text = FormatSpeed(requestedSpeed, effectiveSpeed);
             selectionGroup.alpha = 0f;
             selectionGroup.interactable = false;
@@ -446,10 +522,10 @@ namespace WasteCity.Graybox3D.Building
                 46f);
             Rect drawer = layout.SelectionDrawerSlot;
             Rect selection = new Rect(
-                drawer.xMax - Mathf.Min(310f, drawer.width),
-                drawer.center.y - Mathf.Min(300f, drawer.height) * .5f,
-                Mathf.Min(310f, drawer.width),
-                Mathf.Min(300f, drawer.height));
+                drawer.xMax - Mathf.Min(340f, drawer.width),
+                drawer.center.y - Mathf.Min(500f, drawer.height) * .5f,
+                Mathf.Min(340f, drawer.width),
+                Mathf.Min(500f, drawer.height));
             ApplyCanvasRect(SummaryRect, summary);
             ApplyCanvasRect(SpeedRect, speed);
             ApplyCanvasRect(SelectionRect, selection);
@@ -483,15 +559,26 @@ namespace WasteCity.Graybox3D.Building
                 BuildingUpgradeRequested?.Invoke(selectedStableId);
         }
 
+        private void HandleTechnologyOverloadClicked()
+        {
+            if (selectedKind == GrayboxDefenseSelectionKind3D.Tower &&
+                selectedCanActivateTechnologyOverload &&
+                !string.IsNullOrWhiteSpace(selectedStableId))
+            {
+                TechnologyOverloadRequested?.Invoke(selectedStableId);
+            }
+        }
+
         private static string FormatSummary(
-            GrayboxDefenseRuntimeSnapshot3D snapshot)
+            GrayboxDefenseRuntimeSnapshot3D snapshot,
+            int coreShield)
         {
             if (snapshot == null)
                 return "防御 | 第 0/10 波\n" +
                        "阶段 未开始 | 倒计时 --\n" +
                        "入口 无 | 组成 无\n" +
                        "已生成 0/0 | 存活 0\n" +
-                       "核心 --/--";
+                       "核心 --/-- | 护盾 0";
 
             string countdown = snapshot.CampaignPhase ==
                     SingleCityDefenseCampaignPhase.Warning
@@ -513,7 +600,7 @@ namespace WasteCity.Graybox3D.Building
                    "已生成 " + snapshot.SpawnedEnemyCount + "/" +
                    snapshot.PlannedEnemyCount + " | 存活敌人 " +
                    snapshot.AliveEnemyCount + "\n" +
-                   "核心 " + core;
+                   "核心 " + core + " | 护盾 " + Math.Max(0, coreShield);
         }
 
         private static string PhaseLabel(
@@ -650,6 +737,7 @@ namespace WasteCity.Graybox3D.Building
             result.Append(string.IsNullOrWhiteSpace(details.StatusText)
                 ? "未知"
                 : details.StatusText);
+            AppendTechnologyStatuses(result, details.TechnologyStatuses);
 
             if (kind == GrayboxDefenseSelectionKind3D.Ruin)
             {
@@ -742,6 +830,51 @@ namespace WasteCity.Graybox3D.Building
 
             visible = false;
             return string.Empty;
+        }
+
+        private static void AppendTechnologyStatuses(
+            StringBuilder result,
+            System.Collections.Generic.IReadOnlyList<
+                GrayboxDefenseObservedStatus3D> statuses)
+        {
+            if (statuses == null || statuses.Count == 0) return;
+            for (var index = 0; index < statuses.Count; index++)
+            {
+                GrayboxDefenseObservedStatus3D status = statuses[index];
+                result.Append("\n科技状态 ");
+                result.Append(status.DisplayName);
+                result.Append("｜来源 ");
+                result.Append(string.IsNullOrWhiteSpace(
+                        status.SourceResearchName)
+                    ? "未知科技"
+                    : status.SourceResearchName);
+                if (status.Stacks > 1)
+                {
+                    result.Append("｜");
+                    result.Append(status.Stacks);
+                    result.Append("层");
+                }
+                if (status.CurrentValue > 0f)
+                {
+                    result.Append("｜强度 ");
+                    result.Append(status.CurrentValue.ToString(
+                        "0.#",
+                        CultureInfo.InvariantCulture));
+                }
+                if (!string.IsNullOrWhiteSpace(status.PhaseText))
+                {
+                    result.Append("｜");
+                    result.Append(status.PhaseText);
+                }
+                if (status.RemainingSeconds > 0f)
+                {
+                    result.Append(" ");
+                    result.Append(status.RemainingSeconds.ToString(
+                        "0.0",
+                        CultureInfo.InvariantCulture));
+                    result.Append("秒");
+                }
+            }
         }
 
         private static void AppendProductionDetails(

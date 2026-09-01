@@ -10,6 +10,7 @@ namespace WasteCity.Graybox3D.Building
     {
         Resource,
         Research,
+        TechnologyStatus,
         ProgressionAction,
     }
 
@@ -117,6 +118,8 @@ namespace WasteCity.Graybox3D.Building
             BuildResources();
         private static readonly GrayboxDeveloperCatalogEntry3D[] research =
             BuildResearch();
+        private static readonly GrayboxDeveloperCatalogEntry3D[]
+            technologyStatuses = BuildTechnologyStatuses();
         private static readonly GrayboxDeveloperCatalogEntry3D[] actions =
             BuildActions();
         private static readonly IReadOnlyList<
@@ -126,6 +129,9 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDeveloperCatalogEntry3D> readOnlyResearch =
                 Array.AsReadOnly(research);
         private static readonly IReadOnlyList<
+            GrayboxDeveloperCatalogEntry3D> readOnlyTechnologyStatuses =
+                Array.AsReadOnly(technologyStatuses);
+        private static readonly IReadOnlyList<
             GrayboxDeveloperCatalogEntry3D> readOnlyActions =
                 Array.AsReadOnly(actions);
 
@@ -134,6 +140,9 @@ namespace WasteCity.Graybox3D.Building
 
         public static IReadOnlyList<GrayboxDeveloperCatalogEntry3D>
             ResearchEntries => readOnlyResearch;
+
+        public static IReadOnlyList<GrayboxDeveloperCatalogEntry3D>
+            TechnologyStatusEntries => readOnlyTechnologyStatuses;
 
         public static IReadOnlyList<GrayboxDeveloperCatalogEntry3D>
             ProgressionActionEntries => readOnlyActions;
@@ -152,6 +161,14 @@ namespace WasteCity.Graybox3D.Building
             return string.IsNullOrWhiteSpace(query)
                 ? readOnlyResearch
                 : Search(research, query);
+        }
+
+        public static IReadOnlyList<GrayboxDeveloperCatalogEntry3D>
+            SearchTechnologyStatuses(string query)
+        {
+            return string.IsNullOrWhiteSpace(query)
+                ? readOnlyTechnologyStatuses
+                : Search(technologyStatuses, query);
         }
 
         public static IReadOnlyList<GrayboxDeveloperCatalogEntry3D>
@@ -174,6 +191,13 @@ namespace WasteCity.Graybox3D.Building
             out GrayboxDeveloperCatalogEntry3D entry)
         {
             return TryResolve(research, query, out entry);
+        }
+
+        public static bool TryResolveTechnologyStatus(
+            string query,
+            out GrayboxDeveloperCatalogEntry3D entry)
+        {
+            return TryResolve(technologyStatuses, query, out entry);
         }
 
         public static bool TryResolveProgressionAction(
@@ -210,6 +234,23 @@ namespace WasteCity.Graybox3D.Building
                     GrayboxDeveloperCatalogKind3D.Research,
                     definitions[index].Id.Value,
                     definitions[index].Name);
+            }
+            return result;
+        }
+
+        private static GrayboxDeveloperCatalogEntry3D[]
+            BuildTechnologyStatuses()
+        {
+            IReadOnlyList<ResearchStatusDefinition> definitions =
+                ResearchStatusCatalog.All;
+            var result = new GrayboxDeveloperCatalogEntry3D[
+                definitions.Count];
+            for (var index = 0; index < result.Length; index++)
+            {
+                result[index] = new GrayboxDeveloperCatalogEntry3D(
+                    GrayboxDeveloperCatalogKind3D.TechnologyStatus,
+                    definitions[index].Id,
+                    definitions[index].DisplayName);
             }
             return result;
         }

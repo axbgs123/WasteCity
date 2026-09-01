@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using WasteCity.Economy;
+using WasteCity.Research;
 
 namespace WasteCity.Combat
 {
@@ -56,6 +57,33 @@ namespace WasteCity.Combat
 
         public string DefinitionId { get; }
         public int Count { get; }
+    }
+
+    public readonly struct ArmyTechnologyUnitPersistenceState
+    {
+        public ArmyTechnologyUnitPersistenceState(
+            string stableUnitId,
+            float regenerationAccumulatorSeconds)
+        {
+            StableUnitId = stableUnitId;
+            RegenerationAccumulatorSeconds = regenerationAccumulatorSeconds;
+        }
+
+        public string StableUnitId { get; }
+        public float RegenerationAccumulatorSeconds { get; }
+    }
+
+    public sealed class ArmyTechnologyPersistenceSnapshot
+    {
+        public ArmyTechnologyPersistenceSnapshot(
+            ArmyTechnologyUnitPersistenceState[] units)
+        {
+            Units = units == null
+                ? null
+                : (ArmyTechnologyUnitPersistenceState[])units.Clone();
+        }
+
+        public ArmyTechnologyUnitPersistenceState[] Units { get; }
     }
 
     public sealed class SingleCityArmyPersistenceSnapshot
@@ -140,6 +168,7 @@ namespace WasteCity.Combat
             string definitionId,
             string squadId,
             int currentHealth,
+            int maximumHealth,
             float maintenanceElapsed,
             bool isActive)
         {
@@ -147,6 +176,7 @@ namespace WasteCity.Combat
             DefinitionId = definitionId;
             SquadId = squadId;
             CurrentHealth = currentHealth;
+            MaximumHealth = maximumHealth;
             MaintenanceElapsed = maintenanceElapsed;
             IsActive = isActive;
         }
@@ -155,6 +185,7 @@ namespace WasteCity.Combat
         public string DefinitionId { get; }
         public string SquadId { get; }
         public int CurrentHealth { get; }
+        public int MaximumHealth { get; }
         public float MaintenanceElapsed { get; }
         public bool IsActive { get; }
     }
@@ -168,17 +199,21 @@ namespace WasteCity.Combat
         {
             public UnitState(
                 string stableId,
-                ArmyUnitDefinition definition)
+                ArmyUnitDefinition definition,
+                int maximumHealth)
             {
                 StableId = stableId;
                 Definition = definition;
-                CurrentHealth = definition.MaximumHealth;
+                MaximumHealth = Math.Max(1, maximumHealth);
+                CurrentHealth = MaximumHealth;
             }
 
             public string StableId { get; }
             public ArmyUnitDefinition Definition { get; }
             public int CurrentHealth { get; set; }
+            public int MaximumHealth { get; set; }
             public float MaintenanceElapsed { get; set; }
+            public float RegenerationAccumulatorSeconds { get; set; }
             public bool IsActive { get; set; } = true;
         }
 
@@ -191,6 +226,8 @@ namespace WasteCity.Combat
         private bool leaderAssigned;
         private bool leaderHealthy;
         private ulong persistenceGeneration;
+        private Func<ResearchEffectSnapshot> researchEffectsProvider = () =>
+            ResearchEffectResolver.Resolve(Array.Empty<string>());
 
         public FriendlyUnitCommandModel Commands { get; } =
             new FriendlyUnitCommandModel();
@@ -201,6 +238,14 @@ namespace WasteCity.Combat
             leaderHealthy);
         public IReadOnlyList<ArmyUnitSnapshot> Units => CaptureUnits();
         public int NextUnitOrdinal => nextUnitOrdinal;
+
+        public void ConfigureResearchEffects(
+            Func<ResearchEffectSnapshot> provider)
+        {
+            researchEffectsProvider = provider ?? (() =>
+                ResearchEffectResolver.Resolve(Array.Empty<string>()));
+            RefreshResolvedHealth();
+        }
 
         public int UnitCount(string definitionId)
         {
@@ -254,7 +299,9 @@ namespace WasteCity.Combat
             }
 
             int typeCapacity = Math.Max(0, operationalSourceBuildings) *
-                               definition.CapacityPerBuilding;
+                               ResolveEffects().ResolveUnitCapacity(
+                                   definition.SourceBuildingId,
+                                   definition.CapacityPerBuilding);
             if (UnitCount(definition.Id) >= typeCapacity ||
                 units.Count >= DefaultSquadMaximumUnits)
             {
@@ -280,7 +327,8 @@ namespace WasteCity.Combat
 
                 units.Add(new UnitState(
                     "core.army-unit." + nextUnitOrdinal.ToString("D6"),
-                    definition));
+                    definition,
+                    ResolveMaximumHealth(definition)));
                 nextUnitOrdinal++;
                 progress -= definition.ManufactureSeconds;
                 produced++;
@@ -326,6 +374,107 @@ namespace WasteCity.Combat
             return paidCycles;
         }
 
+        public int TickTechnologyEffects(
+            float deltaSeconds,
+            bool globallyPaused)
+        {
+            RefreshResolvedHealth();
+            float delta = Math.Max(0f, deltaSeconds);
+            if (globallyPaused || delta <= 0f) return 0;
+            if (!ResolveEffects().TissueRegeneration)
+            {
+                ClearRegenerationAccumulators();
+                return 0;
+            }
+
+            int totalHealed = 0;
+            bool stateChanged = false;
+            for (var index = 0; index < units.Count; index++)
+            {
+                UnitState unit = units[index];
+                if (!unit.IsActive ||
+                    unit.CurrentHealth >= unit.MaximumHealth)
+                {
+                    if (unit.RegenerationAccumulatorSeconds > 0f)
+                    {
+                        unit.RegenerationAccumulatorSeconds = 0f;
+                        stateChanged = true;
+                    }
+                    continue;
+                }
+
+                unit.RegenerationAccumulatorSeconds += delta;
+                stateChanged = true;
+                int cycles = (int)Math.Floor(
+                    unit.RegenerationAccumulatorSeconds + .00001f);
+                if (cycles <= 0) continue;
+                int healed = Math.Min(
+                    cycles,
+                    unit.MaximumHealth - unit.CurrentHealth);
+                unit.CurrentHealth += healed;
+                totalHealed += healed;
+                unit.RegenerationAccumulatorSeconds =
+                    unit.CurrentHealth >= unit.MaximumHealth
+                        ? 0f
+                        : Math.Max(
+                            0f,
+                            unit.RegenerationAccumulatorSeconds - cycles);
+            }
+            if (stateChanged) AdvancePersistenceGeneration();
+            return totalHealed;
+        }
+
+        public ArmyTechnologyPersistenceSnapshot CaptureTechnologyState()
+        {
+            var result = new ArmyTechnologyUnitPersistenceState[units.Count];
+            for (var index = 0; index < units.Count; index++)
+            {
+                result[index] = new ArmyTechnologyUnitPersistenceState(
+                    units[index].StableId,
+                    units[index].RegenerationAccumulatorSeconds);
+            }
+            return new ArmyTechnologyPersistenceSnapshot(result);
+        }
+
+        public bool TryRestoreTechnologyState(
+            ArmyTechnologyPersistenceSnapshot snapshot,
+            out string error)
+        {
+            if (snapshot?.Units == null)
+                return Fail("军队科技状态不完整", out error);
+            var byId = new Dictionary<string, float>(StringComparer.Ordinal);
+            for (var index = 0; index < snapshot.Units.Length; index++)
+            {
+                ArmyTechnologyUnitPersistenceState saved =
+                    snapshot.Units[index];
+                if (string.IsNullOrWhiteSpace(saved.StableUnitId) ||
+                    !IsFinite(saved.RegenerationAccumulatorSeconds) ||
+                    saved.RegenerationAccumulatorSeconds < 0f ||
+                    saved.RegenerationAccumulatorSeconds >= 1f ||
+                    !byId.TryAdd(
+                        saved.StableUnitId,
+                        saved.RegenerationAccumulatorSeconds))
+                {
+                    return Fail("军队再生计时状态无效", out error);
+                }
+            }
+            if (byId.Count != units.Count)
+                return Fail("军队再生计时与单位集合不匹配", out error);
+            for (var index = 0; index < units.Count; index++)
+            {
+                if (!byId.TryGetValue(
+                        units[index].StableId,
+                        out float accumulator))
+                {
+                    return Fail("军队再生计时缺少单位", out error);
+                }
+                units[index].RegenerationAccumulatorSeconds = accumulator;
+            }
+            AdvancePersistenceGeneration();
+            error = string.Empty;
+            return true;
+        }
+
         public void SetLeaderAssignment(
             bool assigned,
             bool leaderHealthy)
@@ -348,6 +497,7 @@ namespace WasteCity.Combat
             int rawDamage,
             DamageType damageType)
         {
+            RefreshResolvedHealth();
             if (string.IsNullOrWhiteSpace(stableUnitId) || rawDamage <= 0)
                 return 0;
             for (var index = 0; index < units.Count; index++)
@@ -400,6 +550,7 @@ namespace WasteCity.Combat
 
         public SingleCityArmyPersistenceSnapshot CaptureForPersistence()
         {
+            RefreshResolvedHealth();
             var manufacturing = new List<
                 ArmyManufacturingPersistenceState>();
             for (var index = 0; index < ArmyUnitCatalog.All.Count; index++)
@@ -494,7 +645,9 @@ namespace WasteCity.Combat
                 ArmyUnitPersistenceState saved = value.Units[index];
                 var unit = new UnitState(
                     saved.StableUnitId,
-                    ArmyUnitCatalog.Find(saved.DefinitionId))
+                    ArmyUnitCatalog.Find(saved.DefinitionId),
+                    ResolveMaximumHealth(
+                        ArmyUnitCatalog.Find(saved.DefinitionId)))
                 {
                     CurrentHealth = saved.CurrentHealth,
                     MaintenanceElapsed = saved.MaintenanceElapsed,
@@ -525,7 +678,7 @@ namespace WasteCity.Combat
             return true;
         }
 
-        private static bool TryValidateSnapshot(
+        private bool TryValidateSnapshot(
             SingleCityArmyPersistenceSnapshot snapshot,
             out string error)
         {
@@ -568,7 +721,7 @@ namespace WasteCity.Combat
                         DefaultSquadId,
                         StringComparison.Ordinal) ||
                     item.CurrentHealth <= 0 ||
-                    item.CurrentHealth > definition.MaximumHealth ||
+                    item.CurrentHealth > ResolveMaximumHealth(definition) ||
                     !IsFinite(item.MaintenanceElapsed) ||
                     item.MaintenanceElapsed < 0f ||
                     item.MaintenanceElapsed > definition.MaintenanceSeconds ||
@@ -674,6 +827,7 @@ namespace WasteCity.Combat
 
         private ArmyUnitSnapshot[] CaptureUnits()
         {
+            RefreshResolvedHealth();
             var result = new ArmyUnitSnapshot[units.Count];
             for (var index = 0; index < units.Count; index++)
             {
@@ -683,10 +837,63 @@ namespace WasteCity.Combat
                     unit.Definition.Id,
                     DefaultSquadId,
                     unit.CurrentHealth,
+                    unit.MaximumHealth,
                     unit.MaintenanceElapsed,
                     unit.IsActive);
             }
             return result;
+        }
+
+        private ResearchEffectSnapshot ResolveEffects()
+        {
+            return researchEffectsProvider?.Invoke() ??
+                ResearchEffectResolver.Resolve(Array.Empty<string>());
+        }
+
+        private int ResolveMaximumHealth(ArmyUnitDefinition definition)
+        {
+            if (definition == null) return 1;
+            return Math.Max(
+                1,
+                (int)Math.Round(
+                    definition.MaximumHealth *
+                    ResolveEffects().ResolveUnitHealthMultiplier(
+                        definition.Id),
+                    MidpointRounding.AwayFromZero));
+        }
+
+        private void RefreshResolvedHealth()
+        {
+            for (var index = 0; index < units.Count; index++)
+            {
+                UnitState unit = units[index];
+                int beforeMaximum = Math.Max(1, unit.MaximumHealth);
+                int afterMaximum = ResolveMaximumHealth(unit.Definition);
+                if (beforeMaximum == afterMaximum) continue;
+                unit.CurrentHealth = Math.Max(
+                    1,
+                    Math.Min(
+                        afterMaximum,
+                        (int)Math.Round(
+                            unit.CurrentHealth *
+                            (afterMaximum / (float)beforeMaximum),
+                            MidpointRounding.AwayFromZero)));
+                unit.MaximumHealth = afterMaximum;
+                AdvancePersistenceGeneration();
+            }
+        }
+
+        private void ClearRegenerationAccumulators()
+        {
+            bool changed = false;
+            for (var index = 0; index < units.Count; index++)
+            {
+                if (units[index].RegenerationAccumulatorSeconds <= 0f)
+                    continue;
+                units[index].RegenerationAccumulatorSeconds = 0f;
+                changed = true;
+            }
+            if (changed) AdvancePersistenceGeneration();
         }
     }
 }

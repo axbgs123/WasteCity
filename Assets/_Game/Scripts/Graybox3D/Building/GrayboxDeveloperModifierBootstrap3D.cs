@@ -27,17 +27,22 @@ namespace WasteCity.Graybox3D.Building
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         private GrayboxDeveloperModifier3D modifier;
         private GrayboxDeveloperProgressionFacade3D progressionFacade;
+        private GrayboxDeveloperTechnologyStateFacade3D
+            technologyStateFacade;
         private bool retainedModifiedGameState;
         private GameObject panelRoot;
         private CatalogRow[] resourceRows;
         private CatalogRow[] researchRows;
+        private CatalogRow[] technologyStatusRows;
         private CatalogRow[] progressionRows;
         private Text selectedResourceLabel;
         private Text selectedResearchLabel;
+        private Text selectedTechnologyStatusLabel;
         private Text selectedProgressionActionLabel;
         private Text feedbackLabel;
         private string selectedResourceId;
         private string selectedResearchId;
+        private string selectedTechnologyStatusId;
         private string selectedProgressionActionId;
         private InputField progressionAmount;
         private InputField progressionPressureThreshold;
@@ -113,6 +118,7 @@ namespace WasteCity.Graybox3D.Building
             if (sessionChanged)
             {
                 retainedModifiedGameState = false;
+                technologyStateFacade = null;
             }
 #endif
             this.session = session;
@@ -131,6 +137,14 @@ namespace WasteCity.Graybox3D.Building
             if (ReferenceEquals(progressionFacade, facade)) return;
             progressionFacade = facade;
             modifier?.ConfigureProgressionFacade(facade);
+        }
+
+        public void ConfigureTechnologyStateFacade(
+            GrayboxDeveloperTechnologyStateFacade3D facade)
+        {
+            if (ReferenceEquals(technologyStateFacade, facade)) return;
+            technologyStateFacade = facade;
+            modifier?.ConfigureTechnologyStateFacade(facade);
         }
 #endif
 
@@ -206,7 +220,22 @@ namespace WasteCity.Graybox3D.Building
                 city,
                 presentation);
             modifier.ConfigureProgressionFacade(progressionFacade);
+            EnsureTechnologyStateFacade();
             CreatePanel();
+        }
+
+        private void EnsureTechnologyStateFacade()
+        {
+            if (technologyStateFacade == null)
+            {
+                technologyStateFacade =
+                    new GrayboxDeveloperTechnologyStateFacade3D(
+                        FindObjectOfType<GrayboxDefenseController3D>(),
+                        FindObjectOfType<
+                            GrayboxCivilizationExpansionController3D>(),
+                        session);
+            }
+            modifier?.ConfigureTechnologyStateFacade(technologyStateFacade);
         }
 
         private void DisposeDevelopmentSurface()
@@ -229,13 +258,16 @@ namespace WasteCity.Graybox3D.Building
             panelRoot = null;
             resourceRows = null;
             researchRows = null;
+            technologyStatusRows = null;
             progressionRows = null;
             selectedResourceLabel = null;
             selectedResearchLabel = null;
+            selectedTechnologyStatusLabel = null;
             selectedProgressionActionLabel = null;
             feedbackLabel = null;
             selectedResourceId = null;
             selectedResearchId = null;
+            selectedTechnologyStatusId = null;
             selectedProgressionActionId = null;
             progressionAmount = null;
             progressionPressureThreshold = null;
@@ -372,6 +404,88 @@ namespace WasteCity.Graybox3D.Building
                     ContentRoute.Psionics).Message));
             CreateButton(content, "Unlock All", "解锁全部研究", () =>
                 SetFeedback(modifier.UnlockAllResearchWithFeedback().Message));
+
+            CreateLabel(
+                content,
+                "Technology Status Catalog Label",
+                "科技状态（列表浏览 + 中文/输入搜索）");
+            InputField technologyStatusSearch = CreateInput(
+                content,
+                "Technology Status Search",
+                string.Empty);
+            technologyStatusRows = CreateCatalogResults(
+                content,
+                "Technology Status Results",
+                GrayboxDeveloperCatalogQuery3D.TechnologyStatusEntries,
+                entry => SelectTechnologyStatus(entry));
+            GrayboxDeveloperCatalogEntry3D initialTechnologyStatus =
+                GrayboxDeveloperCatalogQuery3D.TechnologyStatusEntries[0];
+            selectedTechnologyStatusId = initialTechnologyStatus.StableId;
+            selectedTechnologyStatusLabel = CreateLabel(
+                content,
+                "Selected Technology Status",
+                "当前科技状态：" + initialTechnologyStatus.DisplayName);
+            technologyStatusSearch.onValueChanged.AddListener(value =>
+                ApplyCatalogFilter(technologyStatusRows, value));
+            CreateButton(
+                content,
+                "Apply Technology Status Fixture",
+                "施加当前状态",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.Apply));
+            CreateButton(
+                content,
+                "Set Technology Status One Stack",
+                "设为 1 层",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.SetOneStack));
+            CreateButton(
+                content,
+                "Fill Technology Status Stacks",
+                "补满状态层数",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.FillStacks));
+            CreateButton(
+                content,
+                "Clear Selected Technology Status",
+                "清除当前状态",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.Clear));
+            CreateButton(
+                content,
+                "Expire Selected Technology Status",
+                "当前状态立即到期",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.Expire));
+            CreateButton(
+                content,
+                "Trigger Technology Overload",
+                "触发选中激光塔过载",
+                () => ExecuteTechnologyStateAction(
+                    GrayboxDeveloperTechnologyStateAction3D.TriggerOverload));
+            CreateButton(
+                content,
+                "List Technology Status Fixtures",
+                "列出当前测试状态",
+                () =>
+                {
+                    EnsureTechnologyStateFacade();
+                    System.Collections.Generic.IReadOnlyList<string> names =
+                        modifier.ListActiveTechnologyStates();
+                    SetFeedback(names.Count == 0
+                        ? "当前战役无活动科技状态"
+                        : "当前科技状态：" + string.Join("、", names));
+                });
+            CreateButton(
+                content,
+                "Clear Technology Status Fixtures",
+                "清理全部测试状态",
+                () =>
+                {
+                    EnsureTechnologyStateFacade();
+                    SetFeedback(modifier
+                        .ClearTechnologyStatusFixturesWithFeedback().Message);
+                });
 
             CreateLabel(content, "Progression Catalog Label",
                 "文明进程（列表浏览 + 输入搜索）");
@@ -609,6 +723,9 @@ namespace WasteCity.Graybox3D.Building
                     case GrayboxDeveloperCatalogKind3D.Research:
                         prefix = "Developer.Research.";
                         break;
+                    case GrayboxDeveloperCatalogKind3D.TechnologyStatus:
+                        prefix = "Developer.TechnologyStatus.";
+                        break;
                     default:
                         prefix = "Developer.Progression.";
                         break;
@@ -637,6 +754,15 @@ namespace WasteCity.Graybox3D.Building
             SetFeedback("已选择科技：" + entry.DisplayName);
         }
 
+        private void SelectTechnologyStatus(
+            GrayboxDeveloperCatalogEntry3D entry)
+        {
+            selectedTechnologyStatusId = entry.StableId;
+            selectedTechnologyStatusLabel.text =
+                "当前科技状态：" + entry.DisplayName;
+            SetFeedback("已选择科技状态：" + entry.DisplayName);
+        }
+
         private void SelectProgressionAction(
             GrayboxDeveloperCatalogEntry3D entry)
         {
@@ -644,6 +770,15 @@ namespace WasteCity.Graybox3D.Building
             selectedProgressionActionLabel.text =
                 "当前文明进程动作：" + entry.DisplayName;
             SetFeedback("已选择文明进程动作：" + entry.DisplayName);
+        }
+
+        private void ExecuteTechnologyStateAction(
+            GrayboxDeveloperTechnologyStateAction3D action)
+        {
+            EnsureTechnologyStateFacade();
+            SetFeedback(modifier.ExecuteTechnologyStatusActionWithFeedback(
+                selectedTechnologyStatusId,
+                action).Message);
         }
 
         private void ExecuteSelectedProgressionAction()

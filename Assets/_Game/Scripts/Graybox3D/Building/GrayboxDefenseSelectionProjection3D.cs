@@ -1,10 +1,42 @@
 using System;
 using System.Collections.Generic;
+using WasteCity.Building;
 using WasteCity.Combat;
+using WasteCity.Defense;
 using WasteCity.Economy;
+using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public sealed class GrayboxDefenseObservedStatus3D
+    {
+        internal GrayboxDefenseObservedStatus3D(
+            string statusId,
+            string displayName,
+            string sourceResearchName,
+            int stacks,
+            float currentValue,
+            float remainingSeconds,
+            string phaseText)
+        {
+            StatusId = statusId ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            SourceResearchName = sourceResearchName ?? string.Empty;
+            Stacks = Math.Max(0, stacks);
+            CurrentValue = Math.Max(0f, currentValue);
+            RemainingSeconds = Math.Max(0f, remainingSeconds);
+            PhaseText = phaseText ?? string.Empty;
+        }
+
+        public string StatusId { get; }
+        public string DisplayName { get; }
+        public string SourceResearchName { get; }
+        public int Stacks { get; }
+        public float CurrentValue { get; }
+        public float RemainingSeconds { get; }
+        public string PhaseText { get; }
+    }
+
     public sealed class GrayboxDefenseSelectionSnapshot3D
     {
         internal GrayboxDefenseSelectionSnapshot3D(
@@ -21,7 +53,12 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseTowerSnapshot3D tower,
             GrayboxDefenseEnemySnapshot3D enemy,
             ProductionBuildingObservability production,
-            IReadOnlyList<ResourceAmount> lostResources)
+            IReadOnlyList<ResourceAmount> lostResources,
+            IReadOnlyList<GrayboxDefenseObservedStatus3D>
+                technologyStatuses,
+            bool isTechnologyOverloadVisible,
+            bool canActivateTechnologyOverload,
+            string technologyOverloadButtonLabel)
         {
             Kind = kind;
             StableId = stableId;
@@ -37,6 +74,14 @@ namespace WasteCity.Graybox3D.Building
             Enemy = enemy;
             Production = production;
             LostResources = lostResources ?? Array.Empty<ResourceAmount>();
+            TechnologyStatuses = technologyStatuses ??
+                Array.Empty<GrayboxDefenseObservedStatus3D>();
+            IsTechnologyOverloadVisible = isTechnologyOverloadVisible;
+            CanActivateTechnologyOverload =
+                isTechnologyOverloadVisible &&
+                canActivateTechnologyOverload;
+            TechnologyOverloadButtonLabel =
+                technologyOverloadButtonLabel ?? string.Empty;
         }
 
         public GrayboxDefenseSelectionKind3D Kind { get; }
@@ -53,6 +98,11 @@ namespace WasteCity.Graybox3D.Building
         public GrayboxDefenseEnemySnapshot3D Enemy { get; }
         public ProductionBuildingObservability Production { get; }
         public IReadOnlyList<ResourceAmount> LostResources { get; }
+        public IReadOnlyList<GrayboxDefenseObservedStatus3D>
+            TechnologyStatuses { get; }
+        public bool IsTechnologyOverloadVisible { get; }
+        public bool CanActivateTechnologyOverload { get; }
+        public string TechnologyOverloadButtonLabel { get; }
     }
 
     public static class GrayboxDefenseSelectionProjection3D
@@ -65,7 +115,11 @@ namespace WasteCity.Graybox3D.Building
             GrayboxBuildingHealthRuntime3D health,
             ProductionObservabilitySnapshot production,
             bool globallyPaused = false,
-            GrayboxCombatDestructionResult3D destructionResult = null)
+            GrayboxCombatDestructionResult3D destructionResult = null,
+            SingleCityDefenseTechnologyStateSnapshot technologyState = null,
+            GrayboxBuildingTechnologySnapshot3D buildingTechnologyState =
+                null,
+            bool energyOverloadUnlocked = false)
         {
             if (kind == GrayboxDefenseSelectionKind3D.None ||
                 string.IsNullOrWhiteSpace(stableId))
@@ -74,7 +128,11 @@ namespace WasteCity.Graybox3D.Building
             }
 
             if (kind == GrayboxDefenseSelectionKind3D.Enemy)
-                return CaptureEnemy(stableId, defense, globallyPaused);
+                return CaptureEnemy(
+                    stableId,
+                    defense,
+                    globallyPaused,
+                    technologyState);
 
             GrayboxBuildingInstance3D instance = FindInstance(
                 instances,
@@ -123,6 +181,20 @@ namespace WasteCity.Graybox3D.Building
                 instance.IsPlayerOwned &&
                 !instance.IsEvacuationLocked &&
                 current > 0;
+            IReadOnlyList<GrayboxDefenseObservedStatus3D> statuses =
+                CollectStatuses(
+                    kind,
+                    stableId,
+                    technologyState,
+                    buildingTechnologyState,
+                    energyOverloadUnlocked &&
+                    string.Equals(
+                        instance.Placement.Definition.Id.Value,
+                        BuildingCatalog.LaserTower.Id.Value,
+                        StringComparison.Ordinal),
+                    out bool overloadVisible,
+                    out bool canActivateOverload,
+                    out string overloadButtonLabel);
 
             return new GrayboxDefenseSelectionSnapshot3D(
                 kind,
@@ -138,7 +210,11 @@ namespace WasteCity.Graybox3D.Building
                 tower,
                 enemy: null,
                 productionDetails,
-                ResolveLostResources(stableId, destructionResult));
+                ResolveLostResources(stableId, destructionResult),
+                statuses,
+                overloadVisible,
+                canActivateOverload,
+                overloadButtonLabel);
         }
 
         public static string ProductionStopReasonText(
@@ -184,7 +260,8 @@ namespace WasteCity.Graybox3D.Building
         private static GrayboxDefenseSelectionSnapshot3D CaptureEnemy(
             string stableId,
             GrayboxDefenseRuntimeSnapshot3D defense,
-            bool globallyPaused)
+            bool globallyPaused,
+            SingleCityDefenseTechnologyStateSnapshot technologyState)
         {
             GrayboxDefenseEnemySnapshot3D enemy = FindEnemy(defense, stableId);
             if (enemy == null) return null;
@@ -221,7 +298,242 @@ namespace WasteCity.Graybox3D.Building
                 tower: null,
                 enemy,
                 production: null,
-                lostResources: null);
+                lostResources: null,
+                technologyStatuses: CollectEnemyStatuses(
+                    stableId,
+                    technologyState),
+                isTechnologyOverloadVisible: false,
+                canActivateTechnologyOverload: false,
+                technologyOverloadButtonLabel: string.Empty);
+        }
+
+        private static IReadOnlyList<GrayboxDefenseObservedStatus3D>
+            CollectStatuses(
+                GrayboxDefenseSelectionKind3D kind,
+                string stableId,
+                SingleCityDefenseTechnologyStateSnapshot technologyState,
+                GrayboxBuildingTechnologySnapshot3D buildingTechnologyState,
+                bool energyOverloadUnlocked,
+                out bool overloadVisible,
+                out bool canActivateOverload,
+                out string overloadButtonLabel)
+        {
+            overloadVisible = false;
+            canActivateOverload = false;
+            overloadButtonLabel = string.Empty;
+            if (kind == GrayboxDefenseSelectionKind3D.Tower)
+            {
+                return CollectTowerStatuses(
+                    stableId,
+                    technologyState,
+                    energyOverloadUnlocked,
+                    out overloadVisible,
+                    out canActivateOverload,
+                    out overloadButtonLabel);
+            }
+            if (kind == GrayboxDefenseSelectionKind3D.Building)
+                return CollectBuildingStatuses(
+                    stableId,
+                    buildingTechnologyState);
+            return Array.Empty<GrayboxDefenseObservedStatus3D>();
+        }
+
+        private static IReadOnlyList<GrayboxDefenseObservedStatus3D>
+            CollectTowerStatuses(
+                string stableId,
+                SingleCityDefenseTechnologyStateSnapshot technologyState,
+                bool energyOverloadUnlocked,
+                out bool overloadVisible,
+                out bool canActivateOverload,
+                out string overloadButtonLabel)
+        {
+            overloadVisible = energyOverloadUnlocked;
+            canActivateOverload = energyOverloadUnlocked;
+            overloadButtonLabel = energyOverloadUnlocked
+                ? "启动能量过载"
+                : string.Empty;
+            if (!energyOverloadUnlocked)
+                return Array.Empty<GrayboxDefenseObservedStatus3D>();
+
+            SingleCityDefenseOverloadSnapshot overload = null;
+            if (technologyState?.Overloads != null)
+            {
+                for (var index = 0;
+                     index < technologyState.Overloads.Count;
+                     index++)
+                {
+                    if (string.Equals(
+                            technologyState.Overloads[index].TowerStableId,
+                            stableId,
+                            StringComparison.Ordinal))
+                    {
+                        overload = technologyState.Overloads[index];
+                        break;
+                    }
+                }
+            }
+
+            TechnologyOverloadPhase phase = overload?.Phase ??
+                TechnologyOverloadPhase.Ready;
+            float remaining = OverloadRemaining(overload);
+            string phaseText = OverloadPhaseText(phase);
+            canActivateOverload = phase == TechnologyOverloadPhase.Ready;
+            overloadButtonLabel = canActivateOverload
+                ? "启动能量过载"
+                : phaseText + " " + remaining.ToString("0.0") + "秒";
+            return Array.AsReadOnly(new[]
+            {
+                ObservedStatus(
+                    ResearchStatusCatalog.TechnologyOverloadId,
+                    stacks: 1,
+                    currentValue: 0f,
+                    remainingSeconds: remaining,
+                    phaseText: phaseText),
+            });
+        }
+
+        private static IReadOnlyList<GrayboxDefenseObservedStatus3D>
+            CollectEnemyStatuses(
+                string stableId,
+                SingleCityDefenseTechnologyStateSnapshot technologyState)
+        {
+            if (technologyState?.Enemies == null)
+                return Array.Empty<GrayboxDefenseObservedStatus3D>();
+            SingleCityDefenseEnemyTechnologySnapshot enemy = null;
+            for (var index = 0; index < technologyState.Enemies.Count; index++)
+            {
+                if (!string.Equals(
+                        technologyState.Enemies[index].StableEnemyId,
+                        stableId,
+                        StringComparison.Ordinal))
+                    continue;
+                enemy = technologyState.Enemies[index];
+                break;
+            }
+            if (enemy == null)
+                return Array.Empty<GrayboxDefenseObservedStatus3D>();
+
+            var result = new List<GrayboxDefenseObservedStatus3D>(4);
+            if (enemy.SwordIntentStacks > 0)
+                result.Add(ObservedStatus(
+                    ResearchStatusCatalog.SwordIntentId,
+                    enemy.SwordIntentStacks,
+                    0f,
+                    0f,
+                    "叠加中"));
+            if (enemy.InfectionStacks > 0)
+                result.Add(ObservedStatus(
+                    ResearchStatusCatalog.InfectionId,
+                    enemy.InfectionStacks,
+                    0f,
+                    Math.Max(
+                        0f,
+                        InfectionModel.TickSeconds - enemy.InfectionElapsed),
+                    "持续伤害"));
+            if (enemy.ResonanceRemaining > 0f)
+                result.Add(ObservedStatus(
+                    ResearchStatusCatalog.PsionicResonanceId,
+                    1,
+                    0f,
+                    enemy.ResonanceRemaining,
+                    "已标记"));
+            if (enemy.Controlled)
+                result.Add(ObservedStatus(
+                    ResearchStatusCatalog.MindControlId,
+                    1,
+                    0f,
+                    0f,
+                    "已控制"));
+            return result.Count == 0
+                ? Array.Empty<GrayboxDefenseObservedStatus3D>()
+                : result.AsReadOnly();
+        }
+
+        private static IReadOnlyList<GrayboxDefenseObservedStatus3D>
+            CollectBuildingStatuses(
+                string stableId,
+                GrayboxBuildingTechnologySnapshot3D technologyState)
+        {
+            if (technologyState?.Buildings == null)
+                return Array.Empty<GrayboxDefenseObservedStatus3D>();
+            for (var index = 0;
+                 index < technologyState.Buildings.Count;
+                 index++)
+            {
+                GrayboxBuildingTechnologyStateSnapshot3D building =
+                    technologyState.Buildings[index];
+                if (!string.Equals(
+                        building.StableInstanceId,
+                        stableId,
+                        StringComparison.Ordinal) ||
+                    building.Shield <= 0)
+                    continue;
+                return Array.AsReadOnly(new[]
+                {
+                    ObservedStatus(
+                        ResearchStatusCatalog.CityShieldId,
+                        stacks: 1,
+                        currentValue: building.Shield,
+                        remainingSeconds: 0f,
+                        phaseText: "护盾生效"),
+                });
+            }
+            return Array.Empty<GrayboxDefenseObservedStatus3D>();
+        }
+
+        private static GrayboxDefenseObservedStatus3D ObservedStatus(
+            string statusId,
+            int stacks,
+            float currentValue,
+            float remainingSeconds,
+            string phaseText)
+        {
+            ResearchStatusDefinition definition =
+                ResearchStatusCatalog.Find(statusId);
+            ResearchDefinition source = definition == null
+                ? null
+                : ResearchCatalog.Find(definition.SourceResearchId);
+            return new GrayboxDefenseObservedStatus3D(
+                statusId,
+                definition?.DisplayName ?? statusId,
+                source?.Name ?? definition?.SourceResearchId ?? string.Empty,
+                stacks,
+                currentValue,
+                remainingSeconds,
+                phaseText);
+        }
+
+        private static float OverloadRemaining(
+            SingleCityDefenseOverloadSnapshot overload)
+        {
+            if (overload == null) return 0f;
+            switch (overload.Phase)
+            {
+                case TechnologyOverloadPhase.Boosting:
+                    return overload.BoostRemaining;
+                case TechnologyOverloadPhase.Lockout:
+                    return overload.LockoutRemaining;
+                case TechnologyOverloadPhase.Cooldown:
+                    return overload.CooldownRemaining;
+                default:
+                    return 0f;
+            }
+        }
+
+        private static string OverloadPhaseText(
+            TechnologyOverloadPhase phase)
+        {
+            switch (phase)
+            {
+                case TechnologyOverloadPhase.Boosting:
+                    return "强化";
+                case TechnologyOverloadPhase.Lockout:
+                    return "停火锁定";
+                case TechnologyOverloadPhase.Cooldown:
+                    return "冷却";
+                default:
+                    return "就绪";
+            }
         }
 
         private static IReadOnlyList<ResourceAmount> ResolveLostResources(

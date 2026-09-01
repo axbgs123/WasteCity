@@ -1314,8 +1314,6 @@ namespace WasteCity.Graybox3D.Building
             if (definition == null || Research.IsCompleted(definition.Id)) return;
 
             Research.GrantCompletedForDevelopment(definition);
-            AdvanceCatalogRevision();
-            AdvancePlacementRevision();
         }
 
         public void UnlockRouteForDevelopment(ContentRoute route)

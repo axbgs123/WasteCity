@@ -62,7 +62,8 @@ namespace WasteCity.Defense
             int currentHealth,
             float movementRemainder,
             float attackDamageRemainder,
-            string targetStableId)
+            string targetStableId,
+            bool isControlled = false)
         {
             StableId = stableId;
             EnemyDefinitionId = enemyDefinitionId;
@@ -73,6 +74,7 @@ namespace WasteCity.Defense
             MovementRemainder = movementRemainder;
             AttackDamageRemainder = attackDamageRemainder;
             TargetStableId = targetStableId;
+            IsControlled = isControlled;
         }
 
         public string StableId { get; }
@@ -84,6 +86,7 @@ namespace WasteCity.Defense
         public float MovementRemainder { get; }
         public float AttackDamageRemainder { get; }
         public string TargetStableId { get; }
+        public bool IsControlled { get; }
     }
 
     public sealed class SingleCityDefenseCampaignStatisticsPersistenceState
@@ -126,7 +129,8 @@ namespace WasteCity.Defense
             float productionActiveProgressSeconds = 0f,
             float productionEligibleSeconds = 0f,
             bool cityWasPackedAfterCampaignStart = false,
-            bool developmentModifierUsed = false)
+            bool developmentModifierUsed = false,
+            int controlledUnitLossCount = 0)
         {
             ElapsedRuleSeconds = elapsedRuleSeconds;
             SpawnedEnemyCount = spawnedEnemyCount;
@@ -141,6 +145,7 @@ namespace WasteCity.Defense
             ProductionEligibleSeconds = productionEligibleSeconds;
             CityWasPackedAfterCampaignStart = cityWasPackedAfterCampaignStart;
             DevelopmentModifierUsed = developmentModifierUsed;
+            ControlledUnitLossCount = controlledUnitLossCount;
             this.killsByEnemyId = CopyMetrics(killsByEnemyId);
             this.damageByTowerBuildingId = CopyMetrics(
                 damageByTowerBuildingId);
@@ -174,6 +179,7 @@ namespace WasteCity.Defense
         public float ProductionEligibleSeconds { get; }
         public bool CityWasPackedAfterCampaignStart { get; }
         public bool DevelopmentModifierUsed { get; }
+        public int ControlledUnitLossCount { get; }
 
         private static ReadOnlyCollection<
             SingleCityDefenseCampaignMetricPersistenceState> CopyMetrics(
@@ -287,7 +293,8 @@ namespace WasteCity.Defense
                     statistics.ProductionActiveProgressSeconds,
                     statistics.ProductionEligibleSeconds,
                     statistics.CityWasPackedAfterCampaignStart,
-                    statistics.DevelopmentModifierUsed);
+                    statistics.DevelopmentModifierUsed,
+                    statistics.ControlledUnitLossCount);
         }
 
         public string CampaignId { get; }
@@ -393,7 +400,8 @@ namespace WasteCity.Defense
                             item.CurrentHealth,
                             item.MovementRemainder,
                             item.AttackDamageRemainder,
-                            item.TargetStableId));
+                            item.TargetStableId,
+                            item.IsControlled));
                 }
             }
             result.Sort((left, right) => string.CompareOrdinal(

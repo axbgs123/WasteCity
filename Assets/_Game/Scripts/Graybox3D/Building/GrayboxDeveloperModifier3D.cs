@@ -1,20 +1,330 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Combat;
 using WasteCity.Content;
+using WasteCity.Defense;
 using WasteCity.Economy;
+using WasteCity.Leader.CivilizationExpansion;
 using WasteCity.Research;
 using WasteCity.Progression;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public enum GrayboxDeveloperTechnologyStateAction3D
+    {
+        Apply,
+        SetOneStack,
+        FillStacks,
+        Clear,
+        Expire,
+        TriggerOverload,
+    }
+
+    public sealed class GrayboxDeveloperTechnologyStateFacade3D
+    {
+        private readonly GrayboxDefenseController3D defense;
+        private readonly GrayboxCivilizationExpansionController3D expansion;
+        private readonly GrayboxBuildingSession3D session;
+
+        public GrayboxDeveloperTechnologyStateFacade3D(
+            GrayboxDefenseController3D defense,
+            GrayboxCivilizationExpansionController3D expansion,
+            GrayboxBuildingSession3D session = null)
+        {
+            this.defense = defense;
+            this.expansion = expansion;
+            this.session = session;
+        }
+
+        public bool TryActivateSelectedOverload(out string feedback)
+        {
+            if (defense == null ||
+                defense.SelectedKind != GrayboxDefenseSelectionKind3D.Tower ||
+                string.IsNullOrWhiteSpace(defense.SelectedStableId))
+            {
+                feedback = "请先选中一座己方激光塔";
+                return false;
+            }
+            bool activated = defense.TryActivateTechnologyOverload(
+                defense.SelectedStableId);
+            feedback = activated
+                ? "选中激光塔已启动能量过载"
+                : "能量过载未就绪，或当前目标不是可用激光塔";
+            return activated;
+        }
+
+        public bool TryApplyLeaderGeneSplicing(out string feedback)
+        {
+            if (expansion == null)
+            {
+                feedback = "文明与领袖运行时尚未连接";
+                return false;
+            }
+            return expansion.TryApplyGeneSplicingFixtureForDevelopment(
+                out feedback);
+        }
+
+        public bool TrySetSelectedEnemyStatus(
+            string statusId,
+            bool fillStacks,
+            out string feedback)
+        {
+            ResearchStatusDefinition status = ResearchStatusCatalog.Find(
+                statusId);
+            if (defense == null ||
+                defense.SelectedKind != GrayboxDefenseSelectionKind3D.Enemy ||
+                string.IsNullOrWhiteSpace(defense.SelectedStableId))
+            {
+                feedback = "请先选中一名敌人";
+                return false;
+            }
+            bool changed = defense
+                .TrySetSelectedEnemyTechnologyStatusForDevelopment(
+                    statusId,
+                    fillStacks);
+            feedback = changed
+                ? "已为选中敌人" +
+                    (fillStacks ? "补满" : "设置") +
+                    (status?.DisplayName ?? statusId)
+                : (status?.DisplayName ?? statusId) +
+                    "不支持当前动作，或敌人已离开战场";
+            return changed;
+        }
+
+        public bool TryClearSelectedStatus(
+            string statusId,
+            out string feedback)
+        {
+            if (string.Equals(
+                    statusId,
+                    ResearchStatusCatalog.TechnologyOverloadId,
+                    StringComparison.Ordinal))
+            {
+                bool cleared = defense != null &&
+                    defense.TryClearSelectedOverloadForDevelopment();
+                feedback = cleared
+                    ? "已清除选中激光塔的能量过载"
+                    : "请先选中一座拥有过载状态的激光塔";
+                return cleared;
+            }
+            if (string.Equals(
+                    statusId,
+                    ResearchStatusCatalog.GeneSplicingTraitId,
+                    StringComparison.Ordinal))
+            {
+                if (expansion == null)
+                {
+                    feedback = "文明与领袖运行时尚未连接";
+                    return false;
+                }
+                return expansion
+                    .TryClearCurrentLeaderGeneSplicingForDevelopment(
+                        out feedback);
+            }
+            bool enemyCleared = defense != null &&
+                defense.TryClearSelectedEnemyTechnologyStatusForDevelopment(
+                    statusId);
+            ResearchStatusDefinition status = ResearchStatusCatalog.Find(
+                statusId);
+            feedback = enemyCleared
+                ? "已清除选中敌人的" +
+                    (status?.DisplayName ?? statusId)
+                : "选中目标没有可清除的" +
+                    (status?.DisplayName ?? statusId);
+            return enemyCleared;
+        }
+
+        public bool TryExpireSelectedStatus(
+            string statusId,
+            out string feedback)
+        {
+            if (string.Equals(
+                    statusId,
+                    ResearchStatusCatalog.TechnologyOverloadId,
+                    StringComparison.Ordinal))
+            {
+                bool expired = defense != null &&
+                    defense.TryExpireSelectedOverloadForDevelopment();
+                feedback = expired
+                    ? "选中激光塔的能量过载已立即到期"
+                    : "选中激光塔没有可到期的过载阶段";
+                return expired;
+            }
+            if (string.Equals(
+                    statusId,
+                    ResearchStatusCatalog.GeneSplicingTraitId,
+                    StringComparison.Ordinal))
+            {
+                if (expansion == null)
+                {
+                    feedback = "文明与领袖运行时尚未连接";
+                    return false;
+                }
+                return expansion
+                    .TryExpireCurrentLeaderGeneSplicingForDevelopment(
+                        out feedback);
+            }
+            bool enemyExpired = defense != null &&
+                defense.TryExpireSelectedEnemyTechnologyStatusForDevelopment(
+                    statusId);
+            ResearchStatusDefinition status = ResearchStatusCatalog.Find(
+                statusId);
+            feedback = enemyExpired
+                ? "选中敌人的" +
+                    (status?.DisplayName ?? statusId) + "已立即到期"
+                : (status?.DisplayName ?? statusId) +
+                    "没有可到期的倒计时";
+            return enemyExpired;
+        }
+
+        public IReadOnlyList<string> ListActiveStatusNames()
+        {
+            var names = new List<string>();
+            SingleCityDefenseTechnologyStateSnapshot defenseState =
+                defense?.TechnologyState;
+            if (defenseState?.Overloads != null)
+            {
+                for (var index = 0;
+                     index < defenseState.Overloads.Count;
+                     index++)
+                {
+                    if (defenseState.Overloads[index].Phase ==
+                        WasteCity.Combat.TechnologyOverloadPhase.Ready)
+                        continue;
+                    names.Add("能量过载：" +
+                        defenseState.Overloads[index].TowerStableId);
+                }
+            }
+            if (defenseState?.Enemies != null)
+            {
+                for (var index = 0; index < defenseState.Enemies.Count;
+                     index++)
+                {
+                    SingleCityDefenseEnemyTechnologySnapshot enemy =
+                        defenseState.Enemies[index];
+                    if (enemy.SwordIntentStacks > 0)
+                        names.Add("剑意：" + enemy.StableEnemyId + " " +
+                            enemy.SwordIntentStacks + "层");
+                    if (enemy.InfectionStacks > 0)
+                        names.Add("感染：" + enemy.StableEnemyId + " " +
+                            enemy.InfectionStacks + "层");
+                    if (enemy.ResonanceRemaining > 0f)
+                        names.Add("灵能共鸣：" + enemy.StableEnemyId + " " +
+                            enemy.ResonanceRemaining.ToString("0.0") + "秒");
+                    if (enemy.Controlled)
+                        names.Add("精神操控：" + enemy.StableEnemyId);
+                }
+            }
+            AddBuildingPassiveStatuses(names);
+            AddArmyPassiveStatuses(names);
+            CharacterLifeRuntime current = expansion?.Runtime?.FindCharacter(
+                expansion.Runtime.Politics.CurrentLeaderId);
+            if (current?.HasGeneSplicingTrait == true)
+                names.Add("基因强化：" + current.Definition.DisplayName +
+                    " " + current.GeneSplicingRemainingSeconds.ToString("0.0") +
+                    "秒");
+            return names.AsReadOnly();
+        }
+
+        private void AddBuildingPassiveStatuses(List<string> names)
+        {
+            IReadOnlyList<GrayboxBuildingTechnologyStateSnapshot3D> buildings =
+                defense?.BuildingTechnologyState?.Buildings;
+            if (buildings == null || buildings.Count == 0 || session == null)
+                return;
+            bool anyBuilding = false;
+            bool repairBay = false;
+            bool shieldGenerator = false;
+            int shield = 0;
+            for (var index = 0; index < buildings.Count; index++)
+            {
+                GrayboxBuildingTechnologyStateSnapshot3D building =
+                    buildings[index];
+                if (building.Destroyed) continue;
+                anyBuilding = true;
+                repairBay |= string.Equals(
+                    building.BuildingId,
+                    BuildingCatalog.AutomatedRepairBay.Id.Value,
+                    StringComparison.Ordinal);
+                shieldGenerator |= string.Equals(
+                    building.BuildingId,
+                    BuildingCatalog.ShieldGenerator.Id.Value,
+                    StringComparison.Ordinal);
+                shield += building.Shield;
+            }
+            if (repairBay && IsCompleted(
+                    ResearchStatusCatalog.AutomatedRepairId))
+                names.Add("自动维修：自动维修机甲站正在运行");
+            if (anyBuilding && IsCompleted(
+                    ResearchStatusCatalog.CarapaceRegenerationId))
+                names.Add("甲壳再生：建筑被动生效");
+            if (anyBuilding && IsCompleted(
+                    ResearchStatusCatalog.TissueRegenerationId))
+                names.Add("组织再生：建筑被动生效");
+            if (shieldGenerator && IsCompleted(
+                    ResearchStatusCatalog.CityShieldId))
+                names.Add("城市护盾：护盾发生器正在运行，建筑护盾 " +
+                    shield);
+        }
+
+        private void AddArmyPassiveStatuses(List<string> names)
+        {
+            IReadOnlyList<ArmyUnitSnapshot> units = expansion?.Runtime?.Army
+                ?.Units;
+            if (units == null || units.Count == 0 || session == null) return;
+            var activeUnits = 0;
+            var puppets = 0;
+            for (var index = 0; index < units.Count; index++)
+            {
+                if (!units[index].IsActive) continue;
+                activeUnits++;
+                if (string.Equals(
+                        units[index].DefinitionId,
+                        ArmyUnitCatalog.CombatPuppetId,
+                        StringComparison.Ordinal))
+                    puppets++;
+            }
+            if (puppets > 0 && IsCompleted(
+                    ResearchStatusCatalog.PuppetMaintenanceId))
+                names.Add("傀儡维护：活动战斗傀儡 " + puppets);
+            if (activeUnits > 0 && IsCompleted(
+                    ResearchStatusCatalog.TissueRegenerationId))
+                names.Add("组织再生：活动军队单位 " + activeUnits);
+        }
+
+        private bool IsCompleted(string statusId)
+        {
+            ResearchStatusDefinition status = ResearchStatusCatalog.Find(
+                statusId);
+            return status != null &&
+                session.IsResearchCompleted(status.SourceResearchId);
+        }
+
+        public bool TryClearAll(out string feedback)
+        {
+            bool defenseCleared =
+                defense?.TryClearTechnologyFixturesForDevelopment() == true;
+            bool leaderCleared =
+                expansion?.TryClearTechnologyFixturesForDevelopment() == true;
+            bool cleared = defenseCleared || leaderCleared;
+            feedback = cleared
+                ? "已清理全部 Development 科技状态夹具"
+                : "当前战役无可清理状态";
+            return cleared;
+        }
+    }
+
     public sealed class GrayboxDeveloperModifier3D
     {
         private readonly GrayboxBuildingSession3D session;
         private readonly GrayboxMobileCityController3D city;
         private readonly GrayboxBuildingWorldView3D presentation;
         private GrayboxDeveloperProgressionFacade3D progression;
+        private GrayboxDeveloperTechnologyStateFacade3D technologyStates;
         private bool hasModifiedGameState;
 
         public bool HasModifiedGameState => hasModifiedGameState;
@@ -23,6 +333,174 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDeveloperProgressionFacade3D facade)
         {
             progression = facade;
+        }
+
+        public void ConfigureTechnologyStateFacade(
+            GrayboxDeveloperTechnologyStateFacade3D facade)
+        {
+            technologyStates = facade;
+        }
+
+        public IReadOnlyList<string> ListActiveTechnologyStates()
+        {
+            return technologyStates?.ListActiveStatusNames() ??
+                Array.Empty<string>();
+        }
+
+        public GrayboxDeveloperCommandResult3D
+            ApplyTechnologyStatusFixtureWithFeedback(
+                string statusIdOrChineseName)
+        {
+            return ExecuteTechnologyStatusActionWithFeedback(
+                statusIdOrChineseName,
+                GrayboxDeveloperTechnologyStateAction3D.Apply);
+        }
+
+        public GrayboxDeveloperCommandResult3D
+            ExecuteTechnologyStatusActionWithFeedback(
+                string statusIdOrChineseName,
+                GrayboxDeveloperTechnologyStateAction3D action)
+        {
+            if (!GrayboxDeveloperCatalogQuery3D.TryResolveTechnologyStatus(
+                    statusIdOrChineseName,
+                    out GrayboxDeveloperCatalogEntry3D entry))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.UnknownAction,
+                    false,
+                    message: "未找到科技状态：" +
+                        (statusIdOrChineseName ?? string.Empty));
+            }
+            if (technologyStates == null)
+                return Result(
+                    GrayboxDeveloperCommandCode3D.ProgressionUnavailable,
+                    false,
+                    entry,
+                    message: "科技状态运行时尚未连接");
+            ResearchStatusDefinition status =
+                ResearchStatusCatalog.Find(entry.StableId);
+            bool requiresUnlock =
+                action != GrayboxDeveloperTechnologyStateAction3D.Clear &&
+                action != GrayboxDeveloperTechnologyStateAction3D.Expire;
+            if (requiresUnlock && status != null &&
+                !session.IsResearchCompleted(status.SourceResearchId))
+            {
+                ResearchDefinition source = ResearchCatalog.Find(
+                    status.SourceResearchId);
+                return Result(
+                    GrayboxDeveloperCommandCode3D.CommandFailed,
+                    false,
+                    entry,
+                    message: "请先解锁" +
+                        (source?.Name ?? status.SourceResearchId) + "科技");
+            }
+
+            bool applied;
+            string feedback;
+            switch (action)
+            {
+                case GrayboxDeveloperTechnologyStateAction3D.TriggerOverload:
+                    if (!string.Equals(
+                            entry.StableId,
+                            ResearchStatusCatalog.TechnologyOverloadId,
+                            StringComparison.Ordinal))
+                    {
+                        applied = false;
+                        feedback = "只有能量过载支持“触发过载”";
+                        break;
+                    }
+                    applied = technologyStates.TryActivateSelectedOverload(
+                        out feedback);
+                    break;
+                case GrayboxDeveloperTechnologyStateAction3D.SetOneStack:
+                case GrayboxDeveloperTechnologyStateAction3D.FillStacks:
+                    applied = technologyStates.TrySetSelectedEnemyStatus(
+                        entry.StableId,
+                        action ==
+                            GrayboxDeveloperTechnologyStateAction3D.FillStacks,
+                        out feedback);
+                    break;
+                case GrayboxDeveloperTechnologyStateAction3D.Clear:
+                    applied = technologyStates.TryClearSelectedStatus(
+                        entry.StableId,
+                        out feedback);
+                    break;
+                case GrayboxDeveloperTechnologyStateAction3D.Expire:
+                    applied = technologyStates.TryExpireSelectedStatus(
+                        entry.StableId,
+                        out feedback);
+                    break;
+                default:
+                    if (string.Equals(
+                            entry.StableId,
+                            ResearchStatusCatalog.TechnologyOverloadId,
+                            StringComparison.Ordinal))
+                    {
+                        applied = technologyStates.TryActivateSelectedOverload(
+                            out feedback);
+                    }
+                    else if (string.Equals(
+                            entry.StableId,
+                            ResearchStatusCatalog.GeneSplicingTraitId,
+                            StringComparison.Ordinal))
+                    {
+                        applied = technologyStates.TryApplyLeaderGeneSplicing(
+                            out feedback);
+                    }
+                    else if (string.Equals(
+                                 entry.StableId,
+                                 ResearchStatusCatalog.SwordIntentId,
+                                 StringComparison.Ordinal) ||
+                             string.Equals(
+                                 entry.StableId,
+                                 ResearchStatusCatalog.InfectionId,
+                                 StringComparison.Ordinal) ||
+                             string.Equals(
+                                 entry.StableId,
+                                 ResearchStatusCatalog.PsionicResonanceId,
+                                 StringComparison.Ordinal))
+                    {
+                        applied = technologyStates.TrySetSelectedEnemyStatus(
+                            entry.StableId,
+                            fillStacks: false,
+                            out feedback);
+                    }
+                    else
+                    {
+                        applied = false;
+                        feedback = entry.DisplayName +
+                            "是由正式建筑、军队或战斗规则产生的只读被动状态";
+                    }
+                    break;
+            }
+            RecordChange(applied);
+            return Result(
+                applied
+                    ? GrayboxDeveloperCommandCode3D.Success
+                    : GrayboxDeveloperCommandCode3D.CommandFailed,
+                applied,
+                entry,
+                affectedCount: applied ? 1 : 0,
+                message: feedback);
+        }
+
+        public GrayboxDeveloperCommandResult3D
+            ClearTechnologyStatusFixturesWithFeedback()
+        {
+            if (technologyStates == null)
+                return Result(
+                    GrayboxDeveloperCommandCode3D.ProgressionUnavailable,
+                    false,
+                    message: "科技状态运行时尚未连接");
+            bool cleared = technologyStates.TryClearAll(out string feedback);
+            RecordChange(cleared);
+            return Result(
+                cleared
+                    ? GrayboxDeveloperCommandCode3D.Success
+                    : GrayboxDeveloperCommandCode3D.NoChange,
+                true,
+                affectedCount: cleared ? 1 : 0,
+                message: feedback);
         }
 
         public GrayboxDeveloperProgressionQuery3D QueryProgression()

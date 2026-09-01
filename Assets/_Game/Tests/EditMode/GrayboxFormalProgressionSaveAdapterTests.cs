@@ -625,6 +625,7 @@ namespace WasteCity.Tests
                 "Economy",
                 "Production",
                 "Defense",
+                "ResearchEffectState",
                 "Progression",
                 "Evacuation",
                 "CivilizationExpansion",

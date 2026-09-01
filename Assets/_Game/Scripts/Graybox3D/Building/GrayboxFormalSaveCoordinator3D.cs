@@ -16,6 +16,7 @@ namespace WasteCity.Graybox3D.Building
         BuildingStorage,
         Economy,
         Production,
+        ResearchEffectState,
         Progression,
         Defense,
         Evacuation,
@@ -263,6 +264,7 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxFormalSaveDomainId3D.Economy,
                 GrayboxFormalSaveDomainId3D.Production,
                 GrayboxFormalSaveDomainId3D.Defense,
+                GrayboxFormalSaveDomainId3D.ResearchEffectState,
                 GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Evacuation,
                 GrayboxFormalSaveDomainId3D.CivilizationExpansion,
@@ -304,7 +306,8 @@ namespace WasteCity.Graybox3D.Building
             GrayboxProductionController3D productionController,
             GrayboxDefenseController3D defenseController,
             GrayboxEvacuationController3D evacuationController,
-            GrayboxCivilizationExpansionSaveAdapter3D expansion = null)
+            GrayboxCivilizationExpansionSaveAdapter3D expansion = null,
+            GrayboxResearchEffectStateSaveAdapter3D effectState = null)
         {
             if (worldCity == null)
                 throw new ArgumentNullException(nameof(worldCity));
@@ -426,6 +429,25 @@ namespace WasteCity.Graybox3D.Building
                                 source.defense,
                                 instancesProvider(),
                                 out error);
+                    }),
+                new DelegateDomain(
+                    GrayboxFormalSaveDomainId3D.ResearchEffectState,
+                    destination => destination.researchEffectState =
+                        effectState == null
+                            ? new FormalThreeDResearchEffectStateSaveData()
+                            : effectState.Capture(),
+                    (FormalThreeDSaveData source, out string error) =>
+                    {
+                        if (source.researchEffectState == null)
+                        {
+                            error = "正式研究效果状态不能为空";
+                            return false;
+                        }
+                        if (effectState != null)
+                            return effectState.TryPrepareRestore(
+                                source.researchEffectState, out error);
+                        error = string.Empty;
+                        return true;
                     }),
                 new DelegateDomain(
                     GrayboxFormalSaveDomainId3D.Progression,

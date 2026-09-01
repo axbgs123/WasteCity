@@ -14,7 +14,7 @@ namespace WasteCity.Combat
         public HealthModel(int maximum) { Maximum = Math.Max(1, maximum); Current = Maximum; }
         public int Apply(int rawDamage, DamageType type, ArmorType armor)
         {
-            if (IsDead) return 0; int incoming=type==DamageType.Physical&&physicalDamagePercentOverride>=0?Math.Max(0,rawDamage)*physicalDamagePercentOverride/100:DamageMatrix.Apply(rawDamage,type,armor);
+            if (IsDead) return 0; int incoming=type==DamageType.Physical&&physicalDamagePercentOverride>=0?(int)Math.Min(int.MaxValue,(long)Math.Max(0,rawDamage)*physicalDamagePercentOverride/100L):DamageMatrix.Apply(rawDamage,type,armor);
             int absorbed=Math.Min(Shield,incoming);Shield-=absorbed;int amount=Math.Min(Current,incoming-absorbed);
             if(amount>0){Current-=amount;Damaged?.Invoke(amount);if(IsDead)Died?.Invoke();}return absorbed+amount;
         }

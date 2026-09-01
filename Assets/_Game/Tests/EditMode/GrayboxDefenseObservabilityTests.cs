@@ -80,7 +80,7 @@ namespace WasteCity.Tests
                 "阶段 预警 | 倒计时 12.3 秒\n" +
                 "入口 东 / 北 | 组成 啃噬者×12 / 晶壳兽×2\n" +
                 "已生成 5/14 | 存活敌人 4\n" +
-                "核心 1750/2000"));
+                "核心 1750/2000 | 护盾 0"));
             Assert.That(
                 hud.SpeedText.text,
                 Is.EqualTo("速度 | 请求 2× | 有效 0×"));

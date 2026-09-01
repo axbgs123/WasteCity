@@ -4,6 +4,7 @@ using WasteCity.City;
 using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Leader.CivilizationExpansion;
+using WasteCity.Research;
 using WasteCity.World;
 using WasteCity.World.CivilizationExpansion;
 
@@ -99,6 +100,19 @@ namespace WasteCity.CivilizationExpansion
                     return characters[index];
             }
             return null;
+        }
+
+        public void ConfigureResearchEffects(
+            Func<ResearchEffectSnapshot> provider)
+        {
+            Army.ConfigureResearchEffects(provider);
+        }
+
+        public bool TryApplyGeneSplicingToCurrentLeader()
+        {
+            CharacterLifeRuntime current = FindCharacter(
+                Politics.CurrentLeaderId);
+            return current != null && current.TryApplyGeneSplicingTrait();
         }
 
         public bool TryStartExpedition(
@@ -224,6 +238,7 @@ namespace WasteCity.CivilizationExpansion
                 productionDelta,
                 globallyPaused,
                 primaryStorage);
+            Army.TickTechnologyEffects(delta, globallyPaused);
 
             ArmyExpeditionStatus before = Expedition.Status;
             Expedition.Tick(delta, globallyPaused);
@@ -244,6 +259,7 @@ namespace WasteCity.CivilizationExpansion
             for (var index = 0; index < characters.Count; index++)
             {
                 CharacterLifeRuntime character = characters[index];
+                character.TickTechnologyEffects(delta, globallyPaused);
                 CharacterLifeSnapshot characterSnapshot = character.Capture();
                 CharacterRescueSnapshot rescue = characterSnapshot.Rescue;
                 CharacterLifeRuntime rescueSource = rescue != null &&

@@ -732,6 +732,12 @@ namespace WasteCity.Graybox3D.Building
         private ulong settlementSequence;
         private float warningMultiplier = 1f;
         private float buildingHealthMultiplier = 1f;
+        private readonly SingleCityDefenseTechnologyRuntime
+            mainTechnologyStates =
+            new SingleCityDefenseTechnologyRuntime();
+        private SingleCityDefenseTechnologyRuntime pressureTechnologyStates =
+            new SingleCityDefenseTechnologyRuntime();
+        private SingleCityDefenseTechnologyUnlocks technologyUnlocks;
 
         public GrayboxDefenseRuntime3D(
             float coreX,
@@ -785,6 +791,206 @@ namespace WasteCity.Graybox3D.Building
             activePressureEncounterId ?? string.Empty;
         public bool HasActivePressureCampaign =>
             activePressureCampaign != null && !activePressureCampaign.IsTerminal;
+        public SingleCityDefenseTechnologyStateSnapshot TechnologyState =>
+            ActiveTechnologyStates.Snapshot;
+        public GrayboxBuildingTechnologySnapshot3D BuildingTechnologyState =>
+            campaignBuildingHealth?.TechnologySnapshot;
+
+        public bool TryClearTechnologyFixturesForDevelopment()
+        {
+            bool changed = mainTechnologyStates.ClearForDevelopment();
+            changed |= pressureTechnologyStates.ClearForDevelopment();
+            if (campaignBuildingHealth != null)
+                changed |= campaignBuildingHealth
+                    .TryClearTechnologyFixturesForDevelopment();
+            if (!changed) return false;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            unchecked { persistenceGeneration++; }
+            return true;
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool TrySetEnemyTechnologyStatusForDevelopment(
+            string stableEnemyId,
+            string statusId,
+            bool fillStacks)
+        {
+            return RecordTechnologyFixtureChange(
+                ActiveTechnologyStates.TrySetEnemyStatusForDevelopment(
+                    stableEnemyId,
+                    statusId,
+                    fillStacks));
+        }
+
+        public bool TryClearEnemyTechnologyStatusForDevelopment(
+            string stableEnemyId,
+            string statusId)
+        {
+            return RecordTechnologyFixtureChange(
+                ActiveTechnologyStates.TryClearEnemyStatusForDevelopment(
+                    stableEnemyId,
+                    statusId));
+        }
+
+        public bool TryExpireEnemyTechnologyStatusForDevelopment(
+            string stableEnemyId,
+            string statusId)
+        {
+            return RecordTechnologyFixtureChange(
+                ActiveTechnologyStates.TryExpireEnemyStatusForDevelopment(
+                    stableEnemyId,
+                    statusId));
+        }
+
+        public bool TryExpireTechnologyOverloadForDevelopment(
+            string towerStableId)
+        {
+            return RecordTechnologyFixtureChange(
+                ActiveTechnologyStates.TryExpireOverloadForDevelopment(
+                    towerStableId));
+        }
+
+        public bool TryClearTechnologyOverloadForDevelopment(
+            string towerStableId)
+        {
+            return RecordTechnologyFixtureChange(
+                ActiveTechnologyStates.TryClearOverloadForDevelopment(
+                    towerStableId));
+        }
+
+        private bool RecordTechnologyFixtureChange(bool changed)
+        {
+            if (!changed) return false;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            unchecked { persistenceGeneration++; }
+            return true;
+        }
+#endif
+
+        public SingleCityDefenseTechnologyPersistenceSnapshot
+            CaptureTechnologyForPersistence()
+        {
+            return ActiveTechnologyStates.CaptureForPersistence();
+        }
+
+        public bool TryRestoreTechnologyForPersistence(
+            SingleCityDefenseTechnologyPersistenceSnapshot snapshot,
+            out string error)
+        {
+            SingleCityDefenseCampaignSnapshot campaignSnapshot =
+                ActiveCampaignSnapshot;
+            SingleCityDefenseTechnologyRuntime technology =
+                ActiveTechnologyStates;
+            technology.SynchronizeEnemies(campaignSnapshot?.Enemies);
+            if (!technology.TryRestore(snapshot, out error))
+                return false;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            unchecked { persistenceGeneration++; }
+            return true;
+        }
+
+        public bool TryRestoreBuildingTechnologyForPersistence(
+            IReadOnlyList<GrayboxBuildingTechnologyStateSnapshot3D> states,
+            int coreShield,
+            out string error)
+        {
+            if (coreShield < 0 ||
+                coreShield > SingleCityDefenseTechnologyRules.MaximumShield)
+            {
+                error = "城市核心护盾状态无效";
+                return false;
+            }
+            SingleCityDefenseCampaignModel owner = ActiveCampaign;
+            if (owner == null && coreShield != 0)
+            {
+                error = "城市核心护盾无法在当前战役状态恢复";
+                return false;
+            }
+            GrayboxBuildingTechnologySnapshot3D buildingBefore =
+                campaignBuildingHealth?.TechnologySnapshot;
+            if (campaignBuildingHealth != null &&
+                !campaignBuildingHealth.TryRestoreTechnologyState(
+                    states ?? Array.Empty<
+                        GrayboxBuildingTechnologyStateSnapshot3D>(),
+                    out error))
+            {
+                return false;
+            }
+            if (owner != null &&
+                !owner.TryRestoreCoreShieldForPersistence(
+                    coreShield,
+                    SingleCityDefenseTechnologyRules.MaximumShield,
+                    out error))
+            {
+                campaignBuildingHealth?.TryRestoreTechnologyState(
+                    buildingBefore?.Buildings ?? Array.Empty<
+                        GrayboxBuildingTechnologyStateSnapshot3D>(),
+                    out _);
+                return false;
+            }
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            unchecked { persistenceGeneration++; }
+            error = string.Empty;
+            return true;
+        }
+
+        public void ConfigureTechnologyStates(
+            SingleCityDefenseTechnologyUnlocks unlocks)
+        {
+            if (TechnologyUnlocksEqual(technologyUnlocks, unlocks)) return;
+            technologyUnlocks = unlocks;
+            mainTechnologyStates.Configure(unlocks);
+            pressureTechnologyStates.Configure(unlocks);
+            campaignBuildingHealth?.ConfigureTechnologySupport(
+                unlocks.WallPhysicalDamageMultiplier,
+                unlocks.AutomatedRepair,
+                unlocks.MindShield);
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            persistenceGeneration++;
+        }
+
+        public bool TryActivateTechnologyOverload(string towerStableId)
+        {
+            if (string.IsNullOrWhiteSpace(towerStableId) ||
+                !campaignTowerById.TryGetValue(
+                    towerStableId,
+                    out SingleCityDefenseTowerCombatModel tower))
+            {
+                return false;
+            }
+            bool activated = ActiveTechnologyStates.TryActivateOverload(
+                towerStableId,
+                tower.BuildingId);
+            if (!activated) return false;
+            campaignSnapshotDirty = true;
+            snapshotDirty = true;
+            persistenceGeneration++;
+            return true;
+        }
+
+        private static bool TechnologyUnlocksEqual(
+            SingleCityDefenseTechnologyUnlocks left,
+            SingleCityDefenseTechnologyUnlocks right)
+        {
+            return left.EnergyOverload == right.EnergyOverload &&
+                left.SwordIntent == right.SwordIntent &&
+                left.Infection == right.Infection &&
+                left.Resonance == right.Resonance &&
+                left.MindControl == right.MindControl &&
+                left.AcidSpit == right.AcidSpit &&
+                left.TalismanBasics == right.TalismanBasics &&
+                left.AutomatedRepair == right.AutomatedRepair &&
+                left.MindShield == right.MindShield &&
+                left.AcidHeavyDamageMultiplier ==
+                    right.AcidHeavyDamageMultiplier &&
+                left.WallPhysicalDamageMultiplier ==
+                    right.WallPhysicalDamageMultiplier;
+        }
 
         public int TryApplyArmyGuardDamage(
             int rawDamage,
@@ -824,6 +1030,27 @@ namespace WasteCity.Graybox3D.Building
                 ? activePressureCampaign
                 : campaign;
 
+        private SingleCityDefenseTechnologyRuntime ActiveTechnologyStates =>
+            activePressureCampaign != null &&
+            !activePressureCampaign.IsTerminal
+                ? pressureTechnologyStates
+                : mainTechnologyStates;
+
+        private SingleCityDefenseTechnologyRuntime TechnologyFor(
+            SingleCityDefenseCampaignModel owner)
+        {
+            return ReferenceEquals(owner, activePressureCampaign)
+                ? pressureTechnologyStates
+                : mainTechnologyStates;
+        }
+
+        private void ResetPressureTechnologyStates()
+        {
+            pressureTechnologyStates =
+                new SingleCityDefenseTechnologyRuntime();
+            pressureTechnologyStates.Configure(technologyUnlocks);
+        }
+
         public bool TryStartPressure(
             SingleCityDefenseCampaignDefinition definition,
             out string error)
@@ -845,6 +1072,7 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
             activePressureCampaign = pressure;
+            ResetPressureTechnologyStates();
             activePressureEncounterId = definition.Id;
             pressure.TerminalCommitted += HandlePressureTerminal;
             pressure.EnemyDefeated += HandlePressureEnemyDefeated;
@@ -894,6 +1122,7 @@ namespace WasteCity.Graybox3D.Building
             }
 
             activePressureCampaign = candidate;
+            ResetPressureTechnologyStates();
             activePressureEncounterId = definition.Id;
             candidate.TerminalCommitted += HandlePressureTerminal;
             candidate.EnemyDefeated += HandlePressureEnemyDefeated;
@@ -912,6 +1141,7 @@ namespace WasteCity.Graybox3D.Building
                 HandlePressureEnemyDefeated;
             activePressureCampaign = null;
             activePressureEncounterId = null;
+            ResetPressureTechnologyStates();
             campaignSnapshotDirty = true;
             snapshotDirty = true;
             return true;
@@ -932,6 +1162,7 @@ namespace WasteCity.Graybox3D.Building
             activePressureCampaign = null;
             activePressureEncounterId = null;
             activeBroodmotherEncounter = null;
+            ResetPressureTechnologyStates();
             campaignSnapshotDirty = true;
             snapshotDirty = true;
         }
@@ -949,6 +1180,10 @@ namespace WasteCity.Graybox3D.Building
             this.campaign.EnemyDefeated += HandleCampaignEnemyDefeated;
             campaignBuildingHealth = buildingHealth ??
                 throw new ArgumentNullException(nameof(buildingHealth));
+            campaignBuildingHealth.ConfigureTechnologySupport(
+                technologyUnlocks.WallPhysicalDamageMultiplier,
+                technologyUnlocks.AutomatedRepair,
+                technologyUnlocks.MindShield);
             campaignDestructionCoordinator = destructionCoordinator ??
                 throw new ArgumentNullException(nameof(destructionCoordinator));
             campaignTowerById.Clear();
@@ -1534,7 +1769,8 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius,
             bool allowCampaignStart,
-            ResearchEffectSnapshot researchEffects)
+            ResearchEffectSnapshot researchEffects,
+            Func<string, bool> isPlayerPaused = null)
         {
             if (campaign != null)
             {
@@ -1545,7 +1781,8 @@ namespace WasteCity.Graybox3D.Building
                     cityY,
                     groundRadius,
                     allowCampaignStart,
-                    researchEffects);
+                    researchEffects,
+                    isPlayerPaused);
                 return;
             }
 
@@ -1850,7 +2087,8 @@ namespace WasteCity.Graybox3D.Building
             int cityY,
             int groundRadius,
             bool allowCampaignStart,
-            ResearchEffectSnapshot researchEffects)
+            ResearchEffectSnapshot researchEffects,
+            Func<string, bool> isPlayerPaused)
         {
             researchEffects = researchEffects ??
                 ResearchEffectResolver.Resolve(Array.Empty<string>());
@@ -1871,6 +2109,18 @@ namespace WasteCity.Graybox3D.Building
                 campaignBuildingHealth.Synchronize(
                     instances,
                     buildingHealthMultiplier);
+                campaignBuildingHealth.SynchronizeTechnologyOperationalState(
+                    instances,
+                    cityMode,
+                    cityX,
+                    cityY,
+                    groundRadius,
+                    stableInstanceId =>
+                        isPlayerPaused?.Invoke(stableInstanceId) == true ||
+                        campaignTowerById.TryGetValue(
+                            stableInstanceId,
+                            out SingleCityDefenseTowerCombatModel tower) &&
+                        tower.IsPlayerPaused);
                 for (var index = 0; index < instances.Count; index++)
                 {
                     if (instances[index] != null)
@@ -2019,14 +2269,33 @@ namespace WasteCity.Graybox3D.Building
             while (accumulatorSeconds + StepEpsilon >= StepSeconds)
             {
                 SingleCityDefenseCampaignModel owner = ActiveCampaign;
+                SingleCityDefenseTechnologyRuntime technology =
+                    TechnologyFor(owner);
                 owner.Advance(
                     StepSecondsFloat,
                     requestedSpeed: 1,
                     campaignBuildingTargetProvider,
                     campaignBuildingDamageApplier);
+                technology.SynchronizeEnemies(owner.Snapshot.Enemies);
+                ApplyTechnologyDamageEvents(
+                    owner,
+                    technology.Advance(
+                        StepSecondsFloat,
+                        paused: false));
                 for (var index = 0; index < campaignTowers.Count; index++)
                     TickCampaignTower(
-                        campaignTowers[index], cityStorage, owner);
+                        campaignTowers[index], cityStorage, owner, technology);
+                int supportChange =
+                    campaignBuildingHealth.AdvanceTechnologySupport(
+                        StepSecondsFloat,
+                        paused: false,
+                        requestedCoreX,
+                        requestedCoreZ,
+                        out int coreShieldGrant);
+                if (coreShieldGrant > 0)
+                    owner.GrantCoreShield(coreShieldGrant);
+                if (supportChange > 0 || coreShieldGrant > 0)
+                    campaignSnapshotDirty = true;
                 ObserveCrystalBroodmotherAuthority(owner);
                 accumulatorSeconds -= StepSeconds;
                 if (accumulatorSeconds < 0d &&
@@ -2044,7 +2313,8 @@ namespace WasteCity.Graybox3D.Building
         private void TickCampaignTower(
             SingleCityDefenseTowerCombatModel tower,
             CityResourceStorageModel cityStorage,
-            SingleCityDefenseCampaignModel owner)
+            SingleCityDefenseCampaignModel owner,
+            SingleCityDefenseTechnologyRuntime technology)
         {
             if (!campaignRunnableIds.Contains(tower.StableInstanceId))
                 return;
@@ -2056,12 +2326,38 @@ namespace WasteCity.Graybox3D.Building
             }
 
             tower.RefillFrom(cityStorage);
+            string predictedTargetId = owner.PeekTowerTarget(
+                tower.TargetStableEnemyId,
+                tower.X,
+                tower.Z,
+                tower.Range);
+            tower.SetTechnologyMultipliers(
+                technology.ResolveTowerFireRateMultiplier(
+                    tower.StableInstanceId),
+                technology.ResolveTowerDamageMultiplier(
+                    tower.StableInstanceId,
+                    tower.BuildingId,
+                    predictedTargetId));
             int damage = tower.Tick(
                 StepSecondsFloat,
                 owner,
                 globallyPaused: false);
             if (damage > 0)
             {
+                SingleCityDefenseTechnologyHitResult technologyHit =
+                    technology.ApplyTowerHit(
+                        tower.StableInstanceId,
+                        tower.BuildingId,
+                        predictedTargetId,
+                        damage,
+                        StepSecondsFloat,
+                        settledAttackEventSequence + 1ul);
+                ApplyTechnologyHitResult(
+                    owner,
+                    technology,
+                    tower.BuildingId,
+                    predictedTargetId,
+                    technologyHit);
                 AppendSettledAttack(
                     tower.StableInstanceId,
                     tower.TargetStableEnemyId,
@@ -2174,6 +2470,7 @@ namespace WasteCity.Graybox3D.Building
             if (!campaignBuildingHealth.TryApplyDamage(
                     stableBuildingId,
                     damage,
+                    DamageType.Physical,
                     out int appliedDamage,
                     out bool destroyedNow))
             {
@@ -2194,6 +2491,58 @@ namespace WasteCity.Graybox3D.Building
                 RefreshCampaignBuildingTargets();
             }
             return appliedDamage;
+        }
+
+        private static void ApplyTechnologyDamageEvents(
+            SingleCityDefenseCampaignModel owner,
+            IReadOnlyList<SingleCityDefenseTechnologyDamageEvent> events)
+        {
+            if (owner == null || events == null) return;
+            for (var index = 0; index < events.Count; index++)
+            {
+                SingleCityDefenseTechnologyDamageEvent item = events[index];
+                owner.ApplyTechnologyDamage(
+                    item.TargetStableEnemyId,
+                    BuildingCatalog.SporeTower.Id.Value,
+                    item.Damage);
+            }
+        }
+
+        private static void ApplyTechnologyHitResult(
+            SingleCityDefenseCampaignModel owner,
+            SingleCityDefenseTechnologyRuntime technology,
+            string sourceBuildingId,
+            string primaryTargetId,
+            SingleCityDefenseTechnologyHitResult result)
+        {
+            if (owner == null || result == null) return;
+            if (result.TrueDamage > 0)
+            {
+                owner.ApplyTechnologyDamage(
+                    primaryTargetId,
+                    sourceBuildingId,
+                    result.TrueDamage);
+            }
+            for (var index = 0;
+                 index < result.SynchronizedDamageEvents.Count;
+                 index++)
+            {
+                SingleCityDefenseTechnologyDamageEvent item =
+                    result.SynchronizedDamageEvents[index];
+                owner.ApplyTechnologyDamage(
+                    item.TargetStableEnemyId,
+                    sourceBuildingId,
+                    item.Damage);
+            }
+            if (result.Controlled)
+            {
+                if (owner.TryControlEnemy(
+                        primaryTargetId,
+                        sourceBuildingId))
+                {
+                    technology?.TryCommitMindControl(primaryTargetId);
+                }
+            }
         }
 
         private void RetryPendingPresentationRebuilds()
@@ -2922,6 +3271,12 @@ namespace WasteCity.Graybox3D.Building
                        StringComparison.Ordinal) ||
                    string.Equals(buildingId,
                        BuildingCatalog.EmpTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.MindSpire.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.AcidTower.Id.Value,
                        StringComparison.Ordinal);
         }
 

@@ -15,6 +15,8 @@ namespace WasteCity.Persistence.ThreeD
         public FormalThreeDBackpackSaveData backpack;
         public FormalThreeDCraftingSaveData crafting;
         public FormalThreeDResearchSaveData research;
+        public FormalThreeDResearchEffectStateSaveData researchEffectState =
+            new FormalThreeDResearchEffectStateSaveData();
         public FormalThreeDProductionSaveData production;
         public FormalThreeDDefenseSaveData defense;
         public FormalThreeDDefenseCampaignSaveData defenseCampaign;
@@ -376,6 +378,74 @@ namespace WasteCity.Persistence.ThreeD
         public float remainingSeconds;
     }
 
+    public enum FormalResearchEffectTargetKind
+    {
+        Global = 0,
+        City = 1,
+        Building = 2,
+        Tower = 3,
+        Enemy = 4,
+        ArmyUnit = 5,
+        Character = 6,
+    }
+
+    public enum FormalResearchEffectStatePhase
+    {
+        Active = 0,
+        Boosting = 1,
+        Lockout = 2,
+        Cooldown = 3,
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDResearchEffectStateSaveData
+    {
+        public const string ConfigurationSignature =
+            "builtin:research-effect-state@1";
+
+        public string configurationSignature = ConfigurationSignature;
+        public ulong revision;
+        public long nextStableStateOrdinal = 1L;
+        public FormalThreeDResearchEffectStateEntrySaveData[] states =
+            Array.Empty<FormalThreeDResearchEffectStateEntrySaveData>();
+        public FormalThreeDResearchEffectEmitterSaveData[] emitters =
+            Array.Empty<FormalThreeDResearchEffectEmitterSaveData>();
+        public FormalThreeDResearchRewardLedgerSaveData rewardLedger =
+            new FormalThreeDResearchRewardLedgerSaveData();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDResearchEffectStateEntrySaveData
+    {
+        public string stableStateId;
+        public long creationOrdinal;
+        public string effectId;
+        public FormalResearchEffectTargetKind targetKind;
+        public string targetStableId;
+        public FormalResearchEffectStatePhase phase;
+        public float remainingRuleSeconds;
+        public int stacks;
+        public float periodAccumulatorSeconds;
+        public float currentValue;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDResearchEffectEmitterSaveData
+    {
+        public string stableStateId;
+        public long creationOrdinal;
+        public string effectId;
+        public string sourceTowerStableId;
+        public string targetEnemyStableId;
+        public float cooldownRemaining;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDResearchRewardLedgerSaveData
+    {
+        public string[] committedRewardKeys = Array.Empty<string>();
+    }
+
     [Serializable]
     public sealed class FormalThreeDProductionSaveData
     {
@@ -516,6 +586,7 @@ namespace WasteCity.Persistence.ThreeD
         public bool cityWasPackedAfterCampaignStart;
         public bool developmentModifierUsed;
         public bool partialFromMigration;
+        public int controlledUnitLossCount;
     }
 
     [Serializable]
@@ -564,6 +635,7 @@ namespace WasteCity.Persistence.ThreeD
         public float movementRemainder;
         public float attackDamageRemainder;
         public string targetStableId;
+        public bool isControlled;
     }
 
     [Serializable]

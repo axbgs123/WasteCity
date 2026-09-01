@@ -62,7 +62,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void PreviewNodeNeverStartsOrSpendsEvenWithPrerequisiteAndCost()
+        public void ReleasedBallisticsStartsAndSpendsWithPrerequisiteAndCost()
         {
             var model = new ResearchModel();
             var runtime = new FormalResearchRuntime(model);
@@ -74,14 +74,14 @@ namespace WasteCity.Tests
 
             Assert.That(
                 ResearchCatalog.Find(Ballistics).ReleaseState,
-                Is.EqualTo(ResearchReleaseState.PreviewOnly));
+                Is.EqualTo(ResearchReleaseState.Researchable));
             Assert.That(runtime.TryStart(
                 Ballistics,
                 inventory,
-                hasEligibleResearchStation: true), Is.False);
-            Assert.That(inventory.Get(ResourceIds.Iron), Is.EqualTo(12));
-            Assert.That(inventory.Get(ResourceIds.Alloy), Is.EqualTo(10));
-            Assert.That(model.Active, Is.Null);
+                hasEligibleResearchStation: true), Is.True);
+            Assert.That(inventory.Get(ResourceIds.Iron), Is.Zero);
+            Assert.That(inventory.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(model.Active.Id.Value, Is.EqualTo(Ballistics));
         }
 
         [TestCase("core.research.alloy-armor", "core.research.precision-assembly")]

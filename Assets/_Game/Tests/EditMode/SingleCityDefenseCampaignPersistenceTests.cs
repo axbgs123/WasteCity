@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using NUnit.Framework;
@@ -65,6 +66,7 @@ namespace WasteCity.Tests
             RequireProperty(enemyType, "MovementRemainder", typeof(float));
             RequireProperty(enemyType, "AttackDamageRemainder", typeof(float));
             RequireProperty(enemyType, "TargetStableId", typeof(string));
+            RequireProperty(enemyType, "IsControlled", typeof(bool));
 
             RequireProperty(statisticsType, "ElapsedRuleSeconds", typeof(float));
             RequireProperty(statisticsType, "SpawnedEnemyCount", typeof(int));
@@ -78,6 +80,10 @@ namespace WasteCity.Tests
             RequireProperty(statisticsType, "BuildingLossCount", typeof(int));
             RequireProperty(statisticsType, "CoreDamageTaken", typeof(int));
             RequireProperty(statisticsType, "HighestAliveEnemyCount", typeof(int));
+            RequireProperty(
+                statisticsType,
+                "ControlledUnitLossCount",
+                typeof(int));
 
             RequireMethod(
                 typeof(SingleCityDefenseCampaignModel),
@@ -460,6 +466,118 @@ namespace WasteCity.Tests
                 Is.EqualTo(Fingerprint(Capture(baseline))),
                 "Restore must preserve both fixed-step and spawn-clock " +
                 "remainders so frame partitioning cannot change the result.");
+        }
+
+        [Test]
+        public void ControlledFriendlyPreservesHealthFactionAndLossesAcrossRestore()
+        {
+            SingleCityDefenseCampaignModel source = TriggeredModel();
+            CampaignWaveDefinition wave = CampaignWaveCatalog.All[0];
+            float twoSpawns = wave.WarningSeconds +
+                wave.SpawnSeconds / wave.TotalCount * 2f + .1f;
+            source.Advance(twoSpawns, 1);
+            Assert.That(source.Snapshot.Enemies.Count,
+                Is.GreaterThanOrEqualTo(2));
+            string hostileId = source.Snapshot.Enemies[0].StableId;
+            string controlledId = source.Snapshot.Enemies[1].StableId;
+            int healthBefore = source.Snapshot.Enemies[1].CurrentHealth;
+
+            Assert.That(source.TryControlEnemy(
+                controlledId,
+                BuildingCatalog.MindSpire.Id.Value), Is.True);
+            SingleCityDefenseEnemySnapshot controlled = FindEnemy(
+                source.Snapshot, controlledId);
+            Assert.That(controlled.IsControlled, Is.True);
+            Assert.That(controlled.CurrentHealth, Is.EqualTo(healthBefore));
+            Assert.That(source.Snapshot.AliveEnemyCount,
+                Is.EqualTo(source.Snapshot.Enemies.Count - 1));
+
+            SingleCityDefenseCampaignPersistenceState captured =
+                (SingleCityDefenseCampaignPersistenceState)Capture(source);
+            Assert.That(captured.Enemies[1].IsControlled, Is.True);
+            var restored = new SingleCityDefenseCampaignModel(10f, 10f);
+            Assert.That(TryPrepare(restored, captured, out object plan,
+                out string error), Is.True, error);
+            Assert.That(TryCommit(restored, plan, out error), Is.True, error);
+            controlled = FindEnemy(restored.Snapshot, controlledId);
+            Assert.That(controlled.IsControlled, Is.True);
+            Assert.That(controlled.CurrentHealth, Is.EqualTo(healthBefore));
+
+            SetPrivateEnemyPosition(restored, hostileId, 10f, 10f);
+            SetPrivateEnemyPosition(restored, controlledId, 10f, 10f);
+            SetPrivateEnemyHealth(restored, controlledId, 1);
+            restored.Advance(
+                .2f,
+                1,
+                () => Array.Empty<DefenseBuildingCombatTarget>(),
+                null);
+            Assert.That(restored.Snapshot.Enemies,
+                Has.None.Matches<SingleCityDefenseEnemySnapshot>(
+                    value => value.StableId == controlledId));
+            Assert.That(((SingleCityDefenseCampaignPersistenceState)
+                    Capture(restored)).Statistics.ControlledUnitLossCount,
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ControlMutationInvalidatesPreparedRestorePlan()
+        {
+            SingleCityDefenseCampaignModel model = TriggeredModel();
+            CampaignWaveDefinition wave = CampaignWaveCatalog.All[0];
+            model.Advance(
+                wave.WarningSeconds +
+                wave.SpawnSeconds / wave.TotalCount + .1f,
+                1);
+            SingleCityDefenseCampaignPersistenceState saved =
+                (SingleCityDefenseCampaignPersistenceState)Capture(model);
+            Assert.That(TryPrepare(model, saved, out object plan,
+                out string error), Is.True, error);
+            Assert.That(model.TryControlEnemy(
+                model.Snapshot.Enemies[0].StableId,
+                BuildingCatalog.MindSpire.Id.Value), Is.True);
+            Assert.That(TryCommit(model, plan, out _), Is.False);
+        }
+
+        [Test]
+        public void ControlledFriendlySurvivesBeginWaveAndRoundTripsSeparately()
+        {
+            SingleCityDefenseCampaignModel model = TriggeredModel();
+            AdvanceToCleanup(model);
+            string controlledId = model.Snapshot.Enemies[0].StableId;
+            Assert.That(model.TryControlEnemy(
+                controlledId,
+                BuildingCatalog.MindSpire.Id.Value), Is.True);
+            var hostileIds = new List<string>();
+            for (var index = 0; index < model.Snapshot.Enemies.Count; index++)
+                if (!model.Snapshot.Enemies[index].IsControlled)
+                    hostileIds.Add(model.Snapshot.Enemies[index].StableId);
+            for (var index = 0; index < hostileIds.Count; index++)
+                Assert.That(model.DefeatEnemy(
+                    hostileIds[index],
+                    BuildingCatalog.MachineGunTurret.Id.Value), Is.True);
+
+            model.Advance(.1f, 1);
+
+            Assert.That(model.Snapshot.CurrentWaveNumber, Is.EqualTo(2));
+            Assert.That(model.Snapshot.AliveEnemyCount, Is.Zero);
+            SingleCityDefenseEnemySnapshot controlled = FindEnemy(
+                model.Snapshot, controlledId);
+            Assert.That(controlled.IsControlled, Is.True);
+            SingleCityDefenseCampaignPersistenceState saved =
+                (SingleCityDefenseCampaignPersistenceState)Capture(model);
+            Assert.That(saved.Enemies.Count(value => value.IsControlled),
+                Is.EqualTo(1));
+            Assert.That(saved.SpawnedEnemyCountsByEnemyId, Is.Empty,
+                "A prior-wave friendly cannot pollute the new wave's enemy " +
+                "spawn counts.");
+
+            var restored = new SingleCityDefenseCampaignModel(10f, 10f);
+            Assert.That(TryPrepare(restored, saved, out object plan,
+                out string error), Is.True, error);
+            Assert.That(TryCommit(restored, plan, out error), Is.True, error);
+            Assert.That(FindEnemy(restored.Snapshot, controlledId)
+                .IsControlled, Is.True);
+            Assert.That(restored.Snapshot.AliveEnemyCount, Is.Zero);
         }
 
         private static SingleCityDefenseCampaignModel TriggeredModel(
@@ -867,6 +985,26 @@ namespace WasteCity.Tests
                 }
                 RequireProperty(enemy.GetType(), "X").SetValue(enemy, x);
                 RequireProperty(enemy.GetType(), "Z").SetValue(enemy, z);
+                return;
+            }
+            Assert.Fail("Missing private enemy state " + stableId + ".");
+        }
+
+        private static void SetPrivateEnemyHealth(
+            SingleCityDefenseCampaignModel model,
+            string stableId,
+            int health)
+        {
+            IList enemies = PrivateEnemies(model);
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                object enemy = enemies[index];
+                if (!string.Equals(
+                        ReadString(enemy, "StableId"),
+                        stableId,
+                        StringComparison.Ordinal)) continue;
+                RequireProperty(enemy.GetType(), "CurrentHealth")
+                    .SetValue(enemy, health);
                 return;
             }
             Assert.Fail("Missing private enemy state " + stableId + ".");

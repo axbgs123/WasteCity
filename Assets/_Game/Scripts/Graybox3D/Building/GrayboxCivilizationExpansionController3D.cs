@@ -9,6 +9,7 @@ using WasteCity.City;
 using WasteCity.Combat;
 using WasteCity.Economy;
 using WasteCity.Leader.CivilizationExpansion;
+using WasteCity.Research;
 using WasteCity.World;
 using WasteCity.World.CivilizationExpansion;
 
@@ -110,6 +111,7 @@ namespace WasteCity.Graybox3D.Building
                 cityX,
                 cityY,
                 primaryAccount);
+            Runtime.ConfigureResearchEffects(ResolveResearchEffects);
             SynchronizeArmyLeader();
             BindView();
             lastObservedCoreHealth =
@@ -190,6 +192,77 @@ namespace WasteCity.Graybox3D.Building
                 return Runtime?.ResearchEfficiencyMultiplier ?? 1f;
             }
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public bool TryApplyGeneSplicingFixtureForDevelopment(
+            out string feedback)
+        {
+            if (!TryInitialize(out feedback)) return false;
+            bool applied = Runtime.TryApplyGeneSplicingToCurrentLeader();
+            feedback = applied
+                ? "当前领袖已获得基因强化（300秒）"
+                : "当前领袖无法重复获得基因强化";
+            if (applied) Refresh(force: true);
+            return applied;
+        }
+
+        public bool TryClearTechnologyFixturesForDevelopment()
+        {
+            if (Runtime == null) return false;
+            bool cleared = false;
+            for (var index = 0; index < Runtime.Characters.Count; index++)
+            {
+                CharacterLifeRuntime character = Runtime.Characters[index];
+                if (!character.HasGeneSplicingTrait) continue;
+                cleared |= character.TryRestoreTechnologyState(
+                    new CharacterTechnologyPersistenceState(
+                        character.Definition.Id.Value,
+                        0f),
+                    out _);
+            }
+            if (cleared) Refresh(force: true);
+            return cleared;
+        }
+
+        public bool TryExpireCurrentLeaderGeneSplicingForDevelopment(
+            out string feedback)
+        {
+            return TryClearCurrentLeaderGeneSplicingForDevelopment(
+                "当前领袖的基因强化已立即到期",
+                out feedback);
+        }
+
+        public bool TryClearCurrentLeaderGeneSplicingForDevelopment(
+            out string feedback)
+        {
+            return TryClearCurrentLeaderGeneSplicingForDevelopment(
+                "已清除当前领袖的基因强化",
+                out feedback);
+        }
+
+        private bool TryClearCurrentLeaderGeneSplicingForDevelopment(
+            string successFeedback,
+            out string feedback)
+        {
+            if (!TryInitialize(out feedback)) return false;
+            CharacterLifeRuntime current = Runtime.FindCharacter(
+                Runtime.Politics.CurrentLeaderId);
+            if (current?.HasGeneSplicingTrait != true)
+            {
+                feedback = "当前领袖没有活动的基因强化";
+                return false;
+            }
+            bool cleared = current.TryRestoreTechnologyState(
+                new CharacterTechnologyPersistenceState(
+                    current.Definition.Id.Value,
+                    0f),
+                out feedback);
+            if (!cleared) return false;
+            feedback = successFeedback;
+            Refresh(force: true);
+            return true;
+        }
+#endif
 
         private void SynchronizeArmyLeader()
         {
@@ -768,6 +841,7 @@ namespace WasteCity.Graybox3D.Building
 
         private GrayboxCivilizationExpansionPresentation3D ArmyPresentation()
         {
+            ResearchEffectSnapshot effects = ResolveResearchEffects();
             var summary = new StringBuilder();
             summary.Append("默认小队  ")
                 .Append(Runtime.Army.Units.Count)
@@ -777,6 +851,11 @@ namespace WasteCity.Graybox3D.Building
                 .Append(Runtime.Army.Commands.Command)
                 .Append("\n远征：")
                 .Append(Runtime.Expedition.Status);
+            if (effects.TissueRegeneration)
+                summary.Append("\n科技状态：组织再生（活动单位每秒恢复1生命）");
+            if (effects.ResolveUnitHealthMultiplier(
+                    ArmyUnitCatalog.BredBehemothId) > 1f)
+                summary.Append("\n巨兽强化：最大生命 +10%");
             var details = new StringBuilder();
             for (var index = 0; index < ArmyUnitCatalog.All.Count; index++)
             {
@@ -784,6 +863,8 @@ namespace WasteCity.Graybox3D.Building
                 details.Append(unit.ChineseName)
                     .Append("  ")
                     .Append(Runtime.Army.UnitCount(unit.Id))
+                    .Append("  生命 ")
+                    .Append(UnitHealthSummary(unit.Id))
                     .Append("  制造 ")
                     .Append(Runtime.Army.ManufacturingProgress(unit.Id)
                         .ToString("0.0"))
@@ -863,7 +944,13 @@ namespace WasteCity.Graybox3D.Building
                     .Append("  ")
                     .Append(character.State)
                     .Append("  忠诚 ")
-                    .Append(character.Loyalty).Append("\n");
+                    .Append(character.Loyalty);
+                if (character.HasGeneSplicingTrait)
+                    details.Append("  基因强化 ")
+                        .Append(character.GeneSplicingRemainingSeconds
+                            .ToString("0"))
+                        .Append("秒");
+                details.Append("\n");
             }
             for (var index = 0; index < ExternalFactionCatalog.All.Count;
                  index++)
@@ -881,13 +968,21 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < Runtime.Characters.Count; index++)
                 hasDowned |= Runtime.Characters[index].State ==
                     CharacterLifeState.Downed;
+            CharacterLifeRuntime currentLeader = Runtime.FindCharacter(
+                Runtime.Politics.CurrentLeaderId);
+            string leaderTrait = currentLeader?.HasGeneSplicingTrait == true
+                ? "\n领袖特质：基因强化（最大生命 +20%，剩余 " +
+                  currentLeader.GeneSplicingRemainingSeconds.ToString("0") +
+                  "秒）"
+                : "\n领袖特质：无临时科技特质";
             return new GrayboxCivilizationExpansionPresentation3D(
                 "角色、内政与外交",
                 "当前领袖：" + Runtime.Politics.CurrentLeaderId +
                 "\n临时议会：" +
                 (Runtime.Politics.IsInterimCouncilActive ? "运行中" : "未启动") +
                 "\n文明效率：" +
-                Runtime.Politics.EfficiencyMultiplier.ToString("0%"),
+                Runtime.Politics.EfficiencyMultiplier.ToString("0%") +
+                leaderTrait,
                 details.ToString(),
                 "灰烬商团：接触 / 报价 / 接受",
                 true,
@@ -906,8 +1001,22 @@ namespace WasteCity.Graybox3D.Building
 
         private string[] ArmyStatusVisuals()
         {
-            return GrayboxCivilizationExpansionVisualPresenter3D
-                .ArmyStatusVisuals(Runtime.Army.Commands.Command);
+            var result = new List<string>(
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .ArmyStatusVisuals(Runtime.Army.Commands.Command));
+            ResearchEffectSnapshot effects = ResolveResearchEffects();
+            if (effects.TissueRegeneration)
+                AddUnique(
+                    result,
+                    GrayboxCivilizationExpansionVisualPresenter3D
+                        .RescueStatusVisualId);
+            if (effects.ResolveUnitHealthMultiplier(
+                    ArmyUnitCatalog.BredBehemothId) > 1f)
+                AddUnique(
+                    result,
+                    GrayboxCivilizationExpansionVisualPresenter3D
+                        .GuardStatusVisualId);
+            return result.ToArray();
         }
 
         private static string[] WorldStatusVisuals(
@@ -938,10 +1047,56 @@ namespace WasteCity.Graybox3D.Building
                     hasCommunication);
         }
 
-        private static string[] PoliticsStatusVisuals(bool hasDowned)
+        private string[] PoliticsStatusVisuals(bool hasDowned)
         {
-            return GrayboxCivilizationExpansionVisualPresenter3D
-                .PoliticsStatusVisuals(hasDowned);
+            var result = new List<string>(
+                GrayboxCivilizationExpansionVisualPresenter3D
+                    .PoliticsStatusVisuals(hasDowned));
+            CharacterLifeRuntime current = Runtime.FindCharacter(
+                Runtime.Politics.CurrentLeaderId);
+            if (current?.HasGeneSplicingTrait == true)
+                AddUnique(
+                    result,
+                    GrayboxCivilizationExpansionVisualPresenter3D
+                        .RescueStatusVisualId);
+            return result.ToArray();
+        }
+
+        private ResearchEffectSnapshot ResolveResearchEffects()
+        {
+            if (session == null)
+                return ResearchEffectResolver.Resolve(Array.Empty<string>());
+            var completed = new List<string>();
+            foreach (ResearchDefinition definition in ResearchCatalog.All)
+            {
+                if (session.IsResearchCompleted(definition.Id.Value))
+                    completed.Add(definition.Id.Value);
+            }
+            return ResearchEffectResolver.Resolve(completed);
+        }
+
+        private string UnitHealthSummary(string definitionId)
+        {
+            int current = 0;
+            int maximum = 0;
+            IReadOnlyList<ArmyUnitSnapshot> units = Runtime.Army.Units;
+            for (var index = 0; index < units.Count; index++)
+            {
+                if (!string.Equals(
+                        units[index].DefinitionId,
+                        definitionId,
+                        StringComparison.Ordinal))
+                    continue;
+                current += units[index].CurrentHealth;
+                maximum += units[index].MaximumHealth;
+            }
+            return maximum <= 0 ? "--" : current + "/" + maximum;
+        }
+
+        private static void AddUnique(List<string> values, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value) && !values.Contains(value))
+                values.Add(value);
         }
 
         private int CountOperationalBuildings(string buildingId)
@@ -1028,6 +1183,20 @@ namespace WasteCity.Graybox3D.Building
                 value = value * 397ul + Runtime.Transport.Revision;
                 value = value * 397ul + Runtime.Army.Commands.Revision;
                 value = value * 397ul + (ulong)Runtime.Army.Units.Count;
+                value = value * 397ul +
+                    (ulong)(session?.Research?.CompletedCount ?? 0);
+                IReadOnlyList<ArmyUnitSnapshot> units = Runtime.Army.Units;
+                for (var index = 0; index < units.Count; index++)
+                {
+                    value = value * 397ul + (ulong)units[index].CurrentHealth;
+                    value = value * 397ul + (ulong)units[index].MaximumHealth;
+                    value = value * 397ul +
+                        (units[index].IsActive ? 1ul : 0ul);
+                }
+                CharacterLifeRuntime current = Runtime.FindCharacter(
+                    Runtime.Politics.CurrentLeaderId);
+                value = value * 397ul + (ulong)Mathf.CeilToInt(
+                    current?.GeneSplicingRemainingSeconds ?? 0f);
                 value = value * 397ul + (ulong)Runtime.Expedition.Status;
                 value = value * 397ul + (ulong)(view?.Page ?? 0);
                 value = value * 397ul + (ulong)LastFeedback.GetHashCode();

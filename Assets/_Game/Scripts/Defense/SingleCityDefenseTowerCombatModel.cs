@@ -23,6 +23,8 @@ namespace WasteCity.Defense
         private string targetStableEnemyId;
         private float rangeMultiplier = 1f;
         private float damageMultiplier = 1f;
+        private float technologyFireRateMultiplier = 1f;
+        private float technologyDamageMultiplier = 1f;
 
         public SingleCityDefenseTowerCombatModel(
             string stableInstanceId,
@@ -78,6 +80,10 @@ namespace WasteCity.Defense
         public DamageType DamageType => definition.DamageType;
         public float DamagePerSecond => definition.DamagePerSecond;
         public float DamageMultiplier => damageMultiplier;
+        public float TechnologyFireRateMultiplier =>
+            technologyFireRateMultiplier;
+        public float TechnologyDamageMultiplier =>
+            technologyDamageMultiplier;
         public float Range => definition.Range * rangeMultiplier;
         public string ConsumableId => definition.ConsumableId;
         public float SecondsPerConsumable =>
@@ -214,6 +220,19 @@ namespace WasteCity.Defense
                 : multiplier;
         }
 
+        public void SetTechnologyMultipliers(
+            float fireRateMultiplier,
+            float nextDamageMultiplier)
+        {
+            technologyFireRateMultiplier = !IsFinite(fireRateMultiplier)
+                ? 1f
+                : Math.Max(0f, fireRateMultiplier);
+            technologyDamageMultiplier =
+                !IsFinite(nextDamageMultiplier) || nextDamageMultiplier <= 0f
+                    ? 1f
+                    : nextDamageMultiplier;
+        }
+
         public SingleCityDefenseTowerCombatModel RebuildForBuilding(
             string buildingId,
             float nextRangeMultiplier)
@@ -228,6 +247,9 @@ namespace WasteCity.Defense
                 targetStableEnemyId = targetStableEnemyId,
                 IsLogisticsConnected = IsLogisticsConnected,
                 IsPlayerPaused = IsPlayerPaused,
+                technologyFireRateMultiplier =
+                    technologyFireRateMultiplier,
+                technologyDamageMultiplier = technologyDamageMultiplier,
             };
             rebuilt.SetRangeMultiplier(nextRangeMultiplier);
             return rebuilt;
@@ -339,6 +361,8 @@ namespace WasteCity.Defense
                 targetStableEnemyId = targetId;
                 if (string.IsNullOrEmpty(targetId))
                     break;
+                if (technologyFireRateMultiplier <= 0f)
+                    break;
 
                 if (activeConsumableSeconds <= TimeEpsilon)
                 {
@@ -373,7 +397,8 @@ namespace WasteCity.Defense
                     continue;
                 }
                 damageRemainder += definition.DamagePerSecond * multiplier *
-                    damageMultiplier * activeSeconds;
+                    damageMultiplier * technologyDamageMultiplier *
+                    technologyFireRateMultiplier * activeSeconds;
                 int resolvedDamage = WholeDamage(ref damageRemainder);
                 if (resolvedDamage <= 0)
                     continue;
@@ -400,6 +425,7 @@ namespace WasteCity.Defense
             {
                 return 0;
             }
+            if (technologyFireRateMultiplier <= 0f) return 0;
 
             float remainingSeconds = deltaSeconds;
             int totalAppliedDamage = 0;
@@ -423,7 +449,9 @@ namespace WasteCity.Defense
                 if (activeConsumableSeconds < TimeEpsilon)
                     activeConsumableSeconds = 0f;
 
-                damageRemainder += definition.DamagePerSecond * activeSeconds;
+                damageRemainder += definition.DamagePerSecond *
+                    technologyDamageMultiplier *
+                    technologyFireRateMultiplier * activeSeconds;
                 int rawDamage = WholeDamage(ref damageRemainder);
                 if (rawDamage <= 0)
                     continue;
@@ -520,6 +548,12 @@ namespace WasteCity.Defense
                        StringComparison.Ordinal) ||
                    string.Equals(buildingId,
                        BuildingCatalog.EmpTower.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.MindSpire.Id.Value,
+                       StringComparison.Ordinal) ||
+                   string.Equals(buildingId,
+                       BuildingCatalog.AcidTower.Id.Value,
                        StringComparison.Ordinal);
         }
 

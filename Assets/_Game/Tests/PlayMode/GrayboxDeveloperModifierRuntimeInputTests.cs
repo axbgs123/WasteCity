@@ -245,6 +245,8 @@ namespace WasteCity.Tests
             Assert.That(developer.IsPanelOpen, Is.True,
                 "The Development/Editor modifier must open through real 0.");
             InputField actionSearch = FindInput("Progression Action Search");
+            yield return ScrollDeveloperTargetIntoView(
+                actionSearch.GetComponent<RectTransform>());
             yield return FocusInput(actionSearch);
             yield return TapKey(Key.U);
             yield return TapKey(Key.Digit0);
@@ -256,8 +258,7 @@ namespace WasteCity.Tests
             yield return SelectProgressionAction(
                 "查询进度配置签名",
                 "developer.query.configuration-signature");
-            yield return ClickUi(FindButton(
-                "Execute Progression Action").GetComponent<RectTransform>());
+            yield return ExecuteProgressionAction();
             Assert.That(developer.HasModifiedGameState, Is.False,
                 "Read-only query actions never mark the run modified.");
             Assert.That(FindText("Developer Feedback").text,
@@ -288,6 +289,8 @@ namespace WasteCity.Tests
                 "Second Escape closes the modifier without opening menu.");
             yield return TapKey(Key.Digit0);
             Assert.That(developer.IsPanelOpen, Is.True);
+            yield return ScrollDeveloperTargetIntoView(
+                actionSearch.GetComponent<RectTransform>());
 
             yield return SelectProgressionAction(
                 "选择袖珍宇宙命轨",
@@ -345,6 +348,45 @@ namespace WasteCity.Tests
             yield return AssertAttentionThreshold(host, threshold);
         }
 
+        private IEnumerator ScrollDeveloperTargetIntoView(
+            RectTransform target)
+        {
+            ScrollRect scroll = GameObject.Find("Developer.Panel.Scroll")
+                .GetComponent<ScrollRect>();
+            Assert.That(scroll, Is.Not.Null);
+            Assert.That(scroll.content, Is.Not.Null);
+            Assert.That(scroll.viewport, Is.Not.Null);
+            Canvas.ForceUpdateCanvases();
+            Canvas canvas = scroll.viewport.GetComponentInParent<Canvas>();
+            Camera eventCamera = canvas.renderMode ==
+                RenderMode.ScreenSpaceOverlay
+                ? null
+                : canvas.worldCamera;
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(
+                eventCamera,
+                scroll.viewport.TransformPoint(scroll.viewport.rect.center));
+            for (var attempt = 0; attempt < 48; attempt++)
+            {
+                Bounds bounds = RectTransformUtility
+                    .CalculateRelativeRectTransformBounds(
+                        scroll.viewport, target);
+                Rect viewport = scroll.viewport.rect;
+                if (bounds.min.y >= viewport.yMin &&
+                    bounds.max.y <= viewport.yMax)
+                    yield break;
+                float wheel = bounds.center.y < viewport.center.y
+                    ? -120f
+                    : 120f;
+                QueueMouseScroll(screen, wheel);
+                yield return null;
+                QueueMouse(screen);
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+            }
+            Assert.Fail(target.name +
+                " did not enter the developer viewport through mouse wheel input.");
+        }
+
         private IEnumerator AssertAttentionThreshold(
             GrayboxFormalSaveRuntimeHost3D host,
             int threshold)
@@ -362,25 +404,33 @@ namespace WasteCity.Tests
             string stableId)
         {
             InputField search = FindInput("Progression Action Search");
+            yield return ScrollDeveloperTargetIntoView(
+                search.GetComponent<RectTransform>());
             yield return ReplaceInputText(search, chineseName);
             Button action = FindButton("Developer.Progression." + stableId);
             Assert.That(action.gameObject.activeInHierarchy, Is.True,
                 chineseName);
             Assert.That(action.GetComponentInChildren<Text>().text,
                 Is.EqualTo(chineseName));
+            yield return ScrollDeveloperTargetIntoView(
+                action.GetComponent<RectTransform>());
             yield return ClickUi(action.GetComponent<RectTransform>());
         }
 
         private IEnumerator SetProgressionAmount(int value)
         {
-            yield return ReplaceInputText(
-                FindInput("Progression Amount"), value.ToString());
+            InputField amount = FindInput("Progression Amount");
+            yield return ScrollDeveloperTargetIntoView(
+                amount.GetComponent<RectTransform>());
+            yield return ReplaceInputText(amount, value.ToString());
         }
 
         private IEnumerator ExecuteProgressionAction()
         {
-            yield return ClickUi(FindButton(
-                "Execute Progression Action").GetComponent<RectTransform>());
+            RectTransform execute = FindButton("Execute Progression Action")
+                .GetComponent<RectTransform>();
+            yield return ScrollDeveloperTargetIntoView(execute);
+            yield return ClickUi(execute);
         }
 
         private IEnumerator ReplaceInputText(
@@ -493,6 +543,18 @@ namespace WasteCity.Tests
             var state = new MouseState { position = position };
             if (button.HasValue)
                 state = state.WithButton(button.Value);
+            InputSystem.QueueStateEvent(mouse, state);
+            InputSystem.Update();
+            Assert.That(Mouse.current, Is.SameAs(mouse));
+        }
+
+        private void QueueMouseScroll(Vector2 position, float wheel)
+        {
+            var state = new MouseState
+            {
+                position = position,
+                scroll = new Vector2(0f, wheel),
+            };
             InputSystem.QueueStateEvent(mouse, state);
             InputSystem.Update();
             Assert.That(Mouse.current, Is.SameAs(mouse));

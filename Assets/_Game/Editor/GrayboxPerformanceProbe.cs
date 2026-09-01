@@ -2304,6 +2304,10 @@ namespace WasteCity.Editor
                     destination.defense = source.defense;
                     destination.defenseCampaign = source.defenseCampaign;
                     return;
+                case GrayboxFormalSaveDomainId3D.ResearchEffectState:
+                    destination.researchEffectState =
+                        source.researchEffectState;
+                    return;
                 case GrayboxFormalSaveDomainId3D.Evacuation:
                     destination.evacuation = source.evacuation;
                     return;

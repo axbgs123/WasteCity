@@ -114,7 +114,10 @@ namespace WasteCity.Research
             return hasEligibleResearchStation &&
                 definition != null &&
                 IsAvailable(definition) &&
-                Model.Start(definition, cityInventory);
+                Model.Start(
+                    definition,
+                    cityInventory,
+                    InitialProgressFraction());
         }
 
         public bool TryStart(
@@ -126,7 +129,16 @@ namespace WasteCity.Research
             return hasEligibleResearchStation &&
                 definition != null &&
                 IsAvailable(definition) &&
-                Model.Start(definition, cityStorage);
+                Model.Start(
+                    definition,
+                    cityStorage,
+                    InitialProgressFraction());
+        }
+
+        private float InitialProgressFraction()
+        {
+            return ResearchEffectResolver.Resolve(Model.CaptureCompleted())
+                .CollectiveConsciousnessInitialProgressFraction;
         }
 
         public bool Tick(

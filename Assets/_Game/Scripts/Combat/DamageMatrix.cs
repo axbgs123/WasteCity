@@ -16,7 +16,10 @@ namespace WasteCity.Combat
             {100, 130, 130, 70, 100}
         };
         public static int Apply(int rawDamage, DamageType damage, ArmorType armor)
-            => Math.Max(0, rawDamage) * Percent[(int)damage, (int)armor] / 100;
+            => (int)Math.Min(
+                int.MaxValue,
+                (long)Math.Max(0, rawDamage) *
+                Percent[(int)damage, (int)armor] / 100L);
 
         public static float Multiplier(DamageType damage, ArmorType armor)
             => Percent[(int)damage, (int)armor] / 100f;

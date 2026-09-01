@@ -61,9 +61,8 @@ namespace WasteCity.Tests
 
             Assert.That(
                 natural,
-                Has.Length.EqualTo(29),
-                "IDEA-0026 opens sword-array, leaving one initial and " +
-                "twenty-eight naturally researchable nodes.");
+                Has.Length.EqualTo(44),
+                "IDEA-0027 releases all catalogued research nodes.");
             foreach (ResearchDefinition definition in natural)
             {
                 Assert.That(
@@ -80,20 +79,12 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0026_PreviewOnlyNodesDoNotPublishActiveEffects()
+        public void IDEA0027_FormalCatalogNoLongerContainsPreviewOnlyNodes()
         {
-            foreach (ResearchDefinition definition in ResearchCatalog.All.Where(
-                         value => value.ReleaseState ==
-                             ResearchReleaseState.PreviewOnly &&
-                             !CivilizationResearchAvailability.IsGated(
-                                 value.Id.Value)))
-            {
-                Assert.That(
-                    ResearchEffectCatalog.ForResearch(definition.Id.Value),
-                    Has.None.Matches<ResearchEffectDefinition>(effect =>
-                        effect.Activation == ResearchEffectActivation.Active),
-                    definition.Id.Value);
-            }
+            Assert.That(ResearchCatalog.All, Has.None.Matches<
+                ResearchDefinition>(definition =>
+                    definition.ReleaseState ==
+                        ResearchReleaseState.PreviewOnly));
         }
 
         [Test]

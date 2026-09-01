@@ -20,6 +20,16 @@
 
 先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景。单功能检查优先看失败报告中的“只重跑这个失败”：报告实际会在“建议复跑”下给出一个可直接复制的单类筛选。若还没有失败报告，或要补跑相关类，就在[测试自动清单](Generated/Test-Inventory-ZH.md)的“精确测试文件与测试类”表找到对应类名，手动把一到数个类名用 `|` 连起来。该附录的“可复制的测试筛选命令”目前只有全部测试类的聚合筛选，不能当作单功能命令。建造、城市、UI、地形、美术、存档和 legacy schema 兼容的最低检查并不相同；先跑单功能，再跑相关检查，最后才完整回归。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
 
+## IDEA-0027 高级科技状态与 schema 35 检查边界
+
+目录与效果先运行 `IDEA0027ResearchCatalogAndStatusTests`、`IDEA0027ResearchRuntimeEffectsTests` 和 `IDEA0027DefenseTowerCatalogTests`，确认 44 节点、49 边、15 个原预览节点、文明 Lv.2 双门、状态配置与研究继承没有漂移。防御规则运行 `IDEA0027DefenseTechnologyRuntimeTests`：过载阶段、来源—目标一秒窗口、剑意满层、感染周期/稳定连锁、共鸣非递归、精神操控、主/压力战役隔离、建筑运行资格、核心护盾精确恢复和暂停都必须通过。军队与角色运行 `IDEA0027ArmyTechnologyEffectsTests`，检查傀儡容量、巨兽生命比例、组织再生、基因特质、死亡清理和恢复顺序。
+
+正式存档重点运行 `FormalSaveSchema35ContractTests`、`IDEA0027ResearchEffectStateSaveAdapterTests`、`GrayboxFormalSaveCoordinatorTests` 和既有 schema `31→32→33→34→35` 回归。至少覆盖：`34→35` 空迁移；多座来源塔对同一敌人的周期余量往返；未知效果、错误塔、悬空目标、重复 pair、非法阶段/层数/时间；受控友军跨波但不污染敌方计数；死亡角色活动特质；未知或未完成研究的奖励键；后续领域失败时全域回滚。schema `34` 的旧哈希必须先按旧投影验证，不能把新字段混入旧哈希。
+
+真实 UI 运行 `IDEA0027TechnologyStateRuntimeInputTests` 以及科技树、M/P 和开发管理台既有输入夹具。主动过载必须通过正式 Input System 与 UGUI 按钮触发；状态搜索和中文动作必须操作权威 owner；输入焦点、Esc 和模态不得穿透。Release 编译与 Windows Release 构建继续确认管理入口不可达。
+
+本阶段没有修改地形源、地形导入规则、Texture2DArray Builder 或数组内容，日常完整 EditMode 使用 `-testCategory '!TerrainAssetDeep'`。最终还要完成完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、macOS universal 3D、官方文档生成/校验和 `RecordVerification`。这些自动化不能写成用户已经试玩，也不能代替真实 Windows 10 和 11 的视觉、GPU、显存和内存验收。
+
 ## IDEA-0018 地图视觉、镜头层级与 UI 比例检查边界
 
 `IDEA-0018` 当前为“已实现待验证”。地图玩法仍固定为 `64×48`、seed `8128`、3072 格和 schema `32`；任何资源节点、通行、放置、建筑坐标或 world signature 变化都不是本轮视觉重制。地形源、四通道生成器或数组变化必须运行 `FirstArtTerrainVisualStyleTests`、`FirstArtTerrainAssetBuilderTests` 和完整 `TerrainAssetDeep`；Shader/材质与七层综合色运行 `FirstArtTerrainShaderTests`。镜头滚轮、模态阻断、Near/Mid/Far 与定向采矿覆盖运行 `GrayboxCameraAndInputTests`、`GrayboxVisualAndWorldTests`、`GrayboxBuildingProjectionAndViewTests` 和 `GrayboxRuntimeSceneTests`。

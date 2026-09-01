@@ -61,7 +61,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void CoordinatorPublishesTheFixedNineDomainOrder()
+        public void CoordinatorPublishesTheFixedTenDomainOrder()
         {
             Type coordinator = RequireRuntimeType(
                 "GrayboxFormalSaveCoordinator3D");
@@ -86,6 +86,7 @@ namespace WasteCity.Tests
                     "Economy",
                     "Production",
                     "Defense",
+                    "ResearchEffectState",
                     "Progression",
                     "Evacuation",
                     "CivilizationExpansion",
@@ -309,6 +310,7 @@ namespace WasteCity.Tests
         [TestCase(GrayboxFormalSaveDomainId3D.Production)]
         [TestCase(GrayboxFormalSaveDomainId3D.Progression)]
         [TestCase(GrayboxFormalSaveDomainId3D.Defense)]
+        [TestCase(GrayboxFormalSaveDomainId3D.ResearchEffectState)]
         [TestCase(GrayboxFormalSaveDomainId3D.Evacuation)]
         [TestCase(GrayboxFormalSaveDomainId3D.CivilizationExpansion)]
         public void ApplyFailureReplaysRollbackAndRestoresCanonicalAuthority(
@@ -336,12 +338,56 @@ namespace WasteCity.Tests
             Assert.That(CanonicalPayload(harness.Authority.State),
                 Is.EqualTo(preloadCanonical),
                 "Rollback must restore the complete pre-load authority.");
-            Assert.That(harness.TotalCaptureCount, Is.EqualTo(9));
+            Assert.That(harness.TotalCaptureCount, Is.EqualTo(10));
             Assert.That(harness.Rebuilder.InvocationCount, Is.EqualTo(1),
                 "Successful rollback must rebuild derived state once.");
             Assert.That(harness.CompletionCount, Is.Zero);
             Assert.That(harness.PauseObservations, Has.All.True);
             Assert.That(harness.Coordinator.IsTransactionPaused, Is.False);
+        }
+
+        [Test]
+        public void LaterDomainFailureRollsBackResearchEmitterArrayExactly()
+        {
+            FormalSaveEnvelope target = LoadFixtureEnvelope();
+            FormalThreeDSaveData preload =
+                MutatedPreloadPayload(target.formal3D);
+            preload.researchEffectState.revision = 3UL;
+            preload.researchEffectState.nextStableStateOrdinal = 8L;
+            preload.researchEffectState.emitters = new[]
+            {
+                new FormalThreeDResearchEffectEmitterSaveData
+                {
+                    stableStateId = "research.state.000007",
+                    creationOrdinal = 7L,
+                    effectId = "cultivation.status.sword-intent",
+                    sourceTowerStableId = "building.instance.000001",
+                    targetEnemyStableId =
+                        "campaign.enemy.wave-01.0000",
+                    cooldownRemaining = .375f,
+                },
+            };
+            CoordinatorHarness harness = CoordinatorHarness.Create(
+                preload,
+                GrayboxFormalSaveDomainId3D.Progression,
+                DomainFault.FailFirstApply);
+
+            GrayboxFormalSaveCoordinatorResult3D result =
+                harness.Coordinator.RestoreEncoded(
+                    ReadFixture("schema-31-formal-3d.json"));
+
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.RollbackSucceeded, Is.True);
+            FormalThreeDResearchEffectEmitterSaveData restored =
+                harness.Authority.State.researchEffectState.emitters.Single();
+            Assert.That(restored.stableStateId,
+                Is.EqualTo("research.state.000007"));
+            Assert.That(restored.sourceTowerStableId,
+                Is.EqualTo("building.instance.000001"));
+            Assert.That(restored.targetEnemyStableId,
+                Is.EqualTo("campaign.enemy.wave-01.0000"));
+            Assert.That(restored.cooldownRemaining,
+                Is.EqualTo(.375f).Within(.0001f));
         }
 
         [Test]
@@ -671,6 +717,32 @@ namespace WasteCity.Tests
                 "transaction barrier.");
         }
 
+        [Test]
+        public void ProductionCaptureWithoutEffectAdapterCreatesCanonicalState()
+        {
+            string source = File.ReadAllText(ProjectPath(
+                "Assets/_Game/Scripts/Graybox3D/Building/" +
+                "GrayboxFormalSaveCoordinator3D.cs"));
+            string factory = ExtractMethodBlock(
+                source,
+                "public static GrayboxFormalSaveCoordinator3D " +
+                "CreateProduction(");
+
+            StringAssert.Contains(
+                "? new FormalThreeDResearchEffectStateSaveData()",
+                factory);
+            StringAssert.DoesNotContain(
+                "destination.researchEffectState ??",
+                factory,
+                "A stale preloaded default must not preserve a null " +
+                "schema-35 configuration signature.");
+            Assert.That(
+                new FormalThreeDResearchEffectStateSaveData()
+                    .configurationSignature,
+                Is.EqualTo(FormalThreeDResearchEffectStateSaveData
+                    .ConfigurationSignature));
+        }
+
         [TestCase("productionController", "production")]
         [TestCase("defenseController", "defense")]
         public void ProductionAssemblyRebuildsRuntimeShapeBeforeAdapterRestore(
@@ -780,6 +852,9 @@ namespace WasteCity.Tests
                 "biological.production.active-biomass";
             FormalSaveEnvelope fixture = LoadFixtureEnvelope();
             FormalThreeDSaveData payload = ClonePayload(fixture.formal3D);
+            Assert.That(payload.researchEffectState.configurationSignature,
+                Is.EqualTo(FormalThreeDResearchEffectStateSaveData
+                    .ConfigurationSignature));
             FormalThreeDBuildingInstanceSaveData savedBuilding =
                 payload.buildings.instances.Single(instance =>
                     instance.stableInstanceId == stableId);
@@ -831,6 +906,10 @@ namespace WasteCity.Tests
             Assert.That(
                 captured.Envelope.saveSchemaVersion,
                 Is.EqualTo(FormalSaveEnvelope.CurrentSchemaVersion));
+            Assert.That(captured.Envelope.formal3D.researchEffectState
+                    .configurationSignature,
+                Is.EqualTo(FormalThreeDResearchEffectStateSaveData
+                    .ConfigurationSignature));
 
             GrayboxBuildingInstance3D targetInstance = CompleteInstance(
                 stableId,
@@ -846,9 +925,26 @@ namespace WasteCity.Tests
                     targetRuntime,
                     new[] { targetInstance });
 
+            string encoded = FormalSaveCodec.EncodeEnvelope(
+                captured.Envelope);
+            StringAssert.Contains(
+                "\"researchEffectState\":{\"configurationSignature\":" +
+                "\"" + FormalThreeDResearchEffectStateSaveData
+                    .ConfigurationSignature + "\"",
+                encoded);
+            FormalSaveDecodeResult roundTrip =
+                FormalSaveCodec.DecodeEnvelope(encoded);
+            Assert.That(roundTrip.Success, Is.True, roundTrip.Message);
+            Assert.That(roundTrip.Envelope.formal3D.researchEffectState
+                    .configurationSignature,
+                Is.EqualTo(FormalThreeDResearchEffectStateSaveData
+                    .ConfigurationSignature));
+            FormalSaveValidationResult roundTripValidation =
+                FormalSaveValidator.ValidateDecoded(roundTrip);
+            Assert.That(roundTripValidation.IsValid, Is.True,
+                roundTripValidation.Message);
             GrayboxFormalSaveCoordinatorResult3D restored =
-                targetCoordinator.RestoreEncoded(
-                    FormalSaveCodec.EncodeEnvelope(captured.Envelope));
+                targetCoordinator.RestoreEncoded(encoded);
 
             Assert.That(restored.Success, Is.True, restored.Message);
             Assert.That(targetRuntime.TryGetState(
@@ -1180,6 +1276,10 @@ namespace WasteCity.Tests
                         return;
                     case GrayboxFormalSaveDomainId3D.Defense:
                         destination.defense = copy.defense;
+                        return;
+                    case GrayboxFormalSaveDomainId3D.ResearchEffectState:
+                        destination.researchEffectState =
+                            copy.researchEffectState;
                         return;
                     case GrayboxFormalSaveDomainId3D.Evacuation:
                         destination.evacuation = copy.evacuation;

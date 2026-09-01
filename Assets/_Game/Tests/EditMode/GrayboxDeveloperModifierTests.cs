@@ -108,6 +108,7 @@ namespace WasteCity.Tests
                     "System.Boolean ResolveRuntimeAvailability(System.Boolean,System.Boolean)",
                     "System.Void Configure(WasteCity.Graybox3D.Building.GrayboxBuildingSession3D,WasteCity.Graybox3D.GrayboxMobileCityController3D,WasteCity.Graybox3D.Building.GrayboxBuildingWorldView3D,UnityEngine.Canvas)",
                     "System.Void ConfigureProgressionFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionFacade3D)",
+                    "System.Void ConfigureTechnologyStateFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperTechnologyStateFacade3D)",
                     "System.Boolean TryTogglePanel()"
                 }));
 
@@ -171,6 +172,11 @@ namespace WasteCity.Tests
                 Is.EquivalentTo(new[]
                 {
                     "System.Void ConfigureProgressionFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionFacade3D)",
+                    "System.Void ConfigureTechnologyStateFacade(WasteCity.Graybox3D.Building.GrayboxDeveloperTechnologyStateFacade3D)",
+                    "System.Collections.Generic.IReadOnlyList`1[[System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]] ListActiveTechnologyStates()",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ApplyTechnologyStatusFixtureWithFeedback(System.String)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ExecuteTechnologyStatusActionWithFeedback(System.String,WasteCity.Graybox3D.Building.GrayboxDeveloperTechnologyStateAction3D)",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ClearTechnologyStatusFixturesWithFeedback()",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionQuery3D QueryProgression()",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ExecuteProgressionAction(System.String,System.String,System.Int32)",
                     "System.Boolean AddResource(System.String,System.Int32)",

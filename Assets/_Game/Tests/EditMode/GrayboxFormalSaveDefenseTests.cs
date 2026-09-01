@@ -687,9 +687,9 @@ namespace WasteCity.Tests
         {
             const string miningId = "building.instance.000001";
             const string turretId = "building.instance.000003";
-            const string gnawerId = "enemy.campaign.000010";
-            const string crystalId = "enemy.campaign.000011";
-            const string howlerId = "enemy.campaign.000012";
+            const string gnawerId = "campaign.enemy.wave-05.0009";
+            const string crystalId = "campaign.enemy.wave-05.0010";
+            const string howlerId = "campaign.enemy.wave-05.0011";
             return new FormalThreeDDefenseCampaignSaveData
             {
                 campaignId = CampaignWaveCatalog.Id,
@@ -1319,6 +1319,10 @@ namespace WasteCity.Tests
                     case GrayboxFormalSaveDomainId3D.Defense:
                         destination.defense = copy.defense;
                         destination.defenseCampaign = copy.defenseCampaign;
+                        break;
+                    case GrayboxFormalSaveDomainId3D.ResearchEffectState:
+                        destination.researchEffectState =
+                            copy.researchEffectState;
                         break;
                     case GrayboxFormalSaveDomainId3D.Evacuation:
                         destination.evacuation = copy.evacuation;

@@ -253,7 +253,7 @@ namespace WasteCity.Tests
                 Is.EqualTo(GrayboxDefenseSelectionKind3D.Tower));
             Assert.That(RequireSceneObject(DetailsPanelName).activeInHierarchy,
                 Is.True);
-            Assert.That(hud.SelectionText.text, Does.Contain("射程 10 格"));
+            Assert.That(hud.SelectionText.text, Does.Contain("射程 12 格"));
 
             GrayboxBuildingInstance3D smelter = session.Instances.Single(
                 value => value.Placement.Definition == BuildingCatalog.Smelter);
@@ -426,6 +426,8 @@ namespace WasteCity.Tests
             GameObject upgrade = RequireSceneObject(BuildingUpgradeButtonName);
             Assert.That(upgrade.activeInHierarchy, Is.True);
             Assert.That(upgrade.GetComponent<Button>().interactable, Is.True);
+            Time.timeScale = 0f;
+            yield return null;
             int alloyBefore = session.CityStorage.GetNetworkAmount(
                 ResourceIds.Alloy);
             string selectedBefore = controller.SelectedStableId;
@@ -444,6 +446,7 @@ namespace WasteCity.Tests
             Assert.That(RequireSceneObject(
                     "Defense.Selection.Upgrade.Feedback")
                 .GetComponent<Text>().text, Does.Contain("升级完成"));
+            Time.timeScale = 1f;
         }
 
         [UnityTest]

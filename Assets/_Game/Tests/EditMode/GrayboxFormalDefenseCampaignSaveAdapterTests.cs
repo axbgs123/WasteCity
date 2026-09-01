@@ -170,6 +170,49 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SchemaThirtyFiveControlledFriendlyAndLossCountRoundTrip()
+        {
+            Fixture source = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            CampaignWaveDefinition wave = CampaignWaveCatalog.All[0];
+            source.Campaign.Advance(
+                wave.WarningSeconds +
+                wave.SpawnSeconds / wave.TotalCount + .1f,
+                1);
+            SingleCityDefenseEnemySnapshot enemy =
+                source.Campaign.Snapshot.Enemies[0];
+            Assert.That(source.Campaign.TryControlEnemy(
+                enemy.StableId,
+                BuildingCatalog.MindSpire.Id.Value), Is.True);
+            var sourceAdapter = new GrayboxDefenseSaveAdapter3D(source.Runtime);
+            FormalThreeDDefenseCampaignSaveData saved =
+                sourceAdapter.CaptureCampaign();
+            Assert.That(saved.enemyStates[0].isControlled, Is.True);
+            Assert.That(saved.enemyStates[0].currentHealth,
+                Is.EqualTo(enemy.CurrentHealth));
+            saved.statistics.controlledUnitLossCount = 2;
+
+            Fixture target = CreateFixture(
+                "building.instance.000030",
+                "building.instance.000010",
+                "building.instance.000020");
+            var targetAdapter = new GrayboxDefenseSaveAdapter3D(target.Runtime);
+            Assert.That(targetAdapter.TryRestoreCampaign(
+                saved,
+                target.Session.Instances,
+                out string error), Is.True, error);
+            FormalThreeDDefenseCampaignSaveData recaptured =
+                targetAdapter.CaptureCampaign();
+            Assert.That(recaptured.enemyStates[0].isControlled, Is.True);
+            Assert.That(recaptured.enemyStates[0].currentHealth,
+                Is.EqualTo(enemy.CurrentHealth));
+            Assert.That(recaptured.statistics.controlledUnitLossCount,
+                Is.EqualTo(2));
+        }
+
+        [Test]
         public void PartialMigrationStatisticsRoundTripThroughFormalAdapter()
         {
             Fixture source = CreateFixture(
@@ -218,7 +261,7 @@ namespace WasteCity.Tests
                 metricEnumerableType, metricEnumerableType,
                 metricEnumerableType, typeof(int), metricEnumerableType,
                 typeof(bool), typeof(int), typeof(float), typeof(float),
-                typeof(bool), typeof(bool),
+                typeof(bool), typeof(bool), typeof(int),
             };
             ConstructorInfo constructor = typeof(
                     SingleCityDefenseCampaignStatisticsPersistenceState)
@@ -250,7 +293,7 @@ namespace WasteCity.Tests
                 0,
                 Array.Empty<
                     SingleCityDefenseCampaignMetricPersistenceState>(),
-                false, 9, 4.5f, 6f, true, true,
+                false, 9, 4.5f, 6f, true, true, 3,
             });
 
             MethodInfo toDto = typeof(GrayboxDefenseSaveAdapter3D).GetMethod(
@@ -258,7 +301,7 @@ namespace WasteCity.Tests
                 BindingFlags.Static | BindingFlags.NonPublic);
             Assert.That(toDto, Is.Not.Null);
             object dto = toDto.Invoke(null, new[] { persistence });
-            AssertStatisticFields(dto, 9, 4.5f, 6f, true, true);
+            AssertStatisticFields(dto, 9, 4.5f, 6f, true, true, 3);
             AssertMetric(
                 ReadArrayField(dto, "killsByTowerBuildingId"),
                 BuildingCatalog.MachineGunTurret.Id.Value,
@@ -285,7 +328,8 @@ namespace WasteCity.Tests
                 4.5f,
                 6f,
                 true,
-                true);
+                true,
+                3);
             AssertMetric(
                 ReadMetricProperty(
                     restoredStatistics,
@@ -664,7 +708,8 @@ namespace WasteCity.Tests
             float activeSeconds,
             float eligibleSeconds,
             bool packed,
-            bool modifierUsed)
+            bool modifierUsed,
+            int controlledUnitLossCount)
         {
             Assert.That(ReadPublicField<int>(owner,
                 "completedProductionBatchCount"), Is.EqualTo(completedBatches));
@@ -676,6 +721,9 @@ namespace WasteCity.Tests
                 "cityWasPackedAfterCampaignStart"), Is.EqualTo(packed));
             Assert.That(ReadPublicField<bool>(owner,
                 "developmentModifierUsed"), Is.EqualTo(modifierUsed));
+            Assert.That(ReadPublicField<int>(owner,
+                "controlledUnitLossCount"),
+                Is.EqualTo(controlledUnitLossCount));
         }
 
         private static void AssertStatisticProperties(
@@ -684,7 +732,8 @@ namespace WasteCity.Tests
             float activeSeconds,
             float eligibleSeconds,
             bool packed,
-            bool modifierUsed)
+            bool modifierUsed,
+            int controlledUnitLossCount)
         {
             Assert.That(ReadPublicProperty<int>(owner,
                 "CompletedProductionBatchCount"), Is.EqualTo(completedBatches));
@@ -696,6 +745,9 @@ namespace WasteCity.Tests
                 "CityWasPackedAfterCampaignStart"), Is.EqualTo(packed));
             Assert.That(ReadPublicProperty<bool>(owner,
                 "DevelopmentModifierUsed"), Is.EqualTo(modifierUsed));
+            Assert.That(ReadPublicProperty<int>(owner,
+                "ControlledUnitLossCount"),
+                Is.EqualTo(controlledUnitLossCount));
         }
 
         private static T ReadPublicField<T>(object owner, string fieldName)

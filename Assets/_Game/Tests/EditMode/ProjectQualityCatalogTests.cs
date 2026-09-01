@@ -476,6 +476,7 @@ namespace WasteCity.Tests
                 "FormalThreeDCraftingSaveData",
                 "FormalThreeDCraftingExecutionSaveData",
                 "FormalThreeDResearchSaveData",
+                "FormalThreeDResearchEffectStateSaveData",
                 "FormalThreeDProductionSaveData",
                 "FormalThreeDProductionStateSaveData",
                 "FormalThreeDDefenseSaveData",
@@ -517,6 +518,10 @@ namespace WasteCity.Tests
                 "FormalThreeDCraftingSaveData",
                 "FormalThreeDCraftingExecutionSaveData",
                 "FormalThreeDResearchSaveData",
+                "FormalThreeDResearchEffectStateSaveData",
+                "FormalThreeDResearchEffectStateEntrySaveData",
+                "FormalThreeDResearchEffectEmitterSaveData",
+                "FormalThreeDResearchRewardLedgerSaveData",
                 "FormalThreeDProductionSaveData",
                 "FormalThreeDProductionStateSaveData",
                 "FormalThreeDDefenseSaveData",
@@ -697,7 +702,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
             }, runtimeHost.RequiredTestFiles);
-            StringAssert.Contains("九领域", runtimeHost.UseSummary);
+            StringAssert.Contains("十领域", runtimeHost.UseSummary);
 
             ProjectReuseEntry entry = FindReuse(
                 catalog,
@@ -1417,7 +1422,7 @@ namespace WasteCity.Tests
                 effects.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/ResearchRuntimeEffectIntegrationTests.cs");
             CollectionAssert.AreEqual(
-                new[] { "IDEA-0026" },
+                new[] { "IDEA-0026", "IDEA-0027" },
                 effects.RequirementIds);
 
             ProjectReuseEntry presentation = FindReuse(

@@ -424,6 +424,7 @@ namespace WasteCity.Graybox3D.Building
                     movementRemainder = enemy.MovementRemainder,
                     attackDamageRemainder = enemy.AttackDamageRemainder,
                     targetStableId = enemy.TargetStableId,
+                    isControlled = enemy.IsControlled,
                 };
             }
             return result;
@@ -460,6 +461,7 @@ namespace WasteCity.Graybox3D.Building
                     source.CityWasPackedAfterCampaignStart,
                 developmentModifierUsed = source.DevelopmentModifierUsed,
                 partialFromMigration = source.PartialFromMigration,
+                controlledUnitLossCount = source.ControlledUnitLossCount,
             };
         }
 
@@ -528,7 +530,8 @@ namespace WasteCity.Graybox3D.Building
                     statistics.productionActiveProgressSeconds,
                     statistics.productionEligibleSeconds,
                     statistics.cityWasPackedAfterCampaignStart,
-                    statistics.developmentModifierUsed);
+                    statistics.developmentModifierUsed,
+                    statistics.controlledUnitLossCount);
             return new SingleCityDefenseCampaignPersistenceState(
                 source.campaignId,
                 (SingleCityDefenseCampaignPhase)source.phase,
@@ -604,7 +607,8 @@ namespace WasteCity.Graybox3D.Building
                         enemy.currentHealth,
                         enemy.movementRemainder,
                         enemy.attackDamageRemainder,
-                        enemy.targetStableId);
+                        enemy.targetStableId,
+                        enemy.isControlled);
             }
             return result;
         }

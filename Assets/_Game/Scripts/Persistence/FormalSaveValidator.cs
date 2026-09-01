@@ -122,6 +122,16 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "progression", "fate", "offeredIds" },
             new[] { "formal3D", "progression", "pressure", "entries" },
             new[] { "formal3D", "progression", "civilization", "committedAscensionIds" },
+            new[] { "formal3D", "researchEffectState", "states" },
+            new[] { "formal3D", "researchEffectState", "emitters" },
+            new[] { "formal3D", "researchEffectState", "rewardLedger", "committedRewardKeys" },
+        };
+
+        private static readonly string[][] RequiredProgressionSourceMembers =
+        {
+            new[] { "formal3D", "researchEffectState", "configurationSignature" },
+            new[] { "formal3D", "researchEffectState", "revision" },
+            new[] { "formal3D", "researchEffectState", "nextStableStateOrdinal" },
         };
 
         public static FormalSaveValidationResult ValidateDecoded(
@@ -171,6 +181,16 @@ namespace WasteCity.Persistence
                     {
                         string[] path = RequiredProgressionSourceArrays[index];
                         if (!HasJsonPath(source, path))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", path));
+                    }
+                    for (int index = 0;
+                         index < RequiredProgressionSourceMembers.Length;
+                         index++)
+                    {
+                        string[] path = RequiredProgressionSourceMembers[index];
+                        if (!TryFindJsonPath(source, path, out _, out _))
                             return Invalid(
                                 FormalSaveValidationError.MissingRequiredValue,
                                 string.Join(".", path));
@@ -342,8 +362,15 @@ namespace WasteCity.Persistence
             if (result != null) return result;
             result = ValidateProgression(data.progression);
             if (result != null) return result;
-            result = ValidateCivilizationExpansion(
-                data.civilizationExpansion);
+            result = ValidateCivilizationExpansionWithResearch(
+                data.civilizationExpansion,
+                data.research,
+                data.researchEffectState);
+            if (result != null) return result;
+            result = ValidateResearchEffectState(
+                data.researchEffectState,
+                data,
+                buildingIds);
             if (result != null) return result;
 
             string computedHash =
@@ -461,12 +488,647 @@ namespace WasteCity.Persistence
                 return Missing("formal3D.progression");
             if (data.civilizationExpansion == null)
                 return Missing("formal3D.civilizationExpansion");
+            if (data.researchEffectState == null)
+                return Missing("formal3D.researchEffectState");
             return null;
+        }
+
+        private static FormalSaveValidationResult
+            ValidateResearchEffectState(
+                FormalThreeDResearchEffectStateSaveData state,
+                FormalThreeDSaveData data,
+                HashSet<string> buildingIds)
+        {
+            const string path = "formal3D.researchEffectState";
+            if (!string.Equals(
+                    state.configurationSignature,
+                    FormalThreeDResearchEffectStateSaveData
+                        .ConfigurationSignature,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".configurationSignature");
+            if (state.states == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".states");
+            if (state.emitters == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".emitters");
+            if (state.rewardLedger == null)
+                return Missing(path + ".rewardLedger");
+            if (state.rewardLedger.committedRewardKeys == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".rewardLedger.committedRewardKeys");
+            if (state.nextStableStateOrdinal < 1L)
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".nextStableStateOrdinal");
+            if (state.revision == 0UL &&
+                (state.states.Length > 0 ||
+                 state.emitters.Length > 0 ||
+                 state.rewardLedger.committedRewardKeys.Length > 0))
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".revision");
+
+            var stateIds = new HashSet<string>(StringComparer.Ordinal);
+            var ordinals = new HashSet<long>();
+            var statusTargets = new HashSet<string>(StringComparer.Ordinal);
+            var completedResearchIds = new HashSet<string>(
+                data.research.completedResearchIds ?? Array.Empty<string>(),
+                StringComparer.Ordinal);
+            long maximumOrdinal = 0L;
+            long previousOrdinal = 0L;
+            string previousStateId = string.Empty;
+            for (int index = 0; index < state.states.Length; index++)
+            {
+                FormalThreeDResearchEffectStateEntrySaveData entry =
+                    state.states[index];
+                string entryPath = path + ".states[" + index + "]";
+                if (entry == null) return Missing(entryPath);
+
+                FormalSaveValidationResult result = AddStableId(
+                    stateIds,
+                    entry.stableStateId,
+                    entryPath + ".stableStateId");
+                if (result != null) return result;
+                if (!TryParseResearchStateOrdinal(
+                        entry.stableStateId,
+                        out long stableIdOrdinal) ||
+                    stableIdOrdinal != entry.creationOrdinal)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        entryPath + ".stableStateId");
+                if (entry.creationOrdinal < 1L ||
+                    !ordinals.Add(entry.creationOrdinal))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        entryPath + ".creationOrdinal");
+                if (entry.creationOrdinal < previousOrdinal ||
+                    entry.creationOrdinal == previousOrdinal &&
+                    string.CompareOrdinal(
+                        entry.stableStateId,
+                        previousStateId) <= 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        entryPath);
+                previousOrdinal = entry.creationOrdinal;
+                previousStateId = entry.stableStateId;
+                maximumOrdinal = Math.Max(
+                    maximumOrdinal,
+                    entry.creationOrdinal);
+
+                ResearchStatusDefinition definition =
+                    ResearchStatusCatalog.Find(entry.effectId);
+                if (definition == null)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        entryPath + ".effectId");
+                if (!completedResearchIds.Contains(
+                        definition.SourceResearchId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        entryPath + ".effectId");
+                if (!Enum.IsDefined(
+                        typeof(FormalResearchEffectTargetKind),
+                        entry.targetKind))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        entryPath + ".targetKind");
+                ResearchStatusTarget statusTarget = ToResearchStatusTarget(
+                    entry.targetKind);
+                if (!definition.Allows(statusTarget))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        entryPath + ".targetKind");
+                if (!Enum.IsDefined(
+                        typeof(FormalResearchEffectStatePhase),
+                        entry.phase))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        entryPath + ".phase");
+                if (!IsStableId(entry.targetStableId))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        entryPath + ".targetStableId");
+                if (!ResearchEffectTargetExists(
+                        entry.targetKind,
+                        entry.targetStableId,
+                        data,
+                        buildingIds))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        entryPath + ".targetStableId");
+                string statusTargetKey = entry.effectId + "\n" +
+                    ((int)entry.targetKind).ToString(
+                        CultureInfo.InvariantCulture) + "\n" +
+                    entry.targetStableId;
+                if (!statusTargets.Add(statusTargetKey))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        entryPath + ".effectId");
+
+                result = NonNegativeFinite(
+                    entry.remainingRuleSeconds,
+                    entryPath + ".remainingRuleSeconds");
+                if (result != null) return result;
+                float maximumRemaining = definition.MaximumRemainingSeconds(
+                    (ResearchStatusPhase)(int)entry.phase);
+                if (definition.SavesPhase && maximumRemaining <= 0f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        entryPath + ".phase");
+                if (maximumRemaining < 0f ||
+                    (maximumRemaining <= 0f &&
+                     entry.remainingRuleSeconds > 0f) ||
+                    (maximumRemaining > 0f &&
+                     entry.remainingRuleSeconds > maximumRemaining))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        entryPath + ".remainingRuleSeconds");
+                if (entry.stacks <= 0)
+                    return Invalid(
+                        FormalSaveValidationError.NegativeValue,
+                        entryPath + ".stacks");
+                if (entry.stacks > definition.MaximumPersistedStacks)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        entryPath + ".stacks");
+                result = NonNegativeFinite(
+                    entry.periodAccumulatorSeconds,
+                    entryPath + ".periodAccumulatorSeconds");
+                if (result != null) return result;
+                if ((definition.PeriodSeconds <= 0f &&
+                     entry.periodAccumulatorSeconds > 0f) ||
+                    (definition.PeriodSeconds > 0f &&
+                     entry.periodAccumulatorSeconds >=
+                     definition.PeriodSeconds))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        entryPath + ".periodAccumulatorSeconds");
+                result = NonNegativeFinite(
+                    entry.currentValue,
+                    entryPath + ".currentValue");
+                if (result != null) return result;
+                if ((definition.MaximumValue <= 0f &&
+                     entry.currentValue > 0f) ||
+                    (definition.MaximumValue > 0f &&
+                     entry.currentValue > definition.MaximumValue))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        entryPath + ".currentValue");
+                if (!definition.SavesPhase &&
+                    entry.phase != FormalResearchEffectStatePhase.Active)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        entryPath + ".phase");
+            }
+
+            FormalSaveValidationResult emitterValidation =
+                ValidateResearchEffectEmitters(
+                    state.emitters,
+                    data,
+                    completedResearchIds,
+                    stateIds,
+                    ordinals,
+                    ref maximumOrdinal,
+                    path + ".emitters");
+            if (emitterValidation != null) return emitterValidation;
+
+            if (state.nextStableStateOrdinal <= maximumOrdinal)
+                return Invalid(
+                    FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".nextStableStateOrdinal");
+
+            FormalSaveValidationResult ledger = UniqueNonBlank(
+                state.rewardLedger.committedRewardKeys,
+                path + ".rewardLedger.committedRewardKeys");
+            if (ledger != null) return ledger;
+            for (int index = 0;
+                 index < state.rewardLedger.committedRewardKeys.Length;
+                 index++)
+            {
+                string rewardKey =
+                    state.rewardLedger.committedRewardKeys[index];
+                string rewardPath =
+                    path + ".rewardLedger.committedRewardKeys[" +
+                    index + "]";
+                if (!string.Equals(
+                        rewardKey,
+                        ResearchStatusCatalog.GeneSplicingRewardKey,
+                        StringComparison.Ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        rewardPath);
+                if (!completedResearchIds.Contains(
+                        ResearchStatusCatalog.Find(
+                            ResearchStatusCatalog.GeneSplicingTraitId)
+                            .SourceResearchId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        rewardPath);
+            }
+            bool hasGeneTrait = false;
+            for (var index = 0; index < state.states.Length; index++)
+                if (string.Equals(
+                        state.states[index].effectId,
+                        ResearchStatusCatalog.GeneSplicingTraitId,
+                        StringComparison.Ordinal))
+                {
+                    hasGeneTrait = true;
+                    break;
+                }
+            if (hasGeneTrait && !Array.Exists(
+                    state.rewardLedger.committedRewardKeys,
+                    value => string.Equals(
+                        value,
+                        ResearchStatusCatalog.GeneSplicingRewardKey,
+                        StringComparison.Ordinal)))
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".rewardLedger.committedRewardKeys");
+            return ValidateMindControlCampaignProjection(state, data);
+        }
+
+        private static FormalSaveValidationResult
+            ValidateResearchEffectEmitters(
+                FormalThreeDResearchEffectEmitterSaveData[] emitters,
+                FormalThreeDSaveData data,
+                HashSet<string> completedResearchIds,
+                HashSet<string> stateIds,
+                HashSet<long> ordinals,
+                ref long maximumOrdinal,
+                string path)
+        {
+            var pairs = new HashSet<string>(StringComparer.Ordinal);
+            long previousOrdinal = 0L;
+            string previousStateId = string.Empty;
+            for (int index = 0; index < emitters.Length; index++)
+            {
+                FormalThreeDResearchEffectEmitterSaveData emitter =
+                    emitters[index];
+                string itemPath = path + "[" + index + "]";
+                if (emitter == null) return Missing(itemPath);
+
+                FormalSaveValidationResult result = AddStableId(
+                    stateIds,
+                    emitter.stableStateId,
+                    itemPath + ".stableStateId");
+                if (result != null) return result;
+                if (!TryParseResearchStateOrdinal(
+                        emitter.stableStateId,
+                        out long stableIdOrdinal) ||
+                    stableIdOrdinal != emitter.creationOrdinal)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        itemPath + ".stableStateId");
+                if (emitter.creationOrdinal < 1L ||
+                    !ordinals.Add(emitter.creationOrdinal))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        itemPath + ".creationOrdinal");
+                if (emitter.creationOrdinal < previousOrdinal ||
+                    emitter.creationOrdinal == previousOrdinal &&
+                    string.CompareOrdinal(
+                        emitter.stableStateId,
+                        previousStateId) <= 0)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        itemPath);
+                previousOrdinal = emitter.creationOrdinal;
+                previousStateId = emitter.stableStateId;
+                maximumOrdinal = Math.Max(
+                    maximumOrdinal,
+                    emitter.creationOrdinal);
+
+                bool swordIntent = string.Equals(
+                    emitter.effectId,
+                    ResearchStatusCatalog.SwordIntentId,
+                    StringComparison.Ordinal);
+                bool infection = string.Equals(
+                    emitter.effectId,
+                    ResearchStatusCatalog.InfectionId,
+                    StringComparison.Ordinal);
+                if (!swordIntent && !infection)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        itemPath + ".effectId");
+                ResearchStatusDefinition definition =
+                    ResearchStatusCatalog.Find(emitter.effectId);
+                if (definition == null ||
+                    !completedResearchIds.Contains(
+                        definition.SourceResearchId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".effectId");
+                if (!IsMatchingEmitterTower(
+                        data.buildings,
+                        emitter.sourceTowerStableId,
+                        swordIntent))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".sourceTowerStableId");
+                if (!IsCurrentEmitterEnemy(
+                        data.defenseCampaign,
+                        emitter.targetEnemyStableId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".targetEnemyStableId");
+                if (!IsFinite(emitter.cooldownRemaining) ||
+                    emitter.cooldownRemaining <= 0f)
+                    return Invalid(
+                        FormalSaveValidationError.NegativeValue,
+                        itemPath + ".cooldownRemaining");
+                if (emitter.cooldownRemaining > 1f)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        itemPath + ".cooldownRemaining");
+                string pair = emitter.effectId + "\n" +
+                    emitter.sourceTowerStableId + "\n" +
+                    emitter.targetEnemyStableId;
+                if (!pairs.Add(pair))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".effectId");
+            }
+            return null;
+        }
+
+        private static bool IsMatchingEmitterTower(
+            FormalThreeDBuildingsSaveData buildings,
+            string stableTowerId,
+            bool swordIntent)
+        {
+            if (!IsStableId(stableTowerId) || buildings?.instances == null)
+                return false;
+            for (int index = 0; index < buildings.instances.Length; index++)
+            {
+                FormalThreeDBuildingInstanceSaveData building =
+                    buildings.instances[index];
+                if (building == null || !string.Equals(
+                        building.stableInstanceId,
+                        stableTowerId,
+                        StringComparison.Ordinal))
+                    continue;
+                if (building.state != 1 || !building.isPlayerOwned)
+                    return false;
+                return swordIntent
+                    ? string.Equals(
+                          building.definitionId,
+                          BuildingCatalog.SwordArrayTower.Id.Value,
+                          StringComparison.Ordinal) ||
+                      string.Equals(
+                          building.definitionId,
+                          BuildingCatalog.SwordRidingPlatform.Id.Value,
+                          StringComparison.Ordinal)
+                    : string.Equals(
+                        building.definitionId,
+                        BuildingCatalog.SporeTower.Id.Value,
+                        StringComparison.Ordinal);
+            }
+            return false;
+        }
+
+        private static bool IsCurrentEmitterEnemy(
+            FormalThreeDDefenseCampaignSaveData campaign,
+            string stableEnemyId)
+        {
+            if (!IsStableId(stableEnemyId) || campaign?.enemyStates == null)
+                return false;
+            for (int index = 0; index < campaign.enemyStates.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData enemy =
+                    campaign.enemyStates[index];
+                if (enemy != null && enemy.currentHealth > 0 &&
+                    !enemy.isControlled && string.Equals(
+                        enemy.stableEnemyId,
+                        stableEnemyId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static FormalSaveValidationResult
+            ValidateMindControlCampaignProjection(
+                FormalThreeDResearchEffectStateSaveData state,
+                FormalThreeDSaveData data)
+        {
+            const string statePath = "formal3D.researchEffectState.states";
+            FormalThreeDPressureCampaignSaveData pressure =
+                data.progression.pressure?.activeCampaign;
+            string campaignPath = pressure == null
+                ? "formal3D.defenseCampaign.enemyStates"
+                : "formal3D.progression.pressure.activeCampaign.enemyStates";
+            var controlled = new HashSet<string>(StringComparer.Ordinal);
+            FormalThreeDDefenseCampaignEnemyStateSaveData[] enemies =
+                pressure?.enemyStates ?? data.defenseCampaign.enemyStates;
+            for (var index = 0; index < enemies.Length; index++)
+                if (enemies[index].isControlled)
+                    controlled.Add(enemies[index].stableEnemyId);
+            var projected = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < state.states.Length; index++)
+            {
+                FormalThreeDResearchEffectStateEntrySaveData entry =
+                    state.states[index];
+                if (!string.Equals(
+                        entry.effectId,
+                        ResearchStatusCatalog.MindControlId,
+                        StringComparison.Ordinal)) continue;
+                if (entry.targetKind != FormalResearchEffectTargetKind.Enemy ||
+                    !controlled.Contains(entry.targetStableId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        statePath + "[" + index + "].targetStableId");
+                projected.Add(entry.targetStableId);
+            }
+            foreach (string stableId in controlled)
+                if (!projected.Contains(stableId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        campaignPath);
+            return null;
+        }
+
+        private static ResearchStatusTarget ToResearchStatusTarget(
+            FormalResearchEffectTargetKind kind)
+        {
+            switch (kind)
+            {
+                case FormalResearchEffectTargetKind.City:
+                    return ResearchStatusTarget.CityCore;
+                case FormalResearchEffectTargetKind.Building:
+                    return ResearchStatusTarget.Building;
+                case FormalResearchEffectTargetKind.Tower:
+                    return ResearchStatusTarget.Tower;
+                case FormalResearchEffectTargetKind.Enemy:
+                    return ResearchStatusTarget.Enemy;
+                case FormalResearchEffectTargetKind.ArmyUnit:
+                    return ResearchStatusTarget.ArmyUnit;
+                case FormalResearchEffectTargetKind.Character:
+                    return ResearchStatusTarget.Leader;
+                default:
+                    return ResearchStatusTarget.None;
+            }
+        }
+
+        private static bool ResearchEffectTargetExists(
+            FormalResearchEffectTargetKind kind,
+            string stableId,
+            FormalThreeDSaveData data,
+            HashSet<string> buildingIds)
+        {
+            switch (kind)
+            {
+                case FormalResearchEffectTargetKind.Global:
+                    return string.Equals(
+                        stableId,
+                        "global.research.effects",
+                        StringComparison.Ordinal);
+                case FormalResearchEffectTargetKind.City:
+                    if (string.Equals(
+                            stableId,
+                            data.civilizationExpansion.worldLayer
+                                .primaryCityId,
+                            StringComparison.Ordinal))
+                        return true;
+                    FormalThreeDSettlementSaveData[] settlements =
+                        data.civilizationExpansion.worldLayer.settlements;
+                    for (int index = 0; index < settlements.Length; index++)
+                        if (string.Equals(
+                                settlements[index].stableSettlementId,
+                                stableId,
+                                StringComparison.Ordinal))
+                            return true;
+                    return false;
+                case FormalResearchEffectTargetKind.Building:
+                    return buildingIds.Contains(stableId);
+                case FormalResearchEffectTargetKind.Tower:
+                    for (int index = 0;
+                         index < data.buildings.instances.Length;
+                         index++)
+                    {
+                        FormalThreeDBuildingInstanceSaveData building =
+                            data.buildings.instances[index];
+                        if (string.Equals(
+                                building.stableInstanceId,
+                                stableId,
+                                StringComparison.Ordinal))
+                            return DefenseTowerCatalog.For(
+                                building.definitionId) != null;
+                    }
+                    return false;
+                case FormalResearchEffectTargetKind.Enemy:
+                    if (data.defense.enemies != null)
+                        for (int index = 0;
+                             index < data.defense.enemies.Length;
+                             index++)
+                            if (string.Equals(
+                                    data.defense.enemies[index].stableEnemyId,
+                                    stableId,
+                                    StringComparison.Ordinal))
+                                return true;
+                    if (data.defenseCampaign.enemyStates != null)
+                        for (int index = 0;
+                             index < data.defenseCampaign.enemyStates.Length;
+                             index++)
+                            if (string.Equals(
+                                    data.defenseCampaign.enemyStates[index]
+                                        .stableEnemyId,
+                                    stableId,
+                                    StringComparison.Ordinal))
+                                return true;
+                    FormalThreeDPressureCampaignSaveData pressure =
+                        data.progression.pressure.activeCampaign;
+                    if (pressure != null && pressure.enemyStates != null)
+                        for (int index = 0;
+                             index < pressure.enemyStates.Length;
+                             index++)
+                            if (string.Equals(
+                                    pressure.enemyStates[index].stableEnemyId,
+                                    stableId,
+                                    StringComparison.Ordinal))
+                                return true;
+                    return false;
+                case FormalResearchEffectTargetKind.ArmyUnit:
+                    FormalThreeDArmyUnitSaveData[] units =
+                        data.civilizationExpansion.armyLeader.units;
+                    for (int index = 0; index < units.Length; index++)
+                        if (string.Equals(
+                                units[index].stableUnitId,
+                                stableId,
+                                StringComparison.Ordinal))
+                            return true;
+                    FormalThreeDArmyExpeditionSaveData expedition =
+                        data.civilizationExpansion.armyLeader.expedition;
+                    if (expedition != null && expedition.units != null)
+                        for (int index = 0;
+                             index < expedition.units.Length;
+                             index++)
+                            if (string.Equals(
+                                    expedition.units[index].stableUnitId,
+                                    stableId,
+                                    StringComparison.Ordinal))
+                                return true;
+                    return false;
+                case FormalResearchEffectTargetKind.Character:
+                    FormalThreeDCharactersPoliticsSaveData politics =
+                        data.civilizationExpansion.charactersPolitics;
+                    if (string.Equals(
+                            politics.currentLeaderId,
+                            stableId,
+                            StringComparison.Ordinal) ||
+                        string.Equals(
+                            data.civilizationExpansion.armyLeader.leader
+                                .characterId,
+                            stableId,
+                            StringComparison.Ordinal))
+                        return true;
+                    for (int index = 0;
+                         index < politics.characters.Length;
+                         index++)
+                        if (string.Equals(
+                                politics.characters[index].characterId,
+                                stableId,
+                                StringComparison.Ordinal))
+                            return true;
+                    return false;
+                default:
+                    return false;
+            }
         }
 
         private static FormalSaveValidationResult
             ValidateCivilizationExpansion(
                 FormalThreeDCivilizationExpansionSaveData expansion)
+        {
+            return ValidateCivilizationExpansionCore(
+                expansion,
+                ResearchEffectResolver.Resolve(Array.Empty<string>()),
+                null);
+        }
+
+        private static FormalSaveValidationResult
+            ValidateCivilizationExpansionWithResearch(
+                FormalThreeDCivilizationExpansionSaveData expansion,
+                FormalThreeDResearchSaveData research,
+                FormalThreeDResearchEffectStateSaveData effectState)
+        {
+            return ValidateCivilizationExpansionCore(
+                expansion,
+                ResearchEffectResolver.Resolve(
+                    research?.completedResearchIds ?? Array.Empty<string>()),
+                effectState);
+        }
+
+        private static FormalSaveValidationResult
+            ValidateCivilizationExpansionCore(
+                FormalThreeDCivilizationExpansionSaveData expansion,
+                ResearchEffectSnapshot researchEffects,
+                FormalThreeDResearchEffectStateSaveData effectState)
         {
             const string path = "formal3D.civilizationExpansion";
             if (!string.Equals(
@@ -517,7 +1179,8 @@ namespace WasteCity.Persistence
                     path + ".charactersPolitics.currentLeaderId");
             FormalSaveValidationResult result = ValidateExpansionArmy(
                 expansion.armyLeader,
-                path + ".armyLeader");
+                path + ".armyLeader",
+                researchEffects);
             if (result != null) return result;
             result = ValidateExpansionWorld(
                 expansion.worldLayer,
@@ -526,7 +1189,8 @@ namespace WasteCity.Persistence
             result = ValidateExpansionPolitics(
                 expansion.charactersPolitics,
                 expansion.worldLayer,
-                path + ".charactersPolitics");
+                path + ".charactersPolitics",
+                effectState);
             if (result != null) return result;
             if (!string.Equals(
                     expansion.armyLeader.leader.characterId,
@@ -562,7 +1226,8 @@ namespace WasteCity.Persistence
 
         private static FormalSaveValidationResult ValidateExpansionArmy(
             FormalThreeDArmyLeaderSaveData army,
-            string path)
+            string path,
+            ResearchEffectSnapshot researchEffects)
         {
             if (army.nextUnitOrdinal < 1 ||
                 army.nextSquadOrdinal != 2 ||
@@ -585,6 +1250,15 @@ namespace WasteCity.Persistence
                 ArmyUnitDefinition definition = unit == null
                     ? null
                     : ArmyUnitCatalog.Find(unit.definitionId);
+                int maximumHealth = definition == null
+                    ? 0
+                    : Math.Max(
+                        1,
+                        (int)Math.Round(
+                            definition.MaximumHealth *
+                            researchEffects.ResolveUnitHealthMultiplier(
+                                definition.Id),
+                            MidpointRounding.AwayFromZero));
                 if (unit == null || !IsStableId(unit.stableUnitId) ||
                     !unitIds.Add(unit.stableUnitId) || definition == null ||
                     !string.Equals(
@@ -592,7 +1266,7 @@ namespace WasteCity.Persistence
                         SingleCityArmyModel.DefaultSquadId,
                         StringComparison.Ordinal) ||
                     unit.currentHealth <= 0 ||
-                    unit.currentHealth > definition.MaximumHealth ||
+                    unit.currentHealth > maximumHealth ||
                     !IsFinite(unit.maintenanceElapsedSeconds) ||
                     unit.maintenanceElapsedSeconds < 0f ||
                     unit.maintenanceElapsedSeconds >
@@ -891,7 +1565,8 @@ namespace WasteCity.Persistence
         private static FormalSaveValidationResult ValidateExpansionPolitics(
             FormalThreeDCharactersPoliticsSaveData politics,
             FormalThreeDWorldLayerSaveData world,
-            string path)
+            string path,
+            FormalThreeDResearchEffectStateSaveData effectState)
         {
             if (politics.characters.Length == 0)
             {
@@ -946,12 +1621,24 @@ namespace WasteCity.Persistence
                     : CharacterCatalog.Find(item.characterId);
                 bool hasCorpse = item != null &&
                     corpseByCharacter.ContainsKey(item.characterId);
+                bool hasActiveGeneSplicing = item != null &&
+                    HasActiveGeneSplicingState(
+                        effectState,
+                        item.characterId);
+                int expectedMaximumHealth = definition == null
+                    ? 0
+                    : CalculateCharacterMaximumHealth(
+                        definition,
+                        hasActiveGeneSplicing);
                 if (item == null || definition == null ||
                     !characterIds.Add(item.characterId) ||
                     !Enum.IsDefined(typeof(CharacterLifeState), item.state) ||
+                    !IsCharacterResearchEffectStateCompatible(
+                        item,
+                        effectState) ||
                     item.currentHealth < 0 ||
                     item.currentHealth > item.maximumHealth ||
-                    item.maximumHealth != definition.MaximumHealth ||
+                    item.maximumHealth != expectedMaximumHealth ||
                     item.loyalty < 0 || item.loyalty > 100 ||
                     !settlementIds.Contains(item.assignedSettlementId) ||
                     !IsFinite(item.downedRemainingSeconds) ||
@@ -1119,6 +1806,78 @@ namespace WasteCity.Persistence
                 default:
                     return false;
             }
+        }
+
+        private static int ResolveCharacterMaximumHealth(
+            CharacterDefinition definition,
+            FormalThreeDResearchEffectStateSaveData effectState)
+        {
+            return CalculateCharacterMaximumHealth(
+                definition,
+                HasActiveGeneSplicingState(
+                    effectState,
+                    definition.Id.Value));
+        }
+
+        private static bool IsCharacterResearchEffectStateCompatible(
+            FormalThreeDCharacterSaveData character,
+            FormalThreeDResearchEffectStateSaveData effectState)
+        {
+            return character != null &&
+                (character.state != (int)CharacterLifeState.Dead ||
+                 !HasActiveGeneSplicingState(
+                     effectState,
+                     character.characterId));
+        }
+
+        private static bool HasActiveGeneSplicingState(
+            FormalThreeDResearchEffectStateSaveData effectState,
+            string characterId)
+        {
+            FormalThreeDResearchEffectStateEntrySaveData[] states =
+                effectState?.states;
+            if (states != null)
+            {
+                for (int index = 0; index < states.Length; index++)
+                {
+                    FormalThreeDResearchEffectStateEntrySaveData state =
+                        states[index];
+                    if (state != null &&
+                        string.Equals(
+                            state.effectId,
+                            ResearchStatusCatalog.GeneSplicingTraitId,
+                            StringComparison.Ordinal) &&
+                        state.targetKind ==
+                            FormalResearchEffectTargetKind.Character &&
+                        string.Equals(
+                            state.targetStableId,
+                            characterId,
+                            StringComparison.Ordinal) &&
+                        state.phase ==
+                            FormalResearchEffectStatePhase.Active &&
+                        state.remainingRuleSeconds > 0f &&
+                        state.stacks > 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static int CalculateCharacterMaximumHealth(
+            CharacterDefinition definition,
+            bool hasGeneSplicing)
+        {
+            return Math.Max(
+                1,
+                (int)Math.Round(
+                    definition.MaximumHealth *
+                    (hasGeneSplicing
+                        ? CharacterLifeRuntime
+                            .GeneSplicingMaximumHealthMultiplier
+                        : 1f),
+                    MidpointRounding.AwayFromZero));
         }
 
         private static bool IsValidExpeditionLoot(
@@ -2725,14 +3484,62 @@ namespace WasteCity.Persistence
                     return Invalid(FormalSaveValidationError.InvalidDefense,
                         path + ".defeatedEnemyCountsByEnemyId[" + index + "]");
             }
-            if (campaign.enemyStates.Length !=
-                totalSpawned - totalDefeated)
+            var hostileCurrentWaveCount = 0;
+            var controlledCurrentWaveCount = 0;
+            for (var index = 0; index < campaign.enemyStates.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData enemy =
+                    campaign.enemyStates[index];
+                if (!TryParseCampaignEnemySlot(
+                        enemy.stableEnemyId,
+                        out int waveNumber,
+                        out int spawnOrder) ||
+                    spawnOrder != enemy.spawnOrder ||
+                    waveNumber > campaign.currentWaveNumber ||
+                    !enemy.isControlled &&
+                    waveNumber != campaign.currentWaveNumber)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidDefense,
+                        path + ".enemyStates[" + index + "]");
+                if (waveNumber != campaign.currentWaveNumber) continue;
+                if (enemy.isControlled) controlledCurrentWaveCount++;
+                else hostileCurrentWaveCount++;
+            }
+            if (hostileCurrentWaveCount !=
+                totalSpawned - totalDefeated -
+                    controlledCurrentWaveCount)
                 return Invalid(FormalSaveValidationError.InvalidDefense,
                     path + ".enemyStates");
             if (campaign.nextEnemyOrdinal < totalSpawned)
                 return Invalid(FormalSaveValidationError.InvalidHighWaterMark,
                     path + ".nextEnemyOrdinal");
             return null;
+        }
+
+        private static bool TryParseCampaignEnemySlot(
+            string stableId,
+            out int waveNumber,
+            out int spawnOrder)
+        {
+            const string prefix = "campaign.enemy.wave-";
+            waveNumber = 0;
+            spawnOrder = -1;
+            if (string.IsNullOrEmpty(stableId) ||
+                !stableId.StartsWith(prefix, StringComparison.Ordinal) ||
+                stableId.Length != prefix.Length + 7 ||
+                stableId[prefix.Length + 2] != '.') return false;
+            return int.TryParse(
+                    stableId.Substring(prefix.Length, 2),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out waveNumber) &&
+                waveNumber > 0 &&
+                int.TryParse(
+                    stableId.Substring(prefix.Length + 3, 4),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out spawnOrder) &&
+                spawnOrder >= 0;
         }
 
         private static int FindCampaignCount(
@@ -2917,7 +3724,8 @@ namespace WasteCity.Persistence
                 statistics.completedWaveCount < 0 ||
                 statistics.highestAliveEnemyCount < 0 ||
                 statistics.coreDamageTaken < 0 ||
-                statistics.completedProductionBatchCount < 0)
+                statistics.completedProductionBatchCount < 0 ||
+                statistics.controlledUnitLossCount < 0)
                 return Invalid(FormalSaveValidationError.NegativeValue, path);
             result = ValidateCampaignMetrics(
                 statistics.killsByEnemyId,
@@ -3356,6 +4164,25 @@ namespace WasteCity.Persistence
         {
             return !string.IsNullOrEmpty(value) &&
                    StableIdPattern.IsMatch(value);
+        }
+
+        private static bool TryParseResearchStateOrdinal(
+            string value,
+            out long ordinal)
+        {
+            const string prefix = "research.state.";
+            ordinal = 0L;
+            if (string.IsNullOrEmpty(value) ||
+                !value.StartsWith(prefix, StringComparison.Ordinal))
+                return false;
+            string suffix = value.Substring(prefix.Length);
+            return suffix.Length == 6 &&
+                long.TryParse(
+                    suffix,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out ordinal) &&
+                ordinal > 0L;
         }
 
         private static bool TryGeneratedOrdinal(

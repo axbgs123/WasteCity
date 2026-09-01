@@ -935,6 +935,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        [Category("TerrainAssetDeep")]
         public void GeometryShader_VerticalAndHorizontalSurfacesHaveNonDegenerateVariation()
         {
             Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);

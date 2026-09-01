@@ -66,25 +66,23 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void PreviewOnlyTechnologyNeverClaimsItsEffectsAreApplied()
+        public void ReleasedTechnologyClaimsCompletedEffectsAreApplied()
         {
             const string researchId = "core.research.energy-weapons";
             Assert.That(
                 ResearchCatalog.Find(researchId).ReleaseState,
-                Is.EqualTo(ResearchReleaseState.PreviewOnly));
+                Is.EqualTo(ResearchReleaseState.Researchable));
 
             IReadOnlyList<ResearchEffectLinePresentation3D> lines = Resolve(
                 researchId,
                 completed: true);
 
             Assert.That(lines, Is.Not.Empty);
-            Assert.That(lines.All(line => line.IsPreviewOnly), Is.True);
-            Assert.That(lines.All(line => !line.IsApplied), Is.True);
+            Assert.That(lines.All(line => !line.IsPreviewOnly), Is.True);
+            Assert.That(lines.All(line => line.IsApplied), Is.True);
             Assert.That(lines.All(line =>
-                    line.Activation == "仅预览，效果待接入"),
+                    line.Activation == "已生效"),
                 Is.True);
-            Assert.That(lines.Any(line => line.Activation == "已生效"),
-                Is.False);
         }
 
         [Test]
@@ -93,7 +91,7 @@ namespace WasteCity.Tests
             const string researchId = "core.research.alloy-armor";
             Assert.That(
                 ResearchCatalog.Find(researchId).ReleaseState,
-                Is.EqualTo(ResearchReleaseState.PreviewOnly));
+                Is.EqualTo(ResearchReleaseState.Researchable));
 
             IReadOnlyList<ResearchEffectLinePresentation3D> lines = Resolve(
                 researchId,

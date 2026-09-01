@@ -805,7 +805,7 @@ namespace WasteCity.Tests
             Assert.That(ResultMissingResearchId(missingResearch),
                 Is.EqualTo("core.research.automated-machinery"));
 
-            object previewResearch = AssertSelectionStatus(
+            object releasedResearch = AssertSelectionStatus(
                 runtime, assembler.StableInstanceId,
                 "fusion.production.hybrid-core",
                 new[]
@@ -815,10 +815,9 @@ namespace WasteCity.Tests
                     "core.research.gene-splicing",
                     "core.research.collective-consciousness",
                 },
-                false,
-                "ResearchNotCompleted");
-            Assert.That(ResultMissingResearchId(previewResearch),
-                Is.EqualTo("core.research.unmanned-systems"));
+                true,
+                "Completed");
+            Assert.That(ResultMissingResearchId(releasedResearch), Is.Empty);
         }
 
         [Test]

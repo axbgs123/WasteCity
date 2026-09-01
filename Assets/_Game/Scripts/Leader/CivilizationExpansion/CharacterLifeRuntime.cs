@@ -418,6 +418,20 @@ namespace WasteCity.Leader.CivilizationExpansion
         }
     }
 
+    public readonly struct CharacterTechnologyPersistenceState
+    {
+        public CharacterTechnologyPersistenceState(
+            string characterId,
+            float geneSplicingRemainingSeconds)
+        {
+            CharacterId = characterId;
+            GeneSplicingRemainingSeconds = geneSplicingRemainingSeconds;
+        }
+
+        public string CharacterId { get; }
+        public float GeneSplicingRemainingSeconds { get; }
+    }
+
     public sealed class CharacterLifeRuntime
     {
         public const float BaseDownedSeconds = 60f;
@@ -428,6 +442,8 @@ namespace WasteCity.Leader.CivilizationExpansion
         public const string RescueResourceId = ResourceIds.Biomass;
         public const string DelayedRescueInjuryId =
             "core.injury.slow-reaction";
+        public const float GeneSplicingTraitDurationSeconds = 300f;
+        public const float GeneSplicingMaximumHealthMultiplier = 1.2f;
 
         private readonly List<string> equipmentIds;
         private readonly List<string> permanentInjuryIds = new List<string>();
@@ -439,6 +455,7 @@ namespace WasteCity.Leader.CivilizationExpansion
         private int downCount;
         private ulong damageRevision;
         private ulong lastDamageRuleTick = ulong.MaxValue;
+        private float geneSplicingRemainingSeconds;
 
         public CharacterLifeRuntime(CharacterDefinition definition)
         {
@@ -454,7 +471,18 @@ namespace WasteCity.Leader.CivilizationExpansion
         public CharacterDefinition Definition { get; }
         public CharacterLifeState State { get; private set; }
         public int CurrentHealth { get; private set; }
-        public int MaximumHealth => Definition.MaximumHealth;
+        public int MaximumHealth => Math.Max(
+            1,
+            (int)Math.Round(
+                Definition.MaximumHealth *
+                (HasGeneSplicingTrait
+                    ? GeneSplicingMaximumHealthMultiplier
+                    : 1f),
+                MidpointRounding.AwayFromZero));
+        public bool HasGeneSplicingTrait =>
+            geneSplicingRemainingSeconds > 0f;
+        public float GeneSplicingRemainingSeconds =>
+            geneSplicingRemainingSeconds;
         public int Loyalty { get; private set; }
         public string AssignedSettlementId { get; private set; }
         public int X { get; private set; }
@@ -487,6 +515,78 @@ namespace WasteCity.Leader.CivilizationExpansion
         {
             Loyalty = Math.Max(0, Math.Min(100, Loyalty + delta));
             return Loyalty;
+        }
+
+        public bool TryApplyGeneSplicingTrait()
+        {
+            if (State == CharacterLifeState.Dead || HasGeneSplicingTrait)
+                return false;
+            int beforeMaximum = MaximumHealth;
+            geneSplicingRemainingSeconds = GeneSplicingTraitDurationSeconds;
+            AdjustCurrentHealthForMaximumChange(
+                beforeMaximum,
+                MaximumHealth);
+            return true;
+        }
+
+        public void TickTechnologyEffects(float deltaSeconds, bool paused)
+        {
+            if (State == CharacterLifeState.Dead)
+            {
+                geneSplicingRemainingSeconds = 0f;
+                return;
+            }
+            if (paused || !HasGeneSplicingTrait) return;
+            float delta = Math.Max(0f, deltaSeconds);
+            if (delta <= 0f) return;
+            int beforeMaximum = MaximumHealth;
+            geneSplicingRemainingSeconds = Math.Max(
+                0f,
+                geneSplicingRemainingSeconds - delta);
+            if (!HasGeneSplicingTrait)
+            {
+                AdjustCurrentHealthForMaximumChange(
+                    beforeMaximum,
+                    MaximumHealth);
+            }
+        }
+
+        public CharacterTechnologyPersistenceState CaptureTechnologyState()
+        {
+            return new CharacterTechnologyPersistenceState(
+                Definition.Id.Value,
+                State == CharacterLifeState.Dead
+                    ? 0f
+                    : geneSplicingRemainingSeconds);
+        }
+
+        public bool TryRestoreTechnologyState(
+            CharacterTechnologyPersistenceState snapshot,
+            out string error)
+        {
+            if (!string.Equals(
+                    snapshot.CharacterId,
+                    Definition.Id.Value,
+                    StringComparison.Ordinal) ||
+                float.IsNaN(snapshot.GeneSplicingRemainingSeconds) ||
+                float.IsInfinity(snapshot.GeneSplicingRemainingSeconds) ||
+                snapshot.GeneSplicingRemainingSeconds < 0f ||
+                snapshot.GeneSplicingRemainingSeconds >
+                    GeneSplicingTraitDurationSeconds ||
+                State == CharacterLifeState.Dead &&
+                snapshot.GeneSplicingRemainingSeconds > 0f)
+            {
+                error = "角色科技状态无效";
+                return false;
+            }
+            int beforeMaximum = MaximumHealth;
+            geneSplicingRemainingSeconds =
+                snapshot.GeneSplicingRemainingSeconds;
+            AdjustCurrentHealthForMaximumChange(
+                beforeMaximum,
+                MaximumHealth);
+            error = string.Empty;
+            return true;
         }
 
         public bool TryApplyDamage(
@@ -836,6 +936,8 @@ namespace WasteCity.Leader.CivilizationExpansion
             }
 
             State = snapshot.State;
+            if (State == CharacterLifeState.Dead)
+                geneSplicingRemainingSeconds = 0f;
             CurrentHealth = snapshot.CurrentHealth;
             Loyalty = snapshot.Loyalty;
             AssignedSettlementId = snapshot.AssignedSettlementId ?? string.Empty;
@@ -901,6 +1003,7 @@ namespace WasteCity.Leader.CivilizationExpansion
         {
             int releasedBiomass = alreadyReleasedBiomass + ClearRescue();
             State = CharacterLifeState.Dead;
+            geneSplicingRemainingSeconds = 0f;
             CurrentHealth = 0;
             DownedRemainingSeconds = 0f;
             RecoveryRemainingSeconds = 0f;
@@ -922,6 +1025,22 @@ namespace WasteCity.Leader.CivilizationExpansion
             RescueRemainingSeconds = 0f;
             rescueSourceDamageRevision = 0ul;
             return previous;
+        }
+
+        private void AdjustCurrentHealthForMaximumChange(
+            int beforeMaximum,
+            int afterMaximum)
+        {
+            if (CurrentHealth <= 0) return;
+            int safeBefore = Math.Max(1, beforeMaximum);
+            CurrentHealth = Math.Max(
+                1,
+                Math.Min(
+                    Math.Max(1, afterMaximum),
+                    (int)Math.Round(
+                        CurrentHealth *
+                        (Math.Max(1, afterMaximum) / (float)safeBefore),
+                        MidpointRounding.AwayFromZero)));
         }
 
         private static string RescueValidityMessage(

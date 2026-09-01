@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using WasteCity.Building;
+using WasteCity.City;
+using WasteCity.Combat;
+using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Persistence.ThreeD;
 
@@ -14,20 +17,44 @@ namespace WasteCity.Graybox3D.Building
                 int current,
                 int maximum,
                 bool destroyed,
-                bool isWall)
+                bool isWall,
+                string buildingId,
+                float x,
+                float z)
             {
                 Current = current;
                 Maximum = maximum;
                 Destroyed = destroyed;
                 IsWall = isWall;
+                BuildingId = buildingId ?? string.Empty;
+                X = x;
+                Z = z;
+                Repair = new AutomatedRepairModel(
+                    SingleCityDefenseTechnologyRules
+                        .AutomatedRepairPeriodSeconds,
+                    SingleCityDefenseTechnologyRules
+                        .AutomatedRepairAmount);
+                ShieldPulse = new ShieldPulseModel(
+                    SingleCityDefenseTechnologyRules.ShieldPeriodSeconds);
+                CanRunLocally = true;
+                IsLogisticsConnected = true;
             }
 
             public int Current { get; set; }
             public int Maximum { get; set; }
             public bool Destroyed { get; set; }
             public bool IsWall { get; set; }
+            public string BuildingId { get; set; }
+            public float X { get; set; }
+            public float Z { get; set; }
+            public int Shield { get; set; }
             public float TissueRemainder { get; set; }
             public float CarapaceClock { get; set; }
+            public AutomatedRepairModel Repair { get; set; }
+            public ShieldPulseModel ShieldPulse { get; set; }
+            public bool CanRunLocally { get; set; }
+            public bool IsLogisticsConnected { get; set; }
+            public bool IsPlayerPaused { get; set; }
         }
 
         private readonly SortedDictionary<string, HealthState> states =
@@ -35,6 +62,125 @@ namespace WasteCity.Graybox3D.Building
         private readonly HashSet<string> synchronizedIds =
             new HashSet<string>(StringComparer.Ordinal);
         private readonly List<string> removedIds = new List<string>();
+        private float wallPhysicalDamageMultiplier = 1f;
+        private bool automatedRepair;
+        private bool mindShield;
+
+        public GrayboxBuildingTechnologySnapshot3D TechnologySnapshot
+        {
+            get
+            {
+                var snapshots = new GrayboxBuildingTechnologyStateSnapshot3D[
+                    states.Count];
+                var index = 0;
+                foreach (KeyValuePair<string, HealthState> item in states)
+                {
+                    HealthState state = item.Value;
+                    snapshots[index++] =
+                        new GrayboxBuildingTechnologyStateSnapshot3D(
+                            item.Key,
+                            state.BuildingId,
+                            state.Current,
+                            state.Maximum,
+                            state.Shield,
+                            state.Destroyed,
+                            state.TissueRemainder,
+                            state.CarapaceClock,
+                            state.Repair.Clock,
+                            state.ShieldPulse.Clock);
+                }
+                return new GrayboxBuildingTechnologySnapshot3D(snapshots);
+            }
+        }
+
+        public void ConfigureTechnologySupport(
+            float wallPhysicalDamageMultiplier,
+            bool automatedRepair,
+            bool mindShield)
+        {
+            this.wallPhysicalDamageMultiplier = Math.Max(
+                0f, Math.Min(1f, wallPhysicalDamageMultiplier));
+            this.automatedRepair = automatedRepair;
+            this.mindShield = mindShield;
+        }
+
+        public bool TryClearTechnologyFixturesForDevelopment()
+        {
+            bool changed = false;
+            foreach (KeyValuePair<string, HealthState> item in states)
+            {
+                HealthState state = item.Value;
+                changed |= state.Shield > 0 || state.TissueRemainder > 0f ||
+                    state.CarapaceClock > 0f ||
+                    automatedRepair && IsAutomatedRepairBay(state) ||
+                    mindShield && IsShieldGenerator(state);
+                state.Shield = 0;
+                state.TissueRemainder = 0f;
+                state.CarapaceClock = 0f;
+                state.Repair = new AutomatedRepairModel(
+                    SingleCityDefenseTechnologyRules
+                        .AutomatedRepairPeriodSeconds,
+                    SingleCityDefenseTechnologyRules
+                        .AutomatedRepairAmount);
+                state.ShieldPulse = new ShieldPulseModel(
+                    SingleCityDefenseTechnologyRules.ShieldPeriodSeconds);
+            }
+            return changed;
+        }
+
+        public bool TryRestoreTechnologyState(
+            IReadOnlyList<GrayboxBuildingTechnologyStateSnapshot3D> restored,
+            out string error)
+        {
+            if (restored == null)
+            {
+                error = "建筑科技状态不完整";
+                return false;
+            }
+            var byId = new Dictionary<string,
+                GrayboxBuildingTechnologyStateSnapshot3D>(StringComparer.Ordinal);
+            for (var index = 0; index < restored.Count; index++)
+            {
+                GrayboxBuildingTechnologyStateSnapshot3D item = restored[index];
+                if (item == null || !states.ContainsKey(item.StableInstanceId) ||
+                    !byId.TryAdd(item.StableInstanceId, item) ||
+                    item.Shield < 0 ||
+                    item.Shield > SingleCityDefenseTechnologyRules.MaximumShield ||
+                    item.TissueRemainder < 0f || item.TissueRemainder >= 1f ||
+                    item.CarapaceClock < 0f || item.CarapaceClock >= 5f ||
+                    item.RepairClock < 0f || item.RepairClock >=
+                        SingleCityDefenseTechnologyRules
+                            .AutomatedRepairPeriodSeconds ||
+                    item.ShieldPulseClock < 0f || item.ShieldPulseClock >=
+                        SingleCityDefenseTechnologyRules.ShieldPeriodSeconds)
+                {
+                    error = "建筑科技状态记录无效";
+                    return false;
+                }
+            }
+            foreach (KeyValuePair<string, HealthState> pair in states)
+            {
+                HealthState state = pair.Value;
+                if (!byId.TryGetValue(pair.Key, out var item))
+                {
+                    state.Shield = 0;
+                    state.TissueRemainder = 0f;
+                    state.CarapaceClock = 0f;
+                    continue;
+                }
+                state.Shield = item.Shield;
+                state.TissueRemainder = item.TissueRemainder;
+                state.CarapaceClock = item.CarapaceClock;
+                if (!state.Repair.TryRestoreClock(item.RepairClock) ||
+                    !state.ShieldPulse.TryRestoreClock(item.ShieldPulseClock))
+                {
+                    error = "建筑维修或护盾周期状态无效";
+                    return false;
+                }
+            }
+            error = string.Empty;
+            return true;
+        }
 
         public void Synchronize(
             IReadOnlyList<GrayboxBuildingInstance3D> instances)
@@ -98,15 +244,62 @@ namespace WasteCity.Graybox3D.Building
                             maximum,
                             maximum,
                             false,
-                            IsWall(instance)));
+                            IsWall(instance),
+                            instance.Placement.Definition.Id.Value,
+                            instance.Placement.X,
+                            instance.Placement.Y));
                     continue;
                 }
                 existing.IsWall = IsWall(instance);
+                existing.BuildingId =
+                    instance.Placement.Definition.Id.Value;
+                existing.X = instance.Placement.X;
+                existing.Z = instance.Placement.Y;
                 if (existing.Maximum == maximum) continue;
                 int missing = Math.Max(0, existing.Maximum - existing.Current);
                 existing.Maximum = maximum;
                 existing.Current = Math.Max(0, maximum - missing);
                 existing.Destroyed = existing.Current == 0;
+            }
+        }
+
+        public void SynchronizeTechnologyOperationalState(
+            IReadOnlyList<GrayboxBuildingInstance3D> instances,
+            CityMode cityMode,
+            int cityX,
+            int cityY,
+            int groundRadius,
+            Func<string, bool> isPlayerPaused)
+        {
+            foreach (KeyValuePair<string, HealthState> pair in states)
+            {
+                pair.Value.CanRunLocally = false;
+                pair.Value.IsLogisticsConnected = false;
+                pair.Value.IsPlayerPaused = false;
+            }
+            if (instances == null) return;
+            for (var index = 0; index < instances.Count; index++)
+            {
+                GrayboxBuildingInstance3D instance = instances[index];
+                if (instance == null || !states.TryGetValue(
+                        instance.StableInstanceId,
+                        out HealthState state))
+                {
+                    continue;
+                }
+                state.CanRunLocally =
+                    GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                        instance,
+                        cityMode);
+                state.IsLogisticsConnected = state.CanRunLocally &&
+                    GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
+                        instance,
+                        cityMode,
+                        cityX,
+                        cityY,
+                        groundRadius);
+                state.IsPlayerPaused =
+                    isPlayerPaused?.Invoke(instance.StableInstanceId) == true;
             }
         }
 
@@ -137,6 +330,21 @@ namespace WasteCity.Graybox3D.Building
             out int appliedDamage,
             out bool destroyedNow)
         {
+            return TryApplyDamage(
+                stableInstanceId,
+                damage,
+                DamageType.Physical,
+                out appliedDamage,
+                out destroyedNow);
+        }
+
+        public bool TryApplyDamage(
+            string stableInstanceId,
+            int damage,
+            DamageType damageType,
+            out int appliedDamage,
+            out bool destroyedNow)
+        {
             appliedDamage = 0;
             destroyedNow = false;
             if (damage <= 0 || string.IsNullOrWhiteSpace(stableInstanceId) ||
@@ -146,14 +354,114 @@ namespace WasteCity.Graybox3D.Building
             }
 
             if (state.Destroyed) return true;
-            appliedDamage = Math.Min(damage, state.Current);
-            state.Current -= appliedDamage;
+            HealthModel health = CreateHealthModel(state);
+            if (state.IsWall)
+            {
+                health.SetPhysicalDamagePercent((int)Math.Round(
+                    wallPhysicalDamageMultiplier * 100f,
+                    MidpointRounding.AwayFromZero));
+            }
+            appliedDamage = health.Apply(
+                damage,
+                damageType,
+                ArmorType.Light);
+            state.Current = health.Current;
+            state.Shield = health.Shield;
             if (state.Current == 0)
             {
                 state.Destroyed = true;
                 destroyedNow = true;
             }
             return true;
+        }
+
+        public int TryGrantShield(
+            string stableInstanceId,
+            int amount,
+            int maximumShield)
+        {
+            if (amount <= 0 || string.IsNullOrWhiteSpace(stableInstanceId) ||
+                !states.TryGetValue(stableInstanceId, out HealthState state) ||
+                state.Destroyed)
+            {
+                return 0;
+            }
+            HealthModel health = CreateHealthModel(state);
+            int granted = health.GrantShield(amount, maximumShield);
+            state.Shield = health.Shield;
+            return granted;
+        }
+
+        public int AdvanceTechnologySupport(
+            float deltaSeconds,
+            bool paused,
+            float coreX,
+            float coreZ,
+            out int coreShieldGrant)
+        {
+            coreShieldGrant = 0;
+            if (paused || deltaSeconds <= 0f) return 0;
+            var changed = 0;
+            foreach (KeyValuePair<string, HealthState> sourceItem in states)
+            {
+                HealthState source = sourceItem.Value;
+                if (!IsTechnologyOperational(source)) continue;
+                if (automatedRepair && IsAutomatedRepairBay(source) &&
+                    source.Repair.Tick(deltaSeconds))
+                {
+                    foreach (KeyValuePair<string, HealthState> targetItem in
+                             states)
+                    {
+                        HealthState target = targetItem.Value;
+                        if (target.Destroyed || !InRange(
+                                source,
+                                target.X,
+                                target.Z,
+                                SingleCityDefenseTechnologyRules
+                                    .SupportRadius))
+                        {
+                            continue;
+                        }
+                        HealthModel health = CreateHealthModel(target);
+                        int healed = source.Repair.Repair(health);
+                        target.Current = health.Current;
+                        changed += healed;
+                    }
+                }
+                if (!mindShield || !IsShieldGenerator(source) ||
+                    !source.ShieldPulse.Tick(deltaSeconds))
+                {
+                    continue;
+                }
+                foreach (KeyValuePair<string, HealthState> targetItem in
+                         states)
+                {
+                    HealthState target = targetItem.Value;
+                    if (target.Destroyed || !InRange(source, target.X,
+                            target.Z,
+                            SingleCityDefenseTechnologyRules.SupportRadius))
+                    {
+                        continue;
+                    }
+                    HealthModel health = CreateHealthModel(target);
+                    int granted = health.GrantShield(
+                        SingleCityDefenseTechnologyRules
+                            .ShieldRechargeAmount,
+                        SingleCityDefenseTechnologyRules.MaximumShield);
+                    target.Shield = health.Shield;
+                    changed += granted;
+                }
+                if (InRange(
+                        source,
+                        coreX,
+                        coreZ,
+                        SingleCityDefenseTechnologyRules.SupportRadius))
+                {
+                    coreShieldGrant += SingleCityDefenseTechnologyRules
+                        .ShieldRechargeAmount;
+                }
+            }
+            return changed;
         }
 
         public GrayboxElixirBuildingHealthSnapshot3D[]
@@ -345,7 +653,10 @@ namespace WasteCity.Graybox3D.Building
                         entry.currentHealth,
                         maximum,
                         entry.isDestroyed,
-                        IsWall(instance)));
+                        IsWall(instance),
+                        instance.Placement.Definition.Id.Value,
+                        instance.Placement.X,
+                        instance.Placement.Y));
             }
 
             states.Clear();
@@ -392,7 +703,7 @@ namespace WasteCity.Graybox3D.Building
             ResourceInventory inventory,
             CityResourceStorageModel cityStorage)
         {
-            if (state == null || state.Destroyed ||
+            if (!IsTechnologyOperational(state) ||
                 state.Current >= state.Maximum)
             {
                 return 0;
@@ -446,5 +757,98 @@ namespace WasteCity.Graybox3D.Building
             state.Current += accepted;
             return accepted;
         }
+
+        private static HealthModel CreateHealthModel(HealthState state)
+        {
+            var health = new HealthModel(state.Maximum);
+            health.Restore(state.Current, state.Shield);
+            return health;
+        }
+
+        private static bool IsAutomatedRepairBay(HealthState state)
+        {
+            return string.Equals(
+                state.BuildingId,
+                BuildingCatalog.AutomatedRepairBay.Id.Value,
+                StringComparison.Ordinal);
+        }
+
+        private static bool IsShieldGenerator(HealthState state)
+        {
+            return string.Equals(
+                state.BuildingId,
+                BuildingCatalog.ShieldGenerator.Id.Value,
+                StringComparison.Ordinal);
+        }
+
+        private static bool IsTechnologyOperational(HealthState state)
+        {
+            return state != null && !state.Destroyed &&
+                state.CanRunLocally && state.IsLogisticsConnected &&
+                !state.IsPlayerPaused;
+        }
+
+        private static bool InRange(
+            HealthState source,
+            float x,
+            float z,
+            float range)
+        {
+            float offsetX = source.X - x;
+            float offsetZ = source.Z - z;
+            return offsetX * offsetX + offsetZ * offsetZ <= range * range;
+        }
+    }
+
+    public sealed class GrayboxBuildingTechnologyStateSnapshot3D
+    {
+        internal GrayboxBuildingTechnologyStateSnapshot3D(
+            string stableInstanceId,
+            string buildingId,
+            int currentHealth,
+            int maximumHealth,
+            int shield,
+            bool destroyed,
+            float tissueRemainder = 0f,
+            float carapaceClock = 0f,
+            float repairClock = 0f,
+            float shieldPulseClock = 0f)
+        {
+            StableInstanceId = stableInstanceId ?? string.Empty;
+            BuildingId = buildingId ?? string.Empty;
+            CurrentHealth = Math.Max(0, currentHealth);
+            MaximumHealth = Math.Max(1, maximumHealth);
+            Shield = Math.Max(0, shield);
+            Destroyed = destroyed;
+            TissueRemainder = Math.Max(0f, tissueRemainder);
+            CarapaceClock = Math.Max(0f, carapaceClock);
+            RepairClock = Math.Max(0f, repairClock);
+            ShieldPulseClock = Math.Max(0f, shieldPulseClock);
+        }
+
+        public string StableInstanceId { get; }
+        public string BuildingId { get; }
+        public int CurrentHealth { get; }
+        public int MaximumHealth { get; }
+        public int Shield { get; }
+        public bool Destroyed { get; }
+        public float TissueRemainder { get; }
+        public float CarapaceClock { get; }
+        public float RepairClock { get; }
+        public float ShieldPulseClock { get; }
+    }
+
+    public sealed class GrayboxBuildingTechnologySnapshot3D
+    {
+        internal GrayboxBuildingTechnologySnapshot3D(
+            GrayboxBuildingTechnologyStateSnapshot3D[] buildings)
+        {
+            Buildings = Array.AsReadOnly(
+                buildings ??
+                Array.Empty<GrayboxBuildingTechnologyStateSnapshot3D>());
+        }
+
+        public IReadOnlyList<GrayboxBuildingTechnologyStateSnapshot3D>
+            Buildings { get; }
     }
 }

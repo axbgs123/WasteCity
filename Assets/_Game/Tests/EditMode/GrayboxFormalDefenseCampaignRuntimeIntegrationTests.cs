@@ -385,14 +385,15 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void FormalRuntimeSynchronizesFourCatalogTowersAndCitySupply()
+        public void FormalRuntimeSynchronizesFiveCatalogTowersAndCitySupply()
         {
+            const string acidTowerId = "building.instance.009106";
             RuntimeFixture fixture = CreateRuntimeFixture(
                 includeThreeTowers: true,
                 includeSmelter: true);
             fixture.Session.Inventory.Set(ResourceIds.Ammunition, 60);
             fixture.Session.Inventory.Set(ResourceIds.EnergyCrystal, 30);
-            fixture.Session.Inventory.Set(ResourceIds.BiologicalWeapon, 30);
+            fixture.Session.Inventory.Set(ResourceIds.BiologicalWeapon, 60);
 
             SynchronizeFormal(fixture, CityMode.Fortress, 10, 10);
             fixture.Runtime.Tick(
@@ -430,6 +431,11 @@ namespace WasteCity.Tests
                 HeavyMachineGunId,
                 BuildingCatalog.HeavyMachineGunTurret.Id.Value,
                 ResourceIds.Ammunition);
+            AssertTowerSupply(
+                fixture.Runtime,
+                acidTowerId,
+                BuildingCatalog.AcidTower.Id.Value,
+                ResourceIds.BiologicalWeapon);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.Ammunition), Is.Zero);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
@@ -449,6 +455,9 @@ namespace WasteCity.Tests
             int heavyBefore = CampaignTower(
                 fixture.Runtime,
                 HeavyMachineGunId).LocalConsumableAmount;
+            int acidBefore = CampaignTower(
+                fixture.Runtime,
+                acidTowerId).LocalConsumableAmount;
             fixture.Session.Inventory.Set(ResourceIds.Ammunition, 20);
             fixture.Session.Inventory.Set(ResourceIds.EnergyCrystal, 20);
             fixture.Session.Inventory.Set(ResourceIds.BiologicalWeapon, 20);
@@ -467,6 +476,8 @@ namespace WasteCity.Tests
                 .LocalConsumableAmount, Is.EqualTo(sporeBefore));
             Assert.That(CampaignTower(fixture.Runtime, HeavyMachineGunId)
                 .LocalConsumableAmount, Is.EqualTo(heavyBefore));
+            Assert.That(CampaignTower(fixture.Runtime, acidTowerId)
+                .LocalConsumableAmount, Is.EqualTo(acidBefore));
             Assert.That(CampaignTower(fixture.Runtime, MachineGunId)
                 .IsLogisticsConnected, Is.False);
             Assert.That(CampaignTower(fixture.Runtime, LaserId)
@@ -475,20 +486,28 @@ namespace WasteCity.Tests
                 .IsLogisticsConnected, Is.False);
             Assert.That(CampaignTower(fixture.Runtime, HeavyMachineGunId)
                 .IsLogisticsConnected, Is.False);
+            Assert.That(CampaignTower(fixture.Runtime, acidTowerId)
+                .IsLogisticsConnected, Is.False);
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.Ammunition), Is.EqualTo(20));
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.EnergyCrystal), Is.EqualTo(20));
             Assert.That(fixture.Session.CityStorage.GetNetworkAmount(
                 ResourceIds.BiologicalWeapon), Is.EqualTo(20));
-            Assert.That(fixture.Runtime.Snapshot.Towers.Select(value =>
-                    value.StableId),
+            string[] stableTowerIds = fixture.Runtime.Snapshot.Towers
+                .Select(value => value.StableId)
+                .ToArray();
+            Assert.That(stableTowerIds, Is.Unique,
+                "Formal tower synchronization must not duplicate a stable " +
+                "building instance ID.");
+            Assert.That(stableTowerIds,
                 Is.EqualTo(new[]
                 {
                     MachineGunId,
                     LaserId,
                     SporeId,
-                    HeavyMachineGunId
+                    HeavyMachineGunId,
+                    acidTowerId,
                 }));
         }
 

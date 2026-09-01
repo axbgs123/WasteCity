@@ -12,6 +12,8 @@ namespace WasteCity.Research
 
         private static readonly IReadOnlyDictionary<string,
             ResearchDefinition> levelTwoDefinitions = BuildLevelTwo();
+        private static readonly IReadOnlyDictionary<string,
+            ResearchDefinition> levelOneDefinitions = BuildLevelOne();
 
         public static bool IsGated(string researchId)
         {
@@ -35,10 +37,11 @@ namespace WasteCity.Research
             ResearchDefinition definition,
             int civilizationLevel)
         {
-            if (definition == null || !IsGated(definition.Id.Value) ||
-                civilizationLevel < RequiredCivilizationLevel)
+            if (definition == null || !IsGated(definition.Id.Value))
                 return definition;
-            return levelTwoDefinitions[definition.Id.Value];
+            return civilizationLevel >= RequiredCivilizationLevel
+                ? levelTwoDefinitions[definition.Id.Value]
+                : levelOneDefinitions[definition.Id.Value];
         }
 
         public static ResearchDefinition ResolveForPersistence(
@@ -61,10 +64,26 @@ namespace WasteCity.Research
             return result;
         }
 
+        private static IReadOnlyDictionary<string, ResearchDefinition>
+            BuildLevelOne()
+        {
+            var result = new Dictionary<string, ResearchDefinition>(
+                StringComparer.Ordinal);
+            Add(result, ResearchCatalog.Find(AlloyArmorId),
+                "需要文明 Lv.2：解锁机枪塔升级为重型机枪塔，建筑耐久提高 30%",
+                ResearchReleaseState.PreviewOnly);
+            Add(result, ResearchCatalog.Find(SwordRidingId),
+                "需要文明 Lv.2：解锁剑阵台升级为御剑台，飞剑射程提高 30%",
+                ResearchReleaseState.PreviewOnly);
+            return result;
+        }
+
         private static void Add(
             IDictionary<string, ResearchDefinition> destination,
             ResearchDefinition source,
-            string effectSummary)
+            string effectSummary,
+            ResearchReleaseState releaseState =
+                ResearchReleaseState.Researchable)
         {
             if (source == null)
                 throw new InvalidOperationException(
@@ -82,7 +101,7 @@ namespace WasteCity.Research
                     effectSummary,
                     source.CatalogOrder,
                     source.LayoutRow,
-                    ResearchReleaseState.Researchable,
+                    releaseState,
                     source.EffectReferences));
         }
     }

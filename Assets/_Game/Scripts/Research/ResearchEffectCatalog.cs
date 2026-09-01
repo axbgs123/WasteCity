@@ -139,12 +139,12 @@ namespace WasteCity.Research
                     "technology.production.energy-cell", .8f,
                     "能量电池生产效率", 100f, 125f, "全部发电站"),
                 Unlock("core.research.thermal-engineering", "发电站与能量电池配方"),
-                Preview("core.research.ballistics",
-                    ResearchEffectKind.TowerRange, 1.2f, "all.tower",
-                    "炮塔射程", 100f, 120f, "%", "弹药炮塔"),
-                Preview("core.research.ballistics",
+                Scalar("core.research.ballistics",
+                    ResearchEffectKind.TowerRange, 1.2f, "ammo",
+                    "炮塔射程", 100f, 120f, "%", "弹药炮塔", "不叠加"),
+                Scalar("core.research.ballistics",
                     ResearchEffectKind.TowerDamage, 1.15f, "ammo",
-                    "弹药伤害", 100f, 115f, "%", "弹药武器"),
+                    "弹药伤害", 100f, 115f, "%", "弹药武器", "不叠加"),
 
                 Cycle("core.research.artifact-crafting",
                     "cultivation.production.flying-sword", .85f,
@@ -159,18 +159,18 @@ namespace WasteCity.Research
                     "cultivation.production.gather-spirit-stone", .8f,
                     "聚灵生产效率", 100f, 125f, "全部聚灵阵"),
                 Unlock("core.research.spirit-gathering", "聚灵阵与灵石配方"),
-                Preview("core.research.talisman-basics",
+                Scalar("core.research.talisman-basics",
                     ResearchEffectKind.PhysicalDamageTaken, .8f,
                     "core.building.wall", "城墙物理承伤",
-                    100f, 80f, "%", "全部城墙"),
+                    100f, 80f, "%", "全部城墙", "不叠加"),
 
                 Cycle("core.research.bio-cultivation",
                     "biological.production.weapon", .85f,
                     "生物武器培育效率", 100f, 118f, "全部培育室"),
                 Unlock("core.research.bio-cultivation", "培育室与生物武器配方"),
-                Preview("core.research.spore-dispersal",
+                Scalar("core.research.spore-dispersal",
                     ResearchEffectKind.TowerDamage, 1.15f, "biological",
-                    "孢子伤害", 100f, 115f, "%", "孢子塔"),
+                    "孢子伤害", 100f, 115f, "%", "孢子塔", "不叠加"),
                 Unlock("core.research.metabolic-acceleration", "代谢炉"),
                 Scalar("core.research.metabolic-acceleration",
                     ResearchEffectKind.BiomassRecovery, 1.5f, "enemy.corpse",
@@ -184,9 +184,9 @@ namespace WasteCity.Research
                     "psionics.production.amplifier", .85f,
                     "灵能增幅器效率", 100f, 118f, "全部灵能工坊"),
                 Unlock("core.research.psionic-workshop", "灵能工坊与增幅器配方"),
-                Preview("core.research.mind-spire",
+                Scalar("core.research.mind-spire",
                     ResearchEffectKind.RuleToggle, 1f, "psionic.damage",
-                    "灵能穿透", 0f, 1f, "规则", "心灵尖塔"),
+                    "灵能穿透", 0f, 1f, "规则", "心灵尖塔", "不叠加"),
                 ActiveInformation("core.research.consciousness-network",
                     ResearchEffectKind.CommunicationCost, 0f, "same.planet",
                     "远程通信成本", 100f, 0f, "%", "同星球城市",
@@ -204,16 +204,17 @@ namespace WasteCity.Research
                     ResearchEffectKind.BuildingHealth, 1.3f, "all.building",
                     "建筑最大耐久", 100f, 130f, "%", "全部建筑",
                     "不叠加"),
-                Preview("core.research.unmanned-systems",
+                Scalar("core.research.unmanned-systems",
                     ResearchEffectKind.ProductionCycle, .85f,
                     "technology.production.automated-repair",
-                    "自动维修效率", 100f, 118f, "%", "自动维修设施"),
+                    "自动维修效率", 100f, 118f, "%", "自动维修设施",
+                    "不叠加"),
                 Override("core.research.orbital-supply",
                     ResearchEffectKind.LogisticsRange, 24f, "city.logistics",
                     "物流范围", 8f, 24f, "格", "展开城市", "覆盖低级范围"),
-                Preview("core.research.energy-weapons",
+                Scalar("core.research.energy-weapons",
                     ResearchEffectKind.RuleToggle, 1f, "energy.overload",
-                    "能量过载", 0f, 1f, "规则", "能量武器"),
+                    "能量过载", 0f, 1f, "规则", "能量武器", "不叠加"),
 
                 Scalar("core.research.sword-riding",
                     ResearchEffectKind.TowerRange, 1.3f,
@@ -229,37 +230,43 @@ namespace WasteCity.Research
                 Cycle(Formation,
                     "cultivation.production.gather-spirit-stone",
                     1f / 1.5f, "聚灵生产效率", 100f, 150f, "全部聚灵阵"),
-                Preview("core.research.puppetry",
+                Scalar("core.research.puppetry",
                     ResearchEffectKind.UnitCapacity, 4f,
                     "cultivation.building.puppet-workshop", "工坊单位容量",
-                    3f, 4f, "个", "单座傀儡工坊"),
+                    3f, 4f, "个", "单座傀儡工坊", "覆盖基础容量"),
 
-                Preview("core.research.behemoth-breeding",
-                    ResearchEffectKind.UnitHealth, 1.1f, "unit.bred-behemoth",
-                    "培育巨兽最大生命", 100f, 110f, "%", "培育巨兽"),
-                Preview("core.research.acid-spit",
+                Scalar("core.research.behemoth-breeding",
+                    ResearchEffectKind.UnitHealth, 1.1f,
+                    "biological.unit.bred-behemoth",
+                    "培育巨兽最大生命", 100f, 110f, "%", "培育巨兽",
+                    "不叠加"),
+                Scalar("core.research.acid-spit",
                     ResearchEffectKind.TowerDamage, 1.3f, "armor.heavy",
-                    "对重甲伤害", 100f, 130f, "%", "酸液塔"),
+                    "对重甲伤害", 100f, 130f, "%", "酸液塔", "不叠加"),
                 Scalar("core.research.tissue-regeneration",
                     ResearchEffectKind.Regeneration, 1f, "all.building",
-                    "建筑再生", 0f, 1f, "点/秒", "全部建筑", "不叠加"),
-                Preview("core.research.gene-splicing",
+                    "建筑与军队再生", 0f, 1f, "点/秒",
+                    "全部建筑与活动军队", "不叠加"),
+                Scalar("core.research.gene-splicing",
                     ResearchEffectKind.UnitHealth, 1.2f, "leader.temporary",
-                    "领袖临时最大生命", 100f, 120f, "%", "当前领袖"),
+                    "领袖临时最大生命", 100f, 120f, "%", "当前领袖",
+                    "首次正式完成时应用一次，不重复"),
 
-                Preview("core.research.mind-shield",
+                Scalar("core.research.mind-shield",
                     ResearchEffectKind.Regeneration, 20f, "city.shield",
-                    "城市护盾补充", 0f, 20f, "点/8秒", "城市护盾"),
-                Preview("core.research.mind-control",
+                    "城市护盾补充", 0f, 20f, "点/8秒", "城市护盾",
+                    "单目标上限100"),
+                Scalar("core.research.mind-control",
                     ResearchEffectKind.RuleToggle, .1f, "enemy.normal",
-                    "普通目标控制概率", 0f, 10f, "%", "普通非重型敌人"),
+                    "普通目标控制概率", 0f, 10f, "%", "普通非重型敌人",
+                    "每次命中独立确定性判定"),
                 Scalar("core.research.precognitive-sense",
                     ResearchEffectKind.WarningDuration, 1.5f, "wave.warning",
                     "预警时间", 100f, 150f, "%", "全部波次", "不叠加"),
-                Preview("core.research.collective-consciousness",
+                Scalar("core.research.collective-consciousness",
                     ResearchEffectKind.ResearchSpeed, .2f,
                     "multi-city.inherited-progress", "新研究继承进度",
-                    0f, 20f, "%", "同文明城市"),
+                    0f, 20f, "%", "同文明城市", "开始研究时应用一次"),
 
                 Cycle("core.research.bridge.psionic-mech",
                     "fusion.production.psionic-mech-components", .85f,
@@ -537,6 +544,100 @@ namespace WasteCity.Research
                 ResearchEffectKind.TowerAttackInterval,
                 invertRuntimeValue: true);
             return Math.Max(damage, interval);
+        }
+
+        public float ResolvePhysicalDamageTakenMultiplier(string buildingId)
+        {
+            if (string.IsNullOrWhiteSpace(buildingId)) return 1f;
+            return ResolveExactMultiplier(
+                ResearchEffectKind.PhysicalDamageTaken,
+                buildingId,
+                1f,
+                preferLowerValue: true);
+        }
+
+        public int ResolveUnitCapacity(string targetId, int baseCapacity)
+        {
+            int resolved = Math.Max(0, baseCapacity);
+            float value = ResolveExactMultiplier(
+                ResearchEffectKind.UnitCapacity,
+                targetId,
+                resolved,
+                preferLowerValue: false);
+            return Math.Max(resolved, (int)Math.Round(value));
+        }
+
+        public float ResolveUnitHealthMultiplier(string unitId)
+        {
+            return ResolveExactMultiplier(
+                ResearchEffectKind.UnitHealth,
+                unitId,
+                1f,
+                preferLowerValue: false);
+        }
+
+        public float ResolveHeavyArmorDamageMultiplier(string towerBuildingId)
+        {
+            if (!string.Equals(
+                    towerBuildingId,
+                    BuildingCatalog.AcidTower.Id.Value,
+                    StringComparison.Ordinal))
+            {
+                return 1f;
+            }
+            return ResolveExactMultiplier(
+                ResearchEffectKind.TowerDamage,
+                "armor.heavy",
+                1f,
+                preferLowerValue: false);
+        }
+
+        public float CollectiveConsciousnessInitialProgressFraction =>
+            Math.Max(
+                0f,
+                Math.Min(
+                    1f,
+                    ResolveExactMultiplier(
+                        ResearchEffectKind.ResearchSpeed,
+                        "multi-city.inherited-progress",
+                        0f,
+                        preferLowerValue: false)));
+
+        public bool HasActiveRule(string targetId)
+        {
+            return !string.IsNullOrWhiteSpace(targetId) &&
+                appliedEffects.Any(effect =>
+                    effect.Kind == ResearchEffectKind.RuleToggle &&
+                    string.Equals(
+                        effect.TargetId,
+                        targetId,
+                        StringComparison.Ordinal));
+        }
+
+        private float ResolveExactMultiplier(
+            ResearchEffectKind kind,
+            string targetId,
+            float fallback,
+            bool preferLowerValue)
+        {
+            if (string.IsNullOrWhiteSpace(targetId)) return fallback;
+            float resolved = fallback;
+            for (var index = 0; index < appliedEffects.Count; index++)
+            {
+                ResearchEffectDefinition effect = appliedEffects[index];
+                if (effect.Kind != kind ||
+                    !string.Equals(
+                        effect.TargetId,
+                        targetId,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                resolved = preferLowerValue
+                    ? Math.Min(resolved, effect.RuntimeValue)
+                    : Math.Max(resolved, effect.RuntimeValue);
+            }
+            return resolved;
         }
 
         private float ResolveTowerMultiplier(

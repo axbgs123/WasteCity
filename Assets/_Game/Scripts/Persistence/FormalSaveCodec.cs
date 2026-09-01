@@ -52,7 +52,7 @@ namespace WasteCity.Persistence
             public FormalThreeDResearchSaveData research;
             public FormalThreeDProductionSaveData production;
             public FormalThreeDDefenseSaveData defense;
-            public FormalThreeDDefenseCampaignSaveData defenseCampaign;
+            public LegacyDefenseCampaignSaveData defenseCampaign;
             public FormalThreeDEvacuationSaveData evacuation;
             public FormalThreeDPauseSaveData pause;
         }
@@ -70,10 +70,101 @@ namespace WasteCity.Persistence
             public FormalThreeDResearchSaveData research;
             public FormalThreeDProductionSaveData production;
             public FormalThreeDDefenseSaveData defense;
-            public FormalThreeDDefenseCampaignSaveData defenseCampaign;
+            public LegacyDefenseCampaignSaveData defenseCampaign;
             public FormalThreeDEvacuationSaveData evacuation;
             public FormalThreeDPauseSaveData pause;
             public FormalThreeDProgressionSaveData progression;
+        }
+
+        [Serializable]
+        private sealed class SchemaThirtyFourPayload
+        {
+            public string sessionId;
+            public FormalThreeDWorldSaveData world;
+            public FormalThreeDCitySaveData city;
+            public FormalThreeDBuildingsSaveData buildings;
+            public FormalThreeDStorageSaveData storage;
+            public FormalThreeDBackpackSaveData backpack;
+            public FormalThreeDCraftingSaveData crafting;
+            public FormalThreeDResearchSaveData research;
+            public FormalThreeDProductionSaveData production;
+            public FormalThreeDDefenseSaveData defense;
+            public LegacyDefenseCampaignSaveData defenseCampaign;
+            public FormalThreeDEvacuationSaveData evacuation;
+            public FormalThreeDPauseSaveData pause;
+            public FormalThreeDProgressionSaveData progression;
+            public FormalThreeDCivilizationExpansionSaveData
+                civilizationExpansion;
+        }
+
+        [Serializable]
+        private sealed class LegacyDefenseCampaignSaveData
+        {
+            public string campaignId;
+            public int phase;
+            public int currentWaveNumber;
+            public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+                plannedEnemyCountsByEnemyId;
+            public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+                spawnedEnemyCountsByEnemyId;
+            public FormalThreeDDefenseCampaignEnemyCountSaveData[]
+                defeatedEnemyCountsByEnemyId;
+            public FormalThreeDDefenseCampaignSpawnAnchorSaveData[]
+                frozenSpawnAnchors;
+            public float warningRemainingSeconds;
+            public float spawnClockSeconds;
+            public float fixedStepAccumulatorSeconds;
+            public int nextEnemyOrdinal;
+            public int coreCurrentHealth;
+            public float requestedSpeed;
+            public float lastNonZeroSpeed;
+            public int result;
+            public LegacyDefenseCampaignStatisticsSaveData statistics;
+            public FormalThreeDDefenseCampaignTowerCombatStateSaveData[]
+                towerCombatStates;
+            public LegacyDefenseCampaignEnemyStateSaveData[] enemyStates;
+            public FormalThreeDDefenseCampaignBuildingHealthStateSaveData[]
+                buildingHealthStates;
+        }
+
+        [Serializable]
+        private sealed class LegacyDefenseCampaignStatisticsSaveData
+        {
+            public float elapsedRuleSeconds;
+            public int spawnedEnemyCount;
+            public int defeatedEnemyCount;
+            public int completedWaveCount;
+            public FormalThreeDDefenseCampaignMetricSaveData[] killsByEnemyId;
+            public int highestAliveEnemyCount;
+            public int coreDamageTaken;
+            public FormalThreeDDefenseCampaignMetricSaveData[]
+                buildingLossesByBuildingId;
+            public FormalThreeDDefenseCampaignMetricSaveData[]
+                damageByTowerBuildingId;
+            public FormalThreeDDefenseCampaignMetricSaveData[]
+                killsByTowerBuildingId;
+            public FormalThreeDDefenseCampaignMetricSaveData[]
+                consumablesSpentByResourceId;
+            public int completedProductionBatchCount;
+            public float productionActiveProgressSeconds;
+            public float productionEligibleSeconds;
+            public bool cityWasPackedAfterCampaignStart;
+            public bool developmentModifierUsed;
+            public bool partialFromMigration;
+        }
+
+        [Serializable]
+        private sealed class LegacyDefenseCampaignEnemyStateSaveData
+        {
+            public string stableEnemyId;
+            public string archetypeId;
+            public int spawnOrder;
+            public float positionX;
+            public float positionZ;
+            public int currentHealth;
+            public float movementRemainder;
+            public float attackDamageRemainder;
+            public string targetStableId;
         }
 
         public static string Encode(FormalSaveData data)
@@ -129,7 +220,9 @@ namespace WasteCity.Persistence
                 return ComputeSchemaThirtyTwoPayloadHash(payload);
             if (payload.civilizationExpansion == null)
                 return ComputeSchemaThirtyThreePayloadHash(payload);
-            return ComputeSchemaThirtyFourPayloadHash(payload);
+            if (payload.researchEffectState == null)
+                return ComputeSchemaThirtyFourPayloadHash(payload);
+            return ComputeSchemaThirtyFivePayloadHash(payload);
         }
 
         private static string ComputeSha256(string value)
@@ -215,6 +308,7 @@ namespace WasteCity.Persistence
                 (probe.saveSchemaVersion == 31 ||
                  probe.saveSchemaVersion == 32 ||
                  probe.saveSchemaVersion == 33 ||
+                 probe.saveSchemaVersion == 34 ||
                  probe.saveSchemaVersion ==
                     FormalSaveEnvelope.CurrentSchemaVersion))
             {
@@ -268,6 +362,7 @@ namespace WasteCity.Persistence
                     envelope = MigrateSchemaThirtyOneToThirtyTwo(envelope);
                     envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
+                    envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                 }
                 else if (probe.saveSchemaVersion == 32)
                 {
@@ -284,6 +379,7 @@ namespace WasteCity.Persistence
                     }
                     envelope = MigrateSchemaThirtyTwoToThirtyThree(envelope);
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
+                    envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                 }
                 else if (probe.saveSchemaVersion == 33)
                 {
@@ -299,6 +395,22 @@ namespace WasteCity.Persistence
                             "旧版存档校验失败");
                     }
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
+                    envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
+                }
+                else if (probe.saveSchemaVersion == 34)
+                {
+                    string legacyHash = ComputeSchemaThirtyFourPayloadHash(
+                        envelope.formal3D);
+                    if (!string.Equals(
+                            legacyHash,
+                            envelope.payloadHashSha256,
+                            StringComparison.Ordinal))
+                    {
+                        return FormalSaveDecodeResult.Failed(
+                            FormalSaveDecodeError.MalformedJson,
+                            "旧版存档校验失败");
+                    }
+                    envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                 }
                 return FormalSaveDecodeResult.ThreeD(envelope, json);
             }
@@ -390,7 +502,7 @@ namespace WasteCity.Persistence
                 research = canonical.research,
                 production = canonical.production,
                 defense = canonical.defense,
-                defenseCampaign = canonical.defenseCampaign,
+                defenseCampaign = LegacyCampaign(canonical.defenseCampaign),
                 evacuation = canonical.evacuation,
                 pause = canonical.pause,
             };
@@ -414,7 +526,7 @@ namespace WasteCity.Persistence
                 research = canonical.research,
                 production = canonical.production,
                 defense = canonical.defense,
-                defenseCampaign = canonical.defenseCampaign,
+                defenseCampaign = LegacyCampaign(canonical.defenseCampaign),
                 evacuation = canonical.evacuation,
                 pause = canonical.pause,
                 progression = canonical.progression,
@@ -423,6 +535,32 @@ namespace WasteCity.Persistence
         }
 
         private static string ComputeSchemaThirtyFourPayloadHash(
+            FormalThreeDSaveData source)
+        {
+            FormalThreeDSaveData canonical =
+                CopyPayloadWithCanonicalCampaign(source);
+            var legacy = new SchemaThirtyFourPayload
+            {
+                sessionId = canonical.sessionId,
+                world = canonical.world,
+                city = canonical.city,
+                buildings = canonical.buildings,
+                storage = canonical.storage,
+                backpack = canonical.backpack,
+                crafting = canonical.crafting,
+                research = canonical.research,
+                production = canonical.production,
+                defense = canonical.defense,
+                defenseCampaign = LegacyCampaign(canonical.defenseCampaign),
+                evacuation = canonical.evacuation,
+                pause = canonical.pause,
+                progression = canonical.progression,
+                civilizationExpansion = canonical.civilizationExpansion,
+            };
+            return ComputeSha256(JsonUtility.ToJson(legacy, false));
+        }
+
+        private static string ComputeSchemaThirtyFivePayloadHash(
             FormalThreeDSaveData source)
         {
             return ComputeSha256(JsonUtility.ToJson(
@@ -459,6 +597,8 @@ namespace WasteCity.Persistence
                 backpack = source.backpack,
                 crafting = source.crafting,
                 research = source.research,
+                researchEffectState = CopyResearchEffectState(
+                    source.researchEffectState),
                 production = source.production,
                 defense = source.defense,
                 defenseCampaign = CopyCampaign(source.defenseCampaign),
@@ -466,6 +606,103 @@ namespace WasteCity.Persistence
                 pause = source.pause,
                 progression = CopyProgression(source.progression),
                 civilizationExpansion = source.civilizationExpansion,
+            };
+        }
+
+        private static FormalThreeDResearchEffectStateSaveData
+            CopyResearchEffectState(
+                FormalThreeDResearchEffectStateSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDResearchEffectStateEntrySaveData[] sourceStates =
+                source.states ?? Array.Empty<
+                    FormalThreeDResearchEffectStateEntrySaveData>();
+            var states = new FormalThreeDResearchEffectStateEntrySaveData[
+                sourceStates.Length];
+            for (int index = 0; index < sourceStates.Length; index++)
+            {
+                FormalThreeDResearchEffectStateEntrySaveData entry =
+                    sourceStates[index];
+                if (entry == null) continue;
+                states[index] =
+                    new FormalThreeDResearchEffectStateEntrySaveData
+                    {
+                        stableStateId = entry.stableStateId,
+                        creationOrdinal = entry.creationOrdinal,
+                        effectId = entry.effectId,
+                        targetKind = entry.targetKind,
+                        targetStableId = entry.targetStableId,
+                        phase = entry.phase,
+                        remainingRuleSeconds = entry.remainingRuleSeconds,
+                        stacks = entry.stacks,
+                        periodAccumulatorSeconds =
+                            entry.periodAccumulatorSeconds,
+                        currentValue = entry.currentValue,
+                    };
+            }
+            Array.Sort(
+                states,
+                (left, right) =>
+                {
+                    if (ReferenceEquals(left, right)) return 0;
+                    if (left == null) return -1;
+                    if (right == null) return 1;
+                    int ordinal = left.creationOrdinal.CompareTo(
+                        right.creationOrdinal);
+                    return ordinal != 0
+                        ? ordinal
+                        : string.CompareOrdinal(
+                            left.stableStateId,
+                            right.stableStateId);
+                });
+            FormalThreeDResearchEffectEmitterSaveData[] sourceEmitters =
+                source.emitters ?? Array.Empty<
+                    FormalThreeDResearchEffectEmitterSaveData>();
+            var emitters = new FormalThreeDResearchEffectEmitterSaveData[
+                sourceEmitters.Length];
+            for (int index = 0; index < sourceEmitters.Length; index++)
+            {
+                FormalThreeDResearchEffectEmitterSaveData entry =
+                    sourceEmitters[index];
+                if (entry == null) continue;
+                emitters[index] =
+                    new FormalThreeDResearchEffectEmitterSaveData
+                    {
+                        stableStateId = entry.stableStateId,
+                        creationOrdinal = entry.creationOrdinal,
+                        effectId = entry.effectId,
+                        sourceTowerStableId = entry.sourceTowerStableId,
+                        targetEnemyStableId = entry.targetEnemyStableId,
+                        cooldownRemaining = entry.cooldownRemaining,
+                    };
+            }
+            Array.Sort(
+                emitters,
+                (left, right) =>
+                {
+                    if (ReferenceEquals(left, right)) return 0;
+                    if (left == null) return -1;
+                    if (right == null) return 1;
+                    int ordinal = left.creationOrdinal.CompareTo(
+                        right.creationOrdinal);
+                    return ordinal != 0
+                        ? ordinal
+                        : string.CompareOrdinal(
+                            left.stableStateId,
+                            right.stableStateId);
+                });
+            return new FormalThreeDResearchEffectStateSaveData
+            {
+                configurationSignature = source.configurationSignature,
+                revision = source.revision,
+                nextStableStateOrdinal = source.nextStableStateOrdinal,
+                states = states,
+                emitters = emitters,
+                rewardLedger = new FormalThreeDResearchRewardLedgerSaveData
+                {
+                    committedRewardKeys = SortedCopy(
+                        source.rewardLedger?.committedRewardKeys),
+                },
             };
         }
 
@@ -814,6 +1051,93 @@ namespace WasteCity.Persistence
             };
         }
 
+        private static LegacyDefenseCampaignSaveData LegacyCampaign(
+            FormalThreeDDefenseCampaignSaveData source)
+        {
+            if (source == null) return null;
+            FormalThreeDDefenseCampaignSaveData canonical =
+                CopyCampaign(source);
+            var enemies = new LegacyDefenseCampaignEnemyStateSaveData[
+                canonical.enemyStates.Length];
+            for (var index = 0; index < enemies.Length; index++)
+            {
+                FormalThreeDDefenseCampaignEnemyStateSaveData item =
+                    canonical.enemyStates[index];
+                enemies[index] = item == null
+                    ? null
+                    : new LegacyDefenseCampaignEnemyStateSaveData
+                    {
+                        stableEnemyId = item.stableEnemyId,
+                        archetypeId = item.archetypeId,
+                        spawnOrder = item.spawnOrder,
+                        positionX = item.positionX,
+                        positionZ = item.positionZ,
+                        currentHealth = item.currentHealth,
+                        movementRemainder = item.movementRemainder,
+                        attackDamageRemainder = item.attackDamageRemainder,
+                        targetStableId = item.targetStableId,
+                    };
+            }
+            FormalThreeDDefenseCampaignStatisticsSaveData stats =
+                canonical.statistics;
+            return new LegacyDefenseCampaignSaveData
+            {
+                campaignId = canonical.campaignId,
+                phase = canonical.phase,
+                currentWaveNumber = canonical.currentWaveNumber,
+                plannedEnemyCountsByEnemyId =
+                    canonical.plannedEnemyCountsByEnemyId,
+                spawnedEnemyCountsByEnemyId =
+                    canonical.spawnedEnemyCountsByEnemyId,
+                defeatedEnemyCountsByEnemyId =
+                    canonical.defeatedEnemyCountsByEnemyId,
+                frozenSpawnAnchors = canonical.frozenSpawnAnchors,
+                warningRemainingSeconds = canonical.warningRemainingSeconds,
+                spawnClockSeconds = canonical.spawnClockSeconds,
+                fixedStepAccumulatorSeconds =
+                    canonical.fixedStepAccumulatorSeconds,
+                nextEnemyOrdinal = canonical.nextEnemyOrdinal,
+                coreCurrentHealth = canonical.coreCurrentHealth,
+                requestedSpeed = canonical.requestedSpeed,
+                lastNonZeroSpeed = canonical.lastNonZeroSpeed,
+                result = canonical.result,
+                statistics = stats == null
+                    ? null
+                    : new LegacyDefenseCampaignStatisticsSaveData
+                    {
+                        elapsedRuleSeconds = stats.elapsedRuleSeconds,
+                        spawnedEnemyCount = stats.spawnedEnemyCount,
+                        defeatedEnemyCount = stats.defeatedEnemyCount,
+                        completedWaveCount = stats.completedWaveCount,
+                        killsByEnemyId = stats.killsByEnemyId,
+                        highestAliveEnemyCount = stats.highestAliveEnemyCount,
+                        coreDamageTaken = stats.coreDamageTaken,
+                        buildingLossesByBuildingId =
+                            stats.buildingLossesByBuildingId,
+                        damageByTowerBuildingId =
+                            stats.damageByTowerBuildingId,
+                        killsByTowerBuildingId =
+                            stats.killsByTowerBuildingId,
+                        consumablesSpentByResourceId =
+                            stats.consumablesSpentByResourceId,
+                        completedProductionBatchCount =
+                            stats.completedProductionBatchCount,
+                        productionActiveProgressSeconds =
+                            stats.productionActiveProgressSeconds,
+                        productionEligibleSeconds =
+                            stats.productionEligibleSeconds,
+                        cityWasPackedAfterCampaignStart =
+                            stats.cityWasPackedAfterCampaignStart,
+                        developmentModifierUsed =
+                            stats.developmentModifierUsed,
+                        partialFromMigration = stats.partialFromMigration,
+                    },
+                towerCombatStates = canonical.towerCombatStates,
+                enemyStates = enemies,
+                buildingHealthStates = canonical.buildingHealthStates,
+            };
+        }
+
         private static FormalThreeDDefenseCampaignStatisticsSaveData
             CopyStatistics(
                 FormalThreeDDefenseCampaignStatisticsSaveData source)
@@ -846,6 +1170,7 @@ namespace WasteCity.Persistence
                     source.cityWasPackedAfterCampaignStart,
                 developmentModifierUsed = source.developmentModifierUsed,
                 partialFromMigration = source.partialFromMigration,
+                controlledUnitLossCount = source.controlledUnitLossCount,
             };
         }
 
@@ -1023,6 +1348,17 @@ namespace WasteCity.Persistence
             envelope.saveSchemaVersion = 34;
             envelope.payloadHashSha256 =
                 ComputeSchemaThirtyFourPayloadHash(envelope.formal3D);
+            return envelope;
+        }
+
+        private static FormalSaveEnvelope MigrateSchemaThirtyFourToThirtyFive(
+            FormalSaveEnvelope envelope)
+        {
+            envelope.formal3D.researchEffectState =
+                new FormalThreeDResearchEffectStateSaveData();
+            envelope.saveSchemaVersion = 35;
+            envelope.payloadHashSha256 =
+                ComputeSchemaThirtyFivePayloadHash(envelope.formal3D);
             return envelope;
         }
 
@@ -1452,6 +1788,7 @@ namespace WasteCity.Persistence
                         attackDamageRemainder =
                             value.attackDamageRemainder,
                         targetStableId = value.targetStableId,
+                        isControlled = value.isControlled,
                     };
             }
             Array.Sort(result, CompareEnemyState);

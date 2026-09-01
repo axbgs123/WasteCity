@@ -105,6 +105,7 @@ namespace WasteCity.Graybox3D.Building
             developerProgressionFacade;
 #endif
         private GrayboxFormalProgressionSaveAdapter3D progressionAdapter;
+        private GrayboxResearchEffectStateSaveAdapter3D effectStateAdapter;
         private GrayboxAttentionPressureSaveAdapter3D pressureSaveAdapter;
         private GrayboxProgressionEventRouter3D progressionEventRouter;
         private GrayboxPocketUniverseFateController3D pocketUniverseController;
@@ -401,6 +402,18 @@ namespace WasteCity.Graybox3D.Building
                     ? null
                     : new GrayboxCivilizationExpansionSaveAdapter3D(
                         expansionController);
+            effectStateAdapter?.Dispose();
+            effectStateAdapter = new GrayboxResearchEffectStateSaveAdapter3D(
+                operations.Research.Model,
+                defense.Runtime,
+                () => expansionController?.Runtime);
+            expansionAdapter?.ConfigureResearchEffectStateAdapter(
+                effectStateAdapter);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            developerModifier?.ConfigureTechnologyStateFacade(
+                new GrayboxDeveloperTechnologyStateFacade3D(
+                    defense, expansionController));
+#endif
             var rebuilder = new GrayboxFormalControllerRebuilder3D(
                 production,
                 defense,
@@ -421,7 +434,8 @@ namespace WasteCity.Graybox3D.Building
                 production,
                 defense,
                 evacuation,
-                expansionAdapter);
+                expansionAdapter,
+                effectStateAdapter);
             checkpointPolicy = new FormalSaveCheckpointPolicy(
                 TryWriteCheckpoint,
                 () => session.CheckpointRuleTimeSeconds);
@@ -937,6 +951,8 @@ namespace WasteCity.Graybox3D.Building
         private void OnDestroy()
         {
             coordinator?.UnbindCheckpointPolicy();
+            effectStateAdapter?.Dispose();
+            effectStateAdapter = null;
             checkpointPolicy = null;
             coordinator = null;
             production?.ConfigureCivilizationEfficiencySource(null);
