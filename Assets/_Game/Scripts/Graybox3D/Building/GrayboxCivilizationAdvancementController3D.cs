@@ -127,6 +127,11 @@ namespace WasteCity.Graybox3D.Building
             }
             if (fateId == FormalFateCatalog.RewindAnchorId)
                 return rewind.TrySetFateLevel(2, out error);
+            if (FormalFateCatalog.Find(fateId) != null)
+            {
+                error = string.Empty;
+                return true;
+            }
             error = "正式命轨身份无效";
             return false;
         }

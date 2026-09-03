@@ -253,6 +253,58 @@ namespace WasteCity.Tests
                     GrayboxRewindAnchorService3D.SecondStableAnchorId));
         }
 
+        [UnityTest]
+        public IEnumerator IDEA0028_RealGenericActionStartsOnlyLocalHasteDomain()
+        {
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+
+            yield return SelectFate(FormalFateCatalog.LocalHasteId);
+            yield return OpenFateOperations();
+            GameObject action = RequireSceneObject(
+                "FateOperations.GenericAction");
+            Assert.That(action.activeInHierarchy, Is.True);
+            Assert.That(action.GetComponent<Button>(), Is.Not.Null);
+
+            float timeScaleBefore = Time.timeScale;
+            yield return Click(action);
+
+            Assert.That(host.LocalHasteRuntime.Capture().Active, Is.False,
+                "首次真实点击只能打开二次确认，不能直接执行命轨动作。");
+            GameObject confirmation = RequireSceneObject(
+                "FateOperations.Confirmation");
+            Assert.That(confirmation.activeInHierarchy, Is.True);
+            yield return Click(RequireSceneObject("FateOperations.Confirm"));
+
+            LocalHasteSnapshot state = host.LocalHasteRuntime.Capture();
+            Assert.That(state.Active, Is.True);
+            Assert.That(state.TargetId, Is.EqualTo("production"));
+            Assert.That(state.CurrentCycleOrdinal, Is.GreaterThan(0ul));
+            Assert.That(state.RemainingBudgetSeconds,
+                Is.GreaterThan(0f).And.LessThanOrEqualTo(
+                    LocalHasteRuntime.LevelOneBudgetSeconds));
+            Assert.That(Time.timeScale, Is.EqualTo(timeScaleBefore),
+                "局部时加不得修改全局 Time.timeScale。");
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0028_FailedGenericActionShowsConcreteReason()
+        {
+            yield return SelectFate(FormalFateCatalog.VoidChestId);
+            yield return OpenFateOperations();
+            yield return Click(RequireSceneObject(
+                "FateOperations.GenericAction"));
+            yield return Click(RequireSceneObject("FateOperations.Confirm"));
+
+            Text details = RequireSceneObject("FateOperations.Details")
+                .GetComponent<Text>();
+            Assert.That(details, Is.Not.Null);
+            Assert.That(details.text,
+                Does.Contain("反馈：").And.Contain("待领取"),
+                "失败动作必须在正式命轨面板显示具体可行动原因。");
+        }
+
         private static void ConfigureLevelTwoRewindOwners(
             GrayboxFormalSaveRuntimeHost3D host)
         {
@@ -310,8 +362,36 @@ namespace WasteCity.Tests
 
         private IEnumerator SelectRewindFate()
         {
+            yield return SelectFate(FormalFateCatalog.RewindAnchorId);
+        }
+
+        private IEnumerator SelectFate(string fateId)
+        {
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            FormalFateSnapshot pending = host.FateRuntime.Capture();
+            if (!pending.OfferedIds.Contains(
+                    fateId))
+            {
+                Assert.That(host.FateRuntime.TryRestore(
+                    new FormalFateSnapshot(
+                        pending.Revision,
+                        new[]
+                        {
+                            fateId,
+                            FormalFateCatalog.PocketUniverseId,
+                            FormalFateCatalog.VoidDebtId,
+                        },
+                        string.Empty,
+                        0,
+                        pending.OfferSelectionVersion),
+                    out string restoreError), Is.True, restoreError);
+                Assert.That(host.FateSelectionController.RefreshIfChanged(),
+                    Is.True);
+            }
             yield return Click(RequireSceneObject(
-                "FateSelection.Card." + FormalFateCatalog.RewindAnchorId));
+                "FateSelection.Card." + fateId));
             yield return Click(RequireSceneObject("FateSelection.Confirm"));
         }
 

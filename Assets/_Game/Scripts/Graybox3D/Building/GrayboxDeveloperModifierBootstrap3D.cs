@@ -841,6 +841,8 @@ namespace WasteCity.Graybox3D.Building
                     return "压力队列：" + Join(query.PressureQueue);
                 case "developer.query.configuration-signature":
                     return "进度配置签名：" + query.ConfigurationSignature;
+                case "developer.query.fate-domain-states":
+                    return "命轨领域状态：" + Join(query.FateDomainStates);
                 default:
                     return "文明进程查询未执行";
             }

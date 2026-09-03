@@ -47,6 +47,7 @@ namespace WasteCity.Tests
                 { "core.attention.escape.locked-region", Once(-8) },
                 { "core.attention.ruins.optional-interference", Event(-5) },
                 { "core.attention.civilization.advanced", Event(25) },
+                { "core.attention.world.coordinate-locked", Once(0) },
             };
 
         private static readonly IReadOnlyDictionary<string, string>
@@ -75,6 +76,7 @@ namespace WasteCity.Tests
                 { "core.attention.escape.locked-region", "离开锁定观测区域" },
                 { "core.attention.ruins.optional-interference", "完成可选干扰遗迹" },
                 { "core.attention.civilization.advanced", "文明升阶" },
+                { "core.attention.world.coordinate-locked", "坐标锁定" },
             };
 
         [Test]
@@ -105,7 +107,7 @@ namespace WasteCity.Tests
             RequireProperty(definition, "DisplayName", typeof(string));
 
             object[] all = ReadSequence(catalog, "All").Cast<object>().ToArray();
-            Assert.That(all, Has.Length.EqualTo(22));
+            Assert.That(all, Has.Length.EqualTo(Expected.Count));
             var actual = new Dictionary<string, object>(StringComparer.Ordinal);
             foreach (object item in all)
             {

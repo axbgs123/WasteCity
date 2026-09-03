@@ -1054,6 +1054,11 @@ namespace WasteCity.Tests
                 "developerModifier",
                 developer);
             AssertReference(
+                formalSaveHost,
+                "buildingPlacement",
+                Object.FindObjectOfType<
+                    GrayboxBuildingPlacementController3D>(true));
+            AssertReference(
                 coordinator,
                 "progressionView",
                 progressionView);

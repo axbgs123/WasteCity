@@ -47,6 +47,7 @@ namespace WasteCity.Graybox3D.Building
         private bool simulationPaused;
         private bool presentedSimulationPaused;
         private Func<bool> persistencePauseSource;
+        private Func<float> localHasteMultiplierSource;
         private GameSpeedModel formalSpeed;
         private GrayboxFormalRuleClock3D formalRuleClock;
         private GrayboxCampaignTerminalSpeedGate3D terminalSpeedGate;
@@ -98,6 +99,7 @@ namespace WasteCity.Graybox3D.Building
         public event Action<string> FirstMachineGunCompleted;
         public event Action<string> TutorialCombatStarted;
         public event Action<int> CampaignWaveWarningStarted;
+        public event Action<string, string> EnemyDefeatedForFateReward;
 
         public bool TryActivateTechnologyOverload(string towerStableId)
         {
@@ -342,6 +344,11 @@ namespace WasteCity.Graybox3D.Building
             SynchronizeFormalSpeedRuntime();
         }
 
+        public void ConfigureLocalHasteMultiplier(Func<float> source)
+        {
+            localHasteMultiplierSource = source;
+        }
+
         public bool TryContinueCampaignSandbox()
         {
             if (terminalSpeedGate == null ||
@@ -386,6 +393,10 @@ namespace WasteCity.Graybox3D.Building
         {
             using (TickMarker.Auto())
             {
+                float effectiveRuleDeltaSeconds = ruleDeltaSeconds *
+                    Mathf.Max(
+                        0f,
+                        localHasteMultiplierSource?.Invoke() ?? 1f);
                 bool effectivePaused = paused || IsPersistencePaused;
                 simulationPaused = effectivePaused;
                 worldView?.SetSimulationPaused(effectivePaused);
@@ -404,12 +415,12 @@ namespace WasteCity.Graybox3D.Building
                     return false;
                 RegisterCrossDomainStatistics();
                 runtime.Tick(
-                    ruleDeltaSeconds,
+                    effectiveRuleDeltaSeconds,
                     effectivePaused,
                     session.CityStorage);
                 ResearchEffectSnapshot effects = production?.ResearchEffects;
                 int regenerated = buildingHealth.AdvanceRegeneration(
-                    ruleDeltaSeconds,
+                    effectiveRuleDeltaSeconds,
                     effects?.TissueRegeneration ?? session.IsResearchCompleted(
                         "core.research.tissue-regeneration"),
                     effects?.CarapaceGrowth ?? session.IsResearchCompleted(
@@ -986,6 +997,9 @@ namespace WasteCity.Graybox3D.Building
                 qualityMultiplier: 1f,
                 effects);
             session.CityStorage.AddToNetwork(ResourceIds.Biomass, amount);
+            EnemyDefeatedForFateReward?.Invoke(
+                stableEnemyId,
+                enemyDefinitionId);
         }
 
         private void ApplyPresentation(bool force = false)

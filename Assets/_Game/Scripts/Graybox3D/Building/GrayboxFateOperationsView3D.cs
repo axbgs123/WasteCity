@@ -14,8 +14,7 @@ namespace WasteCity.Graybox3D.Building
         private GameObject confirmation;
         private Text detailsText;
         private Text anchorStatus;
-        private IReadOnlyList<string> pocketFlagships = Array.Empty<string>();
-        private IReadOnlyList<string> voidDebts = Array.Empty<string>();
+        private Text confirmationLabel;
         private IReadOnlyList<string> rewindSlots = Array.Empty<string>();
         private IReadOnlyList<GrayboxRewindAnchorSlotPresentation3D>
             rewindSlotStates =
@@ -23,23 +22,28 @@ namespace WasteCity.Graybox3D.Building
 
         public bool IsOpen { get; private set; }
         public string SelectedFateText { get; private set; } = string.Empty;
-        public IReadOnlyList<string> PocketFlagshipTexts => pocketFlagships;
-        public string PocketCollapseStatusText { get; private set; } = string.Empty;
-        public IReadOnlyList<string> VoidDebtResourceTexts => voidDebts;
-        public string VoidDebtTotalText { get; private set; } = string.Empty;
-        public string VoidDebtNextSettlementText { get; private set; } = string.Empty;
+        public string SelectedFateId { get; private set; } = string.Empty;
+        public string RuleText { get; private set; } = string.Empty;
+        public string CostText { get; private set; } = string.Empty;
+        public string LevelText { get; private set; } = string.Empty;
+        public string StatusText { get; private set; } = string.Empty;
+        public string ActionText { get; private set; } = string.Empty;
+        public bool GenericActionVisible { get; private set; }
         public IReadOnlyList<string> RewindAnchorSlotTexts => rewindSlots;
         public bool RewindLevelTwoSlotsVisible { get; private set; }
         public string SelectedRewindAnchorId { get; private set; } =
             string.Empty;
         public bool RewindCommandsVisible { get; private set; }
         public bool IsReadConfirmationOpen { get; private set; }
+        public bool IsFateActionConfirmationOpen { get; private set; }
+        public string ActionFeedbackText { get; private set; } = string.Empty;
         public int RenderCount { get; private set; }
 
         public event Action CreateRewindAnchorRequested;
         public event Action ReadRewindAnchorRequested;
         public event Action<string> ReadRewindAnchorByIdRequested;
         public event Action ClearRewindAnchorRequested;
+        public event Action<string> FateActionRequested;
         public event Action OpenRequested;
 
         public void Configure(Canvas value)
@@ -50,22 +54,29 @@ namespace WasteCity.Graybox3D.Building
 
         public void Apply(
             bool open,
-            string selectedFate,
-            IReadOnlyList<string> pocket,
-            string collapse,
-            IReadOnlyList<string> debts,
-            string debtTotal,
-            string debtNext,
+            GrayboxFateOperationPresentation3D presentation,
             IReadOnlyList<GrayboxRewindAnchorSlotPresentation3D> anchors,
             bool showRewindCommands)
         {
             IsOpen = open;
-            SelectedFateText = selectedFate ?? string.Empty;
-            pocketFlagships = Copy(pocket);
-            PocketCollapseStatusText = collapse ?? string.Empty;
-            voidDebts = Copy(debts);
-            VoidDebtTotalText = debtTotal ?? string.Empty;
-            VoidDebtNextSettlementText = debtNext ?? string.Empty;
+            presentation = presentation ??
+                new GrayboxFateOperationPresentation3D(
+                    string.Empty,
+                    string.Empty,
+                    "尚未选择命轨",
+                    "无",
+                    "未激活",
+                    "当前没有可显示的命轨状态",
+                    "无可用动作",
+                    false);
+            SelectedFateId = presentation.FateId;
+            SelectedFateText = presentation.TitleText;
+            RuleText = presentation.RuleText;
+            CostText = presentation.CostText;
+            LevelText = presentation.LevelText;
+            StatusText = presentation.StatusText;
+            ActionText = presentation.ActionText;
+            GenericActionVisible = presentation.GenericActionAvailable;
             rewindSlotStates = CopySlots(anchors);
             rewindSlots = SlotTexts(rewindSlotStates);
             RewindLevelTwoSlotsVisible = rewindSlotStates.Count == 2;
@@ -79,8 +90,41 @@ namespace WasteCity.Graybox3D.Building
             anchorStatus.text = rewindSlots.Count == 0
                 ? "锚点槽：空"
                 : "锚点槽：" + rewindSlots.Count;
-            SetCommandVisibility(showRewindCommands);
+            SetCommandVisibility(
+                showRewindCommands,
+                presentation.GenericActionAvailable);
             RefreshSlotButtons();
+        }
+
+        public bool RequestFateAction()
+        {
+            if (!GenericActionVisible ||
+                string.IsNullOrEmpty(SelectedFateId)) return false;
+            EnsureUi();
+            ActionFeedbackText = string.Empty;
+            IsReadConfirmationOpen = false;
+            IsFateActionConfirmationOpen = true;
+            if (confirmationLabel != null)
+                confirmationLabel.text = "确认" + ActionText;
+            confirmation.SetActive(true);
+            return true;
+        }
+
+        public void ConfirmFateAction()
+        {
+            if (!IsFateActionConfirmationOpen) return;
+            IsFateActionConfirmationOpen = false;
+            confirmation.SetActive(false);
+            FateActionRequested?.Invoke(SelectedFateId);
+        }
+
+        public void ReportActionResult(bool succeeded, string feedback)
+        {
+            ActionFeedbackText = string.IsNullOrWhiteSpace(feedback)
+                ? (succeeded ? "命轨动作已执行" : "命轨动作未执行")
+                : feedback;
+            if (detailsText != null)
+                detailsText.text = BuildDetailsText();
         }
 
         public void Close()
@@ -102,7 +146,10 @@ namespace WasteCity.Graybox3D.Building
         public void BeginReadConfirmation()
         {
             EnsureUi();
+            IsFateActionConfirmationOpen = false;
             IsReadConfirmationOpen = true;
+            if (confirmationLabel != null)
+                confirmationLabel.text = "确认读取";
             confirmation.SetActive(true);
         }
 
@@ -129,7 +176,16 @@ namespace WasteCity.Graybox3D.Building
         {
             ClearFocus();
             IsReadConfirmationOpen = false;
+            IsFateActionConfirmationOpen = false;
             if (confirmation != null) confirmation.SetActive(false);
+        }
+
+        private void ConfirmPendingAction()
+        {
+            if (IsReadConfirmationOpen)
+                ConfirmRead();
+            else if (IsFateActionConfirmationOpen)
+                ConfirmFateAction();
         }
 
         private void ClearFocus()
@@ -146,6 +202,7 @@ namespace WasteCity.Graybox3D.Building
         private Button clearButton;
         private Button slotOneButton;
         private Button slotTwoButton;
+        private Button genericActionButton;
 
         private void EnsureUi()
         {
@@ -177,6 +234,16 @@ namespace WasteCity.Graybox3D.Building
                 "FateOperations.RewindSlot.2",
                 .52f,
                 GrayboxRewindAnchorService3D.SecondStableAnchorId);
+            genericActionButton = Button(
+                root,
+                "FateOperations.GenericAction",
+                .41f,
+                "执行命轨动作",
+                () => RequestFateAction());
+            RectTransform actionRect =
+                genericActionButton.GetComponent<RectTransform>();
+            actionRect.anchorMin = new Vector2(.35f, .12f);
+            actionRect.anchorMax = new Vector2(.65f, .2f);
 
             RectTransform confirm = Rect(root, "FateOperations.Confirmation");
             confirm.anchorMin = new Vector2(.35f, .38f);
@@ -185,34 +252,50 @@ namespace WasteCity.Graybox3D.Building
             confirm.offsetMax = Vector2.zero;
             Image image = confirm.gameObject.AddComponent<Image>();
             image.color = new Color(.15f, .07f, .07f, 1f);
-            Button(confirm, "FateOperations.Confirm", .18f,
-                "确认读取", ConfirmRead);
+            Button confirmButton = Button(
+                confirm,
+                "FateOperations.Confirm",
+                .18f,
+                "确认读取",
+                ConfirmPendingAction);
+            confirmationLabel =
+                confirmButton.GetComponentInChildren<Text>();
             confirmation = confirm.gameObject;
             confirmation.SetActive(false);
             modal.SetActive(IsOpen);
         }
 
-        private void SetCommandVisibility(bool visible)
+        private void SetCommandVisibility(
+            bool rewindVisible,
+            bool genericVisible)
         {
-            createButton.gameObject.SetActive(visible);
-            readButton.gameObject.SetActive(visible);
-            clearButton.gameObject.SetActive(visible);
+            createButton.gameObject.SetActive(rewindVisible);
+            readButton.gameObject.SetActive(rewindVisible);
+            clearButton.gameObject.SetActive(rewindVisible);
             slotOneButton.gameObject.SetActive(
-                visible && RewindLevelTwoSlotsVisible);
+                rewindVisible && RewindLevelTwoSlotsVisible);
             slotTwoButton.gameObject.SetActive(
-                visible && RewindLevelTwoSlotsVisible);
+                rewindVisible && RewindLevelTwoSlotsVisible);
+            anchorStatus.gameObject.SetActive(rewindVisible);
+            genericActionButton.gameObject.SetActive(genericVisible);
+            Text label = genericActionButton.GetComponentInChildren<Text>();
+            if (label != null) label.text = ActionText;
         }
 
         private string BuildDetailsText()
         {
-            var lines = new List<string> { SelectedFateText };
-            lines.AddRange(pocketFlagships);
-            if (!string.IsNullOrEmpty(PocketCollapseStatusText))
-                lines.Add(PocketCollapseStatusText);
-            lines.AddRange(voidDebts);
-            if (!string.IsNullOrEmpty(VoidDebtTotalText)) lines.Add(VoidDebtTotalText);
-            if (!string.IsNullOrEmpty(VoidDebtNextSettlementText)) lines.Add(VoidDebtNextSettlementText);
-            lines.AddRange(rewindSlots);
+            var lines = new List<string>
+            {
+                SelectedFateText,
+                "规则：" + RuleText,
+                "代价：" + CostText,
+                "等级：" + LevelText,
+                "状态：" + StatusText,
+                "动作：" + ActionText,
+            };
+            if (!string.IsNullOrWhiteSpace(ActionFeedbackText))
+                lines.Add("反馈：" + ActionFeedbackText);
+            if (RewindCommandsVisible) lines.AddRange(rewindSlots);
             return string.Join("\n", lines);
         }
 
@@ -242,12 +325,14 @@ namespace WasteCity.Graybox3D.Building
             clearButton?.onClick.RemoveAllListeners();
             slotOneButton?.onClick.RemoveAllListeners();
             slotTwoButton?.onClick.RemoveAllListeners();
+            genericActionButton?.onClick.RemoveAllListeners();
             if (modal != null) DestroyObject(modal);
             if (fallbackCanvas != null) DestroyObject(fallbackCanvas);
             CreateRewindAnchorRequested = null;
             ReadRewindAnchorRequested = null;
             ReadRewindAnchorByIdRequested = null;
             ClearRewindAnchorRequested = null;
+            FateActionRequested = null;
             OpenRequested = null;
         }
 

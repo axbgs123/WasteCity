@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using WasteCity.Economy;
+using WasteCity.Progression;
 using WasteCity.Research;
 
 namespace WasteCity.Graybox3D.Building
@@ -257,14 +258,21 @@ namespace WasteCity.Graybox3D.Building
 
         private static GrayboxDeveloperCatalogEntry3D[] BuildActions()
         {
-            (string Id, string Name)[] definitions =
+            var definitions = new List<(string Id, string Name)>
             {
                 ("developer.attention.increase", "增加关注度"),
                 ("developer.attention.decrease", "降低关注度"),
                 ("developer.attention.set", "设置关注度"),
-                ("developer.fate.select-pocket-universe", "选择袖珍宇宙命轨"),
-                ("developer.fate.select-void-debt", "选择虚空债命轨"),
-                ("developer.fate.select-rewind-anchor", "选择回溯锚点命轨"),
+            };
+            for (var index = 0; index < FormalFateCatalog.All.Count; index++)
+            {
+                FormalFateDefinition fate = FormalFateCatalog.All[index];
+                definitions.Add((
+                    FateSelectionActionId(fate.Id.Value),
+                    "选择" + fate.DisplayName + "命轨"));
+            }
+            definitions.AddRange(new[]
+            {
                 ("developer.fate.upgrade-level-two", "命轨升到二级"),
                 ("developer.rewind.create", "创建回溯锚点"),
                 ("developer.rewind.read", "读取指定回溯锚点"),
@@ -283,15 +291,29 @@ namespace WasteCity.Graybox3D.Building
                 ("developer.query.thresholds", "查询关注度阈值"),
                 ("developer.query.pressure-queue", "查询压力队列"),
                 ("developer.query.configuration-signature", "查询进度配置签名"),
-            };
+                ("developer.query.fate-domain-states", "查询命轨领域状态"),
+            });
             var result = new GrayboxDeveloperCatalogEntry3D[
-                definitions.Length];
+                definitions.Count];
             for (var index = 0; index < result.Length; index++)
                 result[index] = new GrayboxDeveloperCatalogEntry3D(
                     GrayboxDeveloperCatalogKind3D.ProgressionAction,
                     definitions[index].Id,
                     definitions[index].Name);
             return result;
+        }
+
+        private static string FateSelectionActionId(string fateId)
+        {
+            const string fatePrefix = "core.legacy.";
+            if (string.IsNullOrWhiteSpace(fateId) ||
+                !fateId.StartsWith(fatePrefix, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Formal fate ids must use the core.legacy prefix.");
+            }
+            return "developer.fate.select-" +
+                fateId.Substring(fatePrefix.Length);
         }
 
         private static IReadOnlyList<GrayboxDeveloperCatalogEntry3D> Search(

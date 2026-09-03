@@ -226,6 +226,59 @@ namespace WasteCity.Progression
             return true;
         }
 
+        internal bool TryRaiseToAtLeast(
+            string reasonId,
+            string stableEventKey,
+            int minimumValue,
+            out string error)
+        {
+            FormalAttentionReasonDefinition reason =
+                FormalAttentionCatalog.Find(reasonId);
+            if (reason == null ||
+                string.IsNullOrWhiteSpace(stableEventKey) ||
+                minimumValue < FormalAttentionCatalog.MinimumValue ||
+                minimumValue > FormalAttentionCatalog.MaximumValue)
+            {
+                error = "Attention floor request is invalid.";
+                return false;
+            }
+            if (orphanReasonIds.Contains(reasonId) ||
+                committedEventKeys.Contains(stableEventKey) ||
+                reason.RepeatPolicy ==
+                    FormalAttentionRepeatPolicy.OncePerSession &&
+                onceReasonIds.Contains(reasonId))
+            {
+                error = "Attention floor event was already applied.";
+                return false;
+            }
+
+            int previous = value;
+            value = Math.Max(previous, minimumValue);
+            int requestedDelta = Math.Max(0, minimumValue - previous);
+            int appliedDelta = value - previous;
+            unchecked { revision++; }
+            committedEventKeys.Add(stableEventKey);
+            if (reason.RepeatPolicy ==
+                FormalAttentionRepeatPolicy.OncePerSession)
+            {
+                onceReasonIds.Add(reasonId);
+            }
+            history.Enqueue(new FormalAttentionHistoryEntry(
+                reasonId,
+                stableEventKey,
+                requestedDelta,
+                appliedDelta,
+                value,
+                revision));
+            if (history.Count > FormalAttentionCatalog.HistoryCapacity)
+                history.Dequeue();
+            int newlyReachedMask = LockReachedThresholds(previous, value);
+            RebuildSnapshot();
+            PublishReachedThresholds(newlyReachedMask);
+            error = string.Empty;
+            return true;
+        }
+
         public FormalAttentionSnapshot Capture()
         {
             return cachedSnapshot;

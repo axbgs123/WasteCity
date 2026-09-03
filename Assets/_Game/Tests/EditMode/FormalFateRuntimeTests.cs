@@ -24,6 +24,13 @@ namespace WasteCity.Tests
             "core.legacy.rewind-anchor",
         };
 
+        private static readonly string[] AlternateOffers =
+        {
+            "core.legacy.quantum-entanglement",
+            "core.legacy.spatial-template",
+            "core.legacy.causal-transparency",
+        };
+
         [Test]
         public void IDEA0020_NewRuntimeIsPendingAtLevelZeroWithCachedSnapshot()
         {
@@ -39,6 +46,33 @@ namespace WasteCity.Tests
             Assert.That(Read<bool>(runtime, "EffectsReady"), Is.True);
             Assert.That(StringSequence(first, "OfferedIds"),
                 Is.EqualTo(FixedOffers));
+        }
+
+        [Test]
+        public void IDEA0028_SeededRuntimeUsesTheFormalOfferSelector()
+        {
+            Type runtimeType = RequireType(RuntimeTypeName);
+            object runtime = Activator.CreateInstance(
+                runtimeType,
+                new object[] { "session-alpha", 8128, 1 });
+            Type selector = RequireType(
+                "WasteCity.Progression.FormalFateOfferSelector, WasteCity.Game");
+            MethodInfo select = selector.GetMethod(
+                "Select",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(string), typeof(int), typeof(int) },
+                null);
+            Assert.That(select, Is.Not.Null);
+            string[] expected = ((IEnumerable)select.Invoke(
+                    null,
+                    new object[] { "session-alpha", 8128, 1 }))
+                .Cast<object>()
+                .Select(value => value.ToString())
+                .ToArray();
+
+            Assert.That(StringSequence(Capture(runtime), "OfferedIds"),
+                Is.EqualTo(expected));
         }
 
         [Test]
@@ -131,6 +165,50 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0028_RestoreAdoptsAnyOrderedUniqueThreeFromApprovedPool()
+        {
+            Type snapshotType = RequireType(SnapshotTypeName);
+            object runtime = CreateRuntime();
+            object snapshot = CreateSnapshot(
+                snapshotType,
+                11ul,
+                AlternateOffers[1],
+                2,
+                AlternateOffers);
+
+            Assert.That(TryRestore(runtime, snapshot, out string error), Is.True,
+                error);
+            object restored = Capture(runtime);
+            Assert.That(StringSequence(restored, "OfferedIds"),
+                Is.EqualTo(AlternateOffers));
+            Assert.That(Read<string>(restored, "SelectedId"),
+                Is.EqualTo(AlternateOffers[1]));
+            Assert.That(Read<int>(restored, "Level"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void IDEA0028_RestorePreservesOfferSelectionVersion()
+        {
+            Type snapshotType = RequireType(SnapshotTypeName);
+            object runtime = CreateRuntime();
+            object snapshot = Activator.CreateInstance(
+                snapshotType,
+                new object[]
+                {
+                    0ul,
+                    AlternateOffers,
+                    string.Empty,
+                    0,
+                    1,
+                });
+
+            Assert.That(TryRestore(runtime, snapshot, out string error),
+                Is.True, error);
+            Assert.That(Read<int>(Capture(runtime), "OfferSelectionVersion"),
+                Is.EqualTo(1));
+        }
+
+        [Test]
         public void IDEA0020_InvalidRestoreIsAtomicAndDoesNotOpenFutureLevels()
         {
             Type snapshotType = RequireType(SnapshotTypeName);
@@ -154,13 +232,19 @@ namespace WasteCity.Tests
                     2ul,
                     FixedOffers[0],
                     1,
-                    new[] { FixedOffers[1], FixedOffers[0], FixedOffers[2] }),
+                    new[] { FixedOffers[0], FixedOffers[0], FixedOffers[2] }),
                 CreateSnapshot(
                     snapshotType,
                     2ul,
                     FixedOffers[0],
                     1,
                     new[] { FixedOffers[0], FixedOffers[1] }),
+                CreateSnapshot(
+                    snapshotType,
+                    2ul,
+                    FixedOffers[0],
+                    1,
+                    AlternateOffers),
             };
 
             foreach (object state in invalid)

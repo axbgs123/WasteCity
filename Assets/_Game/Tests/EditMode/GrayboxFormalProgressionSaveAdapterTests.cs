@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
+using WasteCity.Building;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
@@ -46,7 +47,7 @@ namespace WasteCity.Tests
                 typeof(AdvancementSequenceModel),
             });
             Assert.That(constructor, Is.Not.Null);
-            Assert.That(adapter.GetConstructors(), Has.Length.EqualTo(1));
+            Assert.That(adapter.GetConstructors(), Has.Length.EqualTo(2));
             Assert.Throws<TargetInvocationException>(() =>
                 constructor.Invoke(new object[]
                 {
@@ -110,6 +111,497 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0028_SevenNewOwnersRoundTripThroughSchemaThirtySix()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.adapter",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            PopulateIdea0028Owners(
+                pressure, quantum, spatial, haste, foresight, causal, chests,
+                coordinate);
+            var source = CreateIdea0028Adapter(
+                attention, pressure, quantum, spatial, haste, foresight,
+                causal, chests, coordinate);
+
+            FormalThreeDProgressionSaveData saved = source.Capture();
+            Assert.That(saved.quantumEntanglement
+                    .committedSynchronizationKeys,
+                Does.Contain(
+                    QuantumEntanglementRuntime.FirstSynchronizationKey));
+            Assert.That(saved.quantumEntanglement
+                    .committedSynchronizationKeys,
+                Has.None.EqualTo("core.resource.iron")
+                    .And.None.EqualTo("core.resource.water"));
+            Assert.That(saved.spatialTemplate.entries, Has.Length.EqualTo(2));
+            Assert.That(saved.localHaste.active, Is.True);
+            Assert.That(saved.localHaste.cycleOrdinal, Is.EqualTo(2L));
+            Assert.That(saved.foresightDelay.cycleOrdinal, Is.EqualTo(4L));
+            Assert.That(saved.foresightDelay.remainingDisplaySeconds,
+                Is.EqualTo(1.75f).Within(.0001f));
+            Assert.That(saved.causalTransparency.scannedStableEventKeys,
+                Is.Not.Empty);
+            Assert.That(saved.voidChest.committedDeathEventIds,
+                Has.Length.EqualTo(2));
+            Assert.That(saved.coordinateLock.committed, Is.True);
+
+            var targetAttention = new FormalAttentionRuntime();
+            var targetPressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                targetAttention,
+                targetPressure,
+                "session.adapter",
+                out QuantumEntanglementRuntime targetQuantum,
+                out SpatialTemplateRuntime targetSpatial,
+                out LocalHasteRuntime targetHaste,
+                out ForesightDelayRuntime targetForesight,
+                out CausalTransparencyRuntime targetCausal,
+                out VoidChestRuntime targetChests,
+                out CoordinateLockRuntime targetCoordinate);
+            var target = CreateIdea0028Adapter(
+                targetAttention, targetPressure, targetQuantum,
+                targetSpatial, targetHaste, targetForesight, targetCausal,
+                targetChests, targetCoordinate);
+
+            Assert.That(target.TryRestore(saved, out string error),
+                Is.True, error);
+            Assert.That(targetQuantum.Capture().Connected, Is.False);
+            Assert.That(targetQuantum.Capture().SharedResourceIds,
+                Is.EqualTo(quantum.Capture().SharedResourceIds));
+            Assert.That(targetQuantum.Capture().CommittedSynchronizationKeys,
+                Is.EqualTo(
+                    quantum.Capture().CommittedSynchronizationKeys));
+            Assert.That(targetSpatial.Capture().Templates.Single().Id,
+                Is.EqualTo(GrayboxFormalProgressionSaveAdapter3D
+                    .FormalSpatialTemplateSlotId));
+            Assert.That(targetSpatial.Capture().Templates.Single().Cells
+                    .Select(value =>
+                        (value.X, value.Y, value.BuildingDefinitionId,
+                            value.RotationQuarterTurns)),
+                Is.EqualTo(spatial.Capture().Templates.Single().Cells
+                    .Select(value =>
+                        (value.X, value.Y, value.BuildingDefinitionId,
+                            value.RotationQuarterTurns))));
+            Assert.That(targetHaste.Capture().TargetId,
+                Is.EqualTo(haste.Capture().TargetId));
+            Assert.That(targetHaste.Capture().RemainingBudgetSeconds,
+                Is.EqualTo(haste.Capture().RemainingBudgetSeconds));
+            Assert.That(targetHaste.Capture().CurrentCycleOrdinal,
+                Is.EqualTo(2ul));
+            Assert.That(targetForesight.Capture().LastConsumedCycleOrdinal,
+                Is.EqualTo(4ul));
+            Assert.That(targetForesight.Capture().CurrentCycleOrdinal,
+                Is.EqualTo(4ul));
+            Assert.That(targetForesight.Capture().LastProjection.EventId,
+                Is.EqualTo(AttentionPressureCatalog.FindByThreshold(90)
+                    .EncounterId.Value));
+            Assert.That(targetForesight.Capture().DisplayRemainingSeconds,
+                Is.EqualTo(1.75f).Within(.0001f));
+            Assert.That(targetCausal.Capture().FullReasonAccess, Is.True);
+            Assert.That(targetChests.Capture().Evaluations.Select(value =>
+                    (value.DeathId, value.SequenceOrdinal, value.Dropped,
+                        value.Claimed, value.ResourceId, value.Amount,
+                        value.NarrativeFragmentId)),
+                Is.EqualTo(chests.Capture().Evaluations.Select(value =>
+                    (value.DeathId, value.SequenceOrdinal, value.Dropped,
+                        value.Claimed, value.ResourceId, value.Amount,
+                        value.NarrativeFragmentId))));
+            Assert.That(targetCoordinate.Capture().Committed, Is.True);
+        }
+
+        [Test]
+        public void IDEA0028_CenteredTemplateEdgesCaptureIntoValidEnvelope()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.centered-template",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            Assert.That(spatial.TryPrepareRecord(
+                GrayboxFormalProgressionSaveAdapter3D
+                    .FormalSpatialTemplateSlotId,
+                new[]
+                {
+                    new SpatialTemplateCell(
+                        -1, -1, BuildingCatalog.Wall.Id.Value, 0),
+                    new SpatialTemplateCell(
+                        1, 1, BuildingCatalog.Warehouse.Id.Value, 3),
+                },
+                out SpatialTemplateRecordPlan record,
+                out string error), Is.True, error);
+            Assert.That(spatial.TryCommit(record, out error), Is.True, error);
+            var adapter = CreateIdea0028Adapter(
+                attention,
+                pressure,
+                quantum,
+                spatial,
+                haste,
+                foresight,
+                causal,
+                chests,
+                coordinate);
+            FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeEnvelope(
+                File.ReadAllText(Path.Combine(
+                    Application.dataPath,
+                    "_Game",
+                    "Tests",
+                    "Fixtures",
+                    "Persistence",
+                    "schema-31-formal-3d.json")));
+            Assert.That(decoded.Success, Is.True, decoded.Message);
+            FormalSaveEnvelope envelope = decoded.Envelope;
+            envelope.formal3D.progression = adapter.Capture();
+            envelope.payloadHashSha256 =
+                FormalSaveCodec.ComputePayloadHashSha256(envelope.formal3D);
+
+            FormalSaveValidationResult validation =
+                FormalSaveValidator.ValidateEnvelope(envelope);
+
+            Assert.That(validation.IsValid, Is.True, validation.Message);
+            Assert.That(envelope.formal3D.progression.spatialTemplate.entries
+                    .Select(value => (value.relativeX, value.relativeZ)),
+                Is.EqualTo(new[] { (-1, -1), (1, 1) }));
+        }
+
+        [Test]
+        public void IDEA0028_InvalidCycleOrdinalsFailDuringZeroWritePrepare()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.invalid-cycle",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            var adapter = CreateIdea0028Adapter(
+                attention, pressure, quantum, spatial, haste, foresight,
+                causal, chests, coordinate);
+            FormalThreeDProgressionSaveData invalid = adapter.Capture();
+            invalid.localHaste.cycleOrdinal = -1L;
+            LocalHasteSnapshot hasteBefore = haste.Capture();
+            ForesightDelaySnapshot foresightBefore = foresight.Capture();
+
+            Assert.That(adapter.TryPrepareRestore(
+                invalid,
+                out _,
+                out string error), Is.False);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(haste.Capture(), Is.SameAs(hasteBefore));
+            Assert.That(foresight.Capture(), Is.SameAs(foresightBefore));
+
+            invalid = adapter.Capture();
+            invalid.foresightDelay.cycleOrdinal = 2L;
+            invalid.foresightDelay.displayedCycleOrdinals = new[] { 3L };
+            Assert.That(adapter.TryPrepareRestore(
+                invalid, out _, out error), Is.False);
+            Assert.That(error, Is.Not.Empty);
+            Assert.That(haste.Capture(), Is.SameAs(hasteBefore));
+            Assert.That(foresight.Capture(), Is.SameAs(foresightBefore));
+        }
+
+        [Test]
+        public void IDEA0028_HasteKindsCaptureAndRestoreByFormalDomain()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.haste-kind",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            Assert.That(haste.TrySelectTarget("research", out string error),
+                Is.True, error);
+            GrayboxFormalProgressionSaveAdapter3D adapter =
+                CreateIdea0028Adapter(
+                    attention,
+                    pressure,
+                    quantum,
+                    spatial,
+                    haste,
+                    foresight,
+                    causal,
+                    chests,
+                    coordinate);
+
+            FormalThreeDProgressionSaveData saved = adapter.Capture();
+
+            Assert.That(saved.localHaste.targetKind, Is.EqualTo(2));
+            Assert.That(saved.localHaste.targetStableId,
+                Is.EqualTo("research"));
+            Assert.That(adapter.TryPrepareRestore(
+                saved, out _, out error), Is.True, error);
+
+            saved.localHaste.targetKind = 1;
+            Assert.That(adapter.TryPrepareRestore(
+                saved, out _, out error), Is.False);
+            saved.localHaste.targetKind = 2;
+            saved.localHaste.targetStableId = "building:research-01";
+            Assert.That(adapter.TryPrepareRestore(
+                saved, out _, out error), Is.False);
+        }
+
+        [Test]
+        public void IDEA0028_AdapterRejectsDanglingForesightPlan()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.dangling-foresight",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            GrayboxFormalProgressionSaveAdapter3D adapter =
+                CreateIdea0028Adapter(
+                    attention,
+                    pressure,
+                    quantum,
+                    spatial,
+                    haste,
+                    foresight,
+                    causal,
+                    chests,
+                    coordinate);
+            FormalThreeDProgressionSaveData invalid = adapter.Capture();
+            invalid.foresightDelay.revision = 2ul;
+            invalid.foresightDelay.cycleOrdinal = 1;
+            invalid.foresightDelay.plannedStableEventId =
+                "event.not-in-pressure";
+            invalid.foresightDelay.remainingDisplaySeconds = 3f;
+            invalid.foresightDelay.displayedCycleOrdinals =
+                new long[] { 1 };
+
+            Assert.That(adapter.TryPrepareRestore(
+                invalid, out _, out string error), Is.False);
+            Assert.That(error, Does.Contain("压力"));
+        }
+
+        [Test]
+        public void IDEA0028_AdapterRejectsCoordinateLockWithoutBossPressure()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.coordinate-half-commit",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            GrayboxFormalProgressionSaveAdapter3D adapter =
+                CreateIdea0028Adapter(
+                    attention,
+                    pressure,
+                    quantum,
+                    spatial,
+                    haste,
+                    foresight,
+                    causal,
+                    chests,
+                    coordinate);
+            FormalThreeDProgressionSaveData invalid = adapter.Capture();
+            invalid.coordinateLock.committed = true;
+            invalid.coordinateLock.stableEventKey =
+                CoordinateLockCatalog.StableEventKey;
+            invalid.coordinateLock.bossPressureScheduled = true;
+            invalid.coordinateLock.revision = 1ul;
+
+            Assert.That(adapter.TryPrepareRestore(
+                invalid, out _, out string error), Is.False);
+            Assert.That(error, Does.Contain("90").And.Contain("压力"));
+        }
+
+        [Test]
+        public void IDEA0028_DownstreamPressureFailureRollsBackSevenOwners()
+        {
+            var sourceAttention = new FormalAttentionRuntime();
+            var sourcePressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                sourceAttention,
+                sourcePressure,
+                "session.rollback",
+                out QuantumEntanglementRuntime sourceQuantum,
+                out SpatialTemplateRuntime sourceSpatial,
+                out LocalHasteRuntime sourceHaste,
+                out ForesightDelayRuntime sourceForesight,
+                out CausalTransparencyRuntime sourceCausal,
+                out VoidChestRuntime sourceChests,
+                out CoordinateLockRuntime sourceCoordinate);
+            PopulateIdea0028Owners(
+                sourcePressure, sourceQuantum, sourceSpatial, sourceHaste,
+                sourceForesight, sourceCausal, sourceChests,
+                sourceCoordinate);
+            FormalThreeDProgressionSaveData saved = CreateIdea0028Adapter(
+                sourceAttention, sourcePressure, sourceQuantum, sourceSpatial,
+                sourceHaste, sourceForesight, sourceCausal, sourceChests,
+                sourceCoordinate).Capture();
+
+            var targetAttention = new FormalAttentionRuntime();
+            var targetPressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                targetAttention,
+                targetPressure,
+                "session.rollback",
+                out QuantumEntanglementRuntime targetQuantum,
+                out SpatialTemplateRuntime targetSpatial,
+                out LocalHasteRuntime targetHaste,
+                out ForesightDelayRuntime targetForesight,
+                out CausalTransparencyRuntime targetCausal,
+                out VoidChestRuntime targetChests,
+                out CoordinateLockRuntime targetCoordinate);
+            var target = CreateIdea0028Adapter(
+                targetAttention, targetPressure, targetQuantum,
+                targetSpatial, targetHaste, targetForesight, targetCausal,
+                targetChests, targetCoordinate);
+            Assert.That(target.TryPrepareRestore(
+                saved,
+                out GrayboxFormalProgressionRestorePlan3D plan,
+                out string prepareError), Is.True, prepareError);
+            Assert.That(targetPressure.TryQueueThreshold(60, out _), Is.True);
+            string before = Idea0028Fingerprint(
+                targetQuantum, targetSpatial, targetHaste, targetForesight,
+                targetCausal, targetChests, targetCoordinate);
+
+            Assert.That(target.TryCommitRestore(plan, out _), Is.False);
+            Assert.That(Idea0028Fingerprint(
+                    targetQuantum, targetSpatial, targetHaste,
+                    targetForesight, targetCausal, targetChests,
+                    targetCoordinate),
+                Is.EqualTo(before));
+        }
+
+        [Test]
+        public void IDEA0028_CleanAdapterCanRebindSessionScopedOwners()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                attention,
+                new FormalFateRuntime(),
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    pressure,
+                    new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f)));
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.configured",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+
+            Assert.That(adapter.ConfigureIdea0028Owners(
+                quantum, spatial, haste, foresight, causal, chests,
+                coordinate, out string error), Is.True, error);
+            var replacementQuantum =
+                new QuantumEntanglementRuntime(new string[0]);
+            Assert.That(adapter.ConfigureIdea0028Owners(
+                replacementQuantum,
+                new SpatialTemplateRuntime(),
+                new LocalHasteRuntime(),
+                new ForesightDelayRuntime(),
+                new CausalTransparencyRuntime(),
+                new VoidChestRuntime("session.replacement", 1),
+                new CoordinateLockRuntime(attention, pressure),
+                out error), Is.True, error);
+            Assert.That(replacementQuantum.TrySetConnected(false), Is.True);
+            Assert.That(adapter.ConfigureIdea0028Owners(
+                new QuantumEntanglementRuntime(new string[0]),
+                new SpatialTemplateRuntime(),
+                new LocalHasteRuntime(),
+                new ForesightDelayRuntime(),
+                new CausalTransparencyRuntime(),
+                new VoidChestRuntime("session.forbidden", 1),
+                new CoordinateLockRuntime(attention, pressure),
+                out _), Is.False,
+                "Dirty session truth cannot be replaced.");
+        }
+
+        [Test]
+        public void IDEA0028_QuantumDtoNeverSerializesFixedResourceConfigAsEvents()
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            CreateIdea0028Owners(
+                attention,
+                pressure,
+                "session.quantum.dto",
+                out QuantumEntanglementRuntime quantum,
+                out SpatialTemplateRuntime spatial,
+                out LocalHasteRuntime haste,
+                out ForesightDelayRuntime foresight,
+                out CausalTransparencyRuntime causal,
+                out VoidChestRuntime chests,
+                out CoordinateLockRuntime coordinate);
+            GrayboxFormalProgressionSaveAdapter3D adapter =
+                CreateIdea0028Adapter(
+                    attention,
+                    pressure,
+                    quantum,
+                    spatial,
+                    haste,
+                    foresight,
+                    causal,
+                    chests,
+                    coordinate);
+
+            Assert.That(adapter.Capture().quantumEntanglement
+                .committedSynchronizationKeys, Is.Empty);
+            Assert.That(quantum.TryCommitSynchronization(
+                QuantumEntanglementRuntime.FirstSynchronizationKey), Is.True);
+            Assert.That(adapter.Capture().quantumEntanglement
+                    .committedSynchronizationKeys,
+                Is.EqualTo(new[]
+                {
+                    QuantumEntanglementRuntime.FirstSynchronizationKey,
+                }));
+        }
+
+        [Test]
         public void IDEA0020_CaptureMapsBothRuntimesToIndependentSchema33Dto()
         {
             var attention = new FormalAttentionRuntime();
@@ -127,7 +619,7 @@ namespace WasteCity.Tests
 
             FormalThreeDProgressionSaveData first = Capture(adapter);
             Assert.That(first.configurationSignature,
-                Is.EqualTo("builtin:progression@1"));
+                Is.EqualTo("builtin:progression@2"));
             Assert.That(first.attention.value, Is.EqualTo(15));
             Assert.That(first.attention.revision, Is.EqualTo(1ul));
             Assert.That(first.attention.history, Has.Length.EqualTo(1));
@@ -687,6 +1179,203 @@ namespace WasteCity.Tests
                 },
                 civilization = new FormalThreeDCivilizationSaveData(),
             };
+        }
+
+        private static void CreateIdea0028Owners(
+            FormalAttentionRuntime attention,
+            AttentionPressureRuntime pressure,
+            string sessionId,
+            out QuantumEntanglementRuntime quantum,
+            out SpatialTemplateRuntime spatial,
+            out LocalHasteRuntime haste,
+            out ForesightDelayRuntime foresight,
+            out CausalTransparencyRuntime causal,
+            out VoidChestRuntime chests,
+            out CoordinateLockRuntime coordinate)
+        {
+            quantum = new QuantumEntanglementRuntime(new[]
+            {
+                "core.resource.iron",
+                "core.resource.water",
+            });
+            spatial = new SpatialTemplateRuntime();
+            haste = new LocalHasteRuntime();
+            foresight = new ForesightDelayRuntime();
+            causal = new CausalTransparencyRuntime();
+            chests = new VoidChestRuntime(sessionId, 3);
+            coordinate = new CoordinateLockRuntime(attention, pressure);
+        }
+
+        private static void PopulateIdea0028Owners(
+            AttentionPressureRuntime pressure,
+            QuantumEntanglementRuntime quantum,
+            SpatialTemplateRuntime spatial,
+            LocalHasteRuntime haste,
+            ForesightDelayRuntime foresight,
+            CausalTransparencyRuntime causal,
+            VoidChestRuntime chests,
+            CoordinateLockRuntime coordinate)
+        {
+            Assert.That(quantum.TryCommitSynchronization(
+                QuantumEntanglementRuntime.FirstSynchronizationKey), Is.True);
+            Assert.That(quantum.TrySetConnected(false), Is.True);
+            Assert.That(spatial.TryPrepareRecord(
+                GrayboxFormalProgressionSaveAdapter3D
+                    .FormalSpatialTemplateSlotId,
+                new[]
+                {
+                    new SpatialTemplateCell(
+                        -1, -1, "core.building.mining-station", 0),
+                    new SpatialTemplateCell(
+                        1, 0, "core.building.warehouse", 3),
+                },
+                out SpatialTemplateRecordPlan templatePlan,
+                out string error), Is.True, error);
+            Assert.That(spatial.TryCommit(templatePlan, out error),
+                Is.True, error);
+            Assert.That(haste.TryEnterCycle(2, out error), Is.True, error);
+            Assert.That(haste.TrySelectTarget(
+                "production", out error), Is.True, error);
+            Assert.That(haste.TryStart(out error), Is.True, error);
+            Assert.That(haste.Tick(12f, false, out _, out error),
+                Is.True, error);
+            Assert.That(pressure.TryRestore(
+                new AttentionPressureSnapshot(
+                    3ul,
+                    new[]
+                    {
+                        new AttentionPressureEntrySnapshot(
+                            30,
+                            AttentionPressureState.Completed,
+                            0f),
+                        new AttentionPressureEntrySnapshot(
+                            60,
+                            AttentionPressureState.Completed,
+                            0f),
+                        new AttentionPressureEntrySnapshot(
+                            90,
+                            AttentionPressureState.Queued,
+                            0f),
+                    }),
+                out error), Is.True, error);
+            Assert.That(foresight.TryEnterCycle(4, out error), Is.True, error);
+            Assert.That(foresight.TryReveal(
+                4,
+                100f,
+                new[]
+                {
+                    new ForesightAuthoritativePlan(
+                        AttentionPressureCatalog.FindByThreshold(90)
+                            .EncounterId.Value,
+                        140f,
+                        "attention.pressure.90.summary"),
+                },
+                out _,
+                out error), Is.True, error);
+            Assert.That(foresight.TickDisplay(1.25f, false, out error),
+                Is.True, error);
+            Assert.That(causal.TrySetFullReasonAccess(true), Is.True);
+
+            ulong claimedOrdinal = Enumerable.Range(1, 100)
+                .Select(value => (ulong)value)
+                .Single(value => VoidChestRuntime.ShouldDrop(
+                    chests.SessionId,
+                    chests.SelectionVersion,
+                    "enemy.adapter.claimed",
+                    value));
+            ulong pendingOrdinal = Enumerable.Range(1, 100)
+                .Select(value => (ulong)value)
+                .Single(value => VoidChestRuntime.ShouldDrop(
+                    chests.SessionId,
+                    chests.SelectionVersion,
+                    "enemy.adapter.pending",
+                    value));
+            Assert.That(chests.TryEvaluateDeath(
+                "enemy.adapter.claimed",
+                claimedOrdinal,
+                out VoidChestEvaluation claimed,
+                out error), Is.True, error);
+            Assert.That(chests.TryClaim(claimed.ChestId, out error),
+                Is.True, error);
+            Assert.That(chests.TryEvaluateDeath(
+                "enemy.adapter.pending",
+                pendingOrdinal,
+                out _,
+                out error), Is.True, error);
+            Assert.That(coordinate.TryRestore(
+                new CoordinateLockSnapshot(true, 1),
+                out error), Is.True, error);
+        }
+
+        private static GrayboxFormalProgressionSaveAdapter3D
+            CreateIdea0028Adapter(
+                FormalAttentionRuntime attention,
+                AttentionPressureRuntime pressure,
+                QuantumEntanglementRuntime quantum,
+                SpatialTemplateRuntime spatial,
+                LocalHasteRuntime haste,
+                ForesightDelayRuntime foresight,
+                CausalTransparencyRuntime causal,
+                VoidChestRuntime chests,
+                CoordinateLockRuntime coordinate)
+        {
+            return new GrayboxFormalProgressionSaveAdapter3D(
+                attention,
+                new FormalFateRuntime(),
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    pressure,
+                    new GrayboxDefenseRuntime3D(0f, 0f, 20, 0f)),
+                null,
+                null,
+                quantum,
+                spatial,
+                haste,
+                foresight,
+                causal,
+                chests,
+                coordinate);
+        }
+
+        private static string Idea0028Fingerprint(
+            QuantumEntanglementRuntime quantum,
+            SpatialTemplateRuntime spatial,
+            LocalHasteRuntime haste,
+            ForesightDelayRuntime foresight,
+            CausalTransparencyRuntime causal,
+            VoidChestRuntime chests,
+            CoordinateLockRuntime coordinate)
+        {
+            QuantumEntanglementSnapshot q = quantum.Capture();
+            SpatialTemplateSnapshot s = spatial.Capture();
+            LocalHasteSnapshot h = haste.Capture();
+            ForesightDelaySnapshot f = foresight.Capture();
+            CausalTransparencySnapshot c = causal.Capture();
+            VoidChestSnapshot v = chests.Capture();
+            CoordinateLockSnapshot l = coordinate.Capture();
+            return q.Connected + ":" + q.Revision + ":" +
+                string.Join(",", q.SharedResourceIds) + ":" +
+                string.Join(",", q.CommittedSynchronizationKeys) + "|" +
+                s.Revision + ":" + string.Join(",", s.Templates.SelectMany(
+                    template => template.Cells.Select(cell =>
+                        template.Id + ":" + cell.X + ":" + cell.Y + ":" +
+                        cell.BuildingDefinitionId + ":" +
+                        cell.RotationQuarterTurns))) + "|" +
+                h.TargetId + ":" + h.Active + ":" +
+                h.RemainingBudgetSeconds + ":" + h.Revision + ":" +
+                h.CurrentCycleOrdinal + "|" +
+                f.CurrentCycleOrdinal + ":" +
+                f.LastConsumedCycleOrdinal + ":" +
+                f.LastProjection?.EventId + ":" +
+                f.LastProjection?.SecondsUntilEvent + ":" + f.Revision + "|" +
+                f.DisplayRemainingSeconds + "|" +
+                c.FullReasonAccess + ":" + c.Revision + "|" +
+                v.Revision + ":" + string.Join(",", v.Evaluations.Select(
+                    value => value.DeathId + ":" + value.SequenceOrdinal +
+                        ":" + value.Dropped + ":" + value.Claimed)) + "|" +
+                l.Committed + ":" + l.Revision;
         }
 
         private static object CreateAdapter(

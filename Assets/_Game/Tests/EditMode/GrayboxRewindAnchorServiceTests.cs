@@ -313,6 +313,79 @@ namespace WasteCity.Tests
             }
         }
 
+        [Test]
+        public void IDEA0028_ReadKeepsVoidChestIdempotencyAcrossRestart()
+        {
+            using (Harness harness = Harness.Create(
+                       selectedRewind: true))
+            {
+                object service = CreateService(harness);
+                AssertResult(CreateAnchor(service, 40L), true, "Created");
+
+                string droppedDeathId = FindDropAtOrdinal(
+                    harness.SessionId,
+                    harness.VoidChest.SelectionVersion,
+                    1ul);
+                Assert.That(harness.VoidChest.TryEvaluateDeath(
+                    droppedDeathId,
+                    1ul,
+                    out VoidChestEvaluation dropped,
+                    out string error), Is.True, error);
+                Assert.That(dropped.Dropped, Is.True);
+                Assert.That(harness.VoidChest.TryClaim(
+                    dropped.ChestId, out error), Is.True, error);
+                Assert.That(harness.VoidChest.TryEvaluateDeath(
+                    "zz-enemy-after-claimed-drop",
+                    2ul,
+                    out _,
+                    out error), Is.True, error);
+
+                AssertResult(Invoke(service, "Read"),
+                    true, "ReadSucceeded");
+
+                VoidChestSnapshot afterRead = harness.VoidChest.Capture();
+                Assert.That(afterRead.Evaluations.Select(value =>
+                        (value.DeathId, value.SequenceOrdinal)),
+                    Is.EqualTo(new[]
+                    {
+                        (droppedDeathId, 1ul),
+                        ("zz-enemy-after-claimed-drop", 2ul),
+                    }));
+                Assert.That(afterRead.ClaimedChestIds,
+                    Is.EqualTo(new[] { dropped.ChestId }));
+
+                GrayboxFormalSaveCoordinatorResult3D saved =
+                    harness.Coordinator.CaptureEnvelope(
+                        harness.SessionId,
+                        "test.idea-0028",
+                        new[] { "builtin:wastecity@test.idea-0028" },
+                        new FormalSaveCheckpointMetadata
+                        {
+                            sequence = 41L,
+                            reasonId = FormalSaveCheckpointReasonIds
+                                .RewindAnchorUsed,
+                            ruleTimeSeconds = 20f,
+                            completedMilestoneIds = Array.Empty<string>(),
+                        },
+                        new DateTime(
+                            2026, 9, 1, 8, 0, 0, DateTimeKind.Utc));
+                Assert.That(saved.Success, Is.True, saved.Message);
+                VoidChestRuntime restarted = RestoreVoidChest(
+                    saved.Envelope.formal3D.progression,
+                    harness.SessionId,
+                    harness.VoidChest.SelectionVersion);
+                VoidChestSnapshot afterRestart = restarted.Capture();
+                Assert.That(afterRestart.Evaluations.Select(value =>
+                        (value.DeathId, value.SequenceOrdinal)),
+                    Is.EqualTo(afterRead.Evaluations.Select(value =>
+                        (value.DeathId, value.SequenceOrdinal))));
+                Assert.That(afterRestart.ClaimedChestIds,
+                    Is.EqualTo(new[] { dropped.ChestId }));
+                Assert.That(saved.Envelope.formal3D.progression.voidChest
+                    .nextDropOrdinal, Is.EqualTo(3L));
+            }
+        }
+
         private object CreateService(
             Harness harness,
             FormalRewindAnchorMetadataRuntime metadata = null)
@@ -355,6 +428,77 @@ namespace WasteCity.Tests
                 Array.Resize(ref arguments, 7);
             if (metadata != null) arguments[6] = metadata;
             return constructor.Invoke(arguments);
+        }
+
+        private static string FindDropAtOrdinal(
+            string sessionId,
+            int selectionVersion,
+            ulong ordinal)
+        {
+            for (var index = 1; index <= 10000; index++)
+            {
+                string deathId = "rewind-void-death-" + index;
+                if (VoidChestRuntime.ShouldDrop(
+                        sessionId,
+                        selectionVersion,
+                        deathId,
+                        ordinal))
+                    return deathId;
+            }
+            Assert.Fail("A deterministic VoidChest drop was not found.");
+            return string.Empty;
+        }
+
+        private static VoidChestRuntime RestoreVoidChest(
+            FormalThreeDProgressionSaveData progression,
+            string sessionId,
+            int selectionVersion)
+        {
+            var attention = new FormalAttentionRuntime();
+            var pressure = new AttentionPressureRuntime();
+            var fate = new FormalFateRuntime();
+            var voidChest = new VoidChestRuntime(sessionId, selectionVersion);
+            var adapter = new GrayboxFormalProgressionSaveAdapter3D(
+                attention,
+                fate,
+                new PocketUniverseFateEffect(),
+                new FormalVoidDebtRuntime(),
+                new FormalRewindAnchorMetadataRuntime(),
+                new GrayboxAttentionPressureSaveAdapter3D(
+                    pressure,
+                    new GrayboxDefenseRuntime3D(0f, 0f, 9f, 0f)),
+                new FormalCivilizationAscensionRuntime(
+                    FormalFateCatalog.RewindAnchorId),
+                new AdvancementSequenceModel(),
+                CreateQuantumRuntime(),
+                new SpatialTemplateRuntime(),
+                new LocalHasteRuntime(),
+                new ForesightDelayRuntime(),
+                new CausalTransparencyRuntime(),
+                voidChest,
+                new CoordinateLockRuntime(attention, pressure));
+            Assert.That(adapter.TryRestore(
+                CloneProgression(progression), out string error),
+                Is.True, error);
+            return voidChest;
+        }
+
+        private static FormalThreeDProgressionSaveData CloneProgression(
+            FormalThreeDProgressionSaveData source)
+        {
+            return JsonUtility.FromJson<FormalThreeDProgressionSaveData>(
+                JsonUtility.ToJson(source, false));
+        }
+
+        private static QuantumEntanglementRuntime CreateQuantumRuntime()
+        {
+            return new QuantumEntanglementRuntime(new[]
+            {
+                "core.resource.iron",
+                "core.resource.stone",
+                "core.resource.water",
+                "core.resource.biomass",
+            });
         }
 
         private static object CreateAnchor(object service, long sequence)
@@ -473,6 +617,7 @@ namespace WasteCity.Tests
                 AdvancementSequenceModel sequence,
                 FormalRewindAnchorStore store,
                 GrayboxFormalSaveCoordinator3D coordinator,
+                VoidChestRuntime voidChest,
                 int initialWorldSeed,
                 string sessionId)
             {
@@ -484,6 +629,7 @@ namespace WasteCity.Tests
                 Sequence = sequence;
                 Store = store;
                 Coordinator = coordinator;
+                VoidChest = voidChest;
                 InitialWorldSeed = initialWorldSeed;
                 SessionId = sessionId;
             }
@@ -495,6 +641,7 @@ namespace WasteCity.Tests
             public AdvancementSequenceModel Sequence { get; }
             public FormalRewindAnchorStore Store { get; }
             public GrayboxFormalSaveCoordinator3D Coordinator { get; }
+            public VoidChestRuntime VoidChest { get; }
             public int InitialWorldSeed { get; }
             public string SessionId { get; }
 
@@ -522,6 +669,8 @@ namespace WasteCity.Tests
                 AdvancementSequenceModel sequence = selectedRewind
                     ? new AdvancementSequenceModel()
                     : null;
+                var pressure = new AttentionPressureRuntime();
+                var voidChest = new VoidChestRuntime(payload.sessionId, 1);
                 var adapter = new GrayboxFormalProgressionSaveAdapter3D(
                     attention,
                     fate,
@@ -529,10 +678,17 @@ namespace WasteCity.Tests
                     new FormalVoidDebtRuntime(),
                     rewindMetadata ?? new FormalRewindAnchorMetadataRuntime(),
                     new GrayboxAttentionPressureSaveAdapter3D(
-                        new AttentionPressureRuntime(),
+                        pressure,
                         new GrayboxDefenseRuntime3D(0f, 0f, 9f, 0f)),
                     civilization,
-                    sequence);
+                    sequence,
+                    CreateQuantumRuntime(),
+                    new SpatialTemplateRuntime(),
+                    new LocalHasteRuntime(),
+                    new ForesightDelayRuntime(),
+                    new CausalTransparencyRuntime(),
+                    voidChest,
+                    new CoordinateLockRuntime(attention, pressure));
                 IFormalThreeDSaveDomain[] domains = new IFormalThreeDSaveDomain[
                     GrayboxFormalSaveCoordinator3D.DomainOrder.Count];
                 for (var index = 0; index < domains.Length; index++)
@@ -556,6 +712,7 @@ namespace WasteCity.Tests
                     sequence,
                     new FormalRewindAnchorStore(root.Path, fileSystem),
                     coordinator,
+                    voidChest,
                     payload.world.worldSeed,
                     payload.sessionId);
             }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using WasteCity.City;
 using WasteCity.Economy;
+using WasteCity.Progression;
 
 namespace WasteCity.World.CivilizationExpansion
 {
@@ -577,6 +578,7 @@ namespace WasteCity.World.CivilizationExpansion
     {
         private readonly WorldMapModel map;
         private readonly ISettlementInventoryEndpoint primaryInventory;
+        private QuantumEntanglementInventoryNetwork quantumInventoryNetwork;
         private SortedDictionary<string, SettlementRuntime> settlements =
             new SortedDictionary<string, SettlementRuntime>(
                 StringComparer.Ordinal);
@@ -613,6 +615,18 @@ namespace WasteCity.World.CivilizationExpansion
         public int SettlementCount => settlements.Count;
         public ulong Revision { get; private set; }
 
+        public void ConfigureQuantumEntanglement(
+            QuantumEntanglementRuntime runtime)
+        {
+            quantumInventoryNetwork = runtime == null
+                ? null
+                : new QuantumEntanglementInventoryNetwork(
+                    runtime,
+                    ResolveLocalInventoryEndpoint,
+                    IsSettlementCommunicationActive,
+                    GetOrderedSettlementIds);
+        }
+
         public SettlementRuntime GetSettlement(string stableId)
         {
             return !string.IsNullOrWhiteSpace(stableId) &&
@@ -628,13 +642,36 @@ namespace WasteCity.World.CivilizationExpansion
             endpoint = null;
             SettlementRuntime settlement = GetSettlement(settlementId);
             if (settlement == null) return false;
-            if (settlement.Kind == SettlementKind.PrimaryCity)
-            {
-                endpoint = primaryInventory;
-                return true;
-            }
-            endpoint = settlement;
+            ISettlementInventoryEndpoint local =
+                ResolveLocalInventoryEndpoint(settlementId);
+            endpoint = quantumInventoryNetwork == null
+                ? local
+                : quantumInventoryNetwork.CreateEndpoint(settlementId, local);
             return true;
+        }
+
+        private ISettlementInventoryEndpoint ResolveLocalInventoryEndpoint(
+            string settlementId)
+        {
+            SettlementRuntime settlement = GetSettlement(settlementId);
+            if (settlement == null) return null;
+            return settlement.Kind == SettlementKind.PrimaryCity
+                ? primaryInventory
+                : settlement;
+        }
+
+        private bool IsSettlementCommunicationActive(string settlementId)
+        {
+            return GetSettlement(settlementId)?.IsCommunicationActive == true;
+        }
+
+        private IReadOnlyList<string> GetOrderedSettlementIds()
+        {
+            var result = new string[settlements.Count];
+            var index = 0;
+            foreach (KeyValuePair<string, SettlementRuntime> item in settlements)
+                result[index++] = item.Key;
+            return result;
         }
 
         public bool TryEstablishSecondary(

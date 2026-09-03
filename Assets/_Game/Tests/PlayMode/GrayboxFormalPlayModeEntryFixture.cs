@@ -101,18 +101,19 @@ namespace WasteCity.Tests
                 (diagnosticHost?.LastStoreResult?.Diagnostic ?? "null"));
             if (completeFateSelection)
             {
-                yield return ClickButton(
-                    "FateSelection.Card." +
-                    FormalFateCatalog.RewindAnchorId,
-                    mouse);
-                yield return ClickButton("FateSelection.Confirm", mouse);
                 GrayboxFormalSaveRuntimeHost3D host =
                     Object.FindObjectOfType<
                         GrayboxFormalSaveRuntimeHost3D>();
                 Assert.That(host, Is.Not.Null);
+                string offeredFateId =
+                    host.FateRuntime.Capture().OfferedIds[0];
+                yield return ClickButton(
+                    "FateSelection.Card." +
+                    offeredFateId,
+                    mouse);
+                yield return ClickButton("FateSelection.Confirm", mouse);
                 Assert.That(host.FateRuntime.Capture().SelectedId,
-                    Is.EqualTo(
-                        FormalFateCatalog.RewindAnchorId));
+                    Is.EqualTo(offeredFateId));
             }
         }
 

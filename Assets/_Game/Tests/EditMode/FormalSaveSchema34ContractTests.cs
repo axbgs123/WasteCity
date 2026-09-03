@@ -11,7 +11,7 @@ namespace WasteCity.Tests
         [Test]
         public void IDEA0022_CurrentSchemaOwnsOneCivilizationExpansionPayload()
         {
-            Assert.That(FormalSaveEnvelope.CurrentSchemaVersion, Is.EqualTo(35));
+            Assert.That(FormalSaveEnvelope.CurrentSchemaVersion, Is.EqualTo(36));
             FieldInfo field = typeof(FormalThreeDSaveData).GetField(
                 "civilizationExpansion",
                 BindingFlags.Instance | BindingFlags.Public);
@@ -113,7 +113,7 @@ namespace WasteCity.Tests
                 FormalSaveCodec.EncodeEnvelope(envelope));
 
             Assert.That(decoded.Success, Is.True, decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(35));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
             Assert.That(decoded.Envelope.formal3D.civilizationExpansion,
                 Is.Not.Null);
             Assert.That(decoded.Envelope.formal3D.civilizationExpansion

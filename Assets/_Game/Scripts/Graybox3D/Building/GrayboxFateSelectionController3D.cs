@@ -39,7 +39,7 @@ namespace WasteCity.Graybox3D.Building
             {
                 return false;
             }
-            view.ApplyCards(FormalFateCatalog.All);
+            view.ApplyCards(ResolveOfferedDefinitions(snapshot));
             if (snapshot.HasSelection)
             {
                 view.SetSelectedStatus(SelectedStatus(snapshot));
@@ -61,8 +61,10 @@ namespace WasteCity.Graybox3D.Building
 
         public bool TrySelectCard(string fateId, out string error)
         {
-            if (!effectsReady() || fate.Capture().HasSelection ||
-                FormalFateCatalog.Find(fateId) == null)
+            FormalFateSnapshot snapshot = fate.Capture();
+            if (!effectsReady() || snapshot.HasSelection ||
+                FormalFateCatalog.Find(fateId) == null ||
+                !ContainsOffer(snapshot, fateId))
             {
                 error = "命轨选择尚未开放或候选无效";
                 return false;
@@ -111,6 +113,34 @@ namespace WasteCity.Graybox3D.Building
                 ? string.Empty
                 : "已选择：" + definition.DisplayName + "  Lv." +
                   snapshot.Level;
+        }
+
+        private static FormalFateDefinition[] ResolveOfferedDefinitions(
+            FormalFateSnapshot snapshot)
+        {
+            var definitions =
+                new FormalFateDefinition[snapshot.OfferedIds.Count];
+            for (var index = 0; index < definitions.Length; index++)
+            {
+                definitions[index] =
+                    FormalFateCatalog.Find(snapshot.OfferedIds[index]);
+            }
+            return definitions;
+        }
+
+        private static bool ContainsOffer(
+            FormalFateSnapshot snapshot,
+            string fateId)
+        {
+            for (var index = 0; index < snapshot.OfferedIds.Count; index++)
+            {
+                if (string.Equals(
+                        snapshot.OfferedIds[index],
+                        fateId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         private void HandleCardSelected(string fateId)

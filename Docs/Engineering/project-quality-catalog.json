@@ -206,6 +206,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxPocketUniverseFateControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxVoidDebtIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxRewindAnchorServiceTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSpatialTemplateControllerTests.cs",
         "Assets/_Game/Tests/EditMode/RepairProcessTests.cs",
         "Assets/_Game/Tests/EditMode/TurretAndBuildingTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxBuildingRuntimeSceneTests.cs",
@@ -230,13 +231,16 @@
         "IDEA-0017",
         "IDEA-0019",
         "IDEA-0020",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
-        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md"
+        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FocusedPlayMode"
     },
@@ -338,7 +342,8 @@
         "IDEA-0020",
         "IDEA-0021",
         "IDEA-0024",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -346,7 +351,9 @@
         "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
-        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md"
+        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -367,7 +374,13 @@
         "Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs",
-        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs"
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs",
+        "Assets/_Game/Scripts/Progression/QuantumEntanglementRuntime.cs",
+        "Assets/_Game/Scripts/Progression/LocalHasteRuntime.cs",
+        "Assets/_Game/Scripts/Progression/VoidChestRuntime.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/QuantumEntanglementInventoryNetwork.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Economy/**",
@@ -411,6 +424,12 @@
         "Assets/_Game/Tests/EditMode/ResourceTransactionAndCapacityTests.cs",
         "Assets/_Game/Tests/EditMode/RouteCapstoneProductionTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxElixirUseCommand3DTests.cs"
+        ,"Assets/_Game/Tests/EditMode/LocalHasteRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxLocalHasteControllerTests.cs"
+        ,"Assets/_Game/Tests/EditMode/QuantumEntanglementRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/QuantumEntanglementInventoryNetworkTests.cs"
+        ,"Assets/_Game/Tests/EditMode/VoidChestRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxVoidChestControllerTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -426,12 +445,15 @@
         "IDEA-0017",
         "IDEA-0020",
         "IDEA-0021",
-        "IDEA-0024"
+        "IDEA-0024",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
-        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md"
+        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -453,6 +475,9 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs"
+        ,"Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs"
+        ,"Assets/_Game/Scripts/Graybox3D/Building/GrayboxSpatialTemplateController3D.cs"
+        ,"Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs"
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Research/**",
@@ -518,6 +543,17 @@
         "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/CivilizationResearchAvailabilityTests.cs",
         "Assets/_Game/Tests/EditMode/CivilizationResearchOperationsTests.cs"
+        ,"Assets/_Game/Tests/EditMode/CausalTransparencyRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/CoordinateLockRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/ForesightDelayRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/FormalFateOfferSelectorTests.cs"
+        ,"Assets/_Game/Tests/EditMode/LocalHasteRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/QuantumEntanglementRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/SpatialTemplateRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/VoidChestRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxLocalHasteControllerTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxSpatialTemplateControllerTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxVoidChestControllerTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -532,14 +568,17 @@
         "IDEA-0020",
         "IDEA-0021",
         "IDEA-0026",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
         "Docs/superpowers/specs/2026-08-31-idea-0026-rich-research-effects-design.md",
-        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md"
+        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -553,6 +592,7 @@
         "Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxAttentionPressure*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefense*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs",
         "Assets/_Game/Scripts/Content/RouteContentDisplayCatalog.cs"
       ],
       "PrimarySourceGlobs": [
@@ -623,6 +663,10 @@
         "Assets/_Game/Tests/PlayMode/GrayboxDefenseRuntimeInputTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDefenseSettlementRuntimeIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0021BridgeCombatTests.cs"
+        ,"Assets/_Game/Tests/EditMode/VoidChestRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/GrayboxVoidChestControllerTests.cs"
+        ,"Assets/_Game/Tests/EditMode/ForesightDelayRuntimeTests.cs"
+        ,"Assets/_Game/Tests/EditMode/CoordinateLockRuntimeTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
@@ -635,13 +679,16 @@
         "IDEA-0017",
         "IDEA-0020",
         "IDEA-0021",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
-        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md"
+        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FocusedPlayMode"
     },
@@ -685,6 +732,7 @@
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027ResearchEffectStateSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
@@ -717,14 +765,17 @@
         "IDEA-0019",
         "IDEA-0020",
         "IDEA-0021",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
-        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md"
+        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "FullRegression"
     },
@@ -907,6 +958,7 @@
         "Assets/_Game/Tests/EditMode/SingleCityArmyModelTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0022*.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027ArmyTechnologyEffectsTests.cs",
+        "Assets/_Game/Tests/EditMode/QuantumEntanglementInventoryNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionUiInputTests.cs",
         "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
@@ -923,14 +975,17 @@
         "IDEA-0022",
         "IDEA-0023",
         "IDEA-0024",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ],
       "HumanDocumentPaths": [
         "Docs/01-Game-Design-Document-ZH.md",
         "Docs/05-Formal-Development-Roadmap-ZH.md",
         "Docs/06-User-Feedback-and-Change-Control-ZH.md",
         "Docs/superpowers/specs/2026-08-28-idea-0022-civilization-expansion-design.md",
-        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md"
+        "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
+        "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
       ],
       "MinimumVerification": "WindowsBuilds"
     },
@@ -1542,15 +1597,16 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在正式 Attention、Fate、三条命轨效果、Civilization 与 AdvancementSequence owner 和 schema 33 progression/effect DTO 之间确定性捕获、预检并原子恢复 Lv.1/Lv.2 当前真值。",
-      "BoundarySummary": "只映射已经验证的 Progression、文明升阶、演出阶段与命轨效果快照，并准备绑定 owner 身份的零写入恢复计划；不计算升阶资格、不提交关注度或奖励、不推进演出、不读写文件或操作 UI。",
+      "UseSummary": "显式注入 Attention、Fate、文明、演出和各命轨 owner，先建立零写入恢复计划，再由存档协调器统一提交或回滚；量子同步键、空间模板、局部时加周期/预算、预知显示、因果历史、宝箱幂等账本和坐标锁定都保留独立所有权。",
+      "BoundarySummary": "只映射已经验证的 Progression、文明升阶、演出阶段与命轨效果快照；不计算升阶资格、不提交关注度或奖励、不推进演出、不读写文件或操作 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalFateEffectsSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
-        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs"
+        "Assets/_Game/Tests/PlayMode/GrayboxCivilizationAdvancementRuntimeInputTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0020"
@@ -1793,7 +1849,7 @@
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
       "UseSummary": "从正式资源、研究与文明进程动作目录建立稳定顺序的中文查询快照，支持列表浏览、中文名和 stable ID 的规范化子串搜索，供 Editor/Development 修改器的列表与输入查找共用。",
-      "BoundarySummary": "只负责只读目录投影和查询，不增加资源、不解锁科技、不执行 Attention/Fate/Pressure/Boss/Ascension，也不持有搜索框或选择状态；命令必须经过 Modifier/Facade 公共入口，Release 不得引用修改器 UI 或行为。",
+      "BoundarySummary": "只负责只读目录投影和查询，不增加资源、不解锁科技、不执行 Attention/Fate/Pressure/Boss/Ascension，也不持有搜索框或选择状态；九条正式命轨使用游戏中文名和稳定 ID 查询，命令必须经过 Modifier/Facade 公共入口，Release 不得引用修改器 UI 或行为。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierCatalogTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperModifierTests.cs",
@@ -1801,7 +1857,8 @@
       ],
       "RequirementIds": [
         "IDEA-0016",
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0028"
       ]
     },
     {
@@ -1821,7 +1878,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "在 Editor/Development 许可内，以 24 个稳定中文动作查询 Attention、Fate、Pressure、Boss、锚点和首次文明升阶，并把玩家同源命令与明确测试夹具委托给唯一 Host/领域 owner；Bootstrap 同时提供列表、中文搜索与数值/资源/阈值/锚点参数。",
+      "UseSummary": "九条命轨必须以正式游戏中文名和 stable ID 进入同一列表/输入搜索，选择和回滚仍委托给 Host。",
       "BoundarySummary": "只作为开发诊断入口；查询、失败和无变化不得标记修改器使用，真实改变才单向标记。强制命轨选择前仅 dev-only 真实 0 可置顶打开，系统菜单仍最高；Release 不包含 Facade、命令或面板行为。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxDeveloperProgressionCommandTests.cs",
@@ -1830,7 +1887,8 @@
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0028"
       ]
     },
     {
@@ -2581,7 +2639,7 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "从正式 Attention/Fate 不可变快照投影关注度数值、四阶段、下一阈值、最近三条中文原因和固定命轨候选，并用真实 UGUI 状态按钮打开或关闭详情。",
+      "UseSummary": "只显示存档或新进度抽取器已经提交的三项及其顺序，不把九条正式池同时塞入三卡区域。",
       "BoundarySummary": "只读取不可变快照并更新真实 UGUI；不写 Attention/Fate runtime、不进入 schema、不复制关注度增量或命轨规则，也不得在 EffectsReady=false 时开放或强制弹出命轨选择。相同快照引用必须保持零重复刷新。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxProgressionPresentationTests.cs",
@@ -2593,7 +2651,7 @@
     },
     {
       "Id": "graybox-fate-selection-ui-3d",
-      "ChineseName": "三维固定命轨强制选择 UI",
+      "ChineseName": "三维本局三命轨强制选择 UI",
       "TypeNames": [
         "GrayboxFateSelectionCard3D",
         "GrayboxFateSelectionView3D",
@@ -2605,14 +2663,15 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以真实 UGUI 全屏阻断世界输入，完整显示固定三命轨目录文案，并通过二次确认和 ProgressionEventRouter 原子提交唯一 Lv.1 选择与 +5 关注度。",
+      "UseSummary": "卡片内容、顺序和 stable ID 全部读取 `FormalFateSnapshot.OfferedIds`，继续和回溯时不得重新抽取。",
       "BoundarySummary": "强制选择与 Host/真实输入已接且只负责首次 Lv.1 选择；不直接写 Fate 或 Attention runtime，不提供回溯锚点创建/读取按钮，也不承担文明升阶。Lv.2 由独立文明升阶 UI 与 Host 事务处理。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFateSelectionPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateSelectionRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0028"
       ]
     },
     {
@@ -2628,14 +2687,15 @@
       ],
       "FeatureGroupId": "ui-input",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以四份不可变快照和引用缓存显示已选命轨、袖珍旗舰与坍缩、虚空债务与结算，以及 Lv.1 单锚点/Lv.2 双锚点稳定槽选择，并提供真实 UGUI Create、Read、Clear 与指定槽读取二次确认。",
-      "BoundarySummary": "只读取 Fate/Pocket/Void/Rewind 不可变快照并发布带稳定锚点 ID 的命令事件，不直接写 runtime、schema 或文件；Create/Read/Clear 必须由 Host 绑定到唯一 Rewind Service。未选命轨不开放，读取必须二次确认。",
+      "UseSummary": "View 只展示已选命轨对应的状态和操作，控制器把通用动作交给 Host 的唯一领域 owner；回溯锚点 Create、Read、Clear 与指定槽读取仍使用二次确认。",
+      "BoundarySummary": "不直接写 runtime、schema 或文件；Create/Read/Clear 必须由 Host 绑定到唯一 Rewind Service。未选命轨不开放，读取必须二次确认。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFateOperationsPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFateOperationsRuntimeInputTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0028"
       ]
     },
     {
@@ -2733,7 +2793,7 @@
     },
     {
       "Id": "formal-fate-catalog",
-      "ChineseName": "正式固定三命轨目录",
+      "ChineseName": "正式九命轨内容目录",
       "TypeNames": [
         "FormalFateDefinition",
         "FormalFateCatalog"
@@ -2743,13 +2803,14 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "定义 IDEA-0020 固定三选一的袖珍宇宙、虚空债和回溯锚点稳定身份、顺序、显示键与规则键。",
-      "BoundarySummary": "只定义正式三条命轨静态内容；不从 LegacyPathCatalog 的九条历史池随机抽取，不保存选择或等级，不执行生产、债务、回溯、关注度、存档或 UI 效果。",
+      "UseSummary": "所有 UI、修改器、抽取器和领域 owner 都按稳定 ID 查询这里，不从中文名字、旧 Legacy 目录或数组位置反推规则。",
+      "BoundarySummary": "只定义九条已定稿命轨的静态内容；其余十五条草案不进入正式池，不保存本局抽取、选择或等级，也不执行领域效果。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalFateCatalogTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0020"
+        "IDEA-0020",
+        "IDEA-0028"
       ]
     },
     {
@@ -2765,8 +2826,8 @@
       ],
       "FeatureGroupId": "research-population",
       "ReuseLevel": "Recommended",
-      "UseSummary": "维护固定三候选、待选择与已选择状态、命轨等级、Lv.1→Lv.2 单次晋级、revision、缓存快照和原子恢复；Lv.2 静态目录集中提供袖珍宇宙×4 与 4×4、虚空债 60 秒和回溯容量 2。",
-      "BoundarySummary": "只拥有命轨选择与等级真值及 Lv.2 参数；不判断文明升阶条件，不执行袖珍宇宙、虚空债或回溯锚点效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。",
+      "UseSummary": "新进度先用 `FormalFateOfferSelector` 生成三项，再把结果交给 runtime；继续、迁移、锚点和波前重试始终恢复保存的候选。",
+      "BoundarySummary": "只拥有本局候选、选择与等级真值及 Lv.2 参数；不自行抽取候选，不执行任何命轨领域效果，不增加关注度，不创建检查点，不读写文件、不访问 Unity 或 UI。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalFateRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalProgressionTests.cs",
@@ -2775,6 +2836,90 @@
       ],
       "RequirementIds": [
         "IDEA-0020"
+      ]
+    },
+    {
+      "Id": "formal-fate-offer-selector",
+      "ChineseName": "九命轨本局稳定抽取器",
+      "TypeNames": [
+        "FormalFateOfferSelector"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/FormalFateOfferSelector.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "只在创建新进度时调用，并把结果立即交给 `FormalFateRuntime` 和 schema 36 保存。",
+      "BoundarySummary": "继续、迁移、回溯锚点和波前重试不得调用它重抽；它不保存状态、不选择命轨也不执行效果。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalFateOfferSelectorTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0028"
+      ]
+    },
+    {
+      "Id": "formal-fate-domain-runtimes",
+      "ChineseName": "六条新增命轨与坐标锁定纯运行时",
+      "TypeNames": [
+        "QuantumEntanglementRuntime",
+        "SpatialTemplateRuntime",
+        "LocalHasteRuntime",
+        "ForesightDelayRuntime",
+        "CausalTransparencyRuntime",
+        "VoidChestRuntime",
+        "CoordinateLockRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Progression/QuantumEntanglementRuntime.cs",
+        "Assets/_Game/Scripts/Progression/SpatialTemplateRuntime.cs",
+        "Assets/_Game/Scripts/Progression/LocalHasteRuntime.cs",
+        "Assets/_Game/Scripts/Progression/ForesightDelayRuntime.cs",
+        "Assets/_Game/Scripts/Progression/CausalTransparencyRuntime.cs",
+        "Assets/_Game/Scripts/Progression/VoidChestRuntime.cs",
+        "Assets/_Game/Scripts/Progression/CoordinateLockRuntime.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "每个 owner 只通过自己的快照、预检、提交和恢复边界接入 Host，再由对应领域控制器消费。",
+      "BoundarySummary": "不扫描 Unity 场景、不直接写库存/建筑/生产/研究/防御、不把 UI 当真值，也不使用全局 `Time.timeScale`。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/QuantumEntanglementRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/SpatialTemplateRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/LocalHasteRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/ForesightDelayRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/CausalTransparencyRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/VoidChestRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/CoordinateLockRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0028"
+      ]
+    },
+    {
+      "Id": "graybox-fate-domain-controllers-3d",
+      "ChineseName": "三维命轨领域消费控制器",
+      "TypeNames": [
+        "GrayboxLocalHasteController3D",
+        "GrayboxSpatialTemplateController3D",
+        "GrayboxVoidChestController3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxSpatialTemplateController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs"
+      ],
+      "FeatureGroupId": "research-population",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "由唯一 Host 注入领域 owner 和现有正式接口；控制器只编排预检、提交与失败回滚。",
+      "BoundarySummary": "不得复制目标资格、放置合法性、建造费用、库存容量、死亡身份或掉落幂等判断。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/GrayboxLocalHasteControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxSpatialTemplateControllerTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxVoidChestControllerTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0028"
       ]
     },
     {
@@ -4147,8 +4292,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "以统一信封区分 legacy 2D schema 1 至 30、正式 3D schema 31、32、33、34、当前 schema 35 和未来版本，提供确定性编码、逐版本历史 payload hash、结构与跨引用验证，以及 31→32→33→34→35 单向迁移。",
-      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，历史迁移不反推关注度、军队、多城、角色政治或高级科技战斗历史，34→35 只建立空高级状态。",
+      "UseSummary": "为每个新 schema 保留旧版本精确投影与哈希，再增加单向迁移；schema 36 保存本局候选/抽取版本、六条新增命轨状态和坐标锁定。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，35→36 保留旧候选和既有命轨状态，只为新增 owner 建立清洁默认。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
@@ -4159,7 +4304,8 @@
         "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027ResearchEffectStateSaveAdapterTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -4167,7 +4313,8 @@
         "IDEA-0017",
         "IDEA-0020",
         "IDEA-0022",
-        "IDEA-0027"
+        "IDEA-0027",
+        "IDEA-0028"
       ]
     },
     {
@@ -4278,7 +4425,7 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "按 world/city、building/storage、economy、production、defense、researchEffectState、progression、evacuation、civilizationExpansion、pause 固定依赖顺序协调 schema 35 捕获与恢复；先完整验证，再事务式应用，失败时回滚十个权威领域并在成功提交后统一重建派生状态。",
+      "UseSummary": "九命轨的细分 owner 继续收敛在 progression 事务域内，不改变十个顶层领域的提交顺序。",
       "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、临时表现或 UI 入档；研究效果状态是独立事务域，回滚失败会保留安全屏障，调用方不得伪装成成功。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
@@ -4286,12 +4433,14 @@
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
         "IDEA-0020",
-        "IDEA-0022"
+        "IDEA-0022",
+        "IDEA-0028"
       ]
     },
     {
@@ -4305,8 +4454,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "在 GrayboxPrototype3D 组合 schema 35 十领域 coordinator、Attention/Fate/Civilization、文明扩展与高级科技状态唯一 owner、规则效率、UGUI/真实 U/M/N/P/0、检查点与保存恢复。",
-      "BoundarySummary": "只作为正式 3D 场景组合根；资格从 Research/Building/Pressure/Production 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO 或战斗规则；主战役与压力战役状态隔离，内部重试档和回溯锚点都不是第二玩家存档槽。",
+      "UseSummary": "Host 只负责组合新进度抽取、领域 owner、真实消费者、规则周期、界面命令和存档边界；继续时先重绑 session 专属 owner 再恢复。",
+      "BoundarySummary": "只作为正式 3D 场景组合根；资格从 Research/Building/Pressure/Production/Defense 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO 或战斗规则；局部时加不修改 `Time.timeScale`，内部重试档和回溯锚点都不是第二玩家存档槽。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
@@ -4323,7 +4472,8 @@
         "IDEA-0015",
         "IDEA-0017",
         "IDEA-0020",
-        "IDEA-0022"
+        "IDEA-0022",
+        "IDEA-0028"
       ]
     },
     {
@@ -4442,22 +4592,26 @@
       "TypeNames": [
         "WorldLayerRuntime",
         "SettlementRuntime",
-        "TransportRuntime"
+        "TransportRuntime",
+        "QuantumEntanglementInventoryNetwork"
       ],
       "AssetPaths": [
         "Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs",
         "Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs",
-        "Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs"
+        "Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs",
+        "Assets/_Game/Scripts/World/CivilizationExpansion/QuantumEntanglementInventoryNetwork.cs"
       ],
       "FeatureGroupId": "civilization-expansion",
       "ReuseLevel": "Recommended",
-      "UseSummary": "提供主城引用、一次城、一前哨、独立库存/自治、查看与控制权以及存在时间、货物和风险的实体运输队。",
-      "BoundarySummary": "主城仍引用既有库存，位置和路径只消费WorldMapModel与CityPathfinder；不创建第二张地图或第二套主城建筑网格。",
+      "UseSummary": "为各 settlement 保留原本地端点，量子网络只在命轨已选且通信有效时把基础资源读写路由到连接成员。",
+      "BoundarySummary": "主城仍引用既有库存，位置和路径只消费 `WorldMapModel` 与 `CityPathfinder`；量子网络不创建第二库存、第二地图或第二套主城建筑网格，混合事务失败必须完整回滚。",
       "RequiredTestFiles": [
-        "Assets/_Game/Tests/EditMode/IDEA0022WorldLayerSettlementTransportTests.cs"
+        "Assets/_Game/Tests/EditMode/IDEA0022WorldLayerSettlementTransportTests.cs",
+        "Assets/_Game/Tests/EditMode/QuantumEntanglementInventoryNetworkTests.cs"
       ],
       "RequirementIds": [
-        "IDEA-0022"
+        "IDEA-0022",
+        "IDEA-0028"
       ]
     },
     {

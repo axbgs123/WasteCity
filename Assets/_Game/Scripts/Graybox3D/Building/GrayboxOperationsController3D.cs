@@ -52,6 +52,7 @@ namespace WasteCity.Graybox3D.Building
         private bool selectedBackpackPlacesOne;
         private bool eventsBound;
         private Func<float> civilizationResearchEfficiencySource;
+        private Func<float> localHasteResearchMultiplierSource;
         private string inventoryTransferStatus;
         private string craftingFeedback;
         private string selectedProductionId;
@@ -109,6 +110,12 @@ namespace WasteCity.Graybox3D.Building
             Func<float> source)
         {
             civilizationResearchEfficiencySource = source;
+            hasViewFingerprint = false;
+        }
+
+        public void ConfigureLocalHasteResearchMultiplier(Func<float> source)
+        {
+            localHasteResearchMultiplierSource = source;
             hasViewFingerprint = false;
         }
 
@@ -251,7 +258,10 @@ namespace WasteCity.Graybox3D.Building
             research.Tick(
                 ruleDeltaSeconds * Mathf.Max(
                     0f,
-                    civilizationResearchEfficiencySource?.Invoke() ?? 1f),
+                    civilizationResearchEfficiencySource?.Invoke() ?? 1f) *
+                Mathf.Max(
+                    0f,
+                    localHasteResearchMultiplierSource?.Invoke() ?? 1f),
                 city.Mode,
                 paused,
                 HasEligibleResearchStation());

@@ -162,6 +162,8 @@ namespace WasteCity.Progression
                 Event("core.attention.ruins.optional-interference", -5,
                     "完成可选干扰遗迹"),
                 Event("core.attention.civilization.advanced", 25, "文明升阶"),
+                Once("core.attention.world.coordinate-locked", 0,
+                    "坐标锁定"),
             });
 
         private static readonly IReadOnlyDictionary<string,

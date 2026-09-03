@@ -1,6 +1,6 @@
 # 项目自动清单
 
-本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`3e278ccb8fbaa736f865302dc0290e75febf8cffde1d30562f6a5f8535119ca1`。
+本附录为自动生成内容，由目录和项目快照生成；请不要手工修改。生成器 schema：`project-quality-documentation/v2`，内容指纹：`5551f23742f850774cc2bdab39a9a6ad5a55f51b87aba8831f328b100db73962`。
 
 ## 1. 生成说明与内容指纹
 - 指纹覆盖本文件与测试清单的最终正文和生成器 schema，不读取当前时间、Git 提交或机器路径。
@@ -84,6 +84,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalProgressionSaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxOperationsView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs`
@@ -102,7 +103,9 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchTreeViewportInput3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxSpatialTemplateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxUiInputGuard3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxWorldCitySaveAdapter3D.cs`
@@ -137,6 +140,7 @@
 - `Assets/_Game/Scripts/Leader/CivilizationExpansion/DiplomacyRuntime.cs`
 - `Assets/_Game/Scripts/Leader/CivilizationExpansion/LeadershipPoliticsRuntime.cs`
 - `Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExpansionSaveData.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/QuantumEntanglementInventoryNetwork.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs`
@@ -191,6 +195,7 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSettlementView3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseWorldView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs`
 - `Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs`
 - `Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs`
 - 经济生产与物流（`economy-production-logistics`）：
@@ -216,6 +221,7 @@
 - `Assets/_Game/Scripts/Economy/RouteCapstoneProductionCatalog.cs`
 - `Assets/_Game/Scripts/Economy/WarehouseStorageState.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionClock3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionCommandFacade3D.cs`
@@ -223,10 +229,15 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionEligibility3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionRuntime3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProductionSaveAdapter3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/ProductionObservabilitySnapshot.cs`
 - `Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`
+- `Assets/_Game/Scripts/Progression/LocalHasteRuntime.cs`
+- `Assets/_Game/Scripts/Progression/QuantumEntanglementRuntime.cs`
+- `Assets/_Game/Scripts/Progression/VoidChestRuntime.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/QuantumEntanglementInventoryNetwork.cs`
 - 基础时钟与会话（`foundation-clock`）：
 - `Assets/_Game/Scripts/Content/StableId.cs`
 - `Assets/_Game/Scripts/Core/GameClockModel.cs`
@@ -324,10 +335,13 @@
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxEconomySaveAdapter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelectionView3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxLocalHasteController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseCollapseResolver3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxPocketUniverseFateController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxProgressionEventRouter3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxSpatialTemplateController3D.cs`
+- `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidChestController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtAttentionController3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/Building/GrayboxVoidDebtController3D.cs`
 - `Assets/_Game/Scripts/Narrative/GuidanceFlowModel.cs`
@@ -335,16 +349,24 @@
 - `Assets/_Game/Scripts/Progression/AdvancementSequenceModel.cs`
 - `Assets/_Game/Scripts/Progression/AttentionPressureCatalog.cs`
 - `Assets/_Game/Scripts/Progression/AttentionPressureRuntime.cs`
+- `Assets/_Game/Scripts/Progression/CausalTransparencyRuntime.cs`
+- `Assets/_Game/Scripts/Progression/CoordinateLockRuntime.cs`
+- `Assets/_Game/Scripts/Progression/ForesightDelayRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalAttentionRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalCivilizationAscension.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateCatalog.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateLevelTwoCatalog.cs`
+- `Assets/_Game/Scripts/Progression/FormalFateOfferSelector.cs`
 - `Assets/_Game/Scripts/Progression/FormalFateRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalProgressionModels.cs`
 - `Assets/_Game/Scripts/Progression/FormalRewindAnchorMetadataRuntime.cs`
 - `Assets/_Game/Scripts/Progression/FormalVoidDebtRuntime.cs`
+- `Assets/_Game/Scripts/Progression/LocalHasteRuntime.cs`
 - `Assets/_Game/Scripts/Progression/PocketUniverseFateEffect.cs`
+- `Assets/_Game/Scripts/Progression/QuantumEntanglementRuntime.cs`
+- `Assets/_Game/Scripts/Progression/SpatialTemplateRuntime.cs`
+- `Assets/_Game/Scripts/Progression/VoidChestRuntime.cs`
 - `Assets/_Game/Scripts/Research/CivilizationResearchAvailability.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchCatalog.cs`
 - `Assets/_Game/Scripts/Research/DemoResearchRuntime.cs`
@@ -424,6 +446,7 @@
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerationCatalog3D.cs`
 - `Assets/_Game/Scripts/Graybox3D/FormalWorldGenerator3D.cs`
 - `Assets/_Game/Scripts/World/CameraFollowModel.cs`
+- `Assets/_Game/Scripts/World/CivilizationExpansion/QuantumEntanglementInventoryNetwork.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/SettlementRuntime.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/TransportRuntime.cs`
 - `Assets/_Game/Scripts/World/CivilizationExpansion/WorldLayerCatalog.cs`

@@ -124,9 +124,14 @@ namespace WasteCity.Tests
 
             yield return Tap(Key.Digit0);
             Assert.That(developer.IsPanelOpen, Is.False);
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            FormalFateSnapshot offered = host.FateRuntime.Capture();
+            Assert.That(offered.OfferedIds, Is.Not.Empty);
             yield return ClickNamed(
                 "FateSelection.Card." +
-                FormalFateCatalog.RewindAnchorId);
+                offered.OfferedIds[0]);
             yield return ClickNamed("FateSelection.Confirm");
 
             GrayboxCivilizationExpansionView3D expansionView =

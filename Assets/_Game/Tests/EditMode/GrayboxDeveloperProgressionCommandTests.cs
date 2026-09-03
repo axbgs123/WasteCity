@@ -20,7 +20,7 @@ namespace WasteCity.Tests
         {
             Assert.That(
                 GrayboxDeveloperCatalogQuery3D.ProgressionActionEntries,
-                Has.Count.EqualTo(24));
+                Has.Count.EqualTo(31));
             Assert.That(GrayboxDeveloperCatalogQuery3D.SearchProgressionActions(
                     "关注度").Select(value => value.DisplayName),
                 Does.Contain("增加关注度").And.Contain("降低关注度")
@@ -54,6 +54,110 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0028_FateDomainQueryReadsSevenLiveOwnerSnapshots()
+        {
+            using (Fixture fixture = Create())
+            {
+                GrayboxDeveloperProgressionQuery3D initial =
+                    fixture.Modifier.QueryProgression();
+                Assert.That(initial.FateDomainStates, Has.Count.EqualTo(7));
+                Assert.That(initial.FateDomainStates[0],
+                    Does.StartWith("量子纠缠：已连接")
+                        .And.Contain("共享资源 1")
+                        .And.Contain("同步记录 0"));
+                Assert.That(initial.FateDomainStates[1],
+                    Does.StartWith("空间模板：模板 0"));
+                Assert.That(initial.FateDomainStates[2],
+                    Does.StartWith("局部时加：未启动"));
+                Assert.That(initial.FateDomainStates[3],
+                    Does.StartWith("预知迟滞：周期 0").And.Contain("无预告"));
+                Assert.That(initial.FateDomainStates[4],
+                    Does.StartWith("因果透明：完整原因未开放"));
+                Assert.That(initial.FateDomainStates[5],
+                    Does.StartWith("虚空宝箱：评估 0")
+                        .And.Contain("待领取 0").And.Contain("已领取 0"));
+                Assert.That(initial.FateDomainStates[6],
+                    Is.EqualTo("坐标锁定：未锁定"));
+
+                Assert.That(fixture.Quantum.TrySetConnected(false), Is.True);
+                Assert.That(fixture.Spatial.TryRestore(
+                    new SpatialTemplateSnapshot(
+                        1ul,
+                        new[]
+                        {
+                            new SpatialTemplateDefinition(
+                                "developer-template",
+                                new[]
+                                {
+                                    new SpatialTemplateCell(
+                                        0, 0, "core.building.wall", 0),
+                                }),
+                        }),
+                    out string spatialError), Is.True, spatialError);
+                Assert.That(fixture.Haste.TryEnterCycle(
+                    3ul, out string hasteError), Is.True, hasteError);
+                Assert.That(fixture.Haste.TrySelectTarget(
+                    "production", out hasteError), Is.True, hasteError);
+                Assert.That(fixture.Haste.TryStart(out hasteError), Is.True,
+                    hasteError);
+                Assert.That(fixture.Foresight.TryEnterCycle(
+                    4ul, out string foresightError), Is.True, foresightError);
+                Assert.That(fixture.Foresight.TryReveal(
+                    4ul,
+                    10f,
+                    new[]
+                    {
+                        new ForesightAuthoritativePlan(
+                            "event.raid", 25f, "突袭将至"),
+                    },
+                    out _,
+                    out foresightError), Is.True, foresightError);
+                Assert.That(fixture.Causal.TrySetFullReasonAccess(true),
+                    Is.True);
+                for (ulong sequence = 1ul; sequence <= 100ul; sequence++)
+                {
+                    Assert.That(fixture.Chest.TryEvaluateDeath(
+                        "developer-enemy",
+                        sequence,
+                        out _,
+                        out string chestError), Is.True, chestError);
+                }
+                Assert.That(fixture.Coordinate.TryRestore(
+                    new CoordinateLockSnapshot(true, 1ul),
+                    out string coordinateError), Is.True, coordinateError);
+
+                GrayboxDeveloperProgressionQuery3D current =
+                    fixture.Modifier.QueryProgression();
+                Assert.That(current.FateDomainStates[0],
+                    Does.StartWith("量子纠缠：已断开"));
+                Assert.That(current.FateDomainStates[1],
+                    Does.Contain("模板 1").And.Contain("格位 1"));
+                Assert.That(current.FateDomainStates[2],
+                    Does.StartWith("局部时加：运行中")
+                        .And.Contain("目标 生产").And.Contain("周期 3"));
+                Assert.That(current.FateDomainStates[3],
+                    Does.StartWith("预知迟滞：周期 4")
+                        .And.Contain("突袭将至"));
+                Assert.That(current.FateDomainStates[4],
+                    Does.StartWith("因果透明：完整原因已开放"));
+                Assert.That(current.FateDomainStates[5],
+                    Does.Contain("评估 100").And.Contain("待领取 1"));
+                Assert.That(current.FateDomainStates[6],
+                    Is.EqualTo("坐标锁定：已锁定"));
+
+                GrayboxDeveloperCommandResult3D result =
+                    fixture.Modifier.ExecuteProgressionAction(
+                        "查询命轨领域状态");
+                Assert.That(result.Succeeded, Is.True);
+                Assert.That(result.Code,
+                    Is.EqualTo(GrayboxDeveloperCommandCode3D.NoChange));
+                Assert.That(result.Message,
+                    Does.Contain("量子纠缠").And.Contain("坐标锁定"));
+                Assert.That(fixture.Modifier.HasModifiedGameState, Is.False);
+            }
+        }
+
+        [Test]
         public void IDEA0020_AttentionActionsUseFormalHistoryAndRemainRestorable()
         {
             using (Fixture fixture = Create())
@@ -79,9 +183,15 @@ namespace WasteCity.Tests
         }
 
         [TestCase("选择袖珍宇宙命轨", "core.legacy.pocket-universe")]
-        [TestCase("选择虚空债命轨", "core.legacy.void-debt")]
+        [TestCase("选择量子纠缠命轨", "core.legacy.quantum-entanglement")]
+        [TestCase("选择空间模板命轨", "core.legacy.spatial-template")]
         [TestCase("选择回溯锚点命轨", "core.legacy.rewind-anchor")]
-        public void IDEA0020_ThreeFateSelectionActionsBindCivilization(
+        [TestCase("选择局部时加命轨", "core.legacy.local-haste")]
+        [TestCase("选择预知迟滞命轨", "core.legacy.foresight-delay")]
+        [TestCase("选择虚空债命轨", "core.legacy.void-debt")]
+        [TestCase("选择因果透明命轨", "core.legacy.causal-transparency")]
+        [TestCase("选择虚空宝箱命轨", "core.legacy.void-chest")]
+        public void IDEA0028_NineFateSelectionActionsBindCivilization(
             string action,
             string expectedFate)
         {
@@ -94,6 +204,12 @@ namespace WasteCity.Tests
                 Assert.That(fixture.Civilization.Capture().FateId,
                     Is.EqualTo(expectedFate));
                 Assert.That(fixture.Attention.Value, Is.EqualTo(15));
+                Assert.That(fixture.Fate.Capture().OfferedIds,
+                    Does.Contain(expectedFate));
+                Assert.That(fixture.Fate.Capture().OfferedIds,
+                    Has.Count.EqualTo(3));
+                Assert.That(fixture.Fate.Capture().OfferedIds,
+                    Is.Unique);
             }
         }
 
@@ -294,6 +410,16 @@ namespace WasteCity.Tests
             var rewind = new FormalRewindAnchorMetadataRuntime();
             var pressure = new AttentionPressureRuntime();
             var sequence = new AdvancementSequenceModel();
+            var quantum = new QuantumEntanglementRuntime(new[]
+            {
+                ResourceIds.Iron,
+            });
+            var spatial = new SpatialTemplateRuntime();
+            var haste = new LocalHasteRuntime();
+            var foresight = new ForesightDelayRuntime();
+            var causal = new CausalTransparencyRuntime();
+            var chest = new VoidChestRuntime();
+            var coordinate = new CoordinateLockRuntime(attention, pressure);
             var facade = new GrayboxDeveloperProgressionFacade3D(
                 attention,
                 fate,
@@ -312,10 +438,30 @@ namespace WasteCity.Tests
                 null,
                 null,
                 satisfyRequirements,
-                clearRequirements);
+                clearRequirements,
+                quantum,
+                spatial,
+                haste,
+                foresight,
+                causal,
+                chest,
+                coordinate);
             modifier.ConfigureProgressionFacade(facade);
             return new Fixture(
-                root, modifier, attention, fate, civilization, debt, pressure);
+                root,
+                modifier,
+                attention,
+                fate,
+                civilization,
+                debt,
+                pressure,
+                quantum,
+                spatial,
+                haste,
+                foresight,
+                causal,
+                chest,
+                coordinate);
         }
 
         private sealed class Fixture : IDisposable
@@ -327,7 +473,14 @@ namespace WasteCity.Tests
                 FormalFateRuntime fate,
                 FormalCivilizationAscensionRuntime civilization,
                 FormalVoidDebtRuntime debt,
-                AttentionPressureRuntime pressure)
+                AttentionPressureRuntime pressure,
+                QuantumEntanglementRuntime quantum,
+                SpatialTemplateRuntime spatial,
+                LocalHasteRuntime haste,
+                ForesightDelayRuntime foresight,
+                CausalTransparencyRuntime causal,
+                VoidChestRuntime chest,
+                CoordinateLockRuntime coordinate)
             {
                 Root = root;
                 Modifier = modifier;
@@ -336,6 +489,13 @@ namespace WasteCity.Tests
                 Civilization = civilization;
                 Debt = debt;
                 Pressure = pressure;
+                Quantum = quantum;
+                Spatial = spatial;
+                Haste = haste;
+                Foresight = foresight;
+                Causal = causal;
+                Chest = chest;
+                Coordinate = coordinate;
             }
 
             public GameObject Root { get; }
@@ -345,6 +505,13 @@ namespace WasteCity.Tests
             public FormalCivilizationAscensionRuntime Civilization { get; }
             public FormalVoidDebtRuntime Debt { get; }
             public AttentionPressureRuntime Pressure { get; }
+            public QuantumEntanglementRuntime Quantum { get; }
+            public SpatialTemplateRuntime Spatial { get; }
+            public LocalHasteRuntime Haste { get; }
+            public ForesightDelayRuntime Foresight { get; }
+            public CausalTransparencyRuntime Causal { get; }
+            public VoidChestRuntime Chest { get; }
+            public CoordinateLockRuntime Coordinate { get; }
             public void Dispose() => UnityEngine.Object.DestroyImmediate(Root);
         }
     }

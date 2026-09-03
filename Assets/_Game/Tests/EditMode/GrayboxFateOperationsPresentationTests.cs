@@ -18,6 +18,77 @@ namespace WasteCity.Tests
         private const string ControllerName =
             "WasteCity.Graybox3D.Building.GrayboxFateOperationsController3D";
 
+        private static readonly string[] NewActionFateIds =
+        {
+            FormalFateCatalog.QuantumEntanglementId,
+            FormalFateCatalog.SpatialTemplateId,
+            FormalFateCatalog.LocalHasteId,
+            FormalFateCatalog.ForesightDelayId,
+            FormalFateCatalog.CausalTransparencyId,
+            FormalFateCatalog.VoidChestId,
+        };
+
+        [TestCase(FormalFateCatalog.PocketUniverseId)]
+        [TestCase(FormalFateCatalog.QuantumEntanglementId)]
+        [TestCase(FormalFateCatalog.SpatialTemplateId)]
+        [TestCase(FormalFateCatalog.RewindAnchorId)]
+        [TestCase(FormalFateCatalog.LocalHasteId)]
+        [TestCase(FormalFateCatalog.ForesightDelayId)]
+        [TestCase(FormalFateCatalog.VoidDebtId)]
+        [TestCase(FormalFateCatalog.CausalTransparencyId)]
+        [TestCase(FormalFateCatalog.VoidChestId)]
+        public void IDEA0028_AllNineFatesUseTheSameFiveFieldProjection(
+            string fateId)
+        {
+            using (Fixture fixture = Create(Selected(fateId)))
+            {
+                Assert.That(Refresh(fixture.Controller), Is.True);
+                foreach (string property in new[]
+                         {
+                             "RuleText",
+                             "CostText",
+                             "LevelText",
+                             "StatusText",
+                             "ActionText",
+                         })
+                {
+                    Assert.That(Read<string>(fixture.View, property),
+                        Is.Not.Empty, fateId + " / " + property);
+                }
+                StringAssert.Contains("Lv.1",
+                    Read<string>(fixture.View, "LevelText"));
+            }
+        }
+
+        [TestCaseSource(nameof(NewActionFateIds))]
+        public void IDEA0028_NewFatesExposeChineseGenericAction(string fateId)
+        {
+            using (Fixture fixture = Create(Selected(fateId)))
+            {
+                Assert.That(InvokeBool(fixture.Controller, "TryOpen"), Is.True);
+                Assert.That(Read<bool>(fixture.View,
+                    "GenericActionVisible"), Is.True);
+                string label = Read<string>(fixture.View, "ActionText");
+                Assert.That(label, Does.Not.Contain("Try").And.Not.Contain("("));
+
+                string requested = null;
+                EventInfo action = fixture.View.GetType().GetEvent(
+                    "FateActionRequested");
+                Assert.That(action, Is.Not.Null);
+                action.AddEventHandler(fixture.View,
+                    new Action<string>(id => requested = id));
+                Assert.That(InvokeBool(fixture.Controller,
+                    "TryRequestFateAction"), Is.True);
+                Assert.That(requested, Is.Null,
+                    "通用命轨动作必须先进入正式二次确认层。");
+                Assert.That(Read<bool>(fixture.View,
+                    "IsFateActionConfirmationOpen"), Is.True);
+                Assert.That(InvokeBool(fixture.Controller,
+                    "TryConfirmFateAction"), Is.True);
+                Assert.That(requested, Is.EqualTo(fateId));
+            }
+        }
+
         [Test]
         public void IDEA0020_UnselectedFateDoesNotOpenOperations()
         {
@@ -51,12 +122,10 @@ namespace WasteCity.Tests
                     Read<string>(fixture.View, "SelectedFateText"));
                 StringAssert.Contains("Lv.1",
                     Read<string>(fixture.View, "SelectedFateText"));
-                string[] flagships = Strings(fixture.View,
-                    "PocketFlagshipTexts");
-                Assert.That(flagships, Has.Length.EqualTo(1));
-                StringAssert.Contains(stableId, flagships[0]);
+                string status = Read<string>(fixture.View, "StatusText");
+                StringAssert.Contains(stableId, status);
                 StringAssert.Contains("已坍缩",
-                    Read<string>(fixture.View, "PocketCollapseStatusText"));
+                    status);
                 Assert.That(Read<bool>(fixture.View,
                     "RewindCommandsVisible"), Is.False);
             }
@@ -76,14 +145,9 @@ namespace WasteCity.Tests
                 Assert.That(Refresh(fixture.Controller), Is.True);
                 StringAssert.Contains("虚空债",
                     Read<string>(fixture.View, "SelectedFateText"));
-                string[] resources = Strings(fixture.View,
-                    "VoidDebtResourceTexts");
-                Assert.That(resources, Has.Length.EqualTo(1));
-                Assert.That(resources[0], Does.Contain("铁矿").And.Contain("12"));
-                StringAssert.Contains("12",
-                    Read<string>(fixture.View, "VoidDebtTotalText"));
-                StringAssert.Contains("秒",
-                    Read<string>(fixture.View, "VoidDebtNextSettlementText"));
+                string status = Read<string>(fixture.View, "StatusText");
+                Assert.That(status,
+                    Does.Contain("铁矿").And.Contain("12").And.Contain("秒"));
             }
         }
 
@@ -247,7 +311,20 @@ namespace WasteCity.Tests
         private static FormalFateRuntime Selected(string id)
         {
             var fate = new FormalFateRuntime();
-            Assert.That(fate.TrySelect(id, out _, out _, out _), Is.True);
+            var offers = FormalFateCatalog.All
+                .Select(value => value.Id.Value)
+                .Where(value => !string.Equals(
+                    value, id, StringComparison.Ordinal))
+                .Take(2)
+                .ToList();
+            offers.Insert(0, id);
+            Assert.That(fate.TryRestore(
+                new FormalFateSnapshot(
+                    1ul,
+                    offers.ToArray(),
+                    id,
+                    1),
+                out string error), Is.True, error);
             return fate;
         }
 

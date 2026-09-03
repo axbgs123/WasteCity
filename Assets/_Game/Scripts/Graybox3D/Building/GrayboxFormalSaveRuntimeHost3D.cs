@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Combat;
 using WasteCity.Core;
 using WasteCity.Defense;
+using WasteCity.Economy;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
@@ -50,6 +52,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxBuildingSession3D session;
         [SerializeField]
         private GrayboxBuildingWorldView3D buildingPresentation;
+        [SerializeField]
+        private GrayboxBuildingPlacementController3D buildingPlacement;
         [SerializeField] private GrayboxOperationsController3D operations;
         [SerializeField] private GrayboxProductionController3D production;
         [SerializeField] private GrayboxDefenseController3D defense;
@@ -80,6 +84,13 @@ namespace WasteCity.Graybox3D.Building
         private PocketUniverseFateEffect pocketUniverseEffect;
         private FormalVoidDebtRuntime voidDebtRuntime;
         private FormalRewindAnchorMetadataRuntime rewindAnchorMetadata;
+        private QuantumEntanglementRuntime quantumEntanglementRuntime;
+        private SpatialTemplateRuntime spatialTemplateRuntime;
+        private LocalHasteRuntime localHasteRuntime;
+        private ForesightDelayRuntime foresightDelayRuntime;
+        private CausalTransparencyRuntime causalTransparencyRuntime;
+        private VoidChestRuntime voidChestRuntime;
+        private CoordinateLockRuntime coordinateLockRuntime;
         private AttentionPressureRuntime attentionPressureRuntime;
         private FormalCivilizationAscensionRuntime civilization;
         private AdvancementSequenceModel advancementSequence;
@@ -112,6 +123,9 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxVoidDebtController3D voidDebtController;
         private GrayboxVoidDebtAttentionController3D
             voidDebtAttentionController;
+        private GrayboxLocalHasteController3D localHasteController;
+        private GrayboxSpatialTemplateController3D spatialTemplateController;
+        private GrayboxVoidChestController3D voidChestController;
         private FormalRewindAnchorStore rewindAnchorStore;
         private GrayboxRewindAnchorService3D rewindAnchorService;
         private GrayboxAttentionPressureDefenseController3D
@@ -128,6 +142,7 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxFormalSaveCoordinator3D coordinator;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
+        private bool? quantumInventoryRoutingEnabled;
         private bool automaticCheckpointFailureBlocked;
         private ulong automaticCheckpointFailureRevision;
         private bool lastCheckpointHadRetryArtifactFailure;
@@ -149,8 +164,24 @@ namespace WasteCity.Graybox3D.Building
         public FormalRewindAnchorMetadataRuntime RewindAnchorMetadata =>
             rewindAnchorMetadata ??=
                 new FormalRewindAnchorMetadataRuntime();
+        public QuantumEntanglementRuntime QuantumEntanglementRuntime =>
+            quantumEntanglementRuntime ??= CreateQuantumEntanglementRuntime();
+        public SpatialTemplateRuntime SpatialTemplateRuntime =>
+            spatialTemplateRuntime ??= new SpatialTemplateRuntime();
+        public LocalHasteRuntime LocalHasteRuntime =>
+            localHasteRuntime ??= new LocalHasteRuntime();
+        public ForesightDelayRuntime ForesightDelayRuntime =>
+            foresightDelayRuntime ??= new ForesightDelayRuntime();
+        public CausalTransparencyRuntime CausalTransparencyRuntime =>
+            causalTransparencyRuntime ??= new CausalTransparencyRuntime();
+        public VoidChestRuntime VoidChestRuntime =>
+            voidChestRuntime ??= new VoidChestRuntime();
         public AttentionPressureRuntime AttentionPressureRuntime =>
             attentionPressureRuntime ??= new AttentionPressureRuntime();
+        public CoordinateLockRuntime CoordinateLockRuntime =>
+            coordinateLockRuntime ??= new CoordinateLockRuntime(
+                AttentionRuntime,
+                AttentionPressureRuntime);
         public FormalCivilizationAscensionRuntime Civilization =>
             civilization ??= new FormalCivilizationAscensionRuntime();
         public AdvancementSequenceModel Sequence =>
@@ -342,6 +373,31 @@ namespace WasteCity.Graybox3D.Building
                         FateRuntime,
                         VoidDebtRuntime);
             }
+            localHasteController ??= new GrayboxLocalHasteController3D(
+                FateRuntime,
+                LocalHasteRuntime);
+            spatialTemplateController ??=
+                new GrayboxSpatialTemplateController3D(
+                    SpatialTemplateRuntime,
+                    buildingPlacement);
+            if (voidChestController == null)
+            {
+                voidChestController = new GrayboxVoidChestController3D(
+                    FateRuntime,
+                    VoidChestRuntime);
+                defense.EnemyDefeatedForFateReward +=
+                    HandleEnemyDefeatedForFateReward;
+            }
+            production.ConfigureLocalHasteMultiplier(() =>
+                localHasteController.MultiplierFor(
+                    GrayboxLocalHasteDomain3D.Production));
+            operations.ConfigureLocalHasteResearchMultiplier(() =>
+                localHasteController.MultiplierFor(
+                    GrayboxLocalHasteDomain3D.Research));
+            defense.ConfigureLocalHasteMultiplier(() =>
+                localHasteController.MultiplierFor(
+                    GrayboxLocalHasteDomain3D.Defense));
+            SynchronizePassiveFateEffects();
             RebuildPressureComposition();
             if (buildingUpgradeController == null)
             {
@@ -477,6 +533,8 @@ namespace WasteCity.Graybox3D.Building
                         VoidDebtRuntime,
                         RewindAnchorMetadata,
                         fateOperationsView);
+                fateOperationsController.ConfigureStatusProvider(
+                    CaptureFateOperationStatus);
                 progressionView.FateDetailsRequested +=
                     HandleFateDetailsRequested;
                 fateOperationsView.CreateRewindAnchorRequested +=
@@ -485,6 +543,8 @@ namespace WasteCity.Graybox3D.Building
                     HandleReadRewindAnchorByIdRequested;
                 fateOperationsView.ClearRewindAnchorRequested +=
                     HandleClearRewindAnchorRequested;
+                fateOperationsView.FateActionRequested +=
+                    HandleFateActionRequested;
                 fateOperationsController.RefreshIfChanged();
             }
             if (advancementPresentationController == null &&
@@ -544,6 +604,44 @@ namespace WasteCity.Graybox3D.Building
                 LastStartNewProgressError = progressionError;
                 return false;
             }
+            string nextSessionId = Guid.NewGuid().ToString("N");
+            currentSessionId = nextSessionId;
+            if (!TryRebindSessionScopedFateOwners(
+                    nextSessionId,
+                    out string ownerError))
+            {
+                LastProgressionRestoreError = ownerError;
+                LastStartNewProgressError = ownerError;
+                return false;
+            }
+            IReadOnlyList<string> selectedOffers =
+                FormalFateOfferSelector.Select(
+                    nextSessionId,
+                    bootstrap != null
+                        ? bootstrap.CurrentWorldSeed
+                        : GrayboxSceneBootstrap.WorldSeedValue,
+                    1);
+            var newOfferIds = new string[selectedOffers.Count];
+            for (var offerIndex = 0;
+                 offerIndex < selectedOffers.Count;
+                 offerIndex++)
+            {
+                newOfferIds[offerIndex] = selectedOffers[offerIndex];
+            }
+            if (!FateRuntime.TryRestore(
+                    new FormalFateSnapshot(
+                        0ul,
+                        newOfferIds,
+                        string.Empty,
+                        0,
+                        1),
+                    out string offerError))
+            {
+                LastProgressionRestoreError = offerError;
+                LastStartNewProgressError = offerError;
+                return false;
+            }
+            SynchronizeFateRuleCycle();
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
@@ -553,7 +651,6 @@ namespace WasteCity.Graybox3D.Building
 #endif
 
             ResetCheckpointBaseline();
-            currentSessionId = Guid.NewGuid().ToString("N");
             if (expansionController != null &&
                 !expansionController.ResetForNewProgress(
                     out string expansionResetError))
@@ -597,12 +694,22 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
+            string restoredSessionId =
+                LastStoreResult.Envelope.formal3D.sessionId;
+            if (!TryRebindSessionScopedFateOwners(
+                    restoredSessionId,
+                    out string ownerError))
+            {
+                LastProgressionRestoreError = ownerError;
+                return false;
+            }
+
             LastCoordinatorResult = coordinator.RestoreEnvelope(
                 LastStoreResult.Envelope);
             if (!LastCoordinatorResult.Success) return false;
 
-            currentSessionId =
-                LastStoreResult.Envelope.formal3D.sessionId;
+            currentSessionId = restoredSessionId;
+            SynchronizeFateRuleCycle();
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
@@ -927,9 +1034,13 @@ namespace WasteCity.Graybox3D.Building
                     expansionDelta <= 0f ||
                     coordinator?.IsTransactionPaused == true);
             }
+            TickLocalHaste();
+            TickForesightDisplay();
             TickCivilizationAdvancement();
             TickVoidDebt();
             TickAttentionPressure();
+            TickCoordinateLock();
+            SynchronizePassiveFateEffects();
             RefreshBuildingUpgradeCommand();
             fateSelectionController?.RefreshIfChanged();
             fateOperationsController?.RefreshIfChanged();
@@ -950,13 +1061,20 @@ namespace WasteCity.Graybox3D.Building
 
         private void OnDestroy()
         {
+            if (expansionController?.Runtime?.WorldLayer != null)
+                expansionController.Runtime.WorldLayer
+                    .ConfigureQuantumEntanglement(null);
+            quantumInventoryRoutingEnabled = null;
             coordinator?.UnbindCheckpointPolicy();
             effectStateAdapter?.Dispose();
             effectStateAdapter = null;
             checkpointPolicy = null;
             coordinator = null;
             production?.ConfigureCivilizationEfficiencySource(null);
+            production?.ConfigureLocalHasteMultiplier(null);
             operations?.ConfigureCivilizationResearchEfficiency(null);
+            operations?.ConfigureLocalHasteResearchMultiplier(null);
+            defense?.ConfigureLocalHasteMultiplier(null);
             expansionController = null;
             store = null;
             waveRetryStore = null;
@@ -971,6 +1089,19 @@ namespace WasteCity.Graybox3D.Building
             voidDebtController?.Dispose();
             voidDebtController = null;
             voidDebtAttentionController = null;
+            localHasteController = null;
+            spatialTemplateController = null;
+            if (defense != null)
+                defense.EnemyDefeatedForFateReward -=
+                    HandleEnemyDefeatedForFateReward;
+            voidChestController = null;
+            quantumEntanglementRuntime = null;
+            spatialTemplateRuntime = null;
+            localHasteRuntime = null;
+            foresightDelayRuntime = null;
+            causalTransparencyRuntime = null;
+            voidChestRuntime = null;
+            coordinateLockRuntime = null;
             rewindAnchorService = null;
             rewindAnchorStore = null;
             rewindAnchorMetadata = null;
@@ -1036,6 +1167,8 @@ namespace WasteCity.Graybox3D.Building
                     HandleReadRewindAnchorByIdRequested;
                 fateOperationsView.ClearRewindAnchorRequested -=
                     HandleClearRewindAnchorRequested;
+                fateOperationsView.FateActionRequested -=
+                    HandleFateActionRequested;
             }
             fateOperationsController = null;
             progressionAdapter = null;
@@ -1141,6 +1274,7 @@ namespace WasteCity.Graybox3D.Building
                    world != null &&
                    session != null &&
                    buildingPresentation != null &&
+                   buildingPlacement != null &&
                    operations != null &&
                    production != null &&
                    defense != null &&
@@ -1190,6 +1324,118 @@ namespace WasteCity.Graybox3D.Building
             voidDebtAttentionController.Tick(delta, out _);
         }
 
+        public bool TrySelectLocalHasteDomain(
+            GrayboxLocalHasteDomain3D domain,
+            out string error)
+        {
+            if (!TryInitialize() || localHasteController == null)
+            {
+                error = "局部时加运行时尚未就绪";
+                return false;
+            }
+            return localHasteController.TrySelectDomain(domain, out error);
+        }
+
+        public bool TryStartLocalHaste(out string error)
+        {
+            if (!TryInitialize() || localHasteController == null)
+            {
+                error = "局部时加运行时尚未就绪";
+                return false;
+            }
+            return localHasteController.TryStart(out error);
+        }
+
+        public bool TryStopLocalHaste()
+        {
+            return localHasteController?.TryStop() == true;
+        }
+
+        private void TickLocalHaste()
+        {
+            if (!IsInitialized || localHasteController == null) return;
+            SynchronizeFateRuleCycle();
+            bool paused = coordinator?.IsTransactionPaused == true;
+            float delta = paused
+                ? 0f
+                : RuleClock.ResolveRuleDelta(Time.unscaledDeltaTime);
+            SingleCityDefenseCampaignPhase defensePhase =
+                defense?.CampaignSnapshot?.Phase ??
+                SingleCityDefenseCampaignPhase.Idle;
+            bool targetEligible =
+                GrayboxLocalHasteController3D.IsTargetEligible(
+                    localHasteController.SelectedDomain,
+                    production?.Snapshot?.HasCurrentlyRunnableBuilding == true,
+                    operations?.Research?.Model?.Active != null,
+                    defensePhase == SingleCityDefenseCampaignPhase.Warning ||
+                    defensePhase ==
+                        SingleCityDefenseCampaignPhase.SpawningAndCombat ||
+                    defensePhase ==
+                        SingleCityDefenseCampaignPhase.CombatCleanup);
+            localHasteController.Tick(
+                delta,
+                paused || delta <= 0f,
+                targetEligible,
+                out _,
+                out _);
+        }
+
+        private void TickForesightDisplay()
+        {
+            if (!IsInitialized || string.IsNullOrEmpty(currentSessionId))
+                return;
+            SynchronizeFateRuleCycle();
+            bool paused = coordinator?.IsTransactionPaused == true;
+            float delta = paused
+                ? 0f
+                : RuleClock.ResolveRuleDelta(Time.unscaledDeltaTime);
+            ForesightDelayRuntime.TickDisplay(delta, paused, out _);
+        }
+
+        private void SynchronizeFateRuleCycle()
+        {
+            ulong cycle = CurrentFateRuleCycleOrdinal();
+            if (cycle == 0ul) return;
+            if (LocalHasteRuntime.CurrentCycleOrdinal < cycle)
+                LocalHasteRuntime.TryEnterCycle(cycle, out _);
+            if (ForesightDelayRuntime.CurrentCycleOrdinal < cycle)
+                ForesightDelayRuntime.TryEnterCycle(cycle, out _);
+        }
+
+        private ulong CurrentFateRuleCycleOrdinal()
+        {
+            if (string.IsNullOrEmpty(currentSessionId) || session == null)
+                return 0ul;
+            double seconds = Math.Max(
+                0d,
+                session.CheckpointRuleTimeSeconds);
+            return checked((ulong)Math.Floor(
+                seconds / FormalFateCatalog.RuleCycleSeconds) + 1ul);
+        }
+
+        private void SynchronizePassiveFateEffects()
+        {
+            FormalFateSnapshot snapshot = FateRuntime.Capture();
+            bool quantumSelected = snapshot.Level >= 1 && string.Equals(
+                snapshot.SelectedId,
+                FormalFateCatalog.QuantumEntanglementId,
+                StringComparison.Ordinal);
+            if (quantumInventoryRoutingEnabled != quantumSelected)
+            {
+                expansionController?.Runtime?.WorldLayer
+                    .ConfigureQuantumEntanglement(
+                        quantumSelected
+                            ? QuantumEntanglementRuntime
+                            : null);
+                quantumInventoryRoutingEnabled = quantumSelected;
+            }
+            bool causalSelected = snapshot.Level >= 1 && string.Equals(
+                snapshot.SelectedId,
+                FormalFateCatalog.CausalTransparencyId,
+                StringComparison.Ordinal);
+            CausalTransparencyRuntime.TrySetFullReasonAccess(causalSelected);
+        }
+
         private string ResolveRewindSafetyCode()
         {
             if (coordinator?.IsTransactionPaused == true)
@@ -1215,6 +1461,7 @@ namespace WasteCity.Graybox3D.Building
         private void HandleFateSelectionCommitted(string fateId)
         {
             pocketUniverseController?.SynchronizeSelection();
+            SynchronizePassiveFateEffects();
             if (!Civilization.TryBindFate(fateId, out string bindError))
             {
                 Debug.LogError(bindError, this);
@@ -1251,6 +1498,378 @@ namespace WasteCity.Graybox3D.Building
         {
             if (fateOperationsController?.TryOpen() == true)
                 progressionHudController?.RefreshIfChanged();
+        }
+
+        private void HandleFateActionRequested(string fateId)
+        {
+            bool changed = false;
+            string feedback = string.Empty;
+            if (string.Equals(
+                    fateId,
+                    FormalFateCatalog.LocalHasteId,
+                    StringComparison.Ordinal))
+            {
+                GrayboxLocalHasteDomain3D current =
+                    localHasteController?.SelectedDomain ??
+                    GrayboxLocalHasteDomain3D.None;
+                localHasteController?.TryStop();
+                GrayboxLocalHasteDomain3D next = current ==
+                    GrayboxLocalHasteDomain3D.Production
+                        ? GrayboxLocalHasteDomain3D.Research
+                        : current == GrayboxLocalHasteDomain3D.Research
+                            ? GrayboxLocalHasteDomain3D.Defense
+                            : GrayboxLocalHasteDomain3D.Production;
+                if (localHasteController == null)
+                {
+                    feedback = "局部时加运行时尚未就绪";
+                }
+                else if (localHasteController.SelectedDomain != next &&
+                         !localHasteController.TrySelectDomain(
+                             next,
+                             out feedback))
+                {
+                    changed = false;
+                }
+                else
+                {
+                    changed = localHasteController.TryStart(out feedback);
+                    if (changed)
+                        feedback = "局部时加已切换至" +
+                                   LocalHasteDomainName(next);
+                }
+            }
+            else if (string.Equals(
+                         fateId,
+                         FormalFateCatalog.SpatialTemplateId,
+                         StringComparison.Ordinal))
+            {
+                changed = TryUseSpatialTemplate(out feedback);
+            }
+            else if (string.Equals(
+                         fateId,
+                         FormalFateCatalog.ForesightDelayId,
+                         StringComparison.Ordinal))
+            {
+                changed = TryRevealNextPressurePlan(out feedback);
+            }
+            else if (string.Equals(
+                         fateId,
+                         FormalFateCatalog.VoidChestId,
+                         StringComparison.Ordinal))
+            {
+                IReadOnlyList<string> chests =
+                    VoidChestRuntime.Capture().UnclaimedChestIds;
+                if (chests.Count == 0)
+                {
+                    feedback = "当前没有待领取的灰烬宝箱";
+                }
+                else if (voidChestController == null)
+                {
+                    feedback = "虚空宝箱运行时尚未就绪";
+                }
+                else
+                {
+                    changed = voidChestController.TryClaim(
+                        chests[0],
+                        session.CityStorage,
+                        out feedback);
+                    if (changed) feedback = "灰烬宝箱已领取";
+                }
+            }
+            else if (string.Equals(
+                         fateId,
+                         FormalFateCatalog.CausalTransparencyId,
+                         StringComparison.Ordinal) ||
+                     string.Equals(
+                         fateId,
+                         FormalFateCatalog.QuantumEntanglementId,
+                         StringComparison.Ordinal))
+            {
+                changed = true;
+                feedback = "命轨状态已刷新";
+            }
+            else
+            {
+                feedback = "当前命轨没有可执行动作";
+            }
+
+            fateOperationsController?.ReportFateActionResult(
+                changed,
+                feedback);
+            fateOperationsController?.RefreshIfChanged();
+        }
+
+        private bool TryUseSpatialTemplate(out string error)
+        {
+            string selectedId = defense?.SelectedStableId;
+            if (!string.IsNullOrWhiteSpace(selectedId) && session != null)
+            {
+                IReadOnlyList<GrayboxBuildingInstance3D> instances =
+                    session.Instances;
+                for (var index = 0; index < instances.Count; index++)
+                {
+                    GrayboxBuildingInstance3D instance = instances[index];
+                    if (!string.Equals(
+                            instance.StableInstanceId,
+                            selectedId,
+                            StringComparison.Ordinal) ||
+                        instance.Placement?.Definition == null)
+                        continue;
+                    if (spatialTemplateController == null)
+                    {
+                        error = "空间模板运行时尚未就绪";
+                        return false;
+                    }
+                    bool recorded =
+                        spatialTemplateController.TryRecordGroundRegion(
+                            GrayboxFormalProgressionSaveAdapter3D
+                                .FormalSpatialTemplateSlotId,
+                            instance.Placement.X,
+                            instance.Placement.Y,
+                            instances,
+                            out error);
+                    if (recorded) error = "3×3 空间模板已记录";
+                    return recorded;
+                }
+            }
+
+            BuildingSurfaceHit hit = buildingPlacement == null
+                ? BuildingSurfaceHit.Invalid
+                : buildingPlacement.CurrentHit;
+            if (spatialTemplateController == null)
+            {
+                error = "空间模板运行时尚未就绪";
+                return false;
+            }
+            if (!hit.IsValid || hit.Site != BuildingSite.Ground)
+            {
+                error = "请取消建筑选择，并把建造预览移动到可用空地";
+                return false;
+            }
+            bool deployed = spatialTemplateController.TryDeploy(
+                    GrayboxFormalProgressionSaveAdapter3D
+                        .FormalSpatialTemplateSlotId,
+                    hit.X,
+                    hit.Y,
+                    out _,
+                    out GrayboxSpatialTemplateFailure3D failure);
+            error = deployed
+                ? "空间模板已部署"
+                : string.IsNullOrWhiteSpace(failure.Reason)
+                    ? "空间模板无法部署到当前位置"
+                    : failure.Reason;
+            return deployed;
+        }
+
+        private bool TryRevealNextPressurePlan(out string error)
+        {
+            AttentionPressureSnapshot pressure =
+                AttentionPressureRuntime.Capture();
+            var plans = new List<ForesightAuthoritativePlan>();
+            float now = session?.CheckpointRuleTimeSeconds ?? 0f;
+            for (var index = 0; index < pressure.Entries.Count; index++)
+            {
+                AttentionPressureEntrySnapshot entry =
+                    pressure.Entries[index];
+                if (entry.State != AttentionPressureState.Queued &&
+                    entry.State != AttentionPressureState.Warning)
+                    continue;
+                AttentionPressureDefinition definition =
+                    AttentionPressureCatalog.FindByThreshold(entry.Threshold);
+                float remaining = entry.State == AttentionPressureState.Warning
+                    ? entry.WarningRemainingSeconds
+                    : definition?.WarningSeconds ?? 0f;
+                plans.Add(new ForesightAuthoritativePlan(
+                    entry.EncounterId,
+                    now + Math.Max(.01f, remaining),
+                    "关注度压力 " + entry.Threshold));
+            }
+            SynchronizeFateRuleCycle();
+            bool revealed = ForesightDelayRuntime.TryReveal(
+                CurrentFateRuleCycleOrdinal(),
+                now,
+                plans,
+                out ForesightProjection projection,
+                out error);
+            if (revealed)
+                error = "已确认未来片段：" + projection.SummaryKey;
+            else if (string.Equals(
+                         error,
+                         "No future authoritative plan is available.",
+                         StringComparison.Ordinal))
+                error = "当前没有可确认的未来压力计划";
+            return revealed;
+        }
+
+        private string CaptureFateOperationStatus(string fateId)
+        {
+            if (string.Equals(fateId,
+                    FormalFateCatalog.QuantumEntanglementId,
+                    StringComparison.Ordinal))
+            {
+                QuantumEntanglementSnapshot state =
+                    QuantumEntanglementRuntime.Capture();
+                return (state.Connected ? "共享网络已连接" : "共享网络未连接") +
+                    "；基础共享资源 " + state.SharedResourceIds.Count + " 类";
+            }
+            if (string.Equals(fateId,
+                    FormalFateCatalog.SpatialTemplateId,
+                    StringComparison.Ordinal))
+            {
+                SpatialTemplateSnapshot state = SpatialTemplateRuntime.Capture();
+                int cells = state.Templates.Count == 0
+                    ? 0
+                    : state.Templates[0].Cells.Count;
+                return state.Templates.Count == 0
+                    ? "尚未记录模板；先点选一座建筑再执行管理空间模板"
+                    : "已记录 3×3 模板，包含 " + cells +
+                      " 座建筑；点选建筑可覆盖录制，取消建筑选择并把建造预览移到空地可部署";
+            }
+            if (string.Equals(fateId,
+                    FormalFateCatalog.LocalHasteId,
+                    StringComparison.Ordinal))
+            {
+                LocalHasteSnapshot state = LocalHasteRuntime.Capture();
+                return "周期 " + state.CurrentCycleOrdinal + "；目标 " +
+                       LocalHasteDomainName(
+                           localHasteController?.SelectedDomain ??
+                           GrayboxLocalHasteDomain3D.None) +
+                       "；" + (state.Active ? "运行中" : "已停止") +
+                       "；剩余额度 " +
+                       state.RemainingBudgetSeconds.ToString("0.0") + " 秒";
+            }
+            if (string.Equals(fateId,
+                    FormalFateCatalog.ForesightDelayId,
+                    StringComparison.Ordinal))
+            {
+                ForesightDelaySnapshot state =
+                    ForesightDelayRuntime.Capture();
+                ForesightProjection projection = state.LastProjection;
+                return projection == null
+                    ? "暂无可确认片段"
+                    : projection.SummaryKey + "；约 " +
+                      projection.SecondsUntilEvent.ToString("0.0") +
+                      " 秒后发生；片段剩余 " +
+                      state.DisplayRemainingSeconds.ToString("0.0") + " 秒";
+            }
+            if (string.Equals(fateId,
+                    FormalFateCatalog.CausalTransparencyId,
+                    StringComparison.Ordinal))
+            {
+                return CausalTransparencyRuntime.TryProject(
+                    AttentionRuntime.Capture(), out CausalTransparencyProjection p,
+                    out _)
+                        ? BuildCausalTransparencyStatus(p)
+                        : "完整因果链尚未开放";
+            }
+            if (string.Equals(fateId,
+                    FormalFateCatalog.VoidChestId,
+                    StringComparison.Ordinal))
+            {
+                VoidChestSnapshot state = VoidChestRuntime.Capture();
+                return "已判定 " + state.Evaluations.Count +
+                       " 次；待领取 " + state.UnclaimedChestIds.Count +
+                       "；已领取 " + state.ClaimedChestIds.Count;
+            }
+            return string.Empty;
+        }
+
+        private string BuildCausalTransparencyStatus(
+            CausalTransparencyProjection projection)
+        {
+            var lines = new List<string>
+            {
+                "完整原因 " + projection.FullHistory.Count +
+                " 条；阈值关系 " + projection.Thresholds.Count + " 项",
+            };
+            for (var index = 0;
+                 index < projection.FullHistory.Count;
+                 index++)
+            {
+                FormalAttentionHistoryEntry entry =
+                    projection.FullHistory[index];
+                FormalAttentionReasonDefinition reason =
+                    FormalAttentionCatalog.Find(entry.ReasonId);
+                string repeat = reason?.RepeatPolicy ==
+                    FormalAttentionRepeatPolicy.OncePerSession
+                        ? "一次性"
+                        : "可重复";
+                lines.Add(
+                    entry.ReasonId + " / " + entry.StableEventKey +
+                    "：" + Signed(entry.AppliedDelta) + "（" + repeat + "）");
+            }
+            AttentionPressureSnapshot pressure =
+                AttentionPressureRuntime.Capture();
+            for (var index = 0; index < projection.Thresholds.Count; index++)
+            {
+                CausalThresholdExplanation threshold =
+                    projection.Thresholds[index];
+                string pressureState = "未安排";
+                for (var pressureIndex = 0;
+                     pressureIndex < pressure.Entries.Count;
+                     pressureIndex++)
+                {
+                    AttentionPressureEntrySnapshot entry =
+                        pressure.Entries[pressureIndex];
+                    if (entry.Threshold != threshold.Threshold) continue;
+                    pressureState = PressureStateName(entry.State);
+                    break;
+                }
+                lines.Add(
+                    "阈值 " + threshold.Threshold + "：" +
+                    (threshold.WasReached ? "已锁存" : "尚差 " +
+                        threshold.RemainingAttention) +
+                    "；压力 " + pressureState);
+            }
+            return string.Join("\n", lines);
+        }
+
+        private static string PressureStateName(
+            AttentionPressureState state)
+        {
+            switch (state)
+            {
+                case AttentionPressureState.Queued: return "已安排";
+                case AttentionPressureState.Warning: return "预警中";
+                case AttentionPressureState.Active: return "进行中";
+                case AttentionPressureState.Completed: return "已完成";
+                default: return "未安排";
+            }
+        }
+
+        private static string Signed(int value)
+        {
+            return value > 0 ? "+" + value : value.ToString();
+        }
+
+        private static string LocalHasteDomainName(
+            GrayboxLocalHasteDomain3D domain)
+        {
+            switch (domain)
+            {
+                case GrayboxLocalHasteDomain3D.Production: return "生产";
+                case GrayboxLocalHasteDomain3D.Research: return "研究";
+                case GrayboxLocalHasteDomain3D.Defense: return "防御";
+                default: return "未选择";
+            }
+        }
+
+        private void HandleEnemyDefeatedForFateReward(
+            string stableEnemyId,
+            string enemyDefinitionId)
+        {
+            if (voidChestController == null || string.Equals(
+                    enemyDefinitionId,
+                    CrystalBroodmotherCatalog.StableArchetypeId,
+                    StringComparison.Ordinal))
+                return;
+            if (voidChestController.TryEvaluateOrdinaryEnemyDeath(
+                    stableEnemyId,
+                    out VoidChestEvaluation evaluation,
+                    out _) && evaluation.Dropped)
+            {
+                fateOperationsController?.RefreshIfChanged();
+            }
         }
 
         private void HandleCreateRewindAnchorRequested()
@@ -1338,6 +1957,35 @@ namespace WasteCity.Graybox3D.Building
                 tutorialCompleted,
                 firstTowerCompleted,
                 out _);
+        }
+
+        private void TickCoordinateLock()
+        {
+            if (!IsInitialized || CoordinateLockRuntime.Capture().Committed)
+                return;
+            bool legacyAnalysisCompleted = session != null &&
+                session.IsResearchCompleted("core.research.legacy-analysis");
+            bool sixthActEquivalent =
+                CoordinateLockCatalog.IsSixthActEquivalent(
+                    Sequence.Stage);
+            if (!legacyAnalysisCompleted || !sixthActEquivalent) return;
+            CoordinateLockRuntime.TryCommit(
+                legacyAnalysisCompleted,
+                sixthActEquivalent,
+                out _);
+        }
+
+        private bool HasCompletedPressureThreshold(int threshold)
+        {
+            IReadOnlyList<AttentionPressureEntrySnapshot> entries =
+                AttentionPressureRuntime.Capture().Entries;
+            for (var index = 0; index < entries.Count; index++)
+            {
+                AttentionPressureEntrySnapshot entry = entries[index];
+                if (entry.Threshold == threshold)
+                    return entry.State == AttentionPressureState.Completed;
+            }
+            return false;
         }
 
         private void HandleBuildingUpgradeRequested(string stableInstanceId)
@@ -1459,7 +2107,58 @@ namespace WasteCity.Graybox3D.Building
                     RewindAnchorMetadata,
                     pressureSaveAdapter,
                     Civilization,
-                    Sequence);
+                    Sequence,
+                    QuantumEntanglementRuntime,
+                    SpatialTemplateRuntime,
+                    LocalHasteRuntime,
+                    ForesightDelayRuntime,
+                    CausalTransparencyRuntime,
+                    VoidChestRuntime,
+                    CoordinateLockRuntime);
+        }
+
+        private bool TryRebindSessionScopedFateOwners(
+            string sessionId,
+            out string error)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                error = "正式会话 ID 不能为空";
+                return false;
+            }
+            if (string.Equals(
+                    VoidChestRuntime.SessionId,
+                    sessionId,
+                    StringComparison.Ordinal))
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            int selectionVersion = FateRuntime.Capture()
+                .OfferSelectionVersion;
+            if (selectionVersion <= 0)
+                selectionVersion = VoidChestRuntime.DefaultSelectionVersion;
+            var reboundVoidChest = new VoidChestRuntime(
+                sessionId,
+                selectionVersion);
+            if (!ProgressionAdapter.ConfigureIdea0028Owners(
+                    QuantumEntanglementRuntime,
+                    SpatialTemplateRuntime,
+                    LocalHasteRuntime,
+                    ForesightDelayRuntime,
+                    CausalTransparencyRuntime,
+                    reboundVoidChest,
+                    CoordinateLockRuntime,
+                    out error))
+            {
+                return false;
+            }
+            voidChestRuntime = reboundVoidChest;
+            voidChestController = new GrayboxVoidChestController3D(
+                FateRuntime,
+                reboundVoidChest);
+            return true;
         }
 
         private void TickCivilizationAdvancement()
@@ -1499,6 +2198,18 @@ namespace WasteCity.Graybox3D.Building
             AttentionPressureSnapshot snapshot)
         {
             return snapshot?.CrystalBroodmotherDefeated == true;
+        }
+
+        private static QuantumEntanglementRuntime
+            CreateQuantumEntanglementRuntime()
+        {
+            return new QuantumEntanglementRuntime(new[]
+            {
+                ResourceIds.Iron,
+                ResourceIds.Stone,
+                ResourceIds.Water,
+                ResourceIds.Biomass,
+            });
         }
 
         private void HandlePressureWarningStarted(

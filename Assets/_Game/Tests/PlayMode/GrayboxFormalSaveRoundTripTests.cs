@@ -483,9 +483,11 @@ namespace WasteCity.Tests
                 yield return ClickButton("Start.NewGameConfirm");
             Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
             Assert.That(entry.IsStartPageOpen, Is.False);
+            FormalFateSnapshot offered = RequireSaveHost().FateRuntime.Capture();
+            Assert.That(offered.OfferedIds, Is.Not.Empty);
             yield return ClickButton(
                 "FateSelection.Card." +
-                FormalFateCatalog.RewindAnchorId);
+                offered.OfferedIds[0]);
             yield return ClickButton("FateSelection.Confirm");
             SetDevelopmentRuleTime(1f);
         }

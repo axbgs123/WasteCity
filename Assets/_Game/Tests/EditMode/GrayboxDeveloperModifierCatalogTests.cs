@@ -2,6 +2,7 @@ using System.Linq;
 using NUnit.Framework;
 using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Progression;
 using WasteCity.Research;
 
 namespace WasteCity.Tests
@@ -134,7 +135,8 @@ namespace WasteCity.Tests
                 Does.Contain("增加关注度")
                     .And.Contain("选择回溯锚点命轨")
                     .And.Contain("执行首次文明升阶")
-                    .And.Contain("查询进度配置签名"));
+                    .And.Contain("查询进度配置签名")
+                    .And.Contain("查询命轨领域状态"));
         }
 
         [Test]
@@ -158,6 +160,42 @@ namespace WasteCity.Tests
                 Is.True);
             Assert.That(resolved.StableId,
                 Is.EqualTo("developer.query.pressure-queue"));
+
+            var fateStates = GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("命轨领域");
+            Assert.That(fateStates, Has.Count.EqualTo(1));
+            Assert.That(fateStates[0].StableId,
+                Is.EqualTo("developer.query.fate-domain-states"));
+        }
+
+        [Test]
+        public void IDEA0028_FateActionsMirrorNineFormalChineseDefinitions()
+        {
+            GrayboxDeveloperCatalogEntry3D[] entries =
+                GrayboxDeveloperCatalogQuery3D.ProgressionActionEntries
+                    .Where(value => value.StableId.StartsWith(
+                        "developer.fate.select-"))
+                    .ToArray();
+
+            Assert.That(entries, Has.Length.EqualTo(9));
+            Assert.That(entries.Select(value => value.StableId),
+                Is.EqualTo(FormalFateCatalog.All.Select(value =>
+                    "developer.fate.select-" +
+                    value.Id.Value.Substring("core.legacy.".Length))));
+            Assert.That(entries.Select(value => value.DisplayName),
+                Is.EqualTo(FormalFateCatalog.All.Select(value =>
+                    "选择" + value.DisplayName + "命轨")));
+            Assert.That(entries, Has.All.Matches<
+                GrayboxDeveloperCatalogEntry3D>(value =>
+                    !value.DisplayName.Contains("Select") &&
+                    !value.DisplayName.Contains("Try") &&
+                    value.DisplayName != value.StableId));
+
+            var searched = GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("量子纠缠");
+            Assert.That(searched, Has.Count.EqualTo(1));
+            Assert.That(searched[0].DisplayName,
+                Is.EqualTo("选择量子纠缠命轨"));
         }
     }
 }

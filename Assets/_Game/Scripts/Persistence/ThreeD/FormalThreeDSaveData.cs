@@ -33,7 +33,7 @@ namespace WasteCity.Persistence.ThreeD
     public sealed class FormalThreeDProgressionSaveData
     {
         public const string ConfigurationSignature =
-            "builtin:progression@1";
+            "builtin:progression@2";
 
         public string configurationSignature = ConfigurationSignature;
         public FormalThreeDAttentionSaveData attention =
@@ -45,6 +45,20 @@ namespace WasteCity.Persistence.ThreeD
             new FormalThreeDAttentionPressureSaveData();
         public FormalThreeDCivilizationSaveData civilization =
             new FormalThreeDCivilizationSaveData();
+        public FormalThreeDQuantumEntanglementSaveData quantumEntanglement =
+            new FormalThreeDQuantumEntanglementSaveData();
+        public FormalThreeDSpatialTemplateSaveData spatialTemplate =
+            new FormalThreeDSpatialTemplateSaveData();
+        public FormalThreeDLocalHasteSaveData localHaste =
+            new FormalThreeDLocalHasteSaveData();
+        public FormalThreeDForesightDelaySaveData foresightDelay =
+            new FormalThreeDForesightDelaySaveData();
+        public FormalThreeDCausalTransparencySaveData causalTransparency =
+            new FormalThreeDCausalTransparencySaveData();
+        public FormalThreeDVoidChestSaveData voidChest =
+            new FormalThreeDVoidChestSaveData();
+        public FormalThreeDCoordinateLockSaveData coordinateLock =
+            new FormalThreeDCoordinateLockSaveData();
     }
 
     [Serializable]
@@ -133,6 +147,7 @@ namespace WasteCity.Persistence.ThreeD
     [Serializable]
     public sealed class FormalThreeDFateSaveData
     {
+        public int offerSelectionVersion = 1;
         public string[] offeredIds =
         {
             FormalFateCatalog.PocketUniverseId,
@@ -153,6 +168,90 @@ namespace WasteCity.Persistence.ThreeD
             new FormalThreeDVoidDebtSaveData();
         public FormalThreeDRewindAnchorMetadataSaveData rewindAnchors =
             new FormalThreeDRewindAnchorMetadataSaveData();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDQuantumEntanglementSaveData
+    {
+        public ulong revision;
+        public string[] committedSynchronizationKeys = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDSpatialTemplateSaveData
+    {
+        public ulong revision;
+        public FormalThreeDSpatialTemplateEntrySaveData[] entries =
+            Array.Empty<FormalThreeDSpatialTemplateEntrySaveData>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDSpatialTemplateEntrySaveData
+    {
+        public int relativeX;
+        public int relativeZ;
+        public string buildingDefinitionId;
+        public int quarterTurns;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDLocalHasteSaveData
+    {
+        public ulong revision;
+        public long cycleOrdinal;
+        public float remainingBudgetSeconds = 60f;
+        public int targetKind;
+        public string targetStableId = string.Empty;
+        public bool active;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDForesightDelaySaveData
+    {
+        public ulong revision;
+        public long cycleOrdinal;
+        public string plannedStableEventId = string.Empty;
+        public float remainingDisplaySeconds;
+        public long[] displayedCycleOrdinals = Array.Empty<long>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDCausalTransparencySaveData
+    {
+        public ulong revision;
+        public string[] scannedStableEventKeys = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDVoidChestSaveData
+    {
+        public ulong revision;
+        public long nextDropOrdinal = 1L;
+        public FormalThreeDVoidChestEntrySaveData[] pendingChests =
+            Array.Empty<FormalThreeDVoidChestEntrySaveData>();
+        public string[] committedDeathEventIds = Array.Empty<string>();
+        public string[] claimedRewardKeys = Array.Empty<string>();
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDVoidChestEntrySaveData
+    {
+        public string stableChestId;
+        public long dropOrdinal;
+        public string deathEventId;
+        public string resourceId;
+        public int amount;
+        public string narrativeFragmentId;
+        public string rewardKey;
+    }
+
+    [Serializable]
+    public sealed class FormalThreeDCoordinateLockSaveData
+    {
+        public ulong revision;
+        public bool committed;
+        public string stableEventKey = string.Empty;
+        public bool bossPressureScheduled;
     }
 
     [Serializable]

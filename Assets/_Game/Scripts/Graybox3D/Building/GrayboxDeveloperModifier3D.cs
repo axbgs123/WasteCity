@@ -557,6 +557,18 @@ namespace WasteCity.Graybox3D.Building
                     amount,
                     affectedCount: 1,
                     message: entry.DisplayName + "：已执行");
+            if (entry.StableId == "developer.query.fate-domain-states")
+            {
+                GrayboxDeveloperProgressionQuery3D query =
+                    progression.Query();
+                return Result(
+                    GrayboxDeveloperCommandCode3D.NoChange,
+                    true,
+                    entry,
+                    amount,
+                    message: "命轨领域状态：" +
+                        string.Join("；", query.FateDomainStates));
+            }
             bool failed = IsFailureOnlyAction(entry.StableId);
             return Result(
                 failed
@@ -587,6 +599,10 @@ namespace WasteCity.Graybox3D.Building
             string argument,
             int amount)
         {
+            string selectedFateId = ResolveFateSelectionAction(actionId);
+            if (selectedFateId != null)
+                return progression.SelectFate(selectedFateId);
+
             switch (actionId)
             {
                 case "developer.attention.increase":
@@ -595,15 +611,6 @@ namespace WasteCity.Graybox3D.Building
                     return progression.DecreaseAttention(amount);
                 case "developer.attention.set":
                     return progression.SetAttentionFixture(amount);
-                case "developer.fate.select-pocket-universe":
-                    return progression.SelectFate(
-                        FormalFateCatalog.PocketUniverseId);
-                case "developer.fate.select-void-debt":
-                    return progression.SelectFate(
-                        FormalFateCatalog.VoidDebtId);
-                case "developer.fate.select-rewind-anchor":
-                    return progression.SelectFate(
-                        FormalFateCatalog.RewindAnchorId);
                 case "developer.fate.upgrade-level-two":
                     return progression.UpgradeSelectedFateToLevelTwo();
                 case "developer.rewind.create":
@@ -638,11 +645,23 @@ namespace WasteCity.Graybox3D.Building
                 case "developer.query.thresholds":
                 case "developer.query.pressure-queue":
                 case "developer.query.configuration-signature":
+                case "developer.query.fate-domain-states":
                     progression.Query();
                     return false;
                 default:
                     return false;
             }
+        }
+
+        private static string ResolveFateSelectionAction(string actionId)
+        {
+            const string actionPrefix = "developer.fate.select-";
+            if (string.IsNullOrWhiteSpace(actionId) ||
+                !actionId.StartsWith(actionPrefix, StringComparison.Ordinal))
+                return null;
+            string fateId = "core.legacy." +
+                actionId.Substring(actionPrefix.Length);
+            return FormalFateCatalog.Find(fateId) == null ? null : fateId;
         }
 
         private static bool ValidateProgressionArguments(

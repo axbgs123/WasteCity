@@ -13,6 +13,16 @@ namespace WasteCity.Progression
             string[] offeredIds,
             string selectedId,
             int level)
+            : this(revision, offeredIds, selectedId, level, 0)
+        {
+        }
+
+        public FormalFateSnapshot(
+            ulong revision,
+            string[] offeredIds,
+            string selectedId,
+            int level,
+            int offerSelectionVersion)
         {
             Revision = revision;
             this.offeredIds = Array.AsReadOnly(
@@ -21,12 +31,14 @@ namespace WasteCity.Progression
                     : (string[])offeredIds.Clone());
             SelectedId = selectedId;
             Level = level;
+            OfferSelectionVersion = offerSelectionVersion;
         }
 
         public ulong Revision { get; }
         public IReadOnlyList<string> OfferedIds => offeredIds;
         public string SelectedId { get; }
         public int Level { get; }
+        public int OfferSelectionVersion { get; }
         public bool HasSelection => !string.IsNullOrWhiteSpace(SelectedId);
     }
 
@@ -36,15 +48,29 @@ namespace WasteCity.Progression
             "core.attention.fate.first-activation";
         private const string SelectionEventKey = "fate-selection-complete";
 
-        private readonly string[] offeredIds;
+        private string[] offeredIds;
         private string selectedId;
         private int level;
         private ulong revision;
+        private int offerSelectionVersion;
         private FormalFateSnapshot cachedSnapshot;
 
         public FormalFateRuntime()
         {
             offeredIds = BuildFixedOfferIds();
+            RebuildSnapshot();
+        }
+
+        public FormalFateRuntime(
+            string sessionId,
+            int worldSeed,
+            int offerSelectorVersion)
+        {
+            offeredIds = CopyOffers(FormalFateOfferSelector.Select(
+                sessionId,
+                worldSeed,
+                offerSelectorVersion));
+            offerSelectionVersion = offerSelectorVersion;
             RebuildSnapshot();
         }
 
@@ -109,9 +135,17 @@ namespace WasteCity.Progression
                 error = "Formal fate snapshot is required.";
                 return false;
             }
-            if (!MatchesFixedOffers(snapshot.OfferedIds))
+            if (snapshot.OfferSelectionVersion < 0 ||
+                snapshot.OfferSelectionVersion > 1)
             {
-                error = "Formal fate offers do not match the fixed catalog.";
+                error = "Formal fate offer selection version is unsupported.";
+                return false;
+            }
+            if (!TryCopyApprovedOffers(
+                    snapshot.OfferedIds,
+                    out string[] restoredOffers))
+            {
+                error = "Formal fate offers must be three unique approved ids.";
                 return false;
             }
 
@@ -119,16 +153,18 @@ namespace WasteCity.Progression
             bool selected = snapshot.HasSelection &&
                 (snapshot.Level == 1 || snapshot.Level == 2) &&
                 FormalFateCatalog.Find(snapshot.SelectedId) != null &&
-                ContainsOffer(snapshot.SelectedId);
+                ContainsOffer(restoredOffers, snapshot.SelectedId);
             if (!pending && !selected)
             {
                 error = "Formal fate selection and level are inconsistent.";
                 return false;
             }
 
+            offeredIds = restoredOffers;
             selectedId = pending ? null : snapshot.SelectedId;
             level = snapshot.Level;
             revision = snapshot.Revision;
+            offerSelectionVersion = snapshot.OfferSelectionVersion;
             RebuildSnapshot();
             error = string.Empty;
             return true;
@@ -136,20 +172,27 @@ namespace WasteCity.Progression
 
         private static string[] BuildFixedOfferIds()
         {
-            IReadOnlyList<FormalFateDefinition> fixedOffers =
+            IReadOnlyList<FormalFateDefinition> offers =
                 FormalFateCatalog.FixedOffers;
-            var result = new string[fixedOffers.Count];
-            for (var index = 0; index < fixedOffers.Count; index++)
-                result[index] = fixedOffers[index].Id.Value;
+            var result = new string[offers.Count];
+            for (var index = 0; index < offers.Count; index++)
+                result[index] = offers[index].Id.Value;
             return result;
         }
 
         private bool ContainsOffer(string fateId)
         {
-            for (var index = 0; index < offeredIds.Length; index++)
+            return ContainsOffer(offeredIds, fateId);
+        }
+
+        private static bool ContainsOffer(
+            IReadOnlyList<string> offers,
+            string fateId)
+        {
+            for (var index = 0; index < offers.Count; index++)
             {
                 if (string.Equals(
-                        offeredIds[index],
+                        offers[index],
                         fateId,
                         StringComparison.Ordinal))
                     return true;
@@ -157,19 +200,40 @@ namespace WasteCity.Progression
             return false;
         }
 
-        private bool MatchesFixedOffers(IReadOnlyList<string> candidate)
+        private static bool TryCopyApprovedOffers(
+            IReadOnlyList<string> candidate,
+            out string[] result)
         {
-            if (candidate == null || candidate.Count != offeredIds.Length)
+            result = null;
+            if (candidate == null ||
+                candidate.Count != FormalFateOfferSelector.OfferCount)
                 return false;
-            for (var index = 0; index < offeredIds.Length; index++)
+
+            var copy = new string[candidate.Count];
+            for (var index = 0; index < candidate.Count; index++)
             {
-                if (!string.Equals(
-                        candidate[index],
-                        offeredIds[index],
-                        StringComparison.Ordinal))
+                string id = candidate[index];
+                if (string.IsNullOrWhiteSpace(id) ||
+                    FormalFateCatalog.Find(id) == null)
                     return false;
+                for (var prior = 0; prior < index; prior++)
+                {
+                    if (string.Equals(copy[prior], id, StringComparison.Ordinal))
+                        return false;
+                }
+                copy[index] = id;
             }
+
+            result = copy;
             return true;
+        }
+
+        private static string[] CopyOffers(IReadOnlyList<string> offers)
+        {
+            var copy = new string[offers.Count];
+            for (var index = 0; index < offers.Count; index++)
+                copy[index] = offers[index];
+            return copy;
         }
 
         private void RebuildSnapshot()
@@ -178,7 +242,8 @@ namespace WasteCity.Progression
                 revision,
                 offeredIds,
                 selectedId,
-                level);
+                level,
+                offerSelectionVersion);
         }
     }
 }

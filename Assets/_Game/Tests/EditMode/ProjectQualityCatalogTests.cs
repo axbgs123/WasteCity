@@ -497,6 +497,15 @@ namespace WasteCity.Tests
                 "FormalThreeDPressureInjectedReinforcementSaveData",
                 "FormalThreeDFateSaveData",
                 "FormalThreeDFateEffectsSaveData",
+                "FormalThreeDQuantumEntanglementSaveData",
+                "FormalThreeDSpatialTemplateSaveData",
+                "FormalThreeDSpatialTemplateEntrySaveData",
+                "FormalThreeDLocalHasteSaveData",
+                "FormalThreeDForesightDelaySaveData",
+                "FormalThreeDCausalTransparencySaveData",
+                "FormalThreeDVoidChestSaveData",
+                "FormalThreeDVoidChestEntrySaveData",
+                "FormalThreeDCoordinateLockSaveData",
                 "FormalThreeDPocketUniverseSaveData",
                 "FormalThreeDPocketUniverseFlagshipSaveData",
                 "FormalThreeDVoidDebtSaveData",
@@ -665,7 +674,7 @@ namespace WasteCity.Tests
                 "GrayboxFormalProgressionSaveAdapterTests.cs");
             StringAssert.Contains(
                 "零写入恢复计划",
-                progression.BoundarySummary);
+                progression.UseSummary);
             StringAssert.Contains(
                 "不读写文件",
                 progression.BoundarySummary);
@@ -702,7 +711,7 @@ namespace WasteCity.Tests
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
                 "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
             }, runtimeHost.RequiredTestFiles);
-            StringAssert.Contains("十领域", runtimeHost.UseSummary);
+            StringAssert.Contains("领域 owner", runtimeHost.UseSummary);
 
             ProjectReuseEntry entry = FindReuse(
                 catalog,
@@ -1767,7 +1776,7 @@ namespace WasteCity.Tests
                 hud.RequiredTestFiles);
             CollectionAssert.AreEqual(new[] { "IDEA-0020" },
                 hud.RequirementIds);
-            StringAssert.Contains("不可变快照", hud.UseSummary);
+            StringAssert.Contains("已经提交的三项", hud.UseSummary);
             StringAssert.Contains("真实 UGUI", hud.BoundarySummary);
             StringAssert.Contains("不写 Attention/Fate runtime",
                 hud.BoundarySummary);
@@ -1909,8 +1918,8 @@ namespace WasteCity.Tests
             CollectionAssert.Contains(adapter.RequiredTestFiles,
                 "Assets/_Game/Tests/EditMode/" +
                 "GrayboxFormalFateEffectsSaveAdapterTests.cs");
-            StringAssert.Contains("绑定 owner 身份",
-                adapter.BoundarySummary);
+            StringAssert.Contains("各命轨 owner",
+                adapter.UseSummary);
 
             ProjectReuseEntry fateUi = FindReuse(
                 catalog,
@@ -1963,7 +1972,7 @@ namespace WasteCity.Tests
             }, operations.TypeNames);
             CollectionAssert.AreEqual(new[] { edit, play },
                 operations.RequiredTestFiles);
-            StringAssert.Contains("四份不可变快照", operations.UseSummary);
+            StringAssert.Contains("唯一领域 owner", operations.UseSummary);
             StringAssert.Contains("不直接写 runtime、schema 或文件",
                 operations.BoundarySummary);
             StringAssert.Contains("Host 绑定到唯一 Rewind Service",

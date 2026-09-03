@@ -122,6 +122,13 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "progression", "fate", "offeredIds" },
             new[] { "formal3D", "progression", "pressure", "entries" },
             new[] { "formal3D", "progression", "civilization", "committedAscensionIds" },
+            new[] { "formal3D", "progression", "quantumEntanglement", "committedSynchronizationKeys" },
+            new[] { "formal3D", "progression", "spatialTemplate", "entries" },
+            new[] { "formal3D", "progression", "foresightDelay", "displayedCycleOrdinals" },
+            new[] { "formal3D", "progression", "causalTransparency", "scannedStableEventKeys" },
+            new[] { "formal3D", "progression", "voidChest", "pendingChests" },
+            new[] { "formal3D", "progression", "voidChest", "committedDeathEventIds" },
+            new[] { "formal3D", "progression", "voidChest", "claimedRewardKeys" },
             new[] { "formal3D", "researchEffectState", "states" },
             new[] { "formal3D", "researchEffectState", "emitters" },
             new[] { "formal3D", "researchEffectState", "rewardLedger", "committedRewardKeys" },
@@ -132,6 +139,7 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "researchEffectState", "configurationSignature" },
             new[] { "formal3D", "researchEffectState", "revision" },
             new[] { "formal3D", "researchEffectState", "nextStableStateOrdinal" },
+            new[] { "formal3D", "progression", "fate", "offerSelectionVersion" },
         };
 
         public static FormalSaveValidationResult ValidateDecoded(
@@ -1985,6 +1993,20 @@ namespace WasteCity.Persistence
                 return Missing(path + ".pressure");
             if (progression.civilization == null)
                 return Missing(path + ".civilization");
+            if (progression.quantumEntanglement == null)
+                return Missing(path + ".quantumEntanglement");
+            if (progression.spatialTemplate == null)
+                return Missing(path + ".spatialTemplate");
+            if (progression.localHaste == null)
+                return Missing(path + ".localHaste");
+            if (progression.foresightDelay == null)
+                return Missing(path + ".foresightDelay");
+            if (progression.causalTransparency == null)
+                return Missing(path + ".causalTransparency");
+            if (progression.voidChest == null)
+                return Missing(path + ".voidChest");
+            if (progression.coordinateLock == null)
+                return Missing(path + ".coordinateLock");
 
             FormalSaveValidationResult result = ValidateAttention(
                 progression.attention,
@@ -2006,7 +2028,317 @@ namespace WasteCity.Persistence
                 progression.pressure,
                 path + ".pressure");
             if (result != null) return result;
+            result = ValidateIdea0028State(progression, path);
+            if (result != null) return result;
             return null;
+        }
+
+        private static FormalSaveValidationResult ValidateIdea0028State(
+            FormalThreeDProgressionSaveData progression,
+            string path)
+        {
+            FormalSaveValidationResult result = UniqueNonBlank(
+                progression.quantumEntanglement
+                    .committedSynchronizationKeys,
+                path + ".quantumEntanglement.committedSynchronizationKeys");
+            if (result != null) return result;
+
+            FormalThreeDSpatialTemplateEntrySaveData[] entries =
+                progression.spatialTemplate.entries;
+            if (entries == null || entries.Length > 9)
+                return Invalid(FormalSaveValidationError.InvalidArray,
+                    path + ".spatialTemplate.entries");
+            var occupied = new HashSet<string>(StringComparer.Ordinal);
+            for (var index = 0; index < entries.Length; index++)
+            {
+                FormalThreeDSpatialTemplateEntrySaveData entry =
+                    entries[index];
+                string item = path + ".spatialTemplate.entries[" + index + "]";
+                if (entry == null)
+                    return Invalid(FormalSaveValidationError.InvalidArray,
+                        item);
+                if (entry.relativeX < -1 || entry.relativeX > 1 ||
+                    entry.relativeZ < -1 || entry.relativeZ > 1 ||
+                    entry.quarterTurns < 0 || entry.quarterTurns > 3)
+                    return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                        item);
+                string cell = entry.relativeX + ":" + entry.relativeZ;
+                if (!occupied.Add(cell))
+                    return Invalid(FormalSaveValidationError.DuplicateStableId,
+                        item);
+                if (!IsKnownBuildingDefinition(entry.buildingDefinitionId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        item + ".buildingDefinitionId");
+            }
+
+            FormalThreeDLocalHasteSaveData haste = progression.localHaste;
+            if (haste.cycleOrdinal < 0 ||
+                !IsFinite(haste.remainingBudgetSeconds) ||
+                haste.remainingBudgetSeconds < 0f ||
+                haste.remainingBudgetSeconds > 60f ||
+                !LocalHasteRuntime.TryGetTargetKind(
+                    haste.targetStableId,
+                    out int expectedHasteTargetKind) ||
+                haste.targetKind != expectedHasteTargetKind)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".localHaste.targetStableId");
+            if (haste.targetKind == 0)
+            {
+                if (!string.IsNullOrEmpty(haste.targetStableId) || haste.active)
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        path + ".localHaste.targetStableId");
+            }
+            else if (string.IsNullOrWhiteSpace(haste.targetStableId) ||
+                     (haste.active && haste.remainingBudgetSeconds <= 0f))
+            {
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".localHaste.targetStableId");
+            }
+
+            FormalThreeDForesightDelaySaveData foresight =
+                progression.foresightDelay;
+            if (foresight.displayedCycleOrdinals == null ||
+                foresight.cycleOrdinal < 0 ||
+                !IsFinite(foresight.remainingDisplaySeconds) ||
+                foresight.remainingDisplaySeconds < 0f ||
+                foresight.remainingDisplaySeconds > 3f)
+                return Invalid(FormalSaveValidationError.InvalidArray,
+                    path + ".foresightDelay");
+            long previousCycle = 0;
+            for (var index = 0;
+                 index < foresight.displayedCycleOrdinals.Length;
+                 index++)
+            {
+                long cycle = foresight.displayedCycleOrdinals[index];
+                if (cycle <= previousCycle || cycle > foresight.cycleOrdinal)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        path + ".foresightDelay.displayedCycleOrdinals[" +
+                        index + "]");
+                previousCycle = cycle;
+            }
+            if (string.IsNullOrEmpty(foresight.plannedStableEventId))
+            {
+                if (foresight.remainingDisplaySeconds != 0f)
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        path + ".foresightDelay.plannedStableEventId");
+            }
+            else if (foresight.cycleOrdinal <= 0 ||
+                     !IsPlannedPressureEvent(
+                         progression.pressure,
+                         foresight.plannedStableEventId))
+            {
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".foresightDelay.plannedStableEventId");
+            }
+
+            result = UniqueNonBlank(
+                progression.causalTransparency.scannedStableEventKeys,
+                path + ".causalTransparency.scannedStableEventKeys");
+            if (result != null) return result;
+            result = ValidateVoidChest(
+                progression.voidChest,
+                path + ".voidChest");
+            if (result != null) return result;
+
+            FormalThreeDCoordinateLockSaveData coordinate =
+                progression.coordinateLock;
+            bool clean = !coordinate.committed &&
+                string.IsNullOrEmpty(coordinate.stableEventKey) &&
+                !coordinate.bossPressureScheduled && coordinate.revision == 0;
+            if (clean) return null;
+            if (!coordinate.committed)
+                return Invalid(FormalSaveValidationError.InvalidEnumValue,
+                    path + ".coordinateLock");
+            if (!string.Equals(
+                    coordinate.stableEventKey,
+                    CoordinateLockCatalog.StableEventKey,
+                    StringComparison.Ordinal))
+                return Invalid(FormalSaveValidationError.InvalidStableId,
+                    path + ".coordinateLock.stableEventKey");
+            if (!coordinate.bossPressureScheduled ||
+                !HasCoordinateBossPressure(progression.pressure))
+                return Invalid(
+                    FormalSaveValidationError.MissingStableReference,
+                    path + ".coordinateLock.bossPressureScheduled");
+            return coordinate.revision > 0
+                ? null
+                : Invalid(FormalSaveValidationError.InvalidHighWaterMark,
+                    path + ".coordinateLock.revision");
+        }
+
+        private static bool HasCoordinateBossPressure(
+            FormalThreeDAttentionPressureSaveData pressure)
+        {
+            if (pressure?.entries == null) return false;
+            for (var index = 0; index < pressure.entries.Length; index++)
+            {
+                FormalThreeDAttentionPressureEntrySaveData entry =
+                    pressure.entries[index];
+                if (entry != null &&
+                    entry.threshold == CoordinateLockCatalog.TargetAttention)
+                    return true;
+            }
+            return false;
+        }
+
+        private static FormalSaveValidationResult ValidateVoidChest(
+            FormalThreeDVoidChestSaveData data,
+            string path)
+        {
+            if (data.nextDropOrdinal < 1 || data.pendingChests == null ||
+                data.committedDeathEventIds == null ||
+                data.claimedRewardKeys == null)
+                return Invalid(FormalSaveValidationError.InvalidArray, path);
+            FormalSaveValidationResult result = UniqueNonBlank(
+                data.committedDeathEventIds,
+                path + ".committedDeathEventIds");
+            if (result != null) return result;
+            result = UniqueNonBlank(
+                data.claimedRewardKeys,
+                path + ".claimedRewardKeys");
+            if (result != null) return result;
+            var deathOrdinals = new Dictionary<string, long>(
+                StringComparer.Ordinal);
+            var committedOrdinals = new HashSet<long>();
+            for (var index = 0;
+                 index < data.committedDeathEventIds.Length;
+                 index++)
+            {
+                string encoded = data.committedDeathEventIds[index];
+                string encodedPath = path + ".committedDeathEventIds[" +
+                    index + "]";
+                if (!TryDecodeVoidChestDeathEvaluation(
+                        encoded,
+                        out string deathId,
+                        out long ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        encodedPath);
+                if (!deathOrdinals.TryAdd(deathId, ordinal) ||
+                    !committedOrdinals.Add(ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        encodedPath);
+                if (ordinal >= data.nextDropOrdinal)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidHighWaterMark,
+                        encodedPath);
+            }
+            var claimed = new HashSet<string>(
+                data.claimedRewardKeys, StringComparer.Ordinal);
+            var chestIds = new HashSet<string>(StringComparer.Ordinal);
+            var ordinals = new HashSet<long>();
+            for (var index = 0; index < data.pendingChests.Length; index++)
+            {
+                FormalThreeDVoidChestEntrySaveData item =
+                    data.pendingChests[index];
+                string itemPath = path + ".pendingChests[" + index + "]";
+                if (item == null ||
+                    string.IsNullOrWhiteSpace(item.stableChestId) ||
+                    string.IsNullOrWhiteSpace(item.deathEventId) ||
+                    string.IsNullOrWhiteSpace(item.narrativeFragmentId) ||
+                    string.IsNullOrWhiteSpace(item.rewardKey) ||
+                    item.dropOrdinal < 1 ||
+                    item.dropOrdinal >= data.nextDropOrdinal ||
+                    item.amount <= 0 ||
+                    !chestIds.Add(item.stableChestId) ||
+                    !ordinals.Add(item.dropOrdinal) ||
+                    !deathOrdinals.TryGetValue(
+                        item.deathEventId,
+                        out long committedOrdinal) ||
+                    committedOrdinal != item.dropOrdinal ||
+                    claimed.Contains(item.rewardKey) ||
+                    !IsVoidChestResource(item.resourceId))
+                    return Invalid(FormalSaveValidationError.InvalidStableId,
+                        itemPath);
+            }
+            return null;
+        }
+
+        private static bool TryDecodeVoidChestDeathEvaluation(
+            string encoded,
+            out string deathId,
+            out long ordinal)
+        {
+            deathId = string.Empty;
+            ordinal = 0L;
+            if (string.IsNullOrWhiteSpace(encoded)) return false;
+            int lengthSeparator = encoded.IndexOf(':');
+            if (lengthSeparator <= 0 || !int.TryParse(
+                    encoded.Substring(0, lengthSeparator),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int deathIdLength) ||
+                deathIdLength <= 0)
+                return false;
+            int deathIdStart = lengthSeparator + 1;
+            int ordinalSeparator = deathIdStart + deathIdLength;
+            if (ordinalSeparator >= encoded.Length ||
+                encoded[ordinalSeparator] != ':')
+                return false;
+            deathId = encoded.Substring(deathIdStart, deathIdLength);
+            return !string.IsNullOrWhiteSpace(deathId) && long.TryParse(
+                encoded.Substring(ordinalSeparator + 1),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out ordinal) && ordinal > 0L;
+        }
+
+        private static bool IsPlannedPressureEvent(
+            FormalThreeDAttentionPressureSaveData pressure,
+            string stableEventId)
+        {
+            if (pressure?.entries == null ||
+                string.IsNullOrEmpty(stableEventId))
+                return false;
+            for (var index = 0; index < pressure.entries.Length; index++)
+            {
+                FormalThreeDAttentionPressureEntrySaveData entry =
+                    pressure.entries[index];
+                if (entry == null ||
+                    entry.state != (int)AttentionPressureState.Queued &&
+                    entry.state != (int)AttentionPressureState.Warning)
+                    continue;
+                AttentionPressureDefinition definition =
+                    AttentionPressureCatalog.FindByThreshold(entry.threshold);
+                if (definition != null && string.Equals(
+                        definition.EncounterId.Value,
+                        stableEventId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool IsVoidChestResource(string resourceId)
+        {
+            return string.Equals(resourceId, ResourceIds.Iron,
+                       StringComparison.Ordinal) ||
+                string.Equals(resourceId, ResourceIds.Stone,
+                    StringComparison.Ordinal) ||
+                string.Equals(resourceId, ResourceIds.Water,
+                    StringComparison.Ordinal) ||
+                string.Equals(resourceId, ResourceIds.Biomass,
+                    StringComparison.Ordinal);
+        }
+
+        private static bool IsKnownBuildingDefinition(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return false;
+            for (var index = 0; index < BuildingCatalog.All.Length; index++)
+            {
+                if (string.Equals(
+                        BuildingCatalog.All[index].Id.Value,
+                        id,
+                        StringComparison.Ordinal))
+                    return true;
+            }
+            return false;
         }
 
         private static FormalSaveValidationResult ValidatePressure(
@@ -2246,28 +2578,30 @@ namespace WasteCity.Persistence
             FormalThreeDFateSaveData fate,
             string path)
         {
-            string[] expected =
-            {
-                FormalFateCatalog.PocketUniverseId,
-                FormalFateCatalog.VoidDebtId,
-                FormalFateCatalog.RewindAnchorId,
-            };
+            if (fate.offerSelectionVersion < 0 ||
+                fate.offerSelectionVersion > 1)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".offerSelectionVersion");
             if (fate.offeredIds == null)
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
                     path + ".offeredIds");
-            if (fate.offeredIds.Length != expected.Length)
+            if (fate.offeredIds.Length != 3)
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
                     path + ".offeredIds");
-            for (int index = 0; index < expected.Length; index++)
+            var offered = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < fate.offeredIds.Length; index++)
             {
-                if (!string.Equals(
-                        fate.offeredIds[index],
-                        expected[index],
-                        StringComparison.Ordinal))
+                string id = fate.offeredIds[index];
+                if (FormalFateCatalog.Find(id) == null)
                     return Invalid(
-                        FormalSaveValidationError.InvalidEnumValue,
+                        FormalSaveValidationError.InvalidStableId,
+                        path + ".offeredIds[" + index + "]");
+                if (!offered.Add(id))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
                         path + ".offeredIds[" + index + "]");
             }
 
@@ -2280,15 +2614,9 @@ namespace WasteCity.Persistence
                 return null;
             }
 
-            bool known = false;
-            for (int index = 0; index < expected.Length; index++)
-                known |= string.Equals(
-                    fate.selectedId,
-                    expected[index],
-                    StringComparison.Ordinal);
-            if (!known)
+            if (!offered.Contains(fate.selectedId))
                 return Invalid(
-                    FormalSaveValidationError.InvalidStableId,
+                    FormalSaveValidationError.MissingStableReference,
                     path + ".selectedId");
             if (fate.level != 1 && fate.level != 2)
                 return Invalid(

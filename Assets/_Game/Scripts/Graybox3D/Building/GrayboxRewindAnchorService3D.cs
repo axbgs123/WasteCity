@@ -250,6 +250,19 @@ namespace WasteCity.Graybox3D.Building
                 currentProgression.civilization);
             target.formal3D.progression.fateEffects.rewindAnchors = Clone(
                 currentProgression.fateEffects.rewindAnchors);
+            if (!GrayboxFormalProgressionSaveAdapter3D
+                    .TryMergeVoidChestMonotonic(
+                        currentProgression.voidChest,
+                        target.formal3D.progression.voidChest,
+                        out FormalThreeDVoidChestSaveData mergedVoidChest,
+                        out string mergeError))
+            {
+                return Failure(
+                    GrayboxRewindAnchorServiceCode3D.InvalidAnchor,
+                    "无法保留当前虚空宝箱幂等状态",
+                    mergeError);
+            }
+            target.formal3D.progression.voidChest = mergedVoidChest;
             target.payloadHashSha256 =
                 FormalSaveCodec.ComputePayloadHashSha256(target.formal3D);
             FormalSaveValidationResult validation =

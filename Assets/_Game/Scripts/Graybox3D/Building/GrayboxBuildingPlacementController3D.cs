@@ -161,6 +161,59 @@ namespace WasteCity.Graybox3D.Building
             return confirmed;
         }
 
+        public BuildingPlacementEvaluation EvaluateGroundPlacement(
+            BuildingDefinition definition,
+            BuildingOrientation orientation,
+            int anchorX,
+            int anchorY)
+        {
+            EnsureGroundConstructionConfigured();
+            return BuildingPlacementRules.Evaluate(
+                CreateGroundRequest(
+                    definition,
+                    orientation,
+                    anchorX,
+                    anchorY));
+        }
+
+        public bool TryBeginGroundConstruction(
+            BuildingDefinition definition,
+            BuildingOrientation orientation,
+            int anchorX,
+            int anchorY,
+            out GrayboxBuildingInstance3D instance,
+            out BuildingPlacementEvaluation evaluation)
+        {
+            EnsureGroundConstructionConfigured();
+            return session.TryBeginConstruction(
+                CreateGroundRequest(
+                    definition,
+                    orientation,
+                    anchorX,
+                    anchorY),
+                presentation,
+                out instance,
+                out evaluation);
+        }
+
+        public bool TryCancelUnderConstruction(
+            string stableInstanceId,
+            out int acceptedRefund)
+        {
+            EnsureGroundConstructionConfigured();
+            return session.TryCancelConstruction(
+                stableInstanceId,
+                1d,
+                presentation,
+                out acceptedRefund);
+        }
+
+        public int GetAvailableConstructionMaterialAmount(string resourceId)
+        {
+            EnsureGroundConstructionConfigured();
+            return session.GetCityResourceAmount(resourceId);
+        }
+
         public void HidePreview()
         {
             if (!string.IsNullOrEmpty(highlightedNodeId) &&
@@ -467,6 +520,17 @@ namespace WasteCity.Graybox3D.Building
                 default,
                 "外城");
             return CreateRequest(definition, hit, orientation);
+        }
+
+        private void EnsureGroundConstructionConfigured()
+        {
+            if (session == null || city == null || world?.Model == null ||
+                world.Coordinates == null || presentation == null ||
+                evaluationWorkspace == null)
+            {
+                throw new InvalidOperationException(
+                    "Configure the ground building placement controller first.");
+            }
         }
 
         private void BuildMiningGuidance(

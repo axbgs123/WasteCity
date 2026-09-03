@@ -90,6 +90,7 @@ namespace WasteCity.Graybox3D.Building
 
         private Func<bool> persistencePauseSource;
         private Func<float> civilizationEfficiencySource;
+        private Func<float> localHasteMultiplierSource;
         private ResearchModel researchEffectSource;
         private int researchEffectCompletedCount = -1;
         private ResearchEffectSnapshot researchEffects =
@@ -115,6 +116,11 @@ namespace WasteCity.Graybox3D.Building
             Func<float> source)
         {
             civilizationEfficiencySource = source;
+        }
+
+        public void ConfigureLocalHasteMultiplier(Func<float> source)
+        {
+            localHasteMultiplierSource = source;
         }
 
         public void Configure(
@@ -193,7 +199,8 @@ namespace WasteCity.Graybox3D.Building
                 Clock.Tick(
                     ruleDeltaSeconds * Mathf.Max(
                         0f,
-                        civilizationEfficiencySource?.Invoke() ?? 1f),
+                        civilizationEfficiencySource?.Invoke() ?? 1f) *
+                    Mathf.Max(0f, localHasteMultiplierSource?.Invoke() ?? 1f),
                     paused || IsPersistencePaused,
                     session.Instances,
                     city.Mode,

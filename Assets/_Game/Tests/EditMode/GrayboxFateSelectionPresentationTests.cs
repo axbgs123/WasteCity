@@ -19,19 +19,27 @@ namespace WasteCity.Tests
             "WasteCity.Graybox3D.Building.GrayboxFateSelectionCard3D";
 
         [Test]
-        public void IDEA0020_ThreeCardsExposeAllApprovedChineseCopy()
+        public void IDEA0028_ThreeCardsFollowCurrentOfferOrderAndCopy()
         {
-            using (Fixture fixture = Create(effectsReady: true))
+            string[] offeredIds =
+            {
+                FormalFateCatalog.VoidChestId,
+                FormalFateCatalog.QuantumEntanglementId,
+                FormalFateCatalog.RewindAnchorId,
+            };
+            using (Fixture fixture = Create(
+                       effectsReady: true,
+                       offeredIds: offeredIds))
             {
                 Assert.That(Refresh(fixture.Controller), Is.True);
                 object[] cards = Sequence(fixture.View, "Cards");
                 Assert.That(cards, Has.Length.EqualTo(3));
                 Assert.That(cards.Select(value => Read<string>(value, "FateId")),
-                    Is.EqualTo(FormalFateCatalog.All.Select(
-                        value => value.Id.Value)));
+                    Is.EqualTo(offeredIds));
                 for (var index = 0; index < cards.Length; index++)
                 {
-                    FormalFateDefinition expected = FormalFateCatalog.All[index];
+                    FormalFateDefinition expected =
+                        FormalFateCatalog.Find(offeredIds[index]);
                     object actual = cards[index];
                     Assert.That(actual.GetType(), Is.EqualTo(
                         RequireType(CardTypeName)));
@@ -48,6 +56,34 @@ namespace WasteCity.Tests
                 }
                 Assert.That(Read<bool>(fixture.View, "IsOpen"), Is.True,
                     "Pending fate plus EffectsReady must force the modal open.");
+            }
+        }
+
+        [Test]
+        public void IDEA0028_ApprovedFateOutsideCurrentOffersCannotOpenConfirmation()
+        {
+            string[] offeredIds =
+            {
+                FormalFateCatalog.VoidChestId,
+                FormalFateCatalog.QuantumEntanglementId,
+                FormalFateCatalog.RewindAnchorId,
+            };
+            using (Fixture fixture = Create(
+                       effectsReady: true,
+                       offeredIds: offeredIds))
+            {
+                Refresh(fixture.Controller);
+
+                Assert.That(SelectCard(
+                    fixture.Controller,
+                    FormalFateCatalog.PocketUniverseId,
+                    out string error), Is.False);
+                Assert.That(error, Is.Not.Empty);
+                Assert.That(Read<bool>(fixture.View, "IsConfirmationOpen"),
+                    Is.False);
+                Assert.That(Read<string>(fixture.View, "PendingFateId"),
+                    Is.Empty);
+                Assert.That(fixture.Fate.Capture().HasSelection, Is.False);
             }
         }
 
@@ -101,7 +137,9 @@ namespace WasteCity.Tests
             }
         }
 
-        private static Fixture Create(bool effectsReady)
+        private static Fixture Create(
+            bool effectsReady,
+            string[] offeredIds = null)
         {
             Type viewType = RequireType(ViewTypeName);
             Type controllerType = RequireType(ControllerTypeName);
@@ -109,6 +147,12 @@ namespace WasteCity.Tests
             object view = root.AddComponent(viewType);
             var attention = new FormalAttentionRuntime();
             var fate = new FormalFateRuntime();
+            if (offeredIds != null)
+            {
+                Assert.That(fate.TryRestore(
+                    new FormalFateSnapshot(0, offeredIds, null, 0),
+                    out string restoreError), Is.True, restoreError);
+            }
             var router = new GrayboxProgressionEventRouter3D(attention, fate);
             ConstructorInfo constructor = controllerType.GetConstructor(new[]
             {

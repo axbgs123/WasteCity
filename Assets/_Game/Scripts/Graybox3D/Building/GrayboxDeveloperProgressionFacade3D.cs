@@ -18,7 +18,8 @@ namespace WasteCity.Graybox3D.Building
             int[] configuredThresholds,
             int[] reachedThresholds,
             string[] pressureQueue,
-            string configurationSignature)
+            string configurationSignature,
+            string[] fateDomainStates)
         {
             Attention = attention;
             FateId = fateId ?? string.Empty;
@@ -33,6 +34,8 @@ namespace WasteCity.Graybox3D.Building
             PressureQueue = Array.AsReadOnly(
                 pressureQueue ?? Array.Empty<string>());
             ConfigurationSignature = configurationSignature ?? string.Empty;
+            FateDomainStates = Array.AsReadOnly(
+                fateDomainStates ?? Array.Empty<string>());
         }
 
         public int Attention { get; }
@@ -44,6 +47,7 @@ namespace WasteCity.Graybox3D.Building
         public IReadOnlyList<int> ReachedThresholds { get; }
         public IReadOnlyList<string> PressureQueue { get; }
         public string ConfigurationSignature { get; }
+        public IReadOnlyList<string> FateDomainStates { get; }
     }
 
     public sealed class GrayboxDeveloperProgressionFacade3D
@@ -56,6 +60,13 @@ namespace WasteCity.Graybox3D.Building
         private readonly FormalRewindAnchorMetadataRuntime rewind;
         private readonly AttentionPressureRuntime pressure;
         private readonly AdvancementSequenceModel sequence;
+        private readonly QuantumEntanglementRuntime quantum;
+        private readonly SpatialTemplateRuntime spatial;
+        private readonly LocalHasteRuntime haste;
+        private readonly ForesightDelayRuntime foresight;
+        private readonly CausalTransparencyRuntime causal;
+        private readonly VoidChestRuntime chest;
+        private readonly CoordinateLockRuntime coordinate;
         private readonly Func<bool> createAnchor;
         private readonly Func<string, bool> readAnchor;
         private readonly Func<bool> clearAnchors;
@@ -91,7 +102,14 @@ namespace WasteCity.Graybox3D.Building
                     true,
                 () => host?.SatisfyAscensionRequirementsForDevelopment() ==
                     true,
-                () => host?.ClearAscensionRequirementsForDevelopment() == true)
+                () => host?.ClearAscensionRequirementsForDevelopment() == true,
+                host?.QuantumEntanglementRuntime,
+                host?.SpatialTemplateRuntime,
+                host?.LocalHasteRuntime,
+                host?.ForesightDelayRuntime,
+                host?.CausalTransparencyRuntime,
+                host?.VoidChestRuntime,
+                host?.CoordinateLockRuntime)
         {
             if (host == null) throw new ArgumentNullException(nameof(host));
         }
@@ -114,7 +132,14 @@ namespace WasteCity.Graybox3D.Building
             Func<bool> resetPressure = null,
             Func<bool, bool> setBossDefeated = null,
             Func<bool> satisfyAscensionRequirements = null,
-            Func<bool> clearAscensionRequirements = null)
+            Func<bool> clearAscensionRequirements = null,
+            QuantumEntanglementRuntime quantum = null,
+            SpatialTemplateRuntime spatial = null,
+            LocalHasteRuntime haste = null,
+            ForesightDelayRuntime foresight = null,
+            CausalTransparencyRuntime causal = null,
+            VoidChestRuntime chest = null,
+            CoordinateLockRuntime coordinate = null)
         {
             this.attention = attention ??
                 throw new ArgumentNullException(nameof(attention));
@@ -141,6 +166,13 @@ namespace WasteCity.Graybox3D.Building
             this.setBossDefeated = setBossDefeated;
             this.satisfyAscensionRequirements = satisfyAscensionRequirements;
             this.clearAscensionRequirements = clearAscensionRequirements;
+            this.quantum = quantum;
+            this.spatial = spatial;
+            this.haste = haste;
+            this.foresight = foresight;
+            this.causal = causal;
+            this.chest = chest;
+            this.coordinate = coordinate;
         }
 
         public bool IncreaseAttention(int amount)
@@ -213,15 +245,72 @@ namespace WasteCity.Graybox3D.Building
         public bool SelectFate(string fateId)
         {
             FormalFateSnapshot fateBefore = fate.Capture();
-            if (fateBefore.HasSelection) return false;
+            if (fateBefore.HasSelection ||
+                FormalFateCatalog.Find(fateId) == null) return false;
             FormalAttentionSnapshot attentionBefore = attention.Capture();
             FormalCivilizationAscensionSnapshot civilizationBefore =
                 civilization.Capture();
+            if (!Contains(fateBefore.OfferedIds, fateId))
+            {
+                var candidate = new FormalFateSnapshot(
+                    fateBefore.Revision + 1UL,
+                    BuildDevelopmentOffers(fateBefore.OfferedIds, fateId),
+                    null,
+                    0,
+                    fateBefore.OfferSelectionVersion);
+                if (!fate.TryRestore(candidate, out _)) return false;
+            }
             if (fateRouter.TrySelectFate(fateId, out _) &&
                 civilization.TryBindFate(fateId, out _)) return true;
             fate.TryRestore(fateBefore, out _);
             attention.TryRestore(attentionBefore, out _);
             civilization.TryRestore(civilizationBefore, out _);
+            return false;
+        }
+
+        private static string[] BuildDevelopmentOffers(
+            IReadOnlyList<string> current,
+            string selectedFateId)
+        {
+            var result = new string[FormalFateOfferSelector.OfferCount];
+            result[0] = selectedFateId;
+            var count = 1;
+            for (var index = 0;
+                 index < current.Count && count < result.Length;
+                 index++)
+            {
+                if (Contains(result, count, current[index])) continue;
+                result[count++] = current[index];
+            }
+            for (var index = 0;
+                 index < FormalFateCatalog.All.Count && count < result.Length;
+                 index++)
+            {
+                string fateId = FormalFateCatalog.All[index].Id.Value;
+                if (Contains(result, count, fateId)) continue;
+                result[count++] = fateId;
+            }
+            return result;
+        }
+
+        private static bool Contains(
+            IReadOnlyList<string> values,
+            string value)
+        {
+            return Contains(values, values.Count, value);
+        }
+
+        private static bool Contains(
+            IReadOnlyList<string> values,
+            int count,
+            string value)
+        {
+            for (var index = 0; index < count; index++)
+            {
+                if (string.Equals(
+                        values[index], value, StringComparison.Ordinal))
+                    return true;
+            }
             return false;
         }
 
@@ -340,7 +429,101 @@ namespace WasteCity.Graybox3D.Building
                 Copy(FormalAttentionCatalog.Thresholds),
                 Copy(attentionState.ReachedThresholds),
                 queue,
-                FormalThreeDProgressionSaveData.ConfigurationSignature);
+                FormalThreeDProgressionSaveData.ConfigurationSignature,
+                BuildFateDomainStates());
+        }
+
+        private string[] BuildFateDomainStates()
+        {
+            return new[]
+            {
+                QuantumStateText(),
+                SpatialStateText(),
+                HasteStateText(),
+                ForesightStateText(),
+                CausalStateText(),
+                ChestStateText(),
+                CoordinateStateText(),
+            };
+        }
+
+        private string QuantumStateText()
+        {
+            if (quantum == null) return "量子纠缠：未连接运行时";
+            QuantumEntanglementSnapshot state = quantum.Capture();
+            return "量子纠缠：" + (state.Connected ? "已连接" : "已断开") +
+                "，共享资源 " + state.SharedResourceIds.Count +
+                "，同步记录 " + state.CommittedSynchronizationKeys.Count;
+        }
+
+        private string SpatialStateText()
+        {
+            if (spatial == null) return "空间模板：未连接运行时";
+            SpatialTemplateSnapshot state = spatial.Capture();
+            var cells = 0;
+            for (var index = 0; index < state.Templates.Count; index++)
+                cells += state.Templates[index].Cells.Count;
+            return "空间模板：模板 " + state.Templates.Count +
+                "，格位 " + cells;
+        }
+
+        private string HasteStateText()
+        {
+            if (haste == null) return "局部时加：未连接运行时";
+            LocalHasteSnapshot state = haste.Capture();
+            return "局部时加：" + (state.Active ? "运行中" : "未启动") +
+                "，目标 " + (string.IsNullOrEmpty(state.TargetId)
+                    ? "无"
+                    : HasteTargetText(state.TargetId)) +
+                "，剩余 " + state.RemainingBudgetSeconds.ToString("0.##") +
+                " 秒，周期 " + state.CurrentCycleOrdinal;
+        }
+
+        private static string HasteTargetText(string targetId)
+        {
+            switch (targetId)
+            {
+                case "production": return "生产";
+                case "research": return "研究";
+                case "defense": return "防御";
+                default: return "未知目标";
+            }
+        }
+
+        private string ForesightStateText()
+        {
+            if (foresight == null) return "预知迟滞：未连接运行时";
+            ForesightDelaySnapshot state = foresight.Capture();
+            return "预知迟滞：周期 " + state.CurrentCycleOrdinal + "，" +
+                (state.LastProjection == null
+                    ? "无预告"
+                    : "预告 " + state.LastProjection.SummaryKey +
+                      "，显示剩余 " +
+                      state.DisplayRemainingSeconds.ToString("0.##") + " 秒");
+        }
+
+        private string CausalStateText()
+        {
+            if (causal == null) return "因果透明：未连接运行时";
+            CausalTransparencySnapshot state = causal.Capture();
+            return "因果透明：完整原因" +
+                (state.FullReasonAccess ? "已开放" : "未开放");
+        }
+
+        private string ChestStateText()
+        {
+            if (chest == null) return "虚空宝箱：未连接运行时";
+            VoidChestSnapshot state = chest.Capture();
+            return "虚空宝箱：评估 " + state.Evaluations.Count +
+                "，待领取 " + state.UnclaimedChestIds.Count +
+                "，已领取 " + state.ClaimedChestIds.Count;
+        }
+
+        private string CoordinateStateText()
+        {
+            if (coordinate == null) return "坐标锁定：未连接运行时";
+            return "坐标锁定：" +
+                (coordinate.Capture().Committed ? "已锁定" : "未锁定");
         }
 
         private bool AscendFixture()

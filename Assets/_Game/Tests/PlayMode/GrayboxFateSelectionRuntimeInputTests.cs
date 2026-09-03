@@ -91,7 +91,7 @@ namespace WasteCity.Tests
         }
 
         [UnityTest]
-        public IEnumerator IDEA0020_RealFateModalSelectsRewindWithoutInputLeak()
+        public IEnumerator IDEA0028_RealFateModalSelectsOfferedCardWithoutInputLeak()
         {
             GameObject modal = RequireSceneObject("FateSelection.Modal");
             GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
@@ -142,8 +142,13 @@ namespace WasteCity.Tests
             Assert.That(modal.activeInHierarchy, Is.True,
                 "Closing the system menu returns to the fate modal.");
 
+            FormalFateSnapshot pendingFate = host.FateRuntime.Capture();
+            Assert.That(pendingFate.OfferedIds, Has.Count.EqualTo(3));
+            Assert.That(pendingFate.OfferedIds.Distinct().Count(),
+                Is.EqualTo(3));
+            string offeredFateId = pendingFate.OfferedIds[0];
             GameObject card = RequireSceneObject(
-                "FateSelection.Card." + FormalFateCatalog.RewindAnchorId);
+                "FateSelection.Card." + offeredFateId);
             Assert.That(card.GetComponent<Button>(), Is.Not.Null);
             yield return Click(card);
             GameObject confirmation = RequireSceneObject(
@@ -154,7 +159,7 @@ namespace WasteCity.Tests
 
             yield return Click(RequireSceneObject("FateSelection.Confirm"));
             Assert.That(host.FateRuntime.Capture().SelectedId,
-                Is.EqualTo(FormalFateCatalog.RewindAnchorId));
+                Is.EqualTo(offeredFateId));
             Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(1));
             Assert.That(host.AttentionRuntime.Value, Is.EqualTo(15));
             Assert.That(modal.activeSelf, Is.False);

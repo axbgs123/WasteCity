@@ -20,17 +20,48 @@ namespace WasteCity.Tests
                 "袖珍宇宙",
                 "core.fate-effect.pocket-universe"),
             new ExpectedFate(
-                "core.legacy.void-debt",
-                "虚空债",
-                "core.fate-effect.void-debt"),
+                "core.legacy.quantum-entanglement",
+                "量子纠缠",
+                "core.fate-effect.quantum-entanglement"),
+            new ExpectedFate(
+                "core.legacy.spatial-template",
+                "空间模板",
+                "core.fate-effect.spatial-template"),
             new ExpectedFate(
                 "core.legacy.rewind-anchor",
                 "回溯锚点",
                 "core.fate-effect.rewind-anchor"),
+            new ExpectedFate(
+                "core.legacy.local-haste",
+                "局部时加",
+                "core.fate-effect.local-haste"),
+            new ExpectedFate(
+                "core.legacy.foresight-delay",
+                "预知迟滞",
+                "core.fate-effect.foresight-delay"),
+            new ExpectedFate(
+                "core.legacy.void-debt",
+                "虚空债",
+                "core.fate-effect.void-debt"),
+            new ExpectedFate(
+                "core.legacy.causal-transparency",
+                "因果透明",
+                "core.fate-effect.causal-transparency"),
+            new ExpectedFate(
+                "core.legacy.void-chest",
+                "虚空宝箱",
+                "core.fate-effect.void-chest"),
+        };
+
+        private static readonly string[] LegacyFixedOffers =
+        {
+            "core.legacy.pocket-universe",
+            "core.legacy.void-debt",
+            "core.legacy.rewind-anchor",
         };
 
         [Test]
-        public void IDEA0020_CatalogContainsExactlyThreeFixedFormalFates()
+        public void IDEA0028_CatalogContainsNineApprovedFatesAndLegacyOffers()
         {
             Type catalog = RequireType(CatalogTypeName);
             Type definition = RequireType(DefinitionTypeName);
@@ -39,17 +70,18 @@ namespace WasteCity.Tests
                 .Cast<object>()
                 .ToArray();
 
-            Assert.That(all, Has.Length.EqualTo(3));
+            Assert.That(all, Has.Length.EqualTo(9));
             Assert.That(offers, Has.Length.EqualTo(3));
-            Assert.That(offers, Is.EqualTo(all),
-                "The formal offer order is the catalog order, not a random draw.");
+            Assert.That(offers.Select(item => ReadStableId(item, "Id")),
+                Is.EqualTo(LegacyFixedOffers),
+                "The parameterless runtime must retain the schema-35 offer set.");
             Assert.That(all.All(item => item.GetType() == definition), Is.True);
             Assert.That(all.Select(item => ReadStableId(item, "Id")),
                 Is.EqualTo(Expected.Select(value => value.Id)));
         }
 
         [Test]
-        public void IDEA0020_DefinitionsExposeCompletePlayerFacingAndAdapterData()
+        public void IDEA0028_DefinitionsExposeCompletePlayerFacingAndAdapterData()
         {
             Type catalog = RequireType(CatalogTypeName);
             Type definition = RequireType(DefinitionTypeName);
@@ -82,7 +114,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0020_FindUsesCoreLegacyStableStringsWithoutFallback()
+        public void IDEA0028_FindUsesNineCoreLegacyStableStringsWithoutFallback()
         {
             Type catalog = RequireType(CatalogTypeName);
             MethodInfo find = catalog.GetMethod(
@@ -101,8 +133,6 @@ namespace WasteCity.Tests
             }
             Assert.That(find.Invoke(null, new object[] { null }), Is.Null);
             Assert.That(find.Invoke(null, new object[] { string.Empty }), Is.Null);
-            Assert.That(find.Invoke(null, new object[]
-                { "core.legacy.quantum-entanglement" }), Is.Null);
             Assert.That(find.Invoke(null, new object[] { "unknown.fate.id" }),
                 Is.Null);
         }

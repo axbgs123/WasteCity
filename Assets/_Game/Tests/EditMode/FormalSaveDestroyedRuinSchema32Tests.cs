@@ -124,7 +124,8 @@ namespace WasteCity.Tests
                 ReadFixture("schema-31-formal-3d.json"));
             Assert.That(decoded.Success, Is.True, decoded.Message);
             Assert.That(decoded.Envelope, Is.Not.Null);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(35));
+            Assert.That(decoded.Envelope.saveSchemaVersion,
+                Is.EqualTo(FormalSaveEnvelope.CurrentSchemaVersion));
 
             FormalSaveEnvelope envelope = decoded.Envelope;
             FormalThreeDBuildingsSaveData buildings =

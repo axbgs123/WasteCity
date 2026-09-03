@@ -112,7 +112,9 @@ namespace WasteCity.Tests
                 Is.EqualTo(2));
             Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(2));
             Assert.That(host.AttentionRuntime.Value,
-                Is.EqualTo(attentionBefore + 25));
+                Is.EqualTo(System.Math.Min(
+                    FormalAttentionCatalog.MaximumValue,
+                    attentionBefore + 25)));
             Assert.That(Require(
                 "CivilizationAdvancement.Modal").activeInHierarchy,
                 Is.True);

@@ -2888,6 +2888,7 @@ MonoBehaviour:
   world: {fileID: 962754566}
   session: {fileID: 764810524}
   buildingPresentation: {fileID: 1545501225}
+  buildingPlacement: {fileID: 682762449}
   operations: {fileID: 1322457538}
   production: {fileID: 740990735}
   defense: {fileID: 293867046}
