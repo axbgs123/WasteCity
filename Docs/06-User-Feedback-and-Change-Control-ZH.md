@@ -1194,11 +1194,11 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 ### IDEA-0028：九条正式命轨池与坐标锁定闭环
 
 - 提出日期：2026-09-01
-- 最近更新：2026-09-01
+- 最近更新：2026-09-03
 - 优先级：`P1`
 - 需求明确状态：`已明确`
 - 审批状态：`已批准`
-- 实现状态：`开发中`
+- 实现状态：`已实现待验证`
 - 用户原始描述：开始下一项开发，并指出此前想要的命轨并不是现役固定三条，要求回查项目文件后继续；开发方已获授权自行决定 schema、正式需求冲突和实施方向，极小概率且不影响可信开发的问题不扩大处理，涉及建模的内容暂时跳过。
 - 目标体验：每个新进度从九条已定稿命轨中得到由本局稳定身份决定的三张不同候选卡，选择任一条都会真实改变经营、信息、时间、建造或战利品规则；保存、继续、回溯锚点、波前重试和 Development 管理台始终保持同一候选、选择和状态。
 - 正式池：复用既有稳定 ID，登记袖珍宇宙、量子纠缠、空间模板、回溯锚点、局部时加、预知迟滞、虚空债、因果透明、虚空宝箱九条；B2.1 中其余十五条待定草案不进入正式池。新进度使用世界 seed、稳定 session ID 和抽取版本确定性无放回抽三条；保存的 `offeredIds` 及顺序是恢复真值，目录扩展、加载和迁移不得重抽。
@@ -1213,7 +1213,7 @@ Bug 进入 `已验证` 前，至少需要原问题复现结果、修复提交和
 - 影响系统：FormalFateCatalog/Runtime、六个新增命轨领域 owner、WorldLayer/Settlement 库存端点、统一建造、Production/Research/Defense 规则增量、Pressure/Campaign、Attention 历史、战利品事务、正式三卡/详情/Development 管理台、FormalSave schema/codec/validator/coordinator、项目质量与复用目录。
 - 关联正式文档：`Docs/01-Game-Design-Document-ZH.md` A0.3、A4.7、A4.8、A16.6 与 B2.1；`Docs/05-Formal-Development-Roadmap-ZH.md` F6；`IDEA-0020`、`IDEA-0022`、`IDEA-0027`、`DOC-0001`。
 - 验收条件：严格 RED→GREEN。覆盖九条目录/ID/文案、相同输入稳定抽取三条且无重复/跨输入九条可达、任意合法三候选恢复、旧 `35` 候选原样迁移、六条规则 owner 与真实消费者、坐标锁定幂等、schema `31→…→36`/旧哈希/往返/坏档/全域回滚、检查点/锚点/波前重试，以及正式三卡、详情、管理台真实输入。完成日常完整 EditMode、完整 PlayMode、项目质量门、Windows Release 3D、Windows Development 3D、macOS universal 3D、官方文档生成/校验和 `RecordVerification`；自动化与构建不得写成用户试玩或真实 Windows 验收完成。
-- 验证证据：待实现后回填。
+- 验证证据：精确实现提交 `16d5d11f30ec7cc929e298bb3042dffd3449a9a3` 已在独立工作树完成 Git LFS `fsck`；日常 EditMode（排除 `TerrainAssetDeep`）`3219/3219`、完整 PlayMode `106/106`、项目质量文档生成/校验、测试结果分析、无界面编译、Windows Release 3D、Windows Development 3D 和 macOS universal 3D 均通过。人工试玩状态为“等待用户复验”；真实 Windows 10/11 的视觉、GPU、显存和内存验收仍未完成，自动化与跨平台构建不替代这些人工结论。
 - 决策原因或备注：用户的新指令覆盖 `IDEA-0020` 的“固定三候选”阶段性边界，但没有要求改写现役等级语义。文明 Lv.3 目前只有世界观描述，没有条件、奖励和危机的正式数值，因此不在本条凭空实现。旧 `WasteCity.Legacy` 只提供稳定 ID 与历史参考，正式 3D 不恢复对冻结 2D 运行时的依赖。
 
 ### 新构思模板：`IDEA-XXXX`
