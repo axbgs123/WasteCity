@@ -120,6 +120,28 @@ namespace WasteCity.Persistence
         }
 
         [Serializable]
+        private sealed class SchemaThirtySixPayload
+        {
+            public string sessionId;
+            public FormalThreeDWorldSaveData world;
+            public FormalThreeDCitySaveData city;
+            public FormalThreeDBuildingsSaveData buildings;
+            public FormalThreeDStorageSaveData storage;
+            public FormalThreeDBackpackSaveData backpack;
+            public FormalThreeDCraftingSaveData crafting;
+            public FormalThreeDResearchSaveData research;
+            public FormalThreeDResearchEffectStateSaveData researchEffectState;
+            public FormalThreeDProductionSaveData production;
+            public FormalThreeDDefenseSaveData defense;
+            public FormalThreeDDefenseCampaignSaveData defenseCampaign;
+            public FormalThreeDEvacuationSaveData evacuation;
+            public FormalThreeDPauseSaveData pause;
+            public FormalThreeDProgressionSaveData progression;
+            public FormalThreeDCivilizationExpansionSaveData
+                civilizationExpansion;
+        }
+
+        [Serializable]
         private sealed class LegacyProgressionSaveData
         {
             public string configurationSignature;
@@ -280,7 +302,9 @@ namespace WasteCity.Persistence
                 payload.progression.voidChest == null ||
                 payload.progression.coordinateLock == null)
                 return ComputeSchemaThirtyFivePayloadHash(payload);
-            return ComputeSchemaThirtySixPayloadHash(payload);
+            if (payload.exploration == null)
+                return ComputeSchemaThirtySixPayloadHash(payload);
+            return ComputeSchemaThirtySevenPayloadHash(payload);
         }
 
         private static string ComputeSha256(string value)
@@ -368,6 +392,7 @@ namespace WasteCity.Persistence
                  probe.saveSchemaVersion == 33 ||
                  probe.saveSchemaVersion == 34 ||
                  probe.saveSchemaVersion == 35 ||
+                 probe.saveSchemaVersion == 36 ||
                  probe.saveSchemaVersion ==
                     FormalSaveEnvelope.CurrentSchemaVersion))
             {
@@ -423,6 +448,7 @@ namespace WasteCity.Persistence
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
                     envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                     envelope = MigrateSchemaThirtyFiveToThirtySix(envelope);
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
                 }
                 else if (probe.saveSchemaVersion == 32)
                 {
@@ -441,6 +467,7 @@ namespace WasteCity.Persistence
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
                     envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                     envelope = MigrateSchemaThirtyFiveToThirtySix(envelope);
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
                 }
                 else if (probe.saveSchemaVersion == 33)
                 {
@@ -458,6 +485,7 @@ namespace WasteCity.Persistence
                     envelope = MigrateSchemaThirtyThreeToThirtyFour(envelope);
                     envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                     envelope = MigrateSchemaThirtyFiveToThirtySix(envelope);
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
                 }
                 else if (probe.saveSchemaVersion == 34)
                 {
@@ -474,6 +502,7 @@ namespace WasteCity.Persistence
                     }
                     envelope = MigrateSchemaThirtyFourToThirtyFive(envelope);
                     envelope = MigrateSchemaThirtyFiveToThirtySix(envelope);
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
                 }
                 else if (probe.saveSchemaVersion == 35)
                 {
@@ -489,6 +518,22 @@ namespace WasteCity.Persistence
                             "旧版存档校验失败");
                     }
                     envelope = MigrateSchemaThirtyFiveToThirtySix(envelope);
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
+                }
+                else if (probe.saveSchemaVersion == 36)
+                {
+                    string legacyHash = ComputeSchemaThirtySixPayloadHash(
+                        envelope.formal3D);
+                    if (!string.Equals(
+                            legacyHash,
+                            envelope.payloadHashSha256,
+                            StringComparison.Ordinal))
+                    {
+                        return FormalSaveDecodeResult.Failed(
+                            FormalSaveDecodeError.MalformedJson,
+                            "旧版存档校验失败");
+                    }
+                    envelope = MigrateSchemaThirtySixToThirtySeven(envelope);
                 }
                 return FormalSaveDecodeResult.ThreeD(envelope, json);
             }
@@ -668,6 +713,33 @@ namespace WasteCity.Persistence
         private static string ComputeSchemaThirtySixPayloadHash(
             FormalThreeDSaveData source)
         {
+            FormalThreeDSaveData canonical =
+                CopyPayloadWithCanonicalCampaign(source);
+            var legacy = new SchemaThirtySixPayload
+            {
+                sessionId = canonical.sessionId,
+                world = canonical.world,
+                city = canonical.city,
+                buildings = canonical.buildings,
+                storage = canonical.storage,
+                backpack = canonical.backpack,
+                crafting = canonical.crafting,
+                research = canonical.research,
+                researchEffectState = canonical.researchEffectState,
+                production = canonical.production,
+                defense = canonical.defense,
+                defenseCampaign = canonical.defenseCampaign,
+                evacuation = canonical.evacuation,
+                pause = canonical.pause,
+                progression = canonical.progression,
+                civilizationExpansion = canonical.civilizationExpansion,
+            };
+            return ComputeSha256(JsonUtility.ToJson(legacy, false));
+        }
+
+        private static string ComputeSchemaThirtySevenPayloadHash(
+            FormalThreeDSaveData source)
+        {
             return ComputeSha256(JsonUtility.ToJson(
                 CopyPayloadWithCanonicalCampaign(source), false));
         }
@@ -742,6 +814,130 @@ namespace WasteCity.Persistence
                 pause = source.pause,
                 progression = CopyProgression(source.progression),
                 civilizationExpansion = source.civilizationExpansion,
+                exploration = CopyExploration(source.exploration),
+            };
+        }
+
+        private static FormalThreeDExplorationSaveData CopyExploration(
+            FormalThreeDExplorationSaveData source)
+        {
+            if (source == null) return null;
+            var scans = source.scanZones == null
+                ? null
+                : new FormalThreeDScanZoneSaveData[source.scanZones.Length];
+            if (scans != null)
+                for (int index = 0; index < scans.Length; index++)
+                {
+                    FormalThreeDScanZoneSaveData item = source.scanZones[index];
+                    if (item == null) continue;
+                    scans[index] = new FormalThreeDScanZoneSaveData
+                    {
+                        zoneId = item.zoneId,
+                        committedEventKey = item.committedEventKey,
+                    };
+                }
+            var intel = source.intel == null
+                ? null
+                : new FormalThreeDIntelSaveData[source.intel.Length];
+            if (intel != null)
+                for (int index = 0; index < intel.Length; index++)
+                {
+                    FormalThreeDIntelSaveData item = source.intel[index];
+                    if (item == null) continue;
+                    intel[index] = new FormalThreeDIntelSaveData
+                    {
+                        stableIntelId = item.stableIntelId,
+                        ownerKind = item.ownerKind,
+                        ownerStableId = item.ownerStableId,
+                        x = item.x,
+                        y = item.y,
+                        remainingFreshSeconds = item.remainingFreshSeconds,
+                        remainingExpirySeconds = item.remainingExpirySeconds,
+                        hasMutableValue = item.hasMutableValue,
+                        mutableValue = item.mutableValue,
+                        depleted = item.depleted,
+                    };
+                }
+            var alerts = source.outpostAlerts == null
+                ? null
+                : new FormalThreeDOutpostAlertSaveData[
+                    source.outpostAlerts.Length];
+            if (alerts != null)
+                for (int index = 0; index < alerts.Length; index++)
+                {
+                    FormalThreeDOutpostAlertSaveData item =
+                        source.outpostAlerts[index];
+                    if (item == null) continue;
+                    alerts[index] = new FormalThreeDOutpostAlertSaveData
+                    {
+                        stableAlertId = item.stableAlertId,
+                        settlementId = item.settlementId,
+                        attackFactId = item.attackFactId,
+                        severity = item.severity,
+                        x = item.x,
+                        y = item.y,
+                        threatSummary = item.threatSummary,
+                        estimatedLossRiskPercent =
+                            item.estimatedLossRiskPercent,
+                        estimatedSecondsToLoss = item.estimatedSecondsToLoss,
+                        firstRuleTimeSeconds = item.firstRuleTimeSeconds,
+                        latestRuleTimeSeconds = item.latestRuleTimeSeconds,
+                        acknowledged = item.acknowledged,
+                        resolved = item.resolved,
+                        revision = item.revision,
+                    };
+                }
+            FormalThreeDLeaderInteractionSaveData leader = source.leader == null
+                ? null
+                : new FormalThreeDLeaderInteractionSaveData
+                {
+                    requestedControlMode = source.leader.requestedControlMode,
+                    revision = source.leader.revision,
+                    manualGather = source.leader.manualGather == null
+                        ? null
+                        : new FormalThreeDManualGatherSaveData
+                        {
+                            active = source.leader.manualGather.active,
+                            targetNodeId = source.leader.manualGather.targetNodeId,
+                            remainingCycleSeconds = source.leader.manualGather
+                                .remainingCycleSeconds,
+                            cycleOrdinal = source.leader.manualGather.cycleOrdinal,
+                            revision = source.leader.manualGather.revision,
+                        },
+                };
+            FormalThreeDCenJinDistressSaveData distress =
+                source.cenJinDistress == null
+                    ? null
+                    : new FormalThreeDCenJinDistressSaveData
+                    {
+                        siteId = source.cenJinDistress.siteId,
+                        state = source.cenJinDistress.state,
+                        elapsedSinceDiscoverySeconds = source.cenJinDistress
+                            .elapsedSinceDiscoverySeconds,
+                        rescueRemainingSeconds = source.cenJinDistress
+                            .rescueRemainingSeconds,
+                        reservedBiomass = source.cenJinDistress.reservedBiomass,
+                        committedRewardKey = source.cenJinDistress
+                            .committedRewardKey,
+                        revision = source.cenJinDistress.revision,
+                    };
+            return new FormalThreeDExplorationSaveData
+            {
+                configurationSignature = source.configurationSignature,
+                configurationVersion = source.configurationVersion,
+                worldConfigurationSignature =
+                    source.worldConfigurationSignature,
+                width = source.width,
+                height = source.height,
+                exploredCells = source.exploredCells == null
+                    ? null
+                    : (bool[])source.exploredCells.Clone(),
+                scanZones = scans,
+                intel = intel,
+                leader = leader,
+                cenJinDistress = distress,
+                outpostAlerts = alerts,
+                revision = source.revision,
             };
         }
 
@@ -1679,6 +1875,118 @@ namespace WasteCity.Persistence
             envelope.payloadHashSha256 =
                 ComputeSchemaThirtySixPayloadHash(envelope.formal3D);
             return envelope;
+        }
+
+        private static FormalSaveEnvelope MigrateSchemaThirtySixToThirtySeven(
+            FormalSaveEnvelope envelope)
+        {
+            FormalThreeDSaveData payload = envelope.formal3D;
+            FormalThreeDWorldSaveData world = payload.world;
+            int width = world == null ? 0 : world.width;
+            int height = world == null ? 0 : world.height;
+            bool[] explored = width > 0 && height > 0
+                ? new bool[width * height]
+                : Array.Empty<bool>();
+
+            if (payload.city != null)
+                RevealCircle(
+                    explored,
+                    width,
+                    height,
+                    payload.city.cellX,
+                    payload.city.cellY,
+                    7);
+
+            FormalThreeDCivilizationExpansionSaveData expansion =
+                payload.civilizationExpansion;
+            FormalThreeDSettlementSaveData[] settlements = expansion?
+                .worldLayer?.settlements;
+            if (settlements != null)
+            {
+                for (int index = 0; index < settlements.Length; index++)
+                {
+                    FormalThreeDSettlementSaveData settlement =
+                        settlements[index];
+                    if (settlement == null) continue;
+                    int radius;
+                    if (settlement.kind == 0)
+                        radius = 7;
+                    else if (settlement.kind == 1)
+                        radius = 5;
+                    else if (settlement.kind == 2 &&
+                             settlement.communicationConnected)
+                        radius = 3;
+                    else
+                        continue;
+                    RevealCircle(
+                        explored,
+                        width,
+                        height,
+                        settlement.x,
+                        settlement.y,
+                        radius);
+                }
+            }
+
+            FormalThreeDLeaderSaveData leader = expansion?.armyLeader?.leader;
+            bool recruited = leader != null && leader.recruited;
+            if (recruited)
+                RevealCircle(
+                    explored,
+                    width,
+                    height,
+                    (int)Math.Round(
+                        leader.x,
+                        MidpointRounding.AwayFromZero),
+                    (int)Math.Round(
+                        leader.y,
+                        MidpointRounding.AwayFromZero),
+                    4);
+
+            payload.exploration = new FormalThreeDExplorationSaveData
+            {
+                worldConfigurationSignature = world == null
+                    ? string.Empty
+                    : world.configurationSignature,
+                width = width,
+                height = height,
+                exploredCells = explored,
+                cenJinDistress = new FormalThreeDCenJinDistressSaveData
+                {
+                    state = recruited ? 5 : 0,
+                },
+            };
+            envelope.saveSchemaVersion = 37;
+            envelope.payloadHashSha256 =
+                ComputeSchemaThirtySevenPayloadHash(payload);
+            return envelope;
+        }
+
+        private static void RevealCircle(
+            bool[] explored,
+            int width,
+            int height,
+            int centerX,
+            int centerY,
+            int radius)
+        {
+            if (explored == null || width <= 0 || height <= 0 ||
+                radius < 0 || centerX < 0 || centerY < 0 ||
+                centerX >= width || centerY >= height)
+                return;
+            int minimumX = Math.Max(0, centerX - radius);
+            int maximumX = Math.Min(width - 1, centerX + radius);
+            int minimumY = Math.Max(0, centerY - radius);
+            int maximumY = Math.Min(height - 1, centerY + radius);
+            int radiusSquared = radius * radius;
+            for (int y = minimumY; y <= maximumY; y++)
+                for (int x = minimumX; x <= maximumX; x++)
+                {
+                    int dx = x - centerX;
+                    int dy = y - centerY;
+                    if (dx * dx + dy * dy <= radiusSquared)
+                        explored[y * width + x] = true;
+                }
         }
 
         private static FormalThreeDProgressionSaveData

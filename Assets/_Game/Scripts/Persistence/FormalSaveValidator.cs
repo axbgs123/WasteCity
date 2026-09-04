@@ -142,6 +142,26 @@ namespace WasteCity.Persistence
             new[] { "formal3D", "progression", "fate", "offerSelectionVersion" },
         };
 
+        private static readonly string[][] RequiredExplorationSourceArrays =
+        {
+            new[] { "formal3D", "exploration", "exploredCells" },
+            new[] { "formal3D", "exploration", "scanZones" },
+            new[] { "formal3D", "exploration", "intel" },
+            new[] { "formal3D", "exploration", "outpostAlerts" },
+        };
+
+        private static readonly string[][] RequiredExplorationSourceMembers =
+        {
+            new[] { "formal3D", "exploration", "configurationSignature" },
+            new[] { "formal3D", "exploration", "configurationVersion" },
+            new[] { "formal3D", "exploration", "worldConfigurationSignature" },
+            new[] { "formal3D", "exploration", "width" },
+            new[] { "formal3D", "exploration", "height" },
+            new[] { "formal3D", "exploration", "leader" },
+            new[] { "formal3D", "exploration", "cenJinDistress" },
+            new[] { "formal3D", "exploration", "revision" },
+        };
+
         public static FormalSaveValidationResult ValidateDecoded(
             FormalSaveDecodeResult decoded)
         {
@@ -198,6 +218,26 @@ namespace WasteCity.Persistence
                          index++)
                     {
                         string[] path = RequiredProgressionSourceMembers[index];
+                        if (!TryFindJsonPath(source, path, out _, out _))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", path));
+                    }
+                    for (int index = 0;
+                         index < RequiredExplorationSourceArrays.Length;
+                         index++)
+                    {
+                        string[] path = RequiredExplorationSourceArrays[index];
+                        if (!HasJsonPath(source, path))
+                            return Invalid(
+                                FormalSaveValidationError.MissingRequiredValue,
+                                string.Join(".", path));
+                    }
+                    for (int index = 0;
+                         index < RequiredExplorationSourceMembers.Length;
+                         index++)
+                    {
+                        string[] path = RequiredExplorationSourceMembers[index];
                         if (!TryFindJsonPath(source, path, out _, out _))
                             return Invalid(
                                 FormalSaveValidationError.MissingRequiredValue,
@@ -380,6 +420,8 @@ namespace WasteCity.Persistence
                 data,
                 buildingIds);
             if (result != null) return result;
+            result = ValidateExploration(data.exploration, data);
+            if (result != null) return result;
 
             string computedHash =
                 FormalSaveCodec.ComputePayloadHashSha256(data);
@@ -498,7 +540,308 @@ namespace WasteCity.Persistence
                 return Missing("formal3D.civilizationExpansion");
             if (data.researchEffectState == null)
                 return Missing("formal3D.researchEffectState");
+            if (data.exploration == null)
+                return Missing("formal3D.exploration");
             return null;
+        }
+
+        private static FormalSaveValidationResult ValidateExploration(
+            FormalThreeDExplorationSaveData exploration,
+            FormalThreeDSaveData data)
+        {
+            const string path = "formal3D.exploration";
+            if (!string.Equals(
+                    exploration.configurationSignature,
+                    FormalThreeDExplorationSaveData.ConfigurationSignature,
+                    StringComparison.Ordinal) ||
+                exploration.configurationVersion !=
+                    FormalThreeDExplorationSaveData.ConfigurationVersion)
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".configurationSignature");
+            if (exploration.width != data.world.width ||
+                exploration.height != data.world.height ||
+                !string.Equals(
+                    exploration.worldConfigurationSignature,
+                    data.world.configurationSignature,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidWorld,
+                    path + ".worldConfigurationSignature");
+            if (exploration.width <= 0 || exploration.height <= 0 ||
+                exploration.width > int.MaxValue / exploration.height ||
+                exploration.exploredCells == null ||
+                exploration.exploredCells.Length !=
+                    exploration.width * exploration.height)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".exploredCells");
+            if (exploration.scanZones == null || exploration.intel == null ||
+                exploration.outpostAlerts == null)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path);
+            if (exploration.leader == null)
+                return Missing(path + ".leader");
+            if (exploration.leader.manualGather == null)
+                return Missing(path + ".leader.manualGather");
+            if (exploration.cenJinDistress == null)
+                return Missing(path + ".cenJinDistress");
+
+            var scanIds = new HashSet<string>(StringComparer.Ordinal);
+            var scanKeys = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < exploration.scanZones.Length; index++)
+            {
+                FormalThreeDScanZoneSaveData item =
+                    exploration.scanZones[index];
+                string itemPath = path + ".scanZones[" + index + "]";
+                if (item == null ||
+                    (!string.Equals(
+                         item.zoneId,
+                         "core.exploration.zone.safe-mining",
+                         StringComparison.Ordinal) &&
+                     !string.Equals(
+                         item.zoneId,
+                         "core.exploration.zone.crystal-rift",
+                         StringComparison.Ordinal)))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidStableId,
+                        itemPath + ".zoneId");
+                if (!scanIds.Add(item.zoneId))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".zoneId");
+                if (!IsStableLedgerKey(item.committedEventKey) ||
+                    !scanKeys.Add(item.committedEventKey))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".committedEventKey");
+            }
+
+            var intelIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < exploration.intel.Length; index++)
+            {
+                FormalThreeDIntelSaveData item = exploration.intel[index];
+                string itemPath = path + ".intel[" + index + "]";
+                if (item == null || !IsStableId(item.stableIntelId) ||
+                    !intelIds.Add(item.stableIntelId))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".stableIntelId");
+                if (item.ownerKind < 0 || item.ownerKind > 4)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        itemPath + ".ownerKind");
+                if (!IsStableId(item.ownerStableId) ||
+                    !ExplorationOwnerExists(data, item.ownerKind,
+                        item.ownerStableId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".ownerStableId");
+                if (!CellInBounds(data.world, item.x, item.y))
+                    return Invalid(
+                        FormalSaveValidationError.InvalidWorld,
+                        itemPath + ".x");
+                if (!IsFinite(item.remainingFreshSeconds) ||
+                    !IsFinite(item.remainingExpirySeconds) ||
+                    item.remainingFreshSeconds < 0f ||
+                    item.remainingFreshSeconds > 60f ||
+                    item.remainingExpirySeconds < 0f ||
+                    item.remainingExpirySeconds > 180f ||
+                    item.remainingFreshSeconds > item.remainingExpirySeconds ||
+                    item.remainingExpirySeconds == 0f && item.hasMutableValue)
+                    return Invalid(
+                        FormalSaveValidationError.NegativeValue,
+                        itemPath + ".remainingExpirySeconds");
+            }
+
+            FormalThreeDLeaderInteractionSaveData leader = exploration.leader;
+            if (leader.requestedControlMode < 0 ||
+                leader.requestedControlMode > 1)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".leader.requestedControlMode");
+            FormalThreeDManualGatherSaveData gather = leader.manualGather;
+            if (!IsFinite(gather.remainingCycleSeconds) ||
+                gather.remainingCycleSeconds < 0f ||
+                gather.remainingCycleSeconds > 6f)
+                return Invalid(
+                    FormalSaveValidationError.NegativeValue,
+                    path + ".leader.manualGather.remainingCycleSeconds");
+            if (gather.active)
+            {
+                if (leader.requestedControlMode != 1 ||
+                    !ResourceNodeExists(data.world, gather.targetNodeId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        path + ".leader.manualGather.targetNodeId");
+            }
+            else if (!string.IsNullOrEmpty(gather.targetNodeId) ||
+                     gather.remainingCycleSeconds != 0f)
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".leader.manualGather");
+
+            FormalThreeDCenJinDistressSaveData distress =
+                exploration.cenJinDistress;
+            if (!string.Equals(
+                    distress.siteId,
+                    FormalThreeDCenJinDistressSaveData.SiteId,
+                    StringComparison.Ordinal))
+                return Invalid(
+                    FormalSaveValidationError.InvalidStableId,
+                    path + ".cenJinDistress.siteId");
+            if (distress.state < 0 || distress.state > 5)
+                return Invalid(
+                    FormalSaveValidationError.InvalidEnumValue,
+                    path + ".cenJinDistress.state");
+            if (!IsFinite(distress.elapsedSinceDiscoverySeconds) ||
+                !IsFinite(distress.rescueRemainingSeconds) ||
+                distress.elapsedSinceDiscoverySeconds < 0f ||
+                distress.rescueRemainingSeconds < 0f ||
+                distress.rescueRemainingSeconds > 12f ||
+                distress.reservedBiomass < 0)
+                return Invalid(
+                    FormalSaveValidationError.NegativeValue,
+                    path + ".cenJinDistress");
+            bool rescuing = distress.state == 2;
+            bool completed = distress.state >= 3;
+            if (rescuing != (distress.reservedBiomass == 10) ||
+                rescuing != (distress.rescueRemainingSeconds > 0f) ||
+                completed && distress.reservedBiomass != 0 ||
+                completed && distress.rescueRemainingSeconds != 0f ||
+                !rescuing && !completed &&
+                    !string.IsNullOrEmpty(distress.committedRewardKey) ||
+                distress.state >= 3 && distress.state <= 4 &&
+                    !IsStableLedgerKey(distress.committedRewardKey))
+                return Invalid(
+                    FormalSaveValidationError.InvalidArray,
+                    path + ".cenJinDistress");
+
+            var alertIds = new HashSet<string>(StringComparer.Ordinal);
+            var attackIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0;
+                 index < exploration.outpostAlerts.Length;
+                 index++)
+            {
+                FormalThreeDOutpostAlertSaveData item =
+                    exploration.outpostAlerts[index];
+                string itemPath = path + ".outpostAlerts[" + index + "]";
+                if (item == null || !IsStableId(item.stableAlertId) ||
+                    !alertIds.Add(item.stableAlertId))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".stableAlertId");
+                if (!IsStableId(item.attackFactId) ||
+                    !attackIds.Add(item.attackFactId))
+                    return Invalid(
+                        FormalSaveValidationError.DuplicateStableId,
+                        itemPath + ".attackFactId");
+                if (!OutpostExists(data, item.settlementId))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".settlementId");
+                if (item.severity < 1 || item.severity > 3)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidEnumValue,
+                        itemPath + ".severity");
+                if (!CellInBounds(data.world, item.x, item.y) ||
+                    string.IsNullOrWhiteSpace(item.threatSummary) ||
+                    item.estimatedLossRiskPercent < 0 ||
+                    item.estimatedLossRiskPercent > 100 ||
+                    !IsFinite(item.estimatedSecondsToLoss) ||
+                    item.estimatedSecondsToLoss < 0f ||
+                    !IsFinite(item.firstRuleTimeSeconds) ||
+                    !IsFinite(item.latestRuleTimeSeconds) ||
+                    item.firstRuleTimeSeconds < 0d ||
+                    item.latestRuleTimeSeconds < item.firstRuleTimeSeconds)
+                    return Invalid(
+                        FormalSaveValidationError.InvalidArray,
+                        itemPath);
+            }
+            return null;
+        }
+
+        private static bool ExplorationOwnerExists(
+            FormalThreeDSaveData data,
+            int kind,
+            string stableId)
+        {
+            if (kind == 0) return ResourceNodeExists(data.world, stableId);
+            if (kind == 1)
+            {
+                for (int i = 0; i < data.buildings.instances.Length; i++)
+                    if (string.Equals(data.buildings.instances[i]
+                            .stableInstanceId, stableId,
+                            StringComparison.Ordinal)) return true;
+                return false;
+            }
+            if (kind == 2)
+            {
+                FormalThreeDSettlementSaveData[] values = data
+                    .civilizationExpansion.worldLayer.settlements;
+                for (int i = 0; i < values.Length; i++)
+                    if (string.Equals(values[i].stableSettlementId, stableId,
+                            StringComparison.Ordinal)) return true;
+                return false;
+            }
+            if (kind == 3)
+            {
+                FormalThreeDCharacterSaveData[] values = data
+                    .civilizationExpansion.charactersPolitics.characters;
+                for (int i = 0; i < values.Length; i++)
+                    if (string.Equals(values[i].characterId, stableId,
+                            StringComparison.Ordinal)) return true;
+                return false;
+            }
+            FormalThreeDDefenseCampaignEnemyStateSaveData[] enemies =
+                data.defenseCampaign.enemyStates;
+            for (int i = 0; i < enemies.Length; i++)
+                if (string.Equals(enemies[i].stableEnemyId, stableId,
+                        StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        private static bool ResourceNodeExists(
+            FormalThreeDWorldSaveData world,
+            string stableId)
+        {
+            if (world == null || world.resourceNodes == null) return false;
+            for (int index = 0; index < world.resourceNodes.Length; index++)
+                if (string.Equals(
+                        world.resourceNodes[index].stableNodeId,
+                        stableId,
+                        StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        private static bool OutpostExists(
+            FormalThreeDSaveData data,
+            string stableId)
+        {
+            FormalThreeDSettlementSaveData[] values = data
+                .civilizationExpansion.worldLayer.settlements;
+            for (int index = 0; index < values.Length; index++)
+                if (values[index].kind == 2 && string.Equals(
+                        values[index].stableSettlementId,
+                        stableId,
+                        StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        private static bool CellInBounds(
+            FormalThreeDWorldSaveData world,
+            int x,
+            int y)
+        {
+            return world != null && x >= 0 && y >= 0 &&
+                x < world.width && y < world.height;
+        }
+
+        private static bool IsStableLedgerKey(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) &&
+                string.Equals(value, value.Trim(), StringComparison.Ordinal);
         }
 
         private static FormalSaveValidationResult
@@ -4811,6 +5154,11 @@ namespace WasteCity.Persistence
         private static bool IsFinite(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+
+        private static bool IsFinite(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
         }
     }
 }

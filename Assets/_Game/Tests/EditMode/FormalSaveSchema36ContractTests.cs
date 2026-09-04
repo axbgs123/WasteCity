@@ -14,7 +14,7 @@ namespace WasteCity.Tests
         public void IDEA0028_CurrentSchemaOwnsNineFateFoundationState()
         {
             Assert.That(FormalSaveEnvelope.CurrentSchemaVersion,
-                Is.EqualTo(36));
+                Is.EqualTo(37));
 
             var progression = new FormalThreeDProgressionSaveData();
             Assert.That(progression.configurationSignature,
@@ -69,7 +69,7 @@ namespace WasteCity.Tests
             Assert.That(decoded.Success, Is.True, decoded.Message);
             FormalThreeDProgressionSaveData restored =
                 decoded.Envelope.formal3D.progression;
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(37));
             Assert.That(restored.fate.offeredIds, Is.EqualTo(
                 historical.formal3D.progression.fate.offeredIds));
             Assert.That(restored.fate.selectedId,

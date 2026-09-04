@@ -35,7 +35,7 @@ namespace WasteCity.Tests
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(
                 FormalSaveCodec.EncodeEnvelope(current));
             Assert.That(decoded.Success, Is.True, decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(37));
             AssertDefaults(decoded.Envelope.formal3D);
         }
 
@@ -48,7 +48,7 @@ namespace WasteCity.Tests
             Assert.That(decoded.Success, Is.True, decoded.Message);
             Assert.That(decoded.PayloadKind,
                 Is.EqualTo(FormalSavePayloadKind.Formal3D));
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(37));
             Assert.That(decoded.Envelope.formal3D.defenseCampaign, Is.Not.Null,
                 "The schema 31 to 32 campaign migration must still run.");
             AssertDefaults(decoded.Envelope.formal3D);

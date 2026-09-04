@@ -349,9 +349,9 @@ namespace WasteCity.Tests
             Assert.That(
                 WasteCity.Persistence.FormalSaveEnvelope
                     .CurrentSchemaVersion,
-                Is.EqualTo(36),
-                "IDEA-0019 world generation remains v2 while IDEA-0022 " +
-                "adds the later Formal3D schema 34 envelope.");
+                Is.EqualTo(37),
+                "IDEA-0019 world generation remains v2 while IDEA-0029 " +
+                "adds the later Formal3D schema 37 envelope.");
         }
 
         [Test]

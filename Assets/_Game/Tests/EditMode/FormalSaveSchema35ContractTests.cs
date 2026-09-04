@@ -21,7 +21,7 @@ namespace WasteCity.Tests
         public void IDEA0027_CurrentSchemaOwnsNonNullResearchEffectState()
         {
             Assert.That(FormalSaveEnvelope.CurrentSchemaVersion,
-                Is.EqualTo(36));
+                Is.EqualTo(37));
             var payload = new FormalThreeDSaveData();
             Assert.That(payload.researchEffectState, Is.Not.Null);
             Assert.That(payload.researchEffectState.nextStableStateOrdinal,
@@ -117,7 +117,7 @@ namespace WasteCity.Tests
                 json);
 
             Assert.That(decoded.Success, Is.True, decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(37));
             Assert.That(decoded.Envelope.formal3D.researchEffectState,
                 Is.Not.Null);
             Assert.That(decoded.Envelope.formal3D.researchEffectState.states,
@@ -157,7 +157,7 @@ namespace WasteCity.Tests
                 ReadFixture("schema-31-formal-3d.json"));
 
             Assert.That(decoded.Success, Is.True, decoded.Message);
-            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(36));
+            Assert.That(decoded.Envelope.saveSchemaVersion, Is.EqualTo(37));
             Assert.That(decoded.Envelope.formal3D.progression, Is.Not.Null);
             Assert.That(decoded.Envelope.formal3D.civilizationExpansion,
                 Is.Not.Null);
@@ -819,11 +819,11 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void IDEA0027_FutureSchemaThirtySevenIsRejected()
+        public void IDEA0027_FutureSchemaThirtyEightIsRejected()
         {
             string json = ReadFixture("schema-32-future.json").Replace(
                 "\"saveSchemaVersion\": 32",
-                "\"saveSchemaVersion\": 37");
+                "\"saveSchemaVersion\": 38");
 
             FormalSaveDecodeResult decoded = FormalSaveCodec.DecodeAny(json);
 

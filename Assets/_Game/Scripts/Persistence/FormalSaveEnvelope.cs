@@ -33,7 +33,7 @@ namespace WasteCity.Persistence
     [Serializable]
     public sealed class FormalSaveEnvelope
     {
-        public const int CurrentSchemaVersion = 36;
+        public const int CurrentSchemaVersion = 37;
         public const string FormalThreeDRuntimeKind = "formal-3d";
 
         public string gameVersion;
