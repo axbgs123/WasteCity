@@ -632,6 +632,17 @@ namespace WasteCity.Persistence
                     return Invalid(
                         FormalSaveValidationError.InvalidEnumValue,
                         itemPath + ".ownerKind");
+                if (!string.Equals(
+                        item.stableIntelId,
+                        item.ownerStableId,
+                        StringComparison.Ordinal))
+                    return Invalid(
+                        FormalSaveValidationError.MissingStableReference,
+                        itemPath + ".ownerStableId");
+                if (item.summary == null)
+                    return Invalid(
+                        FormalSaveValidationError.MissingRequiredValue,
+                        itemPath + ".summary");
                 if (!IsStableId(item.ownerStableId) ||
                     !ExplorationOwnerExists(data, item.ownerKind,
                         item.ownerStableId))
@@ -649,7 +660,13 @@ namespace WasteCity.Persistence
                     item.remainingExpirySeconds < 0f ||
                     item.remainingExpirySeconds > 180f ||
                     item.remainingFreshSeconds > item.remainingExpirySeconds ||
-                    item.remainingExpirySeconds == 0f && item.hasMutableValue)
+                    item.remainingExpirySeconds == 0f &&
+                        (!string.IsNullOrEmpty(item.summary) ||
+                         item.hasMutableValue || item.mutableValue != 0 ||
+                         item.depleted) ||
+                    !item.hasMutableValue &&
+                        (item.mutableValue != 0 || item.depleted) ||
+                    item.depleted && item.mutableValue > 0)
                     return Invalid(
                         FormalSaveValidationError.NegativeValue,
                         itemPath + ".remainingExpirySeconds");
@@ -671,12 +688,16 @@ namespace WasteCity.Persistence
             if (gather.active)
             {
                 if (leader.requestedControlMode != 1 ||
-                    !ResourceNodeExists(data.world, gather.targetNodeId))
+                    !ResourceNodeMatches(
+                        data.world,
+                        gather.targetNodeId,
+                        gather.targetResourceId))
                     return Invalid(
                         FormalSaveValidationError.MissingStableReference,
                         path + ".leader.manualGather.targetNodeId");
             }
             else if (!string.IsNullOrEmpty(gather.targetNodeId) ||
+                     !string.IsNullOrEmpty(gather.targetResourceId) ||
                      gather.remainingCycleSeconds != 0f)
                 return Invalid(
                     FormalSaveValidationError.InvalidArray,
@@ -733,6 +754,10 @@ namespace WasteCity.Persistence
                         FormalSaveValidationError.DuplicateStableId,
                         itemPath + ".stableAlertId");
                 if (!IsStableId(item.attackFactId) ||
+                    !string.Equals(
+                        item.attackFactId,
+                        item.stableAlertId,
+                        StringComparison.Ordinal) ||
                     !attackIds.Add(item.attackFactId))
                     return Invalid(
                         FormalSaveValidationError.DuplicateStableId,
@@ -812,6 +837,30 @@ namespace WasteCity.Persistence
                         world.resourceNodes[index].stableNodeId,
                         stableId,
                         StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        private static bool ResourceNodeMatches(
+            FormalThreeDWorldSaveData world,
+            string stableId,
+            string resourceId)
+        {
+            if (world == null || world.resourceNodes == null ||
+                string.IsNullOrWhiteSpace(resourceId))
+                return false;
+            for (int index = 0; index < world.resourceNodes.Length; index++)
+            {
+                FormalThreeDResourceNodeSaveData node =
+                    world.resourceNodes[index];
+                if (node != null && string.Equals(
+                        node.stableNodeId,
+                        stableId,
+                        StringComparison.Ordinal) && string.Equals(
+                        node.resourceId,
+                        resourceId,
+                        StringComparison.Ordinal))
+                    return true;
+            }
             return false;
         }
 

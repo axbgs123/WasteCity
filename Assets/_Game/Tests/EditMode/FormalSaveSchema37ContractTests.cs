@@ -46,22 +46,28 @@ namespace WasteCity.Tests
             {
                 new FormalThreeDIntelSaveData
                 {
-                    stableIntelId = "core.intel.resource.000001",
+                    stableIntelId = envelope.formal3D.world.resourceNodes[0]
+                        .stableNodeId,
                     ownerKind = 0,
                     ownerStableId = envelope.formal3D.world.resourceNodes[0]
                         .stableNodeId,
+                    summary = "资源节点 77",
                     x = envelope.formal3D.world.resourceNodes[0].x,
                     y = envelope.formal3D.world.resourceNodes[0].y,
                     remainingFreshSeconds = 42f,
                     remainingExpirySeconds = 162f,
                     hasMutableValue = true,
                     mutableValue = 77,
+                    sourceRevision = 12ul,
                 },
             };
             envelope.formal3D.exploration.leader.requestedControlMode = 1;
             envelope.formal3D.exploration.leader.manualGather.active = true;
             envelope.formal3D.exploration.leader.manualGather.targetNodeId =
                 envelope.formal3D.world.resourceNodes[0].stableNodeId;
+            envelope.formal3D.exploration.leader.manualGather
+                .targetResourceId =
+                envelope.formal3D.world.resourceNodes[0].resourceId;
             envelope.formal3D.exploration.leader.manualGather
                 .remainingCycleSeconds = 3f;
             envelope.formal3D.exploration.cenJinDistress.state = 2;
@@ -76,7 +82,7 @@ namespace WasteCity.Tests
                 {
                     stableAlertId = "core.outpost-alert.000001",
                     settlementId = FindOutpostId(envelope),
-                    attackFactId = "core.attack-fact.000001",
+                    attackFactId = "core.outpost-alert.000001",
                     severity = 2,
                     x = 30,
                     y = 20,
@@ -102,9 +108,15 @@ namespace WasteCity.Tests
             Assert.That(restored.scanZones[0].zoneId,
                 Is.EqualTo("core.exploration.zone.safe-mining"));
             Assert.That(restored.intel[0].mutableValue, Is.EqualTo(77));
+            Assert.That(restored.intel[0].summary,
+                Is.EqualTo("资源节点 77"));
+            Assert.That(restored.intel[0].sourceRevision, Is.EqualTo(12ul));
             Assert.That(restored.leader.requestedControlMode, Is.EqualTo(1));
             Assert.That(restored.leader.manualGather.remainingCycleSeconds,
                 Is.EqualTo(3f));
+            Assert.That(restored.leader.manualGather.targetResourceId,
+                Is.EqualTo(envelope.formal3D.world.resourceNodes[0]
+                    .resourceId));
             Assert.That(restored.cenJinDistress.reservedBiomass, Is.EqualTo(10));
             Assert.That(restored.outpostAlerts[0].acknowledged, Is.True);
         }

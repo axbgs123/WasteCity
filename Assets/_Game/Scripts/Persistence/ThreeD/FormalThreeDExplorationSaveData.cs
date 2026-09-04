@@ -42,6 +42,7 @@ namespace WasteCity.Persistence.ThreeD
         public string stableIntelId;
         public int ownerKind;
         public string ownerStableId;
+        public string summary = string.Empty;
         public int x;
         public int y;
         public float remainingFreshSeconds;
@@ -49,6 +50,7 @@ namespace WasteCity.Persistence.ThreeD
         public bool hasMutableValue;
         public int mutableValue;
         public bool depleted;
+        public ulong sourceRevision;
     }
 
     [Serializable]
@@ -65,6 +67,7 @@ namespace WasteCity.Persistence.ThreeD
     {
         public bool active;
         public string targetNodeId = string.Empty;
+        public string targetResourceId = string.Empty;
         public float remainingCycleSeconds;
         public ulong cycleOrdinal;
         public ulong revision;

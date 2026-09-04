@@ -849,6 +849,7 @@ namespace WasteCity.Persistence
                         stableIntelId = item.stableIntelId,
                         ownerKind = item.ownerKind,
                         ownerStableId = item.ownerStableId,
+                        summary = item.summary,
                         x = item.x,
                         y = item.y,
                         remainingFreshSeconds = item.remainingFreshSeconds,
@@ -856,6 +857,7 @@ namespace WasteCity.Persistence
                         hasMutableValue = item.hasMutableValue,
                         mutableValue = item.mutableValue,
                         depleted = item.depleted,
+                        sourceRevision = item.sourceRevision,
                     };
                 }
             var alerts = source.outpostAlerts == null
@@ -899,6 +901,8 @@ namespace WasteCity.Persistence
                         {
                             active = source.leader.manualGather.active,
                             targetNodeId = source.leader.manualGather.targetNodeId,
+                            targetResourceId = source.leader.manualGather
+                                .targetResourceId,
                             remainingCycleSeconds = source.leader.manualGather
                                 .remainingCycleSeconds,
                             cycleOrdinal = source.leader.manualGather.cycleOrdinal,
