@@ -761,6 +761,7 @@ namespace WasteCity.Tests
                 destination.defense = copy.defense;
                 destination.defenseCampaign = copy.defenseCampaign;
                 destination.evacuation = copy.evacuation;
+                destination.exploration = copy.exploration;
                 destination.pause = copy.pause;
             }
 

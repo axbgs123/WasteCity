@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Economy;
+using WasteCity.Graybox3D.Exploration;
 using WasteCity.World;
 
 namespace WasteCity.Graybox3D
@@ -67,6 +68,9 @@ namespace WasteCity.Graybox3D
         private readonly Dictionary<long, GrayboxResourceNodeMarker3D>
             resourceNodeMarkersByCell =
                 new Dictionary<long, GrayboxResourceNodeMarker3D>();
+        private readonly Dictionary<long, ResourceMarkerFogPresentation3D>
+            resourceMarkerFogPresentations =
+                new Dictionary<long, ResourceMarkerFogPresentation3D>();
         private readonly List<GrayboxResourceNodeMarker3D>
             guidedResourceNodeMarkers =
                 new List<GrayboxResourceNodeMarker3D>();
@@ -350,6 +354,10 @@ namespace WasteCity.Graybox3D
                 GrayboxResourceNodeMarker3D marker =
                     resourceNodeMarkers[index];
                 if (marker != null &&
+                    ResolveResourceMarkerFogPresentation(
+                        marker.WorldX,
+                        marker.WorldY).Mode ==
+                            ResourceMarkerFogMode3D.Live &&
                     marker.WorldX >= 0 && marker.WorldY >= 0 &&
                     marker.WorldX < Model.Width &&
                     marker.WorldY < Model.Height)
@@ -359,6 +367,51 @@ namespace WasteCity.Graybox3D
                 }
             }
             return changed;
+        }
+
+        public bool TrySetResourceMarkerFogPresentation(
+            int worldX,
+            int worldY,
+            ResourceMarkerFogPresentation3D presentation,
+            out string error)
+        {
+            if (!TryGetResourceNodeMarker(
+                    worldX,
+                    worldY,
+                    out GrayboxResourceNodeMarker3D marker) ||
+                marker == null)
+            {
+                error = "No resource marker exists at the requested cell.";
+                return false;
+            }
+            if (!Enum.IsDefined(
+                    typeof(ResourceMarkerFogMode3D),
+                    presentation.Mode))
+            {
+                error = "Unknown resource marker fog presentation mode.";
+                return false;
+            }
+            if (presentation.Mode == ResourceMarkerFogMode3D.LastIntel &&
+                presentation.LastKnownAmount < 0)
+            {
+                error = "Last intel resource amount cannot be negative.";
+                return false;
+            }
+
+            long key = CellKey(worldX, worldY);
+            ResourceMarkerFogPresentation3D current =
+                ResolveResourceMarkerFogPresentation(worldX, worldY);
+            if (current.Mode == presentation.Mode &&
+                current.LastKnownAmount == presentation.LastKnownAmount)
+            {
+                error = string.Empty;
+                return false;
+            }
+
+            resourceMarkerFogPresentations[key] = presentation;
+            ApplyResourceMarkerFogPresentation(marker, presentation);
+            error = string.Empty;
+            return true;
         }
 
         private void LateUpdate()
@@ -460,6 +513,8 @@ namespace WasteCity.Graybox3D
                     worldY,
                     out GrayboxResourceNodeMarker3D marker) ||
                 marker == null ||
+                ResolveResourceMarkerFogPresentation(worldX, worldY).Mode !=
+                    ResourceMarkerFogMode3D.Live ||
                 marker.GuidanceOverride == enabled)
                 return false;
             if (hasResourceNodeMarkerPresentation)
@@ -582,6 +637,7 @@ namespace WasteCity.Graybox3D
             surfaceSlots.Clear();
             resourceNodeMarkers.Clear();
             resourceNodeMarkersByCell.Clear();
+            resourceMarkerFogPresentations.Clear();
             guidedResourceNodeMarkers.Clear();
             acceptedResourceLabelRects.Clear();
             nextResourceNodeRefreshAt = 0f;
@@ -895,6 +951,7 @@ namespace WasteCity.Graybox3D
                 GrayboxResourceNodeMarker3D marker =
                     resourceNodeMarkers[index];
                 if (marker == null ||
+                    !marker.gameObject.activeInHierarchy ||
                     marker.GuidanceOverride != guidanceOnly)
                     continue;
                 Rect labelRect = default;
@@ -1031,6 +1088,72 @@ namespace WasteCity.Graybox3D
                 textHeight,
                 true,
                 guidanceOverride);
+            ResourceMarkerFogPresentation3D fogPresentation =
+                ResolveResourceMarkerFogPresentation(
+                    marker.WorldX,
+                    marker.WorldY);
+            if (fogPresentation.Mode ==
+                ResourceMarkerFogMode3D.LastKnownIdentity)
+            {
+                marker.ApplyDisplayLod(
+                    ResourceNodeMarkerLod3D.Far,
+                    false);
+            }
+        }
+
+        private ResourceMarkerFogPresentation3D
+            ResolveResourceMarkerFogPresentation(int worldX, int worldY)
+        {
+            return resourceMarkerFogPresentations.TryGetValue(
+                CellKey(worldX, worldY),
+                out ResourceMarkerFogPresentation3D presentation)
+                    ? presentation
+                    : ResourceMarkerFogPresentation3D.Live;
+        }
+
+        private void ApplyResourceMarkerFogPresentation(
+            GrayboxResourceNodeMarker3D marker,
+            ResourceMarkerFogPresentation3D presentation)
+        {
+            if (presentation.Mode == ResourceMarkerFogMode3D.Hidden)
+            {
+                marker.gameObject.SetActive(false);
+                return;
+            }
+
+            marker.gameObject.SetActive(true);
+            if (presentation.Mode == ResourceMarkerFogMode3D.LastIntel)
+            {
+                WorldCell cell = Model.Get(marker.WorldX, marker.WorldY);
+                marker.Refresh(new WorldCell(
+                    cell.Terrain,
+                    cell.ResourceId,
+                    presentation.LastKnownAmount,
+                    cell.Traversal));
+            }
+            else if (presentation.Mode == ResourceMarkerFogMode3D.Live)
+            {
+                marker.Refresh(Model.Get(marker.WorldX, marker.WorldY));
+            }
+
+            if (hasResourceNodeMarkerPresentation)
+            {
+                ApplyResourceNodeMarkerPresentation(
+                    marker,
+                    guidanceOverride: false);
+            }
+            else
+            {
+                ResourceNodeMarkerLod3D lod =
+                    presentation.Mode ==
+                        ResourceMarkerFogMode3D.LastKnownIdentity
+                        ? ResourceNodeMarkerLod3D.Far
+                        : hasResourceNodeMarkerLod
+                            ? resourceNodeMarkerLod
+                            : ResourceNodeMarkerLod3D.Near;
+                marker.ApplyDisplayLod(lod, false);
+            }
+            RefreshCurrentResourceLabelLayout();
         }
 
         private static void ResolveMarkerWorldHeights(

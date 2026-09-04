@@ -61,7 +61,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void CoordinatorPublishesTheFixedTenDomainOrder()
+        public void IDEA0029_CoordinatorPublishesTheFixedElevenDomainOrder()
         {
             Type coordinator = RequireRuntimeType(
                 "GrayboxFormalSaveCoordinator3D");
@@ -90,6 +90,7 @@ namespace WasteCity.Tests
                     "Progression",
                     "Evacuation",
                     "CivilizationExpansion",
+                    "Exploration",
                     "Pause",
                 },
                 names);
@@ -313,6 +314,7 @@ namespace WasteCity.Tests
         [TestCase(GrayboxFormalSaveDomainId3D.ResearchEffectState)]
         [TestCase(GrayboxFormalSaveDomainId3D.Evacuation)]
         [TestCase(GrayboxFormalSaveDomainId3D.CivilizationExpansion)]
+        [TestCase(GrayboxFormalSaveDomainId3D.Exploration)]
         public void ApplyFailureReplaysRollbackAndRestoresCanonicalAuthority(
             GrayboxFormalSaveDomainId3D failedDomain)
         {
@@ -338,7 +340,7 @@ namespace WasteCity.Tests
             Assert.That(CanonicalPayload(harness.Authority.State),
                 Is.EqualTo(preloadCanonical),
                 "Rollback must restore the complete pre-load authority.");
-            Assert.That(harness.TotalCaptureCount, Is.EqualTo(10));
+            Assert.That(harness.TotalCaptureCount, Is.EqualTo(11));
             Assert.That(harness.Rebuilder.InvocationCount, Is.EqualTo(1),
                 "Successful rollback must rebuild derived state once.");
             Assert.That(harness.CompletionCount, Is.Zero);
@@ -1287,6 +1289,9 @@ namespace WasteCity.Tests
                     case GrayboxFormalSaveDomainId3D.CivilizationExpansion:
                         destination.civilizationExpansion =
                             copy.civilizationExpansion;
+                        return;
+                    case GrayboxFormalSaveDomainId3D.Exploration:
+                        destination.exploration = copy.exploration;
                         return;
                     case GrayboxFormalSaveDomainId3D.Pause:
                         destination.pause = copy.pause;

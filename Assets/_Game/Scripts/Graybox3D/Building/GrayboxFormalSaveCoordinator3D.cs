@@ -21,6 +21,7 @@ namespace WasteCity.Graybox3D.Building
         Defense,
         Evacuation,
         CivilizationExpansion,
+        Exploration,
         Pause,
     }
 
@@ -46,6 +47,11 @@ namespace WasteCity.Graybox3D.Building
         bool TryApply(
             FormalThreeDSaveData source,
             out string error);
+    }
+
+    public interface IFormalThreeDExplorationSaveDomain :
+        IFormalThreeDSaveDomain
+    {
     }
 
     public interface IFormalThreeDDerivedStateRebuilder
@@ -268,6 +274,7 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxFormalSaveDomainId3D.Progression,
                 GrayboxFormalSaveDomainId3D.Evacuation,
                 GrayboxFormalSaveDomainId3D.CivilizationExpansion,
+                GrayboxFormalSaveDomainId3D.Exploration,
                 GrayboxFormalSaveDomainId3D.Pause,
             });
 
@@ -307,7 +314,8 @@ namespace WasteCity.Graybox3D.Building
             GrayboxDefenseController3D defenseController,
             GrayboxEvacuationController3D evacuationController,
             GrayboxCivilizationExpansionSaveAdapter3D expansion = null,
-            GrayboxResearchEffectStateSaveAdapter3D effectState = null)
+            GrayboxResearchEffectStateSaveAdapter3D effectState = null,
+            IFormalThreeDExplorationSaveDomain explorationDomain = null)
         {
             if (worldCity == null)
                 throw new ArgumentNullException(nameof(worldCity));
@@ -329,6 +337,14 @@ namespace WasteCity.Graybox3D.Building
                 throw new ArgumentException(
                     "暂停领域标识必须为 Pause",
                     nameof(pauseDomain));
+            if (explorationDomain != null &&
+                explorationDomain.DomainId !=
+                    GrayboxFormalSaveDomainId3D.Exploration)
+            {
+                throw new ArgumentException(
+                    "探索领域标识必须为 Exploration",
+                    nameof(explorationDomain));
+            }
             if (instancesProvider == null)
                 throw new ArgumentNullException(nameof(instancesProvider));
             if (worldProvider == null)
@@ -483,6 +499,21 @@ namespace WasteCity.Graybox3D.Building
                             return expansion.TryRestore(
                                 source.civilizationExpansion,
                                 out error);
+                        error = string.Empty;
+                        return true;
+                    }),
+                (IFormalThreeDSaveDomain)explorationDomain ??
+                new DelegateDomain(
+                    GrayboxFormalSaveDomainId3D.Exploration,
+                    destination => destination.exploration ??=
+                        new FormalThreeDExplorationSaveData(),
+                    (FormalThreeDSaveData source, out string error) =>
+                    {
+                        if (source.exploration == null)
+                        {
+                            error = "正式 3D 探索状态不能为空";
+                            return false;
+                        }
                         error = string.Empty;
                         return true;
                     }),

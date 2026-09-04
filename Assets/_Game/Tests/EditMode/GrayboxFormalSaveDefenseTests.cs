@@ -1331,6 +1331,9 @@ namespace WasteCity.Tests
                         destination.civilizationExpansion =
                             copy.civilizationExpansion;
                         break;
+                    case GrayboxFormalSaveDomainId3D.Exploration:
+                        destination.exploration = copy.exploration;
+                        break;
                     case GrayboxFormalSaveDomainId3D.Pause:
                         destination.pause = copy.pause;
                         break;
