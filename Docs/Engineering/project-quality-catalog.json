@@ -79,6 +79,16 @@
         "Assets/_Game/Tests/EditMode/GrayboxWorldLayout3DTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveWorldCityTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldVisibilityRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldIntelRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldExplorationRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ScanRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationPerformanceTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029RuntimeCompositionTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostStateCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostAlertRuntimeTests.cs",
         "Assets/_Game/Tests/PlayMode/FirstArtTerrainRuntimeSceneTests.cs"
       ],
       "ScenePaths": [
@@ -87,13 +97,16 @@
       "RequirementIds": [
         "DOC-0001",
         "IDEA-0018",
-        "IDEA-0019"
+        "IDEA-0019",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
         "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
-        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md"
+        "Docs/superpowers/specs/2026-08-24-idea-0019-map-generation-scale-design.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "Performance"
     },
@@ -154,16 +167,24 @@
       "FailureLocationSummary": "先检查领袖状态、控制切换和场景输入接线",
       "TestFileGlobs": [
         "Assets/_Game/Tests/EditMode/LeaderTests.cs",
-        "Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs"
+        "Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderAiRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderControlRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderInteractionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ManualGatherRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinRescueRuntimeTests.cs"
       ],
       "ScenePaths": [
         "Assets/_Game/Scenes/GrayboxPrototype3D.unity"
       ],
       "RequirementIds": [
-        "DOC-0001"
+        "DOC-0001",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
-        "Docs/Engineering/project-quality-catalog.json"
+        "Docs/Engineering/project-quality-catalog.json",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -265,6 +286,8 @@
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiCanvasConfiguration3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutPolicy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/FormalUiLayoutProfile3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/**",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchTreeProjection3D.cs",
         "Assets/_Game/Scripts/Graybox3D/ResearchTreeVisualLayoutProfile3D.cs",
@@ -277,6 +300,8 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateSelection*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFateOperations*.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxCivilizationAdvancement*.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/**",
         "Assets/_Game/Scripts/Graybox3D/GrayboxInputRouter.cs",
         "Assets/_Game/Scripts/Graybox3D/Usability/**"
       ],
@@ -308,6 +333,10 @@
         "Assets/_Game/Tests/EditMode/IDEA0024ResearchTreePresentationTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0024AcceptanceAndClickableTabsTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027TechnologyStateUiTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationController3DTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationUiProjectionTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029FogPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinDistressPresentationTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalEvacuationVerticalSliceTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxDeveloperModifierRuntimeInputTests.cs",
@@ -343,7 +372,8 @@
         "IDEA-0021",
         "IDEA-0024",
         "IDEA-0027",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -353,7 +383,9 @@
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
-        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -413,6 +445,7 @@
         "Assets/_Game/Tests/EditMode/GrayboxWarehouseStorageIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/LogisticsNetworkTests.cs",
         "Assets/_Game/Tests/EditMode/ManualResourceAccessRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ManualGatherRuntimeTests.cs",
         "Assets/_Game/Tests/EditMode/PassiveProductionTests.cs",
         "Assets/_Game/Tests/EditMode/PlayerBackpackModelTests.cs",
         "Assets/_Game/Tests/EditMode/ProductionTests.cs",
@@ -446,14 +479,17 @@
         "IDEA-0020",
         "IDEA-0021",
         "IDEA-0024",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/superpowers/specs/2026-08-26-idea-0020-progression-attention-fate-ascension-design.md",
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
-        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "FocusedEditMode"
     },
@@ -705,6 +741,8 @@
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxDefenseSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxResearchEffectStateSaveAdapter3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxEvacuationSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationLeaderOutpostSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationSaveDomainProxy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
@@ -713,6 +751,8 @@
       ],
       "PrimarySourceGlobs": [
         "Assets/_Game/Scripts/Persistence/**",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationLeaderOutpostSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationSaveDomainProxy3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveCoordinator3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxFormalSaveRuntimeHost3D.cs",
         "Assets/_Game/Scripts/Graybox3D/Building/GrayboxRewindAnchorService3D.cs",
@@ -733,6 +773,8 @@
         "Assets/_Game/Tests/EditMode/FormalSaveSchema33MigrationTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema37ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027ResearchEffectStateSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveTests.cs",
@@ -766,7 +808,8 @@
         "IDEA-0020",
         "IDEA-0021",
         "IDEA-0027",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
@@ -775,7 +818,9 @@
         "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
-        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "FullRegression"
     },
@@ -920,13 +965,16 @@
         "IDEA-0017",
         "IDEA-0018",
         "IDEA-0020",
-        "IDEA-0021"
+        "IDEA-0021",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/Engineering/project-quality-catalog.json",
         "Docs/Art/IDEA-0018/IDEA-0018-Terrain-Visual-Asset-Record-ZH.md",
         "Docs/superpowers/specs/2026-08-24-idea-0018-civilization-map-ui-design.md",
-        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md"
+        "Docs/superpowers/specs/2026-08-27-idea-0021-lv2-bridges-building-art-design.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "WindowsBuilds"
     },
@@ -964,6 +1012,9 @@
         "Assets/_Game/Tests/EditMode/Production2DCivilizationExpansionVisualPipelineTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationExpansionVisualIntegrationTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0024AcceptanceAndClickableTabsTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostStateCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostAlertRuntimeTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxCivilizationExpansionRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/IDEA0024AcceptanceAndTabsRuntimeInputTests.cs"
       ],
@@ -976,7 +1027,8 @@
         "IDEA-0023",
         "IDEA-0024",
         "IDEA-0027",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ],
       "HumanDocumentPaths": [
         "Docs/01-Game-Design-Document-ZH.md",
@@ -985,7 +1037,9 @@
         "Docs/superpowers/specs/2026-08-28-idea-0022-civilization-expansion-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0027-advanced-technology-states-design.md",
         "Docs/superpowers/specs/2026-09-01-idea-0028-nine-fate-pool-design.md",
-        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md"
+        "Docs/superpowers/plans/2026-09-01-idea-0028-nine-fate-pool.md",
+        "Docs/superpowers/specs/2026-09-04-idea-0029-exploration-leader-outpost-design.md",
+        "Docs/superpowers/plans/2026-09-04-idea-0029-exploration-leader-outpost.md"
       ],
       "MinimumVerification": "WindowsBuilds"
     },
@@ -4282,18 +4336,20 @@
         "FormalThreeDDefenseCampaignSaveData",
         "FormalThreeDDefenseCampaignStatisticsSaveData",
         "FormalThreeDEvacuationSaveData",
-        "FormalThreeDEvacuationRuntimePayloadSaveData"
+        "FormalThreeDEvacuationRuntimePayloadSaveData",
+        "FormalThreeDExplorationSaveData"
       ],
       "AssetPaths": [
         "Assets/_Game/Scripts/Persistence/FormalSaveEnvelope.cs",
         "Assets/_Game/Scripts/Persistence/FormalSaveCodec.cs",
         "Assets/_Game/Scripts/Persistence/FormalSaveValidator.cs",
-        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs"
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDSaveData.cs",
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExplorationSaveData.cs"
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "为每个新 schema 保留旧版本精确投影与哈希，再增加单向迁移；schema 36 保存本局候选/抽取版本、六条新增命轨状态和坐标锁定。",
-      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、派生状态重建或 UI；legacy 2D 不升级为正式 3D，35→36 保留旧候选和既有命轨状态，只为新增 owner 建立清洁默认。",
+      "UseSummary": "为每个新 schema 保留旧版本精确投影与哈希，再增加单向迁移；schema `37` 保存永久探索、扫描幂等、最后情报、领袖控制/手采、岑烬求救与前哨警报。",
+      "BoundarySummary": "只定义存档身份、DTO 信封、codec、纯验证与已批准迁移，不执行文件 IO、领域捕获、恢复应用、实时视野重建或 UI；legacy 2D 不升级为正式 3D，`36→37` 保留既有岑烬与聚落事实，不补扣救援资源、不补发奖励、不猜测历史警报。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/FormalSaveEnvelopeTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveValidatorTests.cs",
@@ -4305,7 +4361,9 @@
         "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
         "Assets/_Game/Tests/EditMode/IDEA0027ResearchEffectStateSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalDefenseCampaignSaveAdapterTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema37ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationSaveAdapterTests.cs"
       ],
       "RequirementIds": [
         "DOC-0001",
@@ -4314,7 +4372,8 @@
         "IDEA-0020",
         "IDEA-0022",
         "IDEA-0027",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ]
     },
     {
@@ -4425,8 +4484,8 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "ReviewBeforeReuse",
-      "UseSummary": "九命轨的细分 owner 继续收敛在 progression 事务域内，不改变十个顶层领域的提交顺序。",
-      "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把连接、路径、临时表现或 UI 入档；研究效果状态是独立事务域，回滚失败会保留安全屏障，调用方不得伪装成成功。",
+      "UseSummary": "把探索、领袖交互和前哨警报作为显式领域接入，九命轨细分 owner 继续收敛在 progression 域，不改变其他既有领域所有权。",
+      "BoundarySummary": "只协调显式注入的领域和派生重建，不搜索场景、不执行文件 IO、不复制领域规则，也不把实时视野、连接、路径、临时表现或 UI 入档；探索恢复失败与其他领域一样必须完整回滚。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCheckpointTests.cs",
@@ -4434,13 +4493,16 @@
         "Assets/_Game/Tests/EditMode/GrayboxBuildAndPerformanceTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema34ContractTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveSchema35ContractTests.cs",
-        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs"
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema36ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema37ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationSaveAdapterTests.cs"
       ],
       "RequirementIds": [
         "IDEA-0015",
         "IDEA-0020",
         "IDEA-0022",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ]
     },
     {
@@ -4454,14 +4516,16 @@
       ],
       "FeatureGroupId": "persistence-migration",
       "ReuseLevel": "SceneOnly",
-      "UseSummary": "Host 只负责组合新进度抽取、领域 owner、真实消费者、规则周期、界面命令和存档边界；继续时先重绑 session 专属 owner 再恢复。",
-      "BoundarySummary": "只作为正式 3D 场景组合根；资格从 Research/Building/Pressure/Production/Defense 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO 或战斗规则；局部时加不修改 `Time.timeScale`，内部重试档和回溯锚点都不是第二玩家存档槽。",
+      "UseSummary": "Host 只负责组合新进度抽取、领域 owner、真实消费者、规则周期、探索/领袖/前哨界面命令和存档边界；继续时先重绑 session 专属 owner 再恢复。",
+      "BoundarySummary": "只作为正式 3D 场景组合根；资格从探索、角色、聚落、库存、Attention、Research/Building/Production/Defense 权威快照采集，UI 只发命令。它不用于冻结 2D、不拥有 DTO、迷雾或战斗规则，也不把实时视野、临时表现和输入焦点写入存档。",
       "RequiredTestFiles": [
         "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxFormalProgressionSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementControllerTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementPresentationTests.cs",
         "Assets/_Game/Tests/EditMode/GrayboxCivilizationAdvancementInputCoordinatorTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationController3DTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationSaveAdapterTests.cs",
         "Assets/_Game/Tests/EditMode/FormalSaveWaveRetryStoreTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRuntimeInputTests.cs",
         "Assets/_Game/Tests/PlayMode/GrayboxFormalSaveRoundTripTests.cs",
@@ -4473,7 +4537,8 @@
         "IDEA-0017",
         "IDEA-0020",
         "IDEA-0022",
-        "IDEA-0028"
+        "IDEA-0028",
+        "IDEA-0029"
       ]
     },
     {
@@ -4685,6 +4750,181 @@
       ]
     },
     {
+      "Id": "formal-exploration-runtime",
+      "ChineseName": "正式三态迷雾、情报与自动扫描运行时",
+      "TypeNames": [
+        "FormalExplorationCatalog3D",
+        "WorldVisionSource",
+        "WorldVisibilityRuntime",
+        "WorldIntelRuntime",
+        "WorldExplorationRuntime",
+        "WorldScanRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/World/Exploration/ExplorationCatalog.cs",
+        "Assets/_Game/Scripts/World/Exploration/WorldVisionSource.cs",
+        "Assets/_Game/Scripts/World/Exploration/WorldVisibilityRuntime.cs",
+        "Assets/_Game/Scripts/World/Exploration/WorldIntelRuntime.cs",
+        "Assets/_Game/Scripts/World/Exploration/WorldExplorationRuntime.cs",
+        "Assets/_Game/Scripts/World/Exploration/ScanRuntime.cs"
+      ],
+      "FeatureGroupId": "world-terrain",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "调用者只发布带稳定 ID、权威坐标和资格的视野来源；查询三态和只读情报快照，首次可见扫描委托既有 Attention 稳定事件。",
+      "BoundarySummary": "不复制地形、Traversal、资源余量、聚落或角色位置；当前 Visible 可重建且不入档，扫描不增加、移动或重置矿点，也不更改地图 seed 与正式内容目录。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldVisibilityRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldIntelRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029WorldExplorationRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ScanRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
+      "Id": "leader-exploration-runtime",
+      "ChineseName": "领袖控制、基础 AI 与手采运行时",
+      "TypeNames": [
+        "LeaderInteractionCatalog",
+        "LeaderControlRuntime",
+        "LeaderAiRules",
+        "ManualGatherRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Leader/Exploration/LeaderInteractionCatalog.cs",
+        "Assets/_Game/Scripts/Leader/Exploration/LeaderControlRuntime.cs",
+        "Assets/_Game/Scripts/Leader/Exploration/LeaderAiRules.cs",
+        "Assets/_Game/Scripts/Leader/Exploration/LeaderIntent.cs",
+        "Assets/_Game/Scripts/Leader/Exploration/ManualGatherRuntime.cs"
+      ],
+      "FeatureGroupId": "leader-direct-control",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "先从权威角色事实评估控制资格，再由既有直接控制协调器解析实际目标；手采每周期先预检节点、视野、距离与背包空间，再提交同一矿点和背包。",
+      "BoundarySummary": "不建立第二直接控制目标、第二资源余额或第二背包；AI 不自动寻矿、战斗或施法，UI 不得绕过运行时直接写模式或资源。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderInteractionCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderControlRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029LeaderAiRulesTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ManualGatherRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxLeaderControlTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
+      "Id": "cen-jin-distress-runtime",
+      "ChineseName": "岑烬求救与原子招募运行时",
+      "TypeNames": [
+        "CenJinDistressRuntime",
+        "CenJinDistressSnapshot",
+        "CenJinDistressTickResult"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Leader/Exploration/CenJinDistressRuntime.cs",
+        "Assets/_Game/Scripts/Leader/Exploration/LeaderInteractionCatalog.cs"
+      ],
+      "FeatureGroupId": "leader-direct-control",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "通过显式事务接口协调资源、人口、角色和 Attention owner；只读快照用于场景显示。",
+      "BoundarySummary": "取消和失败必须回滚，UI 与读档不得重复结算；既有 schema `36` 岑烬迁为兼容已救援，不补扣资源或补发奖励。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinRescueRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinDistressPresentationTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
+      "Id": "outpost-operational-alert-runtime",
+      "ChineseName": "前哨运行状态与三级警报运行时",
+      "TypeNames": [
+        "OutpostOperationalState",
+        "OutpostAlertCatalog",
+        "OutpostAlertRuntime"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/World/Exploration/OutpostOperationalState.cs",
+        "Assets/_Game/Scripts/World/Exploration/OutpostAlertCatalog.cs",
+        "Assets/_Game/Scripts/World/Exploration/OutpostAlertRuntime.cs"
+      ],
+      "FeatureGroupId": "civilization-expansion",
+      "ReuseLevel": "Recommended",
+      "UseSummary": "把 settlement 三项连接状态作为输入，把正式威胁/攻击 owner 的稳定事实提交给警报运行时，UI 只读取快照并发布确认、定位命令。",
+      "BoundarySummary": "不创建第二聚落库存、敌人或战斗模拟；断联不等于停产，警报不能靠距离轮询或 UI 伪造，点击只定位并打开详情，不切换直接控制或强制暂停。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostStateCatalogTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostRuntimeTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029OutpostAlertRuntimeTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
+      "Id": "graybox-exploration-presentation-3d",
+      "ChineseName": "正式三维探索、领袖与前哨界面",
+      "TypeNames": [
+        "GrayboxExplorationController3D",
+        "GrayboxExplorationView3D",
+        "GrayboxFogPresenter3D",
+        "GrayboxFogVisualPolicy3D",
+        "GrayboxCenJinDistressPresenter3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Graybox3D/Exploration/GrayboxExplorationController3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationView3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/GrayboxFogPresenter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/GrayboxFogVisualPolicy3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/ResourceMarkerFogPresentation3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Exploration/GrayboxCenJinDistressPresenter3D.cs"
+      ],
+      "FeatureGroupId": "ui-input",
+      "ReuseLevel": "SceneOnly",
+      "UseSummary": "只消费正式不可变快照，所有按钮与世界选择只发布命令，并服从既有 Input System 模态优先级；自动扫描反馈不得抢占移动。",
+      "BoundarySummary": "不保存探索、库存、角色、聚落或警报真值，不从中文文案反推规则；直接调用内部方法不能代替真实输入验收。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationController3DTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationUiProjectionTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029FogPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinDistressPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
+      "Id": "graybox-exploration-save-adapter-3d",
+      "ChineseName": "schema 37 探索、领袖与前哨存档适配器",
+      "TypeNames": [
+        "FormalThreeDExplorationSaveData",
+        "GrayboxExplorationLeaderOutpostSaveAdapter3D",
+        "GrayboxExplorationSaveDomainProxy3D"
+      ],
+      "AssetPaths": [
+        "Assets/_Game/Scripts/Persistence/ThreeD/FormalThreeDExplorationSaveData.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationLeaderOutpostSaveAdapter3D.cs",
+        "Assets/_Game/Scripts/Graybox3D/Building/GrayboxExplorationSaveDomainProxy3D.cs"
+      ],
+      "FeatureGroupId": "persistence-migration",
+      "ReuseLevel": "ReviewBeforeReuse",
+      "UseSummary": "作为正式协调器的显式 exploration 领域使用，先验证完整 DTO 与跨引用，再一次提交或完整回滚；成功后从权威来源重建实时视野和表现。",
+      "BoundarySummary": "不保存当前 Visible、视野来源、临时遮罩或 UI；`36→37` 必须先验证旧哈希，再从权威坐标建立清洁可视初态且不触发扫描、救援奖励或历史警报。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/FormalSaveSchema37ContractTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationSaveAdapterTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveCoordinatorTests.cs",
+        "Assets/_Game/Tests/EditMode/GrayboxFormalSaveRuntimeHostTests.cs"
+      ],
+      "RequirementIds": [
+        "IDEA-0029"
+      ]
+    },
+    {
       "Id": "formal-save-data",
       "ChineseName": "正式存档数据",
       "TypeNames": [
@@ -4710,13 +4950,27 @@
       "Id": "graybox-prototype-3d",
       "ChineseName": "三维灰盒原型",
       "Path": "Assets/_Game/Scenes/GrayboxPrototype3D.unity",
-      "Purpose": "用于三维运行、正式展开/收起、建造生产防御撤离、系统菜单和场景合同验证。",
+      "Purpose": "用于三维运行、正式展开/收起、建造生产防御撤离、三态迷雾、领袖手采/求救、前哨警报、系统菜单和场景合同验证。",
       "EnabledInBuildSettings": true,
       "ExpectedBuildIndex": 0,
       "ReuseLevel": "SceneOnly"
     }
   ],
   "UiEntries": [
+    {
+      "Id": "graybox-exploration-leader-outpost",
+      "ChineseName": "探索、领袖与前哨面板",
+      "OwnerTypeName": "GrayboxExplorationView3D",
+      "SceneId": "graybox-prototype-3d",
+      "InputPrioritySummary": "系统菜单、撤离和结算模态优先；无高优先界面时 L 打开领袖页，手采、岑烬救援、前哨详情和警报定位只发布正式命令并阻断同帧世界输入，自动扫描反馈不抢占移动。",
+      "RequiredTestFiles": [
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationController3DTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029ExplorationUiProjectionTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029FogPresentationTests.cs",
+        "Assets/_Game/Tests/EditMode/IDEA0029CenJinDistressPresentationTests.cs",
+        "Assets/_Game/Tests/PlayMode/GrayboxProductionObservabilityRuntimeInputTests.cs"
+      ]
+    },
     {
       "Id": "graybox-civilization-expansion",
       "ChineseName": "军队、世界与政务面板",

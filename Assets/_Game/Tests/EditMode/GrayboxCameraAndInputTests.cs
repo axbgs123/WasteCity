@@ -587,7 +587,7 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void TickGameplay_CityTargetDocksLeaderWithoutMovingCity()
+        public void TickGameplay_CityTargetPreservesLeaderWithoutMovingCity()
         {
             RuntimeFixture fixture = CreateRuntimeFixture(true);
             fixture.Leader.transform.position =
@@ -595,6 +595,7 @@ namespace WasteCity.Tests
                     10f,
                     fixture.Leader.transform.position.y,
                     9f);
+            Vector3 leaderStart = fixture.Leader.transform.position;
             Vector3 cityStart = fixture.CityBody.position;
 
             ProcessFrame(
@@ -606,11 +607,7 @@ namespace WasteCity.Tests
 
             Assert.That(
                 fixture.Leader.transform.position,
-                Is.EqualTo(
-                    new Vector3(
-                        cityStart.x + 1.8f,
-                        fixture.Leader.transform.position.y,
-                        cityStart.z + 1.2f)));
+                Is.EqualTo(leaderStart));
             Assert.That(fixture.CityBody.position, Is.EqualTo(cityStart));
         }
 
@@ -976,6 +973,50 @@ namespace WasteCity.Tests
                 -4f,
                 fixture.CameraRigStartY);
             AssertCameraContract(fixture);
+        }
+
+        [Test]
+        public void FocusWorldPosition_UsesFreeCameraWithoutChangingControlTarget()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            fixture.CameraController.TickCamera();
+            DirectControlTarget targetBefore =
+                fixture.CameraController.CurrentTarget;
+            float rigY = fixture.CameraRig.position.y;
+
+            bool focused = fixture.CameraController.FocusWorldPosition(
+                new Vector3(7.25f, 99f, -5.5f));
+
+            Assert.That(focused, Is.True);
+            Assert.That(fixture.CameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
+            Assert.That(fixture.CameraController.CurrentTarget,
+                Is.EqualTo(targetBefore));
+            AssertRigXZ(fixture.CameraRig, 7.25f, -5.5f, rigY);
+            fixture.CameraController.TickCamera();
+            AssertRigXZ(fixture.CameraRig, 7.25f, -5.5f, rigY);
+            AssertCameraContract(fixture);
+        }
+
+        [Test]
+        public void FocusWorldPosition_RejectsInvalidOrMissingRig()
+        {
+            RuntimeFixture fixture = CreateRuntimeFixture(true);
+            Vector3 before = fixture.CameraRig.position;
+
+            Assert.That(fixture.CameraController.FocusWorldPosition(
+                new Vector3(float.NaN, 0f, 1f)), Is.False);
+            Assert.That(fixture.CameraRig.position, Is.EqualTo(before));
+
+            fixture.CameraController.Configure(
+                fixture.Camera,
+                null,
+                fixture.City,
+                fixture.Leader,
+                fixture.DirectControl,
+                fixture.Projector);
+            Assert.That(fixture.CameraController.FocusWorldPosition(
+                new Vector3(1f, 0f, 1f)), Is.False);
         }
 
         [Test]

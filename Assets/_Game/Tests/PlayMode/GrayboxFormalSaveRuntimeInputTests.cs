@@ -191,6 +191,12 @@ namespace WasteCity.Tests
             Assert.That(FindButton("Start.Continue").interactable, Is.True);
             Assert.That(entry.FeedbackMessage,
                 Is.EqualTo("已继续最近进度"));
+            GrayboxFormalSaveRuntimeHost3D host = UnityEngine.Object
+                .FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.ExplorationController, Is.Not.Null);
+            AssertExplorationControllerIsUninitialized(
+                host.ExplorationController);
 
             yield return ClickButton("Start.Continue");
 
@@ -201,6 +207,8 @@ namespace WasteCity.Tests
             Assert.That(entry.FeedbackMessage, Is.Not.Empty);
             Assert.That(FindText("FormalSave.Feedback").text,
                 Is.EqualTo(entry.FeedbackMessage));
+            AssertExplorationControllerIsUninitialized(
+                host.ExplorationController);
         }
 
         [UnityTest]
@@ -603,6 +611,19 @@ namespace WasteCity.Tests
                     GrayboxSystemMenuController3D>();
             Assert.That(menu, Is.Not.Null);
             return menu;
+        }
+
+        private static void AssertExplorationControllerIsUninitialized(
+            WasteCity.Graybox3D.Exploration.GrayboxExplorationController3D
+                controller)
+        {
+            Assert.That(controller.IsInitialized, Is.False);
+            Assert.That(controller.Exploration, Is.Null);
+            Assert.That(controller.LeaderControl, Is.Null);
+            Assert.That(controller.ManualGather, Is.Null);
+            Assert.That(controller.CenJinDistress, Is.Null);
+            Assert.That(controller.OutpostAlerts, Is.Null);
+            Assert.That(controller.AreBoundariesConfigured, Is.False);
         }
 
         private static Button FindButton(string name)

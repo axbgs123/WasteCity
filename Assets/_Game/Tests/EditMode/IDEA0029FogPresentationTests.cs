@@ -158,12 +158,22 @@ namespace WasteCity.Tests
             Assert.That(view.TrySetResourceMarkerFogPresentation(
                     0,
                     0,
-                    ResourceMarkerFogPresentation3D.LastIntel(42),
+                    ResourceMarkerFogPresentation3D.LastIntel(
+                        42,
+                        WorldIntelState.Stale,
+                        76f),
                     out string intelError),
                 Is.True,
                 intelError);
             Assert.That(marker.gameObject.activeSelf, Is.True);
             Assert.That(marker.DisplayedAmount, Is.EqualTo(42));
+            Assert.That(marker.DisplayText,
+                Does.Contain("陈旧情报 · 76 秒前"));
+            Assert.That(marker.IntelVisualState,
+                Is.EqualTo(WorldIntelState.Stale));
+            Color staleTint = marker.IconTint;
+            Assert.That(staleTint.r, Is.GreaterThan(staleTint.b),
+                "Stale intel must use an amber status tint.");
             Assert.That(model.Harvest(0, 0, 10, out _), Is.EqualTo(10));
             Assert.That(view.RefreshResourceNodeMarkers(), Is.False);
             Assert.That(marker.DisplayedAmount, Is.EqualTo(42),
@@ -172,13 +182,25 @@ namespace WasteCity.Tests
             Assert.That(view.TrySetResourceMarkerFogPresentation(
                     0,
                     0,
-                    ResourceMarkerFogPresentation3D.LastKnownIdentity,
+                    ResourceMarkerFogPresentation3D.LastKnownIdentityAt(
+                        181f),
                     out string identityError),
                 Is.True,
                 identityError);
             Assert.That(marker.gameObject.activeSelf, Is.True);
-            Assert.That(marker.DisplayText, Is.Empty,
-                "Expired intel may retain identity but not mutable amount.");
+            Assert.That(marker.DisplayText,
+                Does.Contain("情报已过期 · 181 秒前")
+                    .And.Not.Contain("42"),
+                "Expired intel retains identity and age but not amount.");
+            Color expiredTint = marker.IconTint;
+            Assert.That(marker.IntelVisualState,
+                Is.EqualTo(WorldIntelState.Expired));
+
+            Assert.That(model.Harvest(0, 0, 90, out _), Is.EqualTo(90));
+            Assert.That(view.RefreshResourceNodeMarkers(), Is.False);
+            Assert.That(marker.IconTint, Is.EqualTo(expiredTint),
+                "Expired icon tint must not reveal whether the live node is depleted.");
+            Assert.That(expiredTint, Is.Not.EqualTo(staleTint));
 
             Assert.That(view.TrySetResourceMarkerFogPresentation(
                     0,
@@ -188,7 +210,8 @@ namespace WasteCity.Tests
                 Is.True,
                 liveError);
             Assert.That(marker.gameObject.activeSelf, Is.True);
-            Assert.That(marker.DisplayedAmount, Is.EqualTo(90));
+            Assert.That(marker.DisplayedAmount, Is.Zero);
+            Assert.That(marker.HasIntelVisualState, Is.False);
         }
 
         [Test]

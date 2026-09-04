@@ -2921,6 +2921,7 @@ MonoBehaviour:
   inputCoordinator: {fileID: 1513971949}
   leader: {fileID: 883727725}
   directControl: {fileID: 1650269103}
+  cameraController: {fileID: 637743772}
   explorationController: {fileID: 1959787202}
   fogPresenter: {fileID: 1959787201}
   distressPresenter: {fileID: 1959787203}

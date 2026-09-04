@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using WasteCity.City;
 using WasteCity.Graybox3D;
+using WasteCity.Graybox3D.Building;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -186,7 +187,11 @@ namespace WasteCity.Tests
             Assert.That(
                 leader.DevelopmentFixtureRecruited,
                 Is.True);
-            Assert.That(leader.Model.Recruited, Is.True);
+            Assert.That(
+                leader.Model.Recruited,
+                Is.False,
+                "IDEA-0029 formal new progress must override the authored " +
+                "development recruitment fixture");
             Assert.That(
                 worldView.Coordinates.TryCellToWorld(
                     8,
@@ -348,6 +353,8 @@ namespace WasteCity.Tests
             GrayboxCameraController3D cameraController =
                 Object.FindObjectOfType<
                     GrayboxCameraController3D>();
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
             Transform rig = Camera.main.transform.parent;
             Vector2 dragStart = new Vector2(
                 Screen.width * .5f,
@@ -363,7 +370,9 @@ namespace WasteCity.Tests
                 cameraController.CurrentTarget,
                 Is.EqualTo(DirectControlTarget.City));
 
-            city.Deployment.Restore(CityMode.Fortress, 0f);
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.ExecuteExplorationFixtureForDevelopment(
+                "developer.exploration.gather-ready"), Is.True);
             leader.transform.position = city.transform.position;
             yield return null;
             Assert.That(

@@ -10,6 +10,7 @@ using UnityEngine.TestTools;
 using UnityEngine.UI;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
+using WasteCity.Progression;
 using Object = UnityEngine.Object;
 
 namespace WasteCity.Tests
@@ -121,9 +122,14 @@ namespace WasteCity.Tests
             GameObject status = RequireSceneObject(AttentionStatusName);
             Assert.That(status.GetComponent<Button>(), Is.Not.Null,
                 "The persistent attention status must be a real UGUI button.");
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
             Assert.That(RequireSceneObject(AttentionValueName)
                     .GetComponent<Text>().text,
-                Does.Contain("15").And.Contain("100"));
+                Does.Contain(host.AttentionRuntime.Value.ToString())
+                    .And.Contain(
+                        FormalAttentionCatalog.MaximumValue.ToString()));
             GameObject details = RequireSceneObject(
                 AttentionDetailsName,
                 includeInactive: true);

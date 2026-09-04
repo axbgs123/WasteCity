@@ -10,6 +10,7 @@ using WasteCity.Graybox3D.Building;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
+using WasteCity.World.Exploration;
 
 namespace WasteCity.Tests
 {
@@ -20,7 +21,7 @@ namespace WasteCity.Tests
         {
             Assert.That(
                 GrayboxDeveloperCatalogQuery3D.ProgressionActionEntries,
-                Has.Count.EqualTo(31));
+                Has.Count.EqualTo(46));
             Assert.That(GrayboxDeveloperCatalogQuery3D.SearchProgressionActions(
                     "关注度").Select(value => value.DisplayName),
                 Does.Contain("增加关注度").And.Contain("降低关注度")
@@ -31,6 +32,12 @@ namespace WasteCity.Tests
                     out GrayboxDeveloperCatalogEntry3D query), Is.True);
             Assert.That(query.StableId,
                 Is.EqualTo("developer.query.configuration-signature"));
+            Assert.That(GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("探索").Select(value =>
+                    value.DisplayName),
+                Does.Contain("查询探索视野来源")
+                    .And.Contain("查询探索扫描区状态")
+                    .And.Contain("查询探索情报状态"));
         }
 
         [Test]
@@ -333,6 +340,122 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0029_ExplorationCommandsUseChineseCatalogAndOneFacade()
+        {
+            string invoked = string.Empty;
+            using (Fixture fixture = Create(
+                executeExploration: actionId =>
+                {
+                    invoked = actionId;
+                    return true;
+                }))
+            {
+                GrayboxDeveloperCommandResult3D result = fixture.Modifier
+                    .ExecuteProgressionAction("设置前哨危急警报");
+
+                Assert.That(result.Succeeded, Is.True);
+                Assert.That(invoked,
+                    Is.EqualTo("developer.exploration.alert-critical"));
+                Assert.That(result.Message,
+                    Does.Contain("设置前哨危急警报").And.Contain("已执行"));
+                Assert.That(fixture.Modifier.HasModifiedGameState, Is.True);
+            }
+        }
+
+        [Test]
+        public void IDEA0029_ExplorationDiagnosticsReadFormalOwnersWithoutMutation()
+        {
+            var exploration = new WorldExplorationRuntime(
+                64,
+                48,
+                "diagnostic-session",
+                (_, __) => true);
+            exploration.UpsertSource(new WorldVisionSource(
+                "core.city.000001",
+                WorldVisionSourceKind.PrimaryCity,
+                16,
+                15,
+                true,
+                8ul));
+            Assert.That(exploration.TryObserveVisibleResource(
+                new WorldIntelObservation(
+                    "world.deposit.safe-iron.01",
+                    WorldIntelKind.Resource,
+                    16,
+                    15,
+                    "铁矿 240",
+                    true,
+                    240,
+                    10f,
+                    8ul),
+                out _,
+                out string intelError), Is.True, intelError);
+            var alerts = new OutpostAlertRuntime();
+            Assert.That(alerts.TryReport(
+                "alert.outpost.01",
+                "settlement.outpost.01",
+                20,
+                18,
+                OutpostAlertSeverity.Critical,
+                "异兽群逼近",
+                75,
+                25f,
+                70d,
+                out string alertError), Is.True, alertError);
+
+            GrayboxDeveloperExplorationDiagnostics3D expected =
+                GrayboxDeveloperExplorationDiagnostics3D.Capture(
+                    exploration,
+                    alerts,
+                    80f,
+                    16,
+                    15);
+            using (Fixture fixture = Create(
+                queryExploration: (_, __) => expected))
+            {
+                GrayboxDeveloperExplorationDiagnostics3D diagnostic =
+                    fixture.Modifier.QueryExploration(16, 15);
+
+                Assert.That(diagnostic.VisionSources, Has.Count.EqualTo(1));
+                Assert.That(diagnostic.VisionSources[0],
+                    Does.Contain("core.city.000001")
+                        .And.Contain("主城")
+                        .And.Contain("(16,15)")
+                        .And.Contain("半径 7")
+                        .And.Contain("启用"));
+                Assert.That(diagnostic.CellVisibility,
+                    Does.Contain("(16,15)").And.Contain("当前可见"));
+                Assert.That(diagnostic.ScanZones,
+                    Has.Some.Contains("core.exploration.zone.safe-mining")
+                        .And.Some.Contains("已扫描")
+                        .And.Some.Contains("core.exploration.zone.crystal-rift")
+                        .And.Some.Contains("未扫描"));
+                Assert.That(diagnostic.Intel, Has.Count.EqualTo(1));
+                Assert.That(diagnostic.Intel[0],
+                    Does.Contain("world.deposit.safe-iron.01")
+                        .And.Contain("资源")
+                        .And.Contain("陈旧")
+                        .And.Contain("70 秒"));
+                Assert.That(diagnostic.OutpostAlerts,
+                    Has.Count.EqualTo(1));
+                Assert.That(diagnostic.OutpostAlerts[0],
+                    Does.Contain("alert.outpost.01")
+                        .And.Contain("危急")
+                        .And.Contain("未确认")
+                        .And.Contain("异兽群逼近"));
+
+                GrayboxDeveloperCommandResult3D result = fixture.Modifier
+                    .ExecuteProgressionAction("查询探索视野来源");
+                Assert.That(result.Code,
+                    Is.EqualTo(GrayboxDeveloperCommandCode3D.NoChange));
+                Assert.That(result.Message,
+                    Does.Contain("探索视野来源")
+                        .And.Contain("core.city.000001"));
+                Assert.That(fixture.Modifier.HasModifiedGameState, Is.False);
+            }
+        }
+
+        [Test]
         public void IDEA0020_HostFixtureCommandsSynchronizeDefenseAndResetOverrides()
         {
             string source = File.ReadAllText(Path.Combine(
@@ -384,7 +507,10 @@ namespace WasteCity.Tests
             Func<string, bool> readAnchor = null,
             Func<bool> clearAnchors = null,
             Func<bool> satisfyRequirements = null,
-            Func<bool> clearRequirements = null)
+            Func<bool> clearRequirements = null,
+            Func<string, bool> executeExploration = null,
+            Func<int, int, GrayboxDeveloperExplorationDiagnostics3D>
+                queryExploration = null)
         {
             var root = new GameObject("Developer.Progression.Test");
             root.SetActive(false);
@@ -445,7 +571,9 @@ namespace WasteCity.Tests
                 foresight,
                 causal,
                 chest,
-                coordinate);
+                coordinate,
+                executeExploration,
+                queryExploration);
             modifier.ConfigureProgressionFacade(facade);
             return new Fixture(
                 root,

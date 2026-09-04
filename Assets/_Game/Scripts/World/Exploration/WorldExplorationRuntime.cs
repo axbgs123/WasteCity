@@ -156,6 +156,11 @@ namespace WasteCity.World.Exploration
             return visibility.TryGetSource(stableSourceId, out source);
         }
 
+        public WorldVisionSource[] CaptureSources()
+        {
+            return visibility.CaptureSources();
+        }
+
         public bool IsScanned(string stableZoneId)
         {
             return scan.IsScanned(stableZoneId);
@@ -176,6 +181,15 @@ namespace WasteCity.World.Exploration
             out WorldIntelSnapshot snapshot)
         {
             return intel.TryGet(stableId, currentRuleTimeSeconds, out snapshot);
+        }
+
+        public bool TryGetNextIntelStateTransitionTime(
+            float currentRuleTimeSeconds,
+            out float transitionRuleTimeSeconds)
+        {
+            return intel.TryGetNextStateTransitionTime(
+                currentRuleTimeSeconds,
+                out transitionRuleTimeSeconds);
         }
 
         public bool TryObserveVisibleResource(

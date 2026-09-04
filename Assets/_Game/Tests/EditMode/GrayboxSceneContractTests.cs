@@ -963,6 +963,8 @@ namespace WasteCity.Tests
                 RequiredComponent<GrayboxFormalSaveRuntimeHost3D>(
                     systems,
                     "GrayboxFormalSaveRuntimeHost");
+            GrayboxCameraController3D cameraController =
+                Object.FindObjectOfType<GrayboxCameraController3D>(true);
             GrayboxCivilizationExpansionController3D expansionController =
                 RequiredComponent<
                     GrayboxCivilizationExpansionController3D>(
@@ -1049,6 +1051,10 @@ namespace WasteCity.Tests
                 formalSaveHost,
                 "expansionController",
                 expansionController);
+            AssertReference(
+                formalSaveHost,
+                "cameraController",
+                cameraController);
             AssertReference(
                 formalSaveHost,
                 "developerModifier",

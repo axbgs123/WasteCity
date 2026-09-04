@@ -20,6 +20,16 @@
 
 先在[项目自动清单](Generated/Project-Inventory-ZH.md)确认功能所属文件和场景。单功能检查优先看失败报告中的“只重跑这个失败”：报告实际会在“建议复跑”下给出一个可直接复制的单类筛选。若还没有失败报告，或要补跑相关类，就在[测试自动清单](Generated/Test-Inventory-ZH.md)的“精确测试文件与测试类”表找到对应类名，手动把一到数个类名用 `|` 连起来。该附录的“可复制的测试筛选命令”目前只有全部测试类的聚合筛选，不能当作单功能命令。建造、城市、UI、地形、美术、存档和 legacy schema 兼容的最低检查并不相同；先跑单功能，再跑相关检查，最后才完整回归。变更批准状态和需要补写的记录，以[用户反馈与变更控制](06-User-Feedback-and-Change-Control-ZH.md)为准。
 
+## IDEA-0029 探索、领袖与前哨检查边界
+
+- 三态迷雾与自动扫描：先跑 `IDEA0029ExplorationCatalogTests`、`IDEA0029WorldVisibilityRuntimeTests`、`IDEA0029WorldIntelRuntimeTests`、`IDEA0029WorldExplorationRuntimeTests`、`IDEA0029ScanRuntimeTests`。失败先检查 `Assets/_Game/Scripts/World/Exploration/`；`WorldMapModel` 仍是地图与资源节点真值，当前 `Visible` 可重建且不入档，首次可见扫描只能通过既有 Attention 稳定事件结算一次。
+- 领袖控制、基础 AI 与手采：跑 `IDEA0029LeaderInteractionCatalogTests`、`IDEA0029LeaderControlRuntimeTests`、`IDEA0029LeaderAiRulesTests`、`IDEA0029ManualGatherRuntimeTests`、`GrayboxLeaderControlTests`、`PlayerBackpackModelTests`、`DeploymentAndHarvestTests`。失败先区分控制资格、AI 意图、距离/视野/暂停中断与背包容量预检；节点扣减必须来自同一 `WorldMapModel`，不能出现扣矿后未入包。
+- 岑烬求救：跑 `IDEA0029CenJinRescueRuntimeTests` 与 `IDEA0029CenJinDistressPresentationTests`。重点检查发现、`10` 生物质预留、`12` 秒读条、及时/延迟结果、人口 `+40`、关注度 `+5`、取消回滚和重复加载幂等；领域失败先查 `CenJinDistressRuntime`，显示或按钮失败再查 `GrayboxCenJinDistressPresenter3D` 与探索 View。
+- 前哨状态与警报：跑 `IDEA0029OutpostStateCatalogTests`、`IDEA0029OutpostRuntimeTests`、`IDEA0029OutpostAlertRuntimeTests`。通信、补给、维护继续读取 `SettlementRuntime`，断联不自动等于停产；警戒/受袭/危急只能消费权威威胁事实，确认不等于解决，点击只定位而不强制切换控制。
+- schema `37`：跑 `FormalSaveSchema37ContractTests`、`IDEA0029ExplorationSaveAdapterTests`、`GrayboxFormalSaveCoordinatorTests`、`GrayboxFormalSaveRuntimeHostTests`。先查旧 schema 哈希与 `36→37` 迁移，再查 exploration DTO、十一领域预检/提交/回滚；旧档岑烬不得补扣或补发，实时视野、临时遮罩和 UI 状态不得入档。
+- 正式 3D 场景与真实输入：EditMode 跑 `IDEA0029ExplorationController3DTests`、`IDEA0029ExplorationUiProjectionTests`、`IDEA0029FogPresentationTests`、`IDEA0029CenJinDistressPresentationTests`；PlayMode 以 `GrayboxProductionObservabilityRuntimeInputTests` 内的 `IDEA0029_` 用例为当前入口，必须经过真实 `L`、按钮和世界选择主循环。目录登记或直接调用内部方法都不等于运行时验证。
+- 完成本阶段聚焦检查后，仍需日常完整 EditMode、完整 PlayMode、项目质量门、无界面编译、三项现役 3D 构建、官方文档生成/校验与 `RecordVerification`；人工试玩和真实 Windows 验收只能由实际结果确认。
+
 ## IDEA-0027 高级科技状态与 schema 35 检查边界
 
 目录与效果先运行 `IDEA0027ResearchCatalogAndStatusTests`、`IDEA0027ResearchRuntimeEffectsTests` 和 `IDEA0027DefenseTowerCatalogTests`，确认 44 节点、49 边、15 个原预览节点、文明 Lv.2 双门、状态配置与研究继承没有漂移。防御规则运行 `IDEA0027DefenseTechnologyRuntimeTests`：过载阶段、来源—目标一秒窗口、剑意满层、感染周期/稳定连锁、共鸣非递归、精神操控、主/压力战役隔离、建筑运行资格、核心护盾精确恢复和暂停都必须通过。军队与角色运行 `IDEA0027ArmyTechnologyEffectsTests`，检查傀儡容量、巨兽生命比例、组织再生、基因特质、死亡清理和恢复顺序。

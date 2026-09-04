@@ -112,7 +112,7 @@ namespace WasteCity.Tests
             Assert.That(modal.activeInHierarchy, Is.True,
                 "Pending fate plus EffectsReady must block the new game.");
             Assert.That(host.FateRuntime.Capture().HasSelection, Is.False);
-            Assert.That(host.AttentionRuntime.Value, Is.EqualTo(10));
+            int attentionBeforeSelection = host.AttentionRuntime.Value;
 
             Vector3 cityBefore = city.transform.position;
             yield return TapKey(Key.B);
@@ -161,7 +161,10 @@ namespace WasteCity.Tests
             Assert.That(host.FateRuntime.Capture().SelectedId,
                 Is.EqualTo(offeredFateId));
             Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(1));
-            Assert.That(host.AttentionRuntime.Value, Is.EqualTo(15));
+            Assert.That(host.AttentionRuntime.Value,
+                Is.EqualTo(attentionBeforeSelection +
+                    FormalAttentionCatalog.Find(
+                        "core.attention.fate.first-activation").Delta));
             Assert.That(modal.activeSelf, Is.False);
         }
 

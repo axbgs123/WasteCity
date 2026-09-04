@@ -508,6 +508,13 @@ namespace WasteCity.Graybox3D.Building
             return progression?.Query();
         }
 
+        public GrayboxDeveloperExplorationDiagnostics3D QueryExploration(
+            int cellX,
+            int cellY)
+        {
+            return progression?.QueryExploration(cellX, cellY);
+        }
+
         public GrayboxDeveloperCommandResult3D ExecuteProgressionAction(
             string actionIdOrChineseName,
             string argument = null,
@@ -568,6 +575,19 @@ namespace WasteCity.Graybox3D.Building
                     amount,
                     message: "命轨领域状态：" +
                         string.Join("；", query.FateDomainStates));
+            }
+            if (entry.StableId.StartsWith(
+                    "developer.query.exploration-",
+                    StringComparison.Ordinal))
+            {
+                return Result(
+                    GrayboxDeveloperCommandCode3D.NoChange,
+                    true,
+                    entry,
+                    amount,
+                    message: ExplorationQueryMessage(
+                        entry.StableId,
+                        progression.QueryExploration(0, 0)));
             }
             bool failed = IsFailureOnlyAction(entry.StableId);
             return Result(
@@ -646,10 +666,18 @@ namespace WasteCity.Graybox3D.Building
                 case "developer.query.pressure-queue":
                 case "developer.query.configuration-signature":
                 case "developer.query.fate-domain-states":
+                case "developer.query.exploration-vision-sources":
+                case "developer.query.exploration-cell-visibility":
+                case "developer.query.exploration-scan-zones":
+                case "developer.query.exploration-intel":
+                case "developer.query.exploration-outpost-alerts":
                     progression.Query();
                     return false;
                 default:
-                    return false;
+                    return actionId.StartsWith(
+                        "developer.exploration.",
+                        StringComparison.Ordinal) &&
+                        progression.ExecuteExplorationFixture(actionId);
             }
         }
 
@@ -662,6 +690,32 @@ namespace WasteCity.Graybox3D.Building
             string fateId = "core.legacy." +
                 actionId.Substring(actionPrefix.Length);
             return FormalFateCatalog.Find(fateId) == null ? null : fateId;
+        }
+
+        private static string ExplorationQueryMessage(
+            string actionId,
+            GrayboxDeveloperExplorationDiagnostics3D query)
+        {
+            if (query == null) return "探索诊断服务尚未连接";
+            switch (actionId)
+            {
+                case "developer.query.exploration-vision-sources":
+                    return "探索视野来源：" +
+                        string.Join("；", query.VisionSources);
+                case "developer.query.exploration-cell-visibility":
+                    return "指定格视野状态：" + query.CellVisibility;
+                case "developer.query.exploration-scan-zones":
+                    return "探索扫描区状态：" +
+                        string.Join("；", query.ScanZones);
+                case "developer.query.exploration-intel":
+                    return "探索情报状态：" +
+                        string.Join("；", query.Intel);
+                case "developer.query.exploration-outpost-alerts":
+                    return "前哨警报快照：" +
+                        string.Join("；", query.OutpostAlerts);
+                default:
+                    return "探索诊断查询未执行";
+            }
         }
 
         private static bool ValidateProgressionArguments(

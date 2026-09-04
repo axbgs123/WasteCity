@@ -103,7 +103,6 @@ namespace WasteCity.Tests
                     .Where(value => !value.IsMet)
                     .Select(value => value.MissingText)));
             int attentionBefore = host.AttentionRuntime.Value;
-            host.RuleClock.SetDevelopmentAcceleration(20f);
 
             yield return TapKey(Key.U);
             Assert.That(host.Sequence.Stage,
@@ -118,6 +117,7 @@ namespace WasteCity.Tests
             Assert.That(Require(
                 "CivilizationAdvancement.Modal").activeInHierarchy,
                 Is.True);
+            host.RuleClock.SetDevelopmentAcceleration(20f);
 
             int committedAttention = host.AttentionRuntime.Value;
             yield return TapKey(Key.U);

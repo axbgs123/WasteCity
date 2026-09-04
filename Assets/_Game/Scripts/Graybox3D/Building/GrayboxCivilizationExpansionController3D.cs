@@ -149,6 +149,36 @@ namespace WasteCity.Graybox3D.Building
             Refresh(force: true);
         }
 
+        public bool TryOpenWorldSettlementDetail(
+            string settlementId,
+            out int cellX,
+            out int cellY,
+            out string error)
+        {
+            cellX = -1;
+            cellY = -1;
+            if (!TryInitialize(out error)) return false;
+            SettlementRuntime settlement = Runtime.WorldLayer.GetSettlement(
+                settlementId);
+            if (settlement == null)
+            {
+                error = "未找到警报对应的前哨";
+                return false;
+            }
+            if (!Runtime.WorldLayer.TryFocus(settlement.StableId))
+            {
+                error = "无法聚焦警报对应的前哨";
+                return false;
+            }
+
+            cellX = settlement.X;
+            cellY = settlement.Y;
+            view.Open(GrayboxCivilizationExpansionPage3D.World);
+            Refresh(force: true);
+            error = string.Empty;
+            return true;
+        }
+
         public void Close()
         {
             view?.Close();

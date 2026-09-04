@@ -112,10 +112,14 @@ namespace WasteCity.Tests
             Assert.That(operations, Is.Not.Null);
             Assert.That(city, Is.Not.Null);
 
+            int attentionBeforeSelection = host.AttentionRuntime.Value;
             yield return SelectRewindFate();
             Assert.That(host.FateRuntime.Capture().SelectedId,
                 Is.EqualTo(FormalFateCatalog.RewindAnchorId));
-            Assert.That(host.AttentionRuntime.Value, Is.EqualTo(15));
+            Assert.That(host.AttentionRuntime.Value,
+                Is.EqualTo(attentionBeforeSelection +
+                    FormalAttentionCatalog.Find(
+                        "core.attention.fate.first-activation").Delta));
 
             yield return OpenFateOperations();
             Assert.That(operationsModal.activeInHierarchy, Is.True);

@@ -1,6 +1,7 @@
 using System;
 using WasteCity.Graybox3D.Exploration;
 using WasteCity.Persistence.ThreeD;
+using WasteCity.World.Exploration;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -10,6 +11,9 @@ namespace WasteCity.Graybox3D.Building
         private readonly GrayboxExplorationController3D controller;
         private readonly Func<string> sessionIdProvider;
         private readonly Func<double> ruleTimeSecondsProvider;
+        private GrayboxExplorationLeaderOutpostSaveAdapter3D adapter;
+        private WorldExplorationRuntime adapterExplorationOwner;
+        private string adapterSessionId = string.Empty;
 
         public GrayboxExplorationSaveDomainProxy3D(
             GrayboxExplorationController3D controller,
@@ -46,27 +50,53 @@ namespace WasteCity.Graybox3D.Building
                 adapter.TryApply(source, out error);
         }
 
+        public void ReanchorDerivedRuntimeState()
+        {
+            if (TryCreateAdapter(
+                    out GrayboxExplorationLeaderOutpostSaveAdapter3D current,
+                    out _))
+            {
+                current.ReanchorDerivedRuntimeState();
+            }
+        }
+
         private bool TryCreateAdapter(
             out GrayboxExplorationLeaderOutpostSaveAdapter3D adapter,
             out string error)
         {
-            adapter = null;
             string sessionId = sessionIdProvider();
             if (!controller.IsInitialized ||
                 string.IsNullOrWhiteSpace(sessionId))
             {
+                adapter = null;
                 error = "探索存档域尚未绑定正式会话";
                 return false;
             }
 
-            adapter = new GrayboxExplorationLeaderOutpostSaveAdapter3D(
-                controller.Exploration,
-                controller.LeaderControl,
-                controller.ManualGather,
-                controller.CenJinDistress,
-                controller.OutpostAlerts,
-                sessionId,
-                ruleTimeSecondsProvider);
+            WorldExplorationRuntime explorationOwner =
+                controller.Exploration;
+            if (this.adapter == null ||
+                !ReferenceEquals(
+                    adapterExplorationOwner,
+                    explorationOwner) ||
+                !string.Equals(
+                    adapterSessionId,
+                    sessionId,
+                    StringComparison.Ordinal))
+            {
+                this.adapter =
+                    new GrayboxExplorationLeaderOutpostSaveAdapter3D(
+                        explorationOwner,
+                        controller.LeaderControl,
+                        controller.ManualGather,
+                        controller.CenJinDistress,
+                        controller.OutpostAlerts,
+                        sessionId,
+                        ruleTimeSecondsProvider);
+                adapterExplorationOwner = explorationOwner;
+                adapterSessionId = sessionId;
+            }
+            adapter = this.adapter;
             error = string.Empty;
             return true;
         }

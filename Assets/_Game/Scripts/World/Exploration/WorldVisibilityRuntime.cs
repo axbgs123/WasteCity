@@ -91,6 +91,19 @@ namespace WasteCity.World.Exploration
                 sources.TryGetValue(stableId, out source);
         }
 
+        public WorldVisionSource[] CaptureSources()
+        {
+            var result = new WorldVisionSource[sources.Count];
+            sources.Values.CopyTo(result, 0);
+            Array.Sort(
+                result,
+                (left, right) => string.Compare(
+                    left.StableId,
+                    right.StableId,
+                    StringComparison.Ordinal));
+            return result;
+        }
+
         public int Reveal(int centerX, int centerY, int radius)
         {
             ValidateCell(centerX, centerY);

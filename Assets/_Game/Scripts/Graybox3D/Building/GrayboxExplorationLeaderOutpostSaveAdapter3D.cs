@@ -17,6 +17,8 @@ namespace WasteCity.Graybox3D.Building
         private readonly OutpostAlertRuntime outpostAlerts;
         private readonly string sessionId;
         private readonly Func<double> ruleTimeSecondsProvider;
+        private ulong savedExplorationRevision;
+        private ulong explorationRuntimeRevisionAnchor;
         private ulong savedLeaderRevision;
         private ulong leaderRuntimeRevisionAnchor;
         private ulong savedGatherRevision;
@@ -59,6 +61,8 @@ namespace WasteCity.Graybox3D.Building
             this.ruleTimeSecondsProvider = ruleTimeSecondsProvider ??
                 throw new ArgumentNullException(
                     nameof(ruleTimeSecondsProvider));
+            savedExplorationRevision = exploration.Revision;
+            explorationRuntimeRevisionAnchor = exploration.Revision;
             savedLeaderRevision = leaderControl.Revision;
             leaderRuntimeRevisionAnchor = leaderControl.Revision;
             savedGatherRevision = manualGather.Revision;
@@ -306,7 +310,10 @@ namespace WasteCity.Graybox3D.Building
                         distress.Revision),
                 },
                 outpostAlerts = savedAlerts,
-                revision = explorationSnapshot.Revision,
+                revision = ProjectRevision(
+                    savedExplorationRevision,
+                    explorationRuntimeRevisionAnchor,
+                    explorationSnapshot.Revision),
             };
             error = string.Empty;
             return true;
@@ -653,13 +660,13 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
             double observed = currentRuleTime - age;
-            if (!IsFinite(observed) || observed < 0d ||
+            if (!IsFinite(observed) || observed < -TimeEpsilon ||
                 observed > float.MaxValue)
             {
                 error = "探索情报规则时间无效";
                 return false;
             }
-            observedRuleTime = (float)observed;
+            observedRuleTime = (float)Math.Max(0d, observed);
             error = string.Empty;
             return true;
         }
@@ -675,6 +682,8 @@ namespace WasteCity.Graybox3D.Building
         private void AnchorRestoredRevisions(
             FormalThreeDExplorationSaveData data)
         {
+            savedExplorationRevision = data.revision;
+            explorationRuntimeRevisionAnchor = exploration.Revision;
             savedLeaderRevision = data.leader.revision;
             leaderRuntimeRevisionAnchor = leaderControl.Revision;
             savedGatherRevision = data.leader.manualGather.revision;
@@ -682,6 +691,11 @@ namespace WasteCity.Graybox3D.Building
             gatherRuntimeRevisionAnchor = manualGather.Revision;
             savedDistressRevision = data.cenJinDistress.revision;
             distressRuntimeRevisionAnchor = distress.Revision;
+        }
+
+        internal void ReanchorDerivedRuntimeState()
+        {
+            explorationRuntimeRevisionAnchor = exploration.Revision;
         }
 
         private static ulong ProjectRevision(

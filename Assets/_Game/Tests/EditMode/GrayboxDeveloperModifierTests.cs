@@ -178,6 +178,7 @@ namespace WasteCity.Tests
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ExecuteTechnologyStatusActionWithFeedback(System.String,WasteCity.Graybox3D.Building.GrayboxDeveloperTechnologyStateAction3D)",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ClearTechnologyStatusFixturesWithFeedback()",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperProgressionQuery3D QueryProgression()",
+                    "WasteCity.Graybox3D.Building.GrayboxDeveloperExplorationDiagnostics3D QueryExploration(System.Int32,System.Int32)",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D ExecuteProgressionAction(System.String,System.String,System.Int32)",
                     "System.Boolean AddResource(System.String,System.Int32)",
                     "WasteCity.Graybox3D.Building.GrayboxDeveloperCommandResult3D AddResourceWithFeedback(System.String,System.Int32)",

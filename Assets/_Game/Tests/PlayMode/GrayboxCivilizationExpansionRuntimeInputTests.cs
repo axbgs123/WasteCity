@@ -13,9 +13,12 @@ using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Exploration;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Leader.CivilizationExpansion;
+using WasteCity.World;
 using WasteCity.World.CivilizationExpansion;
+using WasteCity.World.Exploration;
 using Object = UnityEngine.Object;
 
 namespace WasteCity.Tests
@@ -138,7 +141,8 @@ namespace WasteCity.Tests
                 Is.True);
             Vector2 targetScreen = FindSettlementTargetScreen(
                 host.CivilizationExpansionController,
-                world);
+                world,
+                host.ExplorationController.Exploration);
             yield return ClickWorld(targetScreen);
             Assert.That(host.CivilizationExpansionController.Runtime
                     .WorldLayer.GetSettlement(
@@ -279,6 +283,88 @@ namespace WasteCity.Tests
             Assert.That(runtime.Politics.IsInterimCouncilActive, Is.False);
         }
 
+        [UnityTest]
+        public IEnumerator IDEA0029_RealOutpostAlertClickFocusesCameraAndWorldDetail()
+        {
+            GrayboxFormalSaveRuntimeHost3D host = Object.FindObjectOfType<
+                GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxCivilizationExpansionController3D expansion =
+                host.CivilizationExpansionController;
+            GrayboxCivilizationExpansionView3D expansionView =
+                Object.FindObjectOfType<GrayboxCivilizationExpansionView3D>();
+            GrayboxExplorationView3D explorationView =
+                Object.FindObjectOfType<GrayboxExplorationView3D>();
+            GrayboxCameraController3D cameraController =
+                Object.FindObjectOfType<GrayboxCameraController3D>();
+            GrayboxDirectControlCoordinator directControl =
+                Object.FindObjectOfType<GrayboxDirectControlCoordinator>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            Assert.That(expansion, Is.Not.Null);
+            Assert.That(expansionView, Is.Not.Null);
+            Assert.That(explorationView, Is.Not.Null);
+            Assert.That(cameraController, Is.Not.Null);
+            Assert.That(directControl, Is.Not.Null);
+            Assert.That(world, Is.Not.Null);
+
+            SettlementRuntime outpost = EstablishOutpost(
+                expansion.Runtime.WorldLayer,
+                world.Model);
+            const string alertId = "test.outpost-alert.focus.000001";
+            Assert.That(host.ExplorationController.OutpostAlerts.TryReport(
+                alertId,
+                outpost.StableId,
+                outpost.X,
+                outpost.Y,
+                OutpostAlertSeverity.UnderAttack,
+                "测试敌对目标正在攻击前哨",
+                60,
+                45f,
+                10d,
+                out string error), Is.True, error);
+            yield return null;
+
+            Assert.That(explorationView.OutpostAlertButton.gameObject
+                .activeInHierarchy, Is.True);
+            Assert.That(explorationView.OutpostAlertButton.interactable,
+                Is.True);
+            DirectControlTarget controlBefore = directControl.ControlTarget;
+            float timeScaleBefore = Time.timeScale;
+            Transform cameraRig = GameObject.Find("CameraRig").transform;
+            float cameraY = cameraRig.position.y;
+            Assert.That(world.Coordinates.TryCellToWorld(
+                outpost.X,
+                outpost.Y,
+                0f,
+                out Vector3 expectedPosition), Is.True);
+
+            yield return Click(explorationView.OutpostAlertButton);
+
+            Assert.That(host.ExplorationController.OutpostAlerts.Get(alertId)
+                .IsAcknowledged, Is.True);
+            Assert.That(expansion.Runtime.WorldLayer.FocusedSettlementId,
+                Is.EqualTo(outpost.StableId));
+            Assert.That(expansionView.IsOpen, Is.True);
+            Assert.That(expansionView.Page,
+                Is.EqualTo(GrayboxCivilizationExpansionPage3D.World));
+            Assert.That(expansionView.DetailsText.text,
+                Does.Contain("前哨")
+                    .And.Contain("通信：")
+                    .And.Contain("补给：")
+                    .And.Contain("维护："));
+            Assert.That(cameraController.Mode,
+                Is.EqualTo(CameraFollowMode.Free));
+            Assert.That(cameraRig.position.x,
+                Is.EqualTo(expectedPosition.x).Within(.001f));
+            Assert.That(cameraRig.position.z,
+                Is.EqualTo(expectedPosition.z).Within(.001f));
+            Assert.That(cameraRig.position.y,
+                Is.EqualTo(cameraY).Within(.001f));
+            Assert.That(directControl.ControlTarget,
+                Is.EqualTo(controlBefore));
+            Assert.That(Time.timeScale, Is.EqualTo(timeScaleBefore));
+        }
+
         private IEnumerator Tap(Key key)
         {
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(key));
@@ -343,17 +429,18 @@ namespace WasteCity.Tests
 
         private static Vector2 FindSettlementTargetScreen(
             GrayboxCivilizationExpansionController3D controller,
-            GrayboxWorldView3D world)
+            GrayboxWorldView3D world,
+            WorldExplorationRuntime exploration)
         {
             SettlementRuntime primary = controller.Runtime.WorldLayer
                 .PrimaryCity;
-            world.Model.Reveal(primary.X, primary.Y, 8);
             for (var y = 0; y < world.Model.Height; y++)
             for (var x = 0; x < world.Model.Width; x++)
             {
                 if (System.Math.Abs(x - primary.X) +
                         System.Math.Abs(y - primary.Y) < 1 ||
-                    !world.Model.IsRevealed(x, y) ||
+                    exploration.GetState(x, y) ==
+                        WorldVisibilityState.Hidden ||
                     !CityTerrainRules.IsPassable(world.Model.Get(x, y)) ||
                     !world.Coordinates.TryCellToWorld(
                         x, y, 0f, out Vector3 position))
@@ -364,6 +451,44 @@ namespace WasteCity.Tests
             }
             Assert.Fail("No revealed visible secondary-city target was found.");
             return default;
+        }
+
+        private static SettlementRuntime EstablishOutpost(
+            WorldLayerRuntime layer,
+            WasteCity.World.WorldMapModel map)
+        {
+            var account = new FullyFundedSettlementAccount();
+            for (var y = 0; y < map.Height; y++)
+            for (var x = 0; x < map.Width; x++)
+            {
+                if (layer.TryEstablishOutpost(
+                        x,
+                        y,
+                        account,
+                        out SettlementRuntime outpost,
+                        out _))
+                    return outpost;
+            }
+            Assert.Fail("No explored passable outpost target was found.");
+            return null;
+        }
+
+        private sealed class FullyFundedSettlementAccount :
+            ISettlementConstructionAccount
+        {
+            public int Population => 0;
+
+            public int GetAmount(string resourceId)
+            {
+                return 1000;
+            }
+
+            public bool TryCommit(
+                IReadOnlyList<ResourceAmount> costs,
+                int populationCost)
+            {
+                return populationCost == 0;
+            }
         }
 
         private void QueueMouse(

@@ -2315,6 +2315,9 @@ namespace WasteCity.Editor
                     destination.civilizationExpansion =
                         source.civilizationExpansion;
                     return;
+                case GrayboxFormalSaveDomainId3D.Exploration:
+                    destination.exploration = source.exploration;
+                    return;
                 case GrayboxFormalSaveDomainId3D.Pause:
                     destination.pause = source.pause;
                     return;

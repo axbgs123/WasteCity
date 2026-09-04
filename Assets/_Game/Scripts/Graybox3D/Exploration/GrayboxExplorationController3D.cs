@@ -213,6 +213,43 @@ namespace WasteCity.Graybox3D.Exploration
             return true;
         }
 
+        public void RestoreSessionOwners(
+            WorldExplorationRuntime exploration,
+            LeaderControlRuntime leaderControl,
+            ManualGatherRuntime manualGather,
+            CenJinDistressRuntime cenJinDistress,
+            OutpostAlertRuntime outpostAlerts)
+        {
+            if (exploration == null && leaderControl == null &&
+                manualGather == null && cenJinDistress == null &&
+                outpostAlerts == null)
+            {
+                Exploration = null;
+                LeaderControl = null;
+                ManualGather = null;
+                CenJinDistress = null;
+                OutpostAlerts = null;
+                captureManualGatherContext = null;
+                commitGatherOne = null;
+                captureDistressContext = null;
+                distressTransaction = null;
+                IsInitialized = false;
+                return;
+            }
+
+            Exploration = exploration ??
+                throw new ArgumentNullException(nameof(exploration));
+            LeaderControl = leaderControl ??
+                throw new ArgumentNullException(nameof(leaderControl));
+            ManualGather = manualGather ??
+                throw new ArgumentNullException(nameof(manualGather));
+            CenJinDistress = cenJinDistress ??
+                throw new ArgumentNullException(nameof(cenJinDistress));
+            OutpostAlerts = outpostAlerts ??
+                throw new ArgumentNullException(nameof(outpostAlerts));
+            IsInitialized = true;
+        }
+
         public void ConfigureBoundaries(
             Func<ManualGatherContext> captureManualGatherContext,
             Func<string, WorldHarvestTransactionResult> commitGatherOne,

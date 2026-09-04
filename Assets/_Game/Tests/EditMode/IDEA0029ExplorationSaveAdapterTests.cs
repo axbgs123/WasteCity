@@ -82,6 +82,72 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void SessionProxyKeepsRestoredRevisionAnchorsUntilOwnerReset()
+        {
+            var owner = new GameObject("Exploration Save Proxy Anchors");
+            cleanup.Add(owner);
+            GrayboxExplorationController3D controller =
+                owner.AddComponent<GrayboxExplorationController3D>();
+            controller.Initialize(2, 2, "session-proxy", (_, __) => true);
+            var proxy = new GrayboxExplorationSaveDomainProxy3D(
+                controller,
+                () => "session-proxy",
+                () => 0d);
+            FormalThreeDSaveData data = CreateProxyPayload();
+            Assert.That(proxy.TryCapture(data, out string error),
+                Is.True,
+                error);
+            data.exploration.leader.revision = 41ul;
+            data.exploration.leader.manualGather.cycleOrdinal = 42ul;
+            data.exploration.leader.manualGather.revision = 43ul;
+            data.exploration.cenJinDistress.revision = 44ul;
+            data.exploration.revision = 45ul;
+
+            Assert.That(proxy.TryApply(data, out error), Is.True, error);
+            Assert.That(controller.TrySyncVisionSource(
+                new WorldVisionSource(
+                    "leader.derived",
+                    WorldVisionSourceKind.Leader,
+                    0,
+                    0,
+                    true),
+                out error), Is.True, error);
+            proxy.ReanchorDerivedRuntimeState();
+            FormalThreeDSaveData recaptured = CreateProxyPayload();
+            Assert.That(proxy.TryCapture(recaptured, out error),
+                Is.True,
+                error);
+
+            Assert.That(recaptured.exploration.leader.revision,
+                Is.EqualTo(41ul));
+            Assert.That(recaptured.exploration.leader.manualGather
+                .cycleOrdinal, Is.EqualTo(42ul));
+            Assert.That(recaptured.exploration.leader.manualGather.revision,
+                Is.EqualTo(43ul));
+            Assert.That(recaptured.exploration.cenJinDistress.revision,
+                Is.EqualTo(44ul));
+            Assert.That(recaptured.exploration.revision,
+                Is.EqualTo(45ul));
+
+            Assert.That(controller.Exploration.TryObserveVisibleIntel(
+                new WorldIntelObservation(
+                    "building.real-change",
+                    WorldIntelKind.Building,
+                    0,
+                    0,
+                    "新侦察情报",
+                    false,
+                    0,
+                    0f),
+                out error), Is.True, error);
+            FormalThreeDSaveData changed = CreateProxyPayload();
+            Assert.That(proxy.TryCapture(changed, out error),
+                Is.True,
+                error);
+            Assert.That(changed.exploration.revision, Is.EqualTo(46ul));
+        }
+
+        [Test]
         public void CapturesAndRestoresAllFiveRuntimeOwnersLosslessly()
         {
             RuntimeSet source = CreateRuntimeSet();
@@ -197,6 +263,47 @@ namespace WasteCity.Tests
                 ResourceNodeId, 200f, out WorldIntelSnapshot intel), Is.True);
             Assert.That(intel.State, Is.EqualTo(WorldIntelState.Expired));
             Assert.That(intel.SourceRevision, Is.EqualTo(42ul));
+        }
+
+        [Test]
+        public void NearZeroObservationRoundTripToleratesDurationFloatRounding()
+        {
+            const double currentRuleTime = .001d;
+            RuntimeSet source = CreateRuntimeSet(currentRuleTime);
+            source.Exploration.UpsertSource(new WorldVisionSource(
+                "core.city.000001",
+                WorldVisionSourceKind.PrimaryCity,
+                16,
+                15,
+                true));
+            Assert.That(source.Exploration.TryObserveVisibleResource(
+                new WorldIntelObservation(
+                    ResourceNodeId,
+                    WorldIntelKind.Resource,
+                    16,
+                    15,
+                    "铁矿 240",
+                    true,
+                    240,
+                    0f,
+                    1ul),
+                out _,
+                out string error), Is.True, error);
+            var payload = CreatePayload();
+            Assert.That(source.Adapter.TryCapture(payload, out error),
+                Is.True,
+                error);
+
+            RuntimeSet restored = CreateRuntimeSet(currentRuleTime);
+            Assert.That(restored.Adapter.TryApply(payload, out error),
+                Is.True,
+                error);
+            Assert.That(restored.Exploration.TryGetIntel(
+                ResourceNodeId,
+                (float)currentRuleTime,
+                out WorldIntelSnapshot intel), Is.True);
+            Assert.That(intel.ObservedRuleTimeSeconds,
+                Is.EqualTo(0f).Within(.001f));
         }
 
         [Test]
@@ -369,6 +476,18 @@ namespace WasteCity.Tests
                             remainingAmount = 240,
                         },
                     },
+                },
+            };
+        }
+
+        private static FormalThreeDSaveData CreateProxyPayload()
+        {
+            return new FormalThreeDSaveData
+            {
+                sessionId = "session-proxy",
+                world = new FormalThreeDWorldSaveData
+                {
+                    configurationSignature = "core.world.proxy",
                 },
             };
         }

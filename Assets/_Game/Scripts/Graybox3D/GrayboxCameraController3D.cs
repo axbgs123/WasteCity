@@ -137,6 +137,24 @@ namespace WasteCity.Graybox3D
             SnapRigToEffectiveTarget();
         }
 
+        public bool FocusWorldPosition(Vector3 worldPosition)
+        {
+            if (cameraRig == null ||
+                float.IsNaN(worldPosition.x) ||
+                float.IsInfinity(worldPosition.x) ||
+                float.IsNaN(worldPosition.z) ||
+                float.IsInfinity(worldPosition.z))
+                return false;
+
+            freeDragActive = false;
+            followModel.BeginFreeDrag();
+            Vector3 position = cameraRig.position;
+            position.x = worldPosition.x;
+            position.z = worldPosition.z;
+            cameraRig.position = position;
+            return true;
+        }
+
         public void TickCamera()
         {
             bool targetChanged = ObserveCurrentTarget();

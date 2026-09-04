@@ -13,6 +13,7 @@ using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Progression;
+using WasteCity.Leader.Exploration;
 
 namespace WasteCity.Tests
 {
@@ -310,6 +311,8 @@ namespace WasteCity.Tests
             Assert.That(host.Civilization.Capture().CivilizationLevel,
                 Is.EqualTo(2));
             Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(2));
+            bool[] exploredBeforeSave = host.ExplorationController
+                .Capture().Exploration.ExploredCells;
 
             GrayboxFormalSaveEntryController3D entry =
                 Object.FindObjectOfType<
@@ -317,12 +320,23 @@ namespace WasteCity.Tests
             Assert.That(entry, Is.Not.Null);
             GrayboxFormalSaveUiResult3D saved = entry.SaveAndExit();
             Assert.That(saved.Success, Is.True, saved.Message);
+            CollectionAssert.AreEqual(
+                exploredBeforeSave,
+                host.LastCoordinatorResult.Envelope.formal3D
+                    .exploration.exploredCells,
+                "The progression save must preserve the authoritative fog " +
+                "snapshot without assuming an arbitrary map cell is visible.");
             yield return SceneManager.LoadSceneAsync(
                 SceneName, LoadSceneMode.Single);
             yield return null;
             yield return null;
+            entry = Object.FindObjectOfType<
+                GrayboxFormalSaveEntryController3D>(true);
+            Assert.That(entry.CanContinue, Is.True, entry.FeedbackMessage);
             yield return ClickUi(
                 FindButton("Start.Continue").GetComponent<RectTransform>());
+            Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
+            Assert.That(entry.FeedbackMessage, Is.EqualTo("已继续最近进度"));
             host = Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
             Assert.That(host, Is.Not.Null);
             Assert.That(host.AttentionRuntime.Value, Is.EqualTo(100),
@@ -330,6 +344,84 @@ namespace WasteCity.Tests
             Assert.That(host.FateRuntime.Capture().Level, Is.EqualTo(2));
             Assert.That(host.Civilization.Capture().CivilizationLevel,
                 Is.EqualTo(2));
+        }
+
+        [UnityTest]
+        public IEnumerator
+            IDEA0029_ExplorationActionsUseRealZeroChineseSearchAndFormalOwners()
+        {
+            GrayboxDeveloperModifierBootstrap3D developer =
+                Object.FindObjectOfType<
+                    GrayboxDeveloperModifierBootstrap3D>();
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(developer, Is.Not.Null);
+            Assert.That(host, Is.Not.Null);
+
+            yield return TapKey(Key.Digit0);
+            Assert.That(developer.IsPanelOpen, Is.True);
+            yield return SelectProgressionAction(
+                "探索整张地图",
+                "developer.exploration.reveal-all");
+            yield return ExecuteProgressionAction();
+            for (var y = 0; y < host.ExplorationController.Exploration.Height;
+                 y++)
+            for (var x = 0; x < host.ExplorationController.Exploration.Width;
+                 x++)
+            {
+                Assert.That(host.ExplorationController.Exploration
+                    .IsExplored(x, y), Is.True, x + "," + y);
+            }
+
+            yield return SelectProgressionAction(
+                "准备领袖手采验收",
+                "developer.exploration.gather-ready");
+            yield return ExecuteProgressionAction();
+
+            Assert.That(host.ExplorationController.CenJinDistress.IsCompleted,
+                Is.True);
+            Assert.That(host.ExplorationController.LeaderControl.RequestedMode,
+                Is.EqualTo(LeaderControlMode.Manual));
+            Assert.That(FindText("Developer Feedback").text,
+                Does.Contain("准备领袖手采验收").And.Contain("已执行"));
+            Assert.That(developer.HasModifiedGameState, Is.True);
+
+            GrayboxFormalSaveEntryController3D entry =
+                Object.FindObjectOfType<
+                    GrayboxFormalSaveEntryController3D>(true);
+            Assert.That(entry, Is.Not.Null);
+            GrayboxFormalSaveUiResult3D saved = entry.SaveAndExit();
+            Assert.That(saved.Success, Is.True, saved.Message);
+            Assert.That(host.LastCoordinatorResult.Envelope.formal3D
+                .exploration.exploredCells[0], Is.True);
+            Assert.That(host.LastCoordinatorResult.Envelope.formal3D
+                .exploration.exploredCells[
+                    host.ExplorationController.Exploration.Width *
+                    host.ExplorationController.Exploration.Height - 1],
+                Is.True);
+            yield return SceneManager.LoadSceneAsync(
+                SceneName, LoadSceneMode.Single);
+            yield return null;
+            yield return null;
+            entry = Object.FindObjectOfType<
+                GrayboxFormalSaveEntryController3D>(true);
+            Assert.That(entry.CanContinue, Is.True, entry.FeedbackMessage);
+            yield return ClickUi(
+                FindButton("Start.Continue").GetComponent<RectTransform>());
+            Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
+            Assert.That(entry.FeedbackMessage, Is.EqualTo("已继续最近进度"));
+
+            host = Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.ExplorationController.Exploration.IsExplored(0, 0),
+                Is.True);
+            Assert.That(host.ExplorationController.Exploration.IsExplored(
+                host.ExplorationController.Exploration.Width - 1,
+                host.ExplorationController.Exploration.Height - 1), Is.True);
+            Assert.That(host.ExplorationController.CenJinDistress.IsCompleted,
+                Is.True);
+            Assert.That(host.ExplorationController.LeaderControl.RequestedMode,
+                Is.EqualTo(LeaderControlMode.Manual));
         }
 
         private IEnumerator SetAttentionThenCross(

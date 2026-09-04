@@ -12,6 +12,7 @@ using UnityEngine.TestTools;
 using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
+using WasteCity.Core;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
@@ -20,6 +21,7 @@ using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 using WasteCity.Progression;
 using WasteCity.Leader.Exploration;
+using WasteCity.World;
 
 namespace WasteCity.Tests
 {
@@ -36,6 +38,7 @@ namespace WasteCity.Tests
             "FullResourceLedgerPanel";
 
         private Keyboard keyboard;
+        private Keyboard secondaryKeyboard;
         private Mouse mouse;
         private InputSettings.UpdateMode previousUpdateMode;
         private InputSettings.BackgroundBehavior previousBackgroundBehavior;
@@ -97,6 +100,9 @@ namespace WasteCity.Tests
                 }
                 finally
                 {
+                    if (secondaryKeyboard != null &&
+                        secondaryKeyboard.added)
+                        InputSystem.RemoveDevice(secondaryKeyboard);
                     if (keyboard != null && keyboard.added)
                         InputSystem.RemoveDevice(keyboard);
                     if (mouse != null && mouse.added)
@@ -176,10 +182,97 @@ namespace WasteCity.Tests
             Assert.That(exploration.LeaderControlButton
                 .GetComponentInChildren<Text>().text,
                 Does.Contain("岑烬尚未招募"));
+            Assert.That(exploration.StatusText.text,
+                Does.Contain("视野：主城 7 · 次城 5 · 领袖 4 · 前哨 3 · 侦察无人机 6"));
 
             yield return TapKey(Key.L);
 
             Assert.That(exploration.IsOpen, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator
+            IDEA0029_LeaderPanelRefreshesForResourceAndBackpackFacts()
+        {
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxExplorationView3D exploration =
+                Object.FindObjectOfType<GrayboxExplorationView3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(exploration, Is.Not.Null);
+            Assert.That(world, Is.Not.Null);
+            Assert.That(operations, Is.Not.Null);
+            Assert.That(host.ExecuteExplorationFixtureForDevelopment(
+                "developer.exploration.gather-ready"), Is.True);
+
+            FormalResourceNodeSpec3D node =
+                FormalWorldGenerationCatalog3D.ResourceNodes[0];
+            WorldCell before = world.Model.Get(node.X, node.Y);
+            yield return TapKey(Key.L);
+            Assert.That(exploration.ManualGatherText.text,
+                Does.Contain("剩余 " + before.ResourceAmount));
+
+            Assert.That(world.Model.Harvest(
+                node.X, node.Y, 1, out _), Is.EqualTo(1));
+            yield return null;
+            Assert.That(exploration.ManualGatherText.text,
+                Does.Contain("剩余 " + (before.ResourceAmount - 1)));
+
+            Assert.That(operations.Backpack.Add(
+                before.ResourceId, int.MaxValue), Is.GreaterThan(0));
+            yield return null;
+            Assert.That(exploration.ManualGatherButton.interactable,
+                Is.False);
+            Assert.That(exploration.ManualGatherButton
+                .GetComponentInChildren<Text>().text,
+                Does.Contain("背包已满"));
+        }
+
+        [UnityTest]
+        public IEnumerator
+            IDEA0029_StableFormalHostProjectionAllocatesZeroAcross300Ticks()
+        {
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            System.Reflection.MethodInfo synchronizeMethod = typeof(
+                GrayboxFormalSaveRuntimeHost3D).GetMethod(
+                    "SynchronizeExplorationSourcesAndPresentation",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic);
+            System.Reflection.MethodInfo refreshMethod = typeof(
+                GrayboxFormalSaveRuntimeHost3D).GetMethod(
+                    "RefreshExplorationView",
+                    System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic);
+            Assert.That(synchronizeMethod, Is.Not.Null);
+            Assert.That(refreshMethod, Is.Not.Null);
+            var synchronize = (System.Action<bool, bool>)synchronizeMethod
+                .CreateDelegate(
+                typeof(System.Action<bool, bool>),
+                host);
+            var refresh = (System.Action<bool>)refreshMethod.CreateDelegate(
+                typeof(System.Action<bool>),
+                host);
+            host.Speed.Set(0f);
+            yield return null;
+
+            synchronize(false, true);
+            refresh(false);
+            long before = System.GC.GetAllocatedBytesForCurrentThread();
+            for (var index = 0; index < 300; index++)
+            {
+                synchronize(false, true);
+                refresh(false);
+            }
+            long allocated =
+                System.GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.That(allocated, Is.Zero);
         }
 
         [UnityTest]
@@ -203,6 +296,8 @@ namespace WasteCity.Tests
 
             GrayboxDeveloperModifier3D modifier = CreateModifier(session);
             modifier.SetResource(ResourceIds.Biomass, 10);
+            int populationBefore = session.Population;
+            int attentionBefore = host.AttentionRuntime.Capture().Value;
             Assert.That(world.Coordinates.TryCellToWorld(
                     LeaderInteractionCatalog.CenJinDistressCellX,
                     LeaderInteractionCatalog.CenJinDistressCellY,
@@ -239,6 +334,16 @@ namespace WasteCity.Tests
                 Is.True);
             Assert.That(session.CityStorage.GetNetworkAmount(
                 ResourceIds.Biomass), Is.Zero);
+            Assert.That(session.Population,
+                Is.EqualTo(populationBefore +
+                    LeaderInteractionCatalog.CenJinPopulationReward));
+            Assert.That(host.AttentionRuntime.Capture().Value,
+                Is.EqualTo(attentionBefore +
+                    FormalAttentionCatalog.Find(
+                        LeaderInteractionCatalog.CenJinAttentionReasonId)
+                        .Delta));
+            Assert.That(explorationView.CenJinDistressText.text,
+                Does.Contain("及时救援完成"));
             Assert.That(explorationView.LeaderControlButton.interactable,
                 Is.True);
 
@@ -248,6 +353,8 @@ namespace WasteCity.Tests
 
             Assert.That(host.ExplorationController.LeaderControl.RequestedMode,
                 Is.EqualTo(LeaderControlMode.Manual));
+            Assert.That(host.CaptureExplorationPresentation().ControlModeText,
+                Is.EqualTo("手动控制"));
 
             GrayboxOperationsController3D operations =
                 Object.FindObjectOfType<GrayboxOperationsController3D>();
@@ -298,6 +405,11 @@ namespace WasteCity.Tests
             yield return ClickUiElement(
                 explorationView.ManualGatherButton.gameObject,
                 MouseButton.Left);
+            yield return null;
+            Assert.That(host.ExplorationController.ManualGather.IsActive,
+                Is.True);
+            Assert.That(explorationView.ManualGatherText.text,
+                Does.Contain("采集中").And.Contain("生物质"));
 
             float gatherDeadline = Time.realtimeSinceStartup + 4f;
             while (BackpackAmount(operations, ResourceIds.Biomass) ==
@@ -1849,6 +1961,8 @@ namespace WasteCity.Tests
                 Object.FindObjectOfType<GrayboxLeaderController3D>();
             GrayboxDirectControlCoordinator directControl =
                 Object.FindObjectOfType<GrayboxDirectControlCoordinator>();
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
             GrayboxDeveloperModifier3D modifier = CreateModifier(session);
             Assert.That(production, Is.Not.Null);
             Assert.That(operations, Is.Not.Null);
@@ -1857,6 +1971,9 @@ namespace WasteCity.Tests
             Assert.That(presentation, Is.Not.Null);
             Assert.That(leader, Is.Not.Null);
             Assert.That(directControl, Is.Not.Null);
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.ExecuteExplorationFixtureForDevelopment(
+                "developer.exploration.gather-ready"), Is.True);
             Assert.That(modifier.UnlockResearch(
                 BuildingCatalog.Smelter.RequiredResearchId), Is.True);
             Assert.That(modifier.SetResource(ResourceIds.Stone, 100), Is.True);
@@ -1957,6 +2074,9 @@ namespace WasteCity.Tests
             directControl.Refresh();
             Assert.That(directControl.ControlTarget,
                 Is.EqualTo(DirectControlTarget.Leader));
+            host.Speed.SetPaused(GamePauseReason.User, true);
+            Assert.That(host.RuleClock.EffectiveSpeed, Is.Zero,
+                "Direct cache arrangements must not race the unscaled formal production clock.");
             Time.timeScale = 0f;
             state.Input.Set(ResourceIds.Iron, 0);
             state.Output.Set(ResourceIds.Alloy, 3);
@@ -2031,15 +2151,22 @@ namespace WasteCity.Tests
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
             Assert.That(session.Inventory.Get(ResourceIds.Alloy), Is.EqualTo(3));
 
+            int cityAlloyBeforeBackpackTransfer =
+                session.Inventory.Get(ResourceIds.Alloy);
             state.Input.Set(ResourceIds.Iron, 0);
             state.Output.Set(ResourceIds.Alloy, 2);
             yield return ShiftClickUiElement(input);
             Assert.That(state.Input.Get(ResourceIds.Iron), Is.EqualTo(4));
+            Assert.That(state.Output.Get(ResourceIds.Alloy), Is.EqualTo(2),
+                "The unscaled production clock must remain paused while the real Shift input is queued.");
             AssertBackpackSlot(operations, 0, null, 0);
             output = RequireSceneObject(
                 productionRowName + ".OutputTransfer." + ResourceIds.Alloy);
-            yield return ShiftClickUiElement(output);
+            yield return ShiftClickUiElementWithNonCurrentKeyboard(output);
             Assert.That(state.Output.Get(ResourceIds.Alloy), Is.Zero);
+            Assert.That(session.Inventory.Get(ResourceIds.Alloy),
+                Is.EqualTo(cityAlloyBeforeBackpackTransfer),
+                "A Shift transfer must not fall through to city storage.");
             AssertBackpackSlot(
                 operations,
                 0,
@@ -2071,13 +2198,44 @@ namespace WasteCity.Tests
                 paused: false), Is.True);
             operations.RefreshIfChanged();
 
-            Vector3 inaccessibleOffset = new Vector3(20f, 0f, 20f);
-            leader.transform.position += inaccessibleOffset;
-            city.transform.position += inaccessibleOffset;
+            int logisticsRadius = production.ResearchEffects
+                .ResolveLogisticsRange(session.GroundBuildRadius);
+            int inaccessibleCityX = buildingX < world.Coordinates.Width / 2
+                ? world.Coordinates.Width - 1
+                : 0;
+            int inaccessibleCityY = buildingY < world.Coordinates.Height / 2
+                ? world.Coordinates.Height - 1
+                : 0;
+            Assert.That(BuildingRangeRules.IsGroundFootprintInRange(
+                    instance.Placement.Definition,
+                    buildingX,
+                    buildingY,
+                    instance.Placement.Orientation,
+                    inaccessibleCityX,
+                    inaccessibleCityY,
+                    logisticsRadius),
+                Is.False,
+                "The access-denied fixture must remain outside the current formal logistics range after research upgrades.");
+            Assert.That(world.Coordinates.TryCellToWorld(
+                inaccessibleCityX,
+                inaccessibleCityY,
+                city.transform.position.y,
+                out Vector3 inaccessibleCityWorld), Is.True);
+            Assert.That(world.Coordinates.TryCellToWorld(
+                inaccessibleCityX,
+                inaccessibleCityY,
+                leader.transform.position.y,
+                out Vector3 inaccessibleLeaderWorld), Is.True);
+            city.transform.position = inaccessibleCityWorld +
+                new Vector3(.5f, 0f, .5f);
+            leader.transform.position = inaccessibleLeaderWorld +
+                new Vector3(.5f, 0f, .5f);
             Assert.That(production.Tick(
                 GrayboxProductionClock3D.StepSeconds,
                 paused: false), Is.True);
             operations.RefreshIfChanged();
+            Assert.That(state.IsLogisticsConnected, Is.False,
+                "The inaccessible-cache assertion requires logistics to be disconnected before real input is queued.");
             state.Input.Set(ResourceIds.Iron, 0);
             state.Output.Set(ResourceIds.Alloy, 1);
             operations.Backpack.Add(ResourceIds.Iron, 3);
@@ -2408,10 +2566,58 @@ namespace WasteCity.Tests
             yield return null;
             QueueMouse(position);
             yield return null;
+            yield return null;
 
             InputSystem.QueueStateEvent(keyboard, new KeyboardState());
             InputSystem.Update();
             yield return null;
+        }
+
+        private IEnumerator ShiftClickUiElementWithNonCurrentKeyboard(
+            GameObject target)
+        {
+            Assert.That(target.activeInHierarchy, Is.True, target.name);
+            RectTransform rect = target.GetComponent<RectTransform>();
+            Assert.That(rect, Is.Not.Null, target.name);
+            Canvas.ForceUpdateCanvases();
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(
+                null,
+                rect.TransformPoint(rect.rect.center));
+            QueueMouse(position);
+            yield return null;
+
+            secondaryKeyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                secondaryKeyboard.MakeCurrent();
+                InputSystem.QueueStateEvent(
+                    secondaryKeyboard,
+                    new KeyboardState(Key.LeftShift));
+                InputSystem.Update();
+                Assert.That(secondaryKeyboard.leftShiftKey.isPressed, Is.True);
+
+                keyboard.MakeCurrent();
+                InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                InputSystem.Update();
+                Assert.That(Keyboard.current, Is.SameAs(keyboard));
+                Assert.That(keyboard.leftShiftKey.isPressed, Is.False);
+                Assert.That(secondaryKeyboard.leftShiftKey.isPressed, Is.True,
+                    "A connected non-current keyboard keeps its Shift state.");
+
+                QueueMouse(position, MouseButton.Left);
+                yield return null;
+                QueueMouse(position);
+                yield return null;
+                yield return null;
+            }
+            finally
+            {
+                if (secondaryKeyboard != null && secondaryKeyboard.added)
+                    InputSystem.RemoveDevice(secondaryKeyboard);
+                secondaryKeyboard = null;
+                if (keyboard != null && keyboard.added)
+                    keyboard.MakeCurrent();
+            }
         }
 
         private IEnumerator ClickUiElement(

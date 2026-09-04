@@ -1,12 +1,207 @@
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
+using WasteCity.World.Exploration;
 
 namespace WasteCity.Graybox3D.Building
 {
+    public sealed class GrayboxDeveloperExplorationDiagnostics3D
+    {
+        private GrayboxDeveloperExplorationDiagnostics3D(
+            string[] visionSources,
+            string cellVisibility,
+            string[] scanZones,
+            string[] intel,
+            string[] outpostAlerts)
+        {
+            VisionSources = Array.AsReadOnly(
+                visionSources ?? Array.Empty<string>());
+            CellVisibility = cellVisibility ?? string.Empty;
+            ScanZones = Array.AsReadOnly(scanZones ?? Array.Empty<string>());
+            Intel = Array.AsReadOnly(intel ?? Array.Empty<string>());
+            OutpostAlerts = Array.AsReadOnly(
+                outpostAlerts ?? Array.Empty<string>());
+        }
+
+        public IReadOnlyList<string> VisionSources { get; }
+        public string CellVisibility { get; }
+        public IReadOnlyList<string> ScanZones { get; }
+        public IReadOnlyList<string> Intel { get; }
+        public IReadOnlyList<string> OutpostAlerts { get; }
+
+        public static GrayboxDeveloperExplorationDiagnostics3D Capture(
+            WorldExplorationRuntime exploration,
+            OutpostAlertRuntime outpostAlerts,
+            float currentRuleTimeSeconds,
+            int cellX,
+            int cellY)
+        {
+            if (exploration == null)
+            {
+                return new GrayboxDeveloperExplorationDiagnostics3D(
+                    new[] { "探索运行时未连接" },
+                    "探索运行时未连接",
+                    new[] { "探索运行时未连接" },
+                    new[] { "探索运行时未连接" },
+                    BuildAlertLines(outpostAlerts));
+            }
+
+            WorldVisionSource[] sources = exploration.CaptureSources();
+            var sourceLines = new string[sources.Length];
+            for (var index = 0; index < sources.Length; index++)
+            {
+                WorldVisionSource source = sources[index];
+                sourceLines[index] = source.StableId + "｜" +
+                    VisionSourceKindText(source.Kind) + "｜格位 (" +
+                    source.X + "," + source.Y + ")｜半径 " +
+                    source.Radius + "｜" +
+                    (source.Active ? "启用" : "停用");
+            }
+
+            var scanLines = new string[
+                FormalExplorationCatalog3D.ScanZones.Count];
+            for (var index = 0; index < scanLines.Length; index++)
+            {
+                ExplorationScanZoneDefinition zone =
+                    FormalExplorationCatalog3D.ScanZones[index];
+                scanLines[index] = zone.StableId + "｜" +
+                    ScanZoneName(zone.StableId) + "｜" +
+                    (exploration.IsScanned(zone.StableId)
+                        ? "已扫描"
+                        : "未扫描");
+            }
+
+            WorldIntelObservation[] observations = exploration.Capture().Intel;
+            var intelLines = new string[observations.Length];
+            for (var index = 0; index < observations.Length; index++)
+            {
+                WorldIntelObservation observation = observations[index];
+                if (!exploration.TryGetIntel(
+                        observation.StableId,
+                        currentRuleTimeSeconds,
+                        out WorldIntelSnapshot snapshot))
+                {
+                    intelLines[index] = observation.StableId +
+                        "｜情报时刻不可用";
+                    continue;
+                }
+                intelLines[index] = snapshot.StableId + "｜" +
+                    IntelKindText(snapshot.Kind) + "｜格位 (" +
+                    snapshot.X + "," + snapshot.Y + ")｜" +
+                    IntelStateText(snapshot.State) + "｜年龄 " +
+                    FormatNumber(snapshot.AgeSeconds) + " 秒" +
+                    (string.IsNullOrWhiteSpace(snapshot.Summary)
+                        ? string.Empty
+                        : "｜" + snapshot.Summary);
+            }
+
+            string cell = cellX < 0 || cellY < 0 ||
+                cellX >= exploration.Width || cellY >= exploration.Height
+                    ? "格位 (" + cellX + "," + cellY + ")：超出地图范围"
+                    : "格位 (" + cellX + "," + cellY + ")：" +
+                        VisibilityStateText(exploration.GetState(
+                            cellX, cellY));
+            return new GrayboxDeveloperExplorationDiagnostics3D(
+                sourceLines,
+                cell,
+                scanLines,
+                intelLines,
+                BuildAlertLines(outpostAlerts));
+        }
+
+        private static string[] BuildAlertLines(OutpostAlertRuntime runtime)
+        {
+            if (runtime == null) return new[] { "前哨警报运行时未连接" };
+            IReadOnlyList<OutpostAlertEntry> alerts = runtime.Capture().Alerts;
+            var result = new string[alerts.Count];
+            for (var index = 0; index < result.Length; index++)
+            {
+                OutpostAlertEntry alert = alerts[index];
+                OutpostAlertDefinition definition =
+                    OutpostAlertCatalog.ForSeverity(alert.Severity);
+                result[index] = alert.StableAlertId + "｜前哨 " +
+                    alert.SettlementId + "｜格位 (" + alert.X + "," +
+                    alert.Y + ")｜" +
+                    (definition?.ChineseName ?? "无警报") + "｜" +
+                    (alert.IsResolved
+                        ? "已解除"
+                        : alert.IsAcknowledged ? "已确认" : "未确认") +
+                    "｜风险 " + alert.EstimatedLossRiskPercent + "%｜" +
+                    alert.ThreatSummary;
+            }
+            return result;
+        }
+
+        private static string VisionSourceKindText(WorldVisionSourceKind kind)
+        {
+            switch (kind)
+            {
+                case WorldVisionSourceKind.PrimaryCity: return "主城";
+                case WorldVisionSourceKind.SecondaryCity: return "副城";
+                case WorldVisionSourceKind.Leader: return "领袖";
+                case WorldVisionSourceKind.Outpost: return "前哨";
+                case WorldVisionSourceKind.ScoutDrone: return "侦察无人机";
+                default: return "未知来源";
+            }
+        }
+
+        private static string VisibilityStateText(WorldVisibilityState state)
+        {
+            switch (state)
+            {
+                case WorldVisibilityState.Visible: return "当前可见";
+                case WorldVisibilityState.Explored: return "已探索";
+                default: return "未探索";
+            }
+        }
+
+        private static string IntelKindText(WorldIntelKind kind)
+        {
+            switch (kind)
+            {
+                case WorldIntelKind.Resource: return "资源";
+                case WorldIntelKind.Building: return "建筑";
+                case WorldIntelKind.Settlement: return "聚落";
+                case WorldIntelKind.Character: return "人物";
+                case WorldIntelKind.Enemy: return "敌人";
+                default: return "未知情报";
+            }
+        }
+
+        private static string IntelStateText(WorldIntelState state)
+        {
+            switch (state)
+            {
+                case WorldIntelState.Fresh: return "新鲜";
+                case WorldIntelState.Stale: return "陈旧";
+                case WorldIntelState.Expired: return "过期";
+                default: return "未知状态";
+            }
+        }
+
+        private static string ScanZoneName(string stableId)
+        {
+            switch (stableId)
+            {
+                case "core.exploration.zone.safe-mining":
+                    return "安全矿区";
+                case "core.exploration.zone.crystal-rift":
+                    return "晶隙矿区";
+                default:
+                    return "探索区";
+            }
+        }
+
+        private static string FormatNumber(float value)
+        {
+            return value.ToString("0.##", CultureInfo.InvariantCulture);
+        }
+    }
+
     public sealed class GrayboxDeveloperProgressionQuery3D
     {
         internal GrayboxDeveloperProgressionQuery3D(
@@ -76,6 +271,9 @@ namespace WasteCity.Graybox3D.Building
         private readonly Func<bool, bool> setBossDefeated;
         private readonly Func<bool> satisfyAscensionRequirements;
         private readonly Func<bool> clearAscensionRequirements;
+        private readonly Func<string, bool> executeExploration;
+        private readonly Func<int, int,
+            GrayboxDeveloperExplorationDiagnostics3D> queryExploration;
         private readonly GrayboxProgressionEventRouter3D fateRouter;
 
         public GrayboxDeveloperProgressionFacade3D(
@@ -109,7 +307,15 @@ namespace WasteCity.Graybox3D.Building
                 host?.ForesightDelayRuntime,
                 host?.CausalTransparencyRuntime,
                 host?.VoidChestRuntime,
-                host?.CoordinateLockRuntime)
+                host?.CoordinateLockRuntime,
+                actionId => host?.ExecuteExplorationFixtureForDevelopment(
+                    actionId) == true,
+                (x, y) => GrayboxDeveloperExplorationDiagnostics3D.Capture(
+                    host?.ExplorationController?.Exploration,
+                    host?.ExplorationController?.OutpostAlerts,
+                    host?.CurrentRuleTimeSeconds ?? 0f,
+                    x,
+                    y))
         {
             if (host == null) throw new ArgumentNullException(nameof(host));
         }
@@ -139,7 +345,10 @@ namespace WasteCity.Graybox3D.Building
             ForesightDelayRuntime foresight = null,
             CausalTransparencyRuntime causal = null,
             VoidChestRuntime chest = null,
-            CoordinateLockRuntime coordinate = null)
+            CoordinateLockRuntime coordinate = null,
+            Func<string, bool> executeExploration = null,
+            Func<int, int, GrayboxDeveloperExplorationDiagnostics3D>
+                queryExploration = null)
         {
             this.attention = attention ??
                 throw new ArgumentNullException(nameof(attention));
@@ -173,6 +382,8 @@ namespace WasteCity.Graybox3D.Building
             this.causal = causal;
             this.chest = chest;
             this.coordinate = coordinate;
+            this.executeExploration = executeExploration;
+            this.queryExploration = queryExploration;
         }
 
         public bool IncreaseAttention(int amount)
@@ -395,6 +606,25 @@ namespace WasteCity.Graybox3D.Building
         public bool ClearAscensionRequirementsFixture()
         {
             return clearAscensionRequirements?.Invoke() == true;
+        }
+
+        public bool ExecuteExplorationFixture(string actionId)
+        {
+            return !string.IsNullOrWhiteSpace(actionId) &&
+                executeExploration?.Invoke(actionId) == true;
+        }
+
+        public GrayboxDeveloperExplorationDiagnostics3D QueryExploration(
+            int cellX,
+            int cellY)
+        {
+            return queryExploration?.Invoke(cellX, cellY) ??
+                GrayboxDeveloperExplorationDiagnostics3D.Capture(
+                    null,
+                    null,
+                    0f,
+                    cellX,
+                    cellY);
         }
 
         public GrayboxDeveloperProgressionQuery3D Query()

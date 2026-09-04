@@ -136,7 +136,34 @@ namespace WasteCity.Tests
                     .And.Contain("选择回溯锚点命轨")
                     .And.Contain("执行首次文明升阶")
                     .And.Contain("查询进度配置签名")
-                    .And.Contain("查询命轨领域状态"));
+                    .And.Contain("查询命轨领域状态")
+                    .And.Contain("探索整张地图")
+                    .And.Contain("准备领袖手采验收")
+                    .And.Contain("设置前哨危急警报"));
+        }
+
+        [Test]
+        public void IDEA0029_ExplorationActionsSupportChineseListAndSearch()
+        {
+            var entries = GrayboxDeveloperCatalogQuery3D
+                .SearchProgressionActions("前哨");
+
+            Assert.That(entries.Select(value => value.DisplayName),
+                Does.Contain("设置前哨正常运行")
+                    .And.Contain("设置前哨通信中断")
+                    .And.Contain("设置前哨补给中断")
+                    .And.Contain("设置前哨维护中断")
+                    .And.Contain("设置前哨警戒警报")
+                    .And.Contain("设置前哨受袭警报")
+                    .And.Contain("设置前哨危急警报")
+                    .And.Contain("清除前哨警报"));
+            Assert.That(GrayboxDeveloperCatalogQuery3D
+                    .TryResolveProgressionAction(
+                        "准备领袖手采验收",
+                        out GrayboxDeveloperCatalogEntry3D gather),
+                Is.True);
+            Assert.That(gather.StableId,
+                Is.EqualTo("developer.exploration.gather-ready"));
         }
 
         [Test]

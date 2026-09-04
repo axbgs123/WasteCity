@@ -1785,10 +1785,17 @@ namespace WasteCity.Graybox3D.Building
 
         private static bool IsShiftPressed()
         {
-            Keyboard keyboard = Keyboard.current;
-            return keyboard != null &&
-                (keyboard.leftShiftKey.isPressed ||
-                 keyboard.rightShiftKey.isPressed);
+            var devices = InputSystem.devices;
+            for (var index = 0; index < devices.Count; index++)
+            {
+                if (devices[index] is Keyboard keyboard &&
+                    (keyboard.leftShiftKey.isPressed ||
+                     keyboard.rightShiftKey.isPressed))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private ProductionRow EnsureProductionRow(int index)

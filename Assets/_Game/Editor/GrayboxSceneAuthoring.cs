@@ -1202,6 +1202,8 @@ namespace WasteCity.Editor
                 ("expansionController", expansionController),
                 ("leader", buildingReferences.Leader),
                 ("directControl", buildingReferences.DirectControl),
+                ("cameraController",
+                    RequireSingle<GrayboxCameraController3D>(scene)),
                 ("explorationController", explorationController),
                 ("fogPresenter", fogPresenter),
                 ("distressPresenter", distressPresenter),

@@ -622,7 +622,7 @@ namespace WasteCity.Tests
             string content = ReadGuide("Docs/09-Reusable-Project-Catalog-ZH.md");
             ProjectQualityCatalog catalog = ProjectQualityCatalogLoader.LoadFromFile(Path.Combine(ProjectRoot(),
                 "Docs/Engineering/project-quality-catalog.json"));
-            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(144));
+            Assert.That(catalog.ReuseEntries, Has.Length.EqualTo(150));
             StringAssert.Contains(
                 "### 九命轨本局稳定抽取器（推荐复用）",
                 content);

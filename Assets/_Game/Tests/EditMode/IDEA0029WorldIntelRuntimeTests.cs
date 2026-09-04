@@ -101,5 +101,26 @@ namespace WasteCity.Tests
             Assert.That(captured[0].StableId, Is.EqualTo("a"));
             Assert.That(captured[1].StableId, Is.EqualTo("z"));
         }
+
+        [Test]
+        public void NextStateTransitionUsesExactObservationRelativeThresholds()
+        {
+            var runtime = new WorldIntelRuntime();
+            runtime.Observe(new WorldIntelObservation(
+                "late", WorldIntelKind.Resource, 1, 1, "铁矿",
+                true, 20, 13.25f));
+            runtime.Observe(new WorldIntelObservation(
+                "early", WorldIntelKind.Resource, 2, 2, "石料",
+                true, 30, 4.5f));
+
+            Assert.That(runtime.TryGetNextStateTransitionTime(
+                4.5f, out float first), Is.True);
+            Assert.That(first, Is.EqualTo(64.5f).Within(.0001f));
+            Assert.That(runtime.TryGetNextStateTransitionTime(
+                64.5f, out float second), Is.True);
+            Assert.That(second, Is.EqualTo(73.25f).Within(.0001f));
+            Assert.That(runtime.TryGetNextStateTransitionTime(
+                193.25f, out _), Is.False);
+        }
     }
 }

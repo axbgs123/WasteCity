@@ -4,6 +4,7 @@ using UnityEngine;
 using WasteCity.Economy;
 using WasteCity.Graybox3D.Exploration;
 using WasteCity.World;
+using WasteCity.World.Exploration;
 
 namespace WasteCity.Graybox3D
 {
@@ -402,7 +403,10 @@ namespace WasteCity.Graybox3D
             ResourceMarkerFogPresentation3D current =
                 ResolveResourceMarkerFogPresentation(worldX, worldY);
             if (current.Mode == presentation.Mode &&
-                current.LastKnownAmount == presentation.LastKnownAmount)
+                current.LastKnownAmount == presentation.LastKnownAmount &&
+                current.IntelState == presentation.IntelState &&
+                current.IntelAgeSeconds == presentation.IntelAgeSeconds &&
+                current.ShowsIntelAge == presentation.ShowsIntelAge)
             {
                 error = string.Empty;
                 return false;
@@ -1096,7 +1100,7 @@ namespace WasteCity.Graybox3D
                 ResourceMarkerFogMode3D.LastKnownIdentity)
             {
                 marker.ApplyDisplayLod(
-                    ResourceNodeMarkerLod3D.Far,
+                    ResourceNodeMarkerLod3D.Near,
                     false);
             }
         }
@@ -1117,6 +1121,11 @@ namespace WasteCity.Graybox3D
         {
             if (presentation.Mode == ResourceMarkerFogMode3D.Hidden)
             {
+                marker.ApplyIntelPresentation(
+                    false,
+                    string.Empty,
+                    false,
+                    WorldIntelState.Fresh);
                 marker.gameObject.SetActive(false);
                 return;
             }
@@ -1130,10 +1139,28 @@ namespace WasteCity.Graybox3D
                     cell.ResourceId,
                     presentation.LastKnownAmount,
                     cell.Traversal));
+                marker.ApplyIntelPresentation(
+                    false,
+                    presentation.IntelStatusText,
+                    true,
+                    presentation.IntelState);
             }
             else if (presentation.Mode == ResourceMarkerFogMode3D.Live)
             {
                 marker.Refresh(Model.Get(marker.WorldX, marker.WorldY));
+                marker.ApplyIntelPresentation(
+                    false,
+                    string.Empty,
+                    false,
+                    WorldIntelState.Fresh);
+            }
+            else
+            {
+                marker.ApplyIntelPresentation(
+                    true,
+                    presentation.IntelStatusText,
+                    true,
+                    presentation.IntelState);
             }
 
             if (hasResourceNodeMarkerPresentation)
@@ -1147,7 +1174,7 @@ namespace WasteCity.Graybox3D
                 ResourceNodeMarkerLod3D lod =
                     presentation.Mode ==
                         ResourceMarkerFogMode3D.LastKnownIdentity
-                        ? ResourceNodeMarkerLod3D.Far
+                        ? ResourceNodeMarkerLod3D.Near
                         : hasResourceNodeMarkerLod
                             ? resourceNodeMarkerLod
                             : ResourceNodeMarkerLod3D.Near;

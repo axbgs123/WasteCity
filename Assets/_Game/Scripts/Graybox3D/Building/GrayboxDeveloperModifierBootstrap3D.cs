@@ -47,6 +47,8 @@ namespace WasteCity.Graybox3D.Building
         private InputField progressionAmount;
         private InputField progressionPressureThreshold;
         private InputField progressionAnchorId;
+        private InputField explorationCellX;
+        private InputField explorationCellY;
         private int canvasSortingOrderBeforePanel;
         private bool ownsCanvasSortingOverride;
 #endif
@@ -272,6 +274,8 @@ namespace WasteCity.Graybox3D.Building
             progressionAmount = null;
             progressionPressureThreshold = null;
             progressionAnchorId = null;
+            explorationCellX = null;
+            explorationCellY = null;
             ownedPanel.SetActive(false);
             if (Application.isPlaying)
                 Destroy(ownedPanel);
@@ -515,6 +519,18 @@ namespace WasteCity.Graybox3D.Building
                 content,
                 "Progression Anchor Id",
                 GrayboxRewindAnchorService3D.StableAnchorId);
+            CreateLabel(
+                content,
+                "Exploration Cell Parameter",
+                "指定格视野查询坐标（X / Y）");
+            explorationCellX = CreateInput(
+                content,
+                "Exploration Cell X",
+                "0");
+            explorationCellY = CreateInput(
+                content,
+                "Exploration Cell Y",
+                "0");
             CreateLabel(content, "Progression Resource Parameter",
                 "资源参数使用上方当前物品");
             CreateButton(
@@ -828,6 +844,34 @@ namespace WasteCity.Graybox3D.Building
 
         private string QueryFeedback(string actionId)
         {
+            if (actionId.StartsWith(
+                    "developer.query.exploration-",
+                    StringComparison.Ordinal))
+            {
+                GrayboxDeveloperExplorationDiagnostics3D exploration =
+                    modifier.QueryExploration(
+                        ReadInt(explorationCellX, 0),
+                        ReadInt(explorationCellY, 0));
+                if (exploration == null) return "探索诊断服务尚未连接";
+                switch (actionId)
+                {
+                    case "developer.query.exploration-vision-sources":
+                        return "探索视野来源：" +
+                            Join(exploration.VisionSources);
+                    case "developer.query.exploration-cell-visibility":
+                        return "指定格视野状态：" +
+                            exploration.CellVisibility;
+                    case "developer.query.exploration-scan-zones":
+                        return "探索扫描区状态：" +
+                            Join(exploration.ScanZones);
+                    case "developer.query.exploration-intel":
+                        return "探索情报状态：" +
+                            Join(exploration.Intel);
+                    case "developer.query.exploration-outpost-alerts":
+                        return "前哨警报快照：" +
+                            Join(exploration.OutpostAlerts);
+                }
+            }
             GrayboxDeveloperProgressionQuery3D query =
                 modifier.QueryProgression();
             if (query == null) return "文明进程服务尚未连接";

@@ -179,6 +179,31 @@ namespace WasteCity.World.Exploration
             return result;
         }
 
+        public bool TryGetNextStateTransitionTime(
+            float currentRuleTimeSeconds,
+            out float transitionRuleTimeSeconds)
+        {
+            transitionRuleTimeSeconds = float.PositiveInfinity;
+            if (!IsFiniteNonNegative(currentRuleTimeSeconds)) return false;
+            foreach (KeyValuePair<string, WorldIntelObservation> item in
+                     observations)
+            {
+                WorldIntelObservation observation = item.Value;
+                float staleAt = observation.ObservedRuleTimeSeconds +
+                    FormalExplorationCatalog3D.IntelStaleSeconds;
+                float expiresAt = observation.ObservedRuleTimeSeconds +
+                    FormalExplorationCatalog3D.IntelExpiredSeconds;
+                float candidate = currentRuleTimeSeconds < staleAt
+                    ? staleAt
+                    : currentRuleTimeSeconds < expiresAt
+                        ? expiresAt
+                        : float.PositiveInfinity;
+                if (candidate < transitionRuleTimeSeconds)
+                    transitionRuleTimeSeconds = candidate;
+            }
+            return !float.IsPositiveInfinity(transitionRuleTimeSeconds);
+        }
+
         public bool TryRestore(
             IReadOnlyList<WorldIntelObservation> values,
             out string error)

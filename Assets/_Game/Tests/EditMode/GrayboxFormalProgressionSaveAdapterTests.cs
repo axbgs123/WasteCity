@@ -1121,6 +1121,7 @@ namespace WasteCity.Tests
                 "Progression",
                 "Evacuation",
                 "CivilizationExpansion",
+                "Exploration",
                 "Pause",
             }));
 

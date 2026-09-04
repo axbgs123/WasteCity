@@ -1257,6 +1257,11 @@ namespace WasteCity.Tests
             Assert.That(presentation.IsBuildGridVisible, Is.True);
 
             modifier.SetResource(ResourceIds.Stone, 1000);
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.ExecuteExplorationFixtureForDevelopment(
+                "developer.exploration.gather-ready"), Is.True);
             interaction.Select(BuildingCatalog.Housing);
             yield return MoveToValidGroundPreview(city, world, placement);
             yield return HoldMovementAndAssertPreview(

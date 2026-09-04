@@ -806,6 +806,9 @@ namespace WasteCity.Graybox3D.Building
             transactionActive = true;
             checkpointPolicy?.SetSuppressed(true);
             bool retainSafetyBarrier = false;
+            float previousCheckpointRuleTime =
+                checkpointSession?.CheckpointRuleTimeSeconds ?? 0f;
+            bool checkpointRuleTimeMoved = false;
             try
             {
                 GrayboxFormalSaveCoordinatorResult3D rollbackCapture =
@@ -813,11 +816,31 @@ namespace WasteCity.Graybox3D.Building
                 if (!rollbackCapture.Success)
                     return rollbackCapture;
 
+                if (checkpointSession != null)
+                {
+                    if (!checkpointSession.TryRestoreCheckpointRuleTime(
+                            envelope.checkpoint.ruleTimeSeconds,
+                            out string checkpointTimeError))
+                    {
+                        return Failure(
+                            GrayboxFormalSaveCoordinatorCode3D.ApplyFailed,
+                            checkpointTimeError);
+                    }
+                    checkpointRuleTimeMoved = true;
+                }
+
                 if (!TryApplyDomains(
                         envelope.formal3D,
                         out GrayboxFormalSaveDomainId3D? failedDomain,
                         out string error))
                 {
+                    if (checkpointRuleTimeMoved)
+                    {
+                        checkpointSession.TryRestoreCheckpointRuleTime(
+                            previousCheckpointRuleTime,
+                            out _);
+                        checkpointRuleTimeMoved = false;
+                    }
                     bool rollbackSucceeded = TryRollbackDomains(
                         rollbackCapture.Envelope.formal3D,
                         out string rollbackError);
@@ -867,6 +890,13 @@ namespace WasteCity.Graybox3D.Building
                 }
                 catch (Exception rebuildException)
                 {
+                    if (checkpointRuleTimeMoved)
+                    {
+                        checkpointSession.TryRestoreCheckpointRuleTime(
+                            previousCheckpointRuleTime,
+                            out _);
+                        checkpointRuleTimeMoved = false;
+                    }
                     bool rollbackSucceeded =
                         TryRollbackAfterDerivedFailure(
                             rollbackCapture.Envelope.formal3D,
@@ -895,9 +925,6 @@ namespace WasteCity.Graybox3D.Building
                         true);
                 }
                 checkpointPolicy?.TryRestoreBaseline(envelope.checkpoint);
-                checkpointSession?.TryRestoreCheckpointRuleTime(
-                    envelope.checkpoint.ruleTimeSeconds,
-                    out _);
                 try
                 {
                     RestoreCompleted?.Invoke();
@@ -910,6 +937,12 @@ namespace WasteCity.Graybox3D.Building
             }
             catch (Exception exception)
             {
+                if (checkpointRuleTimeMoved)
+                {
+                    checkpointSession?.TryRestoreCheckpointRuleTime(
+                        previousCheckpointRuleTime,
+                        out _);
+                }
                 return Failure(
                     GrayboxFormalSaveCoordinatorCode3D.ApplyFailed,
                     exception.Message);

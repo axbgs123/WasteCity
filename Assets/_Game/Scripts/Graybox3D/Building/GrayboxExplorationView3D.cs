@@ -45,7 +45,8 @@ namespace WasteCity.Graybox3D.Exploration
             GrayboxExplorationActionPresentation3D gatherAction,
             GrayboxExplorationActionPresentation3D rescueAction,
             string characterVisualId = null,
-            string statusVisualId = null)
+            string statusVisualId = null,
+            string visionRangeText = null)
         {
             LeaderName = TextOr(leaderName, "尚未招募");
             StatusSummary = TextOr(statusSummary, "暂无领袖状态");
@@ -79,6 +80,9 @@ namespace WasteCity.Graybox3D.Exploration
             StatusVisualId = TextOr(
                 statusVisualId,
                 GrayboxExplorationView3D.FollowStatusVisualId);
+            VisionRangeText = TextOr(
+                visionRangeText,
+                "未载入正式视野范围");
         }
 
         public string LeaderName { get; }
@@ -94,6 +98,7 @@ namespace WasteCity.Graybox3D.Exploration
         public GrayboxExplorationActionPresentation3D RescueAction { get; }
         public string CharacterVisualId { get; }
         public string StatusVisualId { get; }
+        public string VisionRangeText { get; }
 
         private static GrayboxExplorationActionPresentation3D Disabled(
             string label,
@@ -132,6 +137,24 @@ namespace WasteCity.Graybox3D.Exploration
         public string Summary { get; }
         public bool Warning { get; }
         public bool BlocksWorldInput => false;
+
+        public static GrayboxExplorationScanFeedback3D ForCompletedScan(
+            string zoneName,
+            string discoverySummary,
+            int revealedCellCount,
+            int attentionDelta)
+        {
+            return new GrayboxExplorationScanFeedback3D(
+                true,
+                "自动扫描完成：" + (zoneName ?? string.Empty) +
+                (string.IsNullOrWhiteSpace(discoverySummary)
+                    ? string.Empty
+                    : " · " + discoverySummary.Trim()) +
+                " · 新增情报格 " + Mathf.Max(0, revealedCellCount) +
+                " · 关注度 " + (attentionDelta >= 0 ? "+" : string.Empty) +
+                attentionDelta,
+                false);
+        }
     }
 
     public sealed class GrayboxExplorationOutpostAlertPresentation3D
@@ -222,7 +245,8 @@ namespace WasteCity.Graybox3D.Exploration
             EnsureUi();
             headingText.text = "领袖 · " + current.LeaderName;
             statusText.text = "状态：" + current.StatusSummary +
-                "\n控制模式：" + current.ControlModeText;
+                "\n控制模式：" + current.ControlModeText +
+                "\n视野：" + current.VisionRangeText;
             gatherText.text = BuildGatherText(current);
             distressText.text = "岑烬求救：" +
                 current.CenJinDistressStatusText;

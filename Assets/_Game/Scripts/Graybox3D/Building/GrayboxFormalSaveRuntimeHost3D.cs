@@ -81,6 +81,7 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField] private GrayboxLeaderController3D leader;
         [SerializeField]
         private GrayboxDirectControlCoordinator directControl;
+        [SerializeField] private GrayboxCameraController3D cameraController;
         [SerializeField]
         private GrayboxExplorationController3D explorationController;
         [SerializeField] private GrayboxFogPresenter3D fogPresenter;
@@ -166,10 +167,41 @@ namespace WasteCity.Graybox3D.Building
         private bool lastCheckpointHadRetryArtifactFailure;
         private ulong observedExplorationVisibilityRevision = ulong.MaxValue;
         private ulong observedWorldResourceRevision = ulong.MaxValue;
+        private int observedIntelAgeBucket = -1;
+        private float nextIntelStateRefreshRuleTime = float.PositiveInfinity;
+        private readonly HashSet<string> scoutDroneVisionSourceIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> currentScoutDroneVisionSourceIds =
+            new HashSet<string>(StringComparer.Ordinal);
+        private uint observedScoutDroneCatalogRevision = uint.MaxValue;
+        private uint observedScoutDronePlacementRevision = uint.MaxValue;
+        private long observedScoutDronePatrolStep = long.MinValue;
+        private int observedScoutDroneCityX = int.MinValue;
+        private int observedScoutDroneCityY = int.MinValue;
+        private CityMode observedScoutDroneCityMode = (CityMode)(-1);
+        private bool refreshedVisibleResourceIntelBeforeSourceChange;
+        private ulong presentedLeaderControlRevision = ulong.MaxValue;
+        private ulong presentedManualGatherRevision = ulong.MaxValue;
+        private ulong presentedDistressRevision = ulong.MaxValue;
+        private ulong presentedOutpostAlertRevision = ulong.MaxValue;
+        private int presentedGatherX = int.MinValue;
+        private int presentedGatherY = int.MinValue;
+        private string presentedExplorationFeedback;
+        private CityMode presentedExplorationCityMode = (CityMode)(-1);
+        private ulong presentedLeaderDamageRevision = ulong.MaxValue;
+        private ulong presentedVisibilityRevision = ulong.MaxValue;
+        private ulong presentedResourceRevision = ulong.MaxValue;
+        private ulong presentedStorageRevision = ulong.MaxValue;
+        private ulong presentedOutpostSettlementRevision = ulong.MaxValue;
+        private int presentedLeaderCellX = int.MinValue;
+        private int presentedLeaderCellY = int.MinValue;
+        private int presentedCityCellX = int.MinValue;
+        private int presentedCityCellY = int.MinValue;
+        private bool? presentedWorldModalBlocked;
+        private bool? presentedBackpackCanAccept;
         private int selectedGatherX = -1;
         private int selectedGatherY = -1;
         private string explorationFeedback = string.Empty;
-        private string presentedExplorationSignature = string.Empty;
         private bool explorationViewBound;
 
         public GameSpeedModel Speed => speed ??= new GameSpeedModel();
@@ -240,6 +272,8 @@ namespace WasteCity.Graybox3D.Building
             explorationController;
         public string ExplorationFeedback => explorationFeedback;
         public string CurrentSessionId => currentSessionId;
+        public float CurrentRuleTimeSeconds =>
+            session?.CheckpointRuleTimeSeconds ?? 0f;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
         public FormalSaveWaveRetryStoreResult LastWaveRetryStoreResult
@@ -749,6 +783,20 @@ namespace WasteCity.Graybox3D.Building
 
             string restoredSessionId =
                 LastStoreResult.Envelope.formal3D.sessionId;
+            string previousSessionId = currentSessionId;
+            VoidChestRuntime previousVoidChest = VoidChestRuntime;
+            GrayboxVoidChestController3D previousVoidChestController =
+                voidChestController;
+            WorldExplorationRuntime previousExploration =
+                explorationController.Exploration;
+            LeaderControlRuntime previousLeaderControl =
+                explorationController.LeaderControl;
+            ManualGatherRuntime previousManualGather =
+                explorationController.ManualGather;
+            CenJinDistressRuntime previousDistress =
+                explorationController.CenJinDistress;
+            OutpostAlertRuntime previousOutpostAlerts =
+                explorationController.OutpostAlerts;
             if (!TryRebindSessionScopedFateOwners(
                     restoredSessionId,
                     out string ownerError))
@@ -757,7 +805,6 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
-            string previousSessionId = currentSessionId;
             currentSessionId = restoredSessionId;
             if (!TryResetExplorationSession(
                     restoredSessionId,
@@ -765,7 +812,14 @@ namespace WasteCity.Graybox3D.Building
                     out string explorationResetError))
             {
                 currentSessionId = previousSessionId;
-                LastProgressionRestoreError = explorationResetError;
+                bool fateOwnersRestored =
+                    TryRestoreSessionScopedFateOwners(
+                    previousVoidChest,
+                    previousVoidChestController,
+                    out string restoreOwnerError);
+                LastProgressionRestoreError = fateOwnersRestored
+                    ? explorationResetError
+                    : explorationResetError + "；" + restoreOwnerError;
                 return false;
             }
 
@@ -774,11 +828,32 @@ namespace WasteCity.Graybox3D.Building
             if (!LastCoordinatorResult.Success)
             {
                 currentSessionId = previousSessionId;
+                explorationController.RestoreSessionOwners(
+                    previousExploration,
+                    previousLeaderControl,
+                    previousManualGather,
+                    previousDistress,
+                    previousOutpostAlerts);
+                if (!TryRestoreSessionScopedFateOwners(
+                        previousVoidChest,
+                        previousVoidChestController,
+                        out string restoreOwnerError))
+                {
+                    LastProgressionRestoreError = restoreOwnerError;
+                }
                 return false;
             }
 
-            SynchronizeExplorationSourcesAndPresentation(force: true);
+            // Restoring derived visibility must not fabricate a new
+            // observation. Visible markers still read current world truth;
+            // the departure boundary refreshes last intel before a source
+            // later moves or disappears.
+            SynchronizeExplorationSourcesAndPresentation(
+                force: true,
+                observeVisibleFacts: false);
+            explorationSaveDomain?.ReanchorDerivedRuntimeState();
             SynchronizeLegacyLeaderProjection();
+            RefreshExplorationView(force: true);
             SynchronizeFateRuleCycle();
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
@@ -892,6 +967,182 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             return TryRestorePressureFixtureForDevelopment(
                 defeated ? 90 : 60);
+        }
+
+        public bool ExecuteExplorationFixtureForDevelopment(string actionId)
+        {
+            if (explorationController?.IsInitialized != true)
+                return false;
+            bool changed;
+            switch (actionId)
+            {
+                case "developer.exploration.reveal-all":
+                    changed = RevealAllExplorationForDevelopment();
+                    break;
+                case "developer.exploration.gather-ready":
+                    changed = PrepareManualGatherForDevelopment();
+                    break;
+                case "developer.exploration.outpost-normal":
+                    changed = SetOutpostLinksForDevelopment(true, true, true);
+                    break;
+                case "developer.exploration.outpost-communication-off":
+                    changed = SetOutpostLinksForDevelopment(false, true, true);
+                    break;
+                case "developer.exploration.outpost-supply-off":
+                    changed = SetOutpostLinksForDevelopment(true, false, true);
+                    break;
+                case "developer.exploration.outpost-maintenance-off":
+                    changed = SetOutpostLinksForDevelopment(true, true, false);
+                    break;
+                case "developer.exploration.alert-guard":
+                    changed = ReportOutpostAlertForDevelopment(
+                        OutpostAlertSeverity.Guard);
+                    break;
+                case "developer.exploration.alert-under-attack":
+                    changed = ReportOutpostAlertForDevelopment(
+                        OutpostAlertSeverity.UnderAttack);
+                    break;
+                case "developer.exploration.alert-critical":
+                    changed = ReportOutpostAlertForDevelopment(
+                        OutpostAlertSeverity.Critical);
+                    break;
+                case "developer.exploration.alert-clear":
+                    changed = ClearOutpostAlertsForDevelopment();
+                    break;
+                default:
+                    return false;
+            }
+            if (changed)
+            {
+                expansionController?.Refresh(force: true);
+                SynchronizeExplorationSourcesAndPresentation(force: true);
+                RefreshExplorationView(force: true);
+            }
+            return changed;
+        }
+
+        private bool RevealAllExplorationForDevelopment()
+        {
+            WorldExplorationSnapshot before =
+                explorationController.Exploration.Capture();
+            bool[] explored = before.ExploredCells;
+            bool changed = false;
+            for (var index = 0; index < explored.Length; index++)
+            {
+                changed |= !explored[index];
+                explored[index] = true;
+            }
+            if (!changed) return false;
+            bool restored = explorationController.Exploration.TryRestore(
+                new WorldExplorationSnapshot(
+                    before.Width,
+                    before.Height,
+                    explored,
+                    before.ScanRecords,
+                    before.Intel,
+                    before.Revision + 1ul),
+                out _);
+            if (restored) explorationFeedback = "已探索整张地图";
+            return restored;
+        }
+
+        private bool PrepareManualGatherForDevelopment()
+        {
+            FormalResourceNodeSpec3D node =
+                FormalWorldGenerationCatalog3D.ResourceNodes[0];
+            bool changed = false;
+            if (!explorationController.CenJinDistress.IsCompleted)
+            {
+                changed |= explorationController.CenJinDistress.TryRestore(
+                    CenJinDistressRuntime.CreateLegacyRescued(
+                        currentSessionId).Capture(),
+                    out _);
+                SynchronizeLegacyLeaderProjection();
+            }
+            changed |= city.RestoreDeploymentForDevelopment(
+                CityMode.Fortress);
+            if (world.Coordinates.TryCellToWorld(
+                    Math.Max(0, node.X - 1),
+                    node.Y,
+                    leader.transform.position.y,
+                    out Vector3 leaderPosition) &&
+                leader.transform.position != leaderPosition)
+            {
+                leader.transform.position = leaderPosition;
+                changed = true;
+            }
+            explorationController.LeaderControl.TryRequest(
+                LeaderControlMode.Manual,
+                out _);
+            SynchronizeExplorationSourcesAndPresentation(force: true);
+            changed |= TrySelectManualGatherNode(node.X, node.Y, out _);
+            if (changed) explorationFeedback = "领袖手采验收条件已准备";
+            return changed;
+        }
+
+        private bool SetOutpostLinksForDevelopment(
+            bool communication,
+            bool supplied,
+            bool maintained)
+        {
+            SettlementRuntime outpost = expansionController?.Runtime?
+                .WorldLayer?.GetSettlement(WorldLayerCatalog.Outpost.Id);
+            if (outpost == null) return false;
+            ulong before = outpost.Revision;
+            outpost.SetOperationalLinks(
+                communication,
+                supplied,
+                maintained);
+            if (outpost.Revision == before) return false;
+            explorationFeedback = "前哨运行状态已更新";
+            return true;
+        }
+
+        private bool ReportOutpostAlertForDevelopment(
+            OutpostAlertSeverity severity)
+        {
+            SettlementRuntime outpost = expansionController?.Runtime?
+                .WorldLayer?.GetSettlement(WorldLayerCatalog.Outpost.Id);
+            OutpostAlertDefinition definition =
+                OutpostAlertCatalog.ForSeverity(severity);
+            if (outpost == null || definition == null) return false;
+            int risk = severity == OutpostAlertSeverity.Critical
+                ? 90
+                : severity == OutpostAlertSeverity.UnderAttack ? 60 : 25;
+            float seconds = severity == OutpostAlertSeverity.Critical
+                ? 20f
+                : severity == OutpostAlertSeverity.UnderAttack ? 60f : 120f;
+            string stableId = "developer.outpost.alert." +
+                (explorationController.OutpostAlerts.Revision + 1ul);
+            bool reported = explorationController.OutpostAlerts.TryReport(
+                stableId,
+                outpost.StableId,
+                outpost.X,
+                outpost.Y,
+                severity,
+                definition.ChineseName + "测试威胁",
+                risk,
+                seconds,
+                session.CheckpointRuleTimeSeconds,
+                out _);
+            if (reported) explorationFeedback = "前哨警报已更新";
+            return reported;
+        }
+
+        private bool ClearOutpostAlertsForDevelopment()
+        {
+            IReadOnlyList<OutpostAlertEntry> alerts =
+                explorationController.OutpostAlerts.ActiveAlerts;
+            bool changed = false;
+            for (var index = alerts.Count - 1; index >= 0; index--)
+            {
+                changed |= explorationController.OutpostAlerts.TryResolve(
+                    alerts[index].StableAlertId,
+                    session.CheckpointRuleTimeSeconds,
+                    out _);
+            }
+            if (changed) explorationFeedback = "前哨警报已清除";
+            return changed;
         }
 
         private bool TryRestorePressureFixtureForDevelopment(int threshold)
@@ -1152,7 +1403,27 @@ namespace WasteCity.Graybox3D.Building
             selectedGatherY = -1;
             observedExplorationVisibilityRevision = ulong.MaxValue;
             observedWorldResourceRevision = ulong.MaxValue;
-            presentedExplorationSignature = string.Empty;
+            observedIntelAgeBucket = -1;
+            nextIntelStateRefreshRuleTime = float.PositiveInfinity;
+            presentedLeaderControlRevision = ulong.MaxValue;
+            presentedManualGatherRevision = ulong.MaxValue;
+            presentedDistressRevision = ulong.MaxValue;
+            presentedOutpostAlertRevision = ulong.MaxValue;
+            presentedGatherX = int.MinValue;
+            presentedGatherY = int.MinValue;
+            presentedExplorationFeedback = null;
+            presentedExplorationCityMode = (CityMode)(-1);
+            presentedLeaderDamageRevision = ulong.MaxValue;
+            presentedVisibilityRevision = ulong.MaxValue;
+            presentedResourceRevision = ulong.MaxValue;
+            presentedStorageRevision = ulong.MaxValue;
+            presentedOutpostSettlementRevision = ulong.MaxValue;
+            presentedLeaderCellX = int.MinValue;
+            presentedLeaderCellY = int.MinValue;
+            presentedCityCellX = int.MinValue;
+            presentedCityCellY = int.MinValue;
+            presentedWorldModalBlocked = null;
+            presentedBackpackCanAccept = null;
             production?.ConfigureCivilizationEfficiencySource(null);
             production?.ConfigureLocalHasteMultiplier(null);
             operations?.ConfigureCivilizationResearchEfficiency(null);
@@ -1433,6 +1704,26 @@ namespace WasteCity.Graybox3D.Building
             selectedGatherY = -1;
             observedExplorationVisibilityRevision = ulong.MaxValue;
             observedWorldResourceRevision = ulong.MaxValue;
+            observedIntelAgeBucket = -1;
+            nextIntelStateRefreshRuleTime = float.PositiveInfinity;
+            scoutDroneVisionSourceIds.Clear();
+            currentScoutDroneVisionSourceIds.Clear();
+            observedScoutDroneCatalogRevision = uint.MaxValue;
+            observedScoutDronePlacementRevision = uint.MaxValue;
+            observedScoutDronePatrolStep = long.MinValue;
+            observedScoutDroneCityX = int.MinValue;
+            observedScoutDroneCityY = int.MinValue;
+            observedScoutDroneCityMode = (CityMode)(-1);
+            presentedVisibilityRevision = ulong.MaxValue;
+            presentedResourceRevision = ulong.MaxValue;
+            presentedStorageRevision = ulong.MaxValue;
+            presentedOutpostSettlementRevision = ulong.MaxValue;
+            presentedLeaderCellX = int.MinValue;
+            presentedLeaderCellY = int.MinValue;
+            presentedCityCellX = int.MinValue;
+            presentedCityCellY = int.MinValue;
+            presentedWorldModalBlocked = null;
+            presentedBackpackCanAccept = null;
             explorationFeedback = string.Empty;
             if (!legacyLeader && leader != null)
             {
@@ -1478,7 +1769,7 @@ namespace WasteCity.Graybox3D.Building
                 {
                     explorationFeedback = "手采完成：+" +
                         result.ManualGather.UnitsGathered;
-                    SynchronizeVisibleResourceIntel(force: true);
+                    SynchronizeVisibleResourceIntel();
                 }
                 if (result.Distress.Kind ==
                     CenJinDistressTickKind.Completed)
@@ -1502,15 +1793,22 @@ namespace WasteCity.Graybox3D.Building
             RefreshExplorationView(force: false);
         }
 
-        private void SynchronizeExplorationSourcesAndPresentation(bool force)
+        private void SynchronizeExplorationSourcesAndPresentation(
+            bool force,
+            bool observeVisibleFacts = true)
         {
             if (explorationController?.IsInitialized != true ||
                 world?.Model == null)
                 return;
 
-            if (city != null && city.TryGetCurrentCell(
-                    out int cityX,
-                    out int cityY))
+            refreshedVisibleResourceIntelBeforeSourceChange = false;
+
+            int cityX = 0;
+            int cityY = 0;
+            bool hasCityCell = city != null && city.TryGetCurrentCell(
+                out cityX,
+                out cityY);
+            if (hasCityCell)
             {
                 SyncVisionSource(
                     WorldLayerCatalog.PrimaryCity.Id,
@@ -1521,30 +1819,21 @@ namespace WasteCity.Graybox3D.Building
                     0ul);
             }
 
+            SynchronizeScoutDroneVisionSources(
+                force,
+                hasCityCell,
+                cityX,
+                cityY);
+
             WorldLayerRuntime layer = expansionController?.Runtime?.WorldLayer;
             if (layer != null)
             {
-                WorldLayerRuntimeSnapshot settlements = layer.Capture();
-                for (var index = 0;
-                     index < settlements.Settlements.Count;
-                     index++)
-                {
-                    SettlementRuntimeSnapshot item =
-                        settlements.Settlements[index];
-                    if (item.Kind == SettlementKind.PrimaryCity)
-                        continue;
-                    bool active = item.Kind != SettlementKind.Outpost ||
-                        item.IsCommunicationActive;
-                    SyncVisionSource(
-                        item.StableId,
-                        item.Kind == SettlementKind.Outpost
-                            ? WorldVisionSourceKind.Outpost
-                            : WorldVisionSourceKind.SecondaryCity,
-                        item.X,
-                        item.Y,
-                        active,
-                        item.Revision);
-                }
+                SyncSettlementVisionSource(
+                    layer.GetSettlement(WorldLayerCatalog.SecondaryCity.Id),
+                    WorldVisionSourceKind.SecondaryCity);
+                SyncSettlementVisionSource(
+                    layer.GetSettlement(WorldLayerCatalog.Outpost.Id),
+                    WorldVisionSourceKind.Outpost);
             }
 
             CharacterLifeRuntime currentLeader = CurrentLeaderCharacter();
@@ -1565,20 +1854,206 @@ namespace WasteCity.Graybox3D.Building
 
             ulong visibilityRevision =
                 explorationController.Exploration.VisibilityRevision;
-            if (force ||
+            float ruleTime = session.CheckpointRuleTimeSeconds;
+            int intelAgeBucket = Mathf.Max(
+                0,
+                Mathf.FloorToInt(
+                    ruleTime / 10f));
+            bool authoritativeFactsChanged = force ||
                 visibilityRevision != observedExplorationVisibilityRevision ||
-                world.Model.ResourceRevision != observedWorldResourceRevision)
+                world.Model.ResourceRevision != observedWorldResourceRevision;
+            bool intelAgeChanged =
+                intelAgeBucket != observedIntelAgeBucket;
+            bool intelStateTransitionDue =
+                ruleTime + .0001f >= nextIntelStateRefreshRuleTime;
+            if (authoritativeFactsChanged || intelAgeChanged ||
+                intelStateTransitionDue)
             {
-                SynchronizeVisibleResourceIntel(force);
+                SynchronizeVisibleResourceIntel(
+                    authoritativeFactsChanged && observeVisibleFacts);
                 observedExplorationVisibilityRevision =
                     explorationController.Exploration.VisibilityRevision;
                 observedWorldResourceRevision = world.Model.ResourceRevision;
+                observedIntelAgeBucket = intelAgeBucket;
+                nextIntelStateRefreshRuleTime =
+                    explorationController.Exploration
+                        .TryGetNextIntelStateTransitionTime(
+                            ruleTime,
+                            out float nextTransition)
+                        ? nextTransition
+                        : float.PositiveInfinity;
             }
 
             fogPresenter?.ApplyVisibility(
                 explorationController.Exploration);
             distressPresenter?.Apply(
                 explorationController.CenJinDistress.State);
+        }
+
+        private void SynchronizeScoutDroneVisionSources(
+            bool force,
+            bool hasCityCell,
+            int cityX,
+            int cityY)
+        {
+            uint catalogRevision = session?.CatalogRevision ?? 0u;
+            uint placementRevision = session?.PlacementRevision ?? 0u;
+            CityMode cityMode = city?.Mode ?? CityMode.Mobile;
+            float ruleTime = session?.CheckpointRuleTimeSeconds ?? 0f;
+            long patrolStep = ScoutDroneDeploymentRules.PatrolStep(ruleTime);
+            int observedX = hasCityCell ? cityX : int.MinValue;
+            int observedY = hasCityCell ? cityY : int.MinValue;
+            if (!force &&
+                catalogRevision == observedScoutDroneCatalogRevision &&
+                placementRevision == observedScoutDronePlacementRevision &&
+                patrolStep == observedScoutDronePatrolStep &&
+                observedX == observedScoutDroneCityX &&
+                observedY == observedScoutDroneCityY &&
+                cityMode == observedScoutDroneCityMode)
+                return;
+
+            observedScoutDroneCatalogRevision = catalogRevision;
+            observedScoutDronePlacementRevision = placementRevision;
+            observedScoutDronePatrolStep = patrolStep;
+            observedScoutDroneCityX = observedX;
+            observedScoutDroneCityY = observedY;
+            observedScoutDroneCityMode = cityMode;
+            currentScoutDroneVisionSourceIds.Clear();
+
+            IReadOnlyList<GrayboxBuildingInstance3D> instances =
+                session?.Instances;
+            bool researchCompleted = session != null &&
+                session.IsResearchCompleted(
+                    BuildingCatalog.AutomatedRepairBay.RequiredResearchId);
+            int activeCount = 0;
+            if (instances != null && researchCompleted && hasCityCell)
+            {
+                for (var index = 0; index < instances.Count; index++)
+                {
+                    if (IsOperationalScoutDroneBay(
+                            instances[index],
+                            cityMode,
+                            cityX,
+                            cityY))
+                        activeCount++;
+                }
+            }
+
+            int activeIndex = 0;
+            if (instances != null && activeCount > 0 && world?.Model != null)
+            {
+                for (var index = 0; index < instances.Count; index++)
+                {
+                    GrayboxBuildingInstance3D instance = instances[index];
+                    if (!IsOperationalScoutDroneBay(
+                            instance,
+                            cityMode,
+                            cityX,
+                            cityY))
+                        continue;
+
+                    PlacedBuilding placement = instance.Placement;
+                    float centerX = placement.Site == BuildingSite.InnerCity
+                        ? cityX
+                        : placement.X +
+                          (BuildingOrientationRules.Width(
+                               placement.Definition,
+                               placement.Orientation) - 1) * .5f;
+                    float centerY = placement.Site == BuildingSite.InnerCity
+                        ? cityY
+                        : placement.Y +
+                          (BuildingOrientationRules.Height(
+                               placement.Definition,
+                               placement.Orientation) - 1) * .5f;
+                    var bay = new DroneBayState(
+                        completed: true,
+                        hasLogistics: true);
+                    if (ScoutDroneDeploymentRules.TryCreateVisionSource(
+                            researchCompleted,
+                            bay,
+                            instance.StableInstanceId,
+                            centerX,
+                            centerY,
+                            activeIndex,
+                            activeCount,
+                            ruleTime,
+                            world.Model.Width,
+                            world.Model.Height,
+                            out WorldVisionSource source))
+                    {
+                        currentScoutDroneVisionSourceIds.Add(source.StableId);
+                        SyncVisionSource(
+                            source.StableId,
+                            source.Kind,
+                            source.X,
+                            source.Y,
+                            source.Active,
+                            source.SourceRevision);
+                    }
+                    activeIndex++;
+                }
+            }
+
+            foreach (string stableId in scoutDroneVisionSourceIds)
+            {
+                if (!currentScoutDroneVisionSourceIds.Contains(stableId))
+                {
+                    SyncVisionSource(
+                        stableId,
+                        WorldVisionSourceKind.ScoutDrone,
+                        0,
+                        0,
+                        false,
+                        0ul);
+                }
+            }
+            scoutDroneVisionSourceIds.Clear();
+            foreach (string stableId in currentScoutDroneVisionSourceIds)
+                scoutDroneVisionSourceIds.Add(stableId);
+        }
+
+        private bool IsOperationalScoutDroneBay(
+            GrayboxBuildingInstance3D instance,
+            CityMode cityMode,
+            int cityX,
+            int cityY)
+        {
+            return instance != null &&
+                string.Equals(
+                    instance.Placement?.Definition?.Id.Value,
+                    BuildingCatalog.AutomatedRepairBay.Id.Value,
+                    StringComparison.Ordinal) &&
+                GrayboxBuildingOperationalAccess3D.CanRunLocally(
+                    instance,
+                    cityMode) &&
+                GrayboxBuildingOperationalAccess3D.IsLogisticsConnected(
+                    instance,
+                    cityMode,
+                    cityX,
+                    cityY,
+                    session.GroundBuildRadius);
+        }
+
+        private void SyncSettlementVisionSource(
+            SettlementRuntime settlement,
+            WorldVisionSourceKind kind)
+        {
+            if (settlement == null)
+            {
+                string stableId = kind == WorldVisionSourceKind.Outpost
+                    ? WorldLayerCatalog.Outpost.Id
+                    : WorldLayerCatalog.SecondaryCity.Id;
+                SyncVisionSource(stableId, kind, 0, 0, false, 0ul);
+                return;
+            }
+            SyncVisionSource(
+                settlement.StableId,
+                kind,
+                settlement.X,
+                settlement.Y,
+                kind != WorldVisionSourceKind.Outpost ||
+                    settlement.IsCommunicationActive,
+                settlement.Revision);
         }
 
         private void SyncVisionSource(
@@ -1591,14 +2066,22 @@ namespace WasteCity.Graybox3D.Building
         {
             if (active)
             {
-                bool changed = explorationController.TrySyncVisionSource(
-                    new WorldVisionSource(
+                var desired = new WorldVisionSource(
+                    stableId,
+                    kind,
+                    x,
+                    y,
+                    true,
+                    sourceRevision);
+                if (explorationController.Exploration.TryGetSource(
                         stableId,
-                        kind,
-                        x,
-                        y,
-                        true,
-                        sourceRevision),
+                        out WorldVisionSource existing) &&
+                    !existing.Equals(desired))
+                {
+                    RefreshVisibleResourceIntelBeforeSourceChange();
+                }
+                bool changed = explorationController.TrySyncVisionSource(
+                    desired,
                     out _);
                 if (changed)
                 {
@@ -1610,13 +2093,27 @@ namespace WasteCity.Graybox3D.Building
             }
             else
             {
+                if (explorationController.Exploration.TryGetSource(
+                        stableId,
+                        out _))
+                {
+                    RefreshVisibleResourceIntelBeforeSourceChange();
+                }
                 explorationController.TryRemoveVisionSource(
                     stableId,
                     out _);
             }
         }
 
-        private void SynchronizeVisibleResourceIntel(bool force)
+        private void RefreshVisibleResourceIntelBeforeSourceChange()
+        {
+            if (refreshedVisibleResourceIntelBeforeSourceChange) return;
+            refreshedVisibleResourceIntelBeforeSourceChange = true;
+            SynchronizeVisibleResourceIntel();
+        }
+
+        private void SynchronizeVisibleResourceIntel(
+            bool observeVisibleFacts = true)
         {
             if (explorationController?.IsInitialized != true ||
                 world?.Model == null)
@@ -1633,7 +2130,8 @@ namespace WasteCity.Graybox3D.Building
                 WorldCell cell = world.Model.Get(node.X, node.Y);
                 if (state == WorldVisibilityState.Visible)
                 {
-                    bool observed = explorationController
+                    WorldScanResult scan = default;
+                    bool observed = observeVisibleFacts && explorationController
                         .TryObserveVisibleResource(
                             node.X,
                             node.Y,
@@ -1641,7 +2139,7 @@ namespace WasteCity.Graybox3D.Building
                             cell.ResourceAmount,
                             session.CheckpointRuleTimeSeconds,
                             world.Model.ResourceRevision,
-                            out WorldScanResult scan,
+                            out scan,
                             out _,
                             out _);
                     if (observed)
@@ -1653,8 +2151,18 @@ namespace WasteCity.Graybox3D.Building
                                 node.Y,
                                 FormalExplorationCatalog3D.FindScanZone(
                                     scan.ZoneId).RevealRadius);
-                            explorationFeedback = "自动扫描完成：" +
-                                ExplorationZoneName(scan.ZoneId);
+                            int attentionDelta =
+                                FormalAttentionCatalog.Find(
+                                    scan.AttentionReasonId)?.Delta ?? 0;
+                            explorationFeedback =
+                                GrayboxExplorationScanFeedback3D
+                                    .ForCompletedScan(
+                                        ExplorationZoneName(scan.ZoneId),
+                                        "发现" + ResourceName(
+                                            cell.ResourceId) + "矿点",
+                                        scan.RevealedCellCount,
+                                        attentionDelta)
+                                    .Summary;
                             checkpointPolicy?.QueueCheckpoint(
                                 FormalSaveCheckpointReasonIds
                                     .ExplorationScanCompleted,
@@ -1680,9 +2188,11 @@ namespace WasteCity.Graybox3D.Building
                     presentation = intel.State == WorldIntelState.Expired ||
                         !intel.HasMutableValue
                             ? ResourceMarkerFogPresentation3D
-                                .LastKnownIdentity
+                                .LastKnownIdentityAt(intel.AgeSeconds)
                             : ResourceMarkerFogPresentation3D.LastIntel(
-                                intel.MutableValue);
+                                intel.MutableValue,
+                                intel.State,
+                                intel.AgeSeconds);
                 }
                 world.TrySetResourceMarkerFogPresentation(
                     node.X,
@@ -1836,7 +2346,8 @@ namespace WasteCity.Graybox3D.Building
                 recruited,
                 character,
                 control,
-                gather);
+                gather,
+                CanBackpackAcceptSelectedResource());
             bool gatherEnabled = gatherRuntime.IsActive ||
                 string.IsNullOrEmpty(gatherReason);
             string rescueReason = ResolveRescueDisabledReason();
@@ -1883,7 +2394,22 @@ namespace WasteCity.Graybox3D.Building
                 GrayboxExplorationView3D.CenJinCharacterVisualId,
                 rescueActive
                     ? GrayboxExplorationView3D.RescueStatusVisualId
-                    : GrayboxExplorationView3D.FollowStatusVisualId);
+                    : GrayboxExplorationView3D.FollowStatusVisualId,
+                BuildVisionRangeText());
+        }
+
+        private static string BuildVisionRangeText()
+        {
+            return "主城 " + FormalExplorationCatalog3D.ResolveSightRadius(
+                       WorldVisionSourceKind.PrimaryCity) +
+                   " · 次城 " + FormalExplorationCatalog3D.ResolveSightRadius(
+                       WorldVisionSourceKind.SecondaryCity) +
+                   " · 领袖 " + FormalExplorationCatalog3D.ResolveSightRadius(
+                       WorldVisionSourceKind.Leader) +
+                   " · 前哨 " + FormalExplorationCatalog3D.ResolveSightRadius(
+                       WorldVisionSourceKind.Outpost) +
+                   " · 侦察无人机 " + FormalExplorationCatalog3D
+                       .ResolveSightRadius(WorldVisionSourceKind.ScoutDrone);
         }
 
         private ManualGatherContext CaptureManualGatherContext()
@@ -2199,13 +2725,76 @@ namespace WasteCity.Graybox3D.Building
             if (explorationView == null ||
                 explorationController?.IsInitialized != true)
                 return;
-            string signature = BuildExplorationPresentationSignature();
-            if (!force && string.Equals(
-                    signature,
-                    presentedExplorationSignature,
-                    StringComparison.Ordinal))
+            ulong leaderControlRevision =
+                explorationController.LeaderControl.Revision;
+            ulong manualGatherRevision =
+                explorationController.ManualGather.Revision;
+            ulong distressRevision =
+                explorationController.CenJinDistress.Revision;
+            ulong outpostAlertRevision =
+                explorationController.OutpostAlerts.Revision;
+            CityMode cityMode = city?.Mode ?? CityMode.Mobile;
+            ulong leaderDamageRevision =
+                CurrentLeaderCharacter()?.DamageRevision ?? 0ul;
+            ulong visibilityRevision =
+                explorationController.Exploration.VisibilityRevision;
+            ulong resourceRevision = world?.Model?.ResourceRevision ?? 0ul;
+            ulong storageRevision = session?.CityStorage?.Revision ?? 0ul;
+            SettlementRuntime outpost = expansionController?.Runtime?
+                .WorldLayer?.GetSettlement(WorldLayerCatalog.Outpost.Id);
+            ulong outpostSettlementRevision = outpost?.Revision ?? 0ul;
+            int leaderCellX = int.MinValue;
+            int leaderCellY = int.MinValue;
+            TryGetLeaderCell(out leaderCellX, out leaderCellY);
+            int cityCellX = int.MinValue;
+            int cityCellY = int.MinValue;
+            city?.TryGetCurrentCell(out cityCellX, out cityCellY);
+            bool modalBlocked = IsWorldInteractionModalBlocked();
+            bool backpackCanAccept = CanBackpackAcceptSelectedResource();
+            if (!force &&
+                leaderControlRevision == presentedLeaderControlRevision &&
+                manualGatherRevision == presentedManualGatherRevision &&
+                distressRevision == presentedDistressRevision &&
+                outpostAlertRevision == presentedOutpostAlertRevision &&
+                selectedGatherX == presentedGatherX &&
+                selectedGatherY == presentedGatherY &&
+                string.Equals(
+                    explorationFeedback,
+                    presentedExplorationFeedback,
+                    StringComparison.Ordinal) &&
+                cityMode == presentedExplorationCityMode &&
+                leaderDamageRevision == presentedLeaderDamageRevision &&
+                visibilityRevision == presentedVisibilityRevision &&
+                resourceRevision == presentedResourceRevision &&
+                storageRevision == presentedStorageRevision &&
+                outpostSettlementRevision ==
+                    presentedOutpostSettlementRevision &&
+                leaderCellX == presentedLeaderCellX &&
+                leaderCellY == presentedLeaderCellY &&
+                cityCellX == presentedCityCellX &&
+                cityCellY == presentedCityCellY &&
+                modalBlocked == presentedWorldModalBlocked &&
+                backpackCanAccept == presentedBackpackCanAccept)
                 return;
-            presentedExplorationSignature = signature;
+            presentedLeaderControlRevision = leaderControlRevision;
+            presentedManualGatherRevision = manualGatherRevision;
+            presentedDistressRevision = distressRevision;
+            presentedOutpostAlertRevision = outpostAlertRevision;
+            presentedGatherX = selectedGatherX;
+            presentedGatherY = selectedGatherY;
+            presentedExplorationFeedback = explorationFeedback;
+            presentedExplorationCityMode = cityMode;
+            presentedLeaderDamageRevision = leaderDamageRevision;
+            presentedVisibilityRevision = visibilityRevision;
+            presentedResourceRevision = resourceRevision;
+            presentedStorageRevision = storageRevision;
+            presentedOutpostSettlementRevision = outpostSettlementRevision;
+            presentedLeaderCellX = leaderCellX;
+            presentedLeaderCellY = leaderCellY;
+            presentedCityCellX = cityCellX;
+            presentedCityCellY = cityCellY;
+            presentedWorldModalBlocked = modalBlocked;
+            presentedBackpackCanAccept = backpackCanAccept;
             explorationView.Apply(CaptureExplorationPresentation());
             explorationView.ApplyScanFeedback(
                 new GrayboxExplorationScanFeedback3D(
@@ -2215,18 +2804,6 @@ namespace WasteCity.Graybox3D.Building
                     explorationFeedback.Contains("不足") ||
                     explorationFeedback.Contains("不可")));
             ApplyLatestOutpostAlert();
-        }
-
-        private string BuildExplorationPresentationSignature()
-        {
-            return explorationController.LeaderControl.Revision + "|" +
-                explorationController.ManualGather.Revision + "|" +
-                explorationController.CenJinDistress.Revision + "|" +
-                explorationController.OutpostAlerts.Revision + "|" +
-                selectedGatherX + "," + selectedGatherY + "|" +
-                explorationFeedback + "|" +
-                (city?.Mode ?? CityMode.Mobile) + "|" +
-                (CurrentLeaderCharacter()?.DamageRevision ?? 0ul);
         }
 
         private void ApplyLatestOutpostAlert()
@@ -2270,9 +2847,38 @@ namespace WasteCity.Graybox3D.Building
             if (alert == null) return;
             explorationController.OutpostAlerts.TryAcknowledge(
                 stableAlertId);
-            expansionController?.Runtime?.WorldLayer.TryFocus(
-                alert.SettlementId);
-            explorationFeedback = "已定位前哨警报";
+
+            if (expansionController == null)
+            {
+                explorationFeedback = "无法定位前哨警报";
+                RefreshExplorationView(force: true);
+                return;
+            }
+            if (!expansionController.TryOpenWorldSettlementDetail(
+                    alert.SettlementId,
+                    out int cellX,
+                    out int cellY,
+                    out string error))
+            {
+                explorationFeedback = string.IsNullOrWhiteSpace(error)
+                    ? "无法定位前哨警报"
+                    : error;
+                RefreshExplorationView(force: true);
+                return;
+            }
+
+            explorationView?.Close();
+            bool cameraFocused = world?.Coordinates != null &&
+                world.Coordinates.TryCellToWorld(
+                    cellX,
+                    cellY,
+                    0f,
+                    out Vector3 worldPosition) &&
+                cameraController != null &&
+                cameraController.FocusWorldPosition(worldPosition);
+            explorationFeedback = cameraFocused
+                ? "已定位前哨警报并打开前哨详情"
+                : "已打开前哨详情，但镜头无法定位";
             RefreshExplorationView(force: true);
         }
 
@@ -2280,7 +2886,8 @@ namespace WasteCity.Graybox3D.Building
             bool recruited,
             CharacterLifeRuntime character,
             LeaderControlResolution control,
-            ManualGatherContext context)
+            ManualGatherContext context,
+            bool backpackCanAccept)
         {
             if (!recruited) return "岑烬尚未招募";
             if (character == null || character.State != CharacterLifeState.Active)
@@ -2291,10 +2898,25 @@ namespace WasteCity.Graybox3D.Building
                 return "请先点选实时视野内的资源节点";
             if (!context.TargetVisible) return "资源节点不在实时视野内";
             if (context.NodeAmount <= 0) return "矿脉已枯竭";
+            if (context.ModalBlocked) return "请先关闭其他操作面板";
             if (context.DistanceToFootprint >
                 LeaderInteractionCatalog.ManualGatherMaximumDistance)
                 return "距离资源节点超过 1.5 格";
+            if (!backpackCanAccept) return "背包已满";
             return string.Empty;
+        }
+
+        private bool CanBackpackAcceptSelectedResource()
+        {
+            if (world?.Model == null || operations?.Backpack == null ||
+                selectedGatherX < 0 || selectedGatherY < 0 ||
+                selectedGatherX >= world.Model.Width ||
+                selectedGatherY >= world.Model.Height)
+                return false;
+            WorldCell cell = world.Model.Get(selectedGatherX, selectedGatherY);
+            return cell.HasResource && operations.Backpack.GetAcceptableAmount(
+                cell.ResourceId,
+                1) == 1;
         }
 
         private string ResolveRescueDisabledReason()
@@ -2422,7 +3044,8 @@ namespace WasteCity.Graybox3D.Building
                    production != null &&
                    defense != null &&
                    evacuation != null &&
-                   expansionController != null;
+                   expansionController != null &&
+                   cameraController != null;
         }
 
         private void BindRuleClock()
@@ -3301,6 +3924,29 @@ namespace WasteCity.Graybox3D.Building
             voidChestController = new GrayboxVoidChestController3D(
                 FateRuntime,
                 reboundVoidChest);
+            return true;
+        }
+
+        private bool TryRestoreSessionScopedFateOwners(
+            VoidChestRuntime previousVoidChest,
+            GrayboxVoidChestController3D previousVoidChestController,
+            out string error)
+        {
+            if (!ProgressionAdapter.ConfigureIdea0028Owners(
+                    QuantumEntanglementRuntime,
+                    SpatialTemplateRuntime,
+                    LocalHasteRuntime,
+                    ForesightDelayRuntime,
+                    CausalTransparencyRuntime,
+                    previousVoidChest,
+                    CoordinateLockRuntime,
+                    out error))
+            {
+                return false;
+            }
+            voidChestRuntime = previousVoidChest;
+            voidChestController = previousVoidChestController;
+            error = string.Empty;
             return true;
         }
 

@@ -95,5 +95,37 @@ namespace WasteCity.Tests
             Assert.That(runtime.TryRestoreExplored(
                 new bool[3], out error), Is.False);
         }
+
+        [Test]
+        public void CaptureSourcesIsStableDefensiveAndReadOnly()
+        {
+            var runtime = new WorldVisibilityRuntime(20, 20);
+            runtime.UpsertSource(new WorldVisionSource(
+                "vision.zeta",
+                WorldVisionSourceKind.ScoutDrone,
+                12,
+                8,
+                true,
+                3ul));
+            runtime.UpsertSource(new WorldVisionSource(
+                "vision.alpha",
+                WorldVisionSourceKind.PrimaryCity,
+                4,
+                5,
+                true,
+                2ul));
+            ulong revision = runtime.Revision;
+
+            WorldVisionSource[] first = runtime.CaptureSources();
+            WorldVisionSource[] second = runtime.CaptureSources();
+
+            Assert.That(first, Has.Length.EqualTo(2));
+            Assert.That(first[0].StableId, Is.EqualTo("vision.alpha"));
+            Assert.That(first[1].StableId, Is.EqualTo("vision.zeta"));
+            Assert.That(first, Is.Not.SameAs(second));
+            first[0] = default;
+            Assert.That(second[0].StableId, Is.EqualTo("vision.alpha"));
+            Assert.That(runtime.Revision, Is.EqualTo(revision));
+        }
     }
 }

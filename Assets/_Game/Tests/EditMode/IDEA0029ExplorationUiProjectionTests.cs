@@ -123,6 +123,44 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void CompletedScanFeedbackShowsRevealAndAttentionReward()
+        {
+            GrayboxExplorationScanFeedback3D feedback =
+                GrayboxExplorationScanFeedback3D.ForCompletedScan(
+                    "安全矿区",
+                    "发现铁矿矿点",
+                    23,
+                    2);
+
+            Assert.That(feedback.Visible, Is.True);
+            Assert.That(feedback.Warning, Is.False);
+            Assert.That(feedback.Summary,
+                Is.EqualTo("自动扫描完成：安全矿区 · 发现铁矿矿点 " +
+                    "· 新增情报格 23 · 关注度 +2"));
+        }
+
+        [Test]
+        public void LeaderProjectionShowsFormalVisionRangesWithoutHardcodedUiValues()
+        {
+            var projection = new GrayboxExplorationPresentation3D(
+                "岑烬",
+                "正常",
+                "AI 控制",
+                null,
+                0f,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                visionRangeText: "主城 7 · 次城 5 · 领袖 4 · 前哨 3 · 侦察无人机 6");
+
+            Assert.That(projection.VisionRangeText,
+                Is.EqualTo("主城 7 · 次城 5 · 领袖 4 · 前哨 3 · 侦察无人机 6"));
+        }
+
+        [Test]
         public void OutpostAlertProjectionKeepsStableFocusIdentity()
         {
             var alert = new GrayboxExplorationOutpostAlertPresentation3D(

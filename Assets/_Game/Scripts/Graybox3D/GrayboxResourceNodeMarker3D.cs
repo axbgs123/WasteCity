@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using WasteCity.Economy;
 using WasteCity.World;
+using WasteCity.World.Exploration;
 
 namespace WasteCity.Graybox3D
 {
@@ -28,8 +29,12 @@ namespace WasteCity.Graybox3D
         private TextMesh amountLabel;
         private TextMesh shadowLabel;
         private string resourceDisplayName;
+        private string intelStatusText = string.Empty;
+        private bool suppressAmountForIntel;
         private bool labelRequestedByLod = true;
         private bool labelLayoutVisible = true;
+        private bool hasIntelVisualState;
+        private WorldIntelState intelVisualState;
 
         public string StableId { get; private set; }
         public string ResourceId { get; private set; }
@@ -41,6 +46,9 @@ namespace WasteCity.Graybox3D
             : amountLabel.text;
         public Sprite Icon => icon;
         public Sprite Frame => frame;
+        public bool HasIntelVisualState => hasIntelVisualState;
+        public WorldIntelState IntelVisualState => intelVisualState;
+        public Color IconTint { get; private set; } = Color.white;
         public ResourceNodeMarkerLod3D DisplayLod { get; private set; } =
             ResourceNodeMarkerLod3D.Near;
         public bool GuidanceOverride { get; private set; }
@@ -92,14 +100,8 @@ namespace WasteCity.Graybox3D
             if (amount == DisplayedAmount) return false;
             DisplayedAmount = amount;
             UpdateDisplayText();
-            ApplyLabelColor(amount);
-            iconRenderer.GetPropertyBlock(iconProperties);
-            Color iconColor = amount > 0
-                ? Color.white
-                : new Color(.48f, .48f, .48f, .8f);
-            iconProperties.SetColor("_Color", iconColor);
-            iconProperties.SetColor("_BaseColor", iconColor);
-            iconRenderer.SetPropertyBlock(iconProperties);
+            if (!hasIntelVisualState)
+                ApplyLiveVisualPalette(amount);
             return true;
         }
 
@@ -211,6 +213,23 @@ namespace WasteCity.Graybox3D
                 : ResolveIconMaterial(frame.texture);
         }
 
+        public void ApplyIntelPresentation(
+            bool suppressAmount,
+            string statusText,
+            bool hasIntelState,
+            WorldIntelState intelState)
+        {
+            suppressAmountForIntel = suppressAmount;
+            intelStatusText = statusText ?? string.Empty;
+            hasIntelVisualState = hasIntelState;
+            intelVisualState = intelState;
+            if (hasIntelState)
+                ApplyIntelVisualPalette(intelState);
+            else
+                ApplyLiveVisualPalette(Math.Max(0, DisplayedAmount));
+            UpdateDisplayText();
+        }
+
         public void FaceCamera(Transform cameraTransform)
         {
             if (cameraTransform != null)
@@ -285,11 +304,19 @@ namespace WasteCity.Graybox3D
             switch (DisplayLod)
             {
                 case ResourceNodeMarkerLod3D.Near:
-                    text = resourceDisplayName + "\n" +
-                        DisplayedAmount;
+                    text = resourceDisplayName;
+                    if (!suppressAmountForIntel)
+                        text += "\n" + DisplayedAmount;
+                    if (!string.IsNullOrWhiteSpace(intelStatusText))
+                        text += "\n" + intelStatusText;
                     break;
                 case ResourceNodeMarkerLod3D.Mid:
-                    text = DisplayedAmount.ToString();
+                    text = suppressAmountForIntel
+                        ? intelStatusText
+                        : DisplayedAmount +
+                          (string.IsNullOrWhiteSpace(intelStatusText)
+                              ? string.Empty
+                              : "\n" + intelStatusText);
                     break;
                 default:
                     text = string.Empty;
@@ -414,6 +441,46 @@ namespace WasteCity.Graybox3D
             amountLabel.color = Color.Lerp(resourceColor, Color.white, .7f);
             if (shadowLabel != null)
                 shadowLabel.color = ShadowColor();
+        }
+
+        private void ApplyLiveVisualPalette(int amount)
+        {
+            ApplyLabelColor(amount);
+            ApplyIconTint(amount > 0
+                ? Color.white
+                : new Color(.48f, .48f, .48f, .8f));
+        }
+
+        private void ApplyIntelVisualPalette(WorldIntelState state)
+        {
+            Color tint;
+            switch (state)
+            {
+                case WorldIntelState.Stale:
+                    tint = new Color(1f, .68f, .22f, .92f);
+                    break;
+                case WorldIntelState.Expired:
+                    tint = new Color(.58f, .61f, .64f, .82f);
+                    break;
+                default:
+                    tint = new Color(.65f, .88f, 1f, .96f);
+                    break;
+            }
+            if (amountLabel != null)
+                amountLabel.color = tint;
+            if (shadowLabel != null)
+                shadowLabel.color = ShadowColor();
+            ApplyIconTint(tint);
+        }
+
+        private void ApplyIconTint(Color tint)
+        {
+            EnsurePresentation();
+            IconTint = tint;
+            iconRenderer.GetPropertyBlock(iconProperties);
+            iconProperties.SetColor("_Color", tint);
+            iconProperties.SetColor("_BaseColor", tint);
+            iconRenderer.SetPropertyBlock(iconProperties);
         }
 
         private static Color ShadowColor()

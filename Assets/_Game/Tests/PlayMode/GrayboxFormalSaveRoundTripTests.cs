@@ -16,6 +16,7 @@ using UnityEngine.UI;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Combat;
+using WasteCity.Core;
 using WasteCity.Defense;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
@@ -148,7 +149,6 @@ namespace WasteCity.Tests
 
             yield return SaveThroughRealMenu();
             yield return ReloadAndContinue();
-            yield return EnsureSystemMenuOpen();
             city = RequireCity();
             CityTransitionFingerprint after =
                 CityTransitionFingerprint.Capture(city);
@@ -179,7 +179,6 @@ namespace WasteCity.Tests
 
             yield return SaveThroughRealMenu();
             yield return ReloadAndContinue();
-            yield return EnsureSystemMenuOpen();
             city = RequireCity();
             CityTransitionFingerprint after =
                 CityTransitionFingerprint.Capture(city);
@@ -188,6 +187,102 @@ namespace WasteCity.Tests
             AssertFullAuthorityEquivalent(beforeAuthority,
                 CaptureFullAuthority(), "packing");
             AssertTransitionDerivedState(city);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0029_FailedContinueRestoresExplorationSessionOwners()
+        {
+            yield return StartNewGame();
+            GrayboxFormalSaveRuntimeHost3D host = RequireSaveHost();
+            GrayboxFormalSaveCoordinator3D coordinator =
+                RequireCoordinator(host);
+            string restoredSessionId = host.CurrentSessionId;
+            var checkpoint = new FormalSaveCheckpointMetadata
+            {
+                sequence = 1L,
+                reasonId = FormalSaveCheckpointReasonIds.NewGameReady,
+                ruleTimeSeconds = RequireSession()
+                    .CheckpointRuleTimeSeconds,
+                completedMilestoneIds = Array.Empty<string>(),
+            };
+            GrayboxFormalSaveCoordinatorResult3D captured =
+                coordinator.CaptureEnvelope(
+                    restoredSessionId,
+                    "0.1.0-test",
+                    new[] { "builtin:wastecity@0.1.0-test" },
+                    checkpoint,
+                    new DateTime(
+                        2026, 9, 4, 0, 0, 0, DateTimeKind.Utc));
+            Assert.That(captured.Success, Is.True, captured.Message);
+
+            var store = new FormalSaveStore(saveDirectory);
+            FormalSaveStoreResult saved = store.SaveEnvelope(
+                captured.Envelope,
+                archiveLegacy2D: false,
+                FormalSaveWriteIntent.ContinueProgress);
+            Assert.That(saved.Success, Is.True, saved.Diagnostic);
+
+            string originalSessionId = restoredSessionId + "-previous";
+            Assert.That(originalSessionId, Is.Not.EqualTo(restoredSessionId));
+            Assert.That(host.ProgressionAdapter.TryRestore(
+                    new FormalThreeDProgressionSaveData(),
+                    out string cleanProgressionError),
+                Is.True,
+                cleanProgressionError);
+            SetCurrentSessionId(host, originalSessionId);
+            RebindSessionScopedFateOwners(host, originalSessionId);
+            ResetExplorationSession(host, originalSessionId);
+            VoidChestRuntime originalVoidChest = host.VoidChestRuntime;
+            GrayboxVoidChestController3D originalVoidChestController =
+                RequireVoidChestController(host);
+            var originalExploration = host.ExplorationController.Exploration;
+            var originalLeaderControl =
+                host.ExplorationController.LeaderControl;
+            var originalManualGather =
+                host.ExplorationController.ManualGather;
+            var originalDistress = host.ExplorationController.CenJinDistress;
+            var originalOutpostAlerts =
+                host.ExplorationController.OutpostAlerts;
+
+            IFormalThreeDSaveDomain[] domains = RequireDomains(coordinator);
+            int pauseIndex = Array.FindIndex(
+                domains,
+                value => value.DomainId ==
+                    GrayboxFormalSaveDomainId3D.Pause);
+            Assert.That(pauseIndex, Is.GreaterThanOrEqualTo(0));
+            var failingPause = new FailFirstApplyDomain(
+                domains[pauseIndex]);
+            domains[pauseIndex] = failingPause;
+
+            Assert.That(host.TryContinue(), Is.False);
+            Assert.That(failingPause.ApplyCalls, Is.EqualTo(2),
+                "故障必须发生在目标应用阶段，并由协调器完成一次回滚应用；" +
+                "progression=" + host.LastProgressionRestoreError +
+                "; store=" + host.LastStoreResult?.Diagnostic +
+                "; coordinator=" + host.LastCoordinatorResult?.Message);
+            Assert.That(host.LastCoordinatorResult.Code,
+                Is.EqualTo(GrayboxFormalSaveCoordinatorCode3D.ApplyFailed));
+            Assert.That(host.CurrentSessionId, Is.EqualTo(originalSessionId));
+            Assert.That(
+                host.ExplorationController.Exploration,
+                Is.SameAs(originalExploration));
+            Assert.That(host.ExplorationController.LeaderControl,
+                Is.SameAs(originalLeaderControl));
+            Assert.That(host.ExplorationController.ManualGather,
+                Is.SameAs(originalManualGather));
+            Assert.That(
+                host.ExplorationController.CenJinDistress,
+                Is.SameAs(originalDistress));
+            Assert.That(host.ExplorationController.OutpostAlerts,
+                Is.SameAs(originalOutpostAlerts));
+            Assert.That(
+                host.ExplorationController.CenJinDistress.SessionId,
+                Is.EqualTo(originalSessionId));
+            Assert.That(host.VoidChestRuntime, Is.SameAs(originalVoidChest));
+            Assert.That(host.VoidChestRuntime.SessionId,
+                Is.EqualTo(originalSessionId));
+            Assert.That(RequireVoidChestController(host),
+                Is.SameAs(originalVoidChestController));
         }
 
         [UnityTest]
@@ -212,7 +307,6 @@ namespace WasteCity.Tests
 
             yield return SaveThroughRealMenu();
             yield return ReloadAndContinue();
-            yield return EnsureSystemMenuOpen();
             defense = RequireDefense();
             GrayboxDefensePersistenceState3D after =
                 defense.Runtime.CaptureForPersistence();
@@ -325,7 +419,6 @@ namespace WasteCity.Tests
 
             yield return SaveThroughRealMenu();
             yield return ReloadAndContinue();
-            yield return EnsureSystemMenuOpen();
             evacuation = RequireEvacuation();
             GrayboxEvacuationPersistenceState3D after =
                 evacuation.CaptureForPersistence();
@@ -457,11 +550,22 @@ namespace WasteCity.Tests
             Dictionary<string, FormalSaveFileSnapshot> idleSaveFiles =
                 CaptureFormalSaveFileSnapshots(saveDirectory);
             int idleSceneObjectCount = CountFormalSceneObjects();
+            Dictionary<int, string> idleSceneObjects =
+                CaptureFormalSceneObjects();
+            var idleObjectCountSamples = new List<string>();
             for (var frame = 0;
                  frame < FormalSaveIdleFrameCount;
                  frame++)
             {
                 yield return null;
+                int elapsed = frame + 1;
+                if (elapsed == 1 || elapsed == 2 || elapsed == 3 ||
+                    elapsed == 10 || elapsed == 30 || elapsed == 60 ||
+                    elapsed == 120 || elapsed == FormalSaveIdleFrameCount)
+                {
+                    idleObjectCountSamples.Add(
+                        elapsed + ":" + CountFormalSceneObjects());
+                }
             }
             AssertFormalSaveFilesUnchanged(
                 idleSaveFiles,
@@ -470,7 +574,9 @@ namespace WasteCity.Tests
                 CountFormalSceneObjects(),
                 Is.EqualTo(idleSceneObjectCount),
                 "The blocked formal save scene grew persistent objects " +
-                "across 300 real PlayMode frames.");
+                "across 300 real PlayMode frames. Samples=" +
+                string.Join(",", idleObjectCountSamples) + "; added=" +
+                DescribeAddedFormalSceneObjects(idleSceneObjects));
             Assert.That(RequireEvacuation().IsBlocked, Is.True);
         }
 
@@ -749,9 +855,18 @@ namespace WasteCity.Tests
             yield return ReloadScene();
             GrayboxFormalSaveEntryController3D entry = RequireEntry();
             Assert.That(entry.CanContinue, Is.True, entry.FeedbackMessage);
+            GrayboxFormalSaveRuntimeHost3D host = RequireSaveHost();
+            // The title owns a pause before Continue. Add the system-menu
+            // reason before the real button press so EnterGameplay can remove
+            // the title reason without exposing even one advancing frame.
+            // Escape below still opens the real menu and assumes ownership of
+            // that same pause reason; Main.Continue then clears it normally.
+            host.Speed.SetPaused(GamePauseReason.SystemMenu, true);
+            Time.timeScale = host.Speed.Speed;
             yield return ClickButton("Start.Continue");
             Assert.That(entry.IsRuntimeReady, Is.True, entry.FeedbackMessage);
             Assert.That(entry.IsStartPageOpen, Is.False);
+            yield return EnsureSystemMenuOpen();
         }
 
         private IEnumerator EnsureSystemMenuOpen()
@@ -1018,9 +1133,10 @@ namespace WasteCity.Tests
             var coordinator = field.GetValue(host) as
                 GrayboxFormalSaveCoordinator3D;
             Assert.That(coordinator, Is.Not.Null);
+            Assert.That(host.CurrentSessionId, Is.Not.Empty);
             GrayboxFormalSaveCoordinatorResult3D result =
                 coordinator.CaptureEnvelope(
-                    "task13-round-trip-session",
+                    host.CurrentSessionId,
                     "0.1.0-test",
                     new[] { "builtin:wastecity@0.1.0-test" },
                     new FormalSaveCheckpointMetadata
@@ -1036,6 +1152,88 @@ namespace WasteCity.Tests
             Assert.That(result.Success, Is.True, result.Message);
             Assert.That(result.Envelope?.formal3D, Is.Not.Null);
             return CloneAuthority(result.Envelope.formal3D);
+        }
+
+        private static GrayboxFormalSaveCoordinator3D RequireCoordinator(
+            GrayboxFormalSaveRuntimeHost3D host)
+        {
+            FieldInfo field = typeof(GrayboxFormalSaveRuntimeHost3D)
+                .GetField(
+                    "coordinator",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var coordinator = field.GetValue(host) as
+                GrayboxFormalSaveCoordinator3D;
+            Assert.That(coordinator, Is.Not.Null);
+            return coordinator;
+        }
+
+        private static IFormalThreeDSaveDomain[] RequireDomains(
+            GrayboxFormalSaveCoordinator3D coordinator)
+        {
+            FieldInfo field = typeof(GrayboxFormalSaveCoordinator3D)
+                .GetField(
+                    "domains",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var domains = field.GetValue(coordinator) as
+                IFormalThreeDSaveDomain[];
+            Assert.That(domains, Is.Not.Null);
+            return domains;
+        }
+
+        private static void SetCurrentSessionId(
+            GrayboxFormalSaveRuntimeHost3D host,
+            string sessionId)
+        {
+            FieldInfo field = typeof(GrayboxFormalSaveRuntimeHost3D)
+                .GetField(
+                    "currentSessionId",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            field.SetValue(host, sessionId);
+        }
+
+        private static void ResetExplorationSession(
+            GrayboxFormalSaveRuntimeHost3D host,
+            string sessionId)
+        {
+            MethodInfo method = typeof(GrayboxFormalSaveRuntimeHost3D)
+                .GetMethod(
+                    "TryResetExplorationSession",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            object[] arguments = { sessionId, true, null };
+            bool succeeded = (bool)method.Invoke(host, arguments);
+            Assert.That(succeeded, Is.True, arguments[2] as string);
+        }
+
+        private static void RebindSessionScopedFateOwners(
+            GrayboxFormalSaveRuntimeHost3D host,
+            string sessionId)
+        {
+            MethodInfo method = typeof(GrayboxFormalSaveRuntimeHost3D)
+                .GetMethod(
+                    "TryRebindSessionScopedFateOwners",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(method, Is.Not.Null);
+            object[] arguments = { sessionId, null };
+            bool succeeded = (bool)method.Invoke(host, arguments);
+            Assert.That(succeeded, Is.True, arguments[1] as string);
+        }
+
+        private static GrayboxVoidChestController3D
+            RequireVoidChestController(GrayboxFormalSaveRuntimeHost3D host)
+        {
+            FieldInfo field = typeof(GrayboxFormalSaveRuntimeHost3D)
+                .GetField(
+                    "voidChestController",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(field, Is.Not.Null);
+            var controller = field.GetValue(host) as
+                GrayboxVoidChestController3D;
+            Assert.That(controller, Is.Not.Null);
+            return controller;
         }
 
         private static void AssertFullAuthorityEquivalent(
@@ -1157,6 +1355,29 @@ namespace WasteCity.Tests
                 expected.evacuation.remainingSeconds,
                 ref actual.evacuation.remainingSeconds,
                 context + " evacuation remaining");
+
+            Assert.That(actual.exploration.intel.Length,
+                Is.EqualTo(expected.exploration.intel.Length), context);
+            for (var index = 0;
+                 index < expected.exploration.intel.Length;
+                 index++)
+            {
+                Assert.That(actual.exploration.intel[index].stableIntelId,
+                    Is.EqualTo(expected.exploration.intel[index]
+                        .stableIntelId), context);
+                NormalizeAdvancingFloat(
+                    expected.exploration.intel[index]
+                        .remainingFreshSeconds,
+                    ref actual.exploration.intel[index]
+                        .remainingFreshSeconds,
+                    context + " exploration intel fresh " + index);
+                NormalizeAdvancingFloat(
+                    expected.exploration.intel[index]
+                        .remainingExpirySeconds,
+                    ref actual.exploration.intel[index]
+                        .remainingExpirySeconds,
+                    context + " exploration intel expiry " + index);
+            }
         }
 
         private static void NormalizeAdvancingFloat(
@@ -1520,6 +1741,28 @@ namespace WasteCity.Tests
                 value.gameObject.scene == graybox);
         }
 
+        private static Dictionary<int, string> CaptureFormalSceneObjects()
+        {
+            Scene graybox = SceneManager.GetSceneByName(SceneName);
+            Assert.That(graybox.IsValid() && graybox.isLoaded, Is.True);
+            return Object.FindObjectsOfType<Transform>(true)
+                .Where(value => value.gameObject.scene == graybox)
+                .ToDictionary(
+                    value => value.gameObject.GetInstanceID(),
+                    value => value.gameObject.name);
+        }
+
+        private static string DescribeAddedFormalSceneObjects(
+            IReadOnlyDictionary<int, string> before)
+        {
+            Dictionary<int, string> after = CaptureFormalSceneObjects();
+            return string.Join(
+                ",",
+                after.Where(item => !before.ContainsKey(item.Key))
+                    .Select(item => item.Value)
+                    .OrderBy(value => value, StringComparer.Ordinal));
+        }
+
         private static void AssertSingleFormalComposition()
         {
             AssertSingleLoadedObject<GrayboxSceneBootstrap>();
@@ -1657,6 +1900,42 @@ namespace WasteCity.Tests
         {
             public int Count { get; private set; }
             public void Exit() => Count++;
+        }
+
+        private sealed class FailFirstApplyDomain :
+            IFormalThreeDSaveDomain
+        {
+            private readonly IFormalThreeDSaveDomain inner;
+            private bool failed;
+
+            public FailFirstApplyDomain(IFormalThreeDSaveDomain inner)
+            {
+                this.inner = inner;
+            }
+
+            public GrayboxFormalSaveDomainId3D DomainId => inner.DomainId;
+            public int ApplyCalls { get; private set; }
+
+            public bool TryCapture(
+                FormalThreeDSaveData destination,
+                out string error)
+            {
+                return inner.TryCapture(destination, out error);
+            }
+
+            public bool TryApply(
+                FormalThreeDSaveData source,
+                out string error)
+            {
+                ApplyCalls++;
+                if (!failed)
+                {
+                    failed = true;
+                    error = "forced apply failure after exploration";
+                    return false;
+                }
+                return inner.TryApply(source, out error);
+            }
         }
 
     }
