@@ -19,6 +19,7 @@ using WasteCity.Graybox3D.Exploration;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 using WasteCity.Progression;
+using WasteCity.Leader.Exploration;
 
 namespace WasteCity.Tests
 {
@@ -179,6 +180,134 @@ namespace WasteCity.Tests
             yield return TapKey(Key.L);
 
             Assert.That(exploration.IsOpen, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0029_RealRescueButtonUnlocksLeaderControl()
+        {
+            GrayboxFormalSaveRuntimeHost3D host =
+                Object.FindObjectOfType<GrayboxFormalSaveRuntimeHost3D>();
+            GrayboxExplorationView3D explorationView =
+                Object.FindObjectOfType<GrayboxExplorationView3D>();
+            GrayboxMobileCityController3D city =
+                Object.FindObjectOfType<GrayboxMobileCityController3D>();
+            GrayboxWorldView3D world =
+                Object.FindObjectOfType<GrayboxWorldView3D>();
+            GrayboxBuildingSession3D session =
+                Object.FindObjectOfType<GrayboxBuildingSession3D>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(explorationView, Is.Not.Null);
+            Assert.That(city, Is.Not.Null);
+            Assert.That(world, Is.Not.Null);
+            Assert.That(session, Is.Not.Null);
+
+            GrayboxDeveloperModifier3D modifier = CreateModifier(session);
+            modifier.SetResource(ResourceIds.Biomass, 10);
+            Assert.That(world.Coordinates.TryCellToWorld(
+                    LeaderInteractionCatalog.CenJinDistressCellX,
+                    LeaderInteractionCatalog.CenJinDistressCellY,
+                    city.transform.position.y,
+                    out Vector3 rescuePosition),
+                Is.True);
+            city.transform.position = rescuePosition;
+            city.GetComponent<Rigidbody>().position = rescuePosition;
+            city.Deployment.Restore(CityMode.Fortress, 0f);
+            host.Speed.Set(2f);
+
+            float discoveryDeadline = Time.realtimeSinceStartup + 2f;
+            while (host.ExplorationController.CenJinDistress.State ==
+                       CenJinDistressState.Undiscovered &&
+                   Time.realtimeSinceStartup < discoveryDeadline)
+                yield return null;
+            Assert.That(host.ExplorationController.CenJinDistress.State,
+                Is.EqualTo(CenJinDistressState.Discovered));
+
+            yield return TapKey(Key.L);
+            Assert.That(explorationView.CenJinRescueButton.interactable,
+                Is.True);
+            yield return ClickUiElement(
+                explorationView.CenJinRescueButton.gameObject,
+                MouseButton.Left);
+            Assert.That(host.ExplorationController.CenJinDistress.State,
+                Is.EqualTo(CenJinDistressState.Rescuing));
+
+            float rescueDeadline = Time.realtimeSinceStartup + 8f;
+            while (!host.ExplorationController.CenJinDistress.IsCompleted &&
+                   Time.realtimeSinceStartup < rescueDeadline)
+                yield return null;
+            Assert.That(host.ExplorationController.CenJinDistress.IsCompleted,
+                Is.True);
+            Assert.That(session.CityStorage.GetNetworkAmount(
+                ResourceIds.Biomass), Is.Zero);
+            Assert.That(explorationView.LeaderControlButton.interactable,
+                Is.True);
+
+            yield return ClickUiElement(
+                explorationView.LeaderControlButton.gameObject,
+                MouseButton.Left);
+
+            Assert.That(host.ExplorationController.LeaderControl.RequestedMode,
+                Is.EqualTo(LeaderControlMode.Manual));
+
+            GrayboxOperationsController3D operations =
+                Object.FindObjectOfType<GrayboxOperationsController3D>();
+            GrayboxLeaderController3D leader =
+                Object.FindObjectOfType<GrayboxLeaderController3D>();
+            Assert.That(operations, Is.Not.Null);
+            Assert.That(leader, Is.Not.Null);
+            const int nodeX = 50;
+            const int nodeY = 15;
+            Assert.That(world.Coordinates.TryCellToWorld(
+                    nodeX - 1,
+                    nodeY,
+                    leader.transform.position.y,
+                    out Vector3 leaderNearNode),
+                Is.True);
+            leader.transform.position = leaderNearNode;
+            yield return null;
+            Assert.That(world.Coordinates.TryCellToWorld(
+                    nodeX,
+                    nodeY,
+                    1f,
+                    out Vector3 nodePosition),
+                Is.True);
+            Transform cameraRig = Camera.main.transform.parent;
+            Vector3 cameraOffset = Camera.main.transform.position -
+                cameraRig.position;
+            cameraRig.position = new Vector3(
+                nodePosition.x,
+                cameraRig.position.y,
+                nodePosition.z);
+            Camera.main.transform.position = cameraRig.position + cameraOffset;
+            yield return TapKey(Key.L);
+            yield return null;
+
+            Vector2 nodeScreen = Camera.main.WorldToScreenPoint(nodePosition);
+            QueueMouse(nodeScreen);
+            yield return null;
+            yield return ClickWorld(MouseButton.Left);
+
+            Assert.That(explorationView.IsOpen, Is.True);
+            Assert.That(explorationView.ManualGatherButton.interactable,
+                Is.True,
+                explorationView.ManualGatherText.text + " | " +
+                host.CaptureExplorationPresentation().GatherAction
+                    .DisabledReason);
+            int backpackBefore = BackpackAmount(operations, ResourceIds.Biomass);
+            int nodeBefore = world.Model.Get(nodeX, nodeY).ResourceAmount;
+            yield return ClickUiElement(
+                explorationView.ManualGatherButton.gameObject,
+                MouseButton.Left);
+
+            float gatherDeadline = Time.realtimeSinceStartup + 4f;
+            while (BackpackAmount(operations, ResourceIds.Biomass) ==
+                       backpackBefore &&
+                   Time.realtimeSinceStartup < gatherDeadline)
+                yield return null;
+            Assert.That(BackpackAmount(operations, ResourceIds.Biomass),
+                Is.EqualTo(backpackBefore + 1));
+            Assert.That(world.Model.Get(nodeX, nodeY).ResourceAmount,
+                Is.EqualTo(nodeBefore - 1));
         }
 
         [UnityTest]

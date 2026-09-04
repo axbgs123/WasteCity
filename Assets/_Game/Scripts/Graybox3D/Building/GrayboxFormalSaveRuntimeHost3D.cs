@@ -84,6 +84,8 @@ namespace WasteCity.Graybox3D.Building
         [SerializeField]
         private GrayboxExplorationController3D explorationController;
         [SerializeField] private GrayboxFogPresenter3D fogPresenter;
+        [SerializeField]
+        private GrayboxCenJinDistressPresenter3D distressPresenter;
         [SerializeField] private GrayboxExplorationView3D explorationView;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
@@ -1355,6 +1357,9 @@ namespace WasteCity.Graybox3D.Building
                 gameObject.AddComponent<GrayboxExplorationController3D>();
             fogPresenter ??= GetComponent<GrayboxFogPresenter3D>() ??
                 gameObject.AddComponent<GrayboxFogPresenter3D>();
+            distressPresenter ??=
+                GetComponent<GrayboxCenJinDistressPresenter3D>() ??
+                gameObject.AddComponent<GrayboxCenJinDistressPresenter3D>();
             if (world?.Coordinates == null)
             {
                 error = "世界坐标映射尚未就绪";
@@ -1379,6 +1384,15 @@ namespace WasteCity.Graybox3D.Building
                 fogPresenter.transform,
                 explorationFogMaterial);
             fogPresenter.Generate(world.Coordinates);
+            distressPresenter.Configure(
+                distressPresenter.transform,
+                world.Coordinates,
+                Production2DVisualCatalog3D.Resolve(
+                    Production2DVisualClass.Character,
+                    CharacterCatalog.CenJinId),
+                Production2DVisualCatalog3D.ResolveVisibleBounds(
+                    Production2DVisualClass.Character,
+                    CharacterCatalog.CenJinId));
             error = string.Empty;
             return true;
         }
@@ -1563,6 +1577,8 @@ namespace WasteCity.Graybox3D.Building
 
             fogPresenter?.ApplyVisibility(
                 explorationController.Exploration);
+            distressPresenter?.Apply(
+                explorationController.CenJinDistress.State);
         }
 
         private void SyncVisionSource(
@@ -2048,10 +2064,13 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
             if (city.TryGetCurrentCell(out int cityX, out int cityY))
+            {
                 CurrentLeaderCharacter()?.SetPosition(
                     WorldLayerCatalog.PrimaryCity.Id,
                     cityX,
                     cityY);
+                leader.SnapToCityDock();
+            }
             error = string.Empty;
             return true;
         }

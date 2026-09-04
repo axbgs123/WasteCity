@@ -2882,6 +2882,7 @@ GameObject:
   - component: {fileID: 1959787199}
   - component: {fileID: 1959787202}
   - component: {fileID: 1959787201}
+  - component: {fileID: 1959787203}
   m_Layer: 0
   m_Name: GrayboxFormalSaveRuntimeHost
   m_TagString: Untagged
@@ -2922,6 +2923,7 @@ MonoBehaviour:
   directControl: {fileID: 1650269103}
   explorationController: {fileID: 1959787202}
   fogPresenter: {fileID: 1959787201}
+  distressPresenter: {fileID: 1959787203}
   explorationView: {fileID: 1804086903}
 --- !u!4 &1959787200
 Transform:
@@ -2962,6 +2964,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59030fe31acb42768623037f64c9950e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!114 &1959787203
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959787198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 37947acf9d564738b81c6a4b91094e65, type: 3}
   m_Name:
   m_EditorClassIdentifier:
 --- !u!1 &2120797885

@@ -5,6 +5,7 @@ using WasteCity.Graybox3D.Building;
 using WasteCity.Graybox3D.Exploration;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Leader.CivilizationExpansion;
+using WasteCity.World.CivilizationExpansion;
 
 namespace WasteCity.Tests
 {
@@ -154,6 +155,34 @@ namespace WasteCity.Tests
                 Is.EqualTo("core.ui.status.rescue"));
             Assert.That(GrayboxExplorationView3D.OutpostMarkerVisualId,
                 Is.EqualTo("core.world-marker.outpost"));
+        }
+
+        [Test]
+        public void OutpostWorldCardShowsCommunicationSupplyAndMaintenance()
+        {
+            var outpost = new SettlementRuntimeSnapshot(
+                "core.settlement.outpost",
+                SettlementKind.Outpost,
+                4,
+                5,
+                SettlementAutonomyTemplate.Industrial,
+                0,
+                0,
+                70,
+                false,
+                true,
+                false,
+                0f,
+                Array.Empty<WasteCity.Economy.ResourceAmount>());
+
+            string text = GrayboxCivilizationExpansionController3D
+                .FormatSettlementStatus(outpost);
+
+            Assert.That(text,
+                Does.Contain("通信：中断")
+                    .And.Contain("补给：正常")
+                    .And.Contain("维护：中断")
+                    .And.Contain("总状态：失联"));
         }
     }
 }

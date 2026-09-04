@@ -904,7 +904,9 @@ namespace WasteCity.Graybox3D.Building
                     .Append("  [")
                     .Append(settlement.X).Append(",")
                     .Append(settlement.Y).Append("]  忠诚 ")
-                    .Append(settlement.Loyalty).Append("\n");
+                    .Append(settlement.Loyalty).Append("\n")
+                    .Append(FormatSettlementStatus(settlement))
+                    .Append("\n");
             }
             details.Append("\n运输队：")
                 .Append(transportSnapshot.Convoys.Count)
@@ -931,6 +933,26 @@ namespace WasteCity.Graybox3D.Building
                 Runtime.WorldLayer.GetSettlement(
                     WorldLayerCatalog.SecondaryCity.Id) != null,
                 WorldStatusVisuals(worldSnapshot, transportSnapshot));
+        }
+
+        public static string FormatSettlementStatus(
+            SettlementRuntimeSnapshot settlement)
+        {
+            if (settlement == null) return "聚落状态不可用";
+            string overall = !settlement.IsCommunicationActive
+                ? "失联"
+                : !settlement.IsSupplied
+                    ? "缺少补给"
+                    : !settlement.IsMaintained
+                        ? "维护中断"
+                        : "正常";
+            return "通信：" +
+                (settlement.IsCommunicationActive ? "正常" : "中断") +
+                " · 补给：" +
+                (settlement.IsSupplied ? "正常" : "中断") +
+                " · 维护：" +
+                (settlement.IsMaintained ? "正常" : "中断") +
+                " · 总状态：" + overall;
         }
 
         private GrayboxCivilizationExpansionPresentation3D

@@ -1164,6 +1164,9 @@ namespace WasteCity.Editor
             GrayboxFogPresenter3D fogPresenter =
                 EnsureComponent<GrayboxFogPresenter3D>(
                     formalSaveHostTransform);
+            GrayboxCenJinDistressPresenter3D distressPresenter =
+                EnsureComponent<GrayboxCenJinDistressPresenter3D>(
+                    formalSaveHostTransform);
             Transform formalSaveEntryTransform = EnsureChild(
                 buildingReferences.Systems,
                 "GrayboxFormalSaveEntryController");
@@ -1201,6 +1204,7 @@ namespace WasteCity.Editor
                 ("directControl", buildingReferences.DirectControl),
                 ("explorationController", explorationController),
                 ("fogPresenter", fogPresenter),
+                ("distressPresenter", distressPresenter),
                 ("explorationView", explorationView),
                 ("developerModifier", buildingReferences.Developer),
                 ("inputCoordinator", coordinator));
@@ -1322,7 +1326,9 @@ namespace WasteCity.Editor
                     explorationView ||
                 RequireSingle<GrayboxExplorationController3D>(scene) !=
                     explorationController ||
-                RequireSingle<GrayboxFogPresenter3D>(scene) != fogPresenter)
+                RequireSingle<GrayboxFogPresenter3D>(scene) != fogPresenter ||
+                RequireSingle<GrayboxCenJinDistressPresenter3D>(scene) !=
+                    distressPresenter)
             {
                 throw new InvalidOperationException(
                     "The exploration view/controller/fog presenter is not unique.");
