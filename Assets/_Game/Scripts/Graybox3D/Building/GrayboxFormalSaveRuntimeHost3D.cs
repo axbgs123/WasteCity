@@ -4,6 +4,7 @@ using UnityEngine;
 using WasteCity.Building;
 using WasteCity.City;
 using WasteCity.Combat;
+using WasteCity.CivilizationExpansion;
 using WasteCity.Core;
 using WasteCity.Defense;
 using WasteCity.Economy;
@@ -11,6 +12,12 @@ using WasteCity.Persistence;
 using WasteCity.Persistence.ThreeD;
 using WasteCity.Progression;
 using WasteCity.Graybox3D.Usability;
+using WasteCity.Graybox3D.Exploration;
+using WasteCity.Leader.CivilizationExpansion;
+using WasteCity.Leader.Exploration;
+using WasteCity.World.CivilizationExpansion;
+using WasteCity.World.Exploration;
+using WasteCity.World;
 
 namespace WasteCity.Graybox3D.Building
 {
@@ -71,6 +78,13 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxCivilizationExpansionController3D expansionController;
         [SerializeField]
         private MonoBehaviour inputCoordinator;
+        [SerializeField] private GrayboxLeaderController3D leader;
+        [SerializeField]
+        private GrayboxDirectControlCoordinator directControl;
+        [SerializeField]
+        private GrayboxExplorationController3D explorationController;
+        [SerializeField] private GrayboxFogPresenter3D fogPresenter;
+        [SerializeField] private GrayboxExplorationView3D explorationView;
 
         private readonly GrayboxFormalSaveWriteIntentLatch3D writeIntent =
             new GrayboxFormalSaveWriteIntentLatch3D();
@@ -140,12 +154,21 @@ namespace WasteCity.Graybox3D.Building
         private GrayboxCivilizationAdvancementPresentationController3D
             advancementPresentationController;
         private GrayboxFormalSaveCoordinator3D coordinator;
+        private GrayboxExplorationSaveDomainProxy3D explorationSaveDomain;
+        private Material explorationFogMaterial;
         private FormalSaveCheckpointPolicy checkpointPolicy;
         private string currentSessionId = string.Empty;
         private bool? quantumInventoryRoutingEnabled;
         private bool automaticCheckpointFailureBlocked;
         private ulong automaticCheckpointFailureRevision;
         private bool lastCheckpointHadRetryArtifactFailure;
+        private ulong observedExplorationVisibilityRevision = ulong.MaxValue;
+        private ulong observedWorldResourceRevision = ulong.MaxValue;
+        private int selectedGatherX = -1;
+        private int selectedGatherY = -1;
+        private string explorationFeedback = string.Empty;
+        private string presentedExplorationSignature = string.Empty;
+        private bool explorationViewBound;
 
         public GameSpeedModel Speed => speed ??= new GameSpeedModel();
         public GrayboxFormalRuleClock3D RuleClock =>
@@ -211,6 +234,9 @@ namespace WasteCity.Graybox3D.Building
             fateOperationsController;
         public GrayboxCivilizationExpansionController3D
             CivilizationExpansionController => expansionController;
+        public GrayboxExplorationController3D ExplorationController =>
+            explorationController;
+        public string ExplorationFeedback => explorationFeedback;
         public string CurrentSessionId => currentSessionId;
         public bool IsInitialized { get; private set; }
         public FormalSaveStoreResult LastStoreResult { get; private set; }
@@ -261,6 +287,15 @@ namespace WasteCity.Graybox3D.Building
                     "场景运行时引用或正式经济模型尚未就绪";
                 return false;
             }
+
+            if (!TryEnsureExplorationPresentation(
+                    out string explorationPresentationError))
+            {
+                LastInitializationError =
+                    "探索表现初始化失败：" + explorationPresentationError;
+                return false;
+            }
+            BindExplorationView();
 
             BindRuleClock();
             if (expansionController != null)
@@ -474,6 +509,11 @@ namespace WasteCity.Graybox3D.Building
                 production,
                 defense,
                 evacuation);
+            explorationSaveDomain ??=
+                new GrayboxExplorationSaveDomainProxy3D(
+                    explorationController,
+                    () => currentSessionId,
+                    () => session.CheckpointRuleTimeSeconds);
             coordinator = GrayboxFormalSaveCoordinator3D.CreateProduction(
                 worldCity,
                 buildingStorage,
@@ -491,7 +531,8 @@ namespace WasteCity.Graybox3D.Building
                 defense,
                 evacuation,
                 expansionAdapter,
-                effectStateAdapter);
+                effectStateAdapter,
+                explorationSaveDomain);
             checkpointPolicy = new FormalSaveCheckpointPolicy(
                 TryWriteCheckpoint,
                 () => session.CheckpointRuleTimeSeconds);
@@ -659,6 +700,16 @@ namespace WasteCity.Graybox3D.Building
                     "文明扩展新进度初始化失败：" + expansionResetError;
                 return false;
             }
+            if (!TryResetExplorationSession(
+                    nextSessionId,
+                    legacyLeader: false,
+                    out string explorationResetError))
+            {
+                LastStartNewProgressError =
+                    "探索新进度初始化失败：" + explorationResetError;
+                return false;
+            }
+            SynchronizeExplorationSourcesAndPresentation(force: true);
             rewindAnchorStore?.Clear();
             writeIntent.BeginNewProgress(
                 existing.Code == FormalSaveStoreCode.Legacy2DOnly);
@@ -704,11 +755,28 @@ namespace WasteCity.Graybox3D.Building
                 return false;
             }
 
+            string previousSessionId = currentSessionId;
+            currentSessionId = restoredSessionId;
+            if (!TryResetExplorationSession(
+                    restoredSessionId,
+                    legacyLeader: true,
+                    out string explorationResetError))
+            {
+                currentSessionId = previousSessionId;
+                LastProgressionRestoreError = explorationResetError;
+                return false;
+            }
+
             LastCoordinatorResult = coordinator.RestoreEnvelope(
                 LastStoreResult.Envelope);
-            if (!LastCoordinatorResult.Success) return false;
+            if (!LastCoordinatorResult.Success)
+            {
+                currentSessionId = previousSessionId;
+                return false;
+            }
 
-            currentSessionId = restoredSessionId;
+            SynchronizeExplorationSourcesAndPresentation(force: true);
+            SynchronizeLegacyLeaderProjection();
             SynchronizeFateRuleCycle();
             pocketUniverseController?.SynchronizeSelection();
             fateSelectionController?.RefreshIfChanged();
@@ -1034,6 +1102,7 @@ namespace WasteCity.Graybox3D.Building
                     expansionDelta <= 0f ||
                     coordinator?.IsTransactionPaused == true);
             }
+            TickExploration();
             TickLocalHaste();
             TickForesightDisplay();
             TickCivilizationAdvancement();
@@ -1070,6 +1139,18 @@ namespace WasteCity.Graybox3D.Building
             effectStateAdapter = null;
             checkpointPolicy = null;
             coordinator = null;
+            explorationSaveDomain = null;
+            UnbindExplorationView();
+            if (explorationFogMaterial != null)
+            {
+                Destroy(explorationFogMaterial);
+                explorationFogMaterial = null;
+            }
+            selectedGatherX = -1;
+            selectedGatherY = -1;
+            observedExplorationVisibilityRevision = ulong.MaxValue;
+            observedWorldResourceRevision = ulong.MaxValue;
+            presentedExplorationSignature = string.Empty;
             production?.ConfigureCivilizationEfficiencySource(null);
             production?.ConfigureLocalHasteMultiplier(null);
             operations?.ConfigureCivilizationResearchEfficiency(null);
@@ -1265,6 +1346,1049 @@ namespace WasteCity.Graybox3D.Building
             {
                 checkpointPolicy.SetSuppressed(false);
             }
+        }
+
+        private bool TryEnsureExplorationPresentation(out string error)
+        {
+            explorationController ??=
+                GetComponent<GrayboxExplorationController3D>() ??
+                gameObject.AddComponent<GrayboxExplorationController3D>();
+            fogPresenter ??= GetComponent<GrayboxFogPresenter3D>() ??
+                gameObject.AddComponent<GrayboxFogPresenter3D>();
+            if (world?.Coordinates == null)
+            {
+                error = "世界坐标映射尚未就绪";
+                return false;
+            }
+
+            Shader shader = Shader.Find(
+                "WasteCity/World/ExplorationFogOverlay");
+            if (shader == null)
+            {
+                error = "探索迷雾 Shader 缺失";
+                return false;
+            }
+            if (explorationFogMaterial == null)
+            {
+                explorationFogMaterial = new Material(shader)
+                {
+                    name = "IDEA0029 Exploration Fog Template",
+                };
+            }
+            fogPresenter.Configure(
+                fogPresenter.transform,
+                explorationFogMaterial);
+            fogPresenter.Generate(world.Coordinates);
+            error = string.Empty;
+            return true;
+        }
+
+        private bool TryResetExplorationSession(
+            string sessionId,
+            bool legacyLeader,
+            out string error)
+        {
+            error = string.Empty;
+            if (explorationController == null || world?.Model == null ||
+                !explorationController.TryResetSession(
+                    world.Model.Width,
+                    world.Model.Height,
+                    sessionId,
+                    TryCommitExplorationAttention,
+                    out error))
+            {
+                if (string.IsNullOrWhiteSpace(error))
+                    error = "探索组合运行时不可用";
+                return false;
+            }
+
+            explorationController.ConfigureBoundaries(
+                CaptureManualGatherContext,
+                CommitManualGatherOne,
+                CaptureCenJinDistressContext,
+                TryReserveCenJinBiomass,
+                TryReleaseCenJinBiomass,
+                TryCommitCenJinRescue);
+            expansionController?.Runtime?.ConfigureExplorationQuery(
+                (x, y) => explorationController.Exploration.GetState(x, y) !=
+                    WorldVisibilityState.Hidden);
+            directControl?.ConfigureFormalTargetProvider(
+                ResolveFormalDirectControlTarget);
+            leader?.ConfigureAiIntentProvider(CaptureLeaderAiIntent);
+            selectedGatherX = -1;
+            selectedGatherY = -1;
+            observedExplorationVisibilityRevision = ulong.MaxValue;
+            observedWorldResourceRevision = ulong.MaxValue;
+            explorationFeedback = string.Empty;
+            if (!legacyLeader && leader != null)
+            {
+                leader.Model.Restore(false, false, 0f, 0f, 0f);
+            }
+            if (fogPresenter != null && world.Coordinates != null)
+                fogPresenter.Generate(world.Coordinates);
+            error = string.Empty;
+            return true;
+        }
+
+        private bool TryCommitExplorationAttention(
+            string reasonId,
+            string stableEventKey)
+        {
+            return AttentionRuntime.TryApply(
+                reasonId,
+                stableEventKey,
+                out _);
+        }
+
+        private void TickExploration()
+        {
+            if (!IsInitialized ||
+                explorationController?.IsInitialized != true)
+                return;
+
+            SynchronizeExplorationSourcesAndPresentation(force: false);
+            float delta = RuleClock.ResolveRuleDelta(Time.unscaledDeltaTime);
+            bool paused = delta <= 0f ||
+                coordinator?.IsTransactionPaused == true;
+            if (explorationController.TryTick(
+                    delta,
+                    paused,
+                    out GrayboxExplorationTickResult3D result,
+                    out string error))
+            {
+                if (!string.IsNullOrWhiteSpace(result.ManualGather.Message))
+                    explorationFeedback = result.ManualGather.Message;
+                if (!string.IsNullOrWhiteSpace(result.Distress.Message))
+                    explorationFeedback = result.Distress.Message;
+                if (result.ManualGather.UnitsGathered > 0)
+                {
+                    explorationFeedback = "手采完成：+" +
+                        result.ManualGather.UnitsGathered;
+                    SynchronizeVisibleResourceIntel(force: true);
+                }
+                if (result.Distress.Kind ==
+                    CenJinDistressTickKind.Completed)
+                {
+                    explorationFeedback = result.Distress.Outcome ==
+                        CenJinRescueOutcome.Timely
+                            ? "岑烬已健康加入"
+                            : "岑烬已负伤加入";
+                    SynchronizeLegacyLeaderProjection();
+                    checkpointPolicy?.QueueCheckpoint(
+                        FormalSaveCheckpointReasonIds.CenJinRescueCompleted,
+                        currentSessionId + "|cen-jin-rescued");
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(error))
+            {
+                explorationFeedback = error;
+            }
+            SynchronizeExplorationSourcesAndPresentation(force: false);
+            SynchronizeLeaderCharacterPosition();
+            RefreshExplorationView(force: false);
+        }
+
+        private void SynchronizeExplorationSourcesAndPresentation(bool force)
+        {
+            if (explorationController?.IsInitialized != true ||
+                world?.Model == null)
+                return;
+
+            if (city != null && city.TryGetCurrentCell(
+                    out int cityX,
+                    out int cityY))
+            {
+                SyncVisionSource(
+                    WorldLayerCatalog.PrimaryCity.Id,
+                    WorldVisionSourceKind.PrimaryCity,
+                    cityX,
+                    cityY,
+                    true,
+                    0ul);
+            }
+
+            WorldLayerRuntime layer = expansionController?.Runtime?.WorldLayer;
+            if (layer != null)
+            {
+                WorldLayerRuntimeSnapshot settlements = layer.Capture();
+                for (var index = 0;
+                     index < settlements.Settlements.Count;
+                     index++)
+                {
+                    SettlementRuntimeSnapshot item =
+                        settlements.Settlements[index];
+                    if (item.Kind == SettlementKind.PrimaryCity)
+                        continue;
+                    bool active = item.Kind != SettlementKind.Outpost ||
+                        item.IsCommunicationActive;
+                    SyncVisionSource(
+                        item.StableId,
+                        item.Kind == SettlementKind.Outpost
+                            ? WorldVisionSourceKind.Outpost
+                            : WorldVisionSourceKind.SecondaryCity,
+                        item.X,
+                        item.Y,
+                        active,
+                        item.Revision);
+                }
+            }
+
+            CharacterLifeRuntime currentLeader = CurrentLeaderCharacter();
+            var leaderX = 0;
+            var leaderY = 0;
+            bool leaderActive =
+                explorationController.CenJinDistress.IsCompleted &&
+                currentLeader != null &&
+                currentLeader.State != CharacterLifeState.Dead &&
+                TryGetLeaderCell(out leaderX, out leaderY);
+            SyncVisionSource(
+                LeaderInteractionCatalog.CenJinCharacterId,
+                WorldVisionSourceKind.Leader,
+                leaderActive ? leaderX : 0,
+                leaderActive ? leaderY : 0,
+                leaderActive,
+                currentLeader?.DamageRevision ?? 0ul);
+
+            ulong visibilityRevision =
+                explorationController.Exploration.VisibilityRevision;
+            if (force ||
+                visibilityRevision != observedExplorationVisibilityRevision ||
+                world.Model.ResourceRevision != observedWorldResourceRevision)
+            {
+                SynchronizeVisibleResourceIntel(force);
+                observedExplorationVisibilityRevision =
+                    explorationController.Exploration.VisibilityRevision;
+                observedWorldResourceRevision = world.Model.ResourceRevision;
+            }
+
+            fogPresenter?.ApplyVisibility(
+                explorationController.Exploration);
+        }
+
+        private void SyncVisionSource(
+            string stableId,
+            WorldVisionSourceKind kind,
+            int x,
+            int y,
+            bool active,
+            ulong sourceRevision)
+        {
+            if (active)
+            {
+                bool changed = explorationController.TrySyncVisionSource(
+                    new WorldVisionSource(
+                        stableId,
+                        kind,
+                        x,
+                        y,
+                        true,
+                        sourceRevision),
+                    out _);
+                if (changed)
+                {
+                    world.Model.Reveal(
+                        x,
+                        y,
+                        FormalExplorationCatalog3D.ResolveSightRadius(kind));
+                }
+            }
+            else
+            {
+                explorationController.TryRemoveVisionSource(
+                    stableId,
+                    out _);
+            }
+        }
+
+        private void SynchronizeVisibleResourceIntel(bool force)
+        {
+            if (explorationController?.IsInitialized != true ||
+                world?.Model == null)
+                return;
+            IReadOnlyList<FormalResourceNodeSpec3D> nodes =
+                FormalWorldGenerationCatalog3D.ResourceNodes;
+            for (var index = 0; index < nodes.Count; index++)
+            {
+                FormalResourceNodeSpec3D node = nodes[index];
+                WorldVisibilityState state =
+                    explorationController.Exploration.GetState(
+                        node.X,
+                        node.Y);
+                WorldCell cell = world.Model.Get(node.X, node.Y);
+                if (state == WorldVisibilityState.Visible)
+                {
+                    bool observed = explorationController
+                        .TryObserveVisibleResource(
+                            node.X,
+                            node.Y,
+                            cell.ResourceId,
+                            cell.ResourceAmount,
+                            session.CheckpointRuleTimeSeconds,
+                            world.Model.ResourceRevision,
+                            out WorldScanResult scan,
+                            out _,
+                            out _);
+                    if (observed)
+                    {
+                        if (scan.Status == WorldScanStatus.Committed)
+                        {
+                            world.Model.Reveal(
+                                node.X,
+                                node.Y,
+                                FormalExplorationCatalog3D.FindScanZone(
+                                    scan.ZoneId).RevealRadius);
+                            explorationFeedback = "自动扫描完成：" +
+                                ExplorationZoneName(scan.ZoneId);
+                            checkpointPolicy?.QueueCheckpoint(
+                                FormalSaveCheckpointReasonIds
+                                    .ExplorationScanCompleted,
+                                scan.StableEventKey);
+                        }
+                    }
+                    world.TrySetResourceMarkerFogPresentation(
+                        node.X,
+                        node.Y,
+                        ResourceMarkerFogPresentation3D.Live,
+                        out _);
+                    continue;
+                }
+
+                ResourceMarkerFogPresentation3D presentation =
+                    ResourceMarkerFogPresentation3D.Hidden;
+                if (state == WorldVisibilityState.Explored &&
+                    explorationController.Exploration.TryGetIntel(
+                        node.StableId,
+                        session.CheckpointRuleTimeSeconds,
+                        out WorldIntelSnapshot intel))
+                {
+                    presentation = intel.State == WorldIntelState.Expired ||
+                        !intel.HasMutableValue
+                            ? ResourceMarkerFogPresentation3D
+                                .LastKnownIdentity
+                            : ResourceMarkerFogPresentation3D.LastIntel(
+                                intel.MutableValue);
+                }
+                world.TrySetResourceMarkerFogPresentation(
+                    node.X,
+                    node.Y,
+                    presentation,
+                    out _);
+            }
+        }
+
+        public bool TrySelectManualGatherNode(
+            int worldX,
+            int worldY,
+            out string error)
+        {
+            if (explorationController?.IsInitialized != true ||
+                world?.Model == null ||
+                worldX < 0 || worldY < 0 ||
+                worldX >= world.Model.Width || worldY >= world.Model.Height)
+            {
+                error = "手采目标格无效";
+                return false;
+            }
+            WorldCell cell = world.Model.Get(worldX, worldY);
+            if (!cell.HasResource ||
+                !explorationController.Exploration.IsVisible(
+                    worldX,
+                    worldY))
+            {
+                error = "只能选择实时视野内的资源节点";
+                return false;
+            }
+            selectedGatherX = worldX;
+            selectedGatherY = worldY;
+            explorationFeedback = "已选择：" +
+                ResourceName(cell.ResourceId);
+            RefreshExplorationView(force: true);
+            error = string.Empty;
+            return true;
+        }
+
+        public bool TrySelectManualGatherNodeFromScreen(
+            Vector2 screenPosition,
+            out string error)
+        {
+            Camera camera = Camera.main;
+            if (camera == null)
+            {
+                error = "主摄像机不可用";
+                return false;
+            }
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            var plane = new Plane(Vector3.up, Vector3.zero);
+            if (!plane.Raycast(ray, out float distance) ||
+                !world.TryWorldToCell(
+                    ray.GetPoint(distance),
+                    out int x,
+                    out int y))
+            {
+                error = "未点中世界格";
+                return false;
+            }
+            return TrySelectManualGatherNode(x, y, out error);
+        }
+
+        public bool TryToggleLeaderControl(out string error)
+        {
+            if (explorationController?.IsInitialized != true)
+            {
+                error = "领袖控制尚未就绪";
+                return false;
+            }
+            LeaderControlMode next =
+                explorationController.LeaderControl.RequestedMode ==
+                    LeaderControlMode.Manual
+                    ? LeaderControlMode.AI
+                    : LeaderControlMode.Manual;
+            bool changed = explorationController.TryRequestLeaderControl(
+                next,
+                out error);
+            if (changed)
+                explorationFeedback = next == LeaderControlMode.Manual
+                    ? "已请求接管岑烬"
+                    : "已交还 AI";
+            directControl?.Refresh();
+            RefreshExplorationView(force: true);
+            return changed;
+        }
+
+        public bool TryToggleManualGather(out string error)
+        {
+            error = string.Empty;
+            if (explorationController?.ManualGather?.IsActive == true)
+            {
+                explorationController.CancelManualGather();
+                explorationFeedback = "已取消手采";
+                RefreshExplorationView(force: true);
+                error = string.Empty;
+                return true;
+            }
+            bool started = explorationController != null &&
+                explorationController.TryStartManualGather(out error);
+            explorationFeedback = started ? "开始手采" : error;
+            RefreshExplorationView(force: true);
+            return started;
+        }
+
+        public bool TryToggleCenJinRescue(out string error)
+        {
+            error = string.Empty;
+            if (explorationController?.CenJinDistress?.State ==
+                CenJinDistressState.Rescuing)
+            {
+                bool cancelled = explorationController
+                    .TryCancelCenJinRescue(out error);
+                explorationFeedback = cancelled ? "已取消救援" : error;
+                RefreshExplorationView(force: true);
+                return cancelled;
+            }
+            bool started = explorationController != null &&
+                explorationController.TryBeginCenJinRescue(out error);
+            explorationFeedback = started ? "开始救援岑烬" : error;
+            RefreshExplorationView(force: true);
+            return started;
+        }
+
+        public GrayboxExplorationPresentation3D
+            CaptureExplorationPresentation()
+        {
+            if (explorationController?.IsInitialized != true)
+            {
+                return new GrayboxExplorationPresentation3D(
+                    null, null, null, null, 0f, null, null, null,
+                    null, null, null);
+            }
+
+            CharacterLifeRuntime character = CurrentLeaderCharacter();
+            bool recruited = explorationController.CenJinDistress.IsCompleted;
+            LeaderControlResolution control = ResolveLeaderControl();
+            ManualGatherContext gather = CaptureManualGatherContext();
+            ManualGatherRuntime gatherRuntime =
+                explorationController.ManualGather;
+            float gatherProgress = gatherRuntime.IsActive
+                ? 1f - gatherRuntime.RemainingSeconds /
+                    LeaderInteractionCatalog.ManualGatherCycleSeconds
+                : 0f;
+            string gatherTarget = string.IsNullOrWhiteSpace(gather.ResourceId)
+                ? "未选择资源节点"
+                : ResourceName(gather.ResourceId) + " · 剩余 " +
+                  Math.Max(0, gather.NodeAmount);
+            string gatherReason = ResolveGatherDisabledReason(
+                recruited,
+                character,
+                control,
+                gather);
+            bool gatherEnabled = gatherRuntime.IsActive ||
+                string.IsNullOrEmpty(gatherReason);
+            string rescueReason = ResolveRescueDisabledReason();
+            bool rescueActive = explorationController.CenJinDistress.State ==
+                CenJinDistressState.Rescuing;
+            LeaderControlBlockReason controlBlockReason =
+                ResolveLeaderControlBlockReason(recruited, character);
+
+            return new GrayboxExplorationPresentation3D(
+                recruited ? "岑烬" : "尚未招募",
+                recruited
+                    ? CharacterStateText(character?.State ??
+                        CharacterLifeState.Dead)
+                    : "等待发现东南求救信号",
+                control.ActualMode == LeaderControlMode.Manual
+                    ? "手动控制"
+                    : "AI 控制",
+                gatherTarget,
+                gatherProgress,
+                ManualGatherStatusText(gatherRuntime.Status),
+                gatherRuntime.Status == ManualGatherStatus.BackpackFull ||
+                gatherRuntime.Status == ManualGatherStatus.Interrupted ||
+                gatherRuntime.Status == ManualGatherStatus.NodeDepleted ||
+                gatherRuntime.Status == ManualGatherStatus.TransactionFailed
+                    ? explorationFeedback
+                    : string.Empty,
+                CenJinDistressStateText(
+                    explorationController.CenJinDistress),
+                new GrayboxExplorationActionPresentation3D(
+                    control.RequestedMode == LeaderControlMode.Manual
+                        ? "交还 AI"
+                        : "接管领袖",
+                    control.RequestedMode == LeaderControlMode.Manual ||
+                    controlBlockReason == LeaderControlBlockReason.None,
+                    LeaderControlBlockReasonText(controlBlockReason)),
+                new GrayboxExplorationActionPresentation3D(
+                    gatherRuntime.IsActive ? "取消采集" : "开始采集",
+                    gatherEnabled,
+                    gatherReason),
+                new GrayboxExplorationActionPresentation3D(
+                    rescueActive ? "取消救援" : "开始岑烬救援",
+                    rescueActive || string.IsNullOrEmpty(rescueReason),
+                    rescueReason),
+                GrayboxExplorationView3D.CenJinCharacterVisualId,
+                rescueActive
+                    ? GrayboxExplorationView3D.RescueStatusVisualId
+                    : GrayboxExplorationView3D.FollowStatusVisualId);
+        }
+
+        private ManualGatherContext CaptureManualGatherContext()
+        {
+            CharacterLifeRuntime character = CurrentLeaderCharacter();
+            bool validTarget = world?.Model != null &&
+                selectedGatherX >= 0 && selectedGatherY >= 0 &&
+                selectedGatherX < world.Model.Width &&
+                selectedGatherY < world.Model.Height;
+            WorldCell cell = validTarget
+                ? world.Model.Get(selectedGatherX, selectedGatherY)
+                : default;
+            bool hasLeaderCell = TryGetLeaderCell(
+                out int leaderX,
+                out int leaderY);
+            float distance = validTarget && hasLeaderCell
+                ? Vector2.Distance(
+                    new Vector2(leaderX, leaderY),
+                    new Vector2(selectedGatherX, selectedGatherY))
+                : float.MaxValue;
+            string targetId = validTarget
+                ? FormalWorldGenerationCatalog3D.FindResourceNode(
+                        selectedGatherX,
+                        selectedGatherY)?.StableId ??
+                    GrayboxResourceNodeIdentity3D.Create(
+                        selectedGatherX,
+                        selectedGatherY)
+                : string.Empty;
+            return new ManualGatherContext(
+                explorationController.CenJinDistress.IsCompleted,
+                character?.State ?? CharacterLifeState.Dead,
+                ResolveLeaderControl().ActualMode,
+                IsWorldInteractionModalBlocked(),
+                validTarget && explorationController.Exploration.IsVisible(
+                    selectedGatherX,
+                    selectedGatherY),
+                targetId,
+                cell.ResourceId,
+                cell.ResourceAmount,
+                distance);
+        }
+
+        private WorldHarvestTransactionResult CommitManualGatherOne(
+            string stableTargetId)
+        {
+            ManualGatherContext context = CaptureManualGatherContext();
+            if (!string.Equals(
+                    context.TargetStableId,
+                    stableTargetId,
+                    StringComparison.Ordinal))
+            {
+                return WorldHarvestTransactionResult.Failed(
+                    WorldHarvestTransactionStatus.InvalidRequest,
+                    "手采目标已经改变");
+            }
+            WorldHarvestTransactionResult result =
+                WorldHarvestTransaction.TryCommitOne(
+                    context.ResourceId,
+                    (resourceId, amount) =>
+                        operations.Backpack.GetAcceptableAmount(
+                            resourceId,
+                            amount) == amount,
+                    (resourceId, amount) =>
+                        world.Model.TryHarvestExact(
+                            selectedGatherX,
+                            selectedGatherY,
+                            resourceId,
+                            amount),
+                    (resourceId, amount) =>
+                        operations.Backpack.Add(resourceId, amount) == amount,
+                    (resourceId, amount) =>
+                        world.Model.TryRollbackHarvest(
+                            selectedGatherX,
+                            selectedGatherY,
+                            resourceId,
+                            amount));
+            if (result.Succeeded)
+                world.RefreshResourceNodeMarkers();
+            return result;
+        }
+
+        private CenJinDistressContext3D CaptureCenJinDistressContext()
+        {
+            var cityX = 0;
+            var cityY = 0;
+            bool cityCell = city != null && city.TryGetCurrentCell(
+                out cityX,
+                out cityY);
+            float distance = cityCell
+                ? Vector2.Distance(
+                    new Vector2(cityX, cityY),
+                    new Vector2(
+                        LeaderInteractionCatalog.CenJinDistressCellX,
+                        LeaderInteractionCatalog.CenJinDistressCellY))
+                : float.MaxValue;
+            bool visible = explorationController.Exploration.IsVisible(
+                LeaderInteractionCatalog.CenJinDistressCellX,
+                LeaderInteractionCatalog.CenJinDistressCellY);
+            return new CenJinDistressContext3D(
+                visible,
+                distance,
+                cityCell && !IsWorldInteractionModalBlocked());
+        }
+
+        private bool TryReserveCenJinBiomass(
+            int amount,
+            out string error)
+        {
+            if (session?.CityStorage == null ||
+                !session.CityStorage.TrySpendFromNetwork(
+                    ResourceIds.Biomass,
+                    amount))
+            {
+                error = "生物质不足，需要 " + amount;
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private bool TryReleaseCenJinBiomass(
+            int amount,
+            out string error)
+        {
+            if (session?.CityStorage == null ||
+                session.CityStorage.AddToNetwork(
+                    ResourceIds.Biomass,
+                    amount) != amount)
+            {
+                error = "预留生物质返还失败";
+                return false;
+            }
+            error = string.Empty;
+            return true;
+        }
+
+        private bool TryCommitCenJinRescue(
+            CenJinRescueCommitRequest request,
+            out string error)
+        {
+            if (leader == null || session == null ||
+                !string.Equals(
+                    request.CharacterId,
+                    LeaderInteractionCatalog.CenJinCharacterId,
+                    StringComparison.Ordinal))
+            {
+                error = "岑烬救援角色引用无效";
+                return false;
+            }
+            int populationBefore = session.Population;
+            FormalAttentionSnapshot attentionBefore =
+                AttentionRuntime.Capture();
+            if (!session.TryRestorePopulation(
+                    populationBefore + request.PopulationReward,
+                    session.PopulationCapacity,
+                    out error))
+                return false;
+            if (!AttentionRuntime.TryApply(
+                    request.AttentionReasonId,
+                    request.StableEventKey,
+                    out error))
+            {
+                session.TryRestorePopulation(
+                    populationBefore,
+                    session.PopulationCapacity,
+                    out _);
+                return false;
+            }
+            if (!leader.Model.Recruit(
+                    request.Outcome == CenJinRescueOutcome.Timely))
+            {
+                AttentionRuntime.TryRestore(attentionBefore, out _);
+                session.TryRestorePopulation(
+                    populationBefore,
+                    session.PopulationCapacity,
+                    out _);
+                error = "岑烬已经加入，不能重复救援";
+                return false;
+            }
+            if (city.TryGetCurrentCell(out int cityX, out int cityY))
+                CurrentLeaderCharacter()?.SetPosition(
+                    WorldLayerCatalog.PrimaryCity.Id,
+                    cityX,
+                    cityY);
+            error = string.Empty;
+            return true;
+        }
+
+        private LeaderControlResolution ResolveLeaderControl()
+        {
+            CharacterLifeRuntime character = CurrentLeaderCharacter();
+            return explorationController.LeaderControl.Resolve(
+                city?.Mode ?? CityMode.Mobile,
+                explorationController.CenJinDistress.IsCompleted,
+                character?.State ?? CharacterLifeState.Dead,
+                IsWorldInteractionModalBlocked());
+        }
+
+        private DirectControlTarget ResolveFormalDirectControlTarget()
+        {
+            return explorationController?.IsInitialized == true
+                ? ResolveLeaderControl().ControlTarget
+                : DirectControlTarget.City;
+        }
+
+        private LeaderIntent CaptureLeaderAiIntent()
+        {
+            if (leader == null || world?.Coordinates == null ||
+                explorationController?.IsInitialized != true)
+                return LeaderIntent.None;
+            Vector2 leaderPlane = world.Coordinates.WorldToPlane(
+                leader.transform.position);
+            Vector2 dock = leader.ResolveCityDockPlane();
+            return LeaderAiRules.Resolve(
+                new LeaderAiContext(
+                    city?.Mode ?? CityMode.Mobile,
+                    ResolveLeaderControl().ActualMode,
+                    leaderPlane.x,
+                    leaderPlane.y,
+                    dock.x,
+                    dock.y,
+                    true));
+        }
+
+        private CharacterLifeRuntime CurrentLeaderCharacter()
+        {
+            CivilizationExpansionRuntime runtime = expansionController?.Runtime;
+            return runtime == null
+                ? null
+                : runtime.FindCharacter(runtime.Politics.CurrentLeaderId);
+        }
+
+        private bool TryGetLeaderCell(out int x, out int y)
+        {
+            x = -1;
+            y = -1;
+            return leader != null && world?.Coordinates != null &&
+                world.Coordinates.TryWorldToCell(
+                    leader.transform.position,
+                    out x,
+                    out y);
+        }
+
+        private void SynchronizeLeaderCharacterPosition()
+        {
+            if (!explorationController.CenJinDistress.IsCompleted ||
+                !TryGetLeaderCell(out int x, out int y))
+                return;
+            CurrentLeaderCharacter()?.SetPosition(
+                WorldLayerCatalog.PrimaryCity.Id,
+                x,
+                y);
+        }
+
+        private void SynchronizeLegacyLeaderProjection()
+        {
+            if (leader == null || explorationController == null) return;
+            CenJinDistressState state =
+                explorationController.CenJinDistress.State;
+            bool recruited = explorationController.CenJinDistress.IsCompleted;
+            bool injured = state == CenJinDistressState.RescuedDelayed;
+            leader.Model.Restore(
+                recruited,
+                injured,
+                leader.Model.Overload.CooldownRemaining,
+                leader.Model.Overload.BoostRemaining,
+                leader.Model.Overload.LockoutRemaining);
+        }
+
+        private bool IsWorldInteractionModalBlocked()
+        {
+            return operations?.IsAnyPanelOpen == true ||
+                fateSelectionView?.IsOpen == true ||
+                fateOperationsView?.IsOpen == true ||
+                advancementView?.IsOpen == true ||
+                expansionController?.HasPendingMapTarget == true;
+        }
+
+        private void BindExplorationView()
+        {
+            if (explorationView == null || explorationViewBound) return;
+            explorationView.LeaderControlToggleRequested +=
+                HandleLeaderControlToggleRequested;
+            explorationView.ManualGatherToggleRequested +=
+                HandleManualGatherToggleRequested;
+            explorationView.CenJinRescueToggleRequested +=
+                HandleCenJinRescueToggleRequested;
+            explorationView.OutpostAlertFocusRequested +=
+                HandleOutpostAlertFocusRequested;
+            explorationViewBound = true;
+            RefreshExplorationView(force: true);
+        }
+
+        private void UnbindExplorationView()
+        {
+            if (explorationView == null || !explorationViewBound) return;
+            explorationView.LeaderControlToggleRequested -=
+                HandleLeaderControlToggleRequested;
+            explorationView.ManualGatherToggleRequested -=
+                HandleManualGatherToggleRequested;
+            explorationView.CenJinRescueToggleRequested -=
+                HandleCenJinRescueToggleRequested;
+            explorationView.OutpostAlertFocusRequested -=
+                HandleOutpostAlertFocusRequested;
+            explorationViewBound = false;
+        }
+
+        private void RefreshExplorationView(bool force)
+        {
+            if (explorationView == null ||
+                explorationController?.IsInitialized != true)
+                return;
+            string signature = BuildExplorationPresentationSignature();
+            if (!force && string.Equals(
+                    signature,
+                    presentedExplorationSignature,
+                    StringComparison.Ordinal))
+                return;
+            presentedExplorationSignature = signature;
+            explorationView.Apply(CaptureExplorationPresentation());
+            explorationView.ApplyScanFeedback(
+                new GrayboxExplorationScanFeedback3D(
+                    !string.IsNullOrWhiteSpace(explorationFeedback),
+                    explorationFeedback,
+                    explorationFeedback.Contains("失败") ||
+                    explorationFeedback.Contains("不足") ||
+                    explorationFeedback.Contains("不可")));
+            ApplyLatestOutpostAlert();
+        }
+
+        private string BuildExplorationPresentationSignature()
+        {
+            return explorationController.LeaderControl.Revision + "|" +
+                explorationController.ManualGather.Revision + "|" +
+                explorationController.CenJinDistress.Revision + "|" +
+                explorationController.OutpostAlerts.Revision + "|" +
+                selectedGatherX + "," + selectedGatherY + "|" +
+                explorationFeedback + "|" +
+                (city?.Mode ?? CityMode.Mobile) + "|" +
+                (CurrentLeaderCharacter()?.DamageRevision ?? 0ul);
+        }
+
+        private void ApplyLatestOutpostAlert()
+        {
+            IReadOnlyList<OutpostAlertEntry> alerts =
+                explorationController.OutpostAlerts.UnacknowledgedAlerts;
+            OutpostAlertEntry latest = alerts.Count > 0
+                ? alerts[alerts.Count - 1]
+                : null;
+            explorationView.ApplyOutpostAlert(
+                latest == null
+                    ? new GrayboxExplorationOutpostAlertPresentation3D(
+                        false, string.Empty, string.Empty, string.Empty)
+                    : new GrayboxExplorationOutpostAlertPresentation3D(
+                        true,
+                        latest.StableAlertId,
+                        latest.ThreatSummary,
+                        OutpostAlertCatalog.ForSeverity(latest.Severity)
+                            ?.ChineseName));
+        }
+
+        private void HandleLeaderControlToggleRequested()
+        {
+            TryToggleLeaderControl(out _);
+        }
+
+        private void HandleManualGatherToggleRequested()
+        {
+            TryToggleManualGather(out _);
+        }
+
+        private void HandleCenJinRescueToggleRequested()
+        {
+            TryToggleCenJinRescue(out _);
+        }
+
+        private void HandleOutpostAlertFocusRequested(string stableAlertId)
+        {
+            OutpostAlertEntry alert = explorationController?.OutpostAlerts
+                ?.Get(stableAlertId);
+            if (alert == null) return;
+            explorationController.OutpostAlerts.TryAcknowledge(
+                stableAlertId);
+            expansionController?.Runtime?.WorldLayer.TryFocus(
+                alert.SettlementId);
+            explorationFeedback = "已定位前哨警报";
+            RefreshExplorationView(force: true);
+        }
+
+        private static string ResolveGatherDisabledReason(
+            bool recruited,
+            CharacterLifeRuntime character,
+            LeaderControlResolution control,
+            ManualGatherContext context)
+        {
+            if (!recruited) return "岑烬尚未招募";
+            if (character == null || character.State != CharacterLifeState.Active)
+                return "岑烬当前无法行动";
+            if (control.ActualMode != LeaderControlMode.Manual)
+                return "请先接管岑烬";
+            if (string.IsNullOrWhiteSpace(context.TargetStableId))
+                return "请先点选实时视野内的资源节点";
+            if (!context.TargetVisible) return "资源节点不在实时视野内";
+            if (context.NodeAmount <= 0) return "矿脉已枯竭";
+            if (context.DistanceToFootprint >
+                LeaderInteractionCatalog.ManualGatherMaximumDistance)
+                return "距离资源节点超过 1.5 格";
+            return string.Empty;
+        }
+
+        private string ResolveRescueDisabledReason()
+        {
+            CenJinDistressState state =
+                explorationController.CenJinDistress.State;
+            if (explorationController.CenJinDistress.IsCompleted)
+                return "岑烬已加入";
+            if (state == CenJinDistressState.Undiscovered)
+                return "尚未发现求救信号";
+            CenJinDistressContext3D context = CaptureCenJinDistressContext();
+            if (!context.CanOperate) return "当前状态不能执行救援";
+            if (context.CityDistance >
+                LeaderInteractionCatalog.CenJinRescueMaximumDistance)
+                return "移动城市需进入求救点 3 格内";
+            if (state != CenJinDistressState.Discovered &&
+                state != CenJinDistressState.Rescuing)
+                return "当前求救阶段不可操作";
+            return string.Empty;
+        }
+
+        private static string CharacterStateText(CharacterLifeState state)
+        {
+            switch (state)
+            {
+                case CharacterLifeState.Active: return "可行动";
+                case CharacterLifeState.Downed: return "倒地";
+                case CharacterLifeState.Recovering: return "恢复中";
+                default: return "已死亡";
+            }
+        }
+
+        private static string ManualGatherStatusText(ManualGatherStatus state)
+        {
+            switch (state)
+            {
+                case ManualGatherStatus.Gathering: return "采集中";
+                case ManualGatherStatus.Paused: return "已暂停";
+                case ManualGatherStatus.Gathered: return "本周期已取得资源";
+                case ManualGatherStatus.BackpackFull: return "背包已满";
+                case ManualGatherStatus.NodeDepleted: return "矿脉已枯竭";
+                case ManualGatherStatus.Interrupted: return "采集已中断";
+                case ManualGatherStatus.TransactionFailed: return "采集提交失败";
+                default: return "未在采集";
+            }
+        }
+
+        private static string CenJinDistressStateText(
+            CenJinDistressRuntime distress)
+        {
+            switch (distress.State)
+            {
+                case CenJinDistressState.Discovered:
+                    return distress.IsCritical ? "危急，仍可救援" : "已发现";
+                case CenJinDistressState.Rescuing:
+                    return "救援中 · 剩余 " +
+                        distress.RescueRemainingSeconds.ToString("0.0") + " 秒";
+                case CenJinDistressState.RescuedTimely: return "及时救援完成";
+                case CenJinDistressState.RescuedDelayed: return "延迟救援完成，岑烬负伤";
+                case CenJinDistressState.RescuedLegacy: return "既有进度已招募";
+                default: return "尚未发现求救信号";
+            }
+        }
+
+        private static string LeaderControlBlockReasonText(
+            LeaderControlBlockReason reason)
+        {
+            switch (reason)
+            {
+                case LeaderControlBlockReason.NotRecruited: return "岑烬尚未招募";
+                case LeaderControlBlockReason.LeaderNotActive: return "岑烬当前无法行动";
+                case LeaderControlBlockReason.CityNotFortress: return "移动城市需先展开";
+                case LeaderControlBlockReason.ModalBlocked: return "请先关闭其他界面";
+                default: return string.Empty;
+            }
+        }
+
+        private LeaderControlBlockReason ResolveLeaderControlBlockReason(
+            bool recruited,
+            CharacterLifeRuntime character)
+        {
+            if (!recruited) return LeaderControlBlockReason.NotRecruited;
+            if (character == null || character.State != CharacterLifeState.Active)
+                return LeaderControlBlockReason.LeaderNotActive;
+            if ((city?.Mode ?? CityMode.Mobile) != CityMode.Fortress)
+                return LeaderControlBlockReason.CityNotFortress;
+            return IsWorldInteractionModalBlocked()
+                ? LeaderControlBlockReason.ModalBlocked
+                : LeaderControlBlockReason.None;
+        }
+
+        private static string ExplorationZoneName(string zoneId)
+        {
+            return string.Equals(
+                    zoneId,
+                    "core.exploration.zone.safe-mining",
+                    StringComparison.Ordinal)
+                ? "安全矿区"
+                : string.Equals(
+                    zoneId,
+                    "core.exploration.zone.crystal-rift",
+                    StringComparison.Ordinal)
+                    ? "结晶裂谷"
+                    : zoneId ?? string.Empty;
+        }
+
+        private static string ResourceName(string resourceId)
+        {
+            return ResourceDefinitionCatalog.TryGet(
+                    resourceId,
+                    out ResourceDefinition definition)
+                ? definition.ChineseName
+                : resourceId ?? string.Empty;
         }
 
         private bool HasAuthoredRuntimeReferences()

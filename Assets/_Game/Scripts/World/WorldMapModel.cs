@@ -46,6 +46,7 @@ namespace WasteCity.World
         public int Width { get; }
         public int Height { get; }
         public int ResourceNodeCount { get; private set; }
+        public ulong ResourceRevision { get; private set; }
 
         public WorldMapModel(int width, int height, WorldSeed seed)
         {
@@ -109,6 +110,7 @@ namespace WasteCity.World
             if (harvested <= 0) return 0;
             WorldCell cell = cells[x, y];
             cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested, cell.Traversal);
+            unchecked { ResourceRevision++; }
             return harvested;
         }
 
@@ -157,6 +159,7 @@ namespace WasteCity.World
                 cell.ResourceId,
                 cell.ResourceAmount - amount,
                 cell.Traversal);
+            unchecked { ResourceRevision++; }
             return true;
         }
 
@@ -189,6 +192,7 @@ namespace WasteCity.World
                 cell.ResourceId,
                 cell.ResourceAmount + amount,
                 cell.Traversal);
+            unchecked { ResourceRevision++; }
             return true;
         }
         public int[] CaptureResourceAmounts() { var result=new int[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=cells[x,y].ResourceAmount;return result; }
@@ -213,6 +217,7 @@ namespace WasteCity.World
                 return false;
             }
 
+            bool changed = false;
             for (int y = 0; y < Height; y++)
             {
                 for (int x = 0; x < Width; x++)
@@ -238,6 +243,7 @@ namespace WasteCity.World
                 {
                     int index = y * Width + x;
                     WorldCell cell = cells[x, y];
+                    changed |= cell.ResourceAmount != amounts[index];
                     cells[x, y] = new WorldCell(
                         cell.Terrain,
                         cell.ResourceId,
@@ -245,6 +251,8 @@ namespace WasteCity.World
                         cell.Traversal);
                 }
             }
+
+            if (changed) unchecked { ResourceRevision++; }
 
             error = string.Empty;
             return true;

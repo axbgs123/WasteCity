@@ -2308,6 +2308,8 @@ MonoBehaviour:
   advancementView: {fileID: 1804086901}
   civilizationExpansionView: {fileID: 1804086902}
   civilizationExpansionController: {fileID: 46154811}
+  explorationView: {fileID: 1804086903}
+  explorationCommands: {fileID: 1959787199}
 --- !u!1 &1545501224
 GameObject:
   m_ObjectHideFlags: 0
@@ -2672,6 +2674,7 @@ GameObject:
   - component: {fileID: 1804086900}
   - component: {fileID: 1804086901}
   - component: {fileID: 1804086902}
+  - component: {fileID: 1804086903}
   m_Layer: 5
   m_Name: ProductionObservabilityCanvas
   m_TagString: Untagged
@@ -2854,6 +2857,19 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   canvas: {fileID: 1804086896}
+--- !u!114 &1804086903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1804086891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 413642d579294145a372d3652c398237, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  canvas: {fileID: 1804086896}
 --- !u!1 &1959787198
 GameObject:
   m_ObjectHideFlags: 0
@@ -2864,6 +2880,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1959787200}
   - component: {fileID: 1959787199}
+  - component: {fileID: 1959787202}
+  - component: {fileID: 1959787201}
   m_Layer: 0
   m_Name: GrayboxFormalSaveRuntimeHost
   m_TagString: Untagged
@@ -2900,6 +2918,11 @@ MonoBehaviour:
   advancementView: {fileID: 1804086901}
   expansionController: {fileID: 46154811}
   inputCoordinator: {fileID: 1513971949}
+  leader: {fileID: 883727725}
+  directControl: {fileID: 1650269103}
+  explorationController: {fileID: 1959787202}
+  fogPresenter: {fileID: 1959787201}
+  explorationView: {fileID: 1804086903}
 --- !u!4 &1959787200
 Transform:
   m_ObjectHideFlags: 0
@@ -2915,6 +2938,32 @@ Transform:
   m_Children: []
   m_Father: {fileID: 940661388}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1959787201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959787198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: be9c81a3e59f4d0a9fe5b7bed22838f5, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fogRoot: {fileID: 0}
+  fogMaterialTemplate: {fileID: 0}
+--- !u!114 &1959787202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959787198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59030fe31acb42768623037f64c9950e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1 &2120797885
 GameObject:
   m_ObjectHideFlags: 0

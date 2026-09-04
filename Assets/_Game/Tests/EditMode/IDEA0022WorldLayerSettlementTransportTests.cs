@@ -111,6 +111,15 @@ namespace WasteCity.Tests
                 out error), Is.False);
             Assert.That(error, Does.Contain("揭示"));
             Assert.That(hiddenAccount.CommitCount, Is.Zero);
+
+            hiddenLayer.ConfigureExplorationQuery(
+                (x, y) => x == 2 && y == 1);
+            Assert.That(hiddenLayer.TryEstablishSecondary(
+                2, 1,
+                SettlementAutonomyTemplate.Military,
+                hiddenAccount,
+                out _,
+                out error), Is.True, error);
         }
 
         [Test]

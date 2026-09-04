@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using WasteCity.Defense;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Exploration;
 
 namespace WasteCity.Graybox3D.Usability
 {
@@ -46,6 +47,9 @@ namespace WasteCity.Graybox3D.Usability
         [SerializeField]
         private GrayboxCivilizationExpansionController3D
             civilizationExpansionController;
+        [SerializeField] private GrayboxExplorationView3D explorationView;
+        [SerializeField]
+        private GrayboxFormalSaveRuntimeHost3D explorationCommands;
 
         private IGrayboxDevelopmentPanelControl3D developmentPanel;
         private Func<bool> tryAdvanceOrOpen;
@@ -90,6 +94,16 @@ namespace WasteCity.Graybox3D.Usability
             GrayboxFormalSaveEntryController3D formalSaveEntry)
         {
             this.formalSaveEntry = formalSaveEntry;
+        }
+
+        public void ConfigureExploration(
+            GrayboxExplorationView3D view,
+            GrayboxFormalSaveRuntimeHost3D commands)
+        {
+            explorationView = view ??
+                throw new ArgumentNullException(nameof(view));
+            explorationCommands = commands ??
+                throw new ArgumentNullException(nameof(commands));
         }
 
         public void Configure(
@@ -255,6 +269,15 @@ namespace WasteCity.Graybox3D.Usability
                 return SuppressAll();
             }
 
+            if (explorationView != null && explorationView.IsOpen)
+            {
+                bool leaderPressed = keyboard != null &&
+                    keyboard.lKey.wasPressedThisFrame;
+                if (escapePressed || leaderPressed)
+                    explorationView.Close();
+                return SuppressAll();
+            }
+
             EnsureDevelopmentPanelAdapter();
             if (developmentPanel != null && developmentPanel.IsOpen)
                 return ProcessOpenDevelopmentPanelInput(
@@ -337,6 +360,35 @@ namespace WasteCity.Graybox3D.Usability
                         : worldPanelPressed
                             ? GrayboxCivilizationExpansionPage3D.World
                             : GrayboxCivilizationExpansionPage3D.Politics);
+                return SuppressAll();
+            }
+
+            bool leaderPanelPressed = keyboard != null &&
+                keyboard.lKey.wasPressedThisFrame;
+            if (explorationView != null && leaderPanelPressed &&
+                !HasActiveTextInputFocus() &&
+                (buildingInput == null ||
+                 !buildingInput.IsBuildInteractionActive))
+            {
+                operations?.ClosePanels();
+                buildingInput?.TryCloseForOperations();
+                explorationView.Open();
+                return SuppressAll();
+            }
+
+            Mouse worldMouse = Mouse.current;
+            if (explorationView != null && explorationCommands != null &&
+                worldMouse != null &&
+                worldMouse.leftButton.wasPressedThisFrame &&
+                (buildingInput == null ||
+                 !buildingInput.IsBuildInteractionActive) &&
+                (operations == null || !operations.IsAnyPanelOpen) &&
+                !IsPointerOverUi() &&
+                explorationCommands.TrySelectManualGatherNodeFromScreen(
+                    worldMouse.position.ReadValue(),
+                    out _))
+            {
+                explorationView.Open();
                 return SuppressAll();
             }
 
@@ -527,6 +579,8 @@ namespace WasteCity.Graybox3D.Usability
             advancementView = null;
             civilizationExpansionView = null;
             civilizationExpansionController = null;
+            explorationView = null;
+            explorationCommands = null;
             tryAdvanceOrOpen = null;
             tryContinueAdvancement = null;
             developmentPanel = null;
@@ -610,6 +664,13 @@ namespace WasteCity.Graybox3D.Usability
                 }
             }
             return false;
+        }
+
+        private static bool IsPointerOverUi()
+        {
+            EventSystem eventSystem = EventSystem.current;
+            return eventSystem != null &&
+                eventSystem.IsPointerOverGameObject();
         }
 
         private static bool IsActiveTextInput(GameObject selected)

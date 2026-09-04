@@ -54,6 +54,10 @@ namespace WasteCity.Tests
             Assert.That(map.TryHarvestExact(
                 0, 0, ResourceIds.Iron, 1), Is.True);
             Assert.That(map.Get(0, 0).ResourceAmount, Is.EqualTo(1));
+            Assert.That(map.ResourceRevision, Is.EqualTo(1ul));
+            Assert.That(map.TryRollbackHarvest(
+                0, 0, ResourceIds.Iron, 1), Is.True);
+            Assert.That(map.ResourceRevision, Is.EqualTo(2ul));
         }
 
         [Test]

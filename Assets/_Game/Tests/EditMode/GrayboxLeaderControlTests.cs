@@ -6,6 +6,7 @@ using UnityEngine;
 using WasteCity.City;
 using WasteCity.Graybox3D;
 using WasteCity.Leader;
+using WasteCity.Leader.Exploration;
 using WasteCity.World;
 
 namespace WasteCity.Tests
@@ -255,6 +256,29 @@ namespace WasteCity.Tests
             Assert.That(
                 parameters[0].ParameterType,
                 Is.EqualTo(typeof(Func<DirectControlTarget>)));
+        }
+
+        [Test]
+        public void IDEA0029_AiIntentMovesTowardDockWithoutTeleporting()
+        {
+            LeaderFixture fixture = CreateFixture(
+                FilledMap(7, 7, OpenCell()),
+                true);
+            Vector3 before = fixture.Leader.transform.position;
+            fixture.Leader.ConfigureAiIntentProvider(
+                () => LeaderIntent.ReturnToDock(
+                    before.x + 4f,
+                    before.z));
+
+            fixture.Leader.TickControl(DirectControlTarget.City, .1f);
+
+            Assert.That(fixture.Leader.transform.position.x,
+                Is.EqualTo(before.x + LeaderMoveSpeed * .1f)
+                    .Within(.0001f));
+            Assert.That(fixture.Leader.transform.position.z,
+                Is.EqualTo(before.z).Within(.0001f));
+            Assert.That(fixture.Leader.transform.position.x,
+                Is.LessThan(before.x + 4f));
         }
 
         private LeaderFixture CreateFixture(

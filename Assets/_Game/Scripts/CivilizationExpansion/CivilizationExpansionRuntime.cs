@@ -15,6 +15,7 @@ namespace WasteCity.CivilizationExpansion
         IConvoyInterceptionImmunityProvider
     {
         private readonly WorldMapModel map;
+        private Func<int, int, bool> explorationQuery;
         private readonly List<CharacterLifeRuntime> characters;
         private int nextExpeditionOrdinal = 1;
         private ulong ruleTick;
@@ -108,6 +109,12 @@ namespace WasteCity.CivilizationExpansion
             Army.ConfigureResearchEffects(provider);
         }
 
+        public void ConfigureExplorationQuery(Func<int, int, bool> query)
+        {
+            explorationQuery = query;
+            WorldLayer.ConfigureExplorationQuery(query);
+        }
+
         public bool TryApplyGeneSplicingToCurrentLeader()
         {
             CharacterLifeRuntime current = FindCharacter(
@@ -138,7 +145,8 @@ namespace WasteCity.CivilizationExpansion
             SettlementRuntime primary = WorldLayer.PrimaryCity;
             if (targetX < 0 || targetY < 0 ||
                 targetX >= map.Width || targetY >= map.Height ||
-                !map.IsRevealed(targetX, targetY) ||
+                !(explorationQuery?.Invoke(targetX, targetY) ??
+                  map.IsRevealed(targetX, targetY)) ||
                 !CityTerrainRules.IsPassable(map.Get(targetX, targetY)) ||
                 !CityPathfinder.TryFindPath(
                     map,

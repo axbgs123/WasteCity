@@ -15,6 +15,8 @@ namespace WasteCity.Leader.Exploration
             "core.exploration.site.cen-jin-distress";
         public const string CenJinAttentionReasonId =
             "core.attention.rescue.cen-jin";
+        public const int CenJinDistressCellX = 47;
+        public const int CenJinDistressCellY = 13;
         public const float CenJinRescueMaximumDistance = 3f;
         public const float CenJinRescueSeconds = 12f;
         public const int CenJinBiomassCost = 10;

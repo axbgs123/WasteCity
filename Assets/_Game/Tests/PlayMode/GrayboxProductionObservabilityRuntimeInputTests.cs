@@ -15,6 +15,7 @@ using WasteCity.City;
 using WasteCity.Economy;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Exploration;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.Research;
 using WasteCity.Progression;
@@ -154,6 +155,30 @@ namespace WasteCity.Tests
             Assert.That(research.activeSelf, Is.False);
             Assert.That(systemMenu.IsOpen, Is.True);
             Assert.That(Time.timeScale, Is.Zero);
+        }
+
+        [UnityTest]
+        public IEnumerator IDEA0029_RealLKeyOpensAndClosesLeaderPanel()
+        {
+            GrayboxExplorationView3D exploration =
+                Object.FindObjectOfType<GrayboxExplorationView3D>();
+            Assert.That(exploration, Is.Not.Null);
+            Assert.That(exploration.IsOpen, Is.False);
+
+            yield return TapKey(Key.L);
+
+            Assert.That(exploration.IsOpen, Is.True);
+            Assert.That(exploration.HeadingText.text,
+                Does.Contain("尚未招募"));
+            Assert.That(exploration.LeaderControlButton.interactable,
+                Is.False);
+            Assert.That(exploration.LeaderControlButton
+                .GetComponentInChildren<Text>().text,
+                Does.Contain("岑烬尚未招募"));
+
+            yield return TapKey(Key.L);
+
+            Assert.That(exploration.IsOpen, Is.False);
         }
 
         [UnityTest]

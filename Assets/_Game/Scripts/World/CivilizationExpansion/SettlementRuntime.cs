@@ -578,6 +578,7 @@ namespace WasteCity.World.CivilizationExpansion
     {
         private readonly WorldMapModel map;
         private readonly ISettlementInventoryEndpoint primaryInventory;
+        private Func<int, int, bool> explorationQuery;
         private QuantumEntanglementInventoryNetwork quantumInventoryNetwork;
         private SortedDictionary<string, SettlementRuntime> settlements =
             new SortedDictionary<string, SettlementRuntime>(
@@ -625,6 +626,11 @@ namespace WasteCity.World.CivilizationExpansion
                     ResolveLocalInventoryEndpoint,
                     IsSettlementCommunicationActive,
                     GetOrderedSettlementIds);
+        }
+
+        public void ConfigureExplorationQuery(Func<int, int, bool> query)
+        {
+            explorationQuery = query;
         }
 
         public SettlementRuntime GetSettlement(string stableId)
@@ -859,7 +865,8 @@ namespace WasteCity.World.CivilizationExpansion
             out string error)
         {
             if (x < 0 || y < 0 || x >= map.Width || y >= map.Height ||
-                !map.IsRevealed(x, y))
+                !(explorationQuery?.Invoke(x, y) ??
+                  map.IsRevealed(x, y)))
             {
                 error = "目标格尚未揭示";
                 return false;

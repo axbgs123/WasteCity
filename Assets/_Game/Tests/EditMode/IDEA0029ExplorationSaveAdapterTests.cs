@@ -1,5 +1,10 @@
 using System;
 using NUnit.Framework;
+using System.Collections.Generic;
+using UnityEngine;
+using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Exploration;
+using WasteCity.Persistence.ThreeD;
 using WasteCity.Economy;
 using WasteCity.Graybox3D.Building;
 using WasteCity.Leader.CivilizationExpansion;
@@ -11,6 +16,18 @@ namespace WasteCity.Tests
 {
     public sealed class IDEA0029ExplorationSaveAdapterTests
     {
+        private readonly List<UnityEngine.Object> cleanup =
+            new List<UnityEngine.Object>();
+
+        [TearDown]
+        public void TearDown()
+        {
+            for (var index = cleanup.Count - 1; index >= 0; index--)
+                if (cleanup[index] != null)
+                    UnityEngine.Object.DestroyImmediate(cleanup[index]);
+            cleanup.Clear();
+        }
+
         [Test]
         public void AdapterAndLosslessDtoContractExist()
         {
@@ -32,6 +49,36 @@ namespace WasteCity.Tests
             Assert.That(intel.GetField("summary"), Is.Not.Null);
             Assert.That(intel.GetField("sourceRevision"), Is.Not.Null);
             Assert.That(gather.GetField("targetResourceId"), Is.Not.Null);
+        }
+
+        [Test]
+        public void SessionProxyUsesTheControllersCurrentSessionScopedOwners()
+        {
+            var owner = new GameObject("Exploration Save Proxy");
+            cleanup.Add(owner);
+            GrayboxExplorationController3D controller =
+                owner.AddComponent<GrayboxExplorationController3D>();
+            controller.Initialize(2, 2, "session-proxy", (_, __) => true);
+            var proxy = new GrayboxExplorationSaveDomainProxy3D(
+                controller,
+                () => "session-proxy",
+                () => 0d);
+            var data = new FormalThreeDSaveData
+            {
+                sessionId = "session-proxy",
+                world = new FormalThreeDWorldSaveData
+                {
+                    configurationSignature = "core.world.test",
+                },
+            };
+
+            Assert.That(proxy.DomainId,
+                Is.EqualTo(GrayboxFormalSaveDomainId3D.Exploration));
+            Assert.That(proxy.TryCapture(data, out string error),
+                Is.True,
+                error);
+            Assert.That(data.exploration.width, Is.EqualTo(2));
+            Assert.That(data.exploration.height, Is.EqualTo(2));
         }
 
         [Test]
@@ -131,6 +178,10 @@ namespace WasteCity.Tests
                 error);
 
             FormalThreeDIntelSaveData saved = payload.exploration.intel[0];
+            Assert.That(saved.ownerStableId,
+                Is.EqualTo("world.resource-node.16.15"));
+            Assert.That(saved.stableIntelId,
+                Is.EqualTo(saved.ownerStableId));
             Assert.That(saved.summary, Is.Empty);
             Assert.That(saved.hasMutableValue, Is.False);
             Assert.That(saved.mutableValue, Is.Zero);

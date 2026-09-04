@@ -73,6 +73,36 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void IDEA0029_ExplicitSessionResetReplacesSessionScopedState()
+        {
+            GrayboxExplorationController3D controller = InitializedController();
+            controller.TrySyncVisionSource(
+                new WorldVisionSource(
+                    "city.primary",
+                    WorldVisionSourceKind.PrimaryCity,
+                    10,
+                    10,
+                    true),
+                out _);
+            WorldExplorationRuntime before = controller.Exploration;
+
+            Assert.That(controller.TryResetSession(
+                    64,
+                    48,
+                    "session-next",
+                    (_, __) => true,
+                    out string error),
+                Is.True,
+                error);
+
+            Assert.That(controller.Exploration, Is.Not.SameAs(before));
+            Assert.That(controller.Exploration.SourceCount, Is.Zero);
+            Assert.That(controller.CenJinDistress.SessionId,
+                Is.EqualTo("session-next"));
+            Assert.That(controller.AreBoundariesConfigured, Is.False);
+        }
+
+        [Test]
         public void IDEA0029_VisionSyncIsExplicitIdempotentAndRejectsOutOfBounds()
         {
             GrayboxExplorationController3D controller = InitializedController();

@@ -42,6 +42,12 @@ namespace WasteCity.Tests
                 LeaderInteractionCatalog.CenJinAttentionReasonId,
                 Is.EqualTo("core.attention.rescue.cen-jin"));
             Assert.That(
+                LeaderInteractionCatalog.CenJinDistressCellX,
+                Is.EqualTo(47));
+            Assert.That(
+                LeaderInteractionCatalog.CenJinDistressCellY,
+                Is.EqualTo(13));
+            Assert.That(
                 LeaderInteractionCatalog.CenJinRescueMaximumDistance,
                 Is.EqualTo(3f));
             Assert.That(

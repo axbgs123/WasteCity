@@ -187,6 +187,9 @@ namespace WasteCity.Graybox3D.Building
             for (var index = 0; index < intel.Length; index++)
             {
                 WorldIntelObservation item = intel[index];
+                string persistenceStableId =
+                    ToPersistenceStableId(item.Kind, item.StableId,
+                        item.X, item.Y);
                 double age = currentRuleTime -
                     item.ObservedRuleTimeSeconds;
                 if (!IsFinite(age) || age < -TimeEpsilon)
@@ -206,9 +209,9 @@ namespace WasteCity.Graybox3D.Building
                 int mutableValue = hasMutable ? item.MutableValue : 0;
                 savedIntel[index] = new FormalThreeDIntelSaveData
                 {
-                    stableIntelId = item.StableId,
+                    stableIntelId = persistenceStableId,
                     ownerKind = (int)item.Kind,
-                    ownerStableId = item.StableId,
+                    ownerStableId = persistenceStableId,
                     summary = expired ? string.Empty : item.Summary,
                     x = item.X,
                     y = item.Y,
@@ -272,7 +275,8 @@ namespace WasteCity.Graybox3D.Building
                     manualGather = new FormalThreeDManualGatherSaveData
                     {
                         active = gather.IsActive,
-                        targetNodeId = gather.TargetStableId,
+                        targetNodeId = ToPersistenceResourceNodeId(
+                            gather.TargetStableId),
                         targetResourceId = gather.TargetResourceId,
                         remainingCycleSeconds = gather.RemainingSeconds,
                         cycleOrdinal = ProjectRevision(
@@ -381,8 +385,13 @@ namespace WasteCity.Graybox3D.Building
                     return false;
                 try
                 {
-                    intel[index] = new WorldIntelObservation(
+                    string runtimeStableId = ToRuntimeStableId(
+                        (WorldIntelKind)item.ownerKind,
                         item.stableIntelId,
+                        item.x,
+                        item.y);
+                    intel[index] = new WorldIntelObservation(
+                        runtimeStableId,
                         (WorldIntelKind)item.ownerKind,
                         item.x,
                         item.y,
@@ -424,7 +433,7 @@ namespace WasteCity.Graybox3D.Building
                 data.leader.manualGather;
             var gatherSnapshot = new ManualGatherSnapshot(
                 gather.active,
-                gather.targetNodeId,
+                ToRuntimeResourceNodeId(gather.targetNodeId),
                 gather.targetResourceId,
                 gather.remainingCycleSeconds);
             var gatherCandidate = new ManualGatherRuntime();
@@ -461,6 +470,67 @@ namespace WasteCity.Graybox3D.Building
                 alertSnapshot);
             error = string.Empty;
             return true;
+        }
+
+        private static string ToPersistenceStableId(
+            WorldIntelKind kind,
+            string stableId,
+            int x,
+            int y)
+        {
+            return kind == WorldIntelKind.Resource
+                ? GrayboxResourceNodeIdentity3D.Create(x, y)
+                : stableId;
+        }
+
+        private static string ToRuntimeStableId(
+            WorldIntelKind kind,
+            string stableId,
+            int x,
+            int y)
+        {
+            if (kind != WorldIntelKind.Resource) return stableId;
+            FormalResourceNodeSpec3D? node =
+                FormalWorldGenerationCatalog3D.FindResourceNode(x, y);
+            return node.HasValue ? node.Value.StableId : stableId;
+        }
+
+        private static string ToPersistenceResourceNodeId(string stableId)
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) return string.Empty;
+            for (var index = 0;
+                 index < FormalWorldGenerationCatalog3D.ResourceNodes.Count;
+                 index++)
+            {
+                FormalResourceNodeSpec3D node =
+                    FormalWorldGenerationCatalog3D.ResourceNodes[index];
+                if (string.Equals(
+                        node.StableId,
+                        stableId,
+                        StringComparison.Ordinal))
+                    return GrayboxResourceNodeIdentity3D.Create(
+                        node.X,
+                        node.Y);
+            }
+            return stableId;
+        }
+
+        private static string ToRuntimeResourceNodeId(string stableId)
+        {
+            if (string.IsNullOrWhiteSpace(stableId)) return string.Empty;
+            for (var index = 0;
+                 index < FormalWorldGenerationCatalog3D.ResourceNodes.Count;
+                 index++)
+            {
+                FormalResourceNodeSpec3D node =
+                    FormalWorldGenerationCatalog3D.ResourceNodes[index];
+                if (string.Equals(
+                        GrayboxResourceNodeIdentity3D.Create(node.X, node.Y),
+                        stableId,
+                        StringComparison.Ordinal))
+                    return node.StableId;
+            }
+            return stableId;
         }
 
         private bool TryApplyPrepared(

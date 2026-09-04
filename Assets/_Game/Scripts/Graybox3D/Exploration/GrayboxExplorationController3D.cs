@@ -167,6 +167,52 @@ namespace WasteCity.Graybox3D.Exploration
             IsInitialized = true;
         }
 
+        public bool TryResetSession(
+            int width,
+            int height,
+            string sessionId,
+            TryCommitExplorationAttention attentionCommitter,
+            out string error)
+        {
+            if (width < 1 || height < 1 ||
+                string.IsNullOrWhiteSpace(sessionId) ||
+                attentionCommitter == null)
+            {
+                error = "探索会话重置参数无效";
+                return false;
+            }
+
+            WorldExplorationRuntime nextExploration;
+            CenJinDistressRuntime nextDistress;
+            try
+            {
+                nextExploration = new WorldExplorationRuntime(
+                    width,
+                    height,
+                    sessionId,
+                    attentionCommitter);
+                nextDistress = new CenJinDistressRuntime(sessionId);
+            }
+            catch (Exception exception)
+            {
+                error = "探索会话重置失败：" + exception.Message;
+                return false;
+            }
+
+            Exploration = nextExploration;
+            LeaderControl = new LeaderControlRuntime();
+            ManualGather = new ManualGatherRuntime();
+            CenJinDistress = nextDistress;
+            OutpostAlerts = new OutpostAlertRuntime();
+            captureManualGatherContext = null;
+            commitGatherOne = null;
+            captureDistressContext = null;
+            distressTransaction = null;
+            IsInitialized = true;
+            error = string.Empty;
+            return true;
+        }
+
         public void ConfigureBoundaries(
             Func<ManualGatherContext> captureManualGatherContext,
             Func<string, WorldHarvestTransactionResult> commitGatherOne,

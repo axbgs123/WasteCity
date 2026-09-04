@@ -15,6 +15,7 @@ using WasteCity.ArtIntegration3D;
 using WasteCity.City;
 using WasteCity.Graybox3D;
 using WasteCity.Graybox3D.Building;
+using WasteCity.Graybox3D.Exploration;
 using WasteCity.Graybox3D.Usability;
 using WasteCity.World;
 
@@ -1100,6 +1101,9 @@ namespace WasteCity.Editor
             GrayboxCivilizationExpansionView3D expansionView =
                 EnsureComponent<GrayboxCivilizationExpansionView3D>(
                     operationsTransform);
+            GrayboxExplorationView3D explorationView =
+                EnsureComponent<GrayboxExplorationView3D>(
+                    operationsTransform);
             RemoveMissingMonoBehavioursFromExactObject(
                 operationsTransform.gameObject);
             GrayboxDefenseHud3D defenseHud =
@@ -1154,6 +1158,12 @@ namespace WasteCity.Editor
             GrayboxFormalSaveRuntimeHost3D formalSaveHost =
                 EnsureComponent<GrayboxFormalSaveRuntimeHost3D>(
                     formalSaveHostTransform);
+            GrayboxExplorationController3D explorationController =
+                EnsureComponent<GrayboxExplorationController3D>(
+                    formalSaveHostTransform);
+            GrayboxFogPresenter3D fogPresenter =
+                EnsureComponent<GrayboxFogPresenter3D>(
+                    formalSaveHostTransform);
             Transform formalSaveEntryTransform = EnsureChild(
                 buildingReferences.Systems,
                 "GrayboxFormalSaveEntryController");
@@ -1176,6 +1186,8 @@ namespace WasteCity.Editor
                 ("session", buildingReferences.Session),
                 ("buildingPresentation",
                     buildingReferences.BuildingPresentation),
+                ("buildingPlacement",
+                    RequireSingle<GrayboxBuildingPlacementController3D>(scene)),
                 ("operations", operationsController),
                 ("production", buildingReferences.Production),
                 ("defense", buildingReferences.DefenseController),
@@ -1185,6 +1197,11 @@ namespace WasteCity.Editor
                 ("fateOperationsView", fateOperationsView),
                 ("advancementView", advancementView),
                 ("expansionController", expansionController),
+                ("leader", buildingReferences.Leader),
+                ("directControl", buildingReferences.DirectControl),
+                ("explorationController", explorationController),
+                ("fogPresenter", fogPresenter),
+                ("explorationView", explorationView),
                 ("developerModifier", buildingReferences.Developer),
                 ("inputCoordinator", coordinator));
             SetReferences(
@@ -1210,6 +1227,7 @@ namespace WasteCity.Editor
             SetReferences(fateOperationsView, ("canvas", operationsCanvas));
             SetReferences(advancementView, ("canvas", operationsCanvas));
             SetReferences(expansionView, ("canvas", operationsCanvas));
+            SetReferences(explorationView, ("canvas", operationsCanvas));
             SetReferences(
                 defenseHud,
                 ("canvas", operationsCanvas),
@@ -1256,6 +1274,10 @@ namespace WasteCity.Editor
                 ("civilizationExpansionView", expansionView),
                 ("civilizationExpansionController", expansionController));
             SetReferences(
+                coordinator,
+                ("explorationView", explorationView),
+                ("explorationCommands", formalSaveHost));
+            SetReferences(
                 RequireSingle<GrayboxInputRouter>(scene),
                 ("inputInterceptor", coordinator));
 
@@ -1295,6 +1317,15 @@ namespace WasteCity.Editor
             {
                 throw new InvalidOperationException(
                     "The civilization advancement view is not unique.");
+            }
+            if (RequireSingle<GrayboxExplorationView3D>(scene) !=
+                    explorationView ||
+                RequireSingle<GrayboxExplorationController3D>(scene) !=
+                    explorationController ||
+                RequireSingle<GrayboxFogPresenter3D>(scene) != fogPresenter)
+            {
+                throw new InvalidOperationException(
+                    "The exploration view/controller/fog presenter is not unique.");
             }
             if (RequireSingle<GrayboxFormalSaveRuntimeHost3D>(scene) !=
                     formalSaveHost ||

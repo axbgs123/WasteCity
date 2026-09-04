@@ -1,6 +1,8 @@
+using System;
 using UnityEngine;
 using WasteCity.City;
 using WasteCity.Leader;
+using WasteCity.Leader.Exploration;
 
 namespace WasteCity.Graybox3D
 {
@@ -16,6 +18,7 @@ namespace WasteCity.Graybox3D
         private bool developmentFixtureRecruited;
 
         private Vector2 manualInput;
+        private Func<LeaderIntent> aiIntentProvider;
 
         public LeaderModel Model { get; } = new LeaderModel();
         public bool DevelopmentFixtureRecruited =>
@@ -56,6 +59,11 @@ namespace WasteCity.Graybox3D
             manualInput = Vector2.ClampMagnitude(input, 1f);
         }
 
+        public void ConfigureAiIntentProvider(Func<LeaderIntent> provider)
+        {
+            aiIntentProvider = provider;
+        }
+
         public void TickControl(
             DirectControlTarget target,
             float deltaTime)
@@ -63,6 +71,7 @@ namespace WasteCity.Graybox3D
             if (target != DirectControlTarget.Leader)
             {
                 manualInput = Vector2.zero;
+                TickAiControl(deltaTime);
                 return;
             }
 
@@ -80,20 +89,47 @@ namespace WasteCity.Graybox3D
                 manualInput.normalized *
                 moveSpeed *
                 Mathf.Max(0f, deltaTime);
-            Vector3 candidateWorld =
-                worldView.Coordinates.PlaneToWorld(
-                    candidate,
-                    transform.position.y);
+            TryCommitPlanePosition(candidate);
+        }
 
+        private void TickAiControl(float deltaTime)
+        {
+            if (aiIntentProvider == null || worldView?.Coordinates == null ||
+                worldView.Model == null)
+                return;
+            LeaderIntent intent = aiIntentProvider();
+            if (intent.Kind == LeaderIntentKind.None ||
+                intent.Kind == LeaderIntentKind.HoldPosition)
+                return;
+            Vector2 current = worldView.Coordinates.WorldToPlane(
+                transform.position);
+            Vector2 target = new Vector2(intent.TargetX, intent.TargetY);
+            Vector2 delta = target - current;
+            if (delta.sqrMagnitude <=
+                LeaderAiRules.DockArrivalDistance *
+                LeaderAiRules.DockArrivalDistance)
+                return;
+            float step = moveSpeed * Mathf.Max(0f, deltaTime);
+            if (step <= 0f) return;
+            Vector2 candidate = current +
+                delta.normalized * Mathf.Min(step, delta.magnitude);
+            TryCommitPlanePosition(candidate);
+        }
+
+        private bool TryCommitPlanePosition(Vector2 candidate)
+        {
+            Vector3 candidateWorld = worldView.Coordinates.PlaneToWorld(
+                candidate,
+                transform.position.y);
             if (!worldView.TryWorldToCell(
                     candidateWorld,
                     out int cellX,
                     out int cellY) ||
                 !CityTerrainRules.IsPassable(
                     worldView.Model.Get(cellX, cellY)))
-                return;
-
+                return false;
             transform.position = candidateWorld;
+            return true;
         }
 
         public void SnapToCityDock()
@@ -111,6 +147,15 @@ namespace WasteCity.Graybox3D
                     dockPlane.x,
                     transform.position.y,
                     dockPlane.y);
+        }
+
+        public Vector2 ResolveCityDockPlane()
+        {
+            return city == null
+                ? new Vector2(transform.position.x, transform.position.z)
+                : new Vector2(
+                    city.transform.position.x,
+                    city.transform.position.z) + CityDockOffset;
         }
     }
 }

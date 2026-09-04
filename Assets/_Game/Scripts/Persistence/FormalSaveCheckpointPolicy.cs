@@ -34,6 +34,10 @@ namespace WasteCity.Persistence
         public const string BossEventStarted = "boss-event-started";
         public const string FirstCivilizationAscension =
             "first-civilization-ascension";
+        public const string ExplorationScanCompleted =
+            "exploration-scan-completed";
+        public const string CenJinRescueCompleted =
+            "cen-jin-rescue-completed";
     }
 
     public sealed class FormalSaveCheckpointPolicy
