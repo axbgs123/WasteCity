@@ -63,7 +63,6 @@ namespace WasteCity.Graybox3D
             if (target != DirectControlTarget.Leader)
             {
                 manualInput = Vector2.zero;
-                SnapToCityDock();
                 return;
             }
 

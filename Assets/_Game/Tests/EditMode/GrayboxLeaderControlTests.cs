@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System;
+using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using WasteCity.City;
@@ -198,33 +200,61 @@ namespace WasteCity.Tests
         }
 
         [Test]
-        public void TickControl_CityTargetDocksAndIgnoresMovementInput()
+        public void TickControl_CityTargetPreservesPositionAndIgnoresInput()
         {
             LeaderFixture fixture = CreateFixture(
                 FilledMap(7, 7, OpenCell()),
                 true);
             Vector3 cityStart = fixture.City.transform.position;
-            float leaderY = fixture.Leader.transform.position.y;
             bool recruited = fixture.Leader.Model.Recruited;
             bool injured = fixture.Leader.Model.Injured;
             fixture.Leader.transform.position +=
                 new Vector3(-2f, 0f, 3f);
+            Vector3 leaderBefore = fixture.Leader.transform.position;
 
             fixture.Leader.ApplyManualInput(Vector2.left);
             fixture.Leader.TickControl(DirectControlTarget.City, 1f);
 
             Assert.That(
                 fixture.Leader.transform.position,
-                Is.EqualTo(
-                    new Vector3(
-                        cityStart.x + 1.8f,
-                        leaderY,
-                        cityStart.z + 1.2f)));
+                Is.EqualTo(leaderBefore));
             Assert.That(fixture.City.transform.position, Is.EqualTo(cityStart));
             Assert.That(
                 fixture.Leader.Model.Recruited,
                 Is.EqualTo(recruited));
             Assert.That(fixture.Leader.Model.Injured, Is.EqualTo(injured));
+        }
+
+        [Test]
+        public void IDEA0029_ReturningControlToCityDoesNotTeleportLeader()
+        {
+            LeaderFixture fixture = CreateFixture(
+                FilledMap(7, 7, OpenCell()),
+                true);
+            fixture.Leader.transform.position +=
+                new Vector3(-2f, 0f, 3f);
+            Vector3 before = fixture.Leader.transform.position;
+
+            fixture.Leader.ApplyManualInput(Vector2.left);
+            fixture.Leader.TickControl(DirectControlTarget.City, 1f);
+
+            Assert.That(fixture.Leader.transform.position, Is.EqualTo(before));
+        }
+
+        [Test]
+        public void IDEA0029_DirectControlCoordinatorAcceptsFormalTargetProvider()
+        {
+            MethodInfo configure = typeof(GrayboxDirectControlCoordinator)
+                .GetMethod(
+                    "ConfigureFormalTargetProvider",
+                    BindingFlags.Instance | BindingFlags.Public);
+
+            Assert.That(configure, Is.Not.Null);
+            ParameterInfo[] parameters = configure.GetParameters();
+            Assert.That(parameters, Has.Length.EqualTo(1));
+            Assert.That(
+                parameters[0].ParameterType,
+                Is.EqualTo(typeof(Func<DirectControlTarget>)));
         }
 
         private LeaderFixture CreateFixture(

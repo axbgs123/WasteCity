@@ -79,10 +79,14 @@ namespace WasteCity.Economy
 
         public int Add(string resourceId, int amount)
         {
-            if (!TryGetUsableDefinition(resourceId, out ResourceDefinition definition) || amount <= 0)
+            int acceptable = GetAcceptableAmount(resourceId, amount);
+            if (acceptable <= 0 ||
+                !TryGetUsableDefinition(
+                    resourceId,
+                    out ResourceDefinition definition))
                 return 0;
 
-            int remaining = amount;
+            int remaining = acceptable;
             for (int index = 0; index < SlotCount && remaining > 0; index++)
             {
                 if (!string.Equals(resourceIds[index], resourceId, StringComparison.Ordinal))
@@ -108,7 +112,43 @@ namespace WasteCity.Economy
                 remaining -= moved;
             }
 
-            return amount - remaining;
+            return acceptable - remaining;
+        }
+
+        public int GetAcceptableAmount(
+            string resourceId,
+            int requestedAmount)
+        {
+            if (requestedAmount <= 0 ||
+                !TryGetUsableDefinition(
+                    resourceId,
+                    out ResourceDefinition definition))
+            {
+                return 0;
+            }
+
+            long available = 0;
+            for (int index = 0; index < SlotCount; index++)
+            {
+                if (IsEmpty(index))
+                {
+                    available += definition.StackLimit;
+                }
+                else if (string.Equals(
+                             resourceIds[index],
+                             resourceId,
+                             StringComparison.Ordinal))
+                {
+                    available += Math.Max(
+                        0,
+                        definition.StackLimit - amounts[index]);
+                }
+
+                if (available >= requestedAmount)
+                    return requestedAmount;
+            }
+
+            return available <= 0 ? 0 : (int)available;
         }
 
         public int Remove(string resourceId, int amount)

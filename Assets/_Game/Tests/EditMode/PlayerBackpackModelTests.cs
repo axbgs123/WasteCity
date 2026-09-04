@@ -91,6 +91,41 @@ namespace WasteCity.Tests
         }
 
         [Test]
+        public void AcceptableAmountPreflightMatchesAddWithoutMutatingSlots()
+        {
+            var backpack = new PlayerBackpackModel();
+            Assert.That(backpack.Add(ResourceIds.Iron, 50), Is.EqualTo(50));
+            Assert.That(backpack.Add(ResourceIds.Alloy, 2900),
+                Is.EqualTo(2900));
+            BackpackSlot[] before = CaptureSlots(backpack);
+
+            Assert.That(backpack.GetAcceptableAmount(
+                ResourceIds.Iron, 80), Is.EqualTo(50));
+            AssertSlotsEqual(before, backpack);
+            Assert.That(backpack.Add(ResourceIds.Iron, 80), Is.EqualTo(50));
+            Assert.That(Total(backpack, ResourceIds.Iron), Is.EqualTo(100));
+            Assert.That(backpack.GetAcceptableAmount(
+                ResourceIds.Iron, 1), Is.Zero);
+        }
+
+        [Test]
+        public void AcceptableAmountRejectsInvalidRequestsWithoutMutation()
+        {
+            var backpack = new PlayerBackpackModel();
+            backpack.Add(ResourceIds.Stone, 5);
+            BackpackSlot[] before = CaptureSlots(backpack);
+
+            Assert.That(backpack.GetAcceptableAmount(null, 1), Is.Zero);
+            Assert.That(backpack.GetAcceptableAmount(
+                "unknown.resource", 1), Is.Zero);
+            Assert.That(backpack.GetAcceptableAmount(
+                ResourceIds.Stone, 0), Is.Zero);
+            Assert.That(backpack.GetAcceptableAmount(
+                ResourceIds.Stone, -1), Is.Zero);
+            AssertSlotsEqual(before, backpack);
+        }
+
+        [Test]
         public void SplitHalfRoundsMovedHalfUpAndConservesTheResourceTotal()
         {
             var backpack = new PlayerBackpackModel();

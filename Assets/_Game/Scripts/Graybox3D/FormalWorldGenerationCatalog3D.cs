@@ -278,5 +278,16 @@ namespace WasteCity.Graybox3D
             Corridors => corridors;
         public static IReadOnlyList<FormalResourceNodeSpec3D>
             ResourceNodes => resourceNodes;
+
+        public static FormalResourceNodeSpec3D? FindResourceNode(int x, int y)
+        {
+            for (var index = 0; index < resourceNodes.Length; index++)
+            {
+                FormalResourceNodeSpec3D node = resourceNodes[index];
+                if (node.X == x && node.Y == y)
+                    return node;
+            }
+            return null;
+        }
     }
 }

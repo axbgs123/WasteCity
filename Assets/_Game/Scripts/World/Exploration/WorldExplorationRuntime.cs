@@ -117,6 +117,7 @@ namespace WasteCity.World.Exploration
         public int SourceCount => visibility.SourceCount;
         public int IntelCount => intel.Count;
         public int ScannedZoneCount => scan.ScannedZoneCount;
+        public ulong VisibilityRevision => visibility.Revision;
         public ulong Revision { get; private set; }
 
         public WorldVisibilityState GetState(int x, int y)

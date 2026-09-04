@@ -140,6 +140,50 @@ namespace WasteCity.Graybox3D.Exploration
             return true;
         }
 
+        public bool ApplyVisibility(WorldExplorationRuntime exploration)
+        {
+            if (exploration == null)
+                throw new ArgumentNullException(nameof(exploration));
+            EnsureGenerated();
+            if (exploration.Width != coordinates.Width ||
+                exploration.Height != coordinates.Height)
+            {
+                throw new ArgumentException(
+                    "Exploration dimensions must match the generated fog mask.",
+                    nameof(exploration));
+            }
+            if (hasAppliedRevision &&
+                appliedRevision == exploration.VisibilityRevision)
+            {
+                LastDirtyCellCount = 0;
+                return false;
+            }
+
+            int dirtyCount = 0;
+            for (var y = 0; y < coordinates.Height; y++)
+            for (var x = 0; x < coordinates.Width; x++)
+            {
+                int index = y * coordinates.Width + x;
+                WorldVisibilityState state = exploration.GetState(x, y);
+                if (presentedStates[index] == state)
+                    continue;
+                presentedStates[index] = state;
+                Color32 color = GrayboxFogVisualPolicy3D.Resolve(state);
+                maskColors[index] = color;
+                maskTexture.SetPixel(x, y, color);
+                dirtyCount++;
+            }
+
+            hasAppliedRevision = true;
+            appliedRevision = exploration.VisibilityRevision;
+            LastDirtyCellCount = dirtyCount;
+            if (dirtyCount == 0)
+                return false;
+            maskTexture.Apply(false, false);
+            MaskApplyCount++;
+            return true;
+        }
+
         public WorldVisibilityState GetPresentedState(int x, int y)
         {
             ValidateCell(x, y);

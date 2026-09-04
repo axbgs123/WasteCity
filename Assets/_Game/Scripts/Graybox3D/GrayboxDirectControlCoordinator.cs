@@ -9,6 +9,8 @@ namespace WasteCity.Graybox3D
         [SerializeField] private GrayboxMobileCityController3D city;
         [SerializeField] private GrayboxLeaderController3D leader;
 
+        private Func<DirectControlTarget> formalTargetProvider;
+
         public DirectControlTarget ControlTarget { get; private set; } =
             DirectControlTarget.City;
 
@@ -22,10 +24,17 @@ namespace WasteCity.Graybox3D
             this.leader = leader;
         }
 
+        public void ConfigureFormalTargetProvider(
+            Func<DirectControlTarget> provider)
+        {
+            formalTargetProvider = provider;
+        }
+
         public bool Refresh()
         {
-            DirectControlTarget requested =
-                DirectControlRules.Resolve(
+            DirectControlTarget requested = formalTargetProvider != null
+                ? formalTargetProvider()
+                : DirectControlRules.Resolve(
                     city?.Deployment?.Mode ?? CityMode.Mobile,
                     leader != null && leader.Model.Recruited);
             if (requested == ControlTarget)

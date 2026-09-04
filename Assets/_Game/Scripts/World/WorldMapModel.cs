@@ -101,12 +101,95 @@ namespace WasteCity.World
 
         public int Harvest(int x, int y, int requested, out string resourceId)
         {
-            resourceId = null;
-            if (x < 0 || y < 0 || x >= Width || y >= Height || requested <= 0) return 0;
-            WorldCell cell = cells[x, y]; if (!cell.HasResource || cell.ResourceAmount <= 0) return 0;
-            int harvested = Math.Min(requested, cell.ResourceAmount); resourceId = cell.ResourceId;
+            int harvested = GetHarvestableAmount(
+                x,
+                y,
+                requested,
+                out resourceId);
+            if (harvested <= 0) return 0;
+            WorldCell cell = cells[x, y];
             cells[x, y] = new WorldCell(cell.Terrain, cell.ResourceId, cell.ResourceAmount - harvested, cell.Traversal);
             return harvested;
+        }
+
+        public int GetHarvestableAmount(
+            int x,
+            int y,
+            int requested,
+            out string resourceId)
+        {
+            resourceId = null;
+            if (x < 0 || y < 0 || x >= Width || y >= Height ||
+                requested <= 0)
+            {
+                return 0;
+            }
+
+            WorldCell cell = cells[x, y];
+            if (!cell.HasResource || cell.ResourceAmount <= 0) return 0;
+            resourceId = cell.ResourceId;
+            return Math.Min(requested, cell.ResourceAmount);
+        }
+
+        public bool TryHarvestExact(
+            int x,
+            int y,
+            string expectedResourceId,
+            int amount)
+        {
+            int harvestable = GetHarvestableAmount(
+                x,
+                y,
+                amount,
+                out string actualResourceId);
+            if (harvestable != amount ||
+                !string.Equals(
+                    actualResourceId,
+                    expectedResourceId,
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            WorldCell cell = cells[x, y];
+            cells[x, y] = new WorldCell(
+                cell.Terrain,
+                cell.ResourceId,
+                cell.ResourceAmount - amount,
+                cell.Traversal);
+            return true;
+        }
+
+        public bool TryRollbackHarvest(
+            int x,
+            int y,
+            string expectedResourceId,
+            int amount)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height ||
+                string.IsNullOrWhiteSpace(expectedResourceId) ||
+                amount <= 0)
+            {
+                return false;
+            }
+
+            WorldCell cell = cells[x, y];
+            if (!cell.HasResource ||
+                !string.Equals(
+                    cell.ResourceId,
+                    expectedResourceId,
+                    StringComparison.Ordinal) ||
+                cell.ResourceAmount > int.MaxValue - amount)
+            {
+                return false;
+            }
+
+            cells[x, y] = new WorldCell(
+                cell.Terrain,
+                cell.ResourceId,
+                cell.ResourceAmount + amount,
+                cell.Traversal);
+            return true;
         }
         public int[] CaptureResourceAmounts() { var result=new int[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=cells[x,y].ResourceAmount;return result; }
         public bool[] CaptureRevealed() { var result=new bool[Width*Height];for(int y=0;y<Height;y++)for(int x=0;x<Width;x++)result[y*Width+x]=revealed[x,y];return result; }
