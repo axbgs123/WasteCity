@@ -1,141 +1,161 @@
 # Waste City / 《废土移动城市》
 
-《废土移动城市》Unity 正式版内部开发仓库。仓库为 Private，当前不公开发布。
+一款以移动城市为核心，融合资源采集、生产物流、科技发展、城市防御、探索与文明升阶的俯视角废土策略经营游戏。
 
-## 固定环境
+> 项目正在持续开发，目前公开的是可运行、可测试的开发版本，不是正式发行版。大量建筑、角色和单位仍使用可替换的二维贴图或占位表现。
 
-- Unity：`2022.3.62f1`（revision `4af31df58517`）
-- 渲染：唯一现役 `GrayboxPrototype3D` 使用场景作用域 URP；历史 2D `FormalPrototype` 已退役
-- 平台：Windows 10/11 64 位
-- 输入：Unity Input System
-- 版本控制：Git + Git LFS
-- 默认编辑/正式构建入口：`Assets/_Game/Scenes/GrayboxPrototype3D.unity`
+## 游戏简介
 
-Unity Hub 必须安装上述精确编辑器版本以及 Windows Build Support。工程版本也记录在 `ProjectSettings/ProjectVersion.txt`。
+灾后世界中，幸存者依靠一座能够移动和展开的城市寻找资源。玩家需要选择落脚点，建立生产与仓储网络，研究不同文明路线，抵御逐渐增强的威胁，并在资源、关注度、命轨与文明发展之间作出取舍。
 
-## 新电脑接手
+核心循环：
 
-新电脑需要能够访问本 Private 仓库，并安装 Git、Git LFS、Unity Hub 和 Unity `2022.3.62f1`。
+```text
+驾驶移动城市探索世界
+→ 选择位置并展开城市
+→ 采集、生产、仓储与合成
+→ 研究科技并建设防御
+→ 应对敌袭、压力事件与资源危机
+→ 保留前哨或处理外城资产后撤离
+→ 扩张文明并继续探索
+```
 
-```powershell
+## 当前可体验内容
+
+- `64×48` 确定性 3D 地图、七类地形、24 个固定资源节点与战争迷雾；
+- 移动城市驾驶、自动寻路、展开/收起、内外城双网格建造和撤离；
+- 建筑旋转、半透明预览、放置合法性反馈、采矿位置引导和精确缺料提示；
+- 31 种资源、生产配方、真实仓库、单资源过滤、30 格背包与应急合成；
+- 自下向上的 44 节点科技树、四条发展路线、六个跨路线桥节点与复合科技效果；
+- 三类防御塔、三类敌人、十波单城防御战役、建筑受击、胜负结算和最近波前重试；
+- 关注度、压力事件、九条正式命轨候选池和文明 `Lv.1 → Lv.2` 升阶；
+- 单小队远征、主城/次城/前哨、实体运输、角色救援、外交与继承；
+- 岑烬求救、领袖直接控制与手工采集、最后情报和前哨三级警报；
+- schema `37` 正式 3D 单槽存档、自动检查点、主档校验和备份恢复；
+- Editor/Development Build 专用中文验收管理台，支持资源与科技检索。
+
+功能已经通过自动化和跨平台构建，不代表所有画面、节奏和手感均已完成人工验收。最新测试、构建和待验证边界请以[最近验证快照](Docs/Generated/Latest-Verification-ZH.md)为准。
+
+## 当前开发重点
+
+- 统一地图、移动城市、建筑、资源点与图标的视觉比例；
+- 完善文明式地图层次和工业废土美术语言；
+- 优化资源栏、建造、背包、仓库、合成、科技树及多城市界面；
+- 逐步替换建筑、角色、单位、特效和音频占位资源；
+- 持续验证生产、战斗、探索、前哨和文明进程的长期平衡。
+
+现阶段不会把透明建筑贴图、公告板或程序化对象描述成正式三维模型。真实 Windows 10/11 的视觉、GPU、显存与内存验收，以及当前版本的完整用户试玩，仍等待实际执行。
+
+## 技术信息
+
+| 项目 | 当前配置 |
+|---|---|
+| 引擎 | Unity `2022.3.62f1`（revision `4af31df58517`） |
+| 渲染 | URP，现役 3D 场景作用域管线 |
+| 输入 | Unity Input System，键盘与鼠标 |
+| 目标平台 | Windows 10/11 64 位；同时维护 macOS universal 构建 |
+| 默认场景 | `Assets/_Game/Scenes/GrayboxPrototype3D.unity` |
+| 版本控制 | Git + Git LFS |
+| 当前存档 | Formal 3D schema `37` |
+
+历史 2D `FormalPrototype` 场景及其专属构建入口已经退役。schema `1–30` 的识别、解码、迁移样本和仍被 3D 使用的共享规则继续保留，但不会被静默解释为当前 3D 世界。
+
+## 获取并运行项目
+
+### 环境要求
+
+- Git 与 Git LFS；
+- Unity Hub；
+- Unity `2022.3.62f1`；
+- 构建 Windows 版本时安装对应的 Windows Build Support 模块。
+
+### 克隆
+
+```bash
 git lfs install
 git clone https://github.com/axbgs123/WasteCity.git
-Set-Location WasteCity
+cd WasteCity
 git lfs pull
+git lfs fsck
 git status
 ```
 
-然后在 Unity Hub 中选择“添加/打开”，指向克隆得到的 `WasteCity` 根目录。首次打开由 Unity 依据 `Packages/manifest.json` 和 `Packages/packages-lock.json` 恢复依赖；不要复制或提交其他电脑的 `Library/`、`Temp/`、`Logs/`、`Builds/`、`TestResults/` 或 `UserSettings/`。
+请确认 Git LFS 已拉取真实资源，不要把 LFS pointer 文本当作图片、模型或音频文件。
 
-## 首次验收
+### 在 Unity 中运行
 
-1. 打开默认场景 `Assets/_Game/Scenes/GrayboxPrototype3D.unity`；
-2. 确认 Console 无持续错误；
-3. 运行全部 EditMode 和 PlayMode 测试；
-4. 通过菜单或批处理调用 `WasteCity.Editor.FormalBuildTools.BuildWindows` 构建默认 3D 版本；
-5. 启动 `Builds/Windows/WasteCity.exe` 做独立运行冒烟；
-6. 如需开发版本，调用 `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment`；macOS 构建调用 `WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D`；
-7. schema `1–30` 旧档兼容只由固定 fixtures、decoder 和验证测试保护，不再提供 2D Player 构建入口；
-8. 开发前执行 `git status`，不要覆盖未提交改动。
+1. 在 Unity Hub 中选择“添加/打开”，指向仓库根目录；
+2. 等待 Unity 根据 `Packages/manifest.json` 恢复依赖并完成资源导入；
+3. 打开 `Assets/_Game/Scenes/GrayboxPrototype3D.unity`；
+4. 确认 Console 没有持续错误后进入 Play Mode；
+5. 从启动页选择“新游戏”或载入可兼容的正式 3D 存档。
 
-当前自动化与构建基线：
+不要提交本机生成的 `Library/`、`Temp/`、`Logs/`、`Builds/`、`TestResults/` 或 `UserSettings/`。
 
-- 最新的 EditMode、PlayMode、编译、构建和人工试玩状态见[最新验证快照](Docs/Generated/Latest-Verification-ZH.md)；这里不手工维护会过期的测试数量。
-- Unity 无界面编译：0 错误；
-- Windows Release 3D、Windows Development 3D 和 macOS universal 3D 是三类现役构建；准确结果以最新验证快照为准；
-- 正式 3D 存档 schema 为 `31`；schema `1–30` 继续保持历史 2D 身份，不会被静默解释成 3D；
-- 现役 3D 流程覆盖移动、展开、建造、生产、物流、仓储、背包、应急合成、六节点科技树、首轮防御、撤离和正式存档；
-- 历史四路线、友军和旧 2D 场景控制器已经退役；仅保留仍被共享规则或 schema `1–30` 兼容回归需要的纯模型、稳定 ID、DTO 和固定样本，不代表这些历史系统已接入现役 3D；
-- 当前基线的 Direct3D 11 独立运行冒烟待真实 Windows 10/11 电脑补验。上一正式基线曾完成 12 秒冒烟；当前基线补验前不作为候选发布版。
+## 主要操作
 
-## 仓库目录
+| 按键 | 功能 |
+|---|---|
+| `WASD` | 驾驶当前城市或控制领袖 |
+| 鼠标右键 | 设置城市自动驾驶目标；在特定操作中取消目标 |
+| 鼠标中键 | 拖动镜头 |
+| 鼠标滚轮 | 缩放镜头或科技树 |
+| `Home` | 返回当前控制目标；科技树中恢复全览 |
+| `B` | 打开建造目录 |
+| `R` | 旋转待放置建筑 |
+| `F` | 展开、收起或进入撤离处理 |
+| `E` | 打开背包与合成 |
+| `T` | 打开科技树 |
+| `M` | 军队与远征 |
+| `N` | 城市、前哨与运输 |
+| `P` | 角色、内政与外交 |
+| `U` | 条件满足时开始文明升阶 |
+| `Space` | 战术暂停 |
+| `Esc` | 逐级取消当前操作或打开系统菜单 |
+| `0` | 仅在 Editor/Development Build 中打开验收管理台 |
 
-- `Assets/`：Unity 游戏代码、场景、测试和占位资源；
+界面输入具有优先级。搜索框或其他文本控件获得焦点时，键盘输入不应穿透到城市、建造和世界操作。
+
+## 测试与构建
+
+日常开发应先运行与改动对应的聚焦测试，再运行完整 EditMode 与 PlayMode。只有修改地形源贴图、导入规则、Texture2DArray Builder、数组生成，或准备发布候选时，才运行 `TerrainAssetDeep`。
+
+现役正式构建入口：
+
+- `WasteCity.Editor.FormalBuildTools.BuildWindows`：Windows Release 3D；
+- `WasteCity.Editor.FormalBuildTools.BuildWindowsGraybox3DDevelopment`：Windows Development 3D；
+- `WasteCity.Editor.FormalBuildTools.BuildMacOSGraybox3D`：macOS universal 3D。
+
+测试选择、失败定位、批处理方式与证据要求详见[测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)。
+
+## 仓库结构
+
+- `Assets/`：Unity 游戏代码、场景、测试和运行时资源；
 - `Packages/`：Unity 包清单和锁文件；
-- `ProjectSettings/`：Unity 工程设置与精确编辑器版本；
-- `Docs/`：主 GDD、历史计划、当前进度与正式版后续路线图；
-- `Docs/06-User-Feedback-and-Change-Control-ZH.md`：用户 Bug、新构思、文档变更及实现状态的开发前必读入口；
-- `ArtDesign/`：美术 Bible、风格规范、提示词、资产清单和基线参考图；
-- `.gitattributes`：Unity YAML 合并和 Git LFS 规则；
+- `ProjectSettings/`：工程设置和固定编辑器版本；
+- `Docs/`：GDD、正式路线图、需求变更、测试与复用文档；
+- `ArtDesign/`：美术 Bible、比例规范、提示词和当前视觉基线；
+- `ArtSource/`：可追溯的美术源文件与参考资产；
+- `.gitattributes`：Unity YAML 合并与 Git LFS 规则；
 - `.gitignore`：Unity 本地生成目录排除规则。
 
-## 文档优先级
+## 文档导航
 
-开发前必须先阅读 `Docs/06-User-Feedback-and-Change-Control-ZH.md`。它记录用户最新反馈和已批准变更；登记不等于批准，批准不等于实现，实现不等于验证。
+- [文档总索引](Docs/README.md)
+- [游戏设计文档](Docs/01-Game-Design-Document-ZH.md)
+- [正式开发路线图](Docs/05-Formal-Development-Roadmap-ZH.md)
+- [用户反馈与变更控制](Docs/06-User-Feedback-and-Change-Control-ZH.md)
+- [项目使用与开发入门](Docs/07-Project-Use-and-Development-Guide-ZH.md)
+- [测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)
+- [可复用项目目录](Docs/09-Reusable-Project-Catalog-ZH.md)
+- [最近验证快照](Docs/Generated/Latest-Verification-ZH.md)
 
-1. `Docs/05-Formal-Development-Roadmap-ZH.md`：当前正式版实现顺序与质量门；
-2. `Docs/01-Game-Design-Document-ZH.md`：主 GDD 和正式版目标；
-3. `Docs/00-README-ZH.md`：状态、交接与文档索引；
-4. `Docs/04-Minimum-Releasable-Version-Plan-ZH.md`：历史 MRV；
-5. `Docs/02-Demo-Implementation-Plan-ZH.md`：历史 Demo 实施计划；
-6. `Docs/03-Legacy-Progress-Notes-ZH.md`：早期记录。
+## 参与开发
 
-## 项目质量与复用入口
+提交代码或文档前请完整阅读 [`AGENTS.md`](AGENTS.md) 和[用户反馈与变更控制](Docs/06-User-Feedback-and-Change-Control-ZH.md)。新功能、玩法变更和 Bug 修复需要对应稳定 `IDEA-`、`BUG-` 或 `DOC-` 编号，并遵守测试、文档生成、验证和普通 Git 提交流程。
 
-- [用户反馈与变更控制](Docs/06-User-Feedback-and-Change-Control-ZH.md)：确认批准状态和人工验收结论；
-- [项目使用与开发入门](Docs/07-Project-Use-and-Development-Guide-ZH.md)：从默认场景和基本操作开始；
-- [测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)：按功能选择测试，阅读失败定位；
-- [可复用项目目录](Docs/09-Reusable-Project-Catalog-ZH.md)：选择已有能力时先看用途和边界；
-- [项目自动清单](Docs/Generated/Project-Inventory-ZH.md)、[测试自动清单](Docs/Generated/Test-Inventory-ZH.md)：当前文件、场景、组件与测试入口；
-- [最新验证快照](Docs/Generated/Latest-Verification-ZH.md)、[文档关注提醒](Docs/Generated/Documentation-Attention-ZH.md)：最近证据和需要人工检查的文档提醒。
+请不要提交账号凭据、Unity 许可证、本机缓存、临时构建或机器专用绝对路径。大型 PNG、FBX、Blend、WAV 等资源应按仓库现有规则通过 Git LFS 管理。
 
-## 受控文档更新流程
+## 许可证
 
-完成一次有仓库改动的审查时，先在交付说明写明已经确认的比较基线和审查范围。`TASK_PATHS` 只写本任务已批准的精确路径；不要用全仓库 `git diff`，也不要把用户工作区里所有未提交内容当成本次改动。
-
-### A. 已提交审查
-
-当只审查已经提交的范围时，比较明确基线到 `HEAD`。这不会收集 index、工作区或未跟踪文件：
-
-```sh
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-REVIEW_BASE=<已明确的基线提交>
-TASK_PATHS=("精确路径1" "精确路径2")
-CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
-mkdir -p /tmp/wastecity-project-quality
-git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}" > "$CHANGED_PATHS"
-```
-
-### B. 提交前正常开发
-
-完成门通常在提交前运行。对同一份 `TASK_PATHS`，必须合并四类来源：基线后的已提交改动、index、已跟踪工作区改动和未跟踪文件。这样能收集本任务尚未提交的内容，却不会无差别收集用户的无关脏改：
-
-```sh
-PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-REVIEW_BASE=<已明确的基线提交>
-TASK_PATHS=("精确路径1" "精确路径2")
-CHANGED_PATHS=/tmp/wastecity-project-quality/changed-paths.txt
-mkdir -p /tmp/wastecity-project-quality
-{
-  git diff --name-only "$REVIEW_BASE"...HEAD -- "${TASK_PATHS[@]}"
-  git diff --cached --name-only -- "${TASK_PATHS[@]}"
-  git diff --name-only -- "${TASK_PATHS[@]}"
-  git ls-files --others --exclude-standard -- "${TASK_PATHS[@]}"
-} | LC_ALL=C sort -u > "$CHANGED_PATHS"
-```
-
-确认 `CHANGED_PATHS` 只包含批准范围后，用它生成和验证：
-
-```sh
-WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
-  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
-  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.GenerateDocumentation
-WASTECITY_QUALITY_CHANGED_PATHS="$CHANGED_PATHS" \
-  "$UNITY_BIN" -batchmode -quit -projectPath "$PROJECT_ROOT" \
-  -executeMethod WasteCity.Editor.ProjectQuality.ProjectQualityTools.ValidateDocumentation
-```
-
-其中 `UNITY_BIN` 使用本机 Unity `2022.3.62f1` 的可执行文件。生成前输入清单只用于本轮文档关注提醒，不等于生成后最终暂存清单；步骤 9 仍要单独核对最终精确暂存清单和受保护文件。交付说明必须记录 `REVIEW_BASE`、`TASK_PATHS` 和 `CHANGED_PATHS` 所用清单，方便之后复查。只有用户明确确认“本次没有仓库变更”时，才可先创建空的 UTF-8 文件再运行上述命令；缺少 `WASTECITY_QUALITY_CHANGED_PATHS` 不是普通完成路径。生成和验证只更新或检查受控技术附录，不会替代人工试玩、审批或验收。
-
-上面的命令块仅适用于 macOS/Linux shell。Windows 请在 PowerShell 中用同一份精确路径集合分别运行四类 Git 查询，并用 `Sort-Object -Unique | Set-Content -Encoding utf8` 合并为清单；随后按[测试与 Bug 定位指南](Docs/08-Testing-and-Bug-Location-Guide-ZH.md)的 Windows 入口运行 Unity，不要把 Bash 命令直接当成 Windows 通用命令。
-
-## 美术替换约定
-
-当前大部分表现是占位符。正式资源通过稳定 ID、`VisualSlot`、`VisualDefinition` 和 `VisualLibrary` 替换，不应把碰撞、生命、攻击或存档状态放入纯美术 Prefab。详细要求见 `Docs/05-Formal-Development-Roadmap-ZH.md` 与 `ArtDesign/README.md`。
-
-## GitHub 保密要求
-
-- 仓库必须保持 **Private**；
-- 不创建公开 Release、Pages 或商店页面；
-- 不提交令牌、凭据、个人存档和许可证文件；
-- PNG、FBX、Blend、WAV 等大型资产通过 Git LFS 管理。
+本仓库目前尚未提供开源许可证。仓库公开可见不代表自动授权复制、修改、分发或商业使用；如需使用项目中的代码或美术资源，请先联系仓库所有者取得许可。
